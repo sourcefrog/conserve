@@ -8,7 +8,7 @@ setup(
 	description="dura: a robust backup system",
 	author="Martin Pool",
 	author_email="mbp+dura@sourcefrog.net",
-	# url="http://dura.sourcefrog.net/",
+	url="https://github.com/sourcefrog/dura",
 	packages=["duralib"],
 	scripts=["dura"],
 	classifiers=[
