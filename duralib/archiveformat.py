@@ -13,20 +13,16 @@ from google.protobuf import text_format
 
 from duralib.proto import dura_pb2
 
-class ArchiveFormat(object):
 
-    @classmethod
-    def create(cls):
-        self = cls()
-        return self
-
-    def as_pb2_ascii(self):
-        header = dura_pb2.ArchiveHeader()
-        header.magic = "dura archive"
-        header.read_version = 0
-        header.write_version = 0
-        return text_format.MessageToString(header)
+def make_archive_header():
+    """Make archive header pb2 message.
+    """
+    header = dura_pb2.ArchiveHeader()
+    header.magic = "dura archive"
+    header.read_version = 0
+    header.write_version = 0
+    return header    
 
 
 if __name__ == '__main__':
-    print(ArchiveFormat.create().as_pb2_ascii())
+    print(make_archive_header().SerializeToString())

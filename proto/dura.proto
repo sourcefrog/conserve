@@ -1,5 +1,6 @@
 package duralib.proto;
 
+// One ArchiveHeader in '/DURA-ARCHIVE' in the root of the archive directory.
 message ArchiveHeader {
 	// Literal "dura archive"
 	required string magic = 1;
@@ -9,4 +10,40 @@ message ArchiveHeader {
 
 	// Clients must understand at least this version to correctly write the archive.
     required int32 write_version = 3;
+}
+
+
+// One FileIndex per file version.
+message FileIndex {
+    // File path from backup root (generally utf-8).
+    required bytes path = 1;
+
+    enum FileType {
+        REGULAR = 0;
+        SYMLINK = 1;
+    }
+
+    optional FileType file_type = 2 [default = REGULAR];
+
+    // SHA-1 hash of the contents of the file, as plain bytes (not hex).
+    optional bytes sha1_hash = 3;
+
+    // Length of the file body.
+    optional int64 body_length = 4;
+
+    // Offset of the body within the block data file.
+    optional int64 body_data_start = 5;
+
+    // TODO(mbp): mtime, owner, group, perms, ...
+}
+
+
+// One BlockIndex in '.i' for each data block.
+message BlockIndex {
+    // Information about all files in the block, in filename order.
+    repeated FileIndex file = 1;
+
+    // Hash and length of the whole data file.
+    optional bytes data_sha1 = 2;
+    optional int64 data_length = 3;
 }

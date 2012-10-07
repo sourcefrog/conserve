@@ -22,19 +22,20 @@ one particular band in the immediately lower tier.
 A band contains file contents and metadata.
 
 A band is composed of a *header*, *footer*, and multiple *blocks*, each
-with a *block footer* and a *block tarball*.
+with a *block index* and a *block data*.
 
-The block tarball is, a plain unix tarball of the files included in that
-block.  Each file is stored entirely within one block.
+A block contains the complete text of one or more files.  The files are 
+stored in sorted order.  The block data is simply the concatenation of 
+all the file texts.
 
-The block footer contains 
+The block index is a protobuf describing the files within the block:
 
  - a list of all files included in the block, and for each:
-   - the utf-8 name of the file
+   - the name of the file
    - the hash of that file as it was stored in the tarball.  
    - the mtime of the file
    - possibly ownership, permissions, and other filesystem metadata
- - the hash of the overall tarball
+ - the length and hash of the overall block data file
 
 Band header contains:
 
