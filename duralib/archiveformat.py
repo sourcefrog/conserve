@@ -9,32 +9,24 @@ class reads and writes it.
 
 import json
 import time
+from google.protobuf import text_format
+
+from duralib.proto import dura_pb2
 
 class ArchiveFormat(object):
 
     @classmethod
     def create(cls):
         self = cls()
-        self.version = 1
-        self.optional_read_flags = {}
-        self.optional_write_flags = {}
-        self.mandatory_read_flags = {}
-        self.mandatory_write_flags = {}
-        self.created_unixtime = time.time()
         return self
 
-    def as_json(self):
-        """Return a json string representation."""
-        format_dict = dict(
-            dura_backup_version=self.version,
-            optional_read_flags=self.optional_read_flags,
-            optional_write_flags=self.optional_write_flags,
-            mandatory_read_flags=self.mandatory_read_flags,
-            mandatory_write_flags=self.mandatory_write_flags,
-            created_unixtime=self.created_unixtime,
-            )
-        return json.dumps(format_dict, sort_keys=True, indent=2)
+    def as_pb2_ascii(self):
+        header = dura_pb2.ArchiveHeader()
+        header.magic = "dura archive"
+        header.read_version = 0
+        header.write_version = 0
+        return text_format.MessageToString(header)
 
 
 if __name__ == '__main__':
-    print(ArchiveFormat.create().as_json())
+    print(ArchiveFormat.create().as_pb2_ascii())

@@ -1,0 +1,12 @@
+package duralib.proto;
+
+message ArchiveHeader {
+	// Literal "dura archive"
+	required string magic = 1;
+
+	// Clients must understand at least this version to safely read the archive.
+	required int32 read_version = 2;
+
+	// Clients must understand at least this version to correctly write the archive.
+    required int32 write_version = 3;
+}

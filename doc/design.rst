@@ -69,6 +69,10 @@ Open questions
   it's ok to say the storage layer can detect this case and will abort
   when it notices the block has appeared.
 
+- Maybe not actually tar?  Robert points out there's a lot of historical 
+  cruft in the format, the format is not well defined, and there might be
+  some waste.
+
 
 Verification
 ************
@@ -150,11 +154,13 @@ Emit fairly abstracted events that can be mapped into a ui, or just
 emitted to stdout.
 
 
-Related work
-************
+Scaling numbers
+***************
 
-Duplicity addresses a similar case of backup to cloud or dumb servers, and
-uses librsync delta compression.  In practice, it seems sometimes slow and
-inadequately reliable, and the format is a bit complex and brittle.
+Source directory maybe 1000TB.
 
-obnam: format too complex? Otherwise looks pretty good.
+Blocks perhaps 10MB each.  So that would be 100,000,000 blocks per band.  
+Perhaps if you're doing such a large backup you should make a larger 
+goal block size.
+
+Maybe 1e12 files?

@@ -2,6 +2,9 @@
 Dura format
 ***********
 
+Concepts
+********
+
 The backup *source* is a local directory.  (Actually, a local directory
 subject to some exclusion filters.)
 
@@ -48,26 +51,21 @@ the source directory as it existed at the time the most recent band
 was recorded.  (Modulo any changes that happened during the recording
 of that band.)
 
+Generalities
+************
+
+Protobufs for all metadata: handles evolution, somewhat selfdescribing 
+but also very efficient.
+
 Format file
 ***********
 
-In the root directory of the archive there is a file called `format`.
-This is a json dict with the following fields:
+In the root directory of the archive there is a file called `format`, 
+which is a protobuf with::
 
-  dura_backup_version: 1
-  optional_read_flags: {}
-  optional_write_flags: {}
-  mandatory_read_flags: {}
-  mandatory_write_flags: {}
+    magic: "dura archive"
+    read_version: 0
+    write_version: 0
 
-At present no flags are defined.  Future versions may add flags, which 
-may have values.
-
-Existing clients must not write to the archive if they do not understand
-a mandatory write flag, and must not attempt to restore from it (or write 
-to it) if they do not understand a mandatory read flag.
-
-containing
-
-File naming
-***********
+Clients must have a major version at least equal to those values to correctly
+read and write the archive.
