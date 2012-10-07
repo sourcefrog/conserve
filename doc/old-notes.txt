@@ -1,0 +1,66 @@
+blanket backup
+
+mission: Real filesystems don't general have self-consistent quiescent points.  It doesn't make sense to try to restore a backup at a particular moment in time because the filesystem probably never had that state.  Systems that think in terms of transactional snapshots tend to have trouble with needing to store a whole snapshot to accomplish anything.  With large disks and intermittent network connections, it can be hard to ever finish a backup.  If you've written up 1GB of data, you ought to be able to restore most of that data, regardless of how much more remains to be written.
+
+So instead Blanket accumulates over time a set of files that partially cover the filesystem.  Replaying all of these files in the order they were recorded lets you restore the filesystem up to that point.  Each tarball covers a contiguous subsequence of ordered list of files.
+
+key features:
+• copes well with interrupted or partial backups; as long as one whole file is transferred, it can be restored
+• copes with a dumb server (including S3)
+• can cap the amount of space used for backups and keep as many previous increments as will fit in that
+• simple backup format allowing manual recovery
+
+names: blanket? always? replicity?
+
+see blanket pseudocode
+
+desires:
+
+• as much as possible, something that can just run from a cron job and never need maintenance
+• cope with multiple interrupted short run: get away from the idea of a single run that must complete to be able to restore
+• can interrupt or reboot client machine, reconnect to server
+• ideally would not count on even uploading a single file in one transaction, but rather be able to upload that single file.  but this seems to put some constraints on the storage format and perhaps it's not really worthwhile.
+• quickly verify that what was uploaded is self-consistent and correct, ideally without downloading all of it - some contradiction there - might be able to ask S3 for the hash of the files?
+• minimum assumptions about capabilities of the store: don't count on being able to represent all filenames or being able to store permissions
+• restore some (multiple?) subset of files or directories without scanning through the whole archive
+• use librsync to store increments between files (later?) 
+• restore by meshing together multiple damaged or partial backups from different servers
+• when restoring, if some files already have the right hash, don't bother reading them
+• ui abstraction so it can get a gui later
+• sign/encrypt data files, through gpg or something else
+• relatively simple storage
+• never require uploading the whole filesystem to make progress
+• interrupted or in-progress backup mustn't prevent restore operations
+• multiple increments would be nice, so that you can get back previous states
+• a way to garbage-collect old unwanted increments, without rewriting the whole archive or making a new full backup
+files:
+• store file content inside container files (tars?) similar to duplicity so that they can be encrypted and signed?
+• tarfiles plus a text-mode index of their contents? 
+• could rzip or xz them.
+good and bad points in other systems:
+• rsync: requires smart counterparty; full filesystem scan on both machines at startup; stores files unpacked so can't encrypt and relies on destination capabilities
+• duplicity: 
+∘ for decent performance, requires sometimes doing a full backup; but in fact you may often have some files that never change and copying them all the way up seems redundant
+∘ until the first full backup completes, you can't restore anything?
+∘ can resume backups but this seems to cause some glitches
+file clock:
+• keep a 'clock pointer' being the last file we looked at, or uploaded, seek down to that point and start writing new files that sort after it, then wrap around.  should let you resume without a scan.
+• does it matter that, if one backup is interrupted, this is not likely to ever get back to zero?  actually we can say that it's reset to zero when one full backup layer completes.
+• not a great name; confusable with a time clock
+• needs extra care in sorting things that come before and after / and .
+• ideally should be something that lets us process one directory at a time, perhaps depth first
+file mtimes:
+• if we could trust file mtimes, we could avoid a lot of trouble with reading indexes for the old backups, but they're probably not ultimately trustworthy
+• also files are probably reasonably often touched but not changed, so if we do this the lack of rsync compression will stick out more
+• perhaps it's reasonable to think the clock does not skew by so much that one backup overlaps with another?
+terminology:
+• full vs incremental: does this depend on any previous layers?
+• layers: sequence of packs at one time
+• complete vs partial: does this layer start at the beginning of the tree and span the whole thing, or not?
+• maybe number layers?
+garbage collection:
+• have "layers" of backups and do garbage collection based on that?  so the daily backups would contain all files changed since the last weekly backup.  exclude other backups from the same level from consideration when deciding whether a file needs to be backed up.  but this doesn't seem to totally fit the rather freeform and emergent approach discussed in other places.  do you have to tell it the level each time?
+• have an explicit garbage-collection option to remove some or all layers, perhaps layer prior to a previous date.  do that by finding files that still exist and that are only referenced from those layer and rewriting them into a smaller pack.  we could even do this locally by just looking at mtime/ctimes, assuming we trust them, which is probably not quite safe enough.
+handling deletions:
+• need to distinguish "not changed in this layer" from "deleted in this layer"
+
