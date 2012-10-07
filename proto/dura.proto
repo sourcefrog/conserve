@@ -20,19 +20,20 @@ message FileIndex {
 
     enum FileType {
         REGULAR = 0;
-        SYMLINK = 1;
+        DIRECTORY = 1;
+        SYMLINK = 2;
     }
 
     optional FileType file_type = 2 [default = REGULAR];
 
     // SHA-1 hash of the contents of the file, as plain bytes (not hex).
-    optional bytes sha1_hash = 3;
+    optional bytes data_sha1 = 3;
 
     // Length of the file body.
-    optional int64 body_length = 4;
+    optional int64 data_length = 4;
 
     // Offset of the body within the block data file.
-    optional int64 body_data_start = 5;
+    optional int64 data_offset = 5;
 
     // TODO(mbp): mtime, owner, group, perms, ...
 }

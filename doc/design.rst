@@ -164,3 +164,7 @@ Perhaps if you're doing such a large backup you should make a larger
 goal block size.
 
 Maybe 1e12 files?
+
+On current protobuf implementation, the index is about 1/100th of the data 
+file, with both of them uncompressed.  With gzip, the data file is slightly more 
+compressible than the index; both compress about 3x.
