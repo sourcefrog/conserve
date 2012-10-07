@@ -14,7 +14,7 @@ from google.protobuf import text_format
 from duralib.proto import dura_pb2
 
 
-LOG = logging.getLogger('dura.band')
+LOG = logging.getLogger('dura')
 
 
 def write_band(file_names, to_filename):
@@ -61,7 +61,7 @@ def write_band(file_names, to_filename):
     data_file.close()
     index_file.close()
 
-    logging.debug("band index:\n%s", text_format.MessageToString(block_index))
+    LOG.debug("band index:\n%s", text_format.MessageToString(block_index))
     
 
 if __name__ == "__main__":
