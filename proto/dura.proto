@@ -2,29 +2,30 @@ package duralib.proto;
 
 // One ArchiveHeader in '/DURA-ARCHIVE' in the root of the archive directory.
 message ArchiveHeader {
-	// Literal "dura archive"
-	required string magic = 1;
+    // Literal "dura archive"
+    required string magic = 1;
 
-	// Clients must understand at least this version to safely read the archive.
-	required int32 read_version = 2;
+    // Clients must understand at least this version to safely read the archive.
+    required int32 read_version = 2;
 
-	// Clients must understand at least this version to correctly write the archive.
+    // Clients must understand at least this version to correctly write the archive.
     required int32 write_version = 3;
+}
+
+enum FileType {
+    UNKNOWN = 0;
+    REGULAR = 1;
+    DIRECTORY = 2;
+    SYMLINK = 3;
 }
 
 
 // One FileIndex per file version.
 message FileIndex {
-    // File path from backup root (generally utf-8).
-    required bytes path = 1;
+    // File path from backup root (generally utf-8).  (Required for all current files.)
+    optional bytes path = 1;
 
-    enum FileType {
-        REGULAR = 0;
-        DIRECTORY = 1;
-        SYMLINK = 2;
-    }
-
-    optional FileType file_type = 2 [default = REGULAR];
+    optional FileType file_type = 2;
 
     // SHA-1 hash of the contents of the file, as plain bytes (not hex).
     optional bytes data_sha1 = 3;
@@ -48,3 +49,5 @@ message BlockIndex {
     optional bytes data_sha1 = 2;
     optional int64 data_length = 3;
 }
+
+// vim: et sw=4

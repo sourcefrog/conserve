@@ -11,34 +11,43 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = descriptor.FileDescriptor(
   name='proto/dura.proto',
   package='duralib.proto',
-  serialized_pb='\n\x10proto/dura.proto\x12\rduralib.proto\"K\n\rArchiveHeader\x12\r\n\x05magic\x18\x01 \x02(\t\x12\x14\n\x0cread_version\x18\x02 \x02(\x05\x12\x15\n\rwrite_version\x18\x03 \x02(\x05\"\xca\x01\n\tFileIndex\x12\x0c\n\x04path\x18\x01 \x02(\x0c\x12=\n\tfile_type\x18\x02 \x01(\x0e\x32!.duralib.proto.FileIndex.FileType:\x07REGULAR\x12\x11\n\tdata_sha1\x18\x03 \x01(\x0c\x12\x13\n\x0b\x64\x61ta_length\x18\x04 \x01(\x03\x12\x13\n\x0b\x64\x61ta_offset\x18\x05 \x01(\x03\"3\n\x08\x46ileType\x12\x0b\n\x07REGULAR\x10\x00\x12\r\n\tDIRECTORY\x10\x01\x12\x0b\n\x07SYMLINK\x10\x02\"\\\n\nBlockIndex\x12&\n\x04\x66ile\x18\x01 \x03(\x0b\x32\x18.duralib.proto.FileIndex\x12\x11\n\tdata_sha1\x18\x02 \x01(\x0c\x12\x13\n\x0b\x64\x61ta_length\x18\x03 \x01(\x03')
+  serialized_pb='\n\x10proto/dura.proto\x12\rduralib.proto\"K\n\rArchiveHeader\x12\r\n\x05magic\x18\x01 \x02(\t\x12\x14\n\x0cread_version\x18\x02 \x02(\x05\x12\x15\n\rwrite_version\x18\x03 \x02(\x05\"\x82\x01\n\tFileIndex\x12\x0c\n\x04path\x18\x01 \x01(\x0c\x12*\n\tfile_type\x18\x02 \x01(\x0e\x32\x17.duralib.proto.FileType\x12\x11\n\tdata_sha1\x18\x03 \x01(\x0c\x12\x13\n\x0b\x64\x61ta_length\x18\x04 \x01(\x03\x12\x13\n\x0b\x64\x61ta_offset\x18\x05 \x01(\x03\"\\\n\nBlockIndex\x12&\n\x04\x66ile\x18\x01 \x03(\x0b\x32\x18.duralib.proto.FileIndex\x12\x11\n\tdata_sha1\x18\x02 \x01(\x0c\x12\x13\n\x0b\x64\x61ta_length\x18\x03 \x01(\x03*@\n\x08\x46ileType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0b\n\x07REGULAR\x10\x01\x12\r\n\tDIRECTORY\x10\x02\x12\x0b\n\x07SYMLINK\x10\x03')
 
-
-
-_FILEINDEX_FILETYPE = descriptor.EnumDescriptor(
+_FILETYPE = descriptor.EnumDescriptor(
   name='FileType',
-  full_name='duralib.proto.FileIndex.FileType',
+  full_name='duralib.proto.FileType',
   filename=None,
   file=DESCRIPTOR,
   values=[
     descriptor.EnumValueDescriptor(
-      name='REGULAR', index=0, number=0,
+      name='UNKNOWN', index=0, number=0,
       options=None,
       type=None),
     descriptor.EnumValueDescriptor(
-      name='DIRECTORY', index=1, number=1,
+      name='REGULAR', index=1, number=1,
       options=None,
       type=None),
     descriptor.EnumValueDescriptor(
-      name='SYMLINK', index=2, number=2,
+      name='DIRECTORY', index=2, number=2,
+      options=None,
+      type=None),
+    descriptor.EnumValueDescriptor(
+      name='SYMLINK', index=3, number=3,
       options=None,
       type=None),
   ],
   containing_type=None,
   options=None,
-  serialized_start=264,
-  serialized_end=315,
+  serialized_start=339,
+  serialized_end=403,
 )
+
+
+UNKNOWN = 0
+REGULAR = 1
+DIRECTORY = 2
+SYMLINK = 3
+
 
 
 _ARCHIVEHEADER = descriptor.Descriptor(
@@ -92,7 +101,7 @@ _FILEINDEX = descriptor.Descriptor(
   fields=[
     descriptor.FieldDescriptor(
       name='path', full_name='duralib.proto.FileIndex.path', index=0,
-      number=1, type=12, cpp_type=9, label=2,
+      number=1, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -100,7 +109,7 @@ _FILEINDEX = descriptor.Descriptor(
     descriptor.FieldDescriptor(
       name='file_type', full_name='duralib.proto.FileIndex.file_type', index=1,
       number=2, type=14, cpp_type=8, label=1,
-      has_default_value=True, default_value=0,
+      has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -130,13 +139,12 @@ _FILEINDEX = descriptor.Descriptor(
   ],
   nested_types=[],
   enum_types=[
-    _FILEINDEX_FILETYPE,
   ],
   options=None,
   is_extendable=False,
   extension_ranges=[],
   serialized_start=113,
-  serialized_end=315,
+  serialized_end=243,
 )
 
 
@@ -177,12 +185,11 @@ _BLOCKINDEX = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=317,
-  serialized_end=409,
+  serialized_start=245,
+  serialized_end=337,
 )
 
-_FILEINDEX.fields_by_name['file_type'].enum_type = _FILEINDEX_FILETYPE
-_FILEINDEX_FILETYPE.containing_type = _FILEINDEX;
+_FILEINDEX.fields_by_name['file_type'].enum_type = _FILETYPE
 _BLOCKINDEX.fields_by_name['file'].message_type = _FILEINDEX
 DESCRIPTOR.message_types_by_name['ArchiveHeader'] = _ARCHIVEHEADER
 DESCRIPTOR.message_types_by_name['FileIndex'] = _FILEINDEX
