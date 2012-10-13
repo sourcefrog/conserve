@@ -17,6 +17,13 @@ from duralib.proto import dura_pb2
 LOG = logging.getLogger('dura')
 
 
+def read_index(index_file_name):
+    with open(index_file_name, 'rb') as index_file:
+        block_index = dura_pb2.BlockIndex()
+        block_index.ParseFromString(index_file.read())
+        return block_index
+
+
 def write_band(file_names, to_filename):
     data_file = open(to_filename + '.d', 'wb')
     index_file = open(to_filename + '.i', 'wb')
@@ -25,6 +32,8 @@ def write_band(file_names, to_filename):
     block_index = dura_pb2.BlockIndex()
     for file_name in file_names:
         st = os.lstat(file_name)
+
+        LOG.info('store %s' % file_name)
 
         if stat.S_ISREG(st.st_mode):
             ptype = dura_pb2.FileIndex.REGULAR
@@ -61,7 +70,11 @@ def write_band(file_names, to_filename):
     data_file.close()
     index_file.close()
 
-    LOG.debug("band index:\n%s", text_format.MessageToString(block_index))
+    # TODO(mbp): Maybe also store the compressed sha1 so that we can check it
+    # against a hash provided by the storage system, without reading back the
+    # whole thing?
+
+    # LOG.debug("band index:\n%s", text_format.MessageToString(block_index))
     
 
 if __name__ == "__main__":
