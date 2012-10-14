@@ -13,7 +13,8 @@ from duralib.proto import dura_pb2
 
 
 def bin_to_hex(s):
-    return ''.join(('%02x' % ord(c)) for c in s)
+    return s.encode('hex_codec')
+    ## return ''.join(('%02x' % ord(c)) for c in s)
 
 
 file_type_map = collections.defaultdict(lambda k: '?')
