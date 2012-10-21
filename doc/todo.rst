@@ -1,4 +1,13 @@
-To be able to make backups at all:
+0- make any backup at all
+1- restore from the backup
+
+To be able to make a local backup at all:
+
+* Auto-choose file names within archive
+* Recurse through directories
+* Exclusions?
+
+Verify and validate the backup:
 
 * Start unit tests 
 * Break output into blocks, just on rough file size
