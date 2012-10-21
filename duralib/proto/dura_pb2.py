@@ -11,7 +11,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = descriptor.FileDescriptor(
   name='proto/dura.proto',
   package='duralib.proto',
-  serialized_pb='\n\x10proto/dura.proto\x12\rduralib.proto\"K\n\rArchiveHeader\x12\r\n\x05magic\x18\x01 \x02(\t\x12\x14\n\x0cread_version\x18\x02 \x02(\x05\x12\x15\n\rwrite_version\x18\x03 \x02(\x05\"\x82\x01\n\tFileIndex\x12\x0c\n\x04path\x18\x01 \x01(\x0c\x12*\n\tfile_type\x18\x02 \x01(\x0e\x32\x17.duralib.proto.FileType\x12\x11\n\tdata_sha1\x18\x03 \x01(\x0c\x12\x13\n\x0b\x64\x61ta_length\x18\x04 \x01(\x03\x12\x13\n\x0b\x64\x61ta_offset\x18\x05 \x01(\x03\"\\\n\nBlockIndex\x12&\n\x04\x66ile\x18\x01 \x03(\x0b\x32\x18.duralib.proto.FileIndex\x12\x11\n\tdata_sha1\x18\x02 \x01(\x0c\x12\x13\n\x0b\x64\x61ta_length\x18\x03 \x01(\x03*@\n\x08\x46ileType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0b\n\x07REGULAR\x10\x01\x12\r\n\tDIRECTORY\x10\x02\x12\x0b\n\x07SYMLINK\x10\x03')
+  serialized_pb='\n\x10proto/dura.proto\x12\rduralib.proto\"Y\n\rArchiveHeader\x12\r\n\x05magic\x18\x01 \x02(\t\x12\x1b\n\x13required_read_flags\x18\x02 \x03(\t\x12\x1c\n\x14required_write_flags\x18\x03 \x03(\t\"\x82\x01\n\tFileIndex\x12\x0c\n\x04path\x18\x01 \x01(\x0c\x12*\n\tfile_type\x18\x02 \x01(\x0e\x32\x17.duralib.proto.FileType\x12\x11\n\tdata_sha1\x18\x03 \x01(\x0c\x12\x13\n\x0b\x64\x61ta_length\x18\x04 \x01(\x03\x12\x13\n\x0b\x64\x61ta_offset\x18\x05 \x01(\x03\"\\\n\nBlockIndex\x12&\n\x04\x66ile\x18\x01 \x03(\x0b\x32\x18.duralib.proto.FileIndex\x12\x11\n\tdata_sha1\x18\x02 \x01(\x0c\x12\x13\n\x0b\x64\x61ta_length\x18\x03 \x01(\x03*@\n\x08\x46ileType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0b\n\x07REGULAR\x10\x01\x12\r\n\tDIRECTORY\x10\x02\x12\x0b\n\x07SYMLINK\x10\x03')
 
 _FILETYPE = descriptor.EnumDescriptor(
   name='FileType',
@@ -38,8 +38,8 @@ _FILETYPE = descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=339,
-  serialized_end=403,
+  serialized_start=353,
+  serialized_end=417,
 )
 
 
@@ -65,16 +65,16 @@ _ARCHIVEHEADER = descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='read_version', full_name='duralib.proto.ArchiveHeader.read_version', index=1,
-      number=2, type=5, cpp_type=1, label=2,
-      has_default_value=False, default_value=0,
+      name='required_read_flags', full_name='duralib.proto.ArchiveHeader.required_read_flags', index=1,
+      number=2, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='write_version', full_name='duralib.proto.ArchiveHeader.write_version', index=2,
-      number=3, type=5, cpp_type=1, label=2,
-      has_default_value=False, default_value=0,
+      name='required_write_flags', full_name='duralib.proto.ArchiveHeader.required_write_flags', index=2,
+      number=3, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -88,7 +88,7 @@ _ARCHIVEHEADER = descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=35,
-  serialized_end=110,
+  serialized_end=124,
 )
 
 
@@ -143,8 +143,8 @@ _FILEINDEX = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=113,
-  serialized_end=243,
+  serialized_start=127,
+  serialized_end=257,
 )
 
 
@@ -185,8 +185,8 @@ _BLOCKINDEX = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=245,
-  serialized_end=337,
+  serialized_start=259,
+  serialized_end=351,
 )
 
 _FILEINDEX.fields_by_name['file_type'].enum_type = _FILETYPE
