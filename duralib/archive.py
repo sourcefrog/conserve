@@ -54,6 +54,11 @@ class Archive(object):
         self.path = path
         self._header_path = os.path.join(self.path, ARCHIVE_HEADER_NAME)
 
+    def __repr__(self):
+        return '%s(%r)' % (
+            self.__class__.__name__,
+            getattr(self, 'path'))
+
     def _check_header(self):
         try:
             with file(self._header_path, 'rb') as header_file:
