@@ -6,12 +6,13 @@ import logging
 import os
 import sys
 
+from duralib import cli
+
 
 def main(argv):
     logging.basicConfig(level=logging.DEBUG)
     gettext.install('myapplication', '/usr/share/locale', unicode=1)
-    print _("hello!")
-    return 0
+    return cli.run(argv)
 
 
 if __name__ == '__main__':
