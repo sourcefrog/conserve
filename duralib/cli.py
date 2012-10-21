@@ -7,6 +7,9 @@ import argparse
 import logging
 
 
+from duralib.archive import Archive
+
+
 _log = logging.getLogger('dura')
 
 
@@ -16,11 +19,19 @@ def _make_parser():
     subparsers = parser.add_subparsers(
         title='commands')
 
-    parser_create_archive = subparsers.add_parser(
+    cp = subparsers.add_parser(
         'create-archive',
         help='Make a new archive to hold backups')
-    parser_create_archive.set_defaults(cmd_func=cmd_create_archive)
-    parser_create_archive.add_argument(
+    cp.set_defaults(cmd_func=cmd_create_archive)
+    cp.add_argument(
+        'archive_directory',
+        help='Local path to directory to be created')
+
+    cp = subparsers.add_parser(
+        'describe-archive',
+        help='Show summary information about an archive')
+    cp.set_defaults(cmd_func=cmd_describe_archive)
+    cp.add_argument(
         'archive_directory',
         help='Local path to directory to be created')
 
@@ -28,9 +39,13 @@ def _make_parser():
 
 
 def cmd_create_archive(args):
-    from duralib import archive
-    new_archive = archive.Archive.create(args.archive_directory)
+    new_archive = Archive.create(args.archive_directory)
     _log.info("Created %s", new_archive)
+
+
+def cmd_describe_archive(args):
+    archive = Archive.open(args.archive_directory)
+    _log.info("Opened archive %r", archive)
 
 
 def run(argv):
