@@ -3,6 +3,7 @@
 
 """Unit test Archive marker/metadata"""
 
+import errno
 import os.path
 import tempfile
 import unittest
@@ -33,5 +34,6 @@ class TestArchive(unittest.TestCase):
         # Don't create it
         with self.assertRaises(archive.NoSuchArchive) as ar:
             archive.Archive.open(self.archive_path)
-        #self.assertRegexpMatches(str(ar.exc),
-        #    r"No such archive:
+        self.assertRegexpMatches(str(ar.exception),
+            r"No such archive: .*testarchive.*%s"
+            % os.strerror(errno.ENOENT))

@@ -50,7 +50,7 @@ class Archive(object):
                 pass
         except IOError as e:
             if e.errno == errno.ENOENT:
-                raise NoSuchArchive(path, e)
+                raise NoSuchArchive(path=path, error=e)
             else:
                 # TODO(mbp): Other wrappers?
                 raise
