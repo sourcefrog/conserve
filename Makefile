@@ -1,5 +1,10 @@
 PYTHON=python
 
+lint:
+	pylint -rn --output-format colorized --ignore dura_pb2.py duralib
+
 check:
-		$(PYTHON) -m unittest discover -v 
-		
+	PYTHONPATH=. $(PYTHON) -m unittest discover -v 
+
+protos:
+	protoc --python_out=duralib/ proto/dura.proto
