@@ -34,7 +34,7 @@ Requirements
 ************
 
 - Data should still be recoverable even if there are bugs in this program,
-  or in other systems. 
+  or in other systems.
 
 - The formats should be very simple and if possible recoverable by hand.
 
@@ -51,7 +51,7 @@ Requirements
 Testing
 *******
 
-- Effort testing 
+- Effort testing
 
 - Side-effect free state machines for core algorithms so they can be
   tested without doing real large work
@@ -60,8 +60,8 @@ Testing
 Open questions
 **************
 
-- Locking on the repository against multiple concurrent writers?  Or, can 
-  we avoid that by just having each writer choose their own names for each 
+- Locking on the repository against multiple concurrent writers?  Or, can
+  we avoid that by just having each writer choose their own names for each
   layer/block etc.
 
 - What if two processes are trying to continue with the same band at the
@@ -69,7 +69,7 @@ Open questions
   it's ok to say the storage layer can detect this case and will abort
   when it notices the block has appeared.
 
-- Maybe not actually tar?  Robert points out there's a lot of historical 
+- Maybe not actually tar?  Robert points out there's a lot of historical
   cruft in the format, the format is not well defined, and there might be
   some waste.
 
@@ -92,7 +92,7 @@ Block size tradeoffs
 
 We have to do one roundtrip to the archive per block, so we don't want
 them to be too small.  It might be worse than one (if there's also a
-header file per block). 
+header file per block).
 
 I think it's good not to split files across blocks - but this does mean
 that blocks can grow arbitrarily large if you have large files.
@@ -151,7 +151,11 @@ UI
 **
 
 Emit fairly abstracted events that can be mapped into a ui, or just
-emitted to stdout.
+emitted to stdout.  Maybe emit them as (ascii?) protobufs?
+
+Human strings are internationalized: this should be done strictly in
+the UI layer.  Debug/log strings can be emitted anywhere and don't need
+i18n.
 
 
 Scaling numbers
@@ -159,12 +163,12 @@ Scaling numbers
 
 Source directory maybe 1000TB.
 
-Blocks perhaps 10MB each.  So that would be 100,000,000 blocks per band.  
-Perhaps if you're doing such a large backup you should make a larger 
+Blocks perhaps 10MB each.  So that would be 100,000,000 blocks per band.
+Perhaps if you're doing such a large backup you should make a larger
 goal block size.
 
 Maybe 1e12 files?
 
-On current protobuf implementation, the index is about 1/100th of the data 
-file, with both of them uncompressed.  With gzip, the data file is slightly more 
+On current protobuf implementation, the index is about 1/100th of the data
+file, with both of them uncompressed.  With gzip, the data file is slightly more
 compressible than the index; both compress about 3x.

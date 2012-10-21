@@ -20,18 +20,18 @@ Manifesto
 * Simple formats and conservative internal design, to minimize the risk of
   loss due to internal bugs.
 
-* Well matched for high-latency, limited-bandwidth, write-once cloud 
-  storage.  Cloud storage typically doesn't have full filesystem semantics,
-  but is very unlikely to have IO errors.
+* Well matched for high-latency, limited-bandwidth, write-once cloud
+  storage.  Cloud storage typically doesn't have full filesystem semantics, but is very unlikely to have IO errors.  But, also suitable
+  for local online disk, removable storage, and remote (ssh) smart servers.
 
 * Optional storage layers: compression (bzip2/gzip/lzo), encryption (gpg),
   redundancy (Reed-Solomon).
 
-* Backups should always make forward progress, even if they are never 
+* Backups should always make forward progress, even if they are never
   given enough time to read the whole source or the whole destination.
 
-* Restoring a subset of the backup must be reasonably fast, and not 
-  require reading all history or the entire tree.
+* Restoring a single file or a subset of the backup must be reasonably
+  fast, and must not require reading all history or the entire tree.
 
 * Fast consistency checks of the backup that don't require reading
   all data back (which may be too slow to do regularly), because they
@@ -41,13 +41,13 @@ Manifesto
   to the source directory.
 
 * Send backups to multiple locations: local disk, removable disk,
-  LAN servers, the cloud. 
+  LAN servers, the cloud.
 
-* A human oriented text UI, and a batch mode that can be read by 
-  a GUI or other front end.
+* A human oriented text UI, and a machine UI that can be used to implement
+  out-of-process UIs.  Web and GUI uis.
 
 * Set up as a cron job or daemon and then no other maintenance is needed,
-  other than sometimes manually double-checking the backups can be 
+  other than sometimes manually double-checking the backups can be
   restored and are complete.
 
 * The backup archive should be a pure function of the source directory
