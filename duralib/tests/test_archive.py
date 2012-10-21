@@ -28,3 +28,10 @@ class TestArchive(unittest.TestCase):
         new_archive = archive.Archive.create(self.archive_path)
         second = archive.Archive.open(self.archive_path)
         self.assertEquals(self.archive_path, second.path)
+
+    def test_open_nonexistent(self):
+        # Don't create it
+        with self.assertRaises(archive.NoSuchArchive) as ar:
+            archive.Archive.open(self.archive_path)
+        #self.assertRegexpMatches(str(ar.exc),
+        #    r"No such archive:

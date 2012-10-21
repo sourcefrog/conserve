@@ -7,11 +7,13 @@ There is a json file 'format' in the root of every archive; this
 class reads and writes it.
 """
 
+import errno
 import os.path
 import time
 
 from google.protobuf import text_format
 
+from duralib import errors
 from duralib.proto import dura_pb2
 
 
@@ -42,9 +44,16 @@ class Archive(object):
     @classmethod
     def open(cls, path):
         new_archive = cls(path)
-        with file(new_archive._header_path(), 'rb') as header_file:
-            # TODO(mbp): check contents
-            pass
+        try:
+            with file(new_archive._header_path(), 'rb') as header_file:
+                # TODO(mbp): check contents
+                pass
+        except IOError as e:
+            if e.errno == errno.ENOENT:
+                raise NoSuchArchive(path, e)
+            else:
+                # TODO(mbp): Other wrappers?
+                raise
         return new_archive
 
     def __init__(self, path):
@@ -54,10 +63,14 @@ class Archive(object):
     def _header_path(self):
         return os.path.join(self.path, ARCHIVE_HEADER_NAME)
 
-
     def _make_archive_header_bytestring(self):
         """Make archive header binary protobuf message.
         """
         header = dura_pb2.ArchiveHeader()
         header.magic = "dura backup archive"
         return header.SerializeToString()
+
+
+class NoSuchArchive(errors.DuraError):
+
+    _fmt = "No such archive: %(path)s: %(error)s"
