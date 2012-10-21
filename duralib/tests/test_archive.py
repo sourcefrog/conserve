@@ -37,3 +37,13 @@ class TestArchive(unittest.TestCase):
         self.assertRegexpMatches(str(ar.exception),
             r"No such archive: .*testarchive.*%s"
             % os.strerror(errno.ENOENT))
+
+    def test_open_bad_magic(self):
+        orig_archive = archive.Archive.create(self.archive_path)
+        with file(orig_archive._header_path, "wb") as f:
+            f.write("not this!")
+        with self.assertRaises(archive.BadArchiveHeader) as ar:
+            archive.Archive.open(self.archive_path)
+        self.assertEquals(
+            "Bad archive header: %s" % orig_archive._header_path,
+            str(ar.exception))
