@@ -35,6 +35,15 @@ def _make_parser():
         'archive_directory',
         help='Local path to directory to be created')
 
+    cp = subparsers.add_parser(
+        'dump-index',
+        help='Show debug information about index files')
+    cp.set_defaults(cmd_func=cmd_dump_index)
+    cp.add_argument(
+        'index_files',
+        nargs='*',
+        help='Index files to dump')
+
     return parser
 
 
@@ -46,6 +55,12 @@ def cmd_create_archive(args):
 def cmd_describe_archive(args):
     archive = Archive.open(args.archive_directory)
     _log.info("Opened archive %r", archive)
+
+
+def cmd_dump_index(args):
+    from duralib.dump import dump_index_block
+    for index_file_name in args.index_files:
+        dump_index_block(index_file_name)
 
 
 # Lazily initialized ArgumentParser.

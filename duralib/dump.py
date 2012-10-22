@@ -25,11 +25,6 @@ file_type_map.update({
     })
 
 
-def cmd_dump_index(index_file_names):
-    for index_file_name in index_file_names:
-        dump_index_block(index_file_name)
-
-
 def dump_index_block(index_file_name):
     block_index = band.read_index(index_file_name)
     for file in block_index.file:
@@ -48,9 +43,3 @@ def dump_index_block(index_file_name):
             bin_to_hex(block_index.data_sha1),
             '-',
             block_index.data_length)
-    # TODO(mbp): Maybe have an option to just print the protobuf.
-
-
-if __name__ == "__main__":
-    cmd_dump_index(sys.argv[1:])
-
