@@ -8,13 +8,18 @@ import os.path
 import tempfile
 import unittest
 
+import testresources
+
 from duralib import archive
+from duralib.tests.resources import TemporaryDirectory
 
 
-class TestArchive(unittest.TestCase):
+class TestArchive(testresources.ResourcedTestCase):
+
+    resources = [('tmpdir', TemporaryDirectory())]
 
     def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
+        super(TestArchive, self).setUp()
         self.archive_path = os.path.join(self.tmpdir, "testarchive")
 
     def test_create_archive(self):
