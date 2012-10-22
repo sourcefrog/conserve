@@ -48,9 +48,24 @@ def cmd_describe_archive(args):
     _log.info("Opened archive %r", archive)
 
 
-def run(argv):
-    parser = _make_parser()
-    args = parser.parse_args()
+# Lazily initialized ArgumentParser.
+_parser = None
+
+def parse_command(argv):
+    """Parse a command line; return parsed args.
+
+    The returned args contain a cmd_func that can be called, passing the
+    args, to actually run the command.
+    """
+    global _parser
+    if _parser is None:
+        _parser = _make_parser()
+    args = _parser.parse_args(argv)
     _log.debug("cli args: %r", args)
+    return args
+
+
+def run_command(argv):
+    args = parse_command(argv)
     args.cmd_func(args)
     return 0
