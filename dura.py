@@ -12,7 +12,7 @@ from duralib import cli
 def main(argv):
     logging.basicConfig(level=logging.DEBUG)
     gettext.install('myapplication', '/usr/share/locale', unicode=1)
-    return cli.run_command(argv)
+    return cli.run_command(argv[1:])
 
 
 if __name__ == '__main__':
