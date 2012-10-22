@@ -8,17 +8,21 @@ import os.path
 import tempfile
 import unittest
 
+import testresources
+
 from duralib import archive
 from duralib import cli
+from duralib.tests.resources import TemporaryDirectory
 
 
-class TestCommandLine(unittest.TestCase):
+class TestCommandLine(testresources.ResourcedTestCase):
 
-    def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
-        self.archive_path = os.path.join(self.tmpdir, "testarchive")
+    resources = [('tmpdir', TemporaryDirectory())]
+
+    def subpath(self, p):
+        return os.path.join(self.tmpdir, p)
 
     def test_create_archive(self):
-        cli.run_command(['create-archive', self.archive_path])
+        cli.run_command(['create-archive', self.subpath('a')])
         self.assertTrue(os.path.isfile(
-            os.path.join(self.archive_path, 'DURA-ARCHIVE')))
+            os.path.join(self.subpath('a'), 'DURA-ARCHIVE')))
