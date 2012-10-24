@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/python2
 # Copyright 2012 Martin Pool
 
 import gettext
