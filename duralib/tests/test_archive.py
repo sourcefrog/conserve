@@ -3,6 +3,9 @@
 
 """Unit test Archive marker/metadata"""
 
+
+from __future__ import absolute_import
+
 import errno
 import os.path
 import tempfile

@@ -3,6 +3,9 @@
 
 """Command-line tests"""
 
+
+from __future__ import absolute_import
+
 import errno
 import os.path
 import tempfile
@@ -12,6 +15,7 @@ from fixtures import TempDir, TestWithFixtures
 
 from duralib.archive import Archive
 from duralib import cli
+from duralib.tests.fixtures import EmptyArchive
 
 
 class TestCommandLine(TestWithFixtures):
@@ -29,9 +33,14 @@ class TestCommandLine(TestWithFixtures):
             os.path.join(self.subpath('a'), 'DURA-ARCHIVE')))
 
     def test_backup(self):
-        Archive.create(self.subpath('a'))
+        archive_fixture = self.useFixture(EmptyArchive())
         source_path = self.subpath('sourcefile')
         file(source_path, 'w').write('hello!')
-        cli.run_command(['backup', source_path, 'a'])
+        cli.run_command(['backup', source_path, archive_fixture.archive.path])
         # TODO(mbp): Check something was actually written?  How?
         # Maybe look that there's now one band.
+
+    def test_describe_archive(self):
+        # smoke test
+        cli.run_command([
+            'describe-archive', self.useFixture(EmptyArchive()).archive.path])
