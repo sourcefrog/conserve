@@ -8,16 +8,17 @@ import os.path
 import tempfile
 import unittest
 
-import testresources
+from fixtures import TempDir, TestWithFixtures
 
 from duralib.archive import Archive
 from duralib import cli
-from duralib.tests.resources import TemporaryDirectory
 
 
-class TestCommandLine(testresources.ResourcedTestCase):
+class TestCommandLine(TestWithFixtures):
 
-    resources = [('tmpdir', TemporaryDirectory())]
+    def setUp(self):
+        super(TestCommandLine, self).setUp()
+        self.tmpdir = self.useFixture(TempDir()).path
 
     def subpath(self, p):
         return os.path.join(self.tmpdir, p)

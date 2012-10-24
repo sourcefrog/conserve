@@ -8,18 +8,17 @@ import os.path
 import tempfile
 import unittest
 
-import testresources
+from fixtures import TempDir, TestWithFixtures
+from testresources import ResourcedTestCase
 
 from duralib import archive
-from duralib.tests.resources import TemporaryDirectory
 
 
-class TestArchive(testresources.ResourcedTestCase):
-
-    resources = [('tmpdir', TemporaryDirectory())]
+class TestArchive(TestWithFixtures):
 
     def setUp(self):
         super(TestArchive, self).setUp()
+        self.tmpdir = self.useFixture(TempDir()).path
         self.archive_path = os.path.join(self.tmpdir, "testarchive")
 
     def test_create_archive(self):
