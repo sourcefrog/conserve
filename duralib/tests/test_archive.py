@@ -15,14 +15,14 @@ from fixtures import TempDir, TestWithFixtures
 from testresources import ResourcedTestCase
 
 from duralib import archive
+from duralib.tests.base import DuraTestCase
 
 
-class TestArchive(TestWithFixtures):
+class TestArchive(DuraTestCase):
 
     def setUp(self):
         super(TestArchive, self).setUp()
-        self.tmpdir = self.useFixture(TempDir()).path
-        self.archive_path = os.path.join(self.tmpdir, "testarchive")
+        self.archive_path = self.subpath("testarchive")
 
     def test_create_archive(self):
         new_archive = archive.Archive.create(self.archive_path)
