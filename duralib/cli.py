@@ -54,6 +54,14 @@ def _make_parser():
         nargs='*',
         help='Path to a .i index file to dump')
 
+    cp = _parser_for_cmd('backup')
+    cp.add_argument(
+        'source_file', nargs=argparse.ONE_OR_MORE,
+        help='File to store')
+    cp.add_argument(
+        'archive',
+        help='Existing archive directory')
+
     return parser
 
 
@@ -77,6 +85,15 @@ def cmd_dump_index(args):
     from duralib.dump import dump_index_block
     for index_file_name in args.index_files:
         dump_index_block(index_file_name)
+
+
+def cmd_backup(args):
+    """Store a copy of source files in the archive.
+
+    Creates a new archive version.
+    """
+    # Not implemented
+
 
 
 # Lazily initialized ArgumentParser.
