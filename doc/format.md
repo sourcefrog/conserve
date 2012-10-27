@@ -10,15 +10,17 @@ Archive
 A backup *archive* is a possibly-remote directory, containing archive
 files.
 
-Within an archive there are multiple *tiers* for
-incremental/hierarchical backups.  (For example, for monthly, weekly,
-daily backups.)
-
 In the root directory of the archive there is a file called `DURA-ARCHIVE`,
 which is an `ArchiveHeader` protobuf containing:
 
     magic: "dura backup archive"
 
+Tiers
+-----
+
+Within an archive there are multiple *tiers* for incremental/hierarchical
+backups.  (For example, for monthly, weekly, daily backups.)  Tiers are not
+directly represented on disk; they're just a logical grouping.
 
 Bands
 -----
@@ -77,6 +79,23 @@ Band footer contains:
 
  - the time the band started and ended
  - the hash of all of the block footers
+
+Blocks are stored within their band directory.  Blocks are named starting with
+a `d`, and then the decimal block index, starting at 0, padded to six digits.
+For each block there is a data file, ending in `.d` and an index ending in `.i`.
+The files are typically compressed and in that case they will also have eg a
+`.gz` or `.bz2` suffix.
+
+So, for example:
+
+    my-archive/
+      b0000/
+        d000000.d.gz
+        d000000.i.gz
+
+
+Versions
+--------
 
 The combination of a band, its parent band (if any), parent's parents, etc
 is a *version*: extracting all the contents of the version recreates
