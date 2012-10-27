@@ -114,3 +114,17 @@ def write_band(file_names, to_filename):
 
 def _canonicalize_band_number(band_number):
     return '%04d' % int(band_number)
+
+
+def cmp_band_numbers(n1, n2):
+    """Compare band number strings, treating them as sequences of integers.
+
+    Args:
+        n1, n2: strings, like "0000", "0001-1234".
+
+    Returns:
+        -1 if n1<n2, +1 if n1>n2, 0 if the same.
+    """
+    n1l = [int(x) for x in n1.split('-')]
+    n2l = [int(x) for x in n2.split('-')]
+    return cmp(n1l, n2l)
