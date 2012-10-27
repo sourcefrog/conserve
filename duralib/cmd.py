@@ -11,7 +11,6 @@ in a different way.
 """
 
 
-import argparse
 import logging
 
 
@@ -49,5 +48,3 @@ def cmd_backup(args):
     Creates a new archive version.
     """
     # Not implemented
-
-
