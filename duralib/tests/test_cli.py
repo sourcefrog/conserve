@@ -20,10 +20,6 @@ from duralib.tests.fixtures import EmptyArchive
 
 class TestCommandLine(DuraTestCase):
 
-    def setUp(self):
-        super(TestCommandLine, self).setUp()
-        self.tmpdir = self.useFixture(TempDir()).path
-
     def test_create_archive(self):
         cli.run_command(['create-archive', self.subpath('a')])
         self.assertTrue(os.path.isfile(
@@ -31,6 +27,7 @@ class TestCommandLine(DuraTestCase):
 
     def test_describe_archive(self):
         # smoke test
+        # TODO(mbp): Check the output.
         cli.run_command([
             'describe-archive', self.useFixture(EmptyArchive()).archive.path])
 
