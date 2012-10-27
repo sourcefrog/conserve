@@ -14,6 +14,12 @@ Within an archive there are multiple *tiers* for
 incremental/hierarchical backups.  (For example, for monthly, weekly,
 daily backups.)
 
+In the root directory of the archive there is a file called `DURA-ARCHIVE`,
+which is an `ArchiveHeader` protobuf containing:
+
+    magic: "dura backup archive"
+
+
 Bands
 -----
 
@@ -28,7 +34,7 @@ and so on.  The numbers are zero-padded to four digits in each
 area, so that they will be grouped conveniently for humans looking at
 naively sorted listings of the directory.  (Dura does not rely on them
 being less than five digits, or on the transport returning any particular
-ordering.)
+ordering; bands numbered over 9999 are supported.)
 
 Bands are represented as a subdirectory within the archive directory,
 as `b` followed by the number.  All bands are directly in the
@@ -83,11 +89,3 @@ Generalities
 
 Protobufs for all metadata: handles evolution, somewhat selfdescribing
 but also very efficient.
-
-Format file
------------
-
-In the root directory of the archive there is a file called `DURA-ARCHIVE`,
-which is an `ArchiveHeader` protobuf with:
-
-    magic: "dura archive"
