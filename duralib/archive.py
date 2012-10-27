@@ -89,22 +89,32 @@ class Archive(object):
         Returns:
           A new Band object, which is on disk and empty.
         """
-        band_number = '0'
-        band = Band(self, band_number)
+        existing_bands = list(self.list_bands())
+        if existing_bands:
+            next_number = max(int(b) for b in existing_bands) + 1
+        else:
+            next_number = 0
+        band = Band(self, str(next_number))
         band.create_directory()
         return band
 
     def list_bands(self):
-        """Yield list of existing band numbers.
+        """Return sorted list of existing band numbers.
 
-        Yields:
-          A sequence of strings, in arbitrary order, each of which
-          is a band number like '0'.
+        Bands are sorted numerically.
+
+        Returns:
+          A list of strings, in sorted arbitrary order, each of which
+          is a band number like '0042'.
         """
+        result = []
         for name in os.listdir(self.path):
             band_number = Band.match_band_name(name)
             if band_number is not None:
-                yield band_number
+                result.append(band_number)
+        # TODO(mbp): Smarter sorting for long numbers.
+        result.sort()
+        return result
 
 
 class NoSuchArchive(errors.DuraError):

@@ -67,12 +67,20 @@ class TestArchive(DuraTestCase):
     def test_create_band(self):
         archive = self.useFixture(EmptyArchive()).archive
         band = archive.create_band()
-        self.assertEquals("0", band.band_number)
+        self.assertEquals("0000", band.band_number)
         self.assertEquals(archive, band.archive)
         self.assertEquals(
-            os.path.join(archive.path, 'b0'),
+            os.path.join(archive.path, 'b0000'),
             band.path)
         self.assertTrue(
             os.path.isdir(band.path))
         self.assertEquals(
-            ["0"], list(archive.list_bands()))
+            ["0000"], list(archive.list_bands()))
+
+    def test_create_band_repeated(self):
+        archive = self.useFixture(EmptyArchive()).archive
+        num_bands = 17
+        bands = [archive.create_band() for i in range(num_bands)]
+        self.assertEquals(
+            ["%04d" % i for i in range(num_bands)],
+            list(archive.list_bands()))

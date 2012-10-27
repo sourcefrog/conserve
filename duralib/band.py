@@ -27,10 +27,10 @@ class Band(object):
 
     def __init__(self, archive, band_number):
         self.archive = archive
-        self.band_number = band_number
+        self.band_number = _canonicalize_band_number(band_number)
         self.path = os.path.join(
             self.archive.path,
-            self.name_prefix + band_number)
+            self.name_prefix + self.band_number)
 
     def relpath(self, subpath):
         """Convert band-relative path to an absolute path."""
@@ -110,3 +110,7 @@ def write_band(file_names, to_filename):
     # TODO(mbp): Maybe also store the as-compressed md5 so that we can check it
     # against a hash provided by the storage system, without reading back the
     # whole thing?
+
+
+def _canonicalize_band_number(band_number):
+    return '%04d' % int(band_number)
