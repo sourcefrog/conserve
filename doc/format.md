@@ -34,7 +34,7 @@ Bands are represented as a subdirectory within the archive directory,
 as `b` followed by the number.  All bands are directly in the
 archive directory, not nested by tier.  (This is done so that their
 directories have self-contained names, and the paths don't get too
-long.)  For example::
+long.)  For example:
 
     my-archive/
       b0000
@@ -88,6 +88,6 @@ Format file
 -----------
 
 In the root directory of the archive there is a file called `DURA-ARCHIVE`,
-which is an `ArchiveHeader` protobuf with::
+which is an `ArchiveHeader` protobuf with:
 
     magic: "dura archive"
