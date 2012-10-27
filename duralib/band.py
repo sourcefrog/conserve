@@ -14,7 +14,38 @@ from google.protobuf import text_format
 from duralib.proto import dura_pb2
 
 
-LOG = logging.getLogger('dura')
+_log = logging.getLogger('dura')
+
+
+class Band(object):
+
+    # Prefix on band directory names.
+    name_prefix = 'b'
+
+    def __init__(self, archive, band_number):
+        self.archive = archive
+        self.band_number = band_number
+        self.path = os.path.join(
+            self.archive.path,
+            self.name_prefix + band_number)
+
+    def relpath(self, p):
+        return os.path.join(self.path, p)
+
+    def create_directory(self):
+        _log.info("create band directory %s" % self.path)
+        os.mkdir(self.path)
+
+    @classmethod
+    def match_band_name(cls, filename):
+        """Try to interpret a filename as a band name.
+
+        Returns:
+            A band number, if the filename is a band, otherwise None.
+        """
+        if filename.startswith(cls.name_prefix):
+            return filename[len(cls.name_prefix):]
+
 
 
 def read_index(index_file_name):
@@ -25,6 +56,7 @@ def read_index(index_file_name):
 
 
 def write_band(file_names, to_filename):
+    # TODO(mbp): Don't overwrite existing files.
     data_file = open(to_filename + '.d', 'wb')
     index_file = open(to_filename + '.i', 'wb')
     data_sha = sha.sha()
@@ -33,7 +65,7 @@ def write_band(file_names, to_filename):
     for file_name in file_names:
         st = os.lstat(file_name)
 
-        LOG.info('store %s' % file_name)
+        _log.info('store %s' % file_name)
 
         if stat.S_ISREG(st.st_mode):
             ptype = dura_pb2.FileIndex.REGULAR
@@ -48,7 +80,7 @@ def write_band(file_names, to_filename):
             file_content = os.readlink(file_name)
         else:
             # TODO(mbp): For symlinks, body should be the readlink.
-            LOG.warning("skipping non-regular file %r", file_name)
+            _log.warning("skipping non-regular file %r", file_name)
             continue
 
         file_index = block_index.file.add()
@@ -74,8 +106,8 @@ def write_band(file_names, to_filename):
     # against a hash provided by the storage system, without reading back the
     # whole thing?
 
-    # LOG.debug("band index:\n%s", text_format.MessageToString(block_index))
-    
+    # _log.debug("band index:\n%s", text_format.MessageToString(block_index))
+
 
 if __name__ == "__main__":
     assert len(sys.argv) >= 3

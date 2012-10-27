@@ -8,6 +8,7 @@ class reads and writes it.
 """
 
 import errno
+import glob
 import os.path
 import time
 
@@ -16,6 +17,7 @@ from google.protobuf.message import DecodeError
 
 from duralib import errors
 from duralib.proto import dura_pb2
+from duralib.band import Band
 
 
 ARCHIVE_HEADER_NAME = "DURA-ARCHIVE"
@@ -48,6 +50,9 @@ class Archive(object):
         new_archive = cls(path)
         new_archive._check_header()
         return new_archive
+
+    def relpath(self, p):
+        return os.path.join(self.path, p)
 
     def __init__(self, path):
         """Construct an Archive instance."""
@@ -84,6 +89,29 @@ class Archive(object):
         header = dura_pb2.ArchiveHeader()
         header.magic = _HEADER_MAGIC
         return header.SerializeToString()
+
+    def create_band(self):
+        """Make a new band within the archive.
+
+        Returns:
+          A new Band object, which is on disk and empty.
+        """
+        band_number = '0'
+        band = Band(self, band_number)
+        band.create_directory()
+        return band
+
+    def list_bands(self):
+        """Yield list of existing band numbers.
+
+        Yields:
+          A sequence of strings, in arbitrary order, each of which
+          is a band number like '0'.
+        """
+        for name in os.listdir(self.path):
+            band_number = Band.match_band_name(name)
+            if band_number is not None:
+                yield band_number
 
 
 class NoSuchArchive(errors.DuraError):

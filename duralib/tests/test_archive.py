@@ -60,3 +60,19 @@ class TestArchive(DuraTestCase):
             "Bad archive header: %s" % orig_archive._header_path,
             str(ar.exception))
 
+    def test_list_bands_empty(self):
+        archive = self.useFixture(EmptyArchive()).archive
+        self.assertEquals([], list(archive.list_bands()))
+
+    def test_create_band(self):
+        archive = self.useFixture(EmptyArchive()).archive
+        band = archive.create_band()
+        self.assertEquals("0", band.band_number)
+        self.assertEquals(archive, band.archive)
+        self.assertEquals(
+            os.path.join(archive.path, 'b0'),
+            band.path)
+        self.assertTrue(
+            os.path.isdir(band.path))
+        self.assertEquals(
+            ["0"], list(archive.list_bands()))
