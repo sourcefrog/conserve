@@ -156,19 +156,3 @@ emitted to stdout.  Maybe emit them as (ascii?) protobufs?
 Human strings are internationalized: this should be done strictly in
 the UI layer.  Debug/log strings can be emitted anywhere and don't need
 i18n.
-
-
-Scaling numbers
-***************
-
-Source directory maybe 1000TB.
-
-Blocks perhaps 10MB each.  So that would be 100,000,000 blocks per band.
-Perhaps if you're doing such a large backup you should make a larger
-goal block size.
-
-Maybe 1e12 files?
-
-On current protobuf implementation, the index is about 1/100th of the data
-file, with both of them uncompressed.  With gzip, the data file is slightly more
-compressible than the index; both compress about 3x.
