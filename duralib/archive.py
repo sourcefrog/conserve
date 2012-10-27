@@ -8,11 +8,8 @@ class reads and writes it.
 """
 
 import errno
-import glob
 import os.path
-import time
 
-from google.protobuf import text_format
 from google.protobuf.message import DecodeError
 
 from duralib import errors
@@ -41,8 +38,7 @@ class Archive(object):
         """
         os.mkdir(path)
         new_archive = cls(path)
-        with file(new_archive._header_path, 'wb') as header_file:
-            header_file.write(new_archive._make_archive_header_bytestring())
+        new_archive._write_header()
         return new_archive
 
     @classmethod
@@ -83,12 +79,9 @@ class Archive(object):
         if header.magic != _HEADER_MAGIC:
             raise BadArchiveHeader(header_path=self._header_path)
 
-    def _make_archive_header_bytestring(self):
-        """Make archive header binary protobuf message.
-        """
-        header = dura_pb2.ArchiveHeader()
-        header.magic = _HEADER_MAGIC
-        return header.SerializeToString()
+    def _write_header(self):
+        with file(self._header_path, 'wb') as header_file:
+            header_file.write(_make_archive_header_bytestring())
 
     def create_band(self):
         """Make a new band within the archive.
@@ -122,3 +115,11 @@ class NoSuchArchive(errors.DuraError):
 class BadArchiveHeader(errors.DuraError):
 
     _fmt = "Bad archive header: %(header_path)s"
+
+
+def _make_archive_header_bytestring():
+    """Make archive header binary protobuf message.
+    """
+    header = dura_pb2.ArchiveHeader()
+    header.magic = _HEADER_MAGIC
+    return header.SerializeToString()

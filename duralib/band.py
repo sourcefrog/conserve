@@ -9,8 +9,6 @@ import sha
 import stat
 import sys
 
-from google.protobuf import text_format
-
 from duralib.proto import dura_pb2
 
 
@@ -18,6 +16,11 @@ _log = logging.getLogger('dura')
 
 
 class Band(object):
+    """A Band stores versions from one pass over the source tree.
+
+    The band contains blocks, each of which has actual content from
+    a number of files.
+    """
 
     # Prefix on band directory names.
     name_prefix = 'b'
@@ -29,8 +32,9 @@ class Band(object):
             self.archive.path,
             self.name_prefix + band_number)
 
-    def relpath(self, p):
-        return os.path.join(self.path, p)
+    def relpath(self, subpath):
+        """Convert band-relative path to an absolute path."""
+        return os.path.join(self.path, subpath)
 
     def create_directory(self):
         _log.info("create band directory %s" % self.path)
@@ -45,7 +49,6 @@ class Band(object):
         """
         if filename.startswith(cls.name_prefix):
             return filename[len(cls.name_prefix):]
-
 
 
 def read_index(index_file_name):
@@ -76,11 +79,13 @@ def write_band(file_names, to_filename):
             file_content = None
         elif stat.S_ISLNK(st.st_mode):
             ptype = dura_pb2.FileIndex.SYMLINK
-            # TODO(mbp): Race here between discovering it's a link and trying to read it.
+            # TODO(mbp): Race here between discovering it's a link,
+            # and trying to read it.
             file_content = os.readlink(file_name)
         else:
-            # TODO(mbp): For symlinks, body should be the readlink.
-            _log.warning("skipping non-regular file %r", file_name)
+            # TODO(mbp): Maybe eventually store them too
+            _log.warning("skipping special file %r, %r",
+                file_name, stat)
             continue
 
         file_index = block_index.file.add()
@@ -102,15 +107,6 @@ def write_band(file_names, to_filename):
     data_file.close()
     index_file.close()
 
-    # TODO(mbp): Maybe also store the compressed sha1 so that we can check it
+    # TODO(mbp): Maybe also store the as-compressed md5 so that we can check it
     # against a hash provided by the storage system, without reading back the
     # whole thing?
-
-    # _log.debug("band index:\n%s", text_format.MessageToString(block_index))
-
-
-if __name__ == "__main__":
-    assert len(sys.argv) >= 3
-    logging.basicConfig(level=logging.DEBUG)
-    file_names = sys.argv[1:-1]
-    write_band(file_names, sys.argv[-1])

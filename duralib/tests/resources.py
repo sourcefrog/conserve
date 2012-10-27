@@ -3,8 +3,3 @@
 
 """TestResources for Dura"""
 
-import os.path
-import shutil
-import tempfile
-import unittest
-

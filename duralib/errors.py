@@ -6,6 +6,7 @@
 class DuraError(StandardError):
 
     def __init__(self, **kwargs):
+        super(DuraError, self).__init__()
         self.kwargs = kwargs
         # Greedily format, to make sure that the args actually match the
         # format string.

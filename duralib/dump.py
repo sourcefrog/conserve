@@ -1,12 +1,9 @@
 # Copyright 2012 Martin Pool
 # Licensed under the Apache License, Version 2.0.
 
-"""Print out the contents of an index file."""
+"""Print out the contents of an index entry."""
 
 import collections
-import sys
-
-from google.protobuf import text_format
 
 from duralib import band
 from duralib.proto import dura_pb2
@@ -27,17 +24,17 @@ file_type_map.update({
 
 def dump_index_block(index_file_name):
     block_index = band.read_index(index_file_name)
-    for file in block_index.file:
-        if file.data_sha1:
-            sha_string = bin_to_hex(file.data_sha1)
+    for entry in block_index.file:
+        if entry.data_sha1:
+            sha_string = bin_to_hex(entry.data_sha1)
         else:
             sha_string = '-'
         print '%-40s %10d %10s %s %s' % (
             sha_string,
-            file.data_length,
-            file.data_offset,
-            file_type_map[file.file_type],
-            file.path)
+            entry.data_length,
+            entry.data_offset,
+            file_type_map[entry.file_type],
+            entry.path)
     print '%s %10s %10s =' % ('=' * 40, '=' * 10, '=' * 10)
     print '%40s %10s %10d' % (
             bin_to_hex(block_index.data_sha1),
