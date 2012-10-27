@@ -51,8 +51,7 @@ def cmd_backup(args):
       source_file [str]: Paths to store
       archive [str]: Path to existing archive
     """
-    from duralib.band import write_band
+    from duralib.backup import store_files
     archive = Archive.open(args.archive)
     band = archive.create_band()
-    write_band(args.source_file,
-        band.relpath('d000000'))
+    store_files(args.source_file, band)
