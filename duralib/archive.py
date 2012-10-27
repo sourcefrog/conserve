@@ -1,10 +1,12 @@
 # Copyright 2012 Martin Pool
 # Licensed under the Apache License, Version 2.0 (the "License").
 
-"""dura archive format marker.
+"""dura Archive object: the top-level object that holds backup data.
 
-There is a json file 'format' in the root of every archive; this
-class reads and writes it.
+Within the archive there is:
+
+ - format marker, confirming this is an archive.
+ - zero or more bands, holding backup data.
 """
 
 import errno
@@ -14,7 +16,10 @@ from google.protobuf.message import DecodeError
 
 from duralib import errors
 from duralib.proto import dura_pb2
-from duralib.band import Band
+from duralib.band import (
+    Band,
+    cmp_band_numbers,
+    )
 
 
 ARCHIVE_HEADER_NAME = "DURA-ARCHIVE"
@@ -112,8 +117,7 @@ class Archive(object):
             band_number = Band.match_band_name(name)
             if band_number is not None:
                 result.append(band_number)
-        # TODO(mbp): Smarter sorting for long numbers.
-        result.sort()
+        result.sort(cmp=cmp_band_numbers)
         return result
 
 
