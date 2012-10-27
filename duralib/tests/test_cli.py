@@ -38,6 +38,10 @@ class TestBackupCommand(DuraTestCase):
         archive_fixture = self.useFixture(EmptyArchive())
         source_path = self.subpath('sourcefile')
         file(source_path, 'w').write('hello!')
-        cli.run_command(['backup', source_path, archive_fixture.archive.path])
-        # TODO(mbp): Check something was actually written?  How?
-        # Maybe look that there's now one band.
+        archive_path = archive_fixture.archive.path
+        cli.run_command(['backup', source_path, archive_path])
+        expected_band_path = os.path.join(archive_path, 'b0000')
+        self.assertTrue(os.path.isdir(expected_band_path))
+        self.assertEquals(
+            ['d000000.d', 'd000000.i'],
+            sorted(os.listdir(expected_band_path)))

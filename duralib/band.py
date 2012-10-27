@@ -71,14 +71,14 @@ def write_band(file_names, to_filename):
         _log.info('store %s' % file_name)
 
         if stat.S_ISREG(st.st_mode):
-            ptype = dura_pb2.FileIndex.REGULAR
+            ptype = dura_pb2.REGULAR
             # TODO(mbp): stream content for large files
             file_content = open(file_name).read()
         elif stat.S_ISDIR(st.st_mode):
-            ptype = dura_pb2.FileIndex.DIRECTORY
+            ptype = dura_pb2.DIRECTORY
             file_content = None
         elif stat.S_ISLNK(st.st_mode):
-            ptype = dura_pb2.FileIndex.SYMLINK
+            ptype = dura_pb2.SYMLINK
             # TODO(mbp): Race here between discovering it's a link,
             # and trying to read it.
             file_content = os.readlink(file_name)

@@ -46,5 +46,13 @@ def cmd_backup(args):
     """Store a copy of source files in the archive.
 
     Creates a new archive version.
+
+    Args:
+      source_file [str]: Paths to store
+      archive [str]: Path to existing archive
     """
-    # Not implemented
+    from duralib.band import write_band
+    archive = Archive.open(args.archive)
+    band = archive.create_band()
+    write_band(args.source_file,
+        band.relpath('d000000'))

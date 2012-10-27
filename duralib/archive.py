@@ -106,8 +106,6 @@ class Archive(object):
     def list_bands(self):
         """Return sorted list of existing band numbers.
 
-        Bands are sorted numerically.
-
         Returns:
           A list of strings, in sorted arbitrary order, each of which
           is a band number like '0042'.
