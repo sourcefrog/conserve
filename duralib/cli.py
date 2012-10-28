@@ -7,6 +7,7 @@ import argparse
 import logging
 
 
+import duralib
 from duralib.archive import Archive
 from duralib import cmd
 
@@ -33,6 +34,9 @@ def _parser_for_cmd(cmd_name):
 def _make_parser():
     """Make an ArgumentParser"""
     parser = argparse.ArgumentParser()
+    parser.add_argument('--version', action='version',
+        version='dura ' + duralib.__version__)
+
     global _cmd_subparsers
     _cmd_subparsers = parser.add_subparsers(
         title='commands',
