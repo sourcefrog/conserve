@@ -75,6 +75,9 @@ class BandReader(Band):
     May or may not be complete.  May be concurrently written by other processes.
     """
 
+    def is_finished(self):
+        return os.path.isfile(self.relpath(self.tail_name))
+
 
 class BandWriter(Band):
     """Writes in to a band.
@@ -105,6 +108,9 @@ class BandWriter(Band):
         # TODO(mbp): set block count!
         tail_pb.end_unixtime = int(time.time())
         write_proto_to_file(tail_pb, self.relpath(self.tail_name))
+
+    def is_finished(self):
+        return not self.open
 
 
 def read_index(index_file_name):

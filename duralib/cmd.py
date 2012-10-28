@@ -58,14 +58,19 @@ def cmd_backup(args):
 
 
 def cmd_list_bands(args):
-    """List bands in an archive."""
+    """List bands in an archive.
+
+    Incomplete bands are shown with a + next to their name.
+    """
     archive = Archive.open(args.archive)
     for band_name in archive.list_bands():
         if args.names_only:
             args.stdout.write("%s\n" % band_name)
             continue
         band = archive.open_band_reader(band_name)
-        print "%s" % band_name,
+
+        print "%20s%s" % (band_name,
+            (' ' if band.is_finished() else '+')),
         if band.head:
             print "  %s   %s" % (
                 time.ctime(band.head.start_unixtime),

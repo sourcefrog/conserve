@@ -51,10 +51,14 @@ def TestBandHead(DuraTestCase):
     def test_read_head(self):
         archive = self.useFixture(EmptyArchive()).archive
         writer = archive.create_band()
+        self.assertFalse(writer.is_finished())
         # try to read while it's open
         reader = archive.open_band_reader(writer.band_number)
+        self.assertFalse(reader.is_finished())
         self.assertEquals("0000", reader.band_number)
         # finish, and try to read again
         writer.finish_band()
         reader = archive.open_band_reader(writer.band_number)
         self.assertEquals("0000", reader.band_number)
+        self.assertTrue(reader.is_finished())
+        self.assertTrue(writer.is_finished())
