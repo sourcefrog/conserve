@@ -15,6 +15,7 @@ messages.pot:
 	pygettext dura.py duralib/*.py
 
 check-staged:
-	[ ! -d test-git-staged ] || rm -r test-git-staged
-	git checkout-index --prefix test-git-staged/ -a
-	make -C test-git-staged check
+	t=`mktemp -d --suffix .duralib-test` && \
+	git checkout-index --prefix "$$t/" -a && \
+	make -C "$$t" check && \
+	rm -r "$$t"
