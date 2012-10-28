@@ -48,7 +48,7 @@ def store_files(file_names, to_band):
             ptype = dura_pb2.SYMLINK
             # TODO(mbp): Fix the race here between discovering it's a link,
             # and trying to read it.
-            file_content = os.readlindexink(file_name)
+            file_content = os.readlink(file_name)
         else:
             # TODO(mbp): Maybe eventually store devices etc too
             _log.warning("skipping special file %r, %r",
