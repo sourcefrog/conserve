@@ -11,9 +11,14 @@ import sys
 import time
 
 from duralib.ioutils import (
+    read_proto_from_file,
     write_proto_to_file,
     )
-from duralib.proto import dura_pb2
+from duralib.proto.dura_pb2 import (
+    BandHead,
+    BandTail,
+    BlockIndex,
+    )
 
 
 _log = logging.getLogger('dura')
@@ -60,7 +65,8 @@ class Band(object):
             return filename[len(cls.name_prefix):]
 
     def read_head(self):
-        self.head_pb = read_proto_from_file(BandHead, self.relpath(head_name))
+        self.head = read_proto_from_file(
+            BandHead, self.relpath(self.head_name))
 
 
 class BandReader(Band):
@@ -82,19 +88,19 @@ class BandWriter(Band):
         assert not self.open
         self.open = True
         os.mkdir(self.path)
-        head_pb = dura_pb2.BandHead()
+        head_pb = BandHead()
         head_pb.band_number = self.band_number
         head_pb.start_unixtime = int(time.time())
         head_pb.source_hostname = socket.gethostname()
         write_proto_to_file(head_pb, self.relpath(self.head_name))
-        self.head_pb = head_pb
+        self.head = head_pb
 
     def finish_band(self):
         """Write the band tail; after this no changes are allowed."""
         _log.info("mark band %r finished" % self)
         assert self.open
         self.open = False
-        tail_pb = dura_pb2.BandTail()
+        tail_pb = BandTail()
         tail_pb.band_number = self.band_number
         # TODO(mbp): set block count!
         tail_pb.end_unixtime = int(time.time())
@@ -103,7 +109,7 @@ class BandWriter(Band):
 
 def read_index(index_file_name):
     with open(index_file_name, 'rb') as index_file:
-        block_index = dura_pb2.BlockIndex()
+        block_index = BlockIndex()
         block_index.ParseFromString(index_file.read())
         return block_index
 

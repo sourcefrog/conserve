@@ -12,6 +12,7 @@ in a different way.
 
 
 import logging
+import time
 
 
 from duralib.archive import Archive
@@ -60,5 +61,14 @@ def cmd_list_bands(args):
     """List bands in an archive."""
     archive = Archive.open(args.archive)
     for band_name in archive.list_bands():
-        args.stdout.write("%s\n" % band_name)
+        if args.names_only:
+            args.stdout.write("%s\n" % band_name)
+            continue
+        band = archive.open_band_reader(band_name)
+        print "%s" % band_name,
+        if band.head:
+            print "  %s   %s" % (
+                time.ctime(band.head.start_unixtime),
+                band.head.source_hostname),
+        print
 

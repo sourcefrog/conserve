@@ -3,6 +3,12 @@
 
 """IO utilities."""
 
+import logging
+
+
+_log = logging.getLogger('dura')
+
+
 def write_proto_to_file(proto_obj, filename):
     proto_bytes = proto_obj.SerializeToString()
     with file(filename, 'wb') as f:
@@ -10,7 +16,12 @@ def write_proto_to_file(proto_obj, filename):
 
 def read_proto_from_file(cls, filename):
     pb = cls()
-    with file(filename, 'rb') as f:
-        file_bytes = f.read()
+    try:
+        with file(filename, 'rb') as f:
+            file_bytes = f.read()
+    except IOError as e:
+        _log.warning('failed to read %s from %r: %r' % (
+            cls.__name__, filename, e))
+        return None
     pb.ParseFromString(file_bytes)
     return pb
