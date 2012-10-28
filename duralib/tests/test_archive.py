@@ -42,6 +42,15 @@ class TestArchive(DuraTestCase):
             repr(archive),
             r"Archive\('.*'\)")
 
+    def test_corrupt_magic(self):
+        with file(os.path.join(self.tmpdir, 'DURA-ARCHIVE'), 'w') as f:
+            f.write('some garbage')
+        with self.assertRaises(BadArchiveHeader) as e:
+            Archive.open(self.tmpdir)
+        self.assertRegexpMatches(
+            str(e.exception),
+            "Bad archive header: " + self.tmpdir)
+
     def test_reopen_archive(self):
         Archive.create(self.archive_path)
         second = Archive.open(self.archive_path)
