@@ -98,7 +98,6 @@ def parse_command(argv):
     if _parser is None:
         _parser = _make_parser()
     args = _parser.parse_args(argv)
-    _log.debug("cli args: %r", args)
     return args
 
 
