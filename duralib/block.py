@@ -29,6 +29,8 @@ class BlockWriter(object):
         self.data_path = self.base_path + '.d'
         self.index_path = self.base_path + '.i'
         self.open = False
+        self.file_count = 0
+        self.data_file_position = 0
 
     def begin(self):
         assert self.open == False
@@ -49,6 +51,7 @@ class BlockWriter(object):
         file_index = self.block_index.file.add()
         file_index.file_type = file_type
         file_index.path = path
+        self.file_count += 1
         if content is not None:
             self.store_bulk_content(file_index, content)
 
@@ -56,6 +59,6 @@ class BlockWriter(object):
         file_index.data_length = body_length = len(file_content)
         if body_length:
             file_index.data_sha1 = sha.sha(file_content).digest()
-            file_index.data_offset = self.data_file.tell()
+            self.data_file_position = file_index.data_offset = self.data_file.tell()
         self.data_file.write(file_content)
         self.data_sha.update(file_content)

@@ -56,8 +56,9 @@ def store_files(file_names, to_band):
             continue
         block_writer.store_file(file_name, ptype, file_content)
 
-        if i_file % 20 == 0:
-            _log.debug("starting new block after %d files", i_file)
+        if (block_writer.file_count > 1000
+            or block_writer.data_file_position > 10 << 20):
+            _log.debug("starting new block")
             block_writer.finish()
             block_writer = to_band.create_block()
 
