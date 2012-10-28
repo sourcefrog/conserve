@@ -8,18 +8,25 @@ from __future__ import absolute_import
 
 import errno
 import os.path
-import unittest
 
 from duralib.archive import (
     Archive,
     BadArchiveHeader,
     NoSuchArchive,
     )
+from duralib.ioutils import (
+    write_proto_to_file,
+    )
+from duralib.proto.dura_pb2 import (
+    ArchiveHeader,
+    )
+
 from duralib.tests.base import DuraTestCase
 from duralib.tests.durafixtures import (
     EmptyArchive,
     PopulatedArchive,
     )
+
 
 
 class TestArchive(DuraTestCase):
@@ -42,9 +49,20 @@ class TestArchive(DuraTestCase):
             repr(archive),
             r"Archive\('.*'\)")
 
-    def test_corrupt_magic(self):
+    def test_non_pb_magic(self):
         with file(os.path.join(self.tmpdir, 'DURA-ARCHIVE'), 'w') as f:
             f.write('some garbage')
+        with self.assertRaises(BadArchiveHeader) as e:
+            Archive.open(self.tmpdir)
+        self.assertRegexpMatches(
+            str(e.exception),
+            "Bad archive header: " + self.tmpdir)
+
+    def test_wrong_pb_magic(self):
+        # Contains a pb, but not what it should be
+        header = ArchiveHeader()
+        header.magic = 'black magic'
+        write_proto_to_file(header, os.path.join(self.tmpdir, 'DURA-ARCHIVE'))
         with self.assertRaises(BadArchiveHeader) as e:
             Archive.open(self.tmpdir)
         self.assertRegexpMatches(
