@@ -15,6 +15,12 @@ from duralib.proto import dura_pb2
 _log = logging.getLogger('dura')
 
 
+def do_backup(file_names, to_archive):
+    band = to_archive.create_band()
+    store_files(file_names, band)
+    band.finish_band()
+
+
 def store_files(file_names, to_band):
     """Write some files into a band.
 

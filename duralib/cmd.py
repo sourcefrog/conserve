@@ -51,8 +51,11 @@ def cmd_backup(args):
       source_file [str]: Paths to store
       archive [str]: Path to existing archive
     """
-    from duralib.backup import store_files
+    from duralib.backup import do_backup
     archive = Archive.open(args.archive)
-    band = archive.create_band()
-    store_files(args.source_file, band)
-    band.finish_band()
+    do_backup(args.source_file, archive)
+
+
+def cmd_list_bands(args):
+    """List bands in an archive."""
+    pass
