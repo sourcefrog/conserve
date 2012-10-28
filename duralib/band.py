@@ -105,6 +105,7 @@ class Band(object):
         return '%06d' % next
 
     def create_block(self):
+        # TODO(mbp): Could cache the number, which might be faster for slow transports.
         number = self.next_block_number()
         writer = BlockWriter(self, number)
         writer.begin()
@@ -147,7 +148,7 @@ class BandWriter(Band):
         self.open = False
         tail_pb = BandTail()
         tail_pb.band_number = self.band_number
-        # TODO(mbp): set block count!
+        tail_pb.block_count = int(self.next_block_number())
         tail_pb.end_unixtime = int(time.time())
         write_proto_to_file(tail_pb, self.relpath(self.tail_name))
 
