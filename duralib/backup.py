@@ -33,6 +33,12 @@ def store_files(file_names, to_band):
     i_file = 0
 
     for file_name in file_names:
+        if (block_writer.file_count > 1000
+            or block_writer.data_file_position > 10 << 20):
+            _log.debug("starting new block")
+            block_writer.finish()
+            block_writer = to_band.create_block()
+
         i_file += 1
         st = os.lstat(file_name)
         _log.info('store %s' % file_name)
@@ -55,12 +61,6 @@ def store_files(file_names, to_band):
                 file_name, stat)
             continue
         block_writer.store_file(file_name, ptype, file_content)
-
-        if (block_writer.file_count > 1000
-            or block_writer.data_file_position > 10 << 20):
-            _log.debug("starting new block")
-            block_writer.finish()
-            block_writer = to_band.create_block()
 
     block_writer.finish()
 

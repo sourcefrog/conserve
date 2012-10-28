@@ -59,6 +59,7 @@ class BlockWriter(object):
         file_index.data_length = body_length = len(file_content)
         if body_length:
             file_index.data_sha1 = sha.sha(file_content).digest()
-            self.data_file_position = file_index.data_offset = self.data_file.tell()
+            file_index.data_offset = self.data_file.tell()
         self.data_file.write(file_content)
         self.data_sha.update(file_content)
+        self.data_file_position = self.data_file.tell()
