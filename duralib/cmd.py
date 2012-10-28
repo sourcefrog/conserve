@@ -36,7 +36,7 @@ def cmd_create_archive(args):
 
 def cmd_describe_archive(args):
     """Show summary information about an archive."""
-    archive = Archive.open(args.archive_directory)
+    archive = Archive.open(args.archive)
     _log.info("Opened archive %r", archive)
 
 
