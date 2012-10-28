@@ -26,7 +26,6 @@ from duralib.proto.dura_pb2 import (
     )
 
 
-
 class Band(object):
     """A Band stores versions from one pass over the source tree.
 
@@ -44,8 +43,7 @@ class Band(object):
         self.archive = archive
         self.open = False  # can only be true on writers
         self.band_number = _canonicalize_band_number(band_number)
-        self.path = os.path.join(
-            self.archive.path,
+        self.path = self.archive.relpath(
             self.name_prefix + self.band_number)
 
     def __repr__(self):

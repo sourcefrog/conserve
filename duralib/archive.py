@@ -60,7 +60,7 @@ class Archive(object):
     def __init__(self, path):
         """Construct an Archive instance."""
         self.path = path
-        self._header_path = os.path.join(self.path, ARCHIVE_HEADER_NAME)
+        self._header_path = self.relpath(ARCHIVE_HEADER_NAME)
 
     def __repr__(self):
         return '%s(%r)' % (
