@@ -139,6 +139,10 @@ class TestCreateBand(DuraTestCase):
             ["0000"], archive.list_bands())
         self.assertEquals(
             ["BAND-HEAD"], os.listdir(band.path))
+        # Can get a band reader; they're tested more deeply in test_band.
+        band_reader = archive.open_band_reader('0000')
+        self.assertEqual('0000', band.head.band_number)
+        self.assertEqual(False, band.is_finished())
 
     def test_create_band_repeated(self):
         archive = self.useFixture(EmptyArchive()).archive
