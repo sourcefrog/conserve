@@ -11,7 +11,7 @@ from duralib.band import (
     _canonicalize_band_number,
     )
 from duralib.tests.base import DuraTestCase
-from duralib.tests.fixtures import (
+from duralib.tests.durafixtures import (
     EmptyArchive,
     )
 

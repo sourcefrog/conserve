@@ -6,6 +6,8 @@
 See <http://pypi.python.org/pypi/testfixtures>
 """
 
+# Named this way because absolute import seems to clash with python-coverage.
+
 from __future__ import absolute_import
 
 import os.path

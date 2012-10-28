@@ -11,7 +11,6 @@ import os.path
 import tempfile
 import unittest
 
-from fixtures import TempDir, TestWithFixtures
 from testresources import ResourcedTestCase
 
 from duralib.archive import (
@@ -20,7 +19,7 @@ from duralib.archive import (
     NoSuchArchive,
     )
 from duralib.tests.base import DuraTestCase
-from duralib.tests.fixtures import (
+from duralib.tests.durafixtures import (
     EmptyArchive,
     PopulatedArchive,
     )
@@ -95,3 +94,7 @@ class TestArchive(DuraTestCase):
         self.assertEquals(
             ["%04d" % i for i in range(num_bands)],
             archive.list_bands())
+
+
+if __name__ == '__main__':
+    unittest.main()

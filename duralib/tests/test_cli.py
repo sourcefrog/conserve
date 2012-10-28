@@ -11,12 +11,10 @@ import os.path
 import tempfile
 import unittest
 
-from fixtures import TempDir, TestWithFixtures
-
 from duralib.archive import Archive
 from duralib import cli
 from duralib.tests.base import DuraTestCase
-from duralib.tests.fixtures import EmptyArchive
+from duralib.tests.durafixtures import EmptyArchive
 
 
 class TestCommandLine(DuraTestCase):
