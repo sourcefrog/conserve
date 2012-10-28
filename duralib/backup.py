@@ -3,7 +3,6 @@
 
 """Backup files into the archive."""
 
-import logging
 import os
 import stat
 import sys
@@ -11,7 +10,7 @@ import sys
 from duralib.proto import dura_pb2
 
 
-_log = logging.getLogger('dura')
+from duralib import _log
 
 
 def do_backup(file_names, to_archive):

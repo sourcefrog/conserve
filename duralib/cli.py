@@ -12,7 +12,7 @@ from duralib.archive import Archive
 from duralib import cmd
 
 
-_log = logging.getLogger('dura')
+from duralib import _log
 
 
 def _first_line(s):

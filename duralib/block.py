@@ -14,7 +14,7 @@ from duralib.proto.dura_pb2 import (
     )
 
 
-_log = logging.getLogger('dura')
+from duralib import _log
 
 
 def match_block_index_name(filename):

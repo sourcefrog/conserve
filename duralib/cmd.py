@@ -22,7 +22,7 @@ from duralib.timeutils import (
     )
 
 
-_log = logging.getLogger('dura')
+from duralib import _log
 
 
 def cmd_create_archive(args):

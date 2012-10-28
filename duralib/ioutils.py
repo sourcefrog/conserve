@@ -3,10 +3,8 @@
 
 """IO utilities."""
 
-import logging
 
-
-_log = logging.getLogger('dura')
+from duralib import _log
 
 
 def write_proto_to_file(proto_obj, filename):

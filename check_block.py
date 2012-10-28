@@ -11,9 +11,9 @@ import sys
 
 from google.protobuf import text_format
 
+from duralib import _log
 from duralib.proto import dura_pb2
 
-LOG = logging.getLogger('dura')
 
 def check_block(band_filename):
     data_file = open(band_filename + '.d', 'rb')
@@ -26,13 +26,13 @@ def check_block(band_filename):
     block_index.MergeFromString(index_file.read())
     index_file.close()
 
-    LOG.info('block data length check: %s',
+    _log.info('block data length check: %s',
         data_length == block_index.data_length)
-    LOG.info('block data sha1 check: %s',
+    _log.info('block data sha1 check: %s',
         data_sha.digest() == block_index.data_sha1)
 
     for file in block_index.file:
-        LOG.info('  file: %-60s %10d', file.path, file.data_length)
+        _log.info('  file: %-60s %10d', file.path, file.data_length)
         if file.data_length == 0:
             # no content; nothing to check (and no offset recorded).
             continue
