@@ -83,4 +83,4 @@ def cmd_list_files(args):
     archive = Archive.open(args.archive)
     band = archive.open_band_reader(args.band)
     block_index = band.read_block_index('000000')
-    print_block_index(block_index)
+    print_block_index(block_index, names_only=args.names_only)

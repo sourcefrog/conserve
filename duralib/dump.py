@@ -1,7 +1,7 @@
 # Copyright 2012 Martin Pool
 # Licensed under the Apache License, Version 2.0.
 
-"""Print out the contents of an index entry."""
+"""Print out the contents of various structures."""
 
 import collections
 
@@ -22,8 +22,11 @@ file_type_map.update({
     })
 
 
-def print_block_index(block_index):
+def print_block_index(block_index, names_only=False):
     for entry in block_index.file:
+        if names_only:
+            print entry.path
+            continue
         if entry.data_sha1:
             sha_string = bin_to_hex(entry.data_sha1)
         else:
@@ -34,6 +37,8 @@ def print_block_index(block_index):
             entry.data_offset,
             file_type_map[entry.file_type],
             entry.path)
+    if names_only:
+        return
     print '%s %10s %10s =' % ('=' * 40, '=' * 10, '=' * 10)
     print '%40s %10s %10d' % (
             bin_to_hex(block_index.data_sha1),
