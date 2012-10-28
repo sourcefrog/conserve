@@ -3,12 +3,13 @@
 
 """A band of files, representing a pass over the source tree."""
 
-import logging
 import os
 import socket
 import stat
 import sys
 import time
+
+from duralib import _log
 
 from duralib.block import (
     match_block_index_name,
@@ -24,8 +25,6 @@ from duralib.proto.dura_pb2 import (
     BlockIndex,
     )
 
-
-_log = logging.getLogger('dura')
 
 
 class Band(object):
@@ -132,7 +131,7 @@ class BandWriter(Band):
     """
 
     def start_band(self):
-        _log.info("start band %r" % self)
+        _log.info("begin %r", self)
         assert not self.open
         self.open = True
         os.mkdir(self.path)
@@ -145,7 +144,7 @@ class BandWriter(Band):
 
     def finish_band(self):
         """Write the band tail; after this no changes are allowed."""
-        _log.info("mark band %r finished" % self)
+        _log.info("finish %r", self)
         assert self.open
         self.open = False
         tail_pb = BandTail()

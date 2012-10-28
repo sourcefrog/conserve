@@ -3,6 +3,7 @@
 
 """Blocks, holding backup contents, within bands."""
 
+import logging
 import sha
 
 from duralib.ioutils import (
@@ -11,6 +12,9 @@ from duralib.ioutils import (
 from duralib.proto.dura_pb2 import (
     BlockIndex,
     )
+
+
+_log = logging.getLogger('dura')
 
 
 def match_block_index_name(filename):
@@ -32,8 +36,14 @@ class BlockWriter(object):
         self.file_count = 0
         self.data_file_position = 0
 
+    def __repr__(self):
+        return '%s(%r)' % (
+            self.__class__.__name__,
+            self.base_path)
+
     def begin(self):
         assert self.open == False
+        _log.debug('begin %r', self)
         self.block_index = BlockIndex()
         # TODO(mbp): Make sure not to overwrite existing files.
         self.data_file = open(self.data_path, 'wb')
@@ -41,6 +51,7 @@ class BlockWriter(object):
         self.open = True
 
     def finish(self):
+        _log.debug('finish %r', self)
         self.block_index.data_sha1 = self.data_sha.digest()
         self.block_index.data_length = self.data_file.tell()
         self.data_file.close()
