@@ -46,7 +46,7 @@ class TestBandNumbers(DuraTestCase):
                 cmp=cmp_band_numbers))
 
 
-def TestBandHead(DuraTestCase):
+class TestBandHead(DuraTestCase):
 
     def test_read_head(self):
         archive = self.useFixture(EmptyArchive()).archive
