@@ -59,6 +59,8 @@ class Band(object):
         return os.path.join(self.path, subpath)
 
     def index_file_path(self, block_number):
+        if len(block_number) != 6:
+            block_number = '%06d' % int(block_number)
         return self.relpath('d' + block_number + '.i')
 
     @classmethod

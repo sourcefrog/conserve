@@ -28,7 +28,6 @@ def store_files(file_names, to_band):
         to_band (Band): Band object, already existing and open for
             writing.
     """
-    # TODO(mbp): Split across multiple blocks
     block_writer = to_band.create_block()
     i_file = 0
 
