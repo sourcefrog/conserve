@@ -1,12 +1,11 @@
-***********
 Dura design
-***********
+===========
 
 Dura is a backup system for Unix systems in today's world: especially, for
 backing up to either nearby local disks or in to cloud storage.
 
 Storage environment
-*******************
+-------------------
 
 - You can write whole files, but not update in place
 
@@ -20,7 +19,13 @@ Storage environment
 - No filesystem metadata (ownership etc) can be stored directly; it must
   be encoded
 
-- You can list directories
+- You can list directories (or, "list files starting with a certain prefix")
+
+- May or may not be case sensitive
+
+- Can't detect whether an empty directory exists or not
+
+- Can try to not overwrite files, but not guaranteed coherent
 
 - There is some prospect of local caching (but, relying on caches being
   consistent might be dangerous or make behaviour unpredictable)
@@ -31,7 +36,7 @@ Storage environment
   is?)
 
 Requirements
-************
+------------
 
 - Data should still be recoverable even if there are bugs in this program,
   or in other systems.
@@ -49,7 +54,7 @@ Requirements
 
 
 Testing
-*******
+-------
 
 - Effort testing
 
@@ -58,7 +63,7 @@ Testing
 
 
 Open questions
-**************
+--------------
 
 - Locking on the repository against multiple concurrent writers?  Or, can
   we avoid that by just having each writer choose their own names for each
@@ -75,7 +80,7 @@ Open questions
 
 
 Verification
-************
+------------
 
 - Check the contents of each block against hashes stored in the archive.
 
@@ -88,7 +93,7 @@ Verification
 
 
 Block size tradeoffs
-********************
+--------------------
 
 We have to do one roundtrip to the archive per block, so we don't want
 them to be too small.  It might be worse than one (if there's also a
@@ -99,7 +104,7 @@ that blocks can grow arbitrarily large if you have large files.
 
 
 Incremental update
-******************
+------------------
 
 There are two approaches to doing an incremental update: go just by date,
 or look at every file relative to the previous bands.  The former might
@@ -112,7 +117,7 @@ bound.
 
 
 Concurrency
-***********
+-----------
 
 Concurrency is a bit hard because the storage layer is not necessarily
 coherent.
@@ -127,7 +132,7 @@ Let's just not worry about it for now.
 
 
 Random features
-***************
+---------------
 
 - How can we avoid every user needing to manually configure what to
   exclude?  Perhaps the OS can ship suggested exclusion lists that match the
@@ -148,7 +153,7 @@ Random features
 
 
 UI
-**
+--
 
 Emit fairly abstracted events that can be mapped into a ui, or just
 emitted to stdout.  Maybe emit them as (ascii?) protobufs?
@@ -156,3 +161,35 @@ emitted to stdout.  Maybe emit them as (ascii?) protobufs?
 Human strings are internationalized: this should be done strictly in
 the UI layer.  Debug/log strings can be emitted anywhere and don't need
 i18n.
+
+
+Alarms
+------
+
+When Dura hits something unexpected in the environment, the core code will
+signal an *alarm*, and then attempt to continue.  The alarms are structured
+and can be filtered.  The default handlers will try to balance safety
+vs completion, but they can be customized.  In particular, you can tell
+it to accept everything and try hard to continue, so you have the best chance
+of recovering something from a damaged backup.
+
+This is somewhat similar to Python's warnings module, but a different
+implementation, because Python is so tied to the warnings being about code.
+
+Fields:
+
+ - *area*: source, archive, band, block, restore
+ - *condition*:
+   - missing
+   - ioerror
+   - denied: permissions error from the OS
+   - corrupt: protobuf deserialization failed, etc
+   - mismatch: hash is not what a higher-level object says it should be
+ - *filename*
+ - *message* - only what can't be stored elsewhere
+
+Handling options:
+ - abort
+ - continue (with a warning)
+ - ask
+ - suppress (with only a debug message)
