@@ -17,6 +17,10 @@ from duralib.proto.dura_pb2 import (
 from duralib import _log
 
 
+def canonical_block_number(number_string):
+    return number_string.rjust(6, '0')
+
+
 def match_block_index_name(filename):
     filename = filename.lower()
     if filename.startswith('d') and filename.endswith('.i'):

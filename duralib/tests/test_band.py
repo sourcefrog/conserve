@@ -6,7 +6,10 @@
 
 from __future__ import absolute_import
 
+import unittest
+
 from duralib.band import (
+    Band,
     cmp_band_numbers,
     _canonicalize_band_number,
     )
@@ -15,8 +18,25 @@ from duralib.tests.durafixtures import (
     EmptyArchive,
     )
 
+
+class TestBand(DuraTestCase):
+
+    def test_band_repr(self):
+        archive = self.useFixture(EmptyArchive()).archive
+        band = archive.create_band()
+        self.assertEquals(
+            "BandWriter(path='%s')" % band.path,
+            repr(band))
+
+
 class TestBandNumbers(DuraTestCase):
     """Test formatting, parsing, sorting of band numbers."""
+
+    def test_match_band_name(self):
+        self.assertEqual("0000", Band.match_band_name("b0000"))
+        self.assertEqual("0042", Band.match_band_name("b0042"))
+        self.assertEqual("420000", Band.match_band_name("b420000"))
+        self.assertEqual(None, Band.match_band_name("pony"))
 
     def test_canonicalize_band_number(self):
         self.assertEqual("0000", _canonicalize_band_number("0"))
@@ -75,3 +95,7 @@ class TestBandBlocks(DuraTestCase):
         archive = self.useFixture(EmptyArchive()).archive
         writer = archive.create_band()
         self.assertEquals('000000', writer.next_block_number())
+
+
+if __name__ == '__main__':
+    unittest.main()

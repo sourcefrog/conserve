@@ -5,13 +5,12 @@
 
 import os
 import socket
-import stat
-import sys
 import time
 
 from duralib import _log
 
 from duralib.block import (
+    canonical_block_number,
     match_block_index_name,
     BlockWriter,
     )
@@ -56,9 +55,7 @@ class Band(object):
         return os.path.join(self.path, subpath)
 
     def index_file_path(self, block_number):
-        if len(block_number) != 6:
-            block_number = '%06d' % int(block_number)
-        return self.relpath('d' + block_number + '.i')
+        return self.relpath('d' + canonical_block_number(block_number) + '.i')
 
     @classmethod
     def match_band_name(cls, filename):
@@ -98,10 +95,10 @@ class Band(object):
         # TODO(mbp): Unify with allocation in bands?
         existing_blocks = self.list_blocks()
         if not existing_blocks:
-            next = 0
+            next_number = 0
         else:
-            next = int(existing_blocks[-1]) + 1
-        return '%06d' % next
+            next_number = int(existing_blocks[-1]) + 1
+        return '%06d' % next_number
 
     def create_block(self):
         # TODO(mbp): Could cache the number, which might be faster for slow transports.
