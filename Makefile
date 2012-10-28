@@ -1,7 +1,7 @@
 PYTHON=python
 
 lint:
-	pylint -rn --output-format colorized --ignore dura_pb2.py duralib
+	pylint --rcfile pylintrc --output-format parseable --ignore dura_pb2.py duralib
 
 check: protos
 	PYTHONPATH=. $(PYTHON) -m unittest discover -v
