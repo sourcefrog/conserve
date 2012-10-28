@@ -20,8 +20,8 @@ def read_proto_from_file(cls, filename):
         with file(filename, 'rb') as f:
             file_bytes = f.read()
     except IOError as e:
-        _log.warning('failed to read %s from %r: %r' % (
-            cls.__name__, filename, e))
+        _log.warning('failed to read %s from %r: %s' % (
+            cls.__name__, filename, e.strerror))
         return None
     pb.ParseFromString(file_bytes)
     return pb

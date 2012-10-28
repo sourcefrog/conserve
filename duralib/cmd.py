@@ -16,6 +16,7 @@ import time
 
 
 from duralib.archive import Archive
+from duralib.timeutils import isotime
 
 
 _log = logging.getLogger('dura')
@@ -36,13 +37,6 @@ def cmd_describe_archive(args):
     _log.info("Opened archive %r", archive)
 
 
-def cmd_dump_index(args):
-    """Show debug information about index files."""
-    from duralib.dump import dump_index_block
-    for index_file_name in args.index_files:
-        dump_index_block(index_file_name)
-
-
 def cmd_backup(args):
     """Store a copy of source files in the archive.
 
@@ -61,6 +55,8 @@ def cmd_list_bands(args):
     """List bands in an archive.
 
     Incomplete bands are shown with a + next to their name.
+
+    The start time and source hostname is also shown.
     """
     archive = Archive.open(args.archive)
     for band_name in archive.list_bands():
@@ -69,11 +65,22 @@ def cmd_list_bands(args):
             continue
         band = archive.open_band_reader(band_name)
 
-        print "%20s%s" % (band_name,
-            (' ' if band.is_finished() else '+')),
+        name_plus = band_name
+        if not band.is_finished():
+            name_plus += '+'
+
+        print "%-8s" % name_plus,
         if band.head:
             print "  %s   %s" % (
-                time.ctime(band.head.start_unixtime),
+                isotime(band.head.start_unixtime),
                 band.head.source_hostname),
         print
 
+
+def cmd_list_files(args):
+    """List files in a backup band."""
+    from duralib.dump import print_block_index
+    archive = Archive.open(args.archive)
+    band = archive.open_band_reader(args.band)
+    block_index = band.read_block_index('000000')
+    print_block_index(block_index)

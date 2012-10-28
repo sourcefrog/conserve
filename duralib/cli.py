@@ -49,12 +49,6 @@ def _make_parser():
         'archive_directory',
         help='Local path to archive directory')
 
-    cp = _parser_for_cmd('dump-index')
-    cp.add_argument(
-        'index_files',
-        nargs='*',
-        help='Path to a .i index file to dump')
-
     cp = _parser_for_cmd('backup')
     cp.add_argument(
         'source_file', nargs=argparse.ONE_OR_MORE,
@@ -68,6 +62,13 @@ def _make_parser():
     cp.add_argument(
         '--names-only', '-q',
         help='Just list band names, nothing else.')
+
+    cp = _parser_for_cmd('list-files')
+    cp.add_argument('archive', help='Path of archive directory')
+    cp.add_argument('band', help='Number of band')
+    cp.add_argument(
+        '--names-only', '-q',
+        help='Just list file names.')
 
     return parser
 

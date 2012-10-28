@@ -22,8 +22,7 @@ file_type_map.update({
     })
 
 
-def dump_index_block(index_file_name):
-    block_index = band.read_index(index_file_name)
+def print_block_index(block_index):
     for entry in block_index.file:
         if entry.data_sha1:
             sha_string = bin_to_hex(entry.data_sha1)

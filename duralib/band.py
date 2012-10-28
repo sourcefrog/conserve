@@ -54,6 +54,9 @@ class Band(object):
         """Convert band-relative path to an absolute path."""
         return os.path.join(self.path, subpath)
 
+    def index_file_path(self, block_number):
+        return self.relpath('d' + block_number + '.i')
+
     @classmethod
     def match_band_name(cls, filename):
         """Try to interpret a filename as a band name.
@@ -67,6 +70,10 @@ class Band(object):
     def read_head(self):
         self.head = read_proto_from_file(
             BandHead, self.relpath(self.head_name))
+
+    def read_block_index(self, block_number):
+        return read_proto_from_file(
+            BlockIndex, self.index_file_path(block_number))
 
 
 class BandReader(Band):
@@ -112,12 +119,6 @@ class BandWriter(Band):
     def is_finished(self):
         return not self.open
 
-
-def read_index(index_file_name):
-    with open(index_file_name, 'rb') as index_file:
-        block_index = BlockIndex()
-        block_index.ParseFromString(index_file.read())
-        return block_index
 
 def _canonicalize_band_number(band_number):
     return '%04d' % int(band_number)
