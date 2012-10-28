@@ -8,10 +8,7 @@ from __future__ import absolute_import
 
 import errno
 import os.path
-import tempfile
 import unittest
-
-from testresources import ResourcedTestCase
 
 from duralib.archive import (
     Archive,
@@ -40,15 +37,15 @@ class TestArchive(DuraTestCase):
                 os.path.join(self.archive_path, "DURA-ARCHIVE")))
 
     def test_reopen_archive(self):
-        new_archive = Archive.create(self.archive_path)
+        Archive.create(self.archive_path)
         second = Archive.open(self.archive_path)
         self.assertEquals(self.archive_path, second.path)
 
     def test_open_nonexistent(self):
         # Don't create it
-        with self.assertRaises(NoSuchArchive) as ar:
+        with self.assertRaises(NoSuchArchive) as catcher:
             Archive.open(self.archive_path)
-        self.assertRegexpMatches(str(ar.exception),
+        self.assertRegexpMatches(str(catcher.exception),
             r"No such archive: .*testarchive.*%s"
             % os.strerror(errno.ENOENT))
 
@@ -59,7 +56,7 @@ class TestArchive(DuraTestCase):
         with self.assertRaises(BadArchiveHeader) as ar:
             Archive.open(self.archive_path)
         self.assertEquals(
-            "Bad archive header: %s" % orig_archive._header_path,
+            "Bad archive header: %s" % orig_archive.relpath('DURA-ARCHIVE'),
             str(ar.exception))
 
     def test_list_bands_empty(self):
@@ -90,7 +87,7 @@ class TestArchive(DuraTestCase):
     def test_create_band_repeated(self):
         archive = self.useFixture(EmptyArchive()).archive
         num_bands = 17
-        bands = [archive.create_band() for i in range(num_bands)]
+        unused_bands = [archive.create_band() for i in range(num_bands)]
         self.assertEquals(
             ["%04d" % i for i in range(num_bands)],
             archive.list_bands())
