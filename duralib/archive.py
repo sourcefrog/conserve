@@ -22,6 +22,9 @@ from duralib.band import (
     BandWriter,
     cmp_band_numbers,
     )
+from duralib.ioutils import (
+    write_proto_to_file,
+    )
 
 
 ARCHIVE_HEADER_NAME = "DURA-ARCHIVE"
@@ -87,8 +90,10 @@ class Archive(object):
             raise BadArchiveHeader(header_path=self._header_path)
 
     def _write_header(self):
-        with file(self._header_path, 'wb') as header_file:
-            header_file.write(_make_archive_header_bytestring())
+        """Write DURA-MAGIC archive header."""
+        header = dura_pb2.ArchiveHeader()
+        header.magic = _HEADER_MAGIC
+        write_proto_to_file(header, self.relpath(ARCHIVE_HEADER_NAME))
 
     def create_band(self):
         """Make a new band within the archive.
@@ -140,10 +145,3 @@ class BadArchiveHeader(errors.DuraError):
 
     _fmt = "Bad archive header: %(header_path)s"
 
-
-def _make_archive_header_bytestring():
-    """Make archive header binary protobuf message.
-    """
-    header = dura_pb2.ArchiveHeader()
-    header.magic = _HEADER_MAGIC
-    return header.SerializeToString()
