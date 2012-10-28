@@ -1,5 +1,7 @@
 PYTHON=python
 
+all: protos
+
 lint:
 	pylint --rcfile pylintrc --output-format parseable --ignore dura_pb2.py duralib
 
