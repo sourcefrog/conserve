@@ -64,9 +64,14 @@ def TestBandHead(DuraTestCase):
         self.assertTrue(writer.is_finished())
 
 
-class TestListBlocks(DuraTestCase):
+class TestBandBlocks(DuraTestCase):
 
-    def test_list_blocks(self):
+    def test_list_blocks_empty(self):
         archive = self.useFixture(EmptyArchive()).archive
         writer = archive.create_band()
         self.assertEquals([], writer.list_blocks())
+
+    def test_next_block_empty(self):
+        archive = self.useFixture(EmptyArchive()).archive
+        writer = archive.create_band()
+        self.assertEquals('000000', writer.next_block_number())

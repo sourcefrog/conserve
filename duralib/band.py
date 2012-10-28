@@ -10,6 +10,9 @@ import stat
 import sys
 import time
 
+from duralib.block import (
+    match_block_index_name,
+    )
 from duralib.ioutils import (
     read_proto_from_file,
     write_proto_to_file,
@@ -78,8 +81,20 @@ class Band(object):
     def list_blocks(self):
         """Return a sorted list of blocks in this band."""
         results = []
-        results.sort()
+        for filename in os.listdir(self.path):
+            number = match_block_index_name(filename)
+            if number is not None: results.append(number)
+        results.sort(cmp=cmp_band_numbers)
         return results
+
+    def next_block_number(self):
+        # TODO(mbp): Unify with allocation in bands?
+        existing_blocks = self.list_blocks()
+        if not existing_blocks:
+            next = 0
+        else:
+            next = int(existing_blocks[-1]) + 1
+        return '%06d' % next
 
 
 class BandReader(Band):
