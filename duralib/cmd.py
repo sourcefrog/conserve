@@ -81,6 +81,12 @@ def cmd_list_files(args):
     """List files in a backup band."""
     from duralib.dump import print_block_index
     archive = Archive.open(args.archive)
-    band = archive.open_band_reader(args.band)
-    block_index = band.read_block_index('000000')
-    print_block_index(block_index, names_only=args.names_only)
+    if args.band:
+        band_name = args.band
+    else:
+        band_name = archive.list_bands()[-1]
+        # TODO(mbp): nice error if empty
+    band = archive.open_band_reader(band_name)
+    for block_name in band.list_blocks():
+        block_index = band.read_block_index(block_name)
+        print_block_index(block_index, names_only=args.names_only)
