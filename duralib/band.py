@@ -10,6 +10,9 @@ import stat
 import sys
 import time
 
+from duralib.ioutils import (
+    write_proto_to_file,
+    )
 from duralib.proto import dura_pb2
 
 
@@ -52,18 +55,30 @@ class Band(object):
 
 
 class BandWriter(Band):
-    """Writes in to a band."""
+    """Writes in to a band.
+
+    Attributes:
+        open (bool): True if the band is still open to add files.
+    """
 
     def start_band(self):
         _log.info("create band directory %s" % self.path)
+        self.open = True
         os.mkdir(self.path)
         head_pb = dura_pb2.BandHead()
         head_pb.band_number = self.band_number
         head_pb.start_unixtime = int(time.time())
         head_pb.source_hostname = socket.gethostname()
-        with file(self.relpath(self.head_name), 'wb') as f:
-            f.write(head_pb.SerializeToString())
+        write_proto_to_file(head_pb, self.relpath(self.head_name))
 
+    def finish_band(self):
+        """Write the band tail; after this no changes are allowed."""
+        self.closed = True
+        tail_pb = dura_pb2.BandTail()
+        tail_pb.band_number = self.band_number
+        # TODO(mbp): set block count!
+        tail_pb.end_unixtime = int(time.time())
+        write_proto_to_file(tail_pb, self.relpath(self.tail_name))
 
 
 def read_index(index_file_name):

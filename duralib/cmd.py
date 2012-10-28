@@ -55,3 +55,4 @@ def cmd_backup(args):
     archive = Archive.open(args.archive)
     band = archive.create_band()
     store_files(args.source_file, band)
+    band.finish_band()

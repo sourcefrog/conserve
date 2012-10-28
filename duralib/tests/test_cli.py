@@ -43,5 +43,5 @@ class TestBackupCommand(DuraTestCase):
         expected_band_path = os.path.join(archive_path, 'b0000')
         self.assertTrue(os.path.isdir(expected_band_path))
         self.assertEquals(
-            ['BAND-HEAD', 'd000000.d', 'd000000.i'],
+            ['BAND-HEAD', 'BAND-TAIL', 'd000000.d', 'd000000.i'],
             sorted(os.listdir(expected_band_path)))

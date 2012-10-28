@@ -25,7 +25,6 @@ message BandHead {
     // Should correspond to the on-disk band number, eg "0000".
     optional string band_number = 1;
 
-    // Seconds since the epoch.
     optional int64 start_unixtime = 2;
 
     optional string source_hostname = 3;
@@ -36,10 +35,7 @@ message BandHead {
 message BandTail {
     optional string band_number = 1;
 
-    // Seconds since the epoch.
-    optional int64 start_unixtime = 2;
-
-    optional string source_hostname = 3;
+    optional int64 end_unixtime = 2;
 
     optional int32 block_count = 4;
 
