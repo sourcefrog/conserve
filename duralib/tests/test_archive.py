@@ -93,6 +93,14 @@ class TestArchive(DuraTestCase):
             "Bad archive header: %s" % orig_archive.relpath('DURA-ARCHIVE'),
             str(ar.exception))
 
+    def test_open_header_unreadable(self):
+        # TODO(mbp): We should perhaps handle "permission denied" as a specific alarm,
+        # but for now it will do as an unexpected error.
+        archive = Archive.create(self.archive_path)
+        os.chmod(archive.relpath('DURA-ARCHIVE'), 0)
+        with self.assertRaises(IOError) as ar:
+            Archive.open(self.archive_path)
+
 
 class TestListBands(DuraTestCase):
 
