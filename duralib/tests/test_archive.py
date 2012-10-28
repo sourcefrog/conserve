@@ -36,6 +36,12 @@ class TestArchive(DuraTestCase):
             os.path.isfile(
                 os.path.join(self.archive_path, "DURA-ARCHIVE")))
 
+    def test_archive_repr(self):
+        archive = self.useFixture(EmptyArchive()).archive
+        self.assertRegexpMatches(
+            repr(archive),
+            r"Archive\('.*'\)")
+
     def test_reopen_archive(self):
         Archive.create(self.archive_path)
         second = Archive.open(self.archive_path)
