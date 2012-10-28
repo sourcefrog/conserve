@@ -26,3 +26,14 @@ class EmptyArchive(fixtures.Fixture):
             self._tmpdir_fixture.path, "testarchive"))
 
     # No need for a tearDown: deleting the underlying tmpdir is enough.
+
+
+class PopulatedArchive(fixtures.Fixture):
+
+    def setUp(self):
+        super(PopulatedArchive, self).setUp()
+        self.archive = self.useFixture(EmptyArchive()).archive
+        n_bands = 3
+        for i in range(n_bands):
+            # TODO(mbp): Actually store some files?
+            self.archive.create_band().finish_band()

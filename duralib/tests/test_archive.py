@@ -20,7 +20,10 @@ from duralib.archive import (
     NoSuchArchive,
     )
 from duralib.tests.base import DuraTestCase
-from duralib.tests.fixtures import EmptyArchive
+from duralib.tests.fixtures import (
+    EmptyArchive,
+    PopulatedArchive,
+    )
 
 
 class TestArchive(DuraTestCase):
@@ -63,6 +66,12 @@ class TestArchive(DuraTestCase):
     def test_list_bands_empty(self):
         archive = self.useFixture(EmptyArchive()).archive
         self.assertEquals([], archive.list_bands())
+
+    def test_list_bands_populated(self):
+        archive = self.useFixture(PopulatedArchive()).archive
+        self.assertEquals(
+            ["0000", "0001", "0002"],
+            archive.list_bands())
 
     def test_create_band(self):
         archive = self.useFixture(EmptyArchive()).archive
