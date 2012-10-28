@@ -75,6 +75,12 @@ class Band(object):
         return read_proto_from_file(
             BlockIndex, self.index_file_path(block_number))
 
+    def list_blocks(self):
+        """Return a sorted list of blocks in this band."""
+        results = []
+        results.sort()
+        return results
+
 
 class BandReader(Band):
     """A band open for readonly access.

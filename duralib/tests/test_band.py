@@ -62,3 +62,11 @@ def TestBandHead(DuraTestCase):
         self.assertEquals("0000", reader.band_number)
         self.assertTrue(reader.is_finished())
         self.assertTrue(writer.is_finished())
+
+
+class TestListBlocks(DuraTestCase):
+
+    def test_list_blocks(self):
+        archive = self.useFixture(EmptyArchive()).archive
+        writer = archive.create_band()
+        self.assertEquals([], writer.list_blocks())
