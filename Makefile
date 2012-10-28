@@ -3,10 +3,12 @@ PYTHON=python
 lint:
 	pylint -rn --output-format colorized --ignore dura_pb2.py duralib
 
-check:
+check: protos
 	PYTHONPATH=. $(PYTHON) -m unittest discover -v
 
 protos:
+	mkdir -p duralib/proto
+	touch duralib/proto/__init__.py
 	protoc --python_out=duralib/ proto/dura.proto
 
 messages.pot:
