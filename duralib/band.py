@@ -72,12 +72,19 @@ class Band(object):
             return filename[len(cls.name_prefix):]
 
     def read_head(self):
+        """Read head if possible."""
         self.head = read_proto_from_file(
             BandHead, self.relpath(self.head_name))
 
     def read_block_index(self, block_number):
         return read_proto_from_file(
             BlockIndex, self.index_file_path(block_number))
+
+    def read_tail(self):
+        """Read tail if present and possible."""
+        self.tail = read_proto_from_file(
+            BandTail, self.relpath(self.tail_name))
+        return self.tail
 
     def list_blocks(self):
         """Return a sorted list of blocks in this band."""

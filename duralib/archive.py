@@ -127,6 +127,9 @@ class Archive(object):
         result.sort(cmp=cmp_band_numbers)
         return result
 
+    def last_band(self):
+        return self.list_bands()[-1]
+
 
 class NoSuchArchive(errors.DuraError):
 

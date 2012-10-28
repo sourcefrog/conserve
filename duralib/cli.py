@@ -50,8 +50,14 @@ def _make_parser():
 
     cp = _parser_for_cmd('describe-archive')
     cp.add_argument(
-        'archive_directory',
+        'archive',
         help='Local path to archive directory')
+
+    cp = _parser_for_cmd('describe-band')
+    cp.add_argument(
+        'archive',
+        help='Local path to archive directory')
+    cp.add_argument('--band', help='Number of band')
 
     cp = _parser_for_cmd('backup')
     cp.add_argument(

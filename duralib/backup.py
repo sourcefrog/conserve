@@ -30,8 +30,10 @@ def store_files(file_names, to_band):
     """
     # TODO(mbp): Split across multiple blocks
     block_writer = to_band.create_block()
+    i_file = 0
 
     for file_name in file_names:
+        i_file += 1
         st = os.lstat(file_name)
         _log.info('store %s' % file_name)
 
@@ -53,6 +55,11 @@ def store_files(file_names, to_band):
                 file_name, stat)
             continue
         block_writer.store_file(file_name, ptype, file_content)
+
+        if i_file % 20 == 0:
+            _log.debug("starting new block after %d files", i_file)
+            block_writer.finish()
+            block_writer = to_band.create_block()
 
     block_writer.finish()
 

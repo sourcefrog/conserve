@@ -16,7 +16,10 @@ import time
 
 
 from duralib.archive import Archive
-from duralib.timeutils import isotime
+from duralib.timeutils import (
+    isotime,
+    reltime,
+    )
 
 
 _log = logging.getLogger('dura')
@@ -35,6 +38,27 @@ def cmd_describe_archive(args):
     """Show summary information about an archive."""
     archive = Archive.open(args.archive_directory)
     _log.info("Opened archive %r", archive)
+
+
+def cmd_describe_band(args):
+    """Show summary information about a backup band."""
+    archive = Archive.open(args.archive)
+    band = archive.open_band_reader(args.band or archive.last_band())
+    print 'band:    ', band.band_number
+    print 'path:    ', band.path
+    band.read_head()
+    if band.head:
+        print 'started: ', isotime(band.head.start_unixtime)
+        print 'hostname:', band.head.source_hostname
+    band.read_tail()
+    if band.tail:
+        print 'state:    finished'
+        print 'finished:', isotime(band.tail.end_unixtime)
+        if band.head:
+            print 'duration:', reltime(band.tail.end_unixtime - band.head.start_unixtime)
+        print 'blocks:  ', band.tail.block_count
+    else:
+        print 'state: open'
 
 
 def cmd_backup(args):
@@ -84,7 +108,7 @@ def cmd_list_files(args):
     if args.band:
         band_name = args.band
     else:
-        band_name = archive.list_bands()[-1]
+        band_name = archive.last_band()
         # TODO(mbp): nice error if empty
     band = archive.open_band_reader(band_name)
     for block_name in band.list_blocks():

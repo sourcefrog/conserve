@@ -8,3 +8,6 @@ import time
 
 def isotime(unixtime):
     return time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime(unixtime))
+
+def reltime(seconds):
+    return '%ds (%d minutes)' % (seconds, seconds/60)
