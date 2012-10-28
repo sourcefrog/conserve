@@ -34,7 +34,7 @@ class TestArchive(DuraTestCase):
 
     def setUp(self):
         super(TestArchive, self).setUp()
-        self.archive_path = self.subpath("testarchive")
+        self.archive_path = self.relpath("testarchive")
 
     def test_create_archive(self):
         new_archive = Archive.create(self.archive_path)

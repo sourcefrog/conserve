@@ -20,9 +20,9 @@ from duralib.tests.durafixtures import EmptyArchive
 class TestCommandLine(DuraTestCase):
 
     def test_create_archive(self):
-        cli.run_command(['create-archive', self.subpath('a')])
+        cli.run_command(['create-archive', self.relpath('a')])
         self.assertTrue(os.path.isfile(
-            os.path.join(self.subpath('a'), 'DURA-ARCHIVE')))
+            os.path.join(self.relpath('a'), 'DURA-ARCHIVE')))
 
     def test_describe_archive(self):
         # smoke test
@@ -35,7 +35,7 @@ class TestBackupCommand(DuraTestCase):
 
     def test_backup(self):
         archive_fixture = self.useFixture(EmptyArchive())
-        source_path = self.subpath('sourcefile')
+        source_path = self.relpath('sourcefile')
         file(source_path, 'w').write('hello!')
         archive_path = archive_fixture.archive.path
         cli.run_command(['backup', source_path, archive_path])

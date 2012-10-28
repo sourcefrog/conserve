@@ -23,6 +23,6 @@ class DuraTestCase(TestWithFixtures):
         super(DuraTestCase, self).setUp()
         self.tmpdir = self.useFixture(TempDir()).path
 
-    def subpath(self, p):
+    def relpath(self, p):
         """Make a path relative to tmpdir."""
         return os.path.join(self.tmpdir, p)
