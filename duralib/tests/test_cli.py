@@ -54,7 +54,7 @@ def TestListBands(DuraTestCase):
         out = StringIO()
         archive = self.useFixture(PopulatedArchive()).archive
         cli.run_command(
-            ['list-bands', archive.path],
+            ['list-bands', '-q', archive.path],
             stdout=out)
         self.assertEquals(
             "\n".join("%04d" % i for i in range(3)) + "\n",

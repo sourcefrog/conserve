@@ -34,6 +34,7 @@ class Band(object):
 
     def __init__(self, archive, band_number):
         self.archive = archive
+        self.open = False  # can only be true on writers
         self.band_number = _canonicalize_band_number(band_number)
         self.path = os.path.join(
             self.archive.path,
@@ -58,6 +59,16 @@ class Band(object):
         if filename.startswith(cls.name_prefix):
             return filename[len(cls.name_prefix):]
 
+    def read_head(self):
+        self.head_pb = read_proto_from_file(BandHead, self.relpath(head_name))
+
+
+class BandReader(Band):
+    """A band open for readonly access.
+
+    May or may not be complete.  May be concurrently written by other processes.
+    """
+
 
 class BandWriter(Band):
     """Writes in to a band.
@@ -68,6 +79,7 @@ class BandWriter(Band):
 
     def start_band(self):
         _log.info("start band %r" % self)
+        assert not self.open
         self.open = True
         os.mkdir(self.path)
         head_pb = dura_pb2.BandHead()
@@ -75,11 +87,13 @@ class BandWriter(Band):
         head_pb.start_unixtime = int(time.time())
         head_pb.source_hostname = socket.gethostname()
         write_proto_to_file(head_pb, self.relpath(self.head_name))
+        self.head_pb = head_pb
 
     def finish_band(self):
         """Write the band tail; after this no changes are allowed."""
         _log.info("mark band %r finished" % self)
-        self.closed = True
+        assert self.open
+        self.open = False
         tail_pb = dura_pb2.BandTail()
         tail_pb.band_number = self.band_number
         # TODO(mbp): set block count!

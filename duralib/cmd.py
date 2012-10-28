@@ -61,3 +61,4 @@ def cmd_list_bands(args):
     archive = Archive.open(args.archive)
     for band_name in archive.list_bands():
         args.stdout.write("%s\n" % band_name)
+

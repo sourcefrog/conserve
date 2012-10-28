@@ -18,6 +18,7 @@ from duralib import errors
 from duralib.proto import dura_pb2
 from duralib.band import (
     Band,
+    BandReader,
     BandWriter,
     cmp_band_numbers,
     )
@@ -103,6 +104,12 @@ class Archive(object):
             next_number = 0
         band = BandWriter(self, str(next_number))
         band.start_band()
+        return band
+
+    def open_band_reader(self, band_number):
+        """Open an existing band for reading."""
+        band = BandReader(self, band_number)
+        band.read_head()
         return band
 
     def list_bands(self):

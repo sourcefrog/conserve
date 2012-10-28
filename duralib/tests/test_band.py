@@ -11,7 +11,9 @@ from duralib.band import (
     _canonicalize_band_number,
     )
 from duralib.tests.base import DuraTestCase
-
+from duralib.tests.fixtures import (
+    EmptyArchive,
+    )
 
 class TestBandNumbers(DuraTestCase):
     """Test formatting, parsing, sorting of band numbers."""
@@ -42,3 +44,17 @@ class TestBandNumbers(DuraTestCase):
             numbers,
             sorted(sorted(numbers, reverse=True),
                 cmp=cmp_band_numbers))
+
+
+def TestBandHead(DuraTestCase):
+
+    def test_read_head(self):
+        archive = self.useFixture(EmptyArchive()).archive
+        writer = archive.create_band()
+        # try to read while it's open
+        reader = archive.open_band_reader(writer.band_number)
+        self.assertEquals("0000", reader.band_number)
+        # finish, and try to read again
+        writer.finish_band()
+        reader = archive.open_band_reader(writer.band_number)
+        self.assertEquals("0000", reader.band_number)

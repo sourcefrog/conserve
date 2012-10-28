@@ -65,6 +65,9 @@ def _make_parser():
 
     cp = _parser_for_cmd('list-bands')
     cp.add_argument('archive', help='Path of archive directory')
+    cp.add_argument(
+        '--names-only', '-q',
+        help='Just list band names, nothing else.')
 
     return parser
 
