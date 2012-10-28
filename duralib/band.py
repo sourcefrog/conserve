@@ -39,6 +39,11 @@ class Band(object):
             self.archive.path,
             self.name_prefix + self.band_number)
 
+    def __repr__(self):
+        return '%s(path=%r)' % (
+            self.__class__.__name__,
+            getattr(self, 'path'))
+
     def relpath(self, subpath):
         """Convert band-relative path to an absolute path."""
         return os.path.join(self.path, subpath)
@@ -62,7 +67,7 @@ class BandWriter(Band):
     """
 
     def start_band(self):
-        _log.info("create band directory %s" % self.path)
+        _log.info("start band %r" % self)
         self.open = True
         os.mkdir(self.path)
         head_pb = dura_pb2.BandHead()
@@ -73,6 +78,7 @@ class BandWriter(Band):
 
     def finish_band(self):
         """Write the band tail; after this no changes are allowed."""
+        _log.info("mark band %r finished" % self)
         self.closed = True
         tail_pb = dura_pb2.BandTail()
         tail_pb.band_number = self.band_number
