@@ -6,6 +6,7 @@
 
 from __future__ import absolute_import
 
+from cStringIO import StringIO
 import os.path
 import tempfile
 import unittest
@@ -45,3 +46,16 @@ class TestBackupCommand(DuraTestCase):
         self.assertEquals(
             ['BAND-HEAD', 'BAND-TAIL', 'd000000.d', 'd000000.i'],
             sorted(os.listdir(expected_band_path)))
+
+
+def TestListBands(DuraTestCase):
+
+    def test_list_bands(self):
+        out = StringIO()
+        archive = self.useFixture(PopulatedArchive()).archive
+        cli.run_command(
+            ['list-bands', archive.path],
+            stdout=out)
+        self.assertEquals(
+            "\n".join("%04d" % i for i in range(3)) + "\n",
+            out.getvalue())

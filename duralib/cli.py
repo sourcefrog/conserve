@@ -63,6 +63,9 @@ def _make_parser():
         'archive',
         help='Existing archive directory')
 
+    cp = _parser_for_cmd('list-bands')
+    cp.add_argument('archive', help='Path of archive directory')
+
     return parser
 
 
@@ -83,7 +86,9 @@ def parse_command(argv):
     return args
 
 
-def run_command(argv):
+def run_command(argv, stdout=None):
     args = parse_command(argv)
+    # TODO(mbp): More elegant way to pass it?
+    args.stdout = stdout
     args.cmd_func(args)
     return 0

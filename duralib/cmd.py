@@ -58,4 +58,6 @@ def cmd_backup(args):
 
 def cmd_list_bands(args):
     """List bands in an archive."""
-    pass
+    archive = Archive.open(args.archive)
+    for band_name in archive.list_bands():
+        args.stdout.write("%s\n" % band_name)
