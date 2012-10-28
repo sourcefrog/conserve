@@ -77,6 +77,7 @@ def _make_parser():
     cp = _parser_for_cmd('list-files')
     cp.add_argument('archive', help='Path of archive directory')
     cp.add_argument('--band', help='Number of band')
+    cp.add_argument('--block', help='List only this block')
     cp.add_argument(
         '--names-only', '-q',
         help='Just list file names.',

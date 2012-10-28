@@ -111,6 +111,10 @@ def cmd_list_files(args):
         band_name = archive.last_band()
         # TODO(mbp): nice error if empty
     band = archive.open_band_reader(band_name)
-    for block_name in band.list_blocks():
+    if args.block:
+        block_list = [args.block]
+    else:
+        block_list = band.list_blocks()
+    for block_name in block_list:
         block_index = band.read_block_index(block_name)
         print_block_index(block_index, names_only=args.names_only)
