@@ -12,6 +12,7 @@ import time
 
 from duralib.block import (
     match_block_index_name,
+    BlockWriter,
     )
 from duralib.ioutils import (
     read_proto_from_file,
@@ -95,6 +96,12 @@ class Band(object):
         else:
             next = int(existing_blocks[-1]) + 1
         return '%06d' % next
+
+    def create_block(self):
+        number = self.next_block_number()
+        writer = BlockWriter(self, number)
+        writer.begin()
+        return writer
 
 
 class BandReader(Band):
