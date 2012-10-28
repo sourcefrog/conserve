@@ -133,7 +133,9 @@ class Archive(object):
         return result
 
     def last_band(self):
-        return self.list_bands()[-1]
+        bands = self.list_bands()
+        if bands:
+            return bands[-1]
 
 
 class NoSuchArchive(errors.DuraError):

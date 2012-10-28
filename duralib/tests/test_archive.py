@@ -8,6 +8,7 @@ from __future__ import absolute_import
 
 import errno
 import os.path
+import unittest
 
 from duralib.archive import (
     Archive,
@@ -92,6 +93,9 @@ class TestArchive(DuraTestCase):
             "Bad archive header: %s" % orig_archive.relpath('DURA-ARCHIVE'),
             str(ar.exception))
 
+
+class TestListBands(DuraTestCase):
+
     def test_list_bands_empty(self):
         archive = self.useFixture(EmptyArchive()).archive
         self.assertEquals([], archive.list_bands())
@@ -101,6 +105,17 @@ class TestArchive(DuraTestCase):
         self.assertEquals(
             ["0000", "0001", "0002"],
             archive.list_bands())
+
+    def test_last_band_empty(self):
+        archive = self.useFixture(EmptyArchive()).archive
+        self.assertEquals(None, archive.last_band())
+
+    def test_last_band_populated(self):
+        archive = self.useFixture(PopulatedArchive()).archive
+        self.assertEquals('0002', archive.last_band())
+
+
+class TestCreateBand(DuraTestCase):
 
     def test_create_band(self):
         archive = self.useFixture(EmptyArchive()).archive
