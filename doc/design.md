@@ -185,11 +185,59 @@ Fields:
    - denied: permissions error from the OS
    - corrupt: protobuf deserialization failed, etc
    - mismatch: hash is not what a higher-level object says it should be
+   - exists: a file to be written already exists
  - *filename*
  - *message* - only what can't be stored elsewhere
 
 Handling options:
  - abort
  - continue (with a warning)
- - ask
+ - ask (interactively; perhaps not very useful in a long backup)
  - suppress (with only a debug message)
+
+The default should probably (?) be to abort on almost everything, except perhaps
+not on source alarms.
+
+It should be possible to get a summary, and machine-readable details of alarms
+fired.
+
+
+Return codes and result reporting
+---------------------------------
+
+It's bad if a backup aborts without storing anything because of a footling
+error: it may be some unimportant source file was unreadable and therefore
+nothing was stored.  On the other hand, it's also bad if the backup apparently
+succeeds when there are errors, because the file that was skipped might have
+actually been the most important one.
+
+Therefore there need to be concise and clear summary results, that can be
+read by humans and by scripts reading the output, and an overall one-byte
+summary in the return code.
+
+Possible return codes:
+
+ - everything was ok (0)
+   - no alarms at all
+   - backup completed
+
+ - backup completed with warnings:
+   - some source files couldn't be read?
+   - every source file that could be read has been stored
+
+ - backup completed but with major warnings:
+   - some already stored data seems to be corrupt?
+
+ - fatal error
+   - bad arguments, etc
+   - unexpected exception
+
+We also need to consider the diff, verify, validate cases:
+
+ - some data is wrong or missing, but it may still be possible to restore
+   everything (eg a hash is wrong)
+ - some data is wrong or missing so at least some files can't be restored
+ - the source differs from the backup, in ways that might be accounted for by
+   changes since the date of the backup
+ - the source differs from the backup, with those changes apparently dating
+   from before the backup was made
