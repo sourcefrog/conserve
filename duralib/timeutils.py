@@ -10,4 +10,7 @@ def isotime(unixtime):
     return time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime(unixtime))
 
 def reltime(seconds):
-    return '%ds (%d minutes)' % (seconds, seconds/60)
+    r = '%ds' % seconds
+    if seconds > 120:
+        r += ' (%d minutes)' % (seconds/60)
+    return r
