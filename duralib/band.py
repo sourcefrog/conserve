@@ -41,7 +41,7 @@ class Band(object):
     def __init__(self, archive, band_number):
         self.archive = archive
         self.open = False  # can only be true on writers
-        self.band_number = _canonicalize_band_number(band_number)
+        self.band_number = canonical_band_number(band_number)
         self.path = self.archive.relpath(
             self.name_prefix + self.band_number)
 
@@ -152,8 +152,8 @@ class BandWriter(Band):
         return not self.open
 
 
-def _canonicalize_band_number(band_number):
-    return '%04d' % int(band_number)
+def canonical_band_number(band_number):
+    return band_number.rjust(4, '0')
 
 
 def cmp_band_numbers(n1, n2):

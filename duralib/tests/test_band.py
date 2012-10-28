@@ -10,8 +10,8 @@ import unittest
 
 from duralib.band import (
     Band,
+    canonical_band_number,
     cmp_band_numbers,
-    _canonicalize_band_number,
     )
 from duralib.tests.base import DuraTestCase
 from duralib.tests.durafixtures import (
@@ -38,11 +38,11 @@ class TestBandNumbers(DuraTestCase):
         self.assertEqual("420000", Band.match_band_name("b420000"))
         self.assertEqual(None, Band.match_band_name("pony"))
 
-    def test_canonicalize_band_number(self):
-        self.assertEqual("0000", _canonicalize_band_number("0"))
-        self.assertEqual("0042", _canonicalize_band_number("42"))
-        self.assertEqual("9999", _canonicalize_band_number("9999"))
-        self.assertEqual("123456", _canonicalize_band_number("123456"))
+    def test_canonical_band_number(self):
+        self.assertEqual("0000", canonical_band_number("0"))
+        self.assertEqual("0042", canonical_band_number("42"))
+        self.assertEqual("9999", canonical_band_number("9999"))
+        self.assertEqual("123456", canonical_band_number("123456"))
 
     def test_cmp_band_number(self):
         self.assertEqual(-1, cmp_band_numbers("0000", "0001"))
