@@ -29,6 +29,11 @@ Within each tier, there are multiple *bands*.  (For example, "the monthly
 backup made on 2012-10-01.")  A band may have a *parent* band, which is one
 particular band in the immediately lower tier.
 
+A band may be *open*, while it is receiving data, or *finished* when
+everything from the source has been written.  Bands may remain open
+indefinitely, across multiple Dura invocations, until they are finished.
+Once the band is finished, it will not be changed.
+
 Bands are numbered hierarchically across tiers and sequentially within
 a tier, starting at 0.  So the first base tier band in the whole archive
 is 0000, the first incremental band on top of it is 0000-0000,
@@ -52,8 +57,15 @@ long.)  For example:
 
 A band contains file contents and metadata.
 
-A band is composed of a *header*, *footer*, and multiple *blocks*, each
+A band is composed of a *head*, *tail*, and multiple *blocks*, each
 with a *block index* and a *block data*.
+
+A band head is a file `BAND-HEAD` containing a `BandHead` protobuf.
+
+A band tail is a file `BAND-TAIL` containing a `BandTail` protobuf, only for
+finished bands: it is the presence of this file that defines the band as
+complete.
+
 
 Blocks
 ------

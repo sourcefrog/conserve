@@ -76,6 +76,8 @@ class TestArchive(DuraTestCase):
             os.path.isdir(band.path))
         self.assertEquals(
             ["0000"], archive.list_bands())
+        self.assertEquals(
+            ["BAND-HEAD"], os.listdir(band.path))
 
     def test_create_band_repeated(self):
         archive = self.useFixture(EmptyArchive()).archive

@@ -5,9 +5,10 @@
 
 import logging
 import os
-import sha
+import socket
 import stat
 import sys
+import time
 
 from duralib.proto import dura_pb2
 
@@ -25,6 +26,9 @@ class Band(object):
     # Prefix on band directory names.
     name_prefix = 'b'
 
+    head_name = 'BAND-HEAD'
+    tail_name = 'BAND-TAIL'
+
     def __init__(self, archive, band_number):
         self.archive = archive
         self.band_number = _canonicalize_band_number(band_number)
@@ -36,10 +40,6 @@ class Band(object):
         """Convert band-relative path to an absolute path."""
         return os.path.join(self.path, subpath)
 
-    def create_directory(self):
-        _log.info("create band directory %s" % self.path)
-        os.mkdir(self.path)
-
     @classmethod
     def match_band_name(cls, filename):
         """Try to interpret a filename as a band name.
@@ -49,6 +49,21 @@ class Band(object):
         """
         if filename.startswith(cls.name_prefix):
             return filename[len(cls.name_prefix):]
+
+
+class BandWriter(Band):
+    """Writes in to a band."""
+
+    def start_band(self):
+        _log.info("create band directory %s" % self.path)
+        os.mkdir(self.path)
+        head_pb = dura_pb2.BandHead()
+        head_pb.band_number = self.band_number
+        head_pb.start_unixtime = int(time.time())
+        head_pb.source_hostname = socket.gethostname()
+        with file(self.relpath(self.head_name), 'wb') as f:
+            f.write(head_pb.SerializeToString())
+
 
 
 def read_index(index_file_name):

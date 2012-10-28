@@ -18,6 +18,7 @@ from duralib import errors
 from duralib.proto import dura_pb2
 from duralib.band import (
     Band,
+    BandWriter,
     cmp_band_numbers,
     )
 
@@ -92,15 +93,16 @@ class Archive(object):
         """Make a new band within the archive.
 
         Returns:
-          A new Band object, which is on disk and empty.
+          A new BandWriter object, which has its directory and head
+          on disk, but is otherwise empty.
         """
         existing_bands = list(self.list_bands())
         if existing_bands:
             next_number = max(int(b) for b in existing_bands) + 1
         else:
             next_number = 0
-        band = Band(self, str(next_number))
-        band.create_directory()
+        band = BandWriter(self, str(next_number))
+        band.start_band()
         return band
 
     def list_bands(self):

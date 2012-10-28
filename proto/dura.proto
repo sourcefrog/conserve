@@ -20,6 +20,36 @@ enum FileType {
 }
 
 
+// One BandHead in 'BAND-HEAD' in each band directory.
+message BandHead {
+    // Should correspond to the on-disk band number, eg "0000".
+    optional string band_number = 1;
+
+    // Seconds since the epoch.
+    optional int64 start_unixtime = 2;
+
+    optional string source_hostname = 3;
+}
+
+
+// One BandTail in 'BAND-TAIL' for complete bands only.
+message BandTail {
+    optional string band_number = 1;
+
+    // Seconds since the epoch.
+    optional int64 start_unixtime = 2;
+
+    optional string source_hostname = 3;
+
+    optional int32 block_count = 4;
+
+    // TODO(mbp): Maybe, store lengths and hashes of all index blocks?
+    // But that may make it slow to finish the band, if they need to
+    // all be re-read, and there's no guarantee they weren't corrupted while
+    // the band was being written...
+}
+
+
 // One FileIndex per file version.
 message FileIndex {
     // File path from backup root (generally utf-8).  (Required for all current files.)
