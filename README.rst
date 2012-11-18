@@ -53,3 +53,15 @@ Manifesto
 * The backup archive should be a pure function of the source directory
   and history of backup operations.  (If the backup metadata includes
   a timestamp, you can pass in the timestamp to get the same result.)
+
+
+Dependencies
+************
+
+Ubuntu/Debian package names:
+
+    python-protobuf
+    protobuf-compiler
+    make
+    python-fixtures
+    python-testresources
