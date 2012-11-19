@@ -1,5 +1,7 @@
 # Copyright 2012 Martin Pool
 # Licensed under the Apache License, Version 2.0 (the "License").
+#
+# vim: sw=4 et
 
 """Abstracted commands.
 
@@ -118,3 +120,10 @@ def cmd_list_files(args):
     for block_name in block_list:
         block_index = band.read_block_index(block_name)
         print_block_index(block_index, names_only=args.names_only)
+
+
+def cmd_validate(args):
+    """Check an archive is internally consistent and well-formed."""
+    from duralib.validate import validate_archive
+    validate_archive(args.archive)
+

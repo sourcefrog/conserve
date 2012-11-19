@@ -43,6 +43,14 @@ def _make_parser():
         metavar='command',  # argparse arg metavars are in lowercase.
         )
 
+    cp = _parser_for_cmd('backup')
+    cp.add_argument(
+        'source_file', nargs=argparse.ONE_OR_MORE,
+        help='File to store')
+    cp.add_argument(
+        'archive',
+        help='Existing archive directory')
+
     cp = _parser_for_cmd('create-archive')
     cp.add_argument(
         'archive_directory',
@@ -59,14 +67,6 @@ def _make_parser():
         help='Local path to archive directory')
     cp.add_argument('--band', help='Number of band')
 
-    cp = _parser_for_cmd('backup')
-    cp.add_argument(
-        'source_file', nargs=argparse.ONE_OR_MORE,
-        help='File to store')
-    cp.add_argument(
-        'archive',
-        help='Existing archive directory')
-
     cp = _parser_for_cmd('list-bands')
     cp.add_argument('archive', help='Path of archive directory')
     cp.add_argument(
@@ -82,6 +82,11 @@ def _make_parser():
         '--names-only', '-q',
         help='Just list file names.',
         action='store_true')
+
+    cp = _parser_for_cmd('validate')
+    cp.add_argument(
+        'archive',
+        help='Existing archive directory')
 
     return parser
 

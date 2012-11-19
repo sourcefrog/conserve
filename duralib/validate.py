@@ -1,7 +1,18 @@
 # Copyright 2012 Martin Pool
 # Licensed under the Apache License, Version 2.0 (the "License").
+#
+# vim: sw=4 et
 
-"""Write a band of files to the archive."""
+"""Validate an archive, or components of it.
+
+Validation means checking that the archive is well-formed and internally
+consistent: for example, that the hashes in block indexes correspond to the
+data actually stored in the block data files.  There's no guarantee that 
+the data matches any actual source but it does attempt to show it matches
+one possible source.
+"""
+
+# TODO(mbp): Allow validating just a single block, or a single band, etc.
 
 import logging
 import os
@@ -12,7 +23,17 @@ import sys
 from google.protobuf import text_format
 
 from duralib import _log
+from duralib.archive import Archive
 from duralib.proto import dura_pb2
+
+
+def validate_archive(archive_path):
+    """Validate an archive and all its contents."""
+    _log.info("start validating %s", archive_path)
+    archive = Archive.open(archive_path)
+    _log.info("validation of %s succeeded", archive_path)
+
+
 
 
 def check_block(band_filename):
@@ -41,7 +62,3 @@ def check_block(band_filename):
         body_bytes = data_file.read(file.data_length)
         assert len(body_bytes) == file.data_length
         assert sha.sha(body_bytes).digest() == file.data_sha1
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
-    check_block(sys.argv[1])
