@@ -14,7 +14,7 @@ protos:
 	protoc --python_out=duralib/ proto/dura.proto
 
 messages.pot:
-	pygettext dura.py duralib/*.py
+	pygettext dura duralib/*.py
 
 check-staged:
 	t=`mktemp -d --suffix .duralib-test` && \
