@@ -6,7 +6,7 @@ lint:
 	pylint --rcfile pylintrc --output-format parseable --ignore dura_pb2.py duralib
 
 check: protos
-	PYTHONPATH=. $(PYTHON) -m unittest discover -v
+	PYTHONPATH=.:$$PYTHONPATH $(PYTHON) -m unittest discover -v
 
 protos:
 	mkdir -p duralib/proto
