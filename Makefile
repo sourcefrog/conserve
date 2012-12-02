@@ -8,7 +8,9 @@ lint:
 check: protos
 	PYTHONPATH=.:$$PYTHONPATH $(PYTHON) -m unittest discover -v
 
-protos:
+protos: duralib/proto/dura_pb2.py
+
+duralib/proto/__init__.py duralib/proto/dura_pb2.py: proto/dura.proto
 	mkdir -p duralib/proto
 	touch duralib/proto/__init__.py
 	protoc --python_out=duralib/ proto/dura.proto
