@@ -65,3 +65,11 @@ Ubuntu/Debian package names:
     make
     python-fixtures
     python-testresources
+
+Or, equivalent Python package names:
+
+    fixtures
+    testresources
+    protobuf
+    testtools
+
