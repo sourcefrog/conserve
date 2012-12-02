@@ -12,7 +12,7 @@ archive per source directory to be backed up.
 
 To start making a backup:
 
-    dura create-archive /backup/my-src.dura
+    % dura create-archive /backup/my-src.dura
 
 This creates a directory containing a header file.
 
@@ -24,7 +24,7 @@ To store a backup of some source files into the archive, use the
 `backup` command.  In the current version all files must be explicitly
 listed, eg with the `find` command:
 
-    dura backup `find ~/src` /backup/my-src.dura
+    % dura backup `find ~/src` /backup/my-src.dura
 
 
 Bands
@@ -40,11 +40,16 @@ sequential integers.
 Examining bands
 ---------------
 
-The `list-bands` command shows all the bands in an archive.
+The `list-bands` command shows all the bands in an archive:
 
-`list-files` shows all the files in a particular band, including the 
+    % dura list-bands /backup/my-src.dura
+    0000       2012-12-02T16:24:33   duratesthost.local
+    0001       2012-12-02T16:24:45   duratesthost.local
+
+`list-files` shows all the files in a band, including the 
 time they were made and the host from which they were made.
-
+Like all commands that read a band from an archive, it operates
+on the most recent by default.
 
 Validation
 ----------
