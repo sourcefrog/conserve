@@ -32,7 +32,6 @@ from duralib.tests.durafixtures import (
     )
 
 
-
 class TestArchive(DuraTestCase):
 
     def setUp(self):
@@ -155,16 +154,6 @@ class TestCreateBand(DuraTestCase):
             ["%04d" % i for i in range(num_bands)],
             archive.list_bands())
 
-
-class TestValidate(DuraTestCase):
-
-    def test_validate_empty(self):
-    	"""Verify a clean empty archive."""
-	archive = self.useFixture(EmptyArchive()).archive
-	validate_archive(archive.path)
-
-    # TODO(mbp): Use some kind of ui abstraction so that we can observe what
-    # was claimed to be validated.
 
 
 if __name__ == '__main__':
