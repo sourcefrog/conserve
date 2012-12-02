@@ -32,11 +32,9 @@ from duralib.proto import dura_pb2
 
 def validate_archive(archive_path):
     """Validate an archive and all its contents."""
-    ui.emit('start-validate', archive_path=archive_path)
+    ui.emit('validate-started', archive_path=archive_path)
     archive = Archive.open(archive_path)
-    _log.info("validation of %s succeeded", archive_path)
-
-
+    ui.emit('validate-succeeded')
 
 
 def check_block(band_filename):

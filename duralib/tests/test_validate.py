@@ -43,7 +43,8 @@ class TestValidate(DuraTestCase):
         """Validate a clean empty archive."""
         archive = self.useFixture(EmptyArchive()).archive
         validate_archive(archive.path)
-
-        # TODO(mbp): Use some kind of ui abstraction so that we can observe what
-        # was claimed to be validated.
+        self.assertEquals(
+            [('validate-started', {'archive_path': archive.path}),
+             ('validate-succeeded', {})],
+            self.capture_ui.actions)
         

@@ -40,6 +40,9 @@ class DuraTestCase(TestWithFixtures):
 class CaptureUI(Fixture):
     """Intercept and record all UI actions."""
 
+    # TODO(mbp): Maybe a structured way to check for ui actions, skipping actions 
+    # or attributes that don't matter.  Or maybe we should just test them.
+
     def setUp(self):
         super(CaptureUI, self).setUp()
         self.actions = []
