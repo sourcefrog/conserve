@@ -155,12 +155,41 @@ Random features
 UI
 --
 
+Goals:
+ 
+ * accumulate all actions so they can easily be compared to expected
+   results at the end of a test
+
+ * show them in nicely formatted text output, eg with indenting,
+   color or tabulation, not just log output
+
+ * stream output rather than waiting for the whole command to finish
+
+ * perhaps later support a gui
+
+ * ui interactions can be externalized onto pipes
+
+ * show progress bars, which implies knowing when an operation starts 
+   and ends and if possible how many items are to be processed
+
+ * simple inside the main application code
+
+ * not too many special cases in the ui code
+
 Emit fairly abstracted events that can be mapped into a ui, or just
 emitted to stdout.  Maybe emit them as (ascii?) protobufs?
 
 Human strings are internationalized: this should be done strictly in
 the UI layer.  Debug/log strings can be emitted anywhere and don't need
 i18n.
+
+XXX: is it enough, perhaps, just to use logging? Perhaps that's the 
+simplest thing that would work, for now, enough to do some testing? 
+Open questions:
+
+ * Transmit the actual text to be shown to the user, or some kind of 
+   symbol?  Text is enough to test it, but not so good for reformatting
+   things.
 
 
 Alarms

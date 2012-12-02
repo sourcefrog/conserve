@@ -9,7 +9,14 @@ from __future__ import absolute_import
 import os.path
 import unittest
 
-from fixtures import TempDir, TestWithFixtures
+from fixtures import (
+    Fixture,
+    MonkeyPatch,
+    TempDir,
+    TestWithFixtures,
+    )
+
+from duralib import ui
 
 
 class DuraTestCase(TestWithFixtures):
@@ -22,7 +29,21 @@ class DuraTestCase(TestWithFixtures):
     def setUp(self):
         super(DuraTestCase, self).setUp()
         self.tmpdir = self.useFixture(TempDir()).path
+        self.capture_ui = CaptureUI()
+        self.useFixture(self.capture_ui)
 
     def relpath(self, p):
         """Make a path relative to tmpdir."""
         return os.path.join(self.tmpdir, p)
+
+
+class CaptureUI(Fixture):
+    """Intercept and record all UI actions."""
+
+    def setUp(self):
+        super(CaptureUI, self).setUp()
+        self.actions = []
+        self.useFixture(MonkeyPatch('duralib.ui.emit', self.captured_emit))
+
+    def captured_emit(self, action, **kwargs):
+        self.actions.append((action, kwargs.copy()))

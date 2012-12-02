@@ -22,14 +22,17 @@ import sys
 
 from google.protobuf import text_format
 
-from duralib import _log
+from duralib import (
+    _log,
+    ui,
+    )
 from duralib.archive import Archive
 from duralib.proto import dura_pb2
 
 
 def validate_archive(archive_path):
     """Validate an archive and all its contents."""
-    _log.info("start validating %s", archive_path)
+    ui.emit('start-validate', archive_path=archive_path)
     archive = Archive.open(archive_path)
     _log.info("validation of %s succeeded", archive_path)
 
