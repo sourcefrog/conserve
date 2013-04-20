@@ -60,16 +60,7 @@ Dependencies
 
 Ubuntu/Debian package names:
 
-    python-protobuf
+    libprotobuf-dev
+    clang
     protobuf-compiler
     make
-    python-fixtures
-    python-testresources
-
-Or, equivalent Python package names:
-
-    fixtures
-    testresources
-    protobuf
-    testtools
-
