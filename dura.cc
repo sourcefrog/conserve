@@ -17,18 +17,16 @@ namespace po = boost::program_options;
 
 int parse_options(int argc, char *argv[]) {
     string command;
+    string archive_base_dir;
 
     po::options_description desc("Allowed options");
     desc.add_options()
-	("help", "show help message")
-	("command", po::value<string>(&command), "command to run");
+        ("help", "show help message")
+        ("command", po::value<string>(&command), "command to run")
+        ("archive-dir", po::value(&archive_base_dir));
 
-    po::options_description commands("Commands");
-    commands.add_options()
-	("init-archive", "create a new archive directory");
     po::positional_options_description posopts;
     posopts.add("command", 1);
-
 
     po::variables_map vm;
     po::command_line_parser parser(argc, argv);
@@ -39,15 +37,21 @@ int parse_options(int argc, char *argv[]) {
     po::notify(vm);
 
     if (vm.count("help")) {
-	cout << desc << "\n";
-	return 1;
+        cout << desc << "\n";
+        return 1;
     }
     if (!command.length()) {
-	cout << "no command given!\n";
-	return 1;
+        cout << "no command given!\n";
+        return 1;
+    } else if (command == "init-archive") {
+        if (archive_base_dir.empty()) {
+            cout << "no archive-dir specified\n";
+            return 1;
+        }
+        Archive* arch = Archive::create(archive_base_dir);
     } else {
-	cout << "command: " << command << "\n";
-	return 0;
+        cout << "command: " << command << "\n";
+        return 0;
     }
 
     return 0;
@@ -58,6 +62,6 @@ int parse_options(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
     if (dura::parse_options(argc, argv))
-	return 1;
+        return 1;
     return 0;
 }
