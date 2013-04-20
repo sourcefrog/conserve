@@ -1,7 +1,7 @@
 Dura is a (design for a) robust backup program
-##############################################
+==============================================
 
-Copyright 2012 Martin Pool.
+Copyright 2012-2013 Martin Pool.
 
 Dura is licensed under the Apache License, Version 2.0.
 
@@ -56,7 +56,7 @@ Manifesto
 
 
 Dependencies
-************
+============
 
 Ubuntu/Debian package names:
 
