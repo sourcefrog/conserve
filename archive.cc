@@ -1,5 +1,13 @@
 // Copyright 2013, Martin Pool
 
+#include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include <boost/filesystem.hpp>
+
 #include <google/protobuf/text_format.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
@@ -10,16 +18,35 @@
 namespace dura {
 
 using namespace std;
+
+using namespace boost;
+
 using namespace google::protobuf::io;
 using namespace google::protobuf;
 
-Archive* Archive::create(const string dir) {
+void write_proto_to_file(const Message& message,
+	const filesystem::path& path) {
+    int fd = open(path.string().c_str(),
+	    O_CREAT|O_EXCL|O_WRONLY,
+	    0666);
+    assert(fd > 0);
+    assert(message.SerializeToFileDescriptor(fd));
+    int ret = close(fd);
+    assert(ret == 0);
+}
+
+
+void write_archive_header(const filesystem::path& base_dir) {
     duralib::proto::ArchiveHeader header;
     header.set_magic("dura archive");
-    
-    FileOutputStream out_stream(0);
-    TextFormat::Print(header, &out_stream);
+    write_proto_to_file(header, base_dir/"DURA-ARCHIVE");
+}
 
+Archive* Archive::create(const string dir) {
+    filesystem::path base_path(dir);
+    filesystem::create_directory(base_path);
+    write_archive_header(base_path);
+    
     return new Archive(dir);
 }
 

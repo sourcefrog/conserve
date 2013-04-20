@@ -48,7 +48,7 @@ int parse_options(int argc, char *argv[]) {
             cout << "no archive-dir specified\n";
             return 1;
         }
-        Archive* arch = Archive::create(archive_base_dir);
+        Archive::create(archive_base_dir);
     } else {
         cout << "command: " << command << "\n";
         return 0;
