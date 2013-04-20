@@ -1,4 +1,8 @@
 *~
+*.o
+proto/*.pb.cc
+proto/*.pb.h
+dura
 .*.sw[po]
 *.py[co]
 htmlcov/

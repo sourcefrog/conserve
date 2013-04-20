@@ -1,25 +1,23 @@
-PYTHON=python
+CXX=clang++
+CXXFLAGS=-Wall 
+LIBS=-lprotobuf
+
+dura: dura.cc protos
+	$(CXX) $(CXXFLAGS) -I. $(LIBS) -o $@ dura.cc proto/dura.pb.cc
 
 all: protos
-
-lint:
-	pylint --rcfile pylintrc --output-format parseable --ignore dura_pb2.py duralib
 
 check: protos
 	PYTHONPATH=.:$$PYTHONPATH $(PYTHON) -m unittest discover -v
 
-protos: duralib/proto/dura_pb2.py
+protos: proto/dura.pb.cc
 
-duralib/proto/__init__.py duralib/proto/dura_pb2.py: proto/dura.proto
-	mkdir -p duralib/proto
-	touch duralib/proto/__init__.py
-	protoc --python_out=duralib/ proto/dura.proto
-
-messages.pot:
-	pygettext dura duralib/*.py
+proto/dura.pb.cc proto/dura.pb.h: proto/dura.proto
+	protoc --cc_out=. proto/dura.proto
 
 check-staged:
 	t=`mktemp -d -t duralib-test` && \
 	git checkout-index --prefix "$$t/" -a && \
 	make -C "$$t" check && \
 	rm -r "$$t"
+
