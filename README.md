@@ -1,7 +1,7 @@
 Dura is a (design for a) robust backup program
 ==============================================
 
-Copyright 2012-2013 Martin Pool.
+Copyright 2012-2013 [Martin Pool](http://sourcefrog.net/) <mbp@sourcefrog.net>.
 
 Dura is licensed under the Apache License, Version 2.0.
 
@@ -9,7 +9,7 @@ At this time Dura is not ready for use.
 
 
 Manifesto
-*********
+---------
 
 * The most important thing is that data be retrieved when it's needed;
   within reason it's worth trading off other attributes for that.
