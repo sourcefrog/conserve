@@ -1,9 +1,11 @@
 CXX=clang++
-CXXFLAGS=-Wall 
-LIBS=-lprotobuf
+CXXFLAGS=-Wall -std=c++11
+LIBS=-lprotobuf -lboost_program_options
 
-dura: dura.cc protos
-	$(CXX) $(CXXFLAGS) -I. $(LIBS) -o $@ dura.cc proto/dura.pb.cc
+srcs = dura.cc archive.cc
+
+dura: $(srcs)
+	$(CXX) $(CXXFLAGS) -I. $(LIBS) -o $@ $(srcs) proto/dura.pb.cc
 
 all: protos
 
