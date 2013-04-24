@@ -1,6 +1,16 @@
 Dura format
 ===========
 
+Generalities
+------------
+
+All header data is stored as [Google Protobufs](https://code.google.com/p/protobuf/).  
+Example in this document are expresed as (approximately) the text format of 
+protobufs, but the on-disk format is the compact binary form.
+
+Source
+------
+
 The backup *source* is a local directory.  (Actually, a local directory
 subject to some exclusion filters.)
 
@@ -114,9 +124,3 @@ is a *version*: extracting all the contents of the version recreates
 the source directory as it existed at the time the most recent band
 was recorded.  (Modulo any changes that happened during the recording
 of that band.)
-
-Generalities
-============
-
-Protobufs for all metadata: handles evolution, somewhat selfdescribing
-but also very efficient.
