@@ -7,6 +7,9 @@ backing up to either nearby local disks or in to cloud storage.
 Storage environment
 -------------------
 
+Dura makes limited assumptions about the archive storage, guided by what is 
+commonly supported by cloud storage.
+
 - You can write whole files, but not update in place
 
 - Almost unlimited in size
@@ -21,19 +24,20 @@ Storage environment
 
 - You can list directories (or, "list files starting with a certain prefix")
 
-- May or may not be case sensitive
+- May or may not be case sensitive.
 
-- Can't detect whether an empty directory exists or not
+- Can't detect whether an empty directory exists or not, and might not have a strong 
+  concept of directories, perhaps only ordered names.
 
-- Can try to not overwrite files, but not guaranteed coherent
+- Can try to not overwrite files, but not guaranteed coherent.
 
-- There is some prospect of local caching (but, relying on caches being
-  consistent might be dangerous or make behaviour unpredictable)
+- Dura can cache information onto the source machine's local disk, but of course
+  this cache may be lost or may need to be disabled.
 
 - Connection may be lost and the backup terminated at any point.
 
-- Not absolutely guaranteed read/write coherent (but Google Cloud Storage
-  is?)
+- No guarantee of read-after-write consistency.  (In practice, perhaps several seconds 
+  after writing the change will be visible.)
 
 Requirements
 ------------
@@ -62,21 +66,77 @@ Testing
   tested without doing real large work
 
 
-Open questions
---------------
+Write/write concurrency
+-----------------------
 
-- Locking on the repository against multiple concurrent writers?  Or, can
-  we avoid that by just having each writer choose their own names for each
-  layer/block etc.
+Dura is supposed to be run with just one process writing to destination archive at 
+any time, obviously just from one source.  It is basically up to the user to 
+configure the clients so this happens: to make sure that only one logical machine 
+tries to write to one archive, and that only one backup process runs on that machine
+at any time.
 
-- What if two processes are trying to continue with the same band at the
-  same time, and they both try to write similarly-named blocks?  Perhaps
-  it's ok to say the storage layer can detect this case and will abort
-  when it notices the block has appeared.
+However, it is possible something will go wrong and we end up with an inadvertent
+dual-master situation.  Requirements for that case are:
 
-- Maybe not actually tar?  Robert points out there's a lot of historical
-  cruft in the format, the format is not well defined, and there might be
-  some waste.
+ - Dura should not damage the repository.
+
+ - If possible, one writer should continue and write a full valid backup,
+   and all the others should terminate.
+
+ - This situation is expected to be rare so detecting it should not impose a large
+   performance or complexity cost.
+
+There may be different cases depending when the race occurs: 
+
+ - both are starting a new stripe
+ 
+ - both writing blocks within an existing strip
+
+Possible approaches (not mutually exclusive):
+
+ 1. Write a lock file when active and remove it when done.  This is difficult 
+    because of confusion about taking the lock without global consistency, 
+    and the client may die holding its lock.
+
+ 2. Name block files uniquely so that multiple writers don't conflict.  Not great
+    though because effort and space will be wasted making multiple backups.
+
+ 3. Use deterministic names and detect if the file to be written already exists 
+    (maybe writing it using a do-not-overwrite option, if the back end supports 
+    that).  But, without global consistency, we're not guaranteed to detect 
+    conflicts.
+
+ 4. Check the most-recently-written file before starting.  If it's recent 
+    (within say 20 minutes) and not from the same machine, or not from a 
+    process we can see is dead, warn or pause or abort.
+
+ 5. Keep a client-side lock file, on a filesystem that probably is coherent.
+    Store the pid and similar information to try to detect stale processes.
+    (Doesn't protect against multiple machines all thinking they should 
+    write to the same archive, or eg having different home directories on the 
+    same source.)
+
+ 6. Just make sure each block can be read in isolation even they do come 
+    from racing processes - minimal data dependencies between blocks.
+
+
+Read/write concurrency
+----------------------
+
+Logical readers are physically read-only, so any number can run without interfering
+with writers or with each other.
+
+Because the storage layer does not promise coherency readers will see data in 
+approximately but not exactly the order it was written by the writer.  In practice 
+this means that some files we might expect to be present may be missing.
+
+Perhaps, if a file is missing, we should wait a few seconds to see if it appears.
+
+But, the file may be permanently missing, perhaps because the writer crashed
+before the file was committed.
+
+So concurrency seems to be just a special case of readers being robust with 
+incomplete or damaged archives.
 
 
 Verification
@@ -115,20 +175,6 @@ To continue with a band, we need to just find the last file completely
 stored, which is the last name of the last block footer present in this
 bound.
 
-
-Concurrency
------------
-
-Concurrency is a bit hard because the storage layer is not necessarily
-coherent.
-
-Mostly have to assume people will, out of scope, make sure not to run two
-backups to the same archive at the same time.  Possibly could create a
-lock file against this on the source machine?
-
-Possibly can just abort when an unexpected file already exists.
-
-Let's just not worry about it for now.
 
 
 Random features
