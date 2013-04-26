@@ -8,6 +8,8 @@
 
 #include <boost/filesystem.hpp>
 
+#include <glog/logging.h>
+
 #include <google/protobuf/text_format.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
@@ -37,6 +39,7 @@ void write_proto_to_file(const Message& message,
 
 
 void write_archive_header(const filesystem::path& base_dir) {
+    LOG(INFO) << "create archive in " << base_dir;
     duralib::proto::ArchiveHeader header;
     header.set_magic("dura archive");
     write_proto_to_file(header, base_dir/"DURA-ARCHIVE");

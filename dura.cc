@@ -2,6 +2,8 @@
 
 #include <boost/program_options.hpp>
 
+#include <glog/logging.h>
+
 #include "proto/dura.pb.h"
 
 #include "archive.h"
@@ -61,6 +63,7 @@ int parse_options(int argc, char *argv[]) {
 
 
 int main(int argc, char *argv[]) {
+    google::InitGoogleLogging(argv[0]);
     if (dura::parse_options(argc, argv))
         return 1;
     return 0;
