@@ -2,7 +2,7 @@
 *.o
 proto/*.pb.cc
 proto/*.pb.h
-dura
+conserve
 .*.sw[po]
 *.py[co]
 htmlcov/
@@ -10,4 +10,4 @@ htmlcov/
 messages.pot
 test-git-staged
 duralib/proto/*py
-.dura.sublime*
+.conserve.sublime*

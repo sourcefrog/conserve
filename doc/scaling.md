@@ -1,4 +1,4 @@
-Dura scaling
+Conserve scaling
 ============
 
 Conceptual numbers: Source directory typically 1TB, stretch to 1000PB.

@@ -1,11 +1,11 @@
-Dura is a (design for a) robust backup program
+Conserve is a (design for a) robust backup program
 ==============================================
 
 Copyright 2012-2013 [Martin Pool][1], mbp@sourcefrog.net.
 
-Dura is licensed under the [Apache License, Version 2.0][2].
+Conserve is licensed under the [Apache License, Version 2.0][2].
 
-**At this time Dura is not ready for use.**
+**At this time Conserve is not ready for use.**
 
 _Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License._
 
-Dura's homepage is: <https://github.com/sourcefrog/dura>
+Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
 
 Manifesto
@@ -30,7 +30,7 @@ Manifesto
 
 * Well matched for high-latency, limited-bandwidth, write-once cloud
   storage.  Cloud storage typically doesn't have full filesystem semantics,
-  but is very unlikely to have IO errors.  Dura is also suitable
+  but is very unlikely to have IO errors.  Conserve is also suitable
   for local online disk, removable storage, and remote (ssh) smart servers.
 
 * Optional storage layers: compression (bzip2/gzip/lzo), encryption (gpg),
@@ -46,7 +46,7 @@ Manifesto
   don't require reading all data back (which may be too slow to do regularly).
 
 * Also, possibly-slow verification checks that actually do compare the backup
-  to the source directory, to catch corruption or Dura bugs.
+  to the source directory, to catch corruption or Conserve bugs.
 
 * Send backups to multiple locations: local disk, removable disk,
   LAN servers, the cloud.

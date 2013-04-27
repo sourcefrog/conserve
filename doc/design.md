@@ -1,13 +1,13 @@
-Dura design
+Conserve design
 ===========
 
-Dura is a backup system for Unix systems in today's world: especially, for
+Conserve is a backup system for Unix systems in today's world: especially, for
 backing up to either nearby local disks or in to cloud storage.
 
 Storage environment
 -------------------
 
-Dura makes limited assumptions about the archive storage, guided by what is 
+Conserve makes limited assumptions about the archive storage, guided by what is 
 commonly supported by cloud storage.
 
 - You can write whole files, but not update in place
@@ -31,7 +31,7 @@ commonly supported by cloud storage.
 
 - Can try to not overwrite files, but not guaranteed coherent.
 
-- Dura can cache information onto the source machine's local disk, but of course
+- Conserve can cache information onto the source machine's local disk, but of course
   this cache may be lost or may need to be disabled.
 
 - Connection may be lost and the backup terminated at any point.
@@ -69,7 +69,7 @@ Testing
 Write/write concurrency
 -----------------------
 
-Dura is supposed to be run with just one process writing to destination archive at 
+Conserve is supposed to be run with just one process writing to destination archive at 
 any time, obviously just from one source.  It is basically up to the user to 
 configure the clients so this happens: to make sure that only one logical machine 
 tries to write to one archive, and that only one backup process runs on that machine
@@ -78,7 +78,7 @@ at any time.
 However, it is possible something will go wrong and we end up with an inadvertent
 dual-master situation.  Requirements for that case are:
 
- - Dura should not damage the repository.
+ - Conserve should not damage the repository.
 
  - If possible, one writer should continue and write a full valid backup,
    and all the others should terminate.
@@ -241,7 +241,7 @@ Open questions:
 Alarms
 ------
 
-When Dura hits something unexpected in the environment, the core code will
+When Conserve hits something unexpected in the environment, the core code will
 signal an *alarm*, and then attempt to continue.  The alarms are structured
 and can be filtered.  The default handlers will try to balance safety
 vs completion, but they can be customized.  In particular, you can tell

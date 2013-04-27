@@ -1,7 +1,7 @@
-Dura user guide
+Conserve user guide
 ===============
 
-Dura is a backup system: from local files, to files on other local filesystems.
+Conserve is a backup system: from local files, to files on other local filesystems.
 
 
 Creating an archive
@@ -12,7 +12,7 @@ archive per source directory to be backed up.
 
 To start making a backup:
 
-    % dura create-archive /backup/my-src.dura
+    % conserve create-archive /backup/my-src.conserve
 
 This creates a directory containing a header file.
 
@@ -24,7 +24,7 @@ To store a backup of some source files into the archive, use the
 `backup` command.  In the current version all files must be explicitly
 listed, eg with the `find` command:
 
-    % dura backup `find ~/src` /backup/my-src.dura
+    % conserve backup `find ~/src` /backup/my-src.conserve
 
 
 Bands
@@ -42,9 +42,9 @@ Examining bands
 
 The `list-bands` command shows all the bands in an archive:
 
-    % dura list-bands /backup/my-src.dura
-    0000       2012-12-02T16:24:33   duratesthost.local
-    0001       2012-12-02T16:24:45   duratesthost.local
+    % conserve list-bands /backup/my-src.conserve
+    0000       2012-12-02T16:24:33   conservetesthost.local
+    0001       2012-12-02T16:24:45   conservetesthost.local
 
 `list-files` shows all the files in a band, including the 
 time they were made and the host from which they were made.
@@ -54,7 +54,7 @@ on the most recent by default.
 Validation
 ----------
 
-`dura validate` checks whether the contents of an archive are internally
+`conserve validate` checks whether the contents of an archive are internally
 consistent.  It makes no reference to a source directory, just checks that
 the archive seems to represent reasonable data and that it can all be 
 read and interpreted.

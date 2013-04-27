@@ -13,11 +13,11 @@
 #include <google/protobuf/text_format.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
-#include "proto/dura.pb.h"
+#include "proto/conserve.pb.h"
 
 #include "archive.h"
 
-namespace dura {
+namespace conserve {
 
 using namespace std;
 
@@ -40,17 +40,17 @@ void write_proto_to_file(const Message& message,
 
 void write_archive_header(const filesystem::path& base_dir) {
     LOG(INFO) << "create archive in " << base_dir;
-    duralib::proto::ArchiveHeader header;
-    header.set_magic("dura archive");
-    write_proto_to_file(header, base_dir/"DURA-ARCHIVE");
+    conserve::proto::ArchiveHeader header;
+    header.set_magic("conserve archive");
+    write_proto_to_file(header, base_dir/"CONSERVE-ARCHIVE");
 }
 
 Archive* Archive::create(const string dir) {
     filesystem::path base_path(dir);
     filesystem::create_directory(base_path);
     write_archive_header(base_path);
-    
+
     return new Archive(dir);
 }
 
-} // namespace dura
+} // namespace conserve

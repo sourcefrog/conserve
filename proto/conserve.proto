@@ -1,8 +1,8 @@
-package duralib.proto;
+package conserve.proto;
 
-// One ArchiveHeader in '/DURA-ARCHIVE' in the root of the archive directory.
+// One ArchiveHeader in '/CONSERVE-ARCHIVE' in the root of the archive directory.
 message ArchiveHeader {
-    // Literal "dura archive"
+    // Literal "conserve archive"
     required string magic = 1;
 
     // Clients must understand these features to safely read the archive.

@@ -1,4 +1,4 @@
-Dura format
+Conserve format
 ===========
 
 Generalities
@@ -20,10 +20,10 @@ Archive
 A backup *archive* is a possibly-remote directory, containing archive
 files.
 
-In the root directory of the archive there is a file called `DURA-ARCHIVE`,
+In the root directory of the archive there is a file called `CONSERVE-ARCHIVE`,
 which is an `ArchiveHeader` protobuf containing:
 
-    magic: "dura backup archive"
+    magic: "conserve backup archive"
 
 Tiers
 -----
@@ -41,7 +41,7 @@ particular band in the immediately lower tier.
 
 A band may be *open*, while it is receiving data, or *finished* when
 everything from the source has been written.  Bands may remain open
-indefinitely, across multiple Dura invocations, until they are finished.
+indefinitely, across multiple Conserve invocations, until they are finished.
 Once the band is finished, it will not be changed.
 
 Bands are numbered hierarchically across tiers and sequentially within
@@ -49,7 +49,7 @@ a tier, starting at 0.  So the first base tier band in the whole archive
 is 0000, the first incremental band on top of it is 0000-0000,
 and so on.  The numbers are zero-padded to four digits in each
 area, so that they will be grouped conveniently for humans looking at
-naively sorted listings of the directory.  (Dura does not rely on them
+naively sorted listings of the directory.  (Conserve does not rely on them
 being less than five digits, or on the transport returning any particular
 ordering; bands numbered over 9999 are supported.)
 

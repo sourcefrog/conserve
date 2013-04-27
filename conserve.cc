@@ -5,7 +5,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "proto/dura.pb.h"
+#include "proto/conserve.pb.h"
 
 #include "archive.h"
 
@@ -18,12 +18,12 @@ DEFINE_string(
     "",
     "Path of backup archive.");
 
-namespace dura {
+namespace conserve {
 
 const string version = "0.0";
 
 const string usage =
-"dura - A robust backup program\n"
+"conserve - A robust backup program\n"
 "\n"
 "Copyright 2012-2013 Martin Pool\n"
 "Licenced under the Apache Licence, Version 2.0.\n";
@@ -49,15 +49,15 @@ int parse_options(int argc, char *argv[]) {
     return 0;
 }
 
-} // namespace dura
+} // namespace conserve
 
 
 int main(int argc, char *argv[]) {
-    google::SetVersionString(dura::version);
-    google::SetUsageMessage(dura::usage);
+    google::SetVersionString(conserve::version);
+    google::SetUsageMessage(conserve::usage);
     google::InitGoogleLogging(argv[0]);
     google::ParseCommandLineFlags(&argc, &argv, true);
-    if (dura::parse_options(argc, argv))
+    if (conserve::parse_options(argc, argv))
         return 1;
     return 0;
 }
