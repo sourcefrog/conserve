@@ -1,5 +1,5 @@
 CXX=clang++
-CXXFLAGS=-Wall
+CXXFLAGS=-Wall -ggdb
 #-std=c++11
 LIBS=-lprotobuf -lboost_filesystem -lboost_system -lglog
 
