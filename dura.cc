@@ -20,6 +20,14 @@ DEFINE_string(
 
 namespace dura {
 
+const string version = "0.0";
+
+const string usage =
+"dura - A robust backup program\n"
+"\n"
+"Copyright 2012-2013 Martin Pool\n"
+"Licenced under the Apache Licence, Version 2.0.\n";
+
 
 int parse_options(int argc, char *argv[]) {
     if (argc < 2) {
@@ -45,6 +53,8 @@ int parse_options(int argc, char *argv[]) {
 
 
 int main(int argc, char *argv[]) {
+    google::SetVersionString(dura::version);
+    google::SetUsageMessage(dura::usage);
     google::InitGoogleLogging(argv[0]);
     google::ParseCommandLineFlags(&argc, &argv, true);
     if (dura::parse_options(argc, argv))
