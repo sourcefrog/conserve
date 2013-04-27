@@ -1,7 +1,8 @@
-#include <iostream> 
+#include <iostream>
 
 #include <boost/program_options.hpp>
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "proto/dura.pb.h"
@@ -12,45 +13,26 @@ using namespace std;
 using namespace google::protobuf::io;
 using namespace google::protobuf;
 
-namespace dura {
+DEFINE_string(
+    archive_dir,
+    "",
+    "Path of backup archive.");
 
-namespace po = boost::program_options;
+namespace dura {
 
 
 int parse_options(int argc, char *argv[]) {
-    string command;
-    string archive_base_dir;
-
-    po::options_description desc("Allowed options");
-    desc.add_options()
-        ("help", "show help message")
-        ("command", po::value<string>(&command), "command to run")
-        ("archive-dir", po::value(&archive_base_dir));
-
-    po::positional_options_description posopts;
-    posopts.add("command", 1);
-
-    po::variables_map vm;
-    po::command_line_parser parser(argc, argv);
-    parser.options(desc);
-    parser.positional(posopts);
-
-    po::store(parser.run(), vm);
-    po::notify(vm);
-
-    if (vm.count("help")) {
-        cout << desc << "\n";
-        return 1;
-    }
-    if (!command.length()) {
+    if (argc < 2) {
         cout << "no command given!\n";
         return 1;
-    } else if (command == "init-archive") {
-        if (archive_base_dir.empty()) {
+    }
+    string command(argv[1]);
+    if (command == "init-archive") {
+        if (FLAGS_archive_dir.empty()) {
             cout << "no archive-dir specified\n";
             return 1;
         }
-        Archive::create(archive_base_dir);
+        Archive::create(FLAGS_archive_dir);
     } else {
         cout << "command: " << command << "\n";
         return 0;
@@ -64,6 +46,7 @@ int parse_options(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
     google::InitGoogleLogging(argv[0]);
+    google::ParseCommandLineFlags(&argc, &argv, true);
     if (dura::parse_options(argc, argv))
         return 1;
     return 0;

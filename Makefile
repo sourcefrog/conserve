@@ -1,7 +1,7 @@
 CXX=clang++
 CXXFLAGS=-Wall
 #-std=c++11
-LIBS=-lprotobuf -lboost_filesystem -lboost_system -lglog -lboost_program_options
+LIBS=-lprotobuf -lboost_filesystem -lboost_system -lglog -lgflags
 
 srcs = dura.cc archive.cc proto/dura.pb.cc
 
