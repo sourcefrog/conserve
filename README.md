@@ -29,7 +29,7 @@ Manifesto
   loss due to internal bugs.
 
 * Well matched for high-latency, limited-bandwidth, write-once cloud
-  storage.  Cloud storage typically doesn't have full filesystem semantics, 
+  storage.  Cloud storage typically doesn't have full filesystem semantics,
   but is very unlikely to have IO errors.  Dura is also suitable
   for local online disk, removable storage, and remote (ssh) smart servers.
 
@@ -72,6 +72,8 @@ Ubuntu/Debian package names:
     clang
     protobuf-compiler
     make
+    libglog
+    libgoogle-gflags
 
 [1]: http://sourcefrog.net/
 [2]: https://www.apache.org/licenses/LICENSE-2.0.html
