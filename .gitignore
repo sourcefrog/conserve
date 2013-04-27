@@ -10,3 +10,4 @@ htmlcov/
 messages.pot
 test-git-staged
 duralib/proto/*py
+.dura.sublime*
