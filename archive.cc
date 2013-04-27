@@ -11,7 +11,6 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-#include <assert.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -42,10 +41,10 @@ void write_proto_to_file(const Message& message,
     int fd = open(path.string().c_str(),
 	    O_CREAT|O_EXCL|O_WRONLY,
 	    0666);
-    assert(fd > 0);
-    assert(message.SerializeToFileDescriptor(fd));
+    PCHECK(fd > 0);
+    CHECK(message.SerializeToFileDescriptor(fd));
     int ret = close(fd);
-    assert(ret == 0);
+    PCHECK(ret == 0);
 }
 
 
