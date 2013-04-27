@@ -3,7 +3,7 @@ CXXFLAGS=-Wall -std=c++11
 LIBS=-lprotobuf -lboost_program_options -lboost_filesystem \
      -lboost_system -lglog
 
-srcs = dura.cc archive.cc
+srcs = dura.cc archive.cc proto/dura.pb.cc
 
 dura: $(srcs)
 	$(CXX) $(CXXFLAGS) -I. $(LIBS) -o $@ $(srcs) proto/dura.pb.cc
@@ -16,7 +16,7 @@ check: protos
 protos: proto/dura.pb.cc
 
 proto/dura.pb.cc proto/dura.pb.h: proto/dura.proto
-	protoc --cc_out=. proto/dura.proto
+	protoc --cpp_out=. proto/dura.proto
 
 check-staged:
 	t=`mktemp -d -t duralib-test` && \
