@@ -73,7 +73,6 @@ Ubuntu/Debian package names:
     protobuf-compiler
     make
     libgoogle-glog-dev
-    libgflags-dev
 
 [1]: http://sourcefrog.net/
 [2]: https://www.apache.org/licenses/LICENSE-2.0.html

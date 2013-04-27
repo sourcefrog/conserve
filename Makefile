@@ -1,7 +1,7 @@
 CXX=clang++
 CXXFLAGS=-Wall
 #-std=c++11
-LIBS=-lprotobuf -lboost_filesystem -lboost_system -lglog -lgflags
+LIBS=-lprotobuf -lboost_filesystem -lboost_system -lglog
 
 srcs = conserve.cc archive.cc proto/conserve.pb.cc
 
