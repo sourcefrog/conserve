@@ -1,17 +1,19 @@
 Conserve is a (design for a) robust backup program
 ==============================================
 
-Copyright 2012-2013 [Martin Pool][1], mbp@sourcefrog.net.
-
-Conserve is licensed under the [Apache License, Version 2.0][2].
-
 **At this time Conserve is not ready for use.**
 
-_Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License._
+Copyright 2012-2013 [Martin Pool][1], mbp@sourcefrog.net.
+
+_This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version._
+
+_This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details._
 
 Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
