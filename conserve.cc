@@ -84,8 +84,6 @@ int parse_options(int argc, char *argv[]) {
 
 
 int main(int argc, char *argv[]) {
-    google::SetVersionString(conserve::version);
-    google::SetUsageMessage(conserve::usage);
     google::InitGoogleLogging(argv[0]);
     google::SetStderrLogging(google::GLOG_INFO);
     if (conserve::parse_options(argc, argv))
