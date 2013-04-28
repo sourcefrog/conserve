@@ -1,12 +1,12 @@
 Conserve format
-===========
+===============
 
 Generalities
 ------------
 
-All header data is stored as [Google Protobufs](https://code.google.com/p/protobuf/).  
-Example in this document are expresed as (approximately) the text format of 
-protobufs, but the on-disk format is the compact binary form.
+All header data is stored as [Google Protobufs][1].
+
+Example in this document are expresed as (approximately) the text format of protobufs, but the on-disk format is the compact binary form.
 
 Source
 ------
@@ -60,10 +60,10 @@ directories have self-contained names, and the paths don't get too
 long.)  For example:
 
     my-archive/
-      b0000
-      b0000-0000
-      b0000-0001
-      b0000-0001-0000
+      b0000/
+      b0000-0000/
+      b0000-0001/
+      b0000-0001-0000/
 
 A band contains file contents and metadata.
 
@@ -124,3 +124,5 @@ is a *version*: extracting all the contents of the version recreates
 the source directory as it existed at the time the most recent band
 was recorded.  (Modulo any changes that happened during the recording
 of that band.)
+
+[1]: [https://code.google.com/p/protobuf/]
