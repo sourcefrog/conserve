@@ -35,23 +35,45 @@ const string usage =
 "conserve - A robust backup program\n"
 "\n"
 "Copyright 2012-2013 Martin Pool\n"
-"Licenced under the Apache Licence, Version 2.0.\n";
+"Licenced under the Apache Licence, Version 2.0.\n"
+"\n"
+"Options:\n"
+"  -h            Show help.\n";
+
+
+void show_help() {
+    cout << usage;
+}
 
 
 int parse_options(int argc, char *argv[]) {
-    if (argc < 2) {
-        cout << "no command given!\n";
+    int opt;
+    while (true) {
+        opt = getopt(argc, argv, "h");
+        if (opt == 'h') {
+            show_help();
+            return 1;
+        } else if (opt == -1)
+            break;
+        else {
+            LOG(FATAL) << "Unexpected getopt result " << (char) opt;
+        }
+    }
+
+    if (!argv[optind]) {
+        LOG(ERROR) << "No command given";
         return 1;
     }
-    string command(argv[1]);
+    string command(argv[optind]);
     if (command == "init-archive") {
-        if (argc < 3) {
-            cout << "no archive-dir specified\n";
+        const char *archive_dir = argv[optind+1];
+        if (!archive_dir) {
+            LOG(ERROR) << "Usage: init-archive ARCHIVE-DIR";
             return 1;
         }
-        Archive::create(argv[2]);
+        Archive::create(archive_dir);
     } else {
-        cout << "command: " << command << "\n";
+        LOG(ERROR) << "Unrecognized command: " << command;
         return 0;
     }
 
