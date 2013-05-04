@@ -10,8 +10,8 @@ conserve: $(srcs)
 
 all: protos
 
-check: protos
-	PYTHONPATH=.:$$PYTHONPATH $(PYTHON) -m unittest discover -v
+check: conserve
+	./test.sh
 
 protos: proto/conserve.pb.cc
 
@@ -19,7 +19,7 @@ proto/conserve.pb.cc proto/conserve.pb.h: proto/conserve.proto
 	protoc --cpp_out=. proto/conserve.proto
 
 check-staged:
-	t=`mktemp -d -t conservelib-test` && \
+	t=`mktemp -d` && \
 	git checkout-index --prefix "$$t/" -a && \
 	make -C "$$t" check && \
 	rm -r "$$t"
