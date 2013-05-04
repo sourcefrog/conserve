@@ -35,6 +35,7 @@ private:
     Archive* archive_;
     string name_;
     boost::filesystem::path band_directory_;
+    int block_count_;
 };
 
 } // namespace conserve

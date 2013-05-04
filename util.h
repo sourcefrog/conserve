@@ -17,6 +17,8 @@ void write_proto_to_file(
         const google::protobuf::Message& message,
         const boost::filesystem::path& path);
 
+std::string gethostname_str();
+
 }
 
 // vim: sw=4 et

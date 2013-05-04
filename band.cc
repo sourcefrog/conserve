@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include <boost/filesystem.hpp>
 
@@ -27,6 +28,7 @@
 
 #include "archive.h"
 #include "band.h"
+#include "util.h"
 
 namespace conserve {
 
@@ -34,21 +36,36 @@ using namespace std;
 using namespace boost;
 
 
+const string band_head_name = "BAND-HEAD";
+const string band_tail_name = "BAND-TAIL";
+
+
 BandWriter::BandWriter(Archive* archive, string name) : 
     archive_(archive), 
     name_(name), 
-    band_directory_(archive->base_dir_ / ("b" + name))
+    band_directory_(archive->base_dir_ / ("b" + name)),
+    block_count_(0)
 {
 }
 
 void BandWriter::start() {
     LOG(INFO) << "start band in " << band_directory_;
     filesystem::create_directory(band_directory_);
-    // TODO(mbp): Write band head
+    proto::BandHead head_pb;
+    head_pb.set_band_number(name_);
+    head_pb.set_start_unixtime(time(NULL));
+    head_pb.set_source_hostname(gethostname_str());
+    write_proto_to_file(head_pb,
+            band_directory_ / band_head_name);
 }
 
 void BandWriter::finish() {
-    // TODO(mbp): Write band tail
+    proto::BandTail tail_pb;
+    tail_pb.set_band_number(name_);
+    tail_pb.set_end_unixtime(time(NULL));
+    write_proto_to_file(tail_pb,
+            band_directory_ / band_tail_name);
+    LOG(INFO) << "finish band in " << band_directory_;
 }
 
 } // namespace conserve

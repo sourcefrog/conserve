@@ -18,3 +18,5 @@ echo "hello" > $src/hello
 
 ./conserve backup $archive $src/hello
 [ -d $archive/b0000 ]   # band directory exists
+[ -f $archive/b0000/BAND-HEAD ]   # and header
+[ -f $archive/b0000/BAND-TAIL ]   # and tail

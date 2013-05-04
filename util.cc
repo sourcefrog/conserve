@@ -47,6 +47,12 @@ void write_proto_to_file(
 }
 
 
+string gethostname_str() {
+    char hostname[256];
+    gethostname(hostname, sizeof hostname - 1);
+    return string(hostname);
+}
+
 } // namespace conserve
 
 // vim: sw=4 et
