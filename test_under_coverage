@@ -1,8 +1,0 @@
-#! /bin/sh -ex
-
-testfile=duralib/tests/"$1.py"
-[ -f $testfile ]
-python-coverage erase
-PYTHONPATH=. python-coverage run $testfile
-rm -r htmlcov
-python-coverage html
