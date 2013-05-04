@@ -38,21 +38,32 @@ const string usage =
 "Licenced under the Apache Licence, Version 2.0.\n"
 "\n"
 "Options:\n"
-"  -h            Show help.\n";
+"  -h            Show help.\n"
+"  -V            Show version.\n";
 
 
 void show_help() {
     cout << usage;
 }
 
+} // namespace conserve
 
-int parse_options(int argc, char *argv[]) {
+using namespace conserve;
+
+
+int main(int argc, char *argv[]) {
+    google::InitGoogleLogging(argv[0]);
+    google::SetStderrLogging(google::GLOG_INFO);
+
     int opt;
     while (true) {
-        opt = getopt(argc, argv, "h");
+        opt = getopt(argc, argv, "hV");
         if (opt == 'h') {
             show_help();
-            return 1;
+            return 0;
+        } else if (opt == 'V') {
+            cout << "conserve " << version << "\n";
+            return 0;
         } else if (opt == -1)
             break;
         else {
@@ -77,16 +88,5 @@ int parse_options(int argc, char *argv[]) {
         return 0;
     }
 
-    return 0;
-}
-
-} // namespace conserve
-
-
-int main(int argc, char *argv[]) {
-    google::InitGoogleLogging(argv[0]);
-    google::SetStderrLogging(google::GLOG_INFO);
-    if (conserve::parse_options(argc, argv))
-        return 1;
     return 0;
 }
