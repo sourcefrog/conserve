@@ -11,33 +11,18 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-#ifndef CONSERVE_ARCHIVE_H_
-#define CONSERVE_ARCHIVE_H_
-
-#include "string"
-#include <boost/filesystem.hpp>
+#ifndef CONSERVE_BLOCK_H
+#define CONSERVE_BLOCK_H
 
 namespace conserve {
 
-using namespace std;
-
-class BandWriter;
-
-class Archive {
+class BlockWriter {
 public:
-    static Archive create(const string base_dir);
-
-    Archive(const string base_dir) :
-	base_dir_(base_dir)
-	{}
-
-    BandWriter start_band();
-
-    const boost::filesystem::path base_dir_;
-
-private:
+    void finish();
 };
 
 } // namespace conserve
-#endif // CONSERVE_ARCHIVE_H_
+
+#endif CONSERVE_BLOCK_H
+
 // vim: sw=4 et

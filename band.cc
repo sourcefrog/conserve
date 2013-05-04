@@ -27,37 +27,28 @@
 
 #include "archive.h"
 #include "band.h"
-#include "util.h"
 
 namespace conserve {
 
 using namespace std;
-
 using namespace boost;
 
 
-void write_archive_header(const filesystem::path& base_dir) {
-    LOG(INFO) << "create archive in " << base_dir;
-    conserve::proto::ArchiveHeader header;
-    header.set_magic("conserve archive");
-    write_proto_to_file(header, base_dir/"CONSERVE-ARCHIVE");
+BandWriter::BandWriter(Archive* archive, string name) : 
+    archive_(archive), 
+    name_(name), 
+    band_directory_(archive->base_dir_ / ("b" + name))
+{
 }
 
-
-Archive Archive::create(const string dir) {
-    filesystem::path base_path(dir);
-    filesystem::create_directory(base_path);
-    write_archive_header(base_path);
-
-    return Archive(dir);
+void BandWriter::start() {
+    LOG(INFO) << "start band in " << band_directory_;
+    filesystem::create_directory(band_directory_);
+    // TODO(mbp): Write band head
 }
 
-
-BandWriter Archive::start_band() {
-    // TODO(mbp): Make up the right real next name.
-    BandWriter writer(this, "0000");
-    writer.start();
-    return writer;
+void BandWriter::finish() {
+    // TODO(mbp): Write band tail
 }
 
 } // namespace conserve

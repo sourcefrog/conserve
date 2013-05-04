@@ -11,3 +11,10 @@ EOF
 
 ./conserve init-archive $archive 
 [ -f $archive/CONSERVE-ARCHIVE ]
+
+src=$testtmp/src
+mkdir $src
+echo "hello" > $src/hello
+
+./conserve backup $archive $src/hello
+[ -d $archive/b0000 ]   # band directory exists

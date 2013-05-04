@@ -22,6 +22,7 @@
 #include "proto/conserve.pb.h"
 
 #include "archive.h"
+#include "band.h"
 
 using namespace std;
 using namespace google::protobuf::io;
@@ -83,6 +84,18 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         Archive::create(archive_dir);
+    } else if (command == "backup") {
+        const char *archive_dir = argv[optind+1];
+        if (!archive_dir) {
+            LOG(ERROR) << "Usage: init-archive ARCHIVE-DIR";
+            return 1;
+        }
+        // TODO(mbp): Change to a given directory to read the source 
+        // files, so that their relative paths are correct.  Perhaps also,
+        // an option to strip a given prefix off the names.
+        Archive archive(archive_dir);
+        BandWriter band = archive.start_band();
+        band.finish();
     } else {
         LOG(ERROR) << "Unrecognized command: " << command;
         return 0;
@@ -90,3 +103,5 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
+// vim: sw=4 et
