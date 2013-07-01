@@ -95,6 +95,7 @@ int main(int argc, char *argv[]) {
         // an option to strip a given prefix off the names.
         Archive archive(archive_dir);
         BandWriter band = archive.start_band();
+        // TODO(mbp): Actually back up the files!
         band.finish();
     } else {
         LOG(ERROR) << "Unrecognized command: " << command;

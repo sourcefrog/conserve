@@ -12,7 +12,6 @@ conserve: $(srcs)
 all: protos
 
 check: conserve cram-tests
-	./test.sh
 
 protos: proto/conserve.pb.cc
 
