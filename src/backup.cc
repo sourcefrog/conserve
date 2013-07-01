@@ -11,33 +11,28 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-#ifndef CONSERVE_ARCHIVE_H_
-#define CONSERVE_ARCHIVE_H_
-
-#include "string"
-#include <boost/filesystem.hpp>
+#include <glog/logging.h>
+#include "archive.h"
+#include "band.h"
 
 namespace conserve {
 
-using namespace std;
+int do_backup(char **argv) {
+    const char *archive_dir = argv[0];
+    if (!archive_dir) {
+            LOG(ERROR) << "Usage: conserve backup ARCHIVE SOURCE...";
+            return 1;
+    }
+    // TODO(mbp): Change to a given directory to read the source 
+    // files, so that their relative paths are correct.  Perhaps also,
+    // an option to strip a given prefix off the names.
+    Archive archive(archive_dir);
+    BandWriter band = archive.start_band();
+    // TODO(mbp): Actually back up the files!
+    band.finish();
 
-class BandWriter;
-
-class Archive {
-public:
-    static Archive create(const string base_dir);
-
-    Archive(const string base_dir) :
-	base_dir_(base_dir)
-	{}
-
-    BandWriter start_band();
-
-    const boost::filesystem::path base_dir_;
-
-private:
-};
-
+    return 0;
+}
 } // namespace conserve
-#endif // CONSERVE_ARCHIVE_H_
+
 // vim: sw=4 et

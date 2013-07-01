@@ -1,9 +1,11 @@
 CXX=clang++
-CXXFLAGS=-Wall -ggdb
+CXXFLAGS=-Wall -ggdb -MD
 #-std=c++11
 LIBS=-lprotobuf -lboost_filesystem -lboost_system -lglog
 
-srcs = src/archive.cc src/band.cc src/conserve.cc src/util.cc \
+srcs = src/archive.cc \
+       src/backup.cc \
+       src/band.cc src/conserve.cc src/util.cc \
        proto/conserve.pb.cc
 
 conserve: $(srcs) 

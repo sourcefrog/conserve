@@ -5,7 +5,7 @@
 // modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; either version 2
 // of the License, or (at your option) any later version.
-
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -22,7 +22,7 @@
 #include "proto/conserve.pb.h"
 
 #include "archive.h"
-#include "band.h"
+#include "backup.h"
 
 using namespace std;
 using namespace google::protobuf::io;
@@ -85,18 +85,7 @@ int main(int argc, char *argv[]) {
         }
         Archive::create(archive_dir);
     } else if (command == "backup") {
-        const char *archive_dir = argv[optind+1];
-        if (!archive_dir) {
-            LOG(ERROR) << "Usage: init-archive ARCHIVE-DIR";
-            return 1;
-        }
-        // TODO(mbp): Change to a given directory to read the source 
-        // files, so that their relative paths are correct.  Perhaps also,
-        // an option to strip a given prefix off the names.
-        Archive archive(archive_dir);
-        BandWriter band = archive.start_band();
-        // TODO(mbp): Actually back up the files!
-        band.finish();
+        return do_backup(&argv[optind+1]);
     } else {
         LOG(ERROR) << "Unrecognized command: " << command;
         return 0;
