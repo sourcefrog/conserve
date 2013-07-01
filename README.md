@@ -76,5 +76,9 @@ Ubuntu/Debian package names:
     make
     libgoogle-glog-dev
 
+To run the tests, [cram](https://pypi.python.org/pypi/cram) is needed:
+
+    pip install cram
+
 [1]: http://sourcefrog.net/
 [2]: https://www.apache.org/licenses/LICENSE-2.0.html

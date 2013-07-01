@@ -11,7 +11,7 @@ conserve: $(srcs)
 
 all: protos
 
-check: conserve
+check: conserve cram-tests
 	./test.sh
 
 protos: proto/conserve.pb.cc
@@ -25,3 +25,5 @@ check-staged:
 	make -C "$$t" check && \
 	rm -r "$$t"
 
+cram-tests:
+	PATH=`pwd`:$$PATH cram --indent=4 -v tests/*.md
