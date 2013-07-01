@@ -54,7 +54,7 @@ using namespace conserve;
 
 int main(int argc, char *argv[]) {
     google::InitGoogleLogging(argv[0]);
-    google::SetStderrLogging(google::GLOG_INFO);
+    google::SetStderrLogging(google::GLOG_WARNING);
 
     int opt;
     while (true) {
