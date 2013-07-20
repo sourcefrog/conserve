@@ -13,3 +13,4 @@ duralib/proto/*py
 .conserve.sublime*
 *.d
 conserve.sublime*
+tests/*.err
