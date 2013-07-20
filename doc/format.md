@@ -102,18 +102,21 @@ Band footer contains:
  - the time the band started and ended
  - the hash of all of the block footers
 
-Blocks are stored within their band directory.  Blocks are named starting with
-a `d`, and then the decimal block index, starting at 0, padded to six digits.
-For each block there is a data file, ending in `.d` and an index ending in `.i`.
-The files are typically compressed and in that case they will also have eg a
-`.gz` or `.bz2` suffix.
+Blocks are stored within their band directory, and numbered starting at 0 within
+each band.
+
+For each block there is an index file and and a data file. The index file
+starts with `a` and the data file starts with `d`, followed by the decimal
+block number padded to six digits.
+
+The contents of both the index and data files are gzip-compressed.
 
 So, for example:
 
     my-archive/
       b0000/
-        d000000.d.gz
-        d000000.i.gz
+        a000000
+        d000000
 
 
 Versions

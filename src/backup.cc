@@ -12,8 +12,10 @@
 // GNU General Public License for more details.
 
 #include <glog/logging.h>
+
 #include "archive.h"
 #include "band.h"
+#include "block.h"
 
 namespace conserve {
 
@@ -28,7 +30,10 @@ int do_backup(char **argv) {
     // an option to strip a given prefix off the names.
     Archive archive(archive_dir);
     BandWriter band = archive.start_band();
+    BlockWriter block(band);
+    block.start();
     // TODO(mbp): Actually back up the files!
+    block.finish();
     band.finish();
 
     return 0;

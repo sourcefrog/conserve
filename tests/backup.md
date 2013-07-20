@@ -16,6 +16,8 @@ This creates a new _band directory_ and some block data within it:
     $ ls a/b0000
     BAND-HEAD
     BAND-TAIL
+    a000000
+    d000000
 
 TODO(mbp): Recursively backup directories.
 

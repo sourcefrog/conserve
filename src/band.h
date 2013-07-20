@@ -31,11 +31,16 @@ public:
     void start();
     void finish();
 
+    boost::filesystem::path directory() { return band_directory_; }
+
+    int next_block_number();
+
 private:
     Archive* archive_;
     string name_;
     boost::filesystem::path band_directory_;
-    int block_count_;
+
+    int next_block_number_;
 };
 
 } // namespace conserve

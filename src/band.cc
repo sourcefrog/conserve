@@ -44,7 +44,7 @@ BandWriter::BandWriter(Archive* archive, string name) :
     archive_(archive), 
     name_(name), 
     band_directory_(archive->base_dir_ / ("b" + name)),
-    block_count_(0)
+    next_block_number_(0)
 {
 }
 
@@ -66,6 +66,11 @@ void BandWriter::finish() {
     write_proto_to_file(tail_pb,
             band_directory_ / band_tail_name);
     LOG(INFO) << "finish band in " << band_directory_;
+}
+
+int BandWriter::next_block_number() {
+    // TODO(mbp): Needs to be improved if the band's partially complete.
+    return next_block_number_++;
 }
 
 } // namespace conserve

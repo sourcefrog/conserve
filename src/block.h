@@ -16,13 +16,26 @@
 
 namespace conserve {
 
+class BandWriter;
+
+using namespace boost::filesystem;
+
 class BlockWriter {
 public:
+	void start();
     void finish();
+    BlockWriter(BandWriter band);
+
+private:
+    path block_directory_;
+    int block_number_;
+    path index_filename_;
+    path data_filename_;
+    int data_fd_;
 };
 
 } // namespace conserve
 
-#endif CONSERVE_BLOCK_H
+#endif // CONSERVE_BLOCK_H
 
 // vim: sw=4 et

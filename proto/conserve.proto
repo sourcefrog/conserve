@@ -66,7 +66,7 @@ message FileIndex {
 }
 
 
-// One BlockIndex in '.i' for each data block.
+// One BlockIndex in 'a000000' for each data block.
 message BlockIndex {
     // Information about all files in the block, in filename order.
     repeated FileIndex file = 1;

@@ -10,7 +10,9 @@ CPPFLAGS=-Isrc -I.
 
 srcs = src/archive.cc \
        src/backup.cc \
-       src/band.cc src/conserve.cc src/util.cc \
+       src/band.cc \
+       src/block.cc \
+       src/conserve.cc src/util.cc \
        proto/conserve.pb.cc
 
 objs = $(subst cc,o,$(srcs))
