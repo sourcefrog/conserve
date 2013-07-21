@@ -77,15 +77,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     string command(argv[optind]);
+    char **command_args = &argv[optind+1];
     if (command == "init-archive") {
-        const char *archive_dir = argv[optind+1];
+        const char *archive_dir = command_args[0];
         if (!archive_dir) {
             LOG(ERROR) << "Usage: init-archive ARCHIVE-DIR";
             return 1;
         }
         Archive::create(archive_dir);
     } else if (command == "backup") {
-        return do_backup(&argv[optind+1]);
+        return do_backup(command_args);
     } else {
         LOG(ERROR) << "Unrecognized command: " << command;
         return 0;
