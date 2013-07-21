@@ -36,11 +36,14 @@ using namespace std;
 using namespace boost;
 
 
+const string Archive::HEADER_NAME = "CONSERVE-ARCHIVE";
+
+
 void write_archive_header(const filesystem::path& base_dir) {
     LOG(INFO) << "create archive in " << base_dir;
     conserve::proto::ArchiveHeader header;
     header.set_magic("conserve archive");
-    write_proto_to_file(header, base_dir/"CONSERVE-ARCHIVE");
+    write_proto_to_file(header, base_dir/Archive::HEADER_NAME);
 }
 
 

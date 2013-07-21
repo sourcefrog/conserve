@@ -47,6 +47,17 @@ void write_proto_to_file(
 }
 
 
+void read_proto_from_file(
+        const boost::filesystem::path path,
+        Message* message) {
+    int fd = open(path.c_str(), O_RDONLY);
+    PCHECK(fd > 0);
+    CHECK(message->ParseFromFileDescriptor(fd));
+    int ret = close(fd);
+    PCHECK(ret == 0);
+}
+
+
 string gethostname_str() {
     char hostname[256];
     gethostname(hostname, sizeof hostname - 1);

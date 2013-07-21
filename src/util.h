@@ -17,6 +17,10 @@ void write_proto_to_file(
         const google::protobuf::Message& message,
         const boost::filesystem::path& path);
 
+void read_proto_from_file(
+        const boost::filesystem::path path,
+        google::protobuf::Message* message);
+
 std::string gethostname_str();
 
 }

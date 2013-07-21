@@ -22,6 +22,8 @@ conserve_SOURCES = \
 	src/block.cc \
 	src/block.h \
 	src/conserve.cc \
+	src/printproto.cc \
+	src/printproto.h \
 	src/util.cc \
 	src/util.h
 
@@ -48,4 +50,5 @@ EXTRA_DIST = \
 cram_tests = \
 	tests/backup.md \
 	tests/hello.md \
-	tests/help.md
+	tests/help.md \
+	tests/printproto.md

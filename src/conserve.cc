@@ -23,6 +23,7 @@
 
 #include "archive.h"
 #include "backup.h"
+#include "printproto.h"
 
 using namespace std;
 using namespace google::protobuf::io;
@@ -87,6 +88,8 @@ int main(int argc, char *argv[]) {
         Archive::create(archive_dir);
     } else if (command == "backup") {
         return do_backup(command_args);
+    } else if (command == "printproto") {
+        return cmd_printproto(command_args);
     } else {
         LOG(ERROR) << "Unrecognized command: " << command;
         return 0;
