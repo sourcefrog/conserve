@@ -45,6 +45,10 @@ int cmd_printproto(char **args) {
 
     if (filename == Archive::HEAD_NAME) {
 		message = new conserve::proto::ArchiveHead();
+	} else if (filename == Band::HEAD_NAME) {
+		message = new conserve::proto::BandHead();
+	} else if (filename == Band::TAIL_NAME) {
+		message = new conserve::proto::BandTail();
     } else {
     	LOG(ERROR) << "can't infer proto format from filename " << path;
     	return 1;

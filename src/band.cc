@@ -63,6 +63,7 @@ void BandWriter::finish() {
     proto::BandTail tail_pb;
     tail_pb.set_band_number(name_);
     tail_pb.set_end_unixtime(time(NULL));
+    // TODO(mbp): Write block count
     write_proto_to_file(tail_pb,
             band_directory_ / Band::TAIL_NAME);
     LOG(INFO) << "finish band in " << band_directory_;
