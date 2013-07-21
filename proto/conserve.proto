@@ -1,7 +1,7 @@
 package conserve.proto;
 
 // One ArchiveHeader in '/CONSERVE-ARCHIVE' in the root of the archive directory.
-message ArchiveHeader {
+message ArchiveHead {
     // Literal "conserve archive"
     required string magic = 1;
 

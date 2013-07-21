@@ -21,6 +21,7 @@
 #include "proto/conserve.pb.h"
 
 #include "archive.h"
+#include "band.h"
 #include "printproto.h"
 #include "util.h"
 
@@ -38,17 +39,19 @@ int cmd_printproto(char **args) {
         return 1;
     }
 
-    boost::filesystem::path path = args[0];
+    const boost::filesystem::path path = args[0];
     google::protobuf::Message* message;
+    const boost::filesystem::path filename = path.filename();
 
-    if (path.filename() == Archive::HEADER_NAME) {
-		message = new conserve::proto::ArchiveHeader();
-		read_proto_from_file(path, message);
+    if (filename == Archive::HEAD_NAME) {
+		message = new conserve::proto::ArchiveHead();
     } else {
     	LOG(ERROR) << "can't infer proto format from filename " << path;
     	return 1;
     }
 
+    // TODO(mbp): Handle files that are compressed, encrypted, etc.
+	read_proto_from_file(path, message);
 	google::protobuf::io::FileOutputStream outstream(1);
 	TextFormat::Print(*message, &outstream);
 	outstream.Flush();

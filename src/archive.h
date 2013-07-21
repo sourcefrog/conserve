@@ -35,7 +35,7 @@ public:
 
     const boost::filesystem::path base_dir_;
 
-    static const string HEADER_NAME;
+    static const string HEAD_NAME;
 
 private:
 };

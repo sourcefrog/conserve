@@ -22,7 +22,7 @@ class BlockWriter;
 
 class Band {
 public:
-    static const string HEADER_NAME;
+    static const string HEAD_NAME;
     static const string TAIL_NAME;
 };
 

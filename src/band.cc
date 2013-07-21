@@ -36,7 +36,7 @@ using namespace std;
 using namespace boost;
 
 
-const string Band::HEADER_NAME = "BAND-HEAD";
+const string Band::HEAD_NAME = "BAND-HEAD";
 const string Band::TAIL_NAME = "BAND-TAIL";
 
 
@@ -56,7 +56,7 @@ void BandWriter::start() {
     head_pb.set_start_unixtime(time(NULL));
     head_pb.set_source_hostname(gethostname_str());
     write_proto_to_file(head_pb,
-            band_directory_ / Band::HEADER_NAME);
+            band_directory_ / Band::HEAD_NAME);
 }
 
 void BandWriter::finish() {
