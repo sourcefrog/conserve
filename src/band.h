@@ -20,6 +20,12 @@ namespace conserve {
 
 class BlockWriter;
 
+class Band {
+public:
+    static const string HEADER_NAME;
+    static const string TAIL_NAME;
+};
+
 // Holds an open writable band.
 // Adding files to it creates new blocks.
 // When all relevant files have been added, the band can be closed.

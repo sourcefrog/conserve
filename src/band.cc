@@ -36,8 +36,8 @@ using namespace std;
 using namespace boost;
 
 
-const string band_head_name = "BAND-HEAD";
-const string band_tail_name = "BAND-TAIL";
+const string Band::HEADER_NAME = "BAND-HEAD";
+const string Band::TAIL_NAME = "BAND-TAIL";
 
 
 BandWriter::BandWriter(Archive* archive, string name) : 
@@ -56,7 +56,7 @@ void BandWriter::start() {
     head_pb.set_start_unixtime(time(NULL));
     head_pb.set_source_hostname(gethostname_str());
     write_proto_to_file(head_pb,
-            band_directory_ / band_head_name);
+            band_directory_ / Band::HEADER_NAME);
 }
 
 void BandWriter::finish() {
@@ -64,7 +64,7 @@ void BandWriter::finish() {
     tail_pb.set_band_number(name_);
     tail_pb.set_end_unixtime(time(NULL));
     write_proto_to_file(tail_pb,
-            band_directory_ / band_tail_name);
+            band_directory_ / Band::TAIL_NAME);
     LOG(INFO) << "finish band in " << band_directory_;
 }
 
