@@ -13,3 +13,11 @@ printproto takes exactly one argument:
     $ conserve printproto 1 2 3
     E*] 'conserve printproto' takes exactly one argument, the path of the file to dump. (glob)
     [1]
+
+protobuf messages don't carry any overall type identification, so printproto
+infers the format from the last component of the filename.  It complains if it
+can't guess the format:
+
+    $ conserve printproto /dev/null
+    E*] can't infer proto format from filename "/dev/null" (glob)
+    [1]

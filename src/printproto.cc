@@ -45,7 +45,7 @@ int cmd_printproto(char **args) {
 		message = new conserve::proto::ArchiveHeader();
 		read_proto_from_file(path, message);
     } else {
-    	LOG(ERROR) << "don't know what kind of proto would be in " << path;
+    	LOG(ERROR) << "can't infer proto format from filename " << path;
     	return 1;
     }
 
