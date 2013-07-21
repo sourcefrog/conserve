@@ -14,3 +14,15 @@ duralib/proto/*py
 *.d
 conserve.sublime*
 tests/*.err
+.deps
+Makefile
+Makefile.in
+aclocal.m4
+autom4te.cache
+config.log
+config.status
+configure
+conserve-*.tar.gz
+depcomp
+install-sh
+missing
