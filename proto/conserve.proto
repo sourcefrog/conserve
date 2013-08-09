@@ -1,6 +1,8 @@
 package conserve.proto;
 
-// Used in various messages to track when the metadata was written and by whom.
+// Used in various messages to track when the metadata was written and by whom,
+// for the sake of tracking timing, audit trail, and identifying or working
+// around software bugs.
 message Stamp {
     optional int64 unixtime = 1;
     optional string hostname = 2;
