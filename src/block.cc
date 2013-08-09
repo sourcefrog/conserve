@@ -40,28 +40,25 @@ BlockWriter::BlockWriter(BandWriter band_writer) :
     block_directory_(band_writer.directory()),
     block_number_(band_writer.next_block_number())
 {
-	string padded_number = (boost::format("%06d") % block_number_).str();
-	index_filename_ = block_directory_ / ("a" + padded_number);
-	data_filename_ = block_directory_ / ("d" + padded_number);
+    string padded_number = (boost::format("%06d") % block_number_).str();
+    index_filename_ = block_directory_ / ("a" + padded_number);
+    data_filename_ = block_directory_ / ("d" + padded_number);
 }
 
 void BlockWriter::start() {
-	data_fd_ = open(data_filename_.string().c_str(),
-	    O_CREAT|O_EXCL|O_WRONLY,
-	    0666);
+    data_fd_ = open(data_filename_.string().c_str(),
+        O_CREAT|O_EXCL|O_WRONLY,
+        0666);
     PCHECK(data_fd_ > 0);
 }
 
 void BlockWriter::finish() {
-	proto::BlockIndex index_proto;
-
-	int ret = close(data_fd_);
+    int ret = close(data_fd_);
     PCHECK(ret == 0);
 
-	// TODO(mbp): Compress it.
-    write_proto_to_file(index_proto, index_filename_);
+    // TODO(mbp): Compress it.
+    write_proto_to_file(index_proto_, index_filename_);
     LOG(INFO) << "write block index in " << index_filename_;
-
 }
 
 } // namespace conserve

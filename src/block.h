@@ -14,6 +14,8 @@
 #ifndef CONSERVE_BLOCK_H
 #define CONSERVE_BLOCK_H
 
+#include "proto/conserve.pb.h"
+
 namespace conserve {
 
 class BandWriter;
@@ -22,7 +24,7 @@ using namespace boost::filesystem;
 
 class BlockWriter {
 public:
-	void start();
+    void start();
     void finish();
     BlockWriter(BandWriter band);
 
@@ -32,6 +34,9 @@ private:
     path index_filename_;
     path data_filename_;
     int data_fd_;
+
+    // Accumulates index entries as files are added.
+    conserve::proto::BlockIndex index_proto_;
 };
 
 } // namespace conserve
