@@ -23,6 +23,11 @@ void read_proto_from_file(
 
 std::string gethostname_str();
 
+namespace proto {
+class Stamp;
+};
+
+void populate_stamp(conserve::proto::Stamp *stamp);
 }
 
 // vim: sw=4 et

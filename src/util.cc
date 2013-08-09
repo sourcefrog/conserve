@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include <boost/filesystem.hpp>
 
@@ -23,16 +24,16 @@
 #include <google/protobuf/text_format.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
+#include "proto/conserve.pb.h"
 #include "util.h"
 
 namespace conserve {
 
 using namespace std;
-
 using namespace boost;
-
 using namespace google::protobuf::io;
 using namespace google::protobuf;
+using namespace conserve::proto;
 
 void write_proto_to_file(
         const Message& message,
@@ -62,6 +63,12 @@ string gethostname_str() {
     char hostname[256];
     gethostname(hostname, sizeof hostname - 1);
     return string(hostname);
+}
+
+void populate_stamp(Stamp *stamp) {
+    stamp->set_unixtime(time(0));
+    stamp->set_hostname(gethostname_str());
+    stamp->set_software_version(PACKAGE_VERSION);
 }
 
 } // namespace conserve

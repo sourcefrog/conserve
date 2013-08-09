@@ -53,8 +53,7 @@ void BandWriter::start() {
     filesystem::create_directory(band_directory_);
     proto::BandHead head_pb;
     head_pb.set_band_number(name_);
-    head_pb.set_start_unixtime(time(NULL));
-    head_pb.set_source_hostname(gethostname_str());
+    populate_stamp(head_pb.mutable_stamp());
     write_proto_to_file(head_pb,
             band_directory_ / Band::HEAD_NAME);
 }
@@ -62,7 +61,7 @@ void BandWriter::start() {
 void BandWriter::finish() {
     proto::BandTail tail_pb;
     tail_pb.set_band_number(name_);
-    tail_pb.set_end_unixtime(time(NULL));
+    populate_stamp(tail_pb.mutable_stamp());
     // TODO(mbp): Write block count
     write_proto_to_file(tail_pb,
             band_directory_ / Band::TAIL_NAME);

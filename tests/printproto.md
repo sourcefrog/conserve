@@ -28,11 +28,18 @@ You can also print band heads and tails, and block indexes:
     $ conserve backup a hello
     $ conserve printproto a/b0000/BAND-HEAD
     band_number: "0000"
-    start_unixtime: \d+ (re)
-    source_hostname: "*" (glob)
+    stamp {
+      unixtime: \d+ (re)
+      hostname: "*" (glob)
+      software_version: "0.1.0"
+    }
     $ conserve printproto a/b0000/BAND-TAIL
     band_number: "0000"
-    end_unixtime: \d+ (re)
+    stamp {
+      unixtime: \d+ (re)
+      hostname: "*" (glob)
+      software_version: "0.1.0"
+    }
 
 TODO(mbp): Check block count in tail
 

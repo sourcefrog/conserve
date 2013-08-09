@@ -1,5 +1,12 @@
 package conserve.proto;
 
+// Used in various messages to track when the metadata was written and by whom.
+message Stamp {
+    optional int64 unixtime = 1;
+    optional string hostname = 2;
+    optional string software_version = 3;
+}
+
 // One ArchiveHeader in '/CONSERVE-ARCHIVE' in the root of the archive directory.
 message ArchiveHead {
     // Literal "conserve archive"
@@ -10,6 +17,8 @@ message ArchiveHead {
 
     // Clients must understand these features to safely write the archive.
     repeated string required_write_flags = 3;
+
+    optional Stamp stamp = 4;
 }
 
 enum FileType {
@@ -25,9 +34,7 @@ message BandHead {
     // Should correspond to the on-disk band number, eg "0000".
     optional string band_number = 1;
 
-    optional int64 start_unixtime = 2;
-
-    optional string source_hostname = 3;
+    optional Stamp stamp = 2;
 }
 
 
@@ -35,7 +42,7 @@ message BandHead {
 message BandTail {
     optional string band_number = 1;
 
-    optional int64 end_unixtime = 2;
+    optional Stamp stamp = 2;
 
     optional int32 block_count = 4;
 
@@ -74,6 +81,8 @@ message BlockIndex {
     // Hash and length of the whole data file.
     optional bytes data_sha1 = 2;
     optional int64 data_length = 3;
+
+    optional Stamp stamp = 4;
 }
 
 // vim: et sw=4
