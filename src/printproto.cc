@@ -52,9 +52,12 @@ int cmd_printproto(char **args) {
         message = new conserve::proto::BandTail();
     } else if (Block::resembles_index_filename(filename.string())) {
         message = new conserve::proto::BlockIndex();
+    } else if (Block::resembles_data_filename(filename.string())) {
+        LOG(ERROR) << path << " is a block data file and they don't contain protos";
+        return 1;
     } else {
-    	LOG(ERROR) << "can't infer proto format from filename " << path;
-    	return 1;
+        LOG(ERROR) << "can't infer proto format from filename " << path;
+        return 1;
     }
 
     // TODO(mbp): Handle files that are compressed, encrypted, etc.

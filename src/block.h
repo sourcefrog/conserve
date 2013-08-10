@@ -25,7 +25,11 @@ using namespace boost::filesystem;
 class Block {
 public:
     static bool resembles_index_filename(const string&);
+    static bool resembles_data_filename(const string&);
+    static bool extract_filename_type(const string&, char*);
+    static bool extract_block_number(const string&, int*);
 };
+
 
 class BlockWriter {
 public:

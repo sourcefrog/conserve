@@ -65,20 +65,45 @@ void BlockWriter::finish() {
 }
 
 
-bool Block::resembles_index_filename(const string& f) {
-    switch (f[0]) {
-        case 'a':
-        case 'A':
-            break;
-        default:
-            return false;
-    }
-    for (int i = 1; i < f.size(); i++) {
+bool Block::extract_filename_type(const string& f, char *out) {
+    char f0 = tolower(f[0]);
+    if (f0 == 'a' || f0 == 'd') {
+        if (out)
+            *out = f0;
+        return true;
+    } else
+        return false;
+}
+
+
+bool Block::extract_block_number(const string& f, int* out) {
+    char type;
+    if (!extract_filename_type(f, &type))
+        return false;
+    for (int i = 1; i < f.size(); i++)
         if (!isdigit(f[i]))
             return false;
-    }
+    if (out)
+        *out = atoi(&f[1]);
     return true;
 }
+
+
+bool Block::resembles_index_filename(const string& f) {
+    char ftype;
+    return extract_filename_type(f, &ftype)
+        && ftype == 'a'
+        && extract_block_number(f, NULL);
+}
+
+
+bool Block::resembles_data_filename(const string& f) {
+    char ftype;
+    return extract_filename_type(f, &ftype)
+        && ftype == 'd'
+        && extract_block_number(f, NULL);
+}
+
 
 } // namespace conserve
 
