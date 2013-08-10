@@ -62,6 +62,10 @@ using namespace conserve;
 
 
 int main(int argc, char *argv[]) {
+    // TODO(mbp): Log files might contain sensitive information. They are
+    // written out with permissions controlled by the umask by default.
+    // Possibly we should make them tighter. Or perhaps people should just set
+    // their umask?
     google::InitGoogleLogging(argv[0]);
     google::SetStderrLogging(google::GLOG_WARNING);
 
