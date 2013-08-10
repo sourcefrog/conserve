@@ -31,7 +31,7 @@ using namespace google::protobuf;
 
 namespace conserve {
 
-const string version = "0.0";
+const string version = PACKAGE_VERSION;
 
 const string usage =
 "conserve - A robust backup program\n"

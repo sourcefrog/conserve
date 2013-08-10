@@ -1,7 +1,7 @@
 You can of course check the version number:
 
     $ conserve -V
-    conserve 0.0
+    conserve 0.1.0
 
 and ask for help:
 
