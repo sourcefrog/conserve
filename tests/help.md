@@ -6,10 +6,11 @@ You can of course check the version number:
 and ask for help:
 
     $ conserve -h
-    conserve - A robust backup program
+    conserve - a backup program
     
     Copyright 2012-2013 Martin Pool
-    Licenced under the Apache Licence, Version 2.0.
+    Licenced under the GNU General Public Licence, version 2 or later.
+    Conserve comes with ABSOLUTELY NO WARRANTY of any kind.
     
     Options:
       -h            Show help.
