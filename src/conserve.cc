@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (!argv[optind]) {
-        LOG(ERROR) << "No command given";
+        LOG(ERROR) << "please give a command or use 'conserve -h' for help";
         return 1;
     }
     string command(argv[optind]);

@@ -1,14 +1,14 @@
 Everything in Conserve is done through a subcommand to the `conserve` command:
 
     $ conserve
-    E*] No command given (glob)
+    E0810 01:11:12.576691 13066 conserve.cc:87] please give a command or use 'conserve -h' for help
     [1]
 
 Most of the tests give it the -L option to suppress the log prefix and avoid
 unwanted variation.
 
     $ conserve -L
-    No command given
+    please give a command or use 'conserve -h' for help
     [1]
 
 All log output has a prefix which includes the message severity (E=error,
