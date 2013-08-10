@@ -6,7 +6,8 @@ Generalities
 
 All header data is stored as [Google Protobufs][1].
 
-Example in this document are expresed as (approximately) the text format of protobufs, but the on-disk format is the compact binary form.
+Example in this document are expresed as (approximately) the text format of
+protobufs, but the on-disk format is the compact binary form.
 
 Source
 ------
@@ -20,7 +21,12 @@ Archive
 A backup *archive* is a possibly-remote directory, containing archive
 files.
 
-In the root directory of the archive there is a file called `CONSERVE-ARCHIVE`,
+The archive makes minimal assumptions about the filesystem it's stored on: in
+particular, it need not support case sensitivity, it need not store times or
+other metadata, and it only needs to support 8.3 characters.  It must supported
+nested subdirectories but only of moderate length.
+
+In the root directory of the archive there is a file called `CONSERVE`,
 which is an `ArchiveHeader` protobuf containing:
 
     magic: "conserve backup archive"
@@ -70,9 +76,9 @@ A band contains file contents and metadata.
 A band is composed of a *head*, *tail*, and multiple *blocks*, each
 with a *block index* and a *block data*.
 
-A band head is a file `BAND-HEAD` containing a `BandHead` protobuf.
+A band head is a file `BANDHEAD` containing a `BandHead` protobuf.
 
-A band tail is a file `BAND-TAIL` containing a `BandTail` protobuf, only for
+A band tail is a file `BANDTAIL` containing a `BandTail` protobuf, only for
 finished bands: it is the presence of this file that defines the band as
 complete.
 
@@ -115,6 +121,8 @@ So, for example:
 
     my-archive/
       b0000/
+        BANDHEAD
+        BANDTAIL
         a000000
         d000000
 

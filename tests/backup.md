@@ -14,8 +14,8 @@ And now back it up:
 This creates a new _band directory_ and some block data within it:
 
     $ ls a/b0000
-    BAND-HEAD
-    BAND-TAIL
+    BANDHEAD
+    BANDTAIL
     a000000
     d000000
 

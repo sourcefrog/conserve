@@ -2,7 +2,7 @@ You can use the 'printproto' command to print the contents of an archive
 control file in human-readable form:
 
     $ conserve init-archive a
-    $ conserve printproto a/CONSERVE-ARCHIVE
+    $ conserve printproto a/CONSERVE
     magic: "conserve archive"
 
 printproto takes exactly one argument:
@@ -26,14 +26,14 @@ You can also print band heads and tails, and block indexes:
 
     $ echo hello > srcfile
     $ conserve backup a hello
-    $ conserve printproto a/b0000/BAND-HEAD
+    $ conserve printproto a/b0000/BANDHEAD
     band_number: "0000"
     stamp {
       unixtime: \d+ (re)
       hostname: "*" (glob)
       software_version: "0.1.0"
     }
-    $ conserve printproto a/b0000/BAND-TAIL
+    $ conserve printproto a/b0000/BANDTAIL
     band_number: "0000"
     stamp {
       unixtime: \d+ (re)

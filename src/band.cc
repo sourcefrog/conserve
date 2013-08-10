@@ -36,8 +36,8 @@ using namespace std;
 using namespace boost;
 
 
-const string Band::HEAD_NAME = "BAND-HEAD";
-const string Band::TAIL_NAME = "BAND-TAIL";
+const string Band::HEAD_NAME = "BANDHEAD";
+const string Band::TAIL_NAME = "BANDTAIL";
 
 
 BandWriter::BandWriter(Archive* archive, string name) : 

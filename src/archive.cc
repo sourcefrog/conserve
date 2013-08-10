@@ -36,7 +36,7 @@ using namespace std;
 using namespace boost;
 
 
-const string Archive::HEAD_NAME = "CONSERVE-ARCHIVE";
+const string Archive::HEAD_NAME = "CONSERVE";
 
 
 void write_archive_head(const filesystem::path& base_dir) {
