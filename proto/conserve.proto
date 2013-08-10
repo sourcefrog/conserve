@@ -58,7 +58,7 @@ message BandTail {
 // One FileIndex per file version.
 message FileIndex {
     // File path from backup root (generally utf-8).  (Required for all current files.)
-    optional bytes path = 1;
+    optional string path = 1;
 
     optional FileType file_type = 2;
 

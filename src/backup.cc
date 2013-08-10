@@ -23,15 +23,17 @@
 
 namespace conserve {
 
+using namespace boost::filesystem;
+
 int do_backup(char **argv) {
-    vector<string> source_names;
-    string archive_dir;
+    vector<path> source_names;
+    path archive_dir;
 
     for (int i = 0; argv[i]; i++)
         if (argv[i+1])
-            source_names.push_back(string(argv[i]));
+            source_names.push_back(path(argv[i]));
         else
-            archive_dir = string(argv[i]);
+            archive_dir = path(argv[i]);
 
     if (source_names.empty()) {
         LOG(ERROR) << "Usage: conserve backup SOURCE... ARCHIVE";
@@ -45,7 +47,12 @@ int do_backup(char **argv) {
     BandWriter band = archive.start_band();
     BlockWriter block(band);
     block.start();
-    // TODO(mbp): Actually back up the files!
+
+    for (int i = 0; i < source_names.size(); i++) {
+        // TODO(mbp): Normalize path, check it doesn't contain ..
+        block.add_file(source_names[i]);
+    }
+
     block.finish();
     band.finish();
 

@@ -20,22 +20,23 @@
 namespace conserve {
 
 using namespace std;
+using namespace boost::filesystem;
 
 class BandWriter;
 
 class Archive {
 public:
-    static Archive create(const string base_dir);
+    static Archive create(const path& base_dir);
 
-    Archive(const string base_dir) :
+    Archive(const path& base_dir) :
 	base_dir_(base_dir)
 	{}
 
     BandWriter start_band();
 
-    const boost::filesystem::path base_dir_;
-
     static const string HEAD_NAME;
+
+    const path base_dir_;
 
 private:
 };

@@ -47,7 +47,7 @@ void write_archive_head(const filesystem::path& base_dir) {
 }
 
 
-Archive Archive::create(const string dir) {
+Archive Archive::create(const path& dir) {
     filesystem::path base_path(dir);
     filesystem::create_directory(base_path);
     write_archive_head(base_path);

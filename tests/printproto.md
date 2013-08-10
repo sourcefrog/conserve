@@ -41,6 +41,9 @@ You can also print band heads and tails, and block indexes:
       software_version: "0.1.0"
     }
     $ conserve printproto a/b0000/a000000
+    file {
+      path: "hello"
+    }
     stamp {
       unixtime: \d+ (re)
       hostname: "*" (glob)
@@ -51,6 +54,4 @@ You can also print band heads and tails, and block indexes:
     [1]
 
 TODO(mbp): Check block count in tail
-
-TODO(mbp): Check block index
 

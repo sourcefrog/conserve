@@ -53,6 +53,14 @@ void BlockWriter::start() {
     PCHECK(data_fd_ > 0);
 }
 
+
+void BlockWriter::add_file(const path& source_path) {
+    // TODO(mbp): Actually back up the files!
+    proto::FileIndex* file_index = index_proto_.add_file();
+    file_index->set_path(source_path.string());
+}
+
+
 void BlockWriter::finish() {
     int ret = close(data_fd_);
     PCHECK(ret == 0);

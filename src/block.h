@@ -37,6 +37,8 @@ public:
     void finish();
     BlockWriter(BandWriter band);
 
+    void add_file(const path&);
+
 private:
     path block_directory_;
     int block_number_;
