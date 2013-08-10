@@ -7,19 +7,19 @@ control file in human-readable form:
 
 printproto takes exactly one argument:
 
-    $ conserve printproto 
-    E*] 'conserve printproto' takes exactly one argument, the path of the file to dump. (glob)
+    $ conserve -L printproto
+    'conserve printproto' takes one argument, the path of the file to dump.
     [1]
-    $ conserve printproto 1 2 3
-    E*] 'conserve printproto' takes exactly one argument, the path of the file to dump. (glob)
+    $ conserve -L printproto 1 2 3
+    'conserve printproto' takes one argument, the path of the file to dump.
     [1]
 
 protobuf messages don't carry any overall type identification, so printproto
 infers the format from the last component of the filename.  It complains if it
 can't guess the format:
 
-    $ conserve printproto /dev/null
-    E*] can't infer proto format from filename "/dev/null" (glob)
+    $ conserve -L printproto /dev/null
+    can't infer proto format from filename "/dev/null"
     [1]
 
 You can also print band heads and tails, and block indexes:
@@ -46,8 +46,8 @@ You can also print band heads and tails, and block indexes:
       hostname: "*" (glob)
       software_version: "0.1.0"
     }
-    $ conserve printproto a/b0000/d000000
-    E*] "a/b0000/d000000" is a block data file and they don't contain protos (glob)
+    $ conserve -L printproto a/b0000/d000000
+    "a/b0000/d000000" is a block data file and they don't contain protos
     [1]
 
 TODO(mbp): Check block count in tail

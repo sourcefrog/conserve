@@ -41,7 +41,8 @@ const string usage =
 "\n"
 "Options:\n"
 "  -h            Show help.\n"
-"  -V            Show version.\n";
+"  -V            Show version.\n"
+"  -L            Suppress severity/date/time/source prefix on log lines.\n";
 
 
 void show_help() {
@@ -59,13 +60,15 @@ int main(int argc, char *argv[]) {
 
     int opt;
     while (true) {
-        opt = getopt(argc, argv, "hV");
+        opt = getopt(argc, argv, "hLV");
         if (opt == 'h') {
             show_help();
             return 0;
         } else if (opt == 'V') {
             cout << "conserve " << version << "\n";
             return 0;
+        } else if (opt == 'L') {
+            FLAGS_log_prefix = false;
         } else if (opt == -1)
             break;
         else {

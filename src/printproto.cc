@@ -35,7 +35,7 @@ namespace conserve {
 
 int cmd_printproto(char **args) {
     if (!args[0] || args[1]) {
-        LOG(ERROR) << "'conserve printproto' takes exactly one argument, "
+        LOG(ERROR) << "'conserve printproto' takes one argument, "
             << "the path of the file to dump.";
         return 1;
     }

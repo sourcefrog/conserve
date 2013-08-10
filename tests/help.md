@@ -14,4 +14,5 @@ and ask for help:
     Options:
       -h            Show help.
       -V            Show version.
+      -L            Suppress severity/date/time/source prefix on log lines.
 
