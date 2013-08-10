@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <time.h>
+#include <ctype.h>
 
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
@@ -61,6 +62,22 @@ void BlockWriter::finish() {
     // TODO(mbp): Compress it.
     write_proto_to_file(index_proto_, index_filename_);
     LOG(INFO) << "write block index in " << index_filename_;
+}
+
+
+bool Block::resembles_index_filename(const string& f) {
+    switch (f[0]) {
+        case 'a':
+        case 'A':
+            break;
+        default:
+            return false;
+    }
+    for (int i = 1; i < f.size(); i++) {
+        if (!isdigit(f[i]))
+            return false;
+    }
+    return true;
 }
 
 } // namespace conserve

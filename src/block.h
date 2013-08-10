@@ -22,6 +22,11 @@ class BandWriter;
 
 using namespace boost::filesystem;
 
+class Block {
+public:
+    static bool resembles_index_filename(const string&);
+};
+
 class BlockWriter {
 public:
     void start();

@@ -22,6 +22,7 @@
 
 #include "archive.h"
 #include "band.h"
+#include "block.h"
 #include "printproto.h"
 #include "util.h"
 
@@ -44,25 +45,29 @@ int cmd_printproto(char **args) {
     const boost::filesystem::path filename = path.filename();
 
     if (filename == Archive::HEAD_NAME) {
-		message = new conserve::proto::ArchiveHead();
-	} else if (filename == Band::HEAD_NAME) {
-		message = new conserve::proto::BandHead();
-	} else if (filename == Band::TAIL_NAME) {
-		message = new conserve::proto::BandTail();
+        message = new conserve::proto::ArchiveHead();
+    } else if (filename == Band::HEAD_NAME) {
+        message = new conserve::proto::BandHead();
+    } else if (filename == Band::TAIL_NAME) {
+        message = new conserve::proto::BandTail();
+    } else if (Block::resembles_index_filename(filename.string())) {
+        message = new conserve::proto::BlockIndex();
     } else {
     	LOG(ERROR) << "can't infer proto format from filename " << path;
     	return 1;
     }
 
     // TODO(mbp): Handle files that are compressed, encrypted, etc.
-	read_proto_from_file(path, message);
-	google::protobuf::io::FileOutputStream outstream(1);
-	TextFormat::Print(*message, &outstream);
-	outstream.Flush();
+    read_proto_from_file(path, message);
+    google::protobuf::io::FileOutputStream outstream(1);
+    TextFormat::Print(*message, &outstream);
+    outstream.Flush();
 
-	delete message;
+    delete message;
 
     return 0;
 }
 
 } // namespace conserve
+
+// vim: sw=4 et
