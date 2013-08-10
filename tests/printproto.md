@@ -25,7 +25,7 @@ can't guess the format:
 You can also print band heads and tails, and block indexes:
 
     $ echo hello > srcfile
-    $ conserve backup a hello
+    $ conserve backup hello a
     $ conserve printproto a/b0000/BANDHEAD
     band_number: "0000"
     stamp {

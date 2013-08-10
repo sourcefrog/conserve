@@ -11,6 +11,10 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+
+#include <string>
+#include <vector>
+
 #include <glog/logging.h>
 
 #include "archive.h"
@@ -20,12 +24,21 @@
 namespace conserve {
 
 int do_backup(char **argv) {
-    const char *archive_dir = argv[0];
-    if (!archive_dir) {
-            LOG(ERROR) << "Usage: conserve backup ARCHIVE SOURCE...";
-            return 1;
+    vector<string> source_names;
+    string archive_dir;
+
+    for (int i = 0; argv[i]; i++)
+        if (argv[i+1])
+            source_names.push_back(string(argv[i]));
+        else
+            archive_dir = string(argv[i]);
+
+    if (source_names.empty()) {
+        LOG(ERROR) << "Usage: conserve backup SOURCE... ARCHIVE";
+        return 1;
     }
-    // TODO(mbp): Change to a given directory to read the source 
+
+    // TODO(mbp): Change to a given directory to read the source
     // files, so that their relative paths are correct.  Perhaps also,
     // an option to strip a given prefix off the names.
     Archive archive(archive_dir);

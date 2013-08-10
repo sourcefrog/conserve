@@ -9,7 +9,7 @@ Let's make some files to put into it
 
 And now back it up:
 
-    $ conserve backup a src/f
+    $ conserve backup src/f a
 
 This creates a new _band directory_ and some block data within it:
 
