@@ -42,7 +42,13 @@ const string usage =
 "Options:\n"
 "  -h            Show help.\n"
 "  -V            Show version.\n"
-"  -L            Suppress severity/date/time/source prefix on log lines.\n";
+"  -L            Suppress severity/date/time/source prefix on log lines.\n"
+"\n"
+"Commands:\n"
+"  backup SOURCE... ARCHIVE\n"
+"  init-archive DIR\n"
+"  printproto FILE\n"
+;
 
 
 void show_help() {

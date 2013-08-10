@@ -15,4 +15,9 @@ and ask for help:
       -h            Show help.
       -V            Show version.
       -L            Suppress severity/date/time/source prefix on log lines.
+    
+    Commands:
+      backup SOURCE... ARCHIVE
+      init-archive DIR
+      printproto FILE
 
