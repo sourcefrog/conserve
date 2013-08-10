@@ -24,8 +24,8 @@ message ArchiveHead {
 }
 
 enum FileType {
-    UNKNOWN = 0;
-    REGULAR = 1;
+    REGULAR = 0;
+    UNKNOWN = 1;
     DIRECTORY = 2;
     SYMLINK = 3;
 }
@@ -57,9 +57,12 @@ message BandTail {
 
 // One FileIndex per file version.
 message FileIndex {
-    // File path from backup root (generally utf-8).  (Required for all current files.)
-    optional string path = 1;
+    // File path from backup root. This is generally utf-8, but stored as bytes
+    // so it can cope with anomalously named files.  (Required for all current
+    // files.)
+    optional bytes path = 1;
 
+    // Type of file; unspecified means a plain file.
     optional FileType file_type = 2;
 
     // SHA-1 hash of the contents of the file, as plain bytes (not hex).
@@ -68,7 +71,7 @@ message FileIndex {
     // Length of the file body.
     optional int64 data_length = 4;
 
-    // Offset of the body within the block data file.
+    // Offset of the body within the uncompressed form of the block data file.
     optional int64 data_offset = 5;
 
     // TODO(mbp): mtime, owner, group, perms, ...
