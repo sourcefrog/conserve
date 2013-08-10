@@ -56,6 +56,8 @@ void BlockWriter::finish() {
     int ret = close(data_fd_);
     PCHECK(ret == 0);
 
+    populate_stamp(index_proto_.mutable_stamp());
+
     // TODO(mbp): Compress it.
     write_proto_to_file(index_proto_, index_filename_);
     LOG(INFO) << "write block index in " << index_filename_;
