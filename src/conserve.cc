@@ -34,7 +34,7 @@ namespace conserve {
 const string version = PACKAGE_VERSION;
 
 const string usage =
-"conserve - a backup program\n"
+"conserve - a robust backup program\n"
 "\n"
 "Copyright 2012-2013 Martin Pool\n"
 "Licenced under the GNU General Public Licence, version 2 or later.\n"
