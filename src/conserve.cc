@@ -42,6 +42,7 @@ const string usage =
 "\n"
 "Options:\n"
 "  -h            Show help.\n"
+"  -v            Show info logs on stderr.\n"
 "  -V            Show version.\n"
 "  -L            Suppress severity/date/time/source prefix on log lines.\n"
 "\n"
@@ -71,13 +72,15 @@ int main(int argc, char *argv[]) {
 
     int opt;
     while (true) {
-        opt = getopt(argc, argv, "hLV");
+        opt = getopt(argc, argv, "hLVv");
         if (opt == 'h') {
             show_help();
             return 0;
         } else if (opt == 'V') {
             cout << "conserve " << version << "\n";
             return 0;
+        } else if (opt == 'v') {
+            google::SetStderrLogging(google::GLOG_INFO);
         } else if (opt == 'L') {
             FLAGS_log_prefix = false;
         } else if (opt == -1)
