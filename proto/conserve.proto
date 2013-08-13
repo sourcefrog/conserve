@@ -88,6 +88,8 @@ message BlockIndex {
     optional int64 data_length = 3;
 
     optional Stamp stamp = 4;
+
+    // TODO(mbp): Specify whether/how it's compressed?
 }
 
 // vim: et sw=4
