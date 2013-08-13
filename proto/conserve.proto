@@ -9,7 +9,7 @@ message Stamp {
     optional string software_version = 3;
 }
 
-// One ArchiveHeader in '/CONSERVE-ARCHIVE' in the root of the archive directory.
+// One ArchiveHeader in '/CONSERVE' in the root of the archive directory.
 message ArchiveHead {
     // Literal "conserve archive"
     required string magic = 1;
@@ -38,7 +38,7 @@ enum Compression {
 };
 
 
-// One BandHead in 'BAND-HEAD' in each band directory.
+// One BandHead in 'BANDHEAD' in each band directory.
 message BandHead {
     // Should correspond to the on-disk band number, eg "0000".
     optional string band_number = 1;
@@ -47,7 +47,7 @@ message BandHead {
 }
 
 
-// One BandTail in 'BAND-TAIL' for complete bands only.
+// One BandTail in 'BANDTAIL' for complete bands only.
 message BandTail {
     optional string band_number = 1;
 
