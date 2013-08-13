@@ -43,13 +43,14 @@ int do_backup(char **argv) {
     // TODO(mbp): Change to a given directory to read the source
     // files, so that their relative paths are correct.  Perhaps also,
     // an option to strip a given prefix off the names.
+    // TODO(mbp): Normalize path, check it doesn't contain ..
+
     Archive archive(archive_dir);
     BandWriter band = archive.start_band();
     BlockWriter block(band);
     block.start();
 
     for (int i = 0; i < source_names.size(); i++) {
-        // TODO(mbp): Normalize path, check it doesn't contain ..
         block.add_file(source_names[i]);
     }
 

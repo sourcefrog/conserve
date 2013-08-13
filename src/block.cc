@@ -28,6 +28,7 @@
 #include "archive.h"
 #include "band.h"
 #include "block.h"
+#include "filecopy.h"
 #include "util.h"
 
 namespace conserve {
@@ -46,6 +47,7 @@ BlockWriter::BlockWriter(BandWriter band_writer) :
     data_filename_ = block_directory_ / ("d" + padded_number);
 }
 
+
 void BlockWriter::start() {
     data_fd_ = open(data_filename_.string().c_str(),
         O_CREAT|O_EXCL|O_WRONLY,
@@ -56,8 +58,13 @@ void BlockWriter::start() {
 
 void BlockWriter::add_file(const path& source_path) {
     // TODO(mbp): Actually back up the files!
+    int64_t content_len = -1;
+    CHECK(copy_file_contents(source_path, data_fd_, NULL, &content_len));
+
     proto::FileIndex* file_index = index_proto_.add_file();
     file_index->set_path(source_path.string());
+    CHECK(content_len >= 0);
+    file_index->set_data_length(content_len);
 }
 
 

@@ -22,6 +22,8 @@ conserve_SOURCES = \
 	src/block.cc \
 	src/block.h \
 	src/conserve.cc \
+	src/filecopy.cc \
+	src/filecopy.h \
 	src/printproto.cc \
 	src/printproto.h \
 	src/util.cc \

@@ -24,7 +24,7 @@ can't guess the format:
 
 You can also print band heads and tails, and block indexes:
 
-    $ echo hello > srcfile
+    $ echo hello world > hello
     $ conserve backup hello a
     $ conserve printproto a/b0000/BANDHEAD
     band_number: "0000"
@@ -43,6 +43,7 @@ You can also print band heads and tails, and block indexes:
     $ conserve printproto a/b0000/a000000
     file {
       path: "hello"
+      data_length: 12
     }
     stamp {
       unixtime: \d+ (re)
