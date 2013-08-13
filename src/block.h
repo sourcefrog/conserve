@@ -14,6 +14,9 @@
 #ifndef CONSERVE_BLOCK_H
 #define CONSERVE_BLOCK_H
 
+#include <stdio.h>
+#include <bzlib.h>
+
 #include "proto/conserve.pb.h"
 
 namespace conserve {
@@ -46,8 +49,13 @@ private:
     path data_filename_;
     int data_fd_;
 
+    FILE* data_file_;
+    BZFILE* data_bzfile_;
+
     // Accumulates index entries as files are added.
     conserve::proto::BlockIndex index_proto_;
+
+    void copy_file_bz2(const path& source_path, int64_t* content_len);
 };
 
 } // namespace conserve

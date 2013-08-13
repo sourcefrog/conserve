@@ -5,7 +5,7 @@ bin_PROGRAMS = conserve
 check: cram-tests
 
 CXXFLAGS=-Wall -ggdb
-LDADD=-lprotobuf -lboost_filesystem -lboost_system -lglog
+LDADD=-lprotobuf -lboost_filesystem -lboost_system -lglog -lbz2
 CPPFLAGS = -I$(srcdir/src) -I.
 
 nodist_conserve_SOURCES = proto/conserve.pb.cc

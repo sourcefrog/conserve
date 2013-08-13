@@ -53,13 +53,39 @@ void BlockWriter::start() {
         O_CREAT|O_EXCL|O_WRONLY,
         0666);
     PCHECK(data_fd_ > 0);
+    data_file_ = fdopen(data_fd_, "w");
+    PCHECK(data_file_);
+    int bzerror;
+    data_bzfile_ = BZ2_bzWriteOpen(&bzerror, data_file_, 9, 1, 0);
+    CHECK(data_bzfile_);
+}
+
+
+void BlockWriter::copy_file_bz2(const path& source_path,
+        int64_t* content_len)
+{
+    // TODO: Proper error handling, don't just abort.
+    const size_t copy_buf_size = 64 << 10;
+    char buf[copy_buf_size];
+    int from_fd = open(source_path.c_str(), O_RDONLY);
+    PCHECK(from_fd != -1);
+    *content_len = 0;
+    ssize_t bytes_read;
+    int bzerror;
+    while ((bytes_read = read(from_fd, buf, sizeof buf)) != 0) {
+        PCHECK(bytes_read > 0);
+        BZ2_bzWrite(&bzerror, data_bzfile_, buf, bytes_read);
+        *content_len += bytes_read;
+    }
+    PCHECK(close(from_fd) == 0);
+    // TODO: Accumulate the hash.
 }
 
 
 void BlockWriter::add_file(const path& source_path) {
     // TODO(mbp): Actually back up the files!
     int64_t content_len = -1;
-    CHECK(copy_file_contents(source_path, data_fd_, NULL, &content_len));
+    copy_file_bz2(source_path, &content_len);
 
     proto::FileIndex* file_index = index_proto_.add_file();
     file_index->set_path(source_path.string());
@@ -69,12 +95,15 @@ void BlockWriter::add_file(const path& source_path) {
 
 
 void BlockWriter::finish() {
-    int ret = close(data_fd_);
-    PCHECK(ret == 0);
+    int bzerror;
+    BZ2_bzWriteClose(&bzerror, data_bzfile_, 0, 0, 0);
+    PCHECK(!fclose(data_file_));
 
     populate_stamp(index_proto_.mutable_stamp());
 
-    // TODO(mbp): Compress it.
+    // TODO: Accumulate size and hash as we write the data file, and store it
+    // into the index.
+    index_proto_.set_compression(proto::BZIP2);
     write_proto_to_file(index_proto_, index_filename_);
     LOG(INFO) << "write block index in " << index_filename_;
 }

@@ -31,6 +31,13 @@ enum FileType {
 }
 
 
+enum Compression {
+    NONE = 0;
+    GZIP = 1;
+    BZIP2 = 2;
+};
+
+
 // One BandHead in 'BAND-HEAD' in each band directory.
 message BandHead {
     // Should correspond to the on-disk band number, eg "0000".
@@ -88,6 +95,8 @@ message BlockIndex {
     optional int64 data_length = 3;
 
     optional Stamp stamp = 4;
+
+    optional Compression compression = 5;
 
     // TODO(mbp): Specify whether/how it's compressed?
 }

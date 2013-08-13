@@ -50,6 +50,7 @@ You can also print band heads and tails, and block indexes:
       hostname: "*" (glob)
       software_version: "0.1.0"
     }
+    compression: BZIP2
     $ conserve -L printproto a/b0000/d000000
     "a/b0000/d000000" is a block data file and they don't contain protos
     [1]
