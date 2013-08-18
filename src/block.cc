@@ -84,12 +84,11 @@ void BlockWriter::copy_file_bz2(const path& source_path,
         *content_len += bytes_read;
     }
     PCHECK(close(from_fd) == 0);
-    // TODO: Accumulate the hash.
+    // TODO: Accumulate and return the hash of the stored content.
 }
 
 
 void BlockWriter::add_file(const path& source_path) {
-    // TODO(mbp): Actually back up the files!
     int64_t content_len = -1;
     copy_file_bz2(source_path, &content_len);
 
