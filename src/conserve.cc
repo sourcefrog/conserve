@@ -96,10 +96,11 @@ int main(int argc, char *argv[]) {
     }
     string command(argv[optind]);
     char **command_args = &argv[optind+1];
+
     if (command == "init-archive") {
         const char *archive_dir = command_args[0];
         if (!archive_dir) {
-            LOG(ERROR) << "Usage: init-archive ARCHIVE-DIR";
+            LOG(ERROR) << "usage: conserve init-archive ARCHIVE";
             return 1;
         }
         Archive::create(archive_dir);
@@ -108,7 +109,7 @@ int main(int argc, char *argv[]) {
     } else if (command == "printproto") {
         return cmd_printproto(command_args);
     } else {
-        LOG(ERROR) << "Unrecognized command: " << command;
+        LOG(ERROR) << "unrecognized command: " << command;
         return 0;
     }
 
