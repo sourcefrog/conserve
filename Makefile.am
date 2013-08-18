@@ -34,7 +34,8 @@ proto/conserve.pb.cc proto/conserve.pb.h: proto/conserve.proto
 
 check-staged:
 	t=`mktemp -d` && \
-	git checkout-index --prefix "$$t/" -a && \
+	echo check-staged in "$$t" && \
+	cd $(srcdir) && git checkout-index --prefix "$$t/" -a && \
 	cd "$$t" && \
 	./autogen.sh && \
 	make distcheck && \
