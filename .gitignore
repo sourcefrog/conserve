@@ -26,3 +26,4 @@ conserve-*.tar.gz
 depcomp
 install-sh
 missing
+build
