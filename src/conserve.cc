@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     // Possibly we should make them tighter. Or perhaps people should just set
     // their umask?
     google::InitGoogleLogging(argv[0]);
-    google::SetStderrLogging(google::GLOG_WARNING);
+    google::SetStderrLogging(google::WARNING);
 
     int opt;
     while (true) {
@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
             cout << "conserve " << version << "\n";
             return 0;
         } else if (opt == 'v') {
-            google::SetStderrLogging(google::GLOG_INFO);
+            google::SetStderrLogging(google::INFO);
         } else if (opt == 'L') {
             FLAGS_log_prefix = false;
         } else if (opt == -1)
