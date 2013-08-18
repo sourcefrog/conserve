@@ -24,28 +24,29 @@ class Band {
 public:
     static const string HEAD_NAME;
     static const string TAIL_NAME;
+    boost::filesystem::path directory() { return band_directory_; }
+    Band(Archive* archive, string name);
+
+protected:
+    Archive* archive_;
+    string name_;
+    boost::filesystem::path band_directory_;
 };
+
 
 // Holds an open writable band.
 // Adding files to it creates new blocks.
 // When all relevant files have been added, the band can be closed.
-class BandWriter {
+class BandWriter : public Band {
 public:
-
-    BandWriter(Archive* archive, string name);
+    BandWriter(Archive *archive, string name);
     BlockWriter start_block();
     void start();
     void finish();
 
-    boost::filesystem::path directory() { return band_directory_; }
-
     int next_block_number();
 
 private:
-    Archive* archive_;
-    string name_;
-    boost::filesystem::path band_directory_;
-
     int next_block_number_;
 };
 

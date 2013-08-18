@@ -40,10 +40,15 @@ const string Band::HEAD_NAME = "BANDHEAD";
 const string Band::TAIL_NAME = "BANDTAIL";
 
 
-BandWriter::BandWriter(Archive* archive, string name) : 
-    archive_(archive), 
-    name_(name), 
-    band_directory_(archive->base_dir_ / ("b" + name)),
+Band::Band(Archive* archive, string name) :
+    archive_(archive),
+    name_(name),
+    band_directory_(archive->base_dir_ / ("b" + name))
+{
+}
+
+BandWriter::BandWriter(Archive *archive, string name) :
+    Band(archive, name),
     next_block_number_(0)
 {
 }
@@ -55,7 +60,7 @@ void BandWriter::start() {
     head_pb.set_band_number(name_);
     populate_stamp(head_pb.mutable_stamp());
     write_proto_to_file(head_pb,
-            band_directory_ / Band::HEAD_NAME);
+        band_directory_ / Band::HEAD_NAME);
 }
 
 void BandWriter::finish() {
@@ -63,8 +68,7 @@ void BandWriter::finish() {
     tail_pb.set_band_number(name_);
     populate_stamp(tail_pb.mutable_stamp());
     // TODO(mbp): Write block count
-    write_proto_to_file(tail_pb,
-            band_directory_ / Band::TAIL_NAME);
+    write_proto_to_file(tail_pb, band_directory_ / Band::TAIL_NAME);
     LOG(INFO) << "finish band in " << band_directory_;
 }
 
