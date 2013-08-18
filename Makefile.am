@@ -37,6 +37,8 @@ check-staged:
 	cd $(srcdir) && git checkout-index --prefix "$$t/" -a && \
 	cd "$$t" && \
 	./autogen.sh && \
+	mkdir _build && cd _build && \
+	../configure && \
 	make distcheck && \
 	rm -r "$$t"
 

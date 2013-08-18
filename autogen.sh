@@ -6,4 +6,3 @@
 $MISSING aclocal
 $MISSING automake --foreign --add-missing
 $MISSING autoconf
-./configure
