@@ -50,7 +50,7 @@ int do_backup(char **argv) {
     BlockWriter block(band);
     block.start();
 
-    for (int i = 0; i < source_names.size(); i++) {
+    for (unsigned i = 0; i < source_names.size(); i++) {
         block.add_file(source_names[i]);
     }
 
