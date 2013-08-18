@@ -124,7 +124,7 @@ bool Block::extract_block_number(const string& f, int* out) {
     char type;
     if (!extract_filename_type(f, &type))
         return false;
-    for (int i = 1; i < f.size(); i++)
+    for (unsigned i = 1; i < f.size(); i++)
         if (!isdigit(f[i]))
             return false;
     if (out)
