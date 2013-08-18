@@ -16,7 +16,7 @@
 
 namespace conserve {
 
-int do_backup(char **argv);
+int cmd_backup(char **argv);
 
 } // namespace conserve
 

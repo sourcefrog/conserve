@@ -25,7 +25,7 @@ namespace conserve {
 
 using namespace boost::filesystem;
 
-int do_backup(char **argv) {
+int cmd_backup(char **argv) {
     vector<path> source_names;
     path archive_dir;
 

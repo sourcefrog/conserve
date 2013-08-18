@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
         }
         Archive::create(archive_dir);
     } else if (command == "backup") {
-        return do_backup(command_args);
+        return cmd_backup(command_args);
     } else if (command == "printproto") {
         return cmd_printproto(command_args);
     } else {
