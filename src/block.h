@@ -31,22 +31,26 @@ public:
     static bool resembles_data_filename(const string&);
     static bool extract_filename_type(const string&, char*);
     static bool extract_block_number(const string&, int*);
-};
 
+    Block(Band *band, int block_number);
 
-class BlockWriter {
-public:
-    void start();
-    void finish();
-    BlockWriter(BandWriter band);
-
-    void add_file(const path&);
-
-private:
+protected:
     path block_directory_;
     int block_number_;
     path index_filename_;
     path data_filename_;
+};
+
+
+class BlockWriter : public Block {
+public:
+    void start();
+    void finish();
+    BlockWriter(BandWriter *band);
+
+    void add_file(const path&);
+
+private:
     int data_fd_;
 
     FILE* data_file_;

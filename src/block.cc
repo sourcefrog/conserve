@@ -38,13 +38,19 @@ using namespace boost;
 using namespace boost::filesystem;
 
 
-BlockWriter::BlockWriter(BandWriter band_writer) :
-    block_directory_(band_writer.directory()),
-    block_number_(band_writer.next_block_number())
+Block::Block(Band *band, int block_number) :
+    block_directory_(band->directory()),
+    block_number_(block_number)
 {
     string padded_number = (boost::format("%06d") % block_number_).str();
     index_filename_ = block_directory_ / ("a" + padded_number);
     data_filename_ = block_directory_ / ("d" + padded_number);
+}
+
+
+BlockWriter::BlockWriter(BandWriter *band_writer) :
+    Block(band_writer, band_writer->next_block_number())
+{
 }
 
 

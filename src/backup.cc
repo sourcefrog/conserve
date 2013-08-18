@@ -47,7 +47,7 @@ int cmd_backup(char **argv) {
 
     Archive archive(archive_dir);
     BandWriter band = archive.start_band();
-    BlockWriter block(band);
+    BlockWriter block(&band);
     block.start();
 
     for (unsigned i = 0; i < source_names.size(); i++) {
