@@ -25,6 +25,8 @@ conserve_SOURCES = \
 	src/filecopy.h \
 	src/printproto.cc \
 	src/printproto.h \
+	src/restore.cc \
+	src/restore.h \
 	src/util.cc \
 	src/util.h
 

@@ -21,4 +21,10 @@ This creates a new _band directory_ and some block data within it:
 
 TODO(mbp): Recursively backup directories.
 
-TODO(mbp): Show the contents of the archive and restore from it.
+Obviously you also want to be able to restore from it.  The restore command
+takes an archive name, a destination directory, and optionally a list of files
+to restore into that directory.  Existing files will be overwritten.
+
+TODO: Actually test restoring from it.
+
+TODO: List band contents.
