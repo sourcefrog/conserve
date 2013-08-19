@@ -36,6 +36,7 @@ using namespace std;
 using namespace boost;
 
 
+const string Archive::_HARDCODED_SINGLE_BAND = "0000";
 const string Archive::HEAD_NAME = "CONSERVE";
 
 
@@ -56,9 +57,14 @@ Archive Archive::create(const path& dir) {
 }
 
 
+string Archive::last_band_name() {
+    return _HARDCODED_SINGLE_BAND;
+}
+
+
 BandWriter Archive::start_band() {
     // TODO(mbp): Make up the right real next name.
-    BandWriter writer(this, "0000");
+    BandWriter writer(this, _HARDCODED_SINGLE_BAND);
     writer.start();
     return writer;
 }

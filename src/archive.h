@@ -32,6 +32,7 @@ public:
 	base_dir_(base_dir)
 	{}
 
+    string last_band_name();
     BandWriter start_band();
 
     static const string HEAD_NAME;
@@ -39,6 +40,8 @@ public:
     const path base_dir_;
 
 private:
+    // TODO: Obviously, support multiple bands.
+    static const string _HARDCODED_SINGLE_BAND;
 };
 
 } // namespace conserve
