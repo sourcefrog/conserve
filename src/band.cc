@@ -47,11 +47,13 @@ Band::Band(Archive* archive, string name) :
 {
 }
 
+
 BandWriter::BandWriter(Archive *archive, string name) :
     Band(archive, name),
     next_block_number_(0)
 {
 }
+
 
 void BandWriter::start() {
     LOG(INFO) << "start band in " << band_directory_;
@@ -63,6 +65,7 @@ void BandWriter::start() {
         band_directory_ / Band::HEAD_NAME);
 }
 
+
 void BandWriter::finish() {
     proto::BandTail tail_pb;
     tail_pb.set_band_number(name_);
@@ -71,6 +74,7 @@ void BandWriter::finish() {
     write_proto_to_file(tail_pb, band_directory_ / Band::TAIL_NAME);
     LOG(INFO) << "finish band in " << band_directory_;
 }
+
 
 int BandWriter::next_block_number() {
     // TODO(mbp): Needs to be improved if the band's partially complete.

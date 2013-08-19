@@ -24,13 +24,20 @@ class Band {
 public:
     static const string HEAD_NAME;
     static const string TAIL_NAME;
+
     boost::filesystem::path directory() { return band_directory_; }
-    Band(Archive* archive, string name);
 
 protected:
+    Band(Archive *archive, string name);
     Archive* archive_;
     string name_;
     boost::filesystem::path band_directory_;
+};
+
+
+class BandReader : public Band {
+public:
+    BandReader(Archive *archive, string name) : Band(archive, name) {}
 };
 
 
