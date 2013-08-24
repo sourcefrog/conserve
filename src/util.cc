@@ -31,6 +31,7 @@ namespace conserve {
 
 using namespace std;
 using namespace boost;
+using namespace boost::filesystem;
 using namespace google::protobuf::io;
 using namespace google::protobuf;
 using namespace conserve::proto;
@@ -49,7 +50,7 @@ void write_proto_to_file(
 
 
 void read_proto_from_file(
-        const boost::filesystem::path path,
+        const path path,
         Message* message) {
     int fd = open(path.c_str(), O_RDONLY);
     PCHECK(fd > 0);
@@ -70,6 +71,26 @@ void populate_stamp(Stamp *stamp) {
     stamp->set_hostname(gethostname_str());
     stamp->set_software_version(PACKAGE_VERSION);
 }
+
+
+void break_path(
+        const path &from_path,
+        conserve::proto::Path *to_path_proto)
+{
+    for (path::iterator it = from_path.begin();
+            it != from_path.end();
+            it++) {
+        const path &component = *it;
+        const string component_str = component.string();
+
+        CHECK(component_str != ".");
+        CHECK(component_str != "..");
+        CHECK(component_str != "");
+        CHECK(component_str.find('/') == string::npos);
+        to_path_proto->add_part(component_str);
+    }
+}
+
 
 } // namespace conserve
 

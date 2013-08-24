@@ -42,7 +42,9 @@ You can also print band heads and tails, and block indexes:
     }
     $ conserve printproto a/b0000/a000000
     file {
-      path: "hello"
+      path {
+        part: "hello"
+      }
       data_length: 12
     }
     stamp {

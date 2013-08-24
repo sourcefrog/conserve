@@ -93,7 +93,7 @@ void BlockWriter::add_file(const path& source_path) {
     copy_file_bz2(source_path, &content_len);
 
     proto::FileIndex* file_index = index_proto_.add_file();
-    file_index->set_path(source_path.string());
+    break_path(source_path, file_index->mutable_path());
     CHECK(content_len >= 0);
     file_index->set_data_length(content_len);
 }

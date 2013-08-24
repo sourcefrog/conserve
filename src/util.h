@@ -13,6 +13,11 @@
 
 namespace conserve {
 
+namespace proto {
+    class Stamp;
+    class Path;
+};
+
 void write_proto_to_file(
         const google::protobuf::Message& message,
         const boost::filesystem::path& path);
@@ -23,9 +28,9 @@ void read_proto_from_file(
 
 std::string gethostname_str();
 
-namespace proto {
-class Stamp;
-};
+void break_path(
+        const boost::filesystem::path &from_path,
+        conserve::proto::Path *to_path_proto);
 
 void populate_stamp(conserve::proto::Stamp *stamp);
 }
