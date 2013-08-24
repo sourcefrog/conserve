@@ -30,24 +30,32 @@ oddly-named file in the backup, and also for users with non-UTF-8 encodings to b
 configure this. The filename encoding is not easily detectable.  Linux does require that the 
 separator `/` have the same byte value.)
 
-In the archive, filenames are stored as byte strings. They _should_ be UTF-8 but this is 
+In the archive, filenames are stored as byte strings. They _should_ be NFC UTF-8 but this is 
 not required.  As a consequence filenames are stored as Protobuf `byte` types, not `string`.
 
-In bands created on Windows and OS X they will always be UTF-8.
+In bands created on Windows they will always be UTF-8.
+
+Bands written from OS X we know are UTF-8 and they can be safely converted to NFC.
 
 Linux filenames with anomalous encodings in the source will be stored as non-UTF-8 components.
 
 Source directories in a specific non-UTF-8 encoding can be passed through a translation function to 
 and from UTF-8 so their names are stored more compatibly.
 
+UTF-8 filenames are stored as received from the OS with no normalization.
+TODO: Maybe we should denormalize the filenames on OS X to be more compatible with Linux? Maybe not.
+
 Filenames are always stored torn apart into components, none of which include `/` characters,
 and none of them can be `.` or `..`.
 (TODO: Not actually true now.)
 
-TODO: How to handle case changes and Unicode normalization?
+There is a total order between filenames in the archive: this is very important for binary
+search within it. The order is defined as: filenames components are compared by the byte-by-byte
+comparison of their (typically UTF-8) representation. To compare two paths: compare their 
+pairwise components until a difference is found, or if one of them ends before a difference is found,
+the shorter path comes first.
 
-TODO: Total ordering between names.
-
+TODO: Describe case, unicode normalization handling.
 
 Archive
 -------
