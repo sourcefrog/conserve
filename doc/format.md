@@ -15,6 +15,40 @@ Source
 The backup *source* is a local directory.  (Actually, a local directory
 subject to some exclusion filters.)
 
+Filenames
+---------
+
+Files have names (obviously) in the source and restore directories, and within the archive.
+In source and restore directories, file naming is defined by the OS: on Windows as UTF-16,
+on OS X as UTF-8 and on Linux as an arbitrary 8-bit encoding.  
+
+(Linux filenames are very commonly UTF-8, but there are important exceptions: users who 
+choose to use different encodings for whole filesystems; network or USB filesystems 
+using different encodings; files is source trees that are intentionally in odd encodings; and 
+files that accidentally have anomalous names.  It is useful to include the occasionally 
+oddly-named file in the backup, and also for users with non-UTF-8 encodings to be able to 
+configure this. The filename encoding is not easily detectable.  Linux does require that the 
+separator `/` have the same byte value.)
+
+In the archive, filenames are stored as byte strings. They _should_ be UTF-8 but this is 
+not required.  As a consequence filenames are stored as Protobuf `byte` types, not `string`.
+
+In bands created on Windows and OS X they will always be UTF-8.
+
+Linux filenames with anomalous encodings in the source will be stored as non-UTF-8 components.
+
+Source directories in a specific non-UTF-8 encoding can be passed through a translation function to 
+and from UTF-8 so their names are stored more compatibly.
+
+Filenames are always stored torn apart into components, none of which include `/` characters,
+and none of them can be `.` or `..`.
+(TODO: Not actually true now.)
+
+TODO: How to handle case changes and Unicode normalization?
+
+TODO: Total ordering between names.
+
+
 Archive
 -------
 
