@@ -9,6 +9,14 @@ All header data is stored as [Google Protobufs][1].
 Example in this document are expresed as (approximately) the text format of
 protobufs, but the on-disk format is the compact binary form.
 
+Software version
+----------------
+
+Conserve archives include the version of the software that wrote them, which is an 
+_x.y.z_ tuple. Changes to the `x` major version imply a non-backward-compatible change:
+older versions may not be able to read it. Changes to the `y` minor version may 
+include backward-compatible extensions. 
+
 Source
 ------
 
