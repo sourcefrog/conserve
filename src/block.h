@@ -32,7 +32,7 @@ public:
     static bool extract_filename_type(const string&, char*);
     static bool extract_block_number(const string&, int*);
 
-    Block(Band *band, int block_number);
+    Block(path directory, int block_number);
 
 protected:
     path block_directory_;
@@ -42,11 +42,26 @@ protected:
 };
 
 
+class BlockReader : public Block {
+public:
+    BlockReader(path directory, int block_number);
+
+    int file_number() const { return file_number_; }
+    path file_path() const;
+    void advance();
+    bool done() const;
+
+private:
+    proto::BlockIndex index_pb_;
+    int file_number_;
+};
+
+
 class BlockWriter : public Block {
 public:
     void start();
     void finish();
-    BlockWriter(BandWriter *band);
+    BlockWriter(path directory, int band_number);
 
     void add_file(const path&);
 

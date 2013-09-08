@@ -13,6 +13,8 @@
 
 namespace conserve {
 
+using namespace boost::filesystem;
+
 namespace proto {
     class Stamp;
     class Path;
@@ -31,6 +33,8 @@ std::string gethostname_str();
 void break_path(
         const boost::filesystem::path &from_path,
         conserve::proto::Path *to_path_proto);
+
+path unpack_path(const conserve::proto::Path &proto_path);
 
 void populate_stamp(conserve::proto::Stamp *stamp);
 }

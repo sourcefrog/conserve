@@ -16,28 +16,45 @@
 
 #include <boost/filesystem.hpp>
 
+#include "block.h"
+
 namespace conserve {
 
+using namespace boost::filesystem;
+
 class BlockWriter;
+class BlockReader;
 
 class Band {
 public:
     static const string HEAD_NAME;
     static const string TAIL_NAME;
 
-    boost::filesystem::path directory() { return band_directory_; }
+    path directory() { return band_directory_; }
 
 protected:
     Band(Archive *archive, string name);
     Archive* archive_;
     string name_;
-    boost::filesystem::path band_directory_;
+    path band_directory_;
+    path head_file_name() const;
+    path tail_file_name() const;
 };
 
 
+// Scans through a band in order.
 class BandReader : public Band {
 public:
-    BandReader(Archive *archive, string name) : Band(archive, name) {}
+    BandReader(Archive *archive, string name);
+
+    BlockReader read_next_block();
+    bool done() const;
+    int current_block_number() const { return current_block_number_; };
+
+private:
+    int current_block_number_;
+    proto::BandHead head_pb_;
+    proto::BandTail tail_pb_;
 };
 
 

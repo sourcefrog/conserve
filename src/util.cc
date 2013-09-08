@@ -92,6 +92,20 @@ void break_path(
 }
 
 
+path unpack_path(const conserve::proto::Path &proto_path) {
+    path result;
+    for (int i = 0; i < proto_path.part_size(); i++) {
+        string component_str = proto_path.part(i);
+        CHECK(component_str != ".");
+        CHECK(component_str != "..");
+        CHECK(component_str != "");
+        CHECK(component_str.find('/') == string::npos);
+        result /= component_str;
+    }
+    return result;
+}
+
+
 } // namespace conserve
 
 // vim: sw=4 et

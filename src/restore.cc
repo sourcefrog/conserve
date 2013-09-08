@@ -38,6 +38,16 @@ int cmd_restore(char **argv) {
     Archive archive(archive_dir);
     BandReader band(&archive, archive.last_band_name());
 
+    // TODO: Change to more idiomatic C++ iterators?
+    while (!band.done()) {
+        BlockReader block_reader = band.read_next_block();
+        while (!block_reader.done()) {
+            LOG(INFO) << block_reader.file_number() << " "
+                << block_reader.file_path().string();
+            block_reader.advance();
+        }
+    }
+
     return 0;
 }
 

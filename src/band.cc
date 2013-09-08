@@ -55,6 +55,16 @@ BandWriter::BandWriter(Archive *archive, string name) :
 }
 
 
+path Band::head_file_name() const {
+    return band_directory_ / Band::HEAD_NAME;
+}
+
+
+path Band::tail_file_name() const {
+    return band_directory_ / Band::TAIL_NAME;
+}
+
+
 void BandWriter::start() {
     LOG(INFO) << "start band in " << band_directory_;
     filesystem::create_directory(band_directory_);
@@ -62,7 +72,14 @@ void BandWriter::start() {
     head_pb.set_band_number(name_);
     populate_stamp(head_pb.mutable_stamp());
     write_proto_to_file(head_pb,
-        band_directory_ / Band::HEAD_NAME);
+        head_file_name());
+}
+
+
+BlockWriter BandWriter::start_block() {
+    BlockWriter writer = BlockWriter(directory(), 0);
+    writer.start();
+    return writer;
 }
 
 
@@ -71,7 +88,7 @@ void BandWriter::finish() {
     tail_pb.set_band_number(name_);
     populate_stamp(tail_pb.mutable_stamp());
     // TODO(mbp): Write block count
-    write_proto_to_file(tail_pb, band_directory_ / Band::TAIL_NAME);
+    write_proto_to_file(tail_pb, tail_file_name());
     LOG(INFO) << "finish band in " << band_directory_;
 }
 
@@ -80,6 +97,31 @@ int BandWriter::next_block_number() {
     // TODO(mbp): Needs to be improved if the band's partially complete.
     return next_block_number_++;
 }
+
+
+BandReader::BandReader(Archive *archive, string name) :
+    Band(archive, name),
+    current_block_number_(-1)
+{
+    read_proto_from_file(head_file_name(), &head_pb_);
+    read_proto_from_file(tail_file_name(), &tail_pb_);
+    LOG(INFO) << "start reading band " << head_pb_.band_number();
+    CHECK(head_pb_.band_number() == tail_pb_.band_number());
+    CHECK(tail_pb_.block_count() >= 0);
+}
+
+
+bool BandReader::done() const {
+    return current_block_number_ >= tail_pb_.block_count();
+}
+
+
+BlockReader BandReader::read_next_block() {
+    current_block_number_++;
+    CHECK(!done());
+    return BlockReader(directory(), current_block_number_);
+}
+
 
 } // namespace conserve
 

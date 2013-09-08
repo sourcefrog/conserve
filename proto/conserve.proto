@@ -55,10 +55,10 @@ message BandTail {
 
     optional int32 block_count = 4;
 
-    // TODO(mbp): Maybe, store lengths and hashes of all index blocks?
-    // But that may make it slow to finish the band, if they need to
-    // all be re-read, and there's no guarantee they weren't corrupted while
-    // the band was being written...
+    // TODO(mbp): Maybe, store lengths and hashes of all index blocks?  But
+    // that may make it slow to finish the band, if they need to all be
+    // re-read, and there's no guarantee they weren't corrupted while the
+    // band was being written. Maybe store them per N blocks.
 }
 
 

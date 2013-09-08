@@ -38,8 +38,8 @@ using namespace boost;
 using namespace boost::filesystem;
 
 
-Block::Block(Band *band, int block_number) :
-    block_directory_(band->directory()),
+Block::Block(path directory, int block_number) :
+    block_directory_(directory),
     block_number_(block_number)
 {
     string padded_number = (boost::format("%06d") % block_number_).str();
@@ -48,8 +48,8 @@ Block::Block(Band *band, int block_number) :
 }
 
 
-BlockWriter::BlockWriter(BandWriter *band_writer) :
-    Block(band_writer, band_writer->next_block_number())
+BlockWriter::BlockWriter(path directory, int block_number) :
+    Block(directory, block_number)
 {
 }
 
@@ -151,6 +151,30 @@ bool Block::resembles_data_filename(const string& f) {
     return extract_filename_type(f, &ftype)
         && ftype == 'd'
         && extract_block_number(f, NULL);
+}
+
+
+BlockReader::BlockReader(path directory, int block_number) :
+    Block(directory, block_number),
+    file_number_(0) {
+    read_proto_from_file(index_filename_, &index_pb_);
+}
+
+
+path BlockReader::file_path() const {
+    CHECK(file_number_ < index_pb_.file_size());
+    return unpack_path(index_pb_.file(file_number_).path());
+}
+
+
+bool BlockReader::done() const {
+    return file_number_ >= index_pb_.file_size();
+}
+
+
+void BlockReader::advance() {
+    CHECK(!done());
+    file_number_++;
 }
 
 
