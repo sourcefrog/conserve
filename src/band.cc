@@ -118,7 +118,6 @@ bool BandReader::done() const {
 
 BlockReader BandReader::read_next_block() {
     current_block_number_++;
-    CHECK(!done());
     return BlockReader(directory(), current_block_number_);
 }
 
