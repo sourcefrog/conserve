@@ -83,10 +83,13 @@ message FileIndex {
     // SHA-1 hash of the contents of the file, as plain bytes (not hex).
     optional bytes data_sha1 = 3;
 
-    // Length of the file body.
+    // Length of the (uncompressed) file body.
     optional int64 data_length = 4;
 
-    // Offset of the body within the uncompressed form of the block data file.
+    // Offset of the body within the uncompressed form of the block
+    // data file.
+    // TODO: Actually store this, or just compute from the other data
+    // so far?
     optional int64 data_offset = 5;
 
     // TODO(mbp): mtime, owner, group, perms, ...
