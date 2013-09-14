@@ -42,21 +42,6 @@ protected:
 };
 
 
-class BlockReader : public Block {
-public:
-    BlockReader(path directory, int block_number);
-
-    int file_number() const { return file_number_; }
-    path file_path() const;
-    void advance();
-    bool done() const;
-
-private:
-    proto::BlockIndex index_pb_;
-    int file_number_;
-};
-
-
 class BlockWriter : public Block {
 public:
     void start();

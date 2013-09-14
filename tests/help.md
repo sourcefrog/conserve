@@ -22,4 +22,5 @@ and ask for help:
       backup SOURCE... ARCHIVE
       init-archive DIR
       printproto FILE
+      restore ARCHIVE DESTDIR
 

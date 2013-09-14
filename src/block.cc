@@ -37,6 +37,8 @@ using namespace std;
 using namespace boost;
 using namespace boost::filesystem;
 
+const size_t copy_buf_size = 64 << 10;
+
 
 Block::Block(path directory, int block_number) :
     block_directory_(directory),
@@ -71,7 +73,6 @@ void BlockWriter::copy_file_bz2(const path& source_path,
         int64_t* content_len)
 {
     // TODO: Proper error handling, don't just abort.
-    const size_t copy_buf_size = 64 << 10;
     char buf[copy_buf_size];
     int from_fd = open(source_path.c_str(), O_RDONLY);
     PCHECK(from_fd != -1);
@@ -151,30 +152,6 @@ bool Block::resembles_data_filename(const string& f) {
     return extract_filename_type(f, &ftype)
         && ftype == 'd'
         && extract_block_number(f, NULL);
-}
-
-
-BlockReader::BlockReader(path directory, int block_number) :
-    Block(directory, block_number),
-    file_number_(0) {
-    read_proto_from_file(index_filename_, &index_pb_);
-}
-
-
-path BlockReader::file_path() const {
-    CHECK(file_number_ < index_pb_.file_size());
-    return unpack_path(index_pb_.file(file_number_).path());
-}
-
-
-bool BlockReader::done() const {
-    return file_number_ >= index_pb_.file_size();
-}
-
-
-void BlockReader::advance() {
-    CHECK(!done());
-    file_number_++;
 }
 
 

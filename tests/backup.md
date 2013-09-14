@@ -1,19 +1,18 @@
 To make a backup you must first have an archive:
 
-    $ conserve init-archive a
+    $ conserve init-archive myarchive
 
-Let's make some files to put into it
+Make a file to put into it
 
-    $ mkdir src
-    $ echo strawberry > src/f
+    $ echo strawberry > afile
 
 And now back it up:
 
-    $ conserve backup src/f a
+    $ conserve backup afile myarchive
 
 This creates a new _band directory_ and some block data within it:
 
-    $ ls a/b0000
+    $ ls myarchive/b0000
     BANDHEAD
     BANDTAIL
     a000000
@@ -22,9 +21,17 @@ This creates a new _band directory_ and some block data within it:
 TODO(mbp): Recursively backup directories.
 
 Obviously you also want to be able to restore from it.  The restore command
-takes an archive name, a destination directory, and optionally a list of files
-to restore into that directory.  Existing files will be overwritten.
-
-TODO: Actually test restoring from it.
+takes an archive name, a destination directory, and optionally a list of
+files to restore into that directory.  Existing files will be overwritten.
 
 TODO: List band contents.
+
+    $ conserve restore myarchive restoredir
+    $ cat restoredir/afile
+    strawberry
+
+For safety, you cannot restore to the same directory twice:
+
+    $ conserve -L restore myarchive restoredir
+    error creating restore destination directory "restoredir": File exists
+    [1]

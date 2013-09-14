@@ -20,7 +20,11 @@ conserve_SOURCES = \
 	src/band.h \
 	src/block.cc \
 	src/block.h \
+	src/blockreader.cc \
+	src/blockreader.h \
 	src/conserve.cc \
+	src/datareader.cc \
+	src/datareader.h \
 	src/filecopy.cc \
 	src/filecopy.h \
 	src/printproto.cc \
