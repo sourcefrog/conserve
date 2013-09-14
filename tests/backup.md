@@ -35,3 +35,5 @@ For safety, you cannot restore to the same directory twice:
     $ conserve -L restore myarchive restoredir
     error creating restore destination directory "restoredir": File exists
     [1]
+
+TODO: Test that you can only backup into an already initialized archive.

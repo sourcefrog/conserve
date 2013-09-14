@@ -38,22 +38,36 @@ using namespace boost;
 
 const string Archive::_HARDCODED_SINGLE_BAND = "0000";
 const string Archive::HEAD_NAME = "CONSERVE";
+const string Archive::ARCHIVE_MAGIC = "conserve archive";
 
 
-void write_archive_head(const filesystem::path& base_dir) {
-    LOG(INFO) << "create archive in " << base_dir;
-    conserve::proto::ArchiveHead head;
-    head.set_magic("conserve archive");
-    write_proto_to_file(head, base_dir/Archive::HEAD_NAME);
+Archive::Archive(const path& base_dir, bool create) :
+    base_dir_(base_dir)
+{
+    // TODO: Maybe separate classes rather than a bool?
+    if (create) {
+        LOG(INFO) << "create archive in " << base_dir_;
+        filesystem::create_directory(base_dir_);
+        write_archive_head();
+    } else {
+        LOG(INFO) << "open archive in " << base_dir_;
+        path head_path = base_dir / HEAD_NAME;
+        if (!boost::filesystem::exists(head_path)) {
+            LOG(FATAL)
+                << "archive head \"" << head_path.string()
+                << "\" doesn't exist - is this an archive?";
+            // TODO: Cleaner exception?
+        }
+        read_proto_from_file(head_path, &head_pb_);
+        CHECK(head_pb_.magic() == ARCHIVE_MAGIC);
+    }
 }
 
 
-Archive Archive::create(const path& dir) {
-    filesystem::path base_path(dir);
-    filesystem::create_directory(base_path);
-    write_archive_head(base_path);
-
-    return Archive(dir);
+void Archive::write_archive_head() {
+    LOG(INFO) << "create archive in " << base_dir_;
+    head_pb_.set_magic(ARCHIVE_MAGIC);
+    write_proto_to_file(head_pb_, base_dir_/HEAD_NAME);
 }
 
 

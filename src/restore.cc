@@ -49,7 +49,7 @@ int cmd_restore(char **argv) {
         return 1;
     }
 
-    Archive archive(archive_dir);
+    Archive archive(archive_dir, false);
     BandReader band(&archive, archive.last_band_name());
 
     // TODO: Change to more idiomatic C++ iterators?

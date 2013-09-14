@@ -45,7 +45,8 @@ int cmd_backup(char **argv) {
     // an option to strip a given prefix off the names.
     // TODO(mbp): Normalize path, check it doesn't contain ..
 
-    Archive archive(archive_dir);
+    Archive archive(archive_dir, false);
+
     BandWriter band = archive.start_band();
     BlockWriter block = band.start_block();
 

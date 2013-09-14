@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
             LOG(ERROR) << "usage: conserve init-archive ARCHIVE";
             return 1;
         }
-        Archive::create(archive_dir);
+        Archive(archive_dir, true);
     } else if (command == "backup") {
         return cmd_backup(command_args);
     } else if (command == "printproto") {
