@@ -86,12 +86,6 @@ message FileIndex {
     // Length of the (uncompressed) file body.
     optional int64 data_length = 4;
 
-    // Offset of the body within the uncompressed form of the block
-    // data file.
-    // TODO: Actually store this, or just compute from the other data
-    // so far?
-    optional int64 data_offset = 5;
-
     // TODO(mbp): mtime, owner, group, perms, ...
 }
 
