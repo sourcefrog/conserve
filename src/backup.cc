@@ -50,6 +50,7 @@ int cmd_backup(char **argv) {
     BandWriter band = archive.start_band();
     BlockWriter block = band.start_block();
 
+    // TODO: Make sure to add the files in the right order.
     for (unsigned i = 0; i < source_names.size(); i++) {
         block.add_file(source_names[i]);
     }
