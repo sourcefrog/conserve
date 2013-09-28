@@ -22,6 +22,8 @@ conserve_SOURCES = \
 	src/block.h \
 	src/blockreader.cc \
 	src/blockreader.h \
+	src/blockwriter.cc \
+	src/blockwriter.h \
 	src/bzdatawriter.cc \
 	src/bzdatawriter.h \
 	src/conserve.cc \

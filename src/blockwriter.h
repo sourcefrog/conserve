@@ -11,36 +11,37 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-#ifndef CONSERVE_BLOCK_H
-#define CONSERVE_BLOCK_H
+#ifndef CONSERVE_BLOCKWRITER_H
+#define CONSERVE_BLOCKWRITER_H
 
 #include <stdio.h>
 
 #include "proto/conserve.pb.h"
+#include "bzdatawriter.h"
+#include "block.h"
 
 namespace conserve {
 
+class BandWriter;
+
 using namespace boost::filesystem;
 
-class Block {
+
+class BlockWriter : public Block {
 public:
-    static bool resembles_index_filename(const string&);
-    static bool resembles_data_filename(const string&);
-    static bool extract_filename_type(const string&, char*);
-    static bool extract_block_number(const string&, int*);
+    void finish();
+    BlockWriter(path directory, int band_number);
 
-    Block(path directory, int block_number);
+    void add_file(const path&);
 
-protected:
-    path block_directory_;
-    int block_number_;
-    path index_filename_;
-    path data_filename_;
+private:
+    // Accumulates index entries as files are added.
+    conserve::proto::BlockIndex index_proto_;
+    BzDataWriter data_writer_;
 };
-
 
 } // namespace conserve
 
-#endif // CONSERVE_BLOCK_H
+#endif // CONSERVE_BLOCKWRITER_H
 
 // vim: sw=4 et

@@ -29,6 +29,7 @@
 #include "archive.h"
 #include "band.h"
 #include "blockreader.h"
+#include "blockwriter.h"
 #include "util.h"
 
 namespace conserve {
