@@ -59,7 +59,7 @@ void BlockWriter::add_file(const path& source_path) {
 
 
 void BlockWriter::finish() {
-    // TODO: finish the data block first to check it's complet?
+    // TODO: Finish the data block first to check it's complete?
 
     populate_stamp(index_proto_.mutable_stamp());
 

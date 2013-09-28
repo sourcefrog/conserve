@@ -44,7 +44,7 @@ const string Archive::ARCHIVE_MAGIC = "conserve archive";
 Archive::Archive(const path& base_dir, bool create) :
     base_dir_(base_dir)
 {
-    // TODO: Maybe separate classes rather than a bool?
+    // TODO: Maybe separate class or function for creation rather than a bool?
     if (create) {
         LOG(INFO) << "create archive in " << base_dir_;
         filesystem::create_directory(base_dir_);
