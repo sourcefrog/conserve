@@ -78,9 +78,7 @@ void BandWriter::start() {
 
 
 BlockWriter BandWriter::start_block() {
-    BlockWriter writer = BlockWriter(directory(), 0);
-    writer.start();
-    return writer;
+    return BlockWriter(directory(), 0);
 }
 
 

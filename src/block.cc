@@ -51,47 +51,15 @@ Block::Block(path directory, int block_number) :
 
 
 BlockWriter::BlockWriter(path directory, int block_number) :
-    Block(directory, block_number)
+    Block(directory, block_number),
+    data_writer_(data_filename_)
 {
-}
-
-
-void BlockWriter::start() {
-    data_fd_ = open(data_filename_.string().c_str(),
-        O_CREAT|O_EXCL|O_WRONLY,
-        0666);
-    PCHECK(data_fd_ > 0);
-    data_file_ = fdopen(data_fd_, "w");
-    PCHECK(data_file_);
-    int bzerror;
-    data_bzfile_ = BZ2_bzWriteOpen(&bzerror, data_file_, 9, 1, 0);
-    CHECK(data_bzfile_);
-}
-
-
-void BlockWriter::copy_file_bz2(const path& source_path,
-        int64_t* content_len)
-{
-    // TODO: Proper error handling, don't just abort.
-    char buf[copy_buf_size];
-    int from_fd = open(source_path.c_str(), O_RDONLY);
-    PCHECK(from_fd != -1);
-    *content_len = 0;
-    ssize_t bytes_read;
-    int bzerror;
-    while ((bytes_read = read(from_fd, buf, sizeof buf)) != 0) {
-        PCHECK(bytes_read > 0);
-        BZ2_bzWrite(&bzerror, data_bzfile_, buf, bytes_read);
-        *content_len += bytes_read;
-    }
-    PCHECK(close(from_fd) == 0);
-    // TODO: Accumulate and return the hash of the stored content.
 }
 
 
 void BlockWriter::add_file(const path& source_path) {
     int64_t content_len = -1;
-    copy_file_bz2(source_path, &content_len);
+    data_writer_.store_file(source_path, &content_len);
 
     proto::FileIndex* file_index = index_proto_.add_file();
     break_path(source_path, file_index->mutable_path());
@@ -101,9 +69,7 @@ void BlockWriter::add_file(const path& source_path) {
 
 
 void BlockWriter::finish() {
-    int bzerror;
-    BZ2_bzWriteClose(&bzerror, data_bzfile_, 0, 0, 0);
-    PCHECK(!fclose(data_file_));
+    // TODO: finish the data block first to check it's complet?
 
     populate_stamp(index_proto_.mutable_stamp());
 

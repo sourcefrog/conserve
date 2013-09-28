@@ -15,9 +15,9 @@
 #define CONSERVE_BLOCK_H
 
 #include <stdio.h>
-#include <bzlib.h>
 
 #include "proto/conserve.pb.h"
+#include "bzdatawriter.h"
 
 namespace conserve {
 
@@ -44,22 +44,15 @@ protected:
 
 class BlockWriter : public Block {
 public:
-    void start();
     void finish();
     BlockWriter(path directory, int band_number);
 
     void add_file(const path&);
 
 private:
-    int data_fd_;
-
-    FILE* data_file_;
-    BZFILE* data_bzfile_;
-
     // Accumulates index entries as files are added.
     conserve::proto::BlockIndex index_proto_;
-
-    void copy_file_bz2(const path& source_path, int64_t* content_len);
+    BzDataWriter data_writer_;
 };
 
 } // namespace conserve
