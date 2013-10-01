@@ -36,7 +36,9 @@ conserve_SOURCES = \
 	src/restore.cc \
 	src/restore.h \
 	src/util.cc \
-	src/util.h
+	src/util.h \
+	src/validate.cc \
+	src/validate.h
 
 proto/conserve.pb.cc proto/conserve.pb.h: proto/conserve.proto
 	protoc --cpp_out=. --proto_path $(srcdir) $<

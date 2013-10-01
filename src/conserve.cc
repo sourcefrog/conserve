@@ -25,6 +25,7 @@
 #include "backup.h"
 #include "printproto.h"
 #include "restore.h"
+#include "validate.h"
 
 using namespace std;
 using namespace google::protobuf::io;
@@ -52,6 +53,7 @@ const string usage =
 "  init-archive DIR\n"
 "  printproto FILE\n"
 "  restore ARCHIVE DESTDIR\n"
+"  validate ARCHIVE\n"
 ;
 
 
@@ -112,6 +114,8 @@ int main(int argc, char *argv[]) {
         return cmd_printproto(command_args);
     } else if (command == "restore") {
         return cmd_restore(command_args);
+    } else if (command == "validate") {
+        return cmd_validate(command_args);
     } else {
         LOG(ERROR) << "unrecognized command: " << command;
         return 0;

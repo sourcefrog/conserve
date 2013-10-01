@@ -23,4 +23,5 @@ and ask for help:
       init-archive DIR
       printproto FILE
       restore ARCHIVE DESTDIR
+      validate ARCHIVE
 

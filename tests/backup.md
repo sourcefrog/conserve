@@ -37,3 +37,14 @@ For safety, you cannot restore to the same directory twice:
     [1]
 
 TODO: Test that you can only backup into an already initialized archive.
+
+There is a `validate` command that checks that an archive is internally
+consistent and well formatted.  Validation doesn't compare the contents
+of the archive to any external source.  Validation is intended to catch
+bugs in Conserve, underlying software, or hardware errors -- in the
+absence of such problems it should never fail.
+
+Validate just exits silently and successfully unless problems are
+detected.
+
+    $ conserve validate myarchive
