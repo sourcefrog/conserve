@@ -1,5 +1,6 @@
 AC_PREREQ(2.53)
-AC_INIT([conserve],[0.1.0])
+AC_INIT([conserve], [0.1.1])
+
 AM_INIT_AUTOMAKE
 AC_PROG_CXX
 

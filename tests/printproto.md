@@ -31,14 +31,14 @@ You can also print band heads and tails, and block indexes:
     stamp {
       unixtime: \d+ (re)
       hostname: "*" (glob)
-      software_version: "0.1.0"
+      software_version: "0.1.1"
     }
     $ conserve printproto a/b0000/BANDTAIL
     band_number: "0000"
     stamp {
       unixtime: \d+ (re)
       hostname: "*" (glob)
-      software_version: "0.1.0"
+      software_version: "0.1.1"
     }
     $ conserve printproto a/b0000/a000000
     file {
@@ -50,7 +50,7 @@ You can also print band heads and tails, and block indexes:
     stamp {
       unixtime: \d+ (re)
       hostname: "*" (glob)
-      software_version: "0.1.0"
+      software_version: "0.1.1"
     }
     compression: BZIP2
     $ conserve -L printproto a/b0000/d000000
