@@ -1,14 +1,67 @@
-= Synopsis
-= Options
-= Status codes
+= CONSERVE(1)
+:doctype: manpage
 
-0: success.
+== NAME
 
-1: Found differences when comparing: not necessarily a problem if the source filesystem changed since the backup was made.
+Conserve - a robust file backup and restore program, with fast random access on dumb storage.
 
-2: Encountered problems during operation but continued.
+== SYNOPSIS
 
-3: Stopped due to problems.
+    conserve init-archive ARCHIVE
+    conserve backup FILE... ARCHIVE
+    conserve validate ARCHIVE
+    conserve restore ARCHIVE DEST
+    conserve printproto FILE
 
-= Environment
-= See also
+== OPTIONS
+
+*-h*::
+    Show help.
+    
+*-L*::
+    Turn off log line prefixes on stderr. By default, a prefix is prepended that includes:
+    severity (fatal/error/warning/info); month/day; time; pid; source file line.
+    
+*-v*::
+    Be verbose: show info-level logs on stderr.
+
+*-V*::
+    Show the Conserve version number.
+    
+== FILES
+
+Conserve writes log files into `$TMPDIR`. These files have permissions controlled by the umask,
+but may contain sensitive filenames.
+    
+== EXIT CODES
+
+0:: 
+    Success.
+
+1:: 
+    Found differences when comparing: not necessarily a problem if the source filesystem changed since the backup was made.
+
+2:: 
+    Encountered problems during operation but continued.
+
+3::
+    Stopped due to problems.
+    
+== BUGS
+
+Pre-1.0 versions of Conserve do not promise backwards or forwards compatibility.  
+From 1.0, no format changes will be made in patchlevel releases, and later minor 
+releases will be able to read backups made by all previous releases from 1.0
+onwards.
+
+Conserve should not be used as the only backup mechanism for valuable data.
+
+Many important features are not yet implemented, including incremental backups and random access.
+
+== AUTHOR
+
+Martin Pool <http://sourcefrog.net>
+
+== SEE ALSO
+
+* <http://github.com/sourcefrog/conserve>
