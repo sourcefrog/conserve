@@ -25,6 +25,7 @@
 #include "backup.h"
 #include "exitcode.h"
 #include "printproto.h"
+#include "problem.h"
 #include "restore.h"
 #include "validate.h"
 
@@ -104,27 +105,32 @@ ExitCode run_command_line(char **argv) {
     string command(argv[optind]);
     char **command_args = &argv[optind+1];
 
-    if (command == "init") {
-        const char *archive_dir = command_args[0];
-        if (!archive_dir) {
-            LOG(ERROR) << "usage: conserve init ARCHIVE";
+    try {
+        if (command == "init") {
+            const char *archive_dir = command_args[0];
+            if (!archive_dir) {
+                LOG(ERROR) << "usage: conserve init ARCHIVE";
+                return EXIT_COMMAND_LINE;
+            }
+            Archive(archive_dir, true);
+        } else if (command == "backup") {
+            return cmd_backup(command_args);
+        } else if (command == "printproto") {
+            return cmd_printproto(command_args);
+        } else if (command == "restore") {
+            return cmd_restore(command_args);
+        } else if (command == "validate") {
+            return cmd_validate(command_args);
+        } else {
+            LOG(ERROR) << "unrecognized command: " << command;
             return EXIT_COMMAND_LINE;
         }
-        Archive(archive_dir, true);
-    } else if (command == "backup") {
-        return cmd_backup(command_args);
-    } else if (command == "printproto") {
-        return cmd_printproto(command_args);
-    } else if (command == "restore") {
-        return cmd_restore(command_args);
-    } else if (command == "validate") {
-        return cmd_validate(command_args);
-    } else {
-        LOG(ERROR) << "unrecognized command: " << command;
-        return EXIT_COMMAND_LINE;
-    }
 
-    return EXIT_OK;
+        return EXIT_OK;
+    } catch (Problem const *p) {
+        LOG(ERROR) << "Terminating due to problem";
+        return EXIT_PROBLEMS_STOPPED;
+    }
 }
 
 } // namespace conserve
