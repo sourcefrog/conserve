@@ -23,6 +23,7 @@
 
 #include "archive.h"
 #include "backup.h"
+#include "exitcode.h"
 #include "printproto.h"
 #include "restore.h"
 #include "validate.h"
@@ -33,7 +34,7 @@ using namespace google::protobuf;
 
 namespace conserve {
 
-int run_command_line(char **argv);
+ExitCode run_command_line(char **argv);
 
 const string version = PACKAGE_VERSION;
 
@@ -63,7 +64,7 @@ void show_help() {
     cout << usage;
 }
 
-int main(int argc, char *argv[]) {
+ExitCode main(int argc, char *argv[]) {
     // TODO(mbp): Log files might contain sensitive information. They are
     // written out with permissions controlled by the umask by default.
     // Possibly we should make them tighter. Or perhaps people should just set
@@ -76,10 +77,10 @@ int main(int argc, char *argv[]) {
         opt = getopt(argc, argv, "hLVv");
         if (opt == 'h') {
             show_help();
-            return 0;
+            return EXIT_OK;
         } else if (opt == 'V') {
             cout << "conserve " << version << "\n";
-            return 0;
+            return EXIT_OK;
         } else if (opt == 'v') {
             google::SetStderrLogging(google::INFO);
         } else if (opt == 'L') {
@@ -95,10 +96,10 @@ int main(int argc, char *argv[]) {
 }
 
 
-int run_command_line(char **argv) {
+ExitCode run_command_line(char **argv) {
     if (!argv[optind]) {
         LOG(ERROR) << "please give a command or use 'conserve -h' for help";
-        return 1;
+        return EXIT_COMMAND_LINE;
     }
     string command(argv[optind]);
     char **command_args = &argv[optind+1];
@@ -107,7 +108,7 @@ int run_command_line(char **argv) {
         const char *archive_dir = command_args[0];
         if (!archive_dir) {
             LOG(ERROR) << "usage: conserve init ARCHIVE";
-            return 1;
+            return EXIT_COMMAND_LINE;
         }
         Archive(archive_dir, true);
     } else if (command == "backup") {
@@ -120,10 +121,10 @@ int run_command_line(char **argv) {
         return cmd_validate(command_args);
     } else {
         LOG(ERROR) << "unrecognized command: " << command;
-        return 0;
+        return EXIT_COMMAND_LINE;
     }
 
-    return 0;
+    return EXIT_OK;
 }
 
 } // namespace conserve

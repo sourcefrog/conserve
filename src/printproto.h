@@ -11,10 +11,11 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+#include "exitcode.h"
 
 namespace conserve {
 
 // Print out in text protobuf form the contents of an internal file.
-int cmd_printproto(char **args);
+ExitCode cmd_printproto(char **args);
 
 } // namespace conserve

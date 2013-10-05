@@ -46,6 +46,9 @@ but may contain sensitive filenames.
 
 3::
     Stopped due to problems.
+
+4::
+    Problem with the command line (bad command or options, etc.)
     
 == BUGS
 

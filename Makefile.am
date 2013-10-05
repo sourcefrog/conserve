@@ -29,6 +29,7 @@ conserve_SOURCES = \
 	src/conserve.cc \
 	src/datareader.cc \
 	src/datareader.h \
+	src/exitcode.h \
 	src/filecopy.cc \
 	src/filecopy.h \
 	src/printproto.cc \

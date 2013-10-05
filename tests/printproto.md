@@ -9,10 +9,10 @@ printproto takes exactly one argument:
 
     $ conserve -L printproto
     'conserve printproto' takes one argument, the path of the file to dump.
-    [1]
+    [4]
     $ conserve -L printproto 1 2 3
     'conserve printproto' takes one argument, the path of the file to dump.
-    [1]
+    [4]
 
 protobuf messages don't carry any overall type identification, so printproto
 infers the format from the last component of the filename.  It complains if it
@@ -20,7 +20,7 @@ can't guess the format:
 
     $ conserve -L printproto /dev/null
     can't infer proto format from filename "/dev/null"
-    [1]
+    [4]
 
 You can also print band heads and tails, and block indexes:
 
@@ -55,7 +55,7 @@ You can also print band heads and tails, and block indexes:
     compression: BZIP2
     $ conserve -L printproto a/b0000/d000000
     "a/b0000/d000000" is a block data file and they don't contain protos
-    [1]
+    [4]
 
 TODO(mbp): Check block count in tail
 

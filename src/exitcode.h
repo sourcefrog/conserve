@@ -11,15 +11,21 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-#ifndef CONSERVE_RESTORE_H_
-#define CONSERVE_RESTORE_H_
-
-#include "exitcode.h"
+#ifndef CONSERVE_EXITCODE_H_
+#define CONSERVE_EXITCODE_H_
 
 namespace conserve {
 
-ExitCode cmd_restore(char **argv);
+enum ExitCode {
+    EXIT_OK = 0,
+    EXIT_DIFFERENCES = 1,
+    EXIT_PROBLEMS_NOTED = 2,
+    EXIT_PROBLEMS_STOPPED = 3,
+    EXIT_COMMAND_LINE = 4
+};
 
-} // namespace conserve
+}
 
-#endif // CONSERVE_RESTORE_H_
+#endif // CONSERVE_EXITCODE_H_
+
+// vim: sw=4 et

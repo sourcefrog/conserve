@@ -33,11 +33,11 @@ using namespace google::protobuf;
 
 namespace conserve {
 
-int cmd_printproto(char **args) {
+ExitCode cmd_printproto(char **args) {
     if (!args[0] || args[1]) {
         LOG(ERROR) << "'conserve printproto' takes one argument, "
             << "the path of the file to dump.";
-        return 1;
+        return EXIT_COMMAND_LINE;
     }
 
     const boost::filesystem::path path = args[0];
@@ -54,10 +54,10 @@ int cmd_printproto(char **args) {
         message = new conserve::proto::BlockIndex();
     } else if (Block::resembles_data_filename(filename.string())) {
         LOG(ERROR) << path << " is a block data file and they don't contain protos";
-        return 1;
+        return EXIT_COMMAND_LINE;
     } else {
         LOG(ERROR) << "can't infer proto format from filename " << path;
-        return 1;
+        return EXIT_COMMAND_LINE;
     }
 
     // TODO(mbp): Handle files that are compressed, encrypted, etc.
@@ -68,7 +68,7 @@ int cmd_printproto(char **args) {
 
     delete message;
 
-    return 0;
+    return EXIT_OK;
 }
 
 } // namespace conserve

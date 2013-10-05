@@ -14,9 +14,11 @@
 #ifndef CONSERVE_BACKUP_H_
 #define CONSERVE_BACKUP_H_
 
+#include "exitcode.h"
+
 namespace conserve {
 
-int cmd_backup(char **argv);
+enum ExitCode cmd_backup(char **argv);
 
 } // namespace conserve
 

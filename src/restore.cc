@@ -23,30 +23,32 @@
 #include "band.h"
 #include "block.h"
 #include "blockreader.h"
+#include "restore.h"
 
 namespace conserve {
 
 using namespace boost::filesystem;
 
-int cmd_restore(char **argv) {
+ExitCode cmd_restore(char **argv) {
     // TODO: Restore selected files or directories.
     // TODO: Choose which band, based on name or date.
 
     if (!argv[0] || !argv[1] || argv[2]) {
         LOG(ERROR) << "usage: conserve restore ARCHIVE TODIR";
-        return 1;
+        return EXIT_COMMAND_LINE;
     }
     const path archive_dir = argv[0];
     const path restore_dir = argv[1];
 
     if (mkdir(restore_dir.c_str(), 0777)) {
+        // TODO: signal problem instead
         if (errno == EEXIST) {
             LOG(ERROR)
                 << "error creating restore destination directory \""
                 << restore_dir.string()
                 << "\": " << strerror(errno);
         }
-        return 1;
+        return EXIT_PROBLEMS_STOPPED;
     }
 
     Archive archive(archive_dir, false);
@@ -69,7 +71,7 @@ int cmd_restore(char **argv) {
         }
     }
 
-    return 0;
+    return EXIT_OK;
 }
 
 } // namespace conserve

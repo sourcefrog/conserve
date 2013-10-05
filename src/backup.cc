@@ -20,12 +20,13 @@
 #include "archive.h"
 #include "band.h"
 #include "blockwriter.h"
+#include "exitcode.h"
 
 namespace conserve {
 
 using namespace boost::filesystem;
 
-int cmd_backup(char **argv) {
+enum ExitCode cmd_backup(char **argv) {
     vector<path> source_names;
     path archive_dir;
 
@@ -37,7 +38,7 @@ int cmd_backup(char **argv) {
 
     if (source_names.empty()) {
         LOG(ERROR) << "Usage: conserve backup SOURCE... ARCHIVE";
-        return 1;
+        return EXIT_COMMAND_LINE;
     }
 
     // TODO(mbp): Change to a given directory to read the source
@@ -58,7 +59,7 @@ int cmd_backup(char **argv) {
     block.finish();
     band.finish();
 
-    return 0;
+    return EXIT_OK;
 }
 } // namespace conserve
 

@@ -14,9 +14,11 @@
 #ifndef CONSERVE_VALIDATE_H_
 #define CONSERVE_VALIDATE_H_
 
+#include "exitcode.h"
+
 namespace conserve {
 
-int cmd_validate(char **argv);
+ExitCode cmd_validate(char **argv);
 
 } // namespace conserve
 

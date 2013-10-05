@@ -29,10 +29,10 @@ namespace conserve {
 
 using namespace boost::filesystem;
 
-int cmd_validate(char **argv) {
+ExitCode cmd_validate(char **argv) {
     if (!argv[0] || argv[1]) {
         LOG(ERROR) << "usage: conserve validate ARCHIVE";
-        return 1;
+        return EXIT_COMMAND_LINE;
     }
     const path archive_dir = argv[0];
 
@@ -56,7 +56,7 @@ int cmd_validate(char **argv) {
         }
     }
 
-    return 0;
+    return EXIT_OK;
 }
 
 } // namespace conserve
