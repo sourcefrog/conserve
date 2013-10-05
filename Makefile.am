@@ -54,7 +54,7 @@ check-staged:
 	./autogen.sh && \
 	mkdir _build && cd _build && \
 	../configure && \
-	make distcheck && \
+	$(MAKE) $(MAKEFLAGS) distcheck && \
 	rm -r "$$t"
 
 CRAM_OPTIONS = --indent=4 -v
