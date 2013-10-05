@@ -7,7 +7,7 @@ Conserve - a robust file backup and restore program, with fast random access on 
 
 == SYNOPSIS
 
-    conserve init-archive ARCHIVE
+    conserve init ARCHIVE
     conserve backup FILE... ARCHIVE
     conserve validate ARCHIVE
     conserve restore ARCHIVE DEST

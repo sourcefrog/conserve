@@ -50,7 +50,7 @@ const string usage =
 "\n"
 "Commands:\n"
 "  backup SOURCE... ARCHIVE\n"
-"  init-archive DIR\n"
+"  init DIR\n"
 "  printproto FILE\n"
 "  restore ARCHIVE DESTDIR\n"
 "  validate ARCHIVE\n"
@@ -101,10 +101,10 @@ int main(int argc, char *argv[]) {
     string command(argv[optind]);
     char **command_args = &argv[optind+1];
 
-    if (command == "init-archive") {
+    if (command == "init") {
         const char *archive_dir = command_args[0];
         if (!archive_dir) {
-            LOG(ERROR) << "usage: conserve init-archive ARCHIVE";
+            LOG(ERROR) << "usage: conserve init ARCHIVE";
             return 1;
         }
         Archive(archive_dir, true);

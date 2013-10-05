@@ -20,7 +20,7 @@ and ask for help:
     
     Commands:
       backup SOURCE... ARCHIVE
-      init-archive DIR
+      init DIR
       printproto FILE
       restore ARCHIVE DESTDIR
       validate ARCHIVE

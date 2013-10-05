@@ -1,7 +1,7 @@
 You can use the 'printproto' command to print the contents of an archive
 control file in human-readable form:
 
-    $ conserve init-archive a
+    $ conserve init a
     $ conserve printproto a/CONSERVE
     magic: "conserve archive"
 

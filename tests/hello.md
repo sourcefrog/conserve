@@ -16,7 +16,7 @@ I=info, etc); the MMDD date; the time; the PID; and the source location.
 
 To create an archive:
 
-    $ conserve init-archive a
+    $ conserve init a
 
 This makes a new directory that contains just one file, the `CONSERVE-ARCHIVE`
 header file:

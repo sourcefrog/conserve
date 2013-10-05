@@ -1,6 +1,6 @@
 To make a backup you must first have an archive:
 
-    $ conserve init-archive myarchive
+    $ conserve init myarchive
 
 Make a file to put into it
 
