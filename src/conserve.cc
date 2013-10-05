@@ -33,6 +33,8 @@ using namespace google::protobuf;
 
 namespace conserve {
 
+int run_command_line(char **argv);
+
 const string version = PACKAGE_VERSION;
 
 const string usage =
@@ -60,11 +62,6 @@ const string usage =
 void show_help() {
     cout << usage;
 }
-
-} // namespace conserve
-
-using namespace conserve;
-
 
 int main(int argc, char *argv[]) {
     // TODO(mbp): Log files might contain sensitive information. They are
@@ -94,6 +91,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    return run_command_line(argv);
+}
+
+
+int run_command_line(char **argv) {
     if (!argv[optind]) {
         LOG(ERROR) << "please give a command or use 'conserve -h' for help";
         return 1;
@@ -122,6 +124,12 @@ int main(int argc, char *argv[]) {
     }
 
     return 0;
+}
+
+} // namespace conserve
+
+int main(int argc, char *argv[]) {
+    return conserve::main(argc, argv);
 }
 
 // vim: sw=4 et
