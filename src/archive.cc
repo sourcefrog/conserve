@@ -27,6 +27,7 @@
 
 #include "archive.h"
 #include "band.h"
+#include "problem.h"
 #include "util.h"
 
 namespace conserve {
@@ -53,11 +54,11 @@ Archive::Archive(const path& base_dir, bool create) :
         LOG(INFO) << "open archive in " << base_dir_;
         path head_path = base_dir / HEAD_NAME;
         if (!boost::filesystem::exists(head_path)) {
-            LOG(FATAL)
-                << "archive head \"" << head_path.string()
-                << "\" doesn't exist - is this an archive?";
-            // TODO: Cleaner exception?
+            LOG(ERROR) << "Archive head not found: is this an archive?";
+            Problem("archive", "head", "nonexistent", head_path.string(),
+                    "").signal();
         }
+        // TODO: Do this in read_proto not here
         read_proto_from_file(head_path, &head_pb_);
         CHECK(head_pb_.magic() == ARCHIVE_MAGIC);
     }
