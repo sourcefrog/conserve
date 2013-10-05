@@ -24,6 +24,7 @@
 #include <glog/logging.h>
 
 #include "datareader.h"
+#include "problem.h"
 #include "util.h"
 
 namespace conserve {
@@ -59,12 +60,18 @@ void DataReader::extract_to_fd(int64_t bytes_to_read, int to_fd) {
         VLOG(1) << "try to read " << read_size;
         bytes_read = BZ2_bzRead(&bzerror, bzfile_, buf, read_size);
         VLOG(1) << "got " << bytes_read << " decompressed bytes";
-        if (bzerror != BZ_OK && bzerror != BZ_STREAM_END) 
-            LOG(FATAL) << "bzread failed: " 
-                << BZ2_bzerror(bzfile_, &bzerror);
-        if (!bytes_read)
-            LOG(FATAL) << "bz2 stream ended early; still wanted "
+        if (bzerror != BZ_OK && bzerror != BZ_STREAM_END) {
+            Problem("block", "data", "decompression-failure",
+                    path_,
+                    BZ2_bzerror(bzfile_, &bzerror)).signal();
+            break;
+        }
+        if (!bytes_read) {
+            LOG(ERROR) << "bz2 stream ended early; still wanted "
                 << bytes_to_read << " bytes";
+            Problem("block", "data", "truncated", path_, "");
+            break;
+        }
         int written;
         for (int to_write = 0; to_write < bytes_read; to_write += written) {
             written = write(to_fd, &buf[to_write], bytes_read - to_write);
