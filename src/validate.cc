@@ -23,6 +23,7 @@
 #include "band.h"
 #include "block.h"
 #include "blockreader.h"
+#include "problem.h"
 #include "validate.h"
 
 namespace conserve {
@@ -38,6 +39,8 @@ ExitCode cmd_validate(char **argv) {
 
     Archive archive(archive_dir, false);
     BandReader band(&archive, archive.last_band_name());
+    // TODO: Compare platform-independent paths?
+    path last_path_;
 
     // TODO: Read all bands.
     while (!band.done()) {
@@ -52,7 +55,16 @@ ExitCode cmd_validate(char **argv) {
                 << " path=" << file_path.string();
             CHECK(file_index.file_type() == proto::REGULAR);
             // TODO: Decompress file, check hash and length.
-            // TODO: Check file name ordering.
+
+            // TODO: Move this into the Block object so it can be reused.
+            if (file_path <= last_path_) {
+                string message = file_path.string() + " <= "
+                    + last_path_.string();
+                Problem("entry", "name", "disordered",
+                        block_reader.index_path(),
+                        message).signal();
+            }
+            last_path_ = file_path;
         }
     }
 
