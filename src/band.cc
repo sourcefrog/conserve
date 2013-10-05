@@ -103,8 +103,8 @@ BandReader::BandReader(Archive *archive, string name) :
     Band(archive, name),
     current_block_number_(-1)
 {
-    read_proto_from_file(head_file_name(), &head_pb_);
-    read_proto_from_file(tail_file_name(), &tail_pb_);
+    read_proto_from_file(head_file_name(), &head_pb_, "band", "head");
+    read_proto_from_file(tail_file_name(), &tail_pb_, "band", "tail");
     LOG(INFO) << "start reading band " << head_pb_.band_number();
     CHECK(head_pb_.band_number() == tail_pb_.band_number());
     CHECK(tail_pb_.block_count() >= 0);

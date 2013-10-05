@@ -11,9 +11,12 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+#include <string>
+
 namespace conserve {
 
 using namespace boost::filesystem;
+using namespace std;
 
 namespace proto {
     class Stamp;
@@ -25,8 +28,10 @@ void write_proto_to_file(
         const boost::filesystem::path& path);
 
 void read_proto_from_file(
-        const boost::filesystem::path path,
-        google::protobuf::Message* message);
+        const path& path,
+        google::protobuf::Message* message,
+        const string& object,
+        const string& part);
 
 std::string gethostname_str();
 

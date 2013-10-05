@@ -26,6 +26,7 @@
 
 #include "proto/conserve.pb.h"
 #include "util.h"
+#include "problem.h"
 
 namespace conserve {
 
@@ -50,9 +51,15 @@ void write_proto_to_file(
 
 
 void read_proto_from_file(
-        const path path,
-        Message* message) {
+        const path& path,
+        Message* message,
+        const string& object,
+        const string& part) {
     int fd = open(path.c_str(), O_RDONLY);
+    if (fd < 0) {
+        Problem(object, part, "unreadable", path, strerror(errno)).signal();
+        return; // return blank message
+    }
     PCHECK(fd > 0);
     CHECK(message->ParseFromFileDescriptor(fd));
     int ret = close(fd);

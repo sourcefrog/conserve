@@ -43,15 +43,24 @@ ExitCode cmd_printproto(char **args) {
     const boost::filesystem::path path = args[0];
     google::protobuf::Message* message;
     const boost::filesystem::path filename = path.filename();
+    string object, part;
 
     if (filename == Archive::HEAD_NAME) {
         message = new conserve::proto::ArchiveHead();
+        object = "archive";
+        part = "head";
     } else if (filename == Band::HEAD_NAME) {
         message = new conserve::proto::BandHead();
+        object = "band";
+        part = "head";
     } else if (filename == Band::TAIL_NAME) {
         message = new conserve::proto::BandTail();
+        object = "band";
+        part = "tail";
     } else if (Block::resembles_index_filename(filename.string())) {
         message = new conserve::proto::BlockIndex();
+        object = "block";
+        part = "index";
     } else if (Block::resembles_data_filename(filename.string())) {
         LOG(ERROR) << path << " is a block data file and they don't contain protos";
         return EXIT_COMMAND_LINE;
@@ -61,7 +70,7 @@ ExitCode cmd_printproto(char **args) {
     }
 
     // TODO(mbp): Handle files that are compressed, encrypted, etc.
-    read_proto_from_file(path, message);
+    read_proto_from_file(path, message, object, part);
     google::protobuf::io::FileOutputStream outstream(1);
     TextFormat::Print(*message, &outstream);
     outstream.Flush();
