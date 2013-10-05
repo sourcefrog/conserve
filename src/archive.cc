@@ -54,7 +54,11 @@ Archive::Archive(const path& base_dir, bool create) :
         LOG(INFO) << "open archive in " << base_dir_;
         path head_path = base_dir / HEAD_NAME;
         read_proto_from_file(head_path, &head_pb_, "archive", "head");
-        CHECK(head_pb_.magic() == ARCHIVE_MAGIC);
+        if (head_pb_.magic() != ARCHIVE_MAGIC) {
+            Problem("archive", "head", "bad-magic", head_path,
+                    string("wrong magic: \"") + head_pb_.magic() + "\""
+                    ).signal();
+        }
     }
 }
 
