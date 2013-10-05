@@ -44,7 +44,7 @@ BlockReader::BlockReader(path directory, int block_number) :
     data_reader_(data_filename_),
     file_number_(0)
 {
-    read_proto_from_file(index_filename_, &index_pb_, "block", "index");
+    read_proto_from_file(index_path_, &index_pb_, "block", "index");
 }
 
 

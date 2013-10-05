@@ -42,7 +42,7 @@ Block::Block(path directory, int block_number) :
     block_number_(block_number)
 {
     string padded_number = (boost::format("%06d") % block_number_).str();
-    index_filename_ = block_directory_ / ("a" + padded_number);
+    index_path_ = block_directory_ / ("a" + padded_number);
     data_filename_ = block_directory_ / ("d" + padded_number);
 }
 

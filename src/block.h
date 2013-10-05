@@ -31,10 +31,12 @@ public:
 
     Block(path directory, int block_number);
 
+    path index_path() const { return index_path_; };
+
 protected:
     path block_directory_;
     int block_number_;
-    path index_filename_;
+    path index_path_;
     path data_filename_;
 };
 

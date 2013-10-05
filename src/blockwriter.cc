@@ -73,8 +73,8 @@ void BlockWriter::finish() {
     // TODO: Accumulate size and hash as we write the data file, and store it
     // into the index.
     index_proto_.set_compression(proto::BZIP2);
-    write_proto_to_file(index_proto_, index_filename_);
-    LOG(INFO) << "write block index in " << index_filename_;
+    write_proto_to_file(index_proto_, index_path_);
+    LOG(INFO) << "write block index in " << index_path_;
 }
 
 
