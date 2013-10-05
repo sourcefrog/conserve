@@ -1,0 +1,5 @@
+* Use structured problem reporting rather than fatal glog
+* Change to capnproto
+* Change 'init-archive' to 'init'
+* Test handling of various broken archives - perhaps needs some scripts or infrastructure to construct them
+
