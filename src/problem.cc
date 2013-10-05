@@ -38,6 +38,22 @@ Problem::~Problem() throw() {
 }
 
 
+Problem Problem::from_errno(const string &object,
+        const string& part,
+        const path& path) {
+    return Problem(object, part,
+            result_from_errno(errno),
+            path, strerror(errno));
+}
+
+
+const char* Problem::result_from_errno(int err) {
+    if (err == ENOENT)
+        return "missing";
+    else
+        return "error";
+}
+
 const char* Problem::what() const throw() {
     return what_.c_str();
 }

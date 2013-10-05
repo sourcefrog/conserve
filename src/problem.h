@@ -31,6 +31,12 @@ public:
 
     virtual ~Problem() throw();
 
+    static Problem from_errno(const string &object,
+            const string& part,
+            const path& path);
+
+    static const char* result_from_errno(int err);
+
     virtual const char* what() const throw();
 
     string object_, part_, result_;
