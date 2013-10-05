@@ -57,11 +57,9 @@ check-staged:
 CRAM_OPTIONS = --indent=4 -v
 
 cram-tests: conserve $(cram_tests)
-	chmod +w $(srcdir)/tests
 	PATH=`pwd`:$$PATH cram $(CRAM_OPTIONS) $(srcdir)/tests/*md
 
 update-cram: conserve $(cram_tests)
-	chmod +w $(srcdir)/tests
 	PATH=`pwd`:$$PATH cram $(CRAM_OPTIONS) -i $(srcdir)/tests/*md
 
 CLEANFILES = proto/conserve.pb.h proto/conserve.pb.cc
