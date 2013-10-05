@@ -38,6 +38,9 @@ private:
     // Accumulates index entries as files are added.
     conserve::proto::BlockIndex index_proto_;
     BzDataWriter data_writer_;
+
+    // Last path accumulated, so that we can validate correct ordering.
+    path last_path_stored_;
 };
 
 } // namespace conserve

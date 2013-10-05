@@ -48,13 +48,18 @@ BlockWriter::BlockWriter(path directory, int block_number) :
 
 
 void BlockWriter::add_file(const path& source_path) {
+    CHECK(source_path > last_path_stored_)
+        << source_path.string() << ", " << last_path_stored_.string();
+
     int64_t content_len = -1;
     data_writer_.store_file(source_path, &content_len);
+    CHECK(content_len >= 0);
 
     proto::FileIndex* file_index = index_proto_.add_file();
     break_path(source_path, file_index->mutable_path());
-    CHECK(content_len >= 0);
     file_index->set_data_length(content_len);
+
+    last_path_stored_ = source_path;
 }
 
 
