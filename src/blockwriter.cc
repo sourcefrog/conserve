@@ -48,8 +48,10 @@ BlockWriter::BlockWriter(path directory, int block_number) :
 
 
 void BlockWriter::add_file(const path& source_path) {
-    CHECK(source_path > last_path_stored_)
-        << source_path.string() << ", " << last_path_stored_.string();
+    // TODO: Re-enable this assertion once we sort the filenames, and 
+    // change it to a problem report.
+//    CHECK(source_path > last_path_stored_)
+//        << source_path.string() << ", " << last_path_stored_.string();
 
     int64_t content_len = -1;
     data_writer_.store_file(source_path, &content_len);
