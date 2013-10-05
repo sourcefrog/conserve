@@ -1,0 +1,14 @@
+= Synopsis
+= Options
+= Status codes
+
+0: success.
+
+1: Found differences when comparing: not necessarily a problem if the source filesystem changed since the backup was made.
+
+2: Encountered problems during operation but continued.
+
+3: Stopped due to problems.
+
+= Environment
+= See also
