@@ -1,4 +1,4 @@
-* Use structured problem reporting rather than fatal glog
+* Use structured problem reporting rather than fatal glog (in all cases)
 * Change to capnproto
 * Test handling of various broken archives - perhaps needs some scripts or infrastructure to construct them
-
+* Backup and restore directories, symlinks, etc (maybe also fifos, devices)
