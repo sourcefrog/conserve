@@ -14,6 +14,7 @@
 #ifndef CONSERVE_PROBLEM_H_
 #define CONSERVE_PROBLEM_H_
 
+#include <exception>
 #include <string>
 #include <boost/filesystem.hpp>
 
@@ -22,11 +23,15 @@ namespace conserve {
 using namespace std;
 using namespace boost::filesystem;
 
-class Problem {
+class Problem : public exception {
 public:
     Problem(const string& object, const string& part,
             const string& result,
             const path& path, const string& os_error);
+
+    virtual ~Problem() throw();
+
+    virtual const char* what() const throw();
 
     string object_, part_, result_;
     path path_;
@@ -41,6 +46,10 @@ public:
 
     // Write a description of this problem to the glog.
     void log() const;
+
+private:
+    // Precomposed full string for this exception.
+    string what_;
 };
 
 } // namespace conserve

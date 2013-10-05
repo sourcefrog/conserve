@@ -28,13 +28,23 @@ Problem::Problem(const string& object, const string& part,
     object_(object), part_(part), result_(result),
     path_(path), os_error_(os_error)
 {
+    what_ = shortform()
+            + (!path_.empty() ? ": " + path_.string() : "")
+            + (!os_error_.empty() ? ": " + os_error_ : "");
+}
+
+
+Problem::~Problem() throw() {
+}
+
+
+const char* Problem::what() const throw() {
+    return what_.c_str();
 }
 
 
 void Problem::log() const {
-    LOG(ERROR) << "Problem: " << shortform()
-        << (!path_.empty() ? ": " + path_.string() : "")
-        << (!os_error_.empty() ? ": " + os_error_ : "");
+    LOG(ERROR) << "Problem: " << what();
 }
 
 
