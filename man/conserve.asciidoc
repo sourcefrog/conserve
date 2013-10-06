@@ -3,7 +3,7 @@
 
 == NAME
 
-Conserve - a robust file backup and restore program, with fast random access on dumb storage.
+conserve - robust file backup and restore program.
 
 == SYNOPSIS
 
@@ -12,6 +12,10 @@ Conserve - a robust file backup and restore program, with fast random access on 
     conserve validate ARCHIVE
     conserve restore ARCHIVE DEST
     conserve printproto FILE
+
+== DESCRIPTION
+
+Conserve is a backup program.
 
 == OPTIONS
 
@@ -28,12 +32,7 @@ Conserve - a robust file backup and restore program, with fast random access on 
 *-V*::
     Show the Conserve version number.
     
-== FILES
-
-Conserve writes log files into `$TMPDIR`. These files have permissions controlled by the umask,
-but may contain sensitive filenames.
-    
-== EXIT CODES
+== EXIT STATUS
 
 0:: 
     Success.
@@ -50,21 +49,39 @@ but may contain sensitive filenames.
 4::
     Problem with the command line (bad command or options, etc.)
     
+== FILES
+
+Conserve writes log files into `$TMPDIR`. These files have permissions
+controlled by the umask, but may contain sensitive filenames.
+    
 == BUGS
 
-Pre-1.0 versions of Conserve do not promise backwards or forwards compatibility.  
-From 1.0, no format changes will be made in patchlevel releases, and later minor 
-releases will be able to read backups made by all previous releases from 1.0
-onwards.
+Conserve is immature and should not be used as the only backup mechanism for
+valuable data.
 
-Conserve should not be used as the only backup mechanism for valuable data.
+Pre-1.0 versions of Conserve do not promise backwards or forwards
+compatibility, or that incompatibilities will be cleanly detected and
+reported.  In the absence of unplanned bugs, archives can be read by the exact
+Conserve version that wrote them.  
 
-Many important features are not yet implemented, including incremental backups and random access.
+From 1.0, no format changes will be made in patchlevel releases, and later
+minor releases will be able to read backups made by all previous releases from
+1.0 onwards.
+
+Many important features are not yet implemented, including incremental backups
+and random access.
+
+== EXAMPLE
+
+    conserve init /backup/my-src
+    conserve backup ~/src /backup/my-src
+    conserve validate /backup/my-src
+    conserve restore /backup/my-src /tmp/restored-src
 
 == AUTHOR
 
-Martin Pool <http://sourcefrog.net>
+Martin Pool
 
 == SEE ALSO
 
-* <http://github.com/sourcefrog/conserve>
+<http://github.com/sourcefrog/conserve>
