@@ -1,3 +1,5 @@
+* add manpage to automake
+
 * Validate names are clean
 * Validate name ordering 
 * Assert correct name order while writing
@@ -14,3 +16,4 @@
 
 * Test handling of various broken archives - perhaps needs some scripts or infrastructure to construct them
  * bzip decompression failure
+ * missing lower layers

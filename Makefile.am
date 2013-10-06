@@ -76,3 +76,10 @@ cram_tests = \
 	tests/hello.md \
 	tests/help.md \
 	tests/printproto.md
+
+
+man/conserve.1: man/conserve.asciidoc
+	a2x -vv -f manpage $<
+
+show-manpage: man/conserve.1
+	man $<
