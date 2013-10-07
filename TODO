@@ -1,13 +1,21 @@
 * add manpage to automake
 
+* Change to capnproto
+  (Does add additional dependencies and may make things hard to install on
+  older OS releases...)
+
+* Log compression ratio per block
+
 * Validate names are clean
 * Validate name ordering 
 * Assert correct name order while writing
 
 * Write multiple top-level bands so that you can make more than one backup to an archive
 
+* list bands
+* list files in a band, or in a version
+
 * Use structured problem reporting rather than fatal glog (in all cases)
-* Change to capnproto
 * Backup and restore directories, symlinks, etc (maybe also fifos, devices)
 * Give a warning status if we kept going past problems
 * Add -k option to keep going after problems
@@ -17,3 +25,8 @@
 * Test handling of various broken archives - perhaps needs some scripts or infrastructure to construct them
  * bzip decompression failure
  * missing lower layers
+
+* Write to temporary file and move into place? 
+  Actually needed, or is it better to just say that readers ought to cope 
+  with truncated files, which are likely to happen anyhow.
+
