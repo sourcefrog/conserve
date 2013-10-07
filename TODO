@@ -10,6 +10,8 @@
 * Validate name ordering 
 * Assert correct name order while writing
 
+* Detect and cope with incomplete bands
+
 * Write multiple top-level bands so that you can make more than one backup to an archive
 
 * list bands
@@ -30,3 +32,4 @@
   Actually needed, or is it better to just say that readers ought to cope 
   with truncated files, which are likely to happen anyhow.
 
+* Auto-resume incomplete bands
