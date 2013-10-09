@@ -1,7 +1,7 @@
-Conserve is a (design for a) robust backup program
-==============================================
+Conserve - a robust backup program
+==================================
 
-**At this time Conserve is not ready for use.**
+**At this time Conserve is not ready for production use.**
 
 Copyright 2012-2013 [Martin Pool][1], mbp@sourcefrog.net.
 
