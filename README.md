@@ -17,6 +17,18 @@ GNU General Public License for more details._
 
 Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
+Use
+---
+
+    conserve init /backup/my-source
+    conserve backup ~/src /backup/my-source
+    conserve validate /backup/my-source
+    conserve restore /backup/my-source /tmp/source-restore
+    
+For more details see the 
+[`conserve(1)`](https://github.com/sourcefrog/conserve/blob/master/man/conserve.asciidoc)
+man page.
+
 
 Manifesto
 ---------
