@@ -87,6 +87,7 @@ Ubuntu/Debian package names:
     protobuf-compiler
     make
     libgoogle-glog-dev
+    libssl-dev
 
 To run the tests, [cram](https://pypi.python.org/pypi/cram) is needed:
 
