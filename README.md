@@ -83,11 +83,13 @@ Dependencies
 Ubuntu/Debian package names:
 
     libprotobuf-dev
-    clang
+    clang || g++
     protobuf-compiler
     make
     libgoogle-glog-dev
     libssl-dev
+    automake
+    autoconf
 
 To run the tests, [cram](https://pypi.python.org/pypi/cram) is needed:
 
