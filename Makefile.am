@@ -53,8 +53,9 @@ check-staged:
 	cd "$$t" && \
 	./autogen.sh && \
 	mkdir _build && cd _build && \
-	../configure && \
-	$(MAKE) $(MAKEFLAGS) distcheck && \
+	../configure --prefix "$$t/_installprefix" && \
+	$(MAKE) $(MAKEFLAGS) distcheck -j8 && \
+	$(MAKE) $(MAKEFLAGS) install -j8 && \
 	rm -r "$$t"
 
 CRAM_OPTIONS = --indent=4 -v
