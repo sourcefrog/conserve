@@ -90,6 +90,7 @@ Ubuntu/Debian package names:
     libssl-dev
     automake
     autoconf
+    asciidoc
 
 To run the tests, [cram](https://pypi.python.org/pypi/cram) is needed:
 
