@@ -1,9 +1,3 @@
-* add manpage to automake
-
-* Change to capnproto
-  (Does add additional dependencies and may make things hard to install on
-  older OS releases...)
-
 * Log compression ratio per block
 
 * Validate names are clean
