@@ -76,6 +76,9 @@ Manifesto
   and history of backup operations.  (If the backup metadata includes
   a timestamp, you can pass in the timestamp to get the same result.)
 
+For a comparison to other backup systems, see 
+<https://github.com/sourcefrog/conserve/wiki/Compared-to-others>.
+
 
 Dependencies
 ============
