@@ -4,8 +4,8 @@ bin_PROGRAMS = conserve
 
 check: cram-tests
 
-CXXFLAGS=-Wall -ggdb
-LDADD=-lprotobuf -lboost_filesystem -lboost_system -lglog -lbz2
+CXXFLAGS += -Wall
+LDADD = -lprotobuf -lboost_filesystem -lboost_system -lglog -lbz2
 
 nodist_conserve_SOURCES = proto/conserve.pb.cc
 
