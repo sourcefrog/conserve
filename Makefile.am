@@ -65,10 +65,13 @@ cram-tests: conserve $(cram_tests)
 update-cram: conserve $(cram_tests)
 	PATH=`pwd`:$$PATH cram $(CRAM_OPTIONS) -i $(srcdir)/tests/*md
 
-CLEANFILES = proto/conserve.pb.h proto/conserve.pb.cc
+CLEANFILES = \
+	proto/conserve.pb.h proto/conserve.pb.cc \
+	man/conserve.1
 
 EXTRA_DIST = \
 	proto/conserve.proto \
+	man/conserve.asciidoc \
 	$(cram_tests)
 
 cram_tests = \
@@ -79,7 +82,10 @@ cram_tests = \
 
 
 man/conserve.1: man/conserve.asciidoc
-	a2x -vv -f manpage $<
+	[ -d man ] || mkdir man
+	a2x -vv -f manpage -D man $<
 
 show-manpage: man/conserve.1
 	man $<
+
+man1_MANS = man/conserve.1
