@@ -1,0 +1,9 @@
+libprotobuf-dev
+clang
+protobuf-compiler
+make
+libgoogle-glog-dev
+libssl-dev
+automake
+autoconf
+asciidoc
