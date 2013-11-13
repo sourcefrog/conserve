@@ -1,8 +1,14 @@
-* Log compression ratio per block
-
 * Validate names are clean
 * Validate name ordering 
-* Assert correct name order while writing
+* Add tests for unicode names
+
+* recurse through source directory
+
+* more validation (what?)
+
+* compress index blocks
+
+* Log compression ratio per block
 
 * Detect and cope with incomplete bands
 
