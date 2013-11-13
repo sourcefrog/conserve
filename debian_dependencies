@@ -7,3 +7,4 @@ libssl-dev
 automake
 autoconf
 asciidoc
+libboost-filesystem-dev
