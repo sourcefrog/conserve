@@ -8,3 +8,7 @@ automake
 autoconf
 asciidoc
 libboost-filesystem-dev
+libbz2-dev
+libxml2-utils
+docbook-xml
+xsltproc
