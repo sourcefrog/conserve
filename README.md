@@ -83,17 +83,14 @@ For a comparison to other backup systems, see
 Dependencies
 ============
 
-Ubuntu/Debian package names:
+Ubuntu/Debian package names are listed in `debian_dependencies` for ease
+of installation:
 
-    libprotobuf-dev
-    clang || g++
-    protobuf-compiler
-    make
-    libgoogle-glog-dev
-    libssl-dev
-    automake
-    autoconf
-    asciidoc
+    sudo apt-get install --no-install-recommends `cat debian_dependencies`
+
+Note that `google-glog` is packaged in Debian Squeeze and Jessie but 
+not Wheezy. However, if you add an apt source line for Squeeze, that
+package can be installed onto Wheezy.
 
 To run the tests, [cram](https://pypi.python.org/pypi/cram) is needed:
 
