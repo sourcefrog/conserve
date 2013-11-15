@@ -30,19 +30,10 @@ namespace conserve {
 
 using namespace boost::filesystem;
 
-ExitCode cmd_validate(char **argv) {
-    if (!argv[0] || argv[1]) {
-        LOG(ERROR) << "usage: conserve validate ARCHIVE";
-        return EXIT_COMMAND_LINE;
-    }
-    const path archive_dir = argv[0];
-
-    Archive archive(archive_dir, false);
-    BandReader band(&archive, archive.last_band_name());
-    // TODO: Compare platform-independent paths?
+static void validate_band(BandReader& band) {
+    // TODO: Check this comparison is stable when run on non-unix platforms
+    // and that it's correct for non-ascii names.
     path last_path_;
-
-    // TODO: Read all bands.
     while (!band.done()) {
         // TODO: Check number of blocks is as expected.
         for (BlockReader block_reader = band.read_next_block();
@@ -67,6 +58,21 @@ ExitCode cmd_validate(char **argv) {
             last_path_ = file_path;
         }
     }
+}
+
+
+ExitCode cmd_validate(char **argv) {
+    if (!argv[0] || argv[1]) {
+        LOG(ERROR) << "usage: conserve validate ARCHIVE";
+        return EXIT_COMMAND_LINE;
+    }
+    const path archive_dir = argv[0];
+
+    Archive archive(archive_dir, false);
+    BandReader band(&archive, archive.last_band_name());
+
+    // TODO: Read all bands.
+    validate_band(band);
 
     return EXIT_OK;
 }
