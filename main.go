@@ -7,6 +7,7 @@ import (
     "github.com/docopt/docopt.go" 
 )
 
+
 const usage = `
 conserve - a robust backup program
 
@@ -15,11 +16,11 @@ Licenced under the GNU General Public Licence, version 2 or later.
 Conserve comes with ABSOLUTELY NO WARRANTY of any kind.
 
 Usage:
-  conserve backup SOURCE... ARCHIVE
-  conserve init DIR
-  conserve printproto FILE
-  conserve restore ARCHIVE DESTDIR
-  conserve validate ARCHIVE
+  conserve backup <source>... <archive>
+  conserve init <dir>
+  conserve printproto <file>
+  conserve restore <archive> <destdir>
+  conserve validate <archive>
 
 Options:
   -h            Show help.
