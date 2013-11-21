@@ -88,9 +88,8 @@ of installation:
 
     sudo apt-get install --no-install-recommends `cat debian_dependencies`
 
-Note that `google-glog` is packaged in Debian Squeeze and Jessie but 
-not Wheezy. However, if you add an apt source line for Squeeze, that
-package can be installed onto Wheezy.
+Conserve (specifically the docopt dependency) needs Go 1.1, which is only in
+Debian Jessie and later.
 
 To run the tests, [cram](https://pypi.python.org/pypi/cram) is needed:
 
