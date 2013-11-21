@@ -31,5 +31,7 @@ Options:
 
 func main() {
     args, err := docopt.Parse(usage, nil, true,
-	conservelib.ConserveVersion, false);
+	conservelib.ConserveVersion, false)
+    fmt.Printf("args: %v\n", args)
+    fmt.Printf("err: %v\n", err)
 }
