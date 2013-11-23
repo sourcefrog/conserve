@@ -1,7 +1,7 @@
 package main
 
 import (
-    "fmt"
+    "log"
 
     "github.com/sourcefrog/conserve/conservelib"
     "github.com/docopt/docopt.go" 
@@ -17,22 +17,23 @@ Conserve comes with ABSOLUTELY NO WARRANTY of any kind.
 
 Usage:
   conserve backup <source>... <archive>
-  conserve init <dir>
+  conserve [-vL] init <dir>
   conserve printproto <file>
   conserve restore <archive> <destdir>
   conserve validate <archive>
 
 Options:
-  -h            Show help.
-  -v            Show info logs on stderr.
-  -V            Show version.
+  --help        Show help.
+  --version     Show version.
   -L            Suppress severity/date/time/source prefix on log lines.
+  -v            Show info logs on stderr.
 `
 
 
 func main() {
     args, err := docopt.Parse(usage, nil, true,
 	conservelib.ConserveVersion, false)
-    fmt.Printf("args: %v\n", args)
-    fmt.Printf("err: %v\n", err)
+    log.Printf("args: %v\n", args)
+    log.Printf("err: %v\n", err)
+    log.Printf("format: %#v\n", args["--format"])
 }
