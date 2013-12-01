@@ -58,3 +58,16 @@ func TestInitArchive(t *testing.T) {
             expected_magic, got_magic)
     }
 }
+
+func TestOpenArchive(t *testing.T) {
+    test_dir, err := testDirectory()
+    if err != nil {
+        t.Error(err.Error())
+    }
+    conserve.InitArchive(test_dir)
+    archive2, err := conserve.OpenArchive(test_dir)
+    if archive2 == nil || err != nil {
+        t.Errorf("failed to open archive %v: %v",
+            test_dir, err)
+    }
+}

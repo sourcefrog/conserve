@@ -49,8 +49,12 @@ func InitArchive(archive_dir string) (archive *Archive, err error) {
     return
 }
 
+func headName(archive_dir string) string {
+    return archive_dir + "/" + ArchiveMagicFile
+}
+
 func writeArchiveHeader(archive_dir string) (err error) {
-    head_name := archive_dir + "/" + ArchiveMagicFile
+    head_name := headName(archive_dir)
     f, err := os.Create(head_name)
     if err != nil {
         return
@@ -75,4 +79,18 @@ func writeArchiveHeader(archive_dir string) (err error) {
         return
     }
     return
+}
+
+func OpenArchive(archive_dir string) (archive *Archive, err error) {
+    head_name := headName(archive_dir)
+    head_file, err := os.Open(head_name)
+    if head_file == nil {
+        // TODO: log
+        return
+    }
+    defer head_file.Close()
+
+    // TODO: check magic
+
+    return &Archive{dir: archive_dir}, nil
 }
