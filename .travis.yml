@@ -1,4 +1,6 @@
 language: go
 go:
   - 1.1
-install: go get ./... && pip install cram
+install: 
+  - pip install --user --use-mirrors cram
+  - go get ./...
