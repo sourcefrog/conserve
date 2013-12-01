@@ -11,7 +11,7 @@ message Stamp {
 
 // One ArchiveHeader in '/CONSERVE' in the root of the archive directory.
 message ArchiveHead {
-    // Literal "conserve archive"
+    // Literal "conserve backup archive"
     required string magic = 1;
 
     // Clients must understand these features to safely read the archive.
