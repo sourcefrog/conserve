@@ -51,7 +51,7 @@ func TestInitArchive(t *testing.T) {
         return
     }
 
-    var expected_magic = ("\x0a\x18conserve backup archive")
+    var expected_magic = ("\x0a\x17conserve backup archive")
     var got_magic = string(magic[:n])
     if got_magic != expected_magic {
         t.Errorf("wrong archive magic: wanted %q got %q",
