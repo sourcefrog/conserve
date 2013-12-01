@@ -26,17 +26,18 @@ Licenced under the GNU General Public Licence, version 2 or later.
 Conserve comes with ABSOLUTELY NO WARRANTY of any kind.
 
 Usage:
-  conserve backup <source>... <archive>
   conserve [-v] init <dir>
-  conserve printproto <file>
-  conserve restore <archive> <destdir>
-  conserve validate <archive>
 
 Options:
   --help        Show help.
   --version     Show version.
   -v            Be more verbose.
 `
+
+// conserve backup <source>... <archive>
+// conserve printproto <file>
+// conserve restore <archive> <destdir>
+// conserve validate <archive>
 
 func main() {
     args, _ := docopt.Parse(usage, nil, true,
