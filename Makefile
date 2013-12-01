@@ -3,13 +3,12 @@ check: cram-tests go-tests
 build:
 	go build ./...
 
-go-tests: go-get
+go-tests:
 	go test ./...
 
 # Building the Go protos needs <http://code.google.com/p/goprotobuf/>
 proto/conserve.pb.go: proto/conserve.proto
 	protoc --go_out=. proto/conserve.proto
-
 
 go-install:
 	go install ./cli/conserve
@@ -28,11 +27,14 @@ check-staged:
 
 CRAM_OPTIONS = --indent=4 -v
 
-cram-tests: go-install $(cram_tests)
-	PATH=$$GOPATH/bin:$$PATH cram $(CRAM_OPTIONS) $(cram_tests)
+# TODO: surely a better way to get the binary path?
+gobindir = `pwd`/../../../../bin
 
-update-cram: conserve $(cram_tests)
-	PATH=`pwd`:$$PATH cram $(CRAM_OPTIONS) -i $(cram_tests)
+cram-tests: go-install $(cram_tests)
+	PATH=$(gobindir):$$PATH cram $(CRAM_OPTIONS) $(cram_tests)
+
+update-cram: go-install $(cram_tests)
+	PATH=$(gobindir):$$PATH cram $(CRAM_OPTIONS) -i $(cram_tests)
 
 CLEANFILES = \
 	man/conserve.1
