@@ -1,0 +1,1 @@
+gofmt -s -w -tabwidth=4 -tabs=false . conserve
