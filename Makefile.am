@@ -43,6 +43,10 @@ conserve_SOURCES = \
 	src/validate.cc \
 	src/validate.h
 
+# Building the Go protos needs <http://code.google.com/p/goprotobuf/>
+proto/conserve.pb.go: proto/conserve.proto
+	protoc --go_out=. proto/conserve.proto
+
 proto/conserve.pb.cc proto/conserve.pb.h: proto/conserve.proto
 	protoc --cpp_out=. --proto_path $(srcdir) $<
 
