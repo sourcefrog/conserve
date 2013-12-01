@@ -18,7 +18,7 @@ import (
     "os"
     "testing"
 
-    "github.com/sourcefrog/conserve/conserve"
+    "github.com/sourcefrog/conserve"
 )
 
 func testDirectory() (string, error) {

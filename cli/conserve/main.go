@@ -17,7 +17,7 @@ import (
     "log"
 
     "github.com/docopt/docopt.go"
-    "github.com/sourcefrog/conserve/conserve"
+    "github.com/sourcefrog/conserve"
 )
 
 const usage = `
