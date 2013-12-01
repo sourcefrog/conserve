@@ -2,7 +2,6 @@
 *.o
 proto/*.pb.cc
 proto/*.pb.h
-conserve
 .*.sw[po]
 *.py[co]
 htmlcov/

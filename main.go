@@ -3,7 +3,7 @@ package main
 import (
     "log"
 
-    "github.com/sourcefrog/conserve/conservelib"
+    "github.com/sourcefrog/conserve/conserve"
     "github.com/docopt/docopt.go" 
 )
 
@@ -32,7 +32,7 @@ Options:
 
 func main() {
     args, err := docopt.Parse(usage, nil, true,
-	conservelib.ConserveVersion, false)
+	conserve.ConserveVersion, false)
     log.Printf("args: %v\n", args)
     log.Printf("err: %v\n", err)
     log.Printf("format: %#v\n", args["--format"])
