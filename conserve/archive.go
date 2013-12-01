@@ -2,6 +2,8 @@ package conserve
 
 import (
     "os"
+
+    _ "github.com/sourcefrog/conserve/conserve_proto"
 )
 
 type Archive struct {
