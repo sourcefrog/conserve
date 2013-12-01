@@ -3,7 +3,7 @@ check: cram-tests go-tests
 build:
 	go build ./...
 
-go-tests:
+go-tests: go-get
 	go test ./...
 
 # Building the Go protos needs <http://code.google.com/p/goprotobuf/>
