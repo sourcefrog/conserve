@@ -3,10 +3,9 @@ package main
 import (
     "log"
 
+    "github.com/docopt/docopt.go"
     "github.com/sourcefrog/conserve/conserve"
-    "github.com/docopt/docopt.go" 
 )
-
 
 const usage = `
 conserve - a robust backup program
@@ -17,7 +16,7 @@ Conserve comes with ABSOLUTELY NO WARRANTY of any kind.
 
 Usage:
   conserve backup <source>... <archive>
-  conserve [-vL] init <dir>
+  conserve [-v] init <dir>
   conserve printproto <file>
   conserve restore <archive> <destdir>
   conserve validate <archive>
@@ -25,15 +24,17 @@ Usage:
 Options:
   --help        Show help.
   --version     Show version.
-  -L            Suppress severity/date/time/source prefix on log lines.
   -v            Show info logs on stderr.
 `
 
-
 func main() {
     args, err := docopt.Parse(usage, nil, true,
-	conserve.ConserveVersion, false)
+        conserve.ConserveVersion, false)
     log.Printf("args: %v\n", args)
     log.Printf("err: %v\n", err)
     log.Printf("format: %#v\n", args["--format"])
+
+    if args["init"].(bool) {
+        conserve.InitArchive(args["<dir>"].(string))
+    }
 }
