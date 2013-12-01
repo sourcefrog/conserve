@@ -24,11 +24,6 @@ func TestInitArchive(t *testing.T) {
     if archive == nil {
         t.Error("nil archive returned")
     }
-    // TODO(mbp): Check header bytes are as expected
-    _, err = os.Stat(testDir)
-    if os.IsNotExist(err) {
-        t.Error("archive directory does not exist")
-    }
 
     f, err := os.Open(testDir + "/CONSERVE")
     if err != nil {
