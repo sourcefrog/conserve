@@ -6,3 +6,4 @@ asciidoc
 libxml2-utils
 docbook-xml
 xsltproc
+golang-goprotobuf-dev
