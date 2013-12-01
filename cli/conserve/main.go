@@ -14,8 +14,6 @@
 package main
 
 import (
-    "log"
-
     "github.com/docopt/docopt.go"
     "github.com/sourcefrog/conserve"
 )
@@ -37,15 +35,12 @@ Usage:
 Options:
   --help        Show help.
   --version     Show version.
-  -v            Show info logs on stderr.
+  -v            Be more verbose.
 `
 
 func main() {
-    args, err := docopt.Parse(usage, nil, true,
+    args, _ := docopt.Parse(usage, nil, true,
         conserve.ConserveVersion, false)
-    log.Printf("args: %v\n", args)
-    log.Printf("err: %v\n", err)
-    log.Printf("format: %#v\n", args["--format"])
 
     if args["init"].(bool) {
         conserve.InitArchive(args["<dir>"].(string))
