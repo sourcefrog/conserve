@@ -9,7 +9,7 @@ import (
 )
 
 func testDirectory() (string, error) {
-    return ioutil.TempDir("", "conserve_test")
+    return ioutil.TempDir("", "conserve_test_")
 }
 
 func TestInitArchive(t *testing.T) {
@@ -28,5 +28,25 @@ func TestInitArchive(t *testing.T) {
     _, err = os.Stat(testDir)
     if os.IsNotExist(err) {
         t.Error("archive directory does not exist")
+    }
+
+    f, err := os.Open(testDir + "/CONSERVE")
+    if err != nil {
+        t.Error("failed to read archive magic: ", err)
+        return
+    }
+
+    magic := make([]byte, 100)
+    n, err := f.Read(magic)
+    if err != nil {
+        t.Error("failed to read archive magic: ", err)
+        return
+    }
+
+    var expected_magic = ("\x0a\x18conserve backup archive")
+    var got_magic = string(magic[:n])
+    if got_magic != expected_magic {
+        t.Errorf("wrong archive magic: wanted %q got %q",
+            expected_magic, got_magic)
     }
 }

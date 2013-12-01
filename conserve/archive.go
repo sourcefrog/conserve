@@ -3,10 +3,17 @@ package conserve
 import (
     "os"
 
-    _ "github.com/sourcefrog/conserve/conserve_proto"
+    "code.google.com/p/goprotobuf/proto"
+    "github.com/sourcefrog/conserve/conserve_proto"
+)
+
+const (
+    ArchiveMagicFile   string = "CONSERVE"
+    ArchiveMagicString        = "conserve backup archive"
 )
 
 type Archive struct {
+    dir string
 }
 
 func InitArchive(archive_dir string) (archive *Archive, err error) {
@@ -18,7 +25,41 @@ func InitArchive(archive_dir string) (archive *Archive, err error) {
     } else if err != nil {
         return
     }
-    // TODO(mbp): Actually write the header
-    archive = &Archive{}
+
+    err = writeArchiveHeader(archive_dir)
+    if err != nil {
+        return
+    }
+
+    archive = &Archive{dir: archive_dir}
+
+    return
+}
+
+func writeArchiveHeader(archive_dir string) (err error) {
+    head_name := archive_dir + "/" + ArchiveMagicFile
+    f, err := os.Create(head_name)
+    if err != nil {
+        return
+    }
+
+    header := &conserve_proto.ArchiveHead{
+        Magic: proto.String(ArchiveMagicString),
+        // TODO: set stamp
+    }
+
+    head_bytes, err := proto.Marshal(header)
+    if err != nil {
+        return
+    }
+    _, err = f.Write(head_bytes)
+    if err != nil {
+        return
+    }
+
+    err = f.Close()
+    if err != nil {
+        return
+    }
     return
 }
