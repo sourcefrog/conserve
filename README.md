@@ -17,6 +17,8 @@ GNU General Public License for more details._
 
 Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
+[![Build Status](https://travis-ci.org/sourcefrog/conserve.png?branch=golang)](https://travis-ci.org/sourcefrog/conserve)
+
 Use
 ---
 
