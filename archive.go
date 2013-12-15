@@ -46,7 +46,6 @@ func InitArchive(archive_dir string) (archive *Archive, err error) {
     }
 
     archive = &Archive{dir: archive_dir}
-
     return
 }
 
@@ -55,12 +54,6 @@ func headName(archive_dir string) string {
 }
 
 func writeArchiveHeader(archive_dir string) (err error) {
-    head_name := headName(archive_dir)
-    f, err := os.Create(head_name)
-    if err != nil {
-        return
-    }
-
     header := &conserve_proto.ArchiveHead{
         Magic: proto.String(ArchiveMagicString),
         // TODO: set stamp
@@ -70,15 +63,20 @@ func writeArchiveHeader(archive_dir string) (err error) {
     if err != nil {
         return
     }
-    _, err = f.Write(head_bytes)
+
+    head_name := headName(archive_dir)
+    f, err := os.Create(head_name)
     if err != nil {
         return
     }
 
-    err = f.Close()
+    _, err = f.Write(head_bytes)
     if err != nil {
+        f.Close()
         return
     }
+
+    err = f.Close()
     return
 }
 

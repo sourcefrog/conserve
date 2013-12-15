@@ -76,6 +76,6 @@ func TestOpenNoHeader(t *testing.T) {
     test_dir, err := testDirectory()
     archive2, err := conserve.OpenArchive(test_dir)
     if archive2 != nil || err == nil {
-	t.Errorf("expected failure, was disappointed")
+        t.Errorf("expected failure, was disappointed")
     }
 }
