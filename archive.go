@@ -62,25 +62,7 @@ func writeArchiveHeader(archive_dir string) (err error) {
         Magic: proto.String(ArchiveMagicString),
         // TODO: set stamp
     }
-
-    head_bytes, err := proto.Marshal(header)
-    if err != nil {
-        return
-    }
-
-    head_name := headName(archive_dir)
-    f, err := os.Create(head_name)
-    if err != nil {
-        return
-    }
-
-    _, err = f.Write(head_bytes)
-    if err != nil {
-        f.Close()
-        return
-    }
-
-    err = f.Close()
+    err = writeProtoToFile(header, headName(archive_dir))
     return
 }
 
