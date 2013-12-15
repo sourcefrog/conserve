@@ -11,17 +11,16 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-package conserve_test
+package conserve
 
 import (
-    "github.com/sourcefrog/conserve"
     "os"
     "testing"
 )
 
 func TestCreateBand(t *testing.T) {
     archive, err := createTestArchive(t)
-    band, err := conserve.CreateBand(archive)
+    band, err := CreateBand(archive)
     if band == nil || err != nil {
         t.Errorf("failed to create band: %v", err)
         return
@@ -30,7 +29,7 @@ func TestCreateBand(t *testing.T) {
         t.Errorf("unexpected band name %#v", band.Name())
     }
 
-    headName := band.Directory() + "/" + conserve.BandHeadFilename
+    headName := band.Directory() + "/" + BandHeadFilename
     stat, err := os.Stat(headName)
     if stat == nil || err != nil {
         t.Errorf("failed to stat %v: %v", headName, err)

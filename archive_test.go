@@ -11,26 +11,24 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-package conserve_test
+package conserve
 
 import (
     "io/ioutil"
     "os"
     "testing"
-
-    "github.com/sourcefrog/conserve"
 )
 
 func createTestDirectory() (string, error) {
     return ioutil.TempDir("", "conserve_test_")
 }
 
-func createTestArchive(t *testing.T) (archive *conserve.Archive, err error) {
+func createTestArchive(t *testing.T) (archive *Archive, err error) {
     testDir, err := createTestDirectory()
     if err != nil {
         t.Error(err.Error())
     }
-    archive, err = conserve.InitArchive(testDir)
+    archive, err = InitArchive(testDir)
     if err != nil {
         t.Error(err.Error())
     }
@@ -67,7 +65,7 @@ func TestInitArchive(t *testing.T) {
 func TestOpenArchive(t *testing.T) {
     archive, err := createTestArchive(t)
     testDir := archive.Directory()
-    archive2, err := conserve.OpenArchive(testDir)
+    archive2, err := OpenArchive(testDir)
     if archive2 == nil || err != nil {
         t.Errorf("failed to open archive %v: %v",
             testDir, err)
@@ -76,7 +74,7 @@ func TestOpenArchive(t *testing.T) {
 
 func TestOpenNoHeader(t *testing.T) {
     testDir, err := createTestDirectory()
-    archive2, err := conserve.OpenArchive(testDir)
+    archive2, err := OpenArchive(testDir)
     if archive2 != nil || err == nil {
         t.Errorf("expected failure, was disappointed")
     }
