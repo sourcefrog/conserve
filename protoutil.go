@@ -19,7 +19,6 @@ import (
     "code.google.com/p/goprotobuf/proto"
 )
 
-
 func writeProtoToFile(message proto.Message, filename string) (err error) {
     bytes, err := proto.Marshal(message)
     if err != nil {

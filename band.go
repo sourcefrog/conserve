@@ -14,26 +14,46 @@
 package conserve
 
 import (
+    "github.com/sourcefrog/conserve/conserve_proto"
+    "os"
+    "path"
 )
 
 const (
     // TODO: Generate names numerically so we can store more than one band.
-    firstBandName = "0000"
+    firstBandName    = "0000"
     BandHeadFilename = "BANDHEAD"
     BandTailFilename = "BANDTAIL"
 )
 
 type BandWriter struct {
-    archive *Archive
-    name string
+    archive   *Archive
+    name      string
+    directory string
 }
 
-func CreateBand(a *Archive) (band *BandWriter, err error) {
+func CreateBand(archive *Archive) (band *BandWriter, err error) {
     // TODO: Write header
     name := firstBandName
-    return &BandWriter{archive: a, name: name}, nil
+    band = &BandWriter{
+        archive:   archive,
+        name:      name,
+        directory: path.Join(archive.Directory(), name),
+    }
+    err = os.Mkdir(band.directory, 0777)
+    if err != nil {
+        return
+    }
+    header := &conserve_proto.BandHead{}
+    err = writeProtoToFile(header,
+        path.Join(band.directory, BandHeadFilename))
+    return
 }
 
 func (b *BandWriter) Name() string {
     return b.name
+}
+
+func (b *BandWriter) Directory() string {
+    return b.directory
 }

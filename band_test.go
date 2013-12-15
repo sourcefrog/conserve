@@ -14,8 +14,9 @@
 package conserve_test
 
 import (
-    "testing"
     "github.com/sourcefrog/conserve"
+    "os"
+    "testing"
 )
 
 func TestCreateBand(t *testing.T) {
@@ -28,4 +29,11 @@ func TestCreateBand(t *testing.T) {
     if band.Name() != "0000" {
         t.Errorf("unexpected band name %#v", band.Name())
     }
+
+    headName := band.Directory() + "/" + conserve.BandHeadFilename
+    stat, err := os.Stat(headName)
+    if stat == nil || err != nil {
+        t.Errorf("failed to stat %v: %v", headName, err)
+    }
+    // TODO: Actually unpack and examine
 }
