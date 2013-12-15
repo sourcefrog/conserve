@@ -17,6 +17,8 @@ import (
     "io/ioutil"
     "os"
     "testing"
+
+    "github.com/sourcefrog/conserve/conserve_proto"
 )
 
 func createTestDirectory() (string, error) {
@@ -41,7 +43,8 @@ func createTestArchive(t *testing.T) (archive *Archive, err error) {
 func TestInitArchive(t *testing.T) {
     archive, _ := createTestArchive(t)
 
-    f, err := os.Open(archive.Directory() + "/CONSERVE")
+    archiveHeadFilename := archive.Directory() + "/CONSERVE"
+    f, err := os.Open(archiveHeadFilename)
     if err != nil {
         t.Error("failed to read archive magic: ", err)
         return
@@ -59,6 +62,15 @@ func TestInitArchive(t *testing.T) {
     if got_magic != expected_magic {
         t.Errorf("wrong archive magic: wanted %q got %q",
             expected_magic, got_magic)
+    }
+
+    var headPb = &conserve_proto.ArchiveHead{}
+    err = readProtoFromFile(headPb, archiveHeadFilename)
+    if err != nil {
+        t.Error("failed to parse head proto: %v", err)
+    }
+    if *headPb.Magic != ArchiveMagicString {
+        t.Errorf("bad decoded archive magic: %#v", *headPb.Magic)
     }
 }
 
