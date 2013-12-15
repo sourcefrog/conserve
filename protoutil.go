@@ -19,6 +19,26 @@ import (
     "code.google.com/p/goprotobuf/proto"
 )
 
+func readProtoFromFile(message proto.Message, filename string) (err error) {
+    f, err := os.Open(filename)
+    if err != nil {
+        return
+    }
+    fi, err := f.Stat()
+    if err != nil {
+        return
+    }
+    buf := make([]byte, fi.Size())
+    _, err = f.Read(buf)
+    // NB: This doesn't check that we read the whole file, but probably the
+    // decode will fail in that case.
+    if err != nil {
+        return
+    }
+    err = proto.Unmarshal(buf, message)
+    return
+}
+
 func writeProtoToFile(message proto.Message, filename string) (err error) {
     bytes, err := proto.Marshal(message)
     if err != nil {
