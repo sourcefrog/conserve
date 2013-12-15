@@ -19,18 +19,21 @@ import (
 const (
     // TODO: Generate names numerically so we can store more than one band.
     firstBandName = "0000"
+    BandHeadFilename = "BANDHEAD"
+    BandTailFilename = "BANDTAIL"
 )
 
-type Band struct {
+type BandWriter struct {
     archive *Archive
     name string
 }
 
-func CreateBand(a *Archive) (band *Band, err error) {
+func CreateBand(a *Archive) (band *BandWriter, err error) {
+    // TODO: Write header
     name := firstBandName
-    return &Band{archive: a, name: name}, nil
+    return &BandWriter{archive: a, name: name}, nil
 }
 
-func (b *Band) Name() string {
+func (b *BandWriter) Name() string {
     return b.name
 }
