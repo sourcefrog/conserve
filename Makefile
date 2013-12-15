@@ -1,4 +1,4 @@
-check: cram-tests go-tests
+check: go-tests cram-tests
 
 build:
 	go build ./...
