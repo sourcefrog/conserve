@@ -21,24 +21,29 @@ import (
     "github.com/sourcefrog/conserve"
 )
 
-func testDirectory() (string, error) {
+func createTestDirectory() (string, error) {
     return ioutil.TempDir("", "conserve_test_")
 }
 
-func TestInitArchive(t *testing.T) {
-    testDir, err := testDirectory()
+func createTestArchive(t *testing.T) (archive *conserve.Archive, err error) {
+    testDir, err := createTestDirectory()
     if err != nil {
         t.Error(err.Error())
     }
-    archive, err := conserve.InitArchive(testDir)
+    archive, err = conserve.InitArchive(testDir)
     if err != nil {
         t.Error(err.Error())
     }
     if archive == nil {
         t.Error("nil archive returned")
     }
+    return
+}
 
-    f, err := os.Open(testDir + "/CONSERVE")
+func TestInitArchive(t *testing.T) {
+    archive, _ := createTestArchive(t)
+
+    f, err := os.Open(archive.Directory() + "/CONSERVE")
     if err != nil {
         t.Error("failed to read archive magic: ", err)
         return
@@ -60,21 +65,18 @@ func TestInitArchive(t *testing.T) {
 }
 
 func TestOpenArchive(t *testing.T) {
-    test_dir, err := testDirectory()
-    if err != nil {
-        t.Error(err.Error())
-    }
-    conserve.InitArchive(test_dir)
-    archive2, err := conserve.OpenArchive(test_dir)
+    archive, err := createTestArchive(t)
+    testDir := archive.Directory()
+    archive2, err := conserve.OpenArchive(testDir)
     if archive2 == nil || err != nil {
         t.Errorf("failed to open archive %v: %v",
-            test_dir, err)
+            testDir, err)
     }
 }
 
 func TestOpenNoHeader(t *testing.T) {
-    test_dir, err := testDirectory()
-    archive2, err := conserve.OpenArchive(test_dir)
+    testDir, err := createTestDirectory()
+    archive2, err := conserve.OpenArchive(testDir)
     if archive2 != nil || err == nil {
         t.Errorf("expected failure, was disappointed")
     }

@@ -30,6 +30,10 @@ type Archive struct {
     dir string
 }
 
+func (archive Archive) Directory() string {
+    return archive.dir
+}
+
 func InitArchive(archive_dir string) (archive *Archive, err error) {
     err = os.Mkdir(archive_dir, 0777)
     if os.IsExist(err) {
