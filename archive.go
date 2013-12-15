@@ -14,6 +14,7 @@
 package conserve
 
 import (
+    "log"
     "os"
 
     "code.google.com/p/goprotobuf/proto"
@@ -85,7 +86,7 @@ func OpenArchive(archive_dir string) (archive *Archive, err error) {
     head_name := headName(archive_dir)
     head_file, err := os.Open(head_name)
     if head_file == nil {
-        // TODO: log
+        log.Printf("no header file found in %v, %v", archive_dir, err)
         return
     }
     defer head_file.Close()
