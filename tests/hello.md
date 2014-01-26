@@ -1,9 +1,19 @@
 Everything in Conserve is done through a subcommand to the `conserve` command:
 
     $ conserve
+    conserve - a robust backup program
+    
+    Copyright 2012-2013 Martin Pool
+    Licenced under the GNU General Public Licence, version 2 or later.
+    Conserve comes with ABSOLUTELY NO WARRANTY of any kind.
+    
     Usage:
       conserve [-v] init <dir>
-    [1]
+    
+    Options:
+      --help        Show help.
+      --version     Show version.
+      -v            Be more verbose.
 
 All log output has a prefix which includes the message severity (E=error,
 I=info, etc); the MMDD date; the time; the PID; and the source location.

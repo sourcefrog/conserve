@@ -90,9 +90,6 @@ of installation:
 
     sudo apt-get install --no-install-recommends `cat debian_dependencies`
 
-Conserve (specifically the docopt dependency) needs Go 1.1, which is only in
-Debian Jessie and later.
-
 To run the tests, [cram](https://pypi.python.org/pypi/cram) is needed:
 
     pip install cram

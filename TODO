@@ -1,4 +1,3 @@
-* Maybe move back away from docopt: poor errors; can't handle non-final repeated arguments.
 * Set stamp on archive and band headers.
 
 * Validate names are clean

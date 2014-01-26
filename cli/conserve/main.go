@@ -1,5 +1,5 @@
 // Conserve - robust backup system
-// Copyright 2012-2013 Martin Pool
+// Copyright 2012-2014 Martin Pool
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -14,12 +14,12 @@
 package main
 
 import (
-    "github.com/docopt/docopt.go"
+    "flag"
+    "fmt"
     "github.com/sourcefrog/conserve"
 )
 
-const usage = `
-conserve - a robust backup program
+const usage = `conserve - a robust backup program
 
 Copyright 2012-2013 Martin Pool
 Licenced under the GNU General Public Licence, version 2 or later.
@@ -40,10 +40,12 @@ Options:
 // conserve validate <archive>
 
 func main() {
-    args, _ := docopt.Parse(usage, nil, true,
-        conserve.ConserveVersion, false)
+    flag.Parse()
+    cmd := flag.Arg(0)
 
-    if args["init"].(bool) {
-        conserve.InitArchive(args["<dir>"].(string))
+    if flag.NArg() == 0 {
+        fmt.Print(usage)
+    } else if cmd == "init" {
+        conserve.InitArchive(flag.Arg(1))
     }
 }
