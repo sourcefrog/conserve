@@ -43,5 +43,5 @@ func TestCreateBand(t *testing.T) {
     if head_pb.BandNumber == nil || *head_pb.BandNumber != "0000" {
         t.Errorf("wrong number in band head: %v", head_pb.BandNumber)
     }
-    // TODO: Check the stamp is plausible.
+    CheckStamp(head_pb.Stamp, t)
 }

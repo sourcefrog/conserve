@@ -21,10 +21,14 @@ import (
 func TestMakeStamp(t *testing.T) {
     stamp := MakeStamp()
 
-    CheckStamp(stamp, t)
+    CheckStamp(&stamp, t)
 }
 
-func CheckStamp(stamp conserve_proto.Stamp, t *testing.T) {
+func CheckStamp(stamp *conserve_proto.Stamp, t *testing.T) {
+    if stamp == nil {
+        t.Errorf("stamp is nil")
+        return
+    }
     if *stamp.UnixTime == 0 {
         t.Errorf("unixtime not set")
     }

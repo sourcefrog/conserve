@@ -43,9 +43,10 @@ func CreateBand(archive *Archive) (band *BandWriter, err error) {
     if err != nil {
         return
     }
-    // TODO: Populate stamp in header.
     header := &conserve_proto.BandHead{}
     header.BandNumber = &name
+    stamp := MakeStamp()
+    header.Stamp = &stamp
     err = WriteProtoToFile(header,
         path.Join(band.directory, BandHeadFilename))
     return
