@@ -4,7 +4,7 @@ package conserve.proto;
 // for the sake of tracking timing, audit trail, and identifying or working
 // around software bugs.
 message Stamp {
-    optional int64 unixtime = 1;
+    optional int64 unix_time = 1;
     optional string hostname = 2;
     optional string software_version = 3;
 }

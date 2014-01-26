@@ -95,7 +95,7 @@ func (x *Compression) UnmarshalJSON(data []byte) error {
 }
 
 type Stamp struct {
-	Unixtime         *int64  `protobuf:"varint,1,opt,name=unixtime" json:"unixtime,omitempty"`
+	UnixTime         *int64  `protobuf:"varint,1,opt,name=unix_time" json:"unix_time,omitempty"`
 	Hostname         *string `protobuf:"bytes,2,opt,name=hostname" json:"hostname,omitempty"`
 	SoftwareVersion  *string `protobuf:"bytes,3,opt,name=software_version" json:"software_version,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
@@ -105,9 +105,9 @@ func (m *Stamp) Reset()         { *m = Stamp{} }
 func (m *Stamp) String() string { return proto.CompactTextString(m) }
 func (*Stamp) ProtoMessage()    {}
 
-func (m *Stamp) GetUnixtime() int64 {
-	if m != nil && m.Unixtime != nil {
-		return *m.Unixtime
+func (m *Stamp) GetUnixTime() int64 {
+	if m != nil && m.UnixTime != nil {
+		return *m.UnixTime
 	}
 	return 0
 }
