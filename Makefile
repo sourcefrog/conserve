@@ -1,15 +1,17 @@
 check: go-tests cram-tests
 
-build:
+proto_go = conserve_proto/conserve.pb.go
+
+build: $(proto_go)
 	go build ./...
 
 # No tests in subdirectories yet.
-go-tests:
+go-tests: $(proto_go)
 	go test .
 
 # Building the Go protos needs <http://code.google.com/p/goprotobuf/>
-proto/conserve.pb.go: proto/conserve.proto
-	protoc --go_out=. proto/conserve.proto
+$(proto_go): conserve_proto/conserve.proto
+	protoc --go_out=. conserve_proto/conserve.proto
 
 go-install:
 	go install ./cli/conserve
