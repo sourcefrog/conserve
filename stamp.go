@@ -19,12 +19,13 @@ import (
     "time"
 )
 
-func MakeStamp() (stamp conserve_proto.Stamp) {
+func MakeStamp() *conserve_proto.Stamp {
+    var stamp conserve_proto.Stamp
     stamp.UnixTime = new(int64)
     *stamp.UnixTime = time.Now().Unix()
     hostname, _ := os.Hostname()
     stamp.Hostname = &hostname
     version := ConserveVersion
     stamp.SoftwareVersion = &version
-    return
+    return &stamp
 }

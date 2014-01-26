@@ -21,7 +21,7 @@ import (
 func TestMakeStamp(t *testing.T) {
     stamp := MakeStamp()
 
-    CheckStamp(&stamp, t)
+    CheckStamp(stamp, t)
 }
 
 func CheckStamp(stamp *conserve_proto.Stamp, t *testing.T) {
