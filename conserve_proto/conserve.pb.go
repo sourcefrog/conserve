@@ -128,7 +128,6 @@ func (m *Stamp) GetSoftwareVersion() string {
 
 type ArchiveHead struct {
 	Magic            *string `protobuf:"bytes,1,req,name=magic" json:"magic,omitempty"`
-	Stamp            *Stamp  `protobuf:"bytes,4,opt,name=stamp" json:"stamp,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -141,13 +140,6 @@ func (m *ArchiveHead) GetMagic() string {
 		return *m.Magic
 	}
 	return ""
-}
-
-func (m *ArchiveHead) GetStamp() *Stamp {
-	if m != nil {
-		return m.Stamp
-	}
-	return nil
 }
 
 type BandHead struct {

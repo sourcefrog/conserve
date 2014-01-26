@@ -59,7 +59,6 @@ func headName(archive_dir string) string {
 func writeArchiveHeader(archive_dir string) (err error) {
     header := &conserve_proto.ArchiveHead{
         Magic: proto.String(ArchiveMagicString),
-        // TODO: set stamp
     }
     err = WriteProtoToFile(header, headName(archive_dir))
     return

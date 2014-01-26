@@ -13,8 +13,6 @@ message Stamp {
 message ArchiveHead {
     // Literal "conserve backup archive"
     required string magic = 1;
-
-    optional Stamp stamp = 4;
 }
 
 enum FileType {
