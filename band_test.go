@@ -1,5 +1,5 @@
 // Conserve - robust backup system
-// Copyright 2012-2013 Martin Pool
+// Copyright 2012-2014 Martin Pool
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -14,6 +14,7 @@
 package conserve
 
 import (
+    "github.com/sourcefrog/conserve/conserve_proto"
     "os"
     "testing"
 )
@@ -34,5 +35,13 @@ func TestCreateBand(t *testing.T) {
     if stat == nil || err != nil {
         t.Errorf("failed to stat %v: %v", headName, err)
     }
-    // TODO: Actually unpack and examine
+    var head_pb conserve_proto.BandHead
+    err = ReadProtoFromFile(&head_pb, headName)
+    if err != nil {
+        t.Errorf("failed to parse band head: %v", err)
+    }
+    if head_pb.BandNumber == nil || *head_pb.BandNumber != "0000" {
+        t.Errorf("wrong number in band head: %v", head_pb.BandNumber)
+    }
+    // TODO: Check the stamp is plausible.
 }
