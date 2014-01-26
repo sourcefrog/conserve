@@ -14,7 +14,6 @@
 package conserve
 
 import (
-    "log"
     "os"
 
     "code.google.com/p/goprotobuf/proto"
@@ -62,7 +61,7 @@ func writeArchiveHeader(archive_dir string) (err error) {
         Magic: proto.String(ArchiveMagicString),
         // TODO: set stamp
     }
-    err = writeProtoToFile(header, headName(archive_dir))
+    err = WriteProtoToFile(header, headName(archive_dir))
     return
 }
 
@@ -70,7 +69,6 @@ func OpenArchive(archive_dir string) (archive *Archive, err error) {
     head_name := headName(archive_dir)
     head_file, err := os.Open(head_name)
     if head_file == nil {
-        log.Printf("no header file found in %v, %v", archive_dir, err)
         return
     }
     defer head_file.Close()

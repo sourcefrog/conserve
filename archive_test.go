@@ -65,7 +65,7 @@ func TestInitArchive(t *testing.T) {
     }
 
     var headPb = &conserve_proto.ArchiveHead{}
-    err = readProtoFromFile(headPb, archiveHeadFilename)
+    err = ReadProtoFromFile(headPb, archiveHeadFilename)
     if err != nil {
         t.Error("failed to parse head proto: %v", err)
     }

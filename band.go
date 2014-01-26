@@ -21,7 +21,7 @@ import (
 
 const (
     // TODO: Generate names numerically so we can store more than one band.
-    firstBandName    = "0000"
+    firstBandNumber  = "0000"
     BandHeadFilename = "BANDHEAD"
     BandTailFilename = "BANDTAIL"
 )
@@ -33,8 +33,7 @@ type BandWriter struct {
 }
 
 func CreateBand(archive *Archive) (band *BandWriter, err error) {
-    // TODO: Write header
-    name := firstBandName
+    name := firstBandNumber
     band = &BandWriter{
         archive:   archive,
         name:      name,
@@ -44,8 +43,10 @@ func CreateBand(archive *Archive) (band *BandWriter, err error) {
     if err != nil {
         return
     }
+    // TODO: Populate stamp in header.
     header := &conserve_proto.BandHead{}
-    err = writeProtoToFile(header,
+    header.BandNumber = &name
+    err = WriteProtoToFile(header,
         path.Join(band.directory, BandHeadFilename))
     return
 }

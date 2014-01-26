@@ -19,7 +19,7 @@ import (
     "code.google.com/p/goprotobuf/proto"
 )
 
-func readProtoFromFile(message proto.Message, filename string) (err error) {
+func ReadProtoFromFile(message proto.Message, filename string) (err error) {
     f, err := os.Open(filename)
     if err != nil {
         return
@@ -39,7 +39,7 @@ func readProtoFromFile(message proto.Message, filename string) (err error) {
     return
 }
 
-func writeProtoToFile(message proto.Message, filename string) (err error) {
+func WriteProtoToFile(message proto.Message, filename string) (err error) {
     bytes, err := proto.Marshal(message)
     if err != nil {
         return

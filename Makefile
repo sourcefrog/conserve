@@ -3,8 +3,9 @@ check: go-tests cram-tests
 build:
 	go build ./...
 
+# No tests in subdirectories yet.
 go-tests:
-	go test ./...
+	go test .
 
 # Building the Go protos needs <http://code.google.com/p/goprotobuf/>
 proto/conserve.pb.go: proto/conserve.proto
