@@ -1,14 +1,9 @@
-libprotobuf-dev
-clang
-protobuf-compiler
+golang-go
 make
-libgoogle-glog-dev
-libssl-dev
 automake
 autoconf
 asciidoc
-libboost-filesystem-dev
-libbz2-dev
 libxml2-utils
 docbook-xml
 xsltproc
+golang-goprotobuf-dev
