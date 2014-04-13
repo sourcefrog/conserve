@@ -40,4 +40,6 @@ func TestAddFiles(t *testing.T) {
     if err != nil {
         t.Fail()
     }
+
+    // TODO: Test reading content back.
 }
