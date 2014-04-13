@@ -21,7 +21,7 @@ import (
 
 func TestAddFiles(t *testing.T) {
     archive, err := createTestArchive(t)
-    band, err := CreateBand(archive)
+    band, err := StartBand(archive)
     if band == nil || err != nil {
         t.Errorf("failed to create band: %v", err)
         return

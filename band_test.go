@@ -19,9 +19,9 @@ import (
     "testing"
 )
 
-func TestCreateEmptyBand(t *testing.T) {
+func TestEmptyBand(t *testing.T) {
     archive, err := createTestArchive(t)
-    band, err := CreateBand(archive)
+    band, err := StartBand(archive)
     if band == nil || err != nil {
         t.Errorf("failed to create band: %v", err)
         return
@@ -55,7 +55,7 @@ func TestCreateEmptyBand(t *testing.T) {
     }
 
     // Now close it and look for the footer
-    band.Close()
+    band.Finish()
     err = ReadProtoFromFile(&tail_pb, tailName)
     if err != nil {
         t.Errorf("failed to parse band tail: %v", err)

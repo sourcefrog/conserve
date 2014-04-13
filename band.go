@@ -33,7 +33,7 @@ type BandWriter struct {
     blockCount int32
 }
 
-func CreateBand(archive *Archive) (band *BandWriter, err error) {
+func StartBand(archive *Archive) (band *BandWriter, err error) {
     bandNumber := firstBandNumber
     band = &BandWriter{
         archive:    archive,
@@ -61,7 +61,7 @@ func (b *BandWriter) Directory() string {
     return b.directory
 }
 
-func (b *BandWriter) Close() (err error) {
+func (b *BandWriter) Finish() (err error) {
     tail_pb := &conserve_proto.BandTail{
         BandNumber: &b.bandNumber,
         Stamp:      MakeStamp(),
