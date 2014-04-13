@@ -74,5 +74,3 @@ func (b *BandWriter) Finish() (err error) {
 }
 
 // TODO: Open Band for read; scan through all blocks until done.
-
-// TODO: Finish band and write footer.
