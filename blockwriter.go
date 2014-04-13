@@ -24,10 +24,12 @@ type BlockWriter struct {
     dataFile    *os.File
     directory   string
     blockNumber string
+    finished    bool
 }
 
 func StartBlock(bandw *BandWriter) (blkw *BlockWriter, err error) {
     // TODO: Increment numbers
+    AssertNotFinished(bandw.Finished())
     blockNumber := "0000000"
     blockBaseName := path.Join(bandw.Directory(), "d"+blockNumber)
     dataFile, err := os.OpenFile(
@@ -51,6 +53,8 @@ func StartBlock(bandw *BandWriter) (blkw *BlockWriter, err error) {
 func (blkw *BlockWriter) AddFile(sourceFile *os.File) (err error) {
     // Add to index
     // TODO: Trim off some of the name depending on the base directory.
+    AssertNotFinished(blkw.finished)
+
     fileType := conserve_proto.FileType_REGULAR
     newFileIndex := conserve_proto.FileIndex{
         FileType: &fileType,
@@ -76,6 +80,7 @@ func (blkw *BlockWriter) AddFile(sourceFile *os.File) (err error) {
 }
 
 func (blkw *BlockWriter) Finish() (err error) {
+    blkw.finished = true
     indexFileName := path.Join(blkw.directory, "a"+blkw.blockNumber)
     blkw.blockIndex.Stamp = MakeStamp()
     err = WriteProtoToFile(

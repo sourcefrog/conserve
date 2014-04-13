@@ -31,6 +31,7 @@ type BandWriter struct {
     bandNumber string
     directory  string
     blockCount int32
+    finished   bool
 }
 
 func StartBand(archive *Archive) (band *BandWriter, err error) {
@@ -53,6 +54,10 @@ func StartBand(archive *Archive) (band *BandWriter, err error) {
     return
 }
 
+func (b *BandWriter) Finished() bool {
+    return b.finished
+}
+
 func (b *BandWriter) BandNumber() string {
     return b.bandNumber
 }
@@ -62,6 +67,7 @@ func (b *BandWriter) Directory() string {
 }
 
 func (b *BandWriter) Finish() (err error) {
+    b.finished = true
     tail_pb := &conserve_proto.BandTail{
         BandNumber: &b.bandNumber,
         Stamp:      MakeStamp(),
