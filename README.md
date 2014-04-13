@@ -3,7 +3,7 @@ Conserve - a robust backup program
 
 **At this time Conserve is not ready for production use.**
 
-Copyright 2012-2013 [Martin Pool][1], mbp@sourcefrog.net.
+Copyright 2012-2014 [Martin Pool][1], mbp@sourcefrog.net.
 
 _This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
