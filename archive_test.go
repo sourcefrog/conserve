@@ -67,7 +67,7 @@ func TestInitArchive(t *testing.T) {
     var headPb = &conserve_proto.ArchiveHead{}
     err = ReadProtoFromFile(headPb, archiveHeadFilename)
     if err != nil {
-        t.Error("failed to parse head proto: %v", err)
+        t.Errorf("failed to parse head proto: %v", err)
     }
     if *headPb.Magic != ArchiveMagicString {
         t.Errorf("bad decoded archive magic: %#v", *headPb.Magic)
