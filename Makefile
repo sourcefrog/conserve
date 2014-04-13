@@ -17,17 +17,6 @@ go-install:
 	go install ./cli/conserve
 
 
-# TODO: How to cleanly install?
-
-check-staged:
-	t=`mktemp -d` && \
-	echo check-staged in "$$t" && \
-	git checkout-index --prefix "$$t/" -a && \
-	cd "$$t" && \
-	make distcheck -j8 && \
-	$(MAKE) $(MAKEFLAGS) check -j8 && \
-	rm -r "$$t"
-
 CRAM_OPTIONS = --indent=4 -v
 
 # TODO: surely a better way to get the binary path?
