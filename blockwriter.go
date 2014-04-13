@@ -62,12 +62,12 @@ func (blkw *BlockWriter) AddFile(sourceFile *os.File) (err error) {
     sourceFile.Seek(0, os.SEEK_SET)
     // TODO: Copy everything.
     // TODO: Accumulate hash as we go.
-    buf := make([]byte, 0, 60000)
-    _, err = sourceFile.Read(buf)
+    buf := make([]byte, 60000)
+    bytesRead, err := sourceFile.Read(buf)
     if err != nil {
         return
     }
-    _, err = blkw.dataFile.Write(buf)
+    _, err = blkw.dataFile.Write(buf[:bytesRead])
     if err != nil {
         return
     }
