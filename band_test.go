@@ -19,15 +19,16 @@ import (
     "testing"
 )
 
-func TestCreateBand(t *testing.T) {
+func TestCreateEmptyBand(t *testing.T) {
     archive, err := createTestArchive(t)
     band, err := CreateBand(archive)
     if band == nil || err != nil {
         t.Errorf("failed to create band: %v", err)
         return
     }
-    if band.Name() != "0000" {
-        t.Errorf("unexpected band name %#v", band.Name())
+    number := band.BandNumber()
+    if number != "0000" {
+        t.Errorf("unexpected band name %#v", number)
     }
 
     headName := band.Directory() + "/" + BandHeadFilename
@@ -44,4 +45,26 @@ func TestCreateBand(t *testing.T) {
         t.Errorf("wrong number in band head: %v", head_pb.BandNumber)
     }
     CheckStamp(head_pb.Stamp, t)
+
+    // Check no tail yet.
+    tailName := band.Directory() + "/" + BandTailFilename
+    var tail_pb conserve_proto.BandTail
+    err = ReadProtoFromFile(&tail_pb, tailName)
+    if !os.IsNotExist(err) {
+        t.Error("tail seems to exist before band is closed")
+    }
+
+    // Now close it and look for the footer
+    band.Close()
+    err = ReadProtoFromFile(&tail_pb, tailName)
+    if err != nil {
+        t.Errorf("failed to parse band tail: %v", err)
+    }
+    if *tail_pb.BlockCount != 0 {
+        t.Fail()
+    }
+    if *tail_pb.BandNumber != "0000" {
+        t.Fail()
+    }
+    CheckStamp(tail_pb.Stamp, t)
 }

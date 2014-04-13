@@ -27,34 +27,52 @@ const (
 )
 
 type BandWriter struct {
-    archive   *Archive
-    name      string
-    directory string
+    archive    *Archive
+    bandNumber string
+    directory  string
+    blockCount int32
 }
 
 func CreateBand(archive *Archive) (band *BandWriter, err error) {
-    name := firstBandNumber
+    bandNumber := firstBandNumber
     band = &BandWriter{
-        archive:   archive,
-        name:      name,
-        directory: path.Join(archive.Directory(), name),
+        archive:    archive,
+        bandNumber: bandNumber,
+        directory:  path.Join(archive.Directory(), bandNumber),
     }
     err = os.Mkdir(band.directory, 0777)
     if err != nil {
         return
     }
     header := &conserve_proto.BandHead{}
-    header.BandNumber = &name
+    header.BandNumber = &bandNumber
     header.Stamp = MakeStamp()
     err = WriteProtoToFile(header,
         path.Join(band.directory, BandHeadFilename))
+
     return
 }
 
-func (b *BandWriter) Name() string {
-    return b.name
+func (b *BandWriter) BandNumber() string {
+    return b.bandNumber
 }
 
 func (b *BandWriter) Directory() string {
     return b.directory
 }
+
+func (b *BandWriter) Close() (err error) {
+    tail_pb := &conserve_proto.BandTail{
+        BandNumber: &b.bandNumber,
+        Stamp:      MakeStamp(),
+        BlockCount: &b.blockCount,
+    }
+    err = WriteProtoToFile(tail_pb,
+        path.Join(b.directory, BandTailFilename))
+
+    return
+}
+
+// TODO: Open Band for read; scan through all blocks until done.
+
+// TODO: Finish band and write footer.
