@@ -8,7 +8,8 @@ Everything in Conserve is done through a subcommand to the `conserve` command:
     Conserve comes with ABSOLUTELY NO WARRANTY of any kind.
     
     Usage:
-      conserve [-v] init <dir>
+      conserve init DIR
+      conserve backup ARCHIVE FILE...
     
     Options:
       --help        Show help.

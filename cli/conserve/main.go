@@ -17,6 +17,7 @@ import (
     "flag"
     "fmt"
     "github.com/sourcefrog/conserve"
+    "log"
 )
 
 const usage = `conserve - a robust backup program
@@ -26,7 +27,8 @@ Licenced under the GNU General Public Licence, version 2 or later.
 Conserve comes with ABSOLUTELY NO WARRANTY of any kind.
 
 Usage:
-  conserve [-v] init <dir>
+  conserve init DIR
+  conserve backup ARCHIVE FILE...
 
 Options:
   --help        Show help.
@@ -47,5 +49,14 @@ func main() {
         fmt.Print(usage)
     } else if cmd == "init" {
         conserve.InitArchive(flag.Arg(1))
+    } else if cmd == "backup" {
+        archive, err := conserve.OpenArchive(flag.Arg(1))
+        if err != nil {
+            log.Fatal(err)
+        }
+        err = conserve.Backup(archive, flag.Args()[2:])
+        if err != nil {
+            log.Fatal(err)
+        }
     }
 }
