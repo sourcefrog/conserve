@@ -53,20 +53,12 @@ message BandTail {
 }
 
 
-// A file path, as a sequence of components.  To make a unix relative path
-// they can joined up with slashes.
-
-message Path {
-    // This is generally UTF-8, and compared as UTF-8, but stored as bytes
-    // so it can cope with anomalously named files.
-    repeated bytes part = 1;
-}
-
-
 // One FileIndex per file version.
 message FileIndex {
     // Relative path from source directory.  Required for all current files.
-    optional Path path = 1;
+    // This is generally UTF-8, and compared as UTF-8, but stored as bytes
+    // so it can cope with anomalously named files.
+    optional bytes path = 1;
 
     // Type of file; unspecified means a plain file.
     optional FileType file_type = 2;

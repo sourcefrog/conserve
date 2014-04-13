@@ -198,24 +198,8 @@ func (m *BandTail) GetBlockCount() int32 {
 	return 0
 }
 
-type Path struct {
-	Part             [][]byte `protobuf:"bytes,1,rep,name=part" json:"part,omitempty"`
-	XXX_unrecognized []byte   `json:"-"`
-}
-
-func (m *Path) Reset()         { *m = Path{} }
-func (m *Path) String() string { return proto.CompactTextString(m) }
-func (*Path) ProtoMessage()    {}
-
-func (m *Path) GetPart() [][]byte {
-	if m != nil {
-		return m.Part
-	}
-	return nil
-}
-
 type FileIndex struct {
-	Path             *Path     `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
+	Path             []byte    `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
 	FileType         *FileType `protobuf:"varint,2,opt,name=file_type,enum=conserve.proto.FileType" json:"file_type,omitempty"`
 	DataSha1         []byte    `protobuf:"bytes,3,opt,name=data_sha1" json:"data_sha1,omitempty"`
 	DataLength       *int64    `protobuf:"varint,4,opt,name=data_length" json:"data_length,omitempty"`
@@ -226,7 +210,7 @@ func (m *FileIndex) Reset()         { *m = FileIndex{} }
 func (m *FileIndex) String() string { return proto.CompactTextString(m) }
 func (*FileIndex) ProtoMessage()    {}
 
-func (m *FileIndex) GetPath() *Path {
+func (m *FileIndex) GetPath() []byte {
 	if m != nil {
 		return m.Path
 	}
