@@ -16,9 +16,6 @@ Everything in Conserve is done through a subcommand to the `conserve` command:
       --version     Show version.
       -v            Be more verbose.
 
-All log output has a prefix which includes the message severity (E=error,
-I=info, etc); the MMDD date; the time; the PID; and the source location.
-
 To create an archive:
 
     $ conserve init a
