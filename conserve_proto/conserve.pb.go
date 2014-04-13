@@ -16,89 +16,89 @@ var _ = math.Inf
 type FileType int32
 
 const (
-	FileType_REGULAR   FileType = 0
-	FileType_UNKNOWN   FileType = 1
-	FileType_DIRECTORY FileType = 2
-	FileType_SYMLINK   FileType = 3
+    FileType_REGULAR   FileType = 0
+    FileType_UNKNOWN   FileType = 1
+    FileType_DIRECTORY FileType = 2
+    FileType_SYMLINK   FileType = 3
 )
 
 var FileType_name = map[int32]string{
-	0: "REGULAR",
-	1: "UNKNOWN",
-	2: "DIRECTORY",
-	3: "SYMLINK",
+    0:  "REGULAR",
+    1:  "UNKNOWN",
+    2:  "DIRECTORY",
+    3:  "SYMLINK",
 }
 var FileType_value = map[string]int32{
-	"REGULAR":   0,
-	"UNKNOWN":   1,
-	"DIRECTORY": 2,
-	"SYMLINK":   3,
+    "REGULAR":   0,
+    "UNKNOWN":   1,
+    "DIRECTORY": 2,
+    "SYMLINK":   3,
 }
 
 func (x FileType) Enum() *FileType {
-	p := new(FileType)
-	*p = x
-	return p
+    p := new(FileType)
+    *p = x
+    return p
 }
 func (x FileType) String() string {
-	return proto.EnumName(FileType_name, int32(x))
+    return proto.EnumName(FileType_name, int32(x))
 }
 func (x FileType) MarshalJSON() ([]byte, error) {
-	return json.Marshal(x.String())
+    return json.Marshal(x.String())
 }
 func (x *FileType) UnmarshalJSON(data []byte) error {
-	value, err := proto.UnmarshalJSONEnum(FileType_value, data, "FileType")
-	if err != nil {
-		return err
-	}
-	*x = FileType(value)
-	return nil
+    value, err := proto.UnmarshalJSONEnum(FileType_value, data, "FileType")
+    if err != nil {
+        return err
+    }
+    *x = FileType(value)
+    return nil
 }
 
 type Compression int32
 
 const (
-	Compression_NONE  Compression = 0
-	Compression_GZIP  Compression = 1
-	Compression_BZIP2 Compression = 2
+    Compression_NONE  Compression = 0
+    Compression_GZIP  Compression = 1
+    Compression_BZIP2 Compression = 2
 )
 
 var Compression_name = map[int32]string{
-	0: "NONE",
-	1: "GZIP",
-	2: "BZIP2",
+    0:  "NONE",
+    1:  "GZIP",
+    2:  "BZIP2",
 }
 var Compression_value = map[string]int32{
-	"NONE":  0,
-	"GZIP":  1,
-	"BZIP2": 2,
+    "NONE":  0,
+    "GZIP":  1,
+    "BZIP2": 2,
 }
 
 func (x Compression) Enum() *Compression {
-	p := new(Compression)
-	*p = x
-	return p
+    p := new(Compression)
+    *p = x
+    return p
 }
 func (x Compression) String() string {
-	return proto.EnumName(Compression_name, int32(x))
+    return proto.EnumName(Compression_name, int32(x))
 }
 func (x Compression) MarshalJSON() ([]byte, error) {
-	return json.Marshal(x.String())
+    return json.Marshal(x.String())
 }
 func (x *Compression) UnmarshalJSON(data []byte) error {
-	value, err := proto.UnmarshalJSONEnum(Compression_value, data, "Compression")
-	if err != nil {
-		return err
-	}
-	*x = Compression(value)
-	return nil
+    value, err := proto.UnmarshalJSONEnum(Compression_value, data, "Compression")
+    if err != nil {
+        return err
+    }
+    *x = Compression(value)
+    return nil
 }
 
 type Stamp struct {
-	UnixTime         *int64  `protobuf:"varint,1,opt,name=unix_time" json:"unix_time,omitempty"`
-	Hostname         *string `protobuf:"bytes,2,opt,name=hostname" json:"hostname,omitempty"`
-	SoftwareVersion  *string `protobuf:"bytes,3,opt,name=software_version" json:"software_version,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+    UnixTime         *int64  `protobuf:"varint,1,opt,name=unix_time" json:"unix_time,omitempty"`
+    Hostname         *string `protobuf:"bytes,2,opt,name=hostname" json:"hostname,omitempty"`
+    SoftwareVersion  *string `protobuf:"bytes,3,opt,name=software_version" json:"software_version,omitempty"`
+    XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *Stamp) Reset()         { *m = Stamp{} }
@@ -106,29 +106,29 @@ func (m *Stamp) String() string { return proto.CompactTextString(m) }
 func (*Stamp) ProtoMessage()    {}
 
 func (m *Stamp) GetUnixTime() int64 {
-	if m != nil && m.UnixTime != nil {
-		return *m.UnixTime
-	}
-	return 0
+    if m != nil && m.UnixTime != nil {
+        return *m.UnixTime
+    }
+    return 0
 }
 
 func (m *Stamp) GetHostname() string {
-	if m != nil && m.Hostname != nil {
-		return *m.Hostname
-	}
-	return ""
+    if m != nil && m.Hostname != nil {
+        return *m.Hostname
+    }
+    return ""
 }
 
 func (m *Stamp) GetSoftwareVersion() string {
-	if m != nil && m.SoftwareVersion != nil {
-		return *m.SoftwareVersion
-	}
-	return ""
+    if m != nil && m.SoftwareVersion != nil {
+        return *m.SoftwareVersion
+    }
+    return ""
 }
 
 type ArchiveHead struct {
-	Magic            *string `protobuf:"bytes,1,req,name=magic" json:"magic,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+    Magic            *string `protobuf:"bytes,1,req,name=magic" json:"magic,omitempty"`
+    XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *ArchiveHead) Reset()         { *m = ArchiveHead{} }
@@ -136,16 +136,16 @@ func (m *ArchiveHead) String() string { return proto.CompactTextString(m) }
 func (*ArchiveHead) ProtoMessage()    {}
 
 func (m *ArchiveHead) GetMagic() string {
-	if m != nil && m.Magic != nil {
-		return *m.Magic
-	}
-	return ""
+    if m != nil && m.Magic != nil {
+        return *m.Magic
+    }
+    return ""
 }
 
 type BandHead struct {
-	BandNumber       *string `protobuf:"bytes,1,opt,name=band_number" json:"band_number,omitempty"`
-	Stamp            *Stamp  `protobuf:"bytes,2,opt,name=stamp" json:"stamp,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+    BandNumber       *string `protobuf:"bytes,1,opt,name=band_number" json:"band_number,omitempty"`
+    Stamp            *Stamp  `protobuf:"bytes,2,opt,name=stamp" json:"stamp,omitempty"`
+    XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *BandHead) Reset()         { *m = BandHead{} }
@@ -153,24 +153,24 @@ func (m *BandHead) String() string { return proto.CompactTextString(m) }
 func (*BandHead) ProtoMessage()    {}
 
 func (m *BandHead) GetBandNumber() string {
-	if m != nil && m.BandNumber != nil {
-		return *m.BandNumber
-	}
-	return ""
+    if m != nil && m.BandNumber != nil {
+        return *m.BandNumber
+    }
+    return ""
 }
 
 func (m *BandHead) GetStamp() *Stamp {
-	if m != nil {
-		return m.Stamp
-	}
-	return nil
+    if m != nil {
+        return m.Stamp
+    }
+    return nil
 }
 
 type BandTail struct {
-	BandNumber       *string `protobuf:"bytes,1,opt,name=band_number" json:"band_number,omitempty"`
-	Stamp            *Stamp  `protobuf:"bytes,2,opt,name=stamp" json:"stamp,omitempty"`
-	BlockCount       *int32  `protobuf:"varint,4,opt,name=block_count" json:"block_count,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+    BandNumber       *string `protobuf:"bytes,1,opt,name=band_number" json:"band_number,omitempty"`
+    Stamp            *Stamp  `protobuf:"bytes,2,opt,name=stamp" json:"stamp,omitempty"`
+    BlockCount       *int32  `protobuf:"varint,4,opt,name=block_count" json:"block_count,omitempty"`
+    XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *BandTail) Reset()         { *m = BandTail{} }
@@ -178,32 +178,32 @@ func (m *BandTail) String() string { return proto.CompactTextString(m) }
 func (*BandTail) ProtoMessage()    {}
 
 func (m *BandTail) GetBandNumber() string {
-	if m != nil && m.BandNumber != nil {
-		return *m.BandNumber
-	}
-	return ""
+    if m != nil && m.BandNumber != nil {
+        return *m.BandNumber
+    }
+    return ""
 }
 
 func (m *BandTail) GetStamp() *Stamp {
-	if m != nil {
-		return m.Stamp
-	}
-	return nil
+    if m != nil {
+        return m.Stamp
+    }
+    return nil
 }
 
 func (m *BandTail) GetBlockCount() int32 {
-	if m != nil && m.BlockCount != nil {
-		return *m.BlockCount
-	}
-	return 0
+    if m != nil && m.BlockCount != nil {
+        return *m.BlockCount
+    }
+    return 0
 }
 
 type FileIndex struct {
-	Path             []byte    `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
-	FileType         *FileType `protobuf:"varint,2,opt,name=file_type,enum=conserve.proto.FileType" json:"file_type,omitempty"`
-	DataSha1         []byte    `protobuf:"bytes,3,opt,name=data_sha1" json:"data_sha1,omitempty"`
-	DataLength       *int64    `protobuf:"varint,4,opt,name=data_length" json:"data_length,omitempty"`
-	XXX_unrecognized []byte    `json:"-"`
+    Path             []byte    `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
+    FileType         *FileType `protobuf:"varint,2,opt,name=file_type,enum=conserve.proto.FileType" json:"file_type,omitempty"`
+    DataSha1         []byte    `protobuf:"bytes,3,opt,name=data_sha1" json:"data_sha1,omitempty"`
+    DataLength       *int64    `protobuf:"varint,4,opt,name=data_length" json:"data_length,omitempty"`
+    XXX_unrecognized []byte    `json:"-"`
 }
 
 func (m *FileIndex) Reset()         { *m = FileIndex{} }
@@ -211,40 +211,40 @@ func (m *FileIndex) String() string { return proto.CompactTextString(m) }
 func (*FileIndex) ProtoMessage()    {}
 
 func (m *FileIndex) GetPath() []byte {
-	if m != nil {
-		return m.Path
-	}
-	return nil
+    if m != nil {
+        return m.Path
+    }
+    return nil
 }
 
 func (m *FileIndex) GetFileType() FileType {
-	if m != nil && m.FileType != nil {
-		return *m.FileType
-	}
-	return 0
+    if m != nil && m.FileType != nil {
+        return *m.FileType
+    }
+    return 0
 }
 
 func (m *FileIndex) GetDataSha1() []byte {
-	if m != nil {
-		return m.DataSha1
-	}
-	return nil
+    if m != nil {
+        return m.DataSha1
+    }
+    return nil
 }
 
 func (m *FileIndex) GetDataLength() int64 {
-	if m != nil && m.DataLength != nil {
-		return *m.DataLength
-	}
-	return 0
+    if m != nil && m.DataLength != nil {
+        return *m.DataLength
+    }
+    return 0
 }
 
 type BlockIndex struct {
-	File             []*FileIndex `protobuf:"bytes,1,rep,name=file" json:"file,omitempty"`
-	DataSha1         []byte       `protobuf:"bytes,2,opt,name=data_sha1" json:"data_sha1,omitempty"`
-	DataLength       *int64       `protobuf:"varint,3,opt,name=data_length" json:"data_length,omitempty"`
-	Stamp            *Stamp       `protobuf:"bytes,4,opt,name=stamp" json:"stamp,omitempty"`
-	Compression      *Compression `protobuf:"varint,5,opt,name=compression,enum=conserve.proto.Compression" json:"compression,omitempty"`
-	XXX_unrecognized []byte       `json:"-"`
+    File             []*FileIndex `protobuf:"bytes,1,rep,name=file" json:"file,omitempty"`
+    DataSha1         []byte       `protobuf:"bytes,2,opt,name=data_sha1" json:"data_sha1,omitempty"`
+    DataLength       *int64       `protobuf:"varint,3,opt,name=data_length" json:"data_length,omitempty"`
+    Stamp            *Stamp       `protobuf:"bytes,4,opt,name=stamp" json:"stamp,omitempty"`
+    Compression      *Compression `protobuf:"varint,5,opt,name=compression,enum=conserve.proto.Compression" json:"compression,omitempty"`
+    XXX_unrecognized []byte       `json:"-"`
 }
 
 func (m *BlockIndex) Reset()         { *m = BlockIndex{} }
@@ -252,41 +252,41 @@ func (m *BlockIndex) String() string { return proto.CompactTextString(m) }
 func (*BlockIndex) ProtoMessage()    {}
 
 func (m *BlockIndex) GetFile() []*FileIndex {
-	if m != nil {
-		return m.File
-	}
-	return nil
+    if m != nil {
+        return m.File
+    }
+    return nil
 }
 
 func (m *BlockIndex) GetDataSha1() []byte {
-	if m != nil {
-		return m.DataSha1
-	}
-	return nil
+    if m != nil {
+        return m.DataSha1
+    }
+    return nil
 }
 
 func (m *BlockIndex) GetDataLength() int64 {
-	if m != nil && m.DataLength != nil {
-		return *m.DataLength
-	}
-	return 0
+    if m != nil && m.DataLength != nil {
+        return *m.DataLength
+    }
+    return 0
 }
 
 func (m *BlockIndex) GetStamp() *Stamp {
-	if m != nil {
-		return m.Stamp
-	}
-	return nil
+    if m != nil {
+        return m.Stamp
+    }
+    return nil
 }
 
 func (m *BlockIndex) GetCompression() Compression {
-	if m != nil && m.Compression != nil {
-		return *m.Compression
-	}
-	return 0
+    if m != nil && m.Compression != nil {
+        return *m.Compression
+    }
+    return 0
 }
 
 func init() {
-	proto.RegisterEnum("conserve.proto.FileType", FileType_name, FileType_value)
-	proto.RegisterEnum("conserve.proto.Compression", Compression_name, Compression_value)
+    proto.RegisterEnum("conserve.proto.FileType", FileType_name, FileType_value)
+    proto.RegisterEnum("conserve.proto.Compression", Compression_name, Compression_value)
 }
