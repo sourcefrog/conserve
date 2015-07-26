@@ -1,11 +1,5 @@
-language: go
-go:
-  - 1.0
-  - 1.1
-  - 1.2
-before_install:
-  - sudo apt-get update -qq
-install: 
-  - sudo apt-get install -qq protobuf-compiler
-  - sudo pip install --use-mirrors cram
-  - go get ./...
+language: rust
+sudo: false
+rust:
+  - stable
+  - beta

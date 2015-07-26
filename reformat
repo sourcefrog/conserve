@@ -1,2 +1,0 @@
-#! /bin/sh -ex
-gofmt -s -w -tabwidth=4 -tabs=false $@

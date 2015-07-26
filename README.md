@@ -3,7 +3,7 @@ Conserve - a robust backup program
 
 **At this time Conserve is not ready for production use.**
 
-Copyright 2012-2014 [Martin Pool][1], mbp@sourcefrog.net.
+Copyright 2012-2015 [Martin Pool][1], mbp@sourcefrog.net.
 
 _This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -17,17 +17,19 @@ GNU General Public License for more details._
 
 Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
-[![Build Status](https://travis-ci.org/sourcefrog/conserve.png?branch=golang)](https://travis-ci.org/sourcefrog/conserve)
+[![Build Status](https://travis-ci.org/sourcefrog/conserve.png?branch=rust)](https://travis-ci.org/sourcefrog/conserve)
 
 Use
 ---
 
+This doesn't work yet:
+
     conserve init /backup/my-source
-    conserve backup ~/src /backup/my-source
+    conserve backup ~/ /backup/my-source
     conserve validate /backup/my-source
     conserve restore /backup/my-source /tmp/source-restore
-    
-For more details see the 
+
+For more details see the
 [`conserve(1)`](https://github.com/sourcefrog/conserve/blob/master/man/conserve.asciidoc)
 man page.
 
@@ -78,7 +80,7 @@ Manifesto
   and history of backup operations.  (If the backup metadata includes
   a timestamp, you can pass in the timestamp to get the same result.)
 
-For a comparison to other backup systems, see 
+For a comparison to other backup systems, see
 <https://github.com/sourcefrog/conserve/wiki/Compared-to-others>.
 
 
