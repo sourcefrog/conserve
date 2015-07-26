@@ -1,0 +1,8 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Conserve
+Upstream-Contact: Martin Pool <mbp@sourcefrog.net>
+Source: https://github.com/sourcefrog/conserve
+
+Files: *
+Copyright: 2012-2013 Martin Pool
+Licence: GPL-2+
