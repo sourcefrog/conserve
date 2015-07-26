@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf} ;
 
 use rustc_serialize::json;
 
+const HEADER_FILENAME: &'static str = "CONSERVE";
 const ARCHIVE_VERSION: &'static str = "0.2.0";
 
 #[derive(Debug)]
@@ -47,7 +48,7 @@ impl Archive {
         let header = ArchiveHeader{
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
-        let header_path = self.dir.join("conserve-archive");
+        let header_path = self.dir.join(HEADER_FILENAME);
         let mut header_file = match File::create(&header_path) {
             Ok(f) => f,
             Err(e) => {
