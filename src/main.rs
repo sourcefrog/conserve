@@ -48,6 +48,7 @@ fn run_init(args: &Args) {
 }
 
 
+#[cfg_attr(test, allow(dead_code))] // https://github.com/rust-lang/rust/issues/12327
 fn main() {
     log::set_logger(|max_log_level| {
         max_log_level.set(LogLevelFilter::Debug);
