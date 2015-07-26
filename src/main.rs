@@ -29,11 +29,8 @@ struct Args {
 }
 
 
-fn run_init(args: &Args) {
-    match conserve::Archive::init(Path::new(&args.arg_dir)) {
-        Ok(archive) => info!("Created archive in {:?}", archive.path()),
-        Err(e) => error!("Failed to create archive: {}", e)
-    }
+fn run_init(args: &Args) -> std::io::Result<()> {
+    conserve::Archive::init(Path::new(&args.arg_dir)).and(Ok(()))
 }
 
 
@@ -50,9 +47,13 @@ fn main() {
         .decode()
         .unwrap_or_else(|e| e.exit());
 
-    if args.cmd_init {
+    let result = if args.cmd_init {
         run_init(&args)
     } else {
-        error!("unknown command?")
+        panic!("unreachable?")
+    };
+
+    if result.is_err() {
+        std::process::exit(1)
     }
 }

@@ -29,7 +29,7 @@ You can ask for help:
 To create an archive:
 
     $ conserve init a
-    Created archive in "a"
+    Created new archive in "a"
 
 This makes a new directory that contains just one file, the `CONSERVE-ARCHIVE`
 header file:

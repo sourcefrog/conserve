@@ -26,22 +26,17 @@ impl Archive {
         let archive = Archive {
             dir: dir.to_path_buf(),
         };
-        match std::fs::create_dir(&archive.dir) {
-            Err(e) => {
-                error!("Failed to create archive directory {:?}: {}",
-                    archive.dir.display(), e);
-                return Err(e);
-            },
-            Ok(_) => (),
-        }
-
-        match archive.write_archive_header() {
-            Err(e) => {
-                error!("Failed to write archive header: {}", e);
-                Err(e)
-            },
-            Ok(_) => Ok(archive),
-        }
+        if let Err(e) = std::fs::create_dir(&archive.dir) {
+            error!("Failed to create archive directory {:?}: {}",
+                archive.dir.display(), e);
+            return Err(e);
+        };
+        if let Err(e) = archive.write_archive_header() {
+            error!("Failed to write archive header: {}", e);
+            return Err(e)
+        };
+        info!("Created new archive in {:?}", dir.display());
+        Ok(archive)
     }
 
     fn write_archive_header(self: &Archive) -> Result<()> {
@@ -59,14 +54,12 @@ impl Archive {
         };
         let header_json = json::encode(&header).unwrap();
         debug!("header json = {}", header_json);
-        match header_file.write_all(header_json.as_bytes()) {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                error!("Couldn't write header file {:?}: {}",
-                    header_path.display(), e);
-                Err(e)
-            }
+        if let Err(e) = header_file.write_all(header_json.as_bytes()) {
+            error!("Couldn't write header file {:?}: {}",
+                header_path.display(), e);
+            return Err(e)
         }
+        Ok(())
     }
 
     pub fn path(self: &Archive) -> &Path {
