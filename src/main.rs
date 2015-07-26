@@ -1,3 +1,5 @@
+// Copyright 2015 Martin Pool.
+
 extern crate conserve;
 extern crate docopt;
 #[macro_use]
@@ -5,6 +7,7 @@ extern crate log;
 extern crate rustc_serialize;
 
 use docopt::Docopt;
+use log::{LogLevelFilter};
 use std::io::{Error};
 use std::path::{Path};
 
@@ -26,23 +29,6 @@ struct Args {
 }
 
 
-use log::{LogRecord, LogLevelFilter, LogMetadata};
-
-struct SimpleLogger;
-
-impl log::Log for SimpleLogger {
-    fn enabled(&self, _metadata: &LogMetadata) -> bool {
-        true
-    }
-
-    fn log(&self, record: &LogRecord) {
-        if self.enabled(record.metadata()) {
-            println!("{} - {}", record.level(), record.args());
-        }
-    }
-}
-
-
 fn run_init(args: &Args) {
     match conserve::Archive::init(Path::new(&args.arg_dir)) {
         Ok(archive) => info!("Created archive in {:?}", archive.path()),
@@ -55,7 +41,7 @@ fn run_init(args: &Args) {
 fn main() {
     log::set_logger(|max_log_level| {
         max_log_level.set(LogLevelFilter::Info);
-        Box::new(SimpleLogger)
+        Box::new(conserve::logger::ConsoleLogger)
     }).ok();
 
     let args: Args = Docopt::new(USAGE).unwrap()

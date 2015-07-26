@@ -8,5 +8,6 @@ extern crate log;
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 mod archive;
+pub mod logger;
 
 pub use archive::Archive;
