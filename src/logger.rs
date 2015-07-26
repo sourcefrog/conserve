@@ -1,6 +1,7 @@
 // Copyright 2015 Martin Pool.
 
 extern crate log;
+extern crate term;
 
 use log::{LogRecord, LogLevel, LogMetadata};
 
@@ -12,14 +13,20 @@ impl log::Log for ConsoleLogger {
     }
 
     fn log(&self, record: &LogRecord) {
-        let level_prefix = match record.metadata().level() {
-            LogLevel::Error => "error: ",
-            LogLevel::Warn => "warning: ",
-            _ => "",
-        };
-
-        if self.enabled(record.metadata()) {
-            println!("{}{}", level_prefix, record.args());
+        if ! self.enabled(record.metadata()) {
+            return;
         }
+
+        let mut t = term::stdout().unwrap();
+        let level = record.metadata().level();
+        match level {
+            LogLevel::Error | LogLevel::Warn => {
+                t.fg(term::color::RED).unwrap();
+                (write!(t, "{}: ", level)).unwrap();
+                t.reset().unwrap();
+            }
+            _ => (),
+        }
+        writeln!(t, "{}", record.args()).unwrap();
     }
 }
