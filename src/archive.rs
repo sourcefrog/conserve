@@ -1,3 +1,6 @@
+// Conserve backup system.
+// Copyright 2015 Martin Pool.
+
 use std;
 use std::fs::{File};
 use std::io::{Error, Result, Write};

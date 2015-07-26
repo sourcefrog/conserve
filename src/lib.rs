@@ -1,4 +1,5 @@
 // Conserve backup system.
+// Copyright 2015 Martin Pool.
 
 #[macro_use]
 extern crate log;
