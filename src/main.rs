@@ -42,8 +42,8 @@ impl log::Log for SimpleLogger {
 
 fn run_init(args: &Args) {
     match conserve::Archive::init(&args.arg_dir) {
-        Ok(archive) => info!("created archive {:?}", archive),
-        Err(e) => error!("failed to create archive: {}", e)
+        Ok(archive) => info!("Created archive {:?}", archive),
+        Err(e) => error!("Failed to create archive: {}", e)
     }
 }
 

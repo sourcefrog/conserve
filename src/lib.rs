@@ -1,5 +1,7 @@
 // Conserve backup system.
 
+extern crate rustc_serialize;
+
 #[macro_use]
 extern crate log;
 
