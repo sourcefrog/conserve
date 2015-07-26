@@ -28,7 +28,7 @@ use log::{LogRecord, LogLevel, LogLevelFilter, LogMetadata};
 struct SimpleLogger;
 
 impl log::Log for SimpleLogger {
-    fn enabled(&self, metadata: &LogMetadata) -> bool {
+    fn enabled(&self, _metadata: &LogMetadata) -> bool {
         true
     }
 
