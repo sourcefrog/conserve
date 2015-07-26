@@ -22,12 +22,18 @@ impl Archive {
     /// Make a new directory to hold an archive, and write the header.
     pub fn init(dir: &str) -> Result<Archive> {
         info!("Creating archive directory {}", dir);
-        let pathbuf = PathBuf::from(dir);
-        try!(std::fs::create_dir(&pathbuf));
-
         let archive = Archive {
-            dir: pathbuf,
+            dir: PathBuf::from(dir),
         };
+        match std::fs::create_dir(&archive.dir) {
+            Err(e) => {
+                error!("Failed to create archive directory {:?}: {}",
+                    archive.dir.display(), e);
+                return Err(e);
+            },
+            Ok(_) => (),
+        }
+        
         match archive.write_archive_header() {
             Err(e) => {
                 error!("Failed to write archive header: {}", e);
@@ -47,11 +53,18 @@ impl Archive {
             Err(e) => {
                 error!("Couldn't open archive header {:?}: {}",
                     header_path.display(), e);
-                return Err(e);
+                return Err(e)
             }
         };
         let header_json = json::encode(&header).unwrap();
         debug!("header json = {}", header_json);
-        header_file.write_all(header_json.as_bytes())
+        match header_file.write_all(header_json.as_bytes()) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                error!("Couldn't write header file {:?}: {}",
+                    header_path.display(), e);
+                Err(e)
+            }
+        }
     }
 }
