@@ -1,7 +1,7 @@
 * Write some files into a band.
 
 * Validate names are clean
-* Validate name ordering 
+* Validate name ordering
 * Add tests for unicode names
 
 * recurse through source directory
@@ -30,8 +30,10 @@
  * bzip decompression failure
  * missing lower layers
 
-* Write to temporary file and move into place? 
-  Actually needed, or is it better to just say that readers ought to cope 
+* Write to temporary file and move into place?
+  Actually needed, or is it better to just say that readers ought to cope
   with truncated files, which are likely to happen anyhow.
 
 * Auto-resume incomplete bands
+
+* Run cram tests from Cargo, or otherwise automatically?
