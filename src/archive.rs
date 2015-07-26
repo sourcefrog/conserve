@@ -1,7 +1,7 @@
 use std;
 use std::fs::{File};
-use std::io::{Error, ErrorKind, Result, Write};
-use std::path::PathBuf;
+use std::io::{Error, Result, Write};
+use std::path::{Path, PathBuf} ;
 
 use rustc_serialize::json;
 
@@ -20,10 +20,10 @@ struct ArchiveHeader {
 
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
-    pub fn init(dir: &str) -> Result<Archive> {
-        info!("Creating archive directory {}", dir);
+    pub fn init(dir: &Path) -> Result<Archive> {
+        info!("Creating archive directory {:?}", dir.display());
         let archive = Archive {
-            dir: PathBuf::from(dir),
+            dir: dir.to_path_buf(),
         };
         match std::fs::create_dir(&archive.dir) {
             Err(e) => {
@@ -33,7 +33,7 @@ impl Archive {
             },
             Ok(_) => (),
         }
-        
+
         match archive.write_archive_header() {
             Err(e) => {
                 error!("Failed to write archive header: {}", e);
@@ -66,5 +66,20 @@ impl Archive {
                 Err(e)
             }
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    extern crate tempdir;
+
+    use super::*;
+
+    #[test]
+    fn test_create_archive() {
+        let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
+        let arch = Archive::init(&testdir.path().join("arch"));
+        arch.unwrap();  // created ok
     }
 }

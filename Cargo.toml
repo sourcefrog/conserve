@@ -8,3 +8,4 @@ authors = ["Martin Pool <mbp@sourcefrog.net>"]
 docopt = "*"
 log = "*"
 rustc-serialize = "*"
+tempdir = "*"
