@@ -55,7 +55,7 @@ impl Archive {
                 return Err(e)
             }
         };
-        let header_json = json::encode(&header).unwrap();
+        let header_json = json::encode(&header).unwrap() + "\n";
         debug!("header json = {}", header_json);
         if let Err(e) = header_file.write_all(header_json.as_bytes()) {
             error!("Couldn't write header file {:?}: {}",
