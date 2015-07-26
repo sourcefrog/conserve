@@ -55,7 +55,6 @@ fn main() {
         max_log_level.set(LogLevelFilter::Debug);
         Box::new(SimpleLogger)
     }).ok();
-    info!("hello");
 
     let args: Args = Docopt::new(USAGE).unwrap()
         .version(Some(conserve::VERSION.to_string()))
