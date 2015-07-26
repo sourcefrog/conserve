@@ -1,24 +1,35 @@
 Everything in Conserve is done through a subcommand to the `conserve` command:
 
     $ conserve
-    conserve - a robust backup program
-
-    Copyright 2012-2013 Martin Pool
-    Licenced under the GNU General Public Licence, version 2 or later.
-    Conserve comes with ABSOLUTELY NO WARRANTY of any kind.
-
+    Invalid arguments.
+    
     Usage:
-      conserve init DIR
-      conserve backup ARCHIVE FILE...
+        conserve init <dir>
+        conserve --version
+        conserve --help
+    [1]
 
-    Options:
-      --help        Show help.
-      --version     Show version.
-      -v            Be more verbose.
+You can ask for help:
+
+    $ conserve --help
+    Conserve: an (incomplete) backup tool.
+    Copyright 2015 Martin Pool, GNU GPL v2+.
+    https://github.com/sourcefrog/conserve
+    
+    Usage:
+        conserve init <dir>
+        conserve --version
+        conserve --help
+
+`--version` shows the version with no fluff:
+
+    $ conserve --version
+    0.2.0
 
 To create an archive:
 
     $ conserve init a
+    INFO - Created archive in "a"
 
 This makes a new directory that contains just one file, the `CONSERVE-ARCHIVE`
 header file:

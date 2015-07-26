@@ -22,7 +22,7 @@ struct ArchiveHeader {
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
     pub fn init(dir: &Path) -> Result<Archive> {
-        info!("Creating archive directory {:?}", dir.display());
+        debug!("Creating archive directory {:?}", dir.display());
         let archive = Archive {
             dir: dir.to_path_buf(),
         };
