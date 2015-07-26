@@ -68,6 +68,10 @@ impl Archive {
             }
         }
     }
+
+    pub fn path(self: &Archive) -> &Path {
+        self.dir.as_path()
+    }
 }
 
 
@@ -80,7 +84,8 @@ mod tests {
     #[test]
     fn test_create_archive() {
         let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
-        let arch = Archive::init(&testdir.path().join("arch"));
-        arch.unwrap();  // created ok
+        let arch = Archive::init(&testdir.path().join("arch")).unwrap();
+
+        assert_eq!(arch.path(), testdir.path().join("arch").as_path());
     }
 }
