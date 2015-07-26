@@ -5,6 +5,7 @@ extern crate log;
 extern crate rustc_serialize;
 
 use docopt::Docopt;
+use std::io::{Error, ErrorKind};
 
 static USAGE: &'static str = "
 Usage:
@@ -28,7 +29,7 @@ struct SimpleLogger;
 
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &LogMetadata) -> bool {
-        metadata.level() <= LogLevel::Info
+        true
     }
 
     fn log(&self, record: &LogRecord) {
@@ -40,13 +41,16 @@ impl log::Log for SimpleLogger {
 
 
 fn run_init(args: &Args) {
-    conserve::Archive::init(&args.arg_dir).unwrap();
+    match conserve::Archive::init(&args.arg_dir) {
+        Ok(archive) => info!("created archive {:?}", archive),
+        Err(e) => error!("failed to create archive: {}", e)
+    }
 }
 
 
 fn main() {
     log::set_logger(|max_log_level| {
-        max_log_level.set(LogLevelFilter::Info);
+        max_log_level.set(LogLevelFilter::Debug);
         Box::new(SimpleLogger)
     }).ok();
     info!("hello");
