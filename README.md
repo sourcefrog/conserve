@@ -1,6 +1,8 @@
 Conserve - a robust backup program
 ==================================
 
+[![Join the chat at https://gitter.im/sourcefrog/conserve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/sourcefrog/conserve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 **At this time Conserve is not ready for production use.**
 
 Copyright 2012-2015 [Martin Pool][1], mbp@sourcefrog.net.
