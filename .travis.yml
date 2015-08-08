@@ -3,3 +3,4 @@ sudo: false
 rust:
   - stable
   - beta
+  - nightly
