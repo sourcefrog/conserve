@@ -4,18 +4,15 @@ Conserve format
 Generalities
 ------------
 
-All header data is stored as [Google Protobufs][1].
-
-Example in this document are expresed as (approximately) the text format of
-protobufs, but the on-disk format is the compact binary form.
+All header data is stored as Json dictionaries.
 
 Software version
 ----------------
 
-Conserve archives include the version of the software that wrote them, which is an 
+Conserve archives include the version of the software that wrote them, which is an
 _x.y.z_ tuple. Changes to the `x` major version imply a non-backward-compatible change:
-older versions may not be able to read it. Changes to the `y` minor version may 
-include backward-compatible extensions. 
+older versions may not be able to read it. Changes to the `y` minor version may
+include backward-compatible extensions.
 
 Source
 ------
@@ -30,27 +27,17 @@ Files have names (obviously) in the source and restore directories, and within t
 In source and restore directories, file naming is defined by the OS: on Windows as UTF-16,
 on OS X as UTF-8 and on Linux as an arbitrary 8-bit encoding.  
 
-(Linux filenames are very commonly UTF-8, but there are important exceptions: users who 
-choose to use different encodings for whole filesystems; network or USB filesystems 
-using different encodings; files is source trees that are intentionally in odd encodings; and 
-files that accidentally have anomalous names.  It is useful to include the occasionally 
-oddly-named file in the backup, and also for users with non-UTF-8 encodings to be able to 
-configure this. The filename encoding is not easily detectable.  Linux does require that the 
+(Linux filenames are very commonly UTF-8, but there are important exceptions: users who
+choose to use different encodings for whole filesystems; network or USB filesystems
+using different encodings; files is source trees that are intentionally in odd encodings; and
+files that accidentally have anomalous names.  It is useful to include the occasionally
+oddly-named file in the backup, and also for users with non-UTF-8 encodings to be able to
+configure this. The filename encoding is not easily detectable.  Linux does require that the
 separator `/` have the same byte value.)
 
-In the archive, filenames are stored as byte strings. They _should_ be NFC UTF-8 but this is 
-not required.  As a consequence filenames are stored as Protobuf `byte` types, not `string`.
+In the archive, filenames are stored as UTF-8 byte strings. UTF-8 filenames are
+stored as received from the OS with no normalization.
 
-In bands created on Windows they will always be UTF-8.
-
-Bands written from OS X we know are UTF-8 and they can be safely converted to NFC.
-
-Linux filenames with anomalous encodings in the source will be stored as non-UTF-8 components.
-
-Source directories in a specific non-UTF-8 encoding can be passed through a translation function to 
-and from UTF-8 so their names are stored more compatibly.
-
-UTF-8 filenames are stored as received from the OS with no normalization.
 TODO: Maybe we should denormalize the filenames on OS X to be more compatible with Linux? Maybe not.
 
 Filenames are always stored torn apart into components, none of which include `/` characters,
@@ -59,11 +46,11 @@ and none of them can be `.` or `..`.
 
 There is a total order between filenames in the archive: this is very important for binary
 search within it. The order is defined as: filenames components are compared by the byte-by-byte
-comparison of their (typically UTF-8) representation. To compare two paths: compare their 
+comparison of their (typically UTF-8) representation. To compare two paths: compare their
 pairwise components until a difference is found, or if one of them ends before a difference is found,
 the shorter path comes first.
 
-TODO: Describe case, unicode normalization handling.
+Filenames are treated as case-sensitive.
 
 Archive
 -------
@@ -77,9 +64,9 @@ other metadata, and it only needs to support 8.3 characters.  It must supported
 nested subdirectories but only of moderate length.
 
 In the root directory of the archive there is a file called `CONSERVE`,
-which is an `ArchiveHeader` protobuf containing:
+which is contains a json dict:
 
-    magic: "conserve backup archive"
+    {"conserve_archive_version":"0.2.0"}
 
 Tiers
 -----
@@ -126,12 +113,13 @@ A band contains file contents and metadata.
 A band is composed of a *head*, *tail*, and multiple *blocks*, each
 with a *block index* and a *block data*.
 
-A band head is a file `BANDHEAD` containing a `BandHead` protobuf.
+A band head is a file `BANDHEAD` containing a json dictionary.
 
-A band tail is a file `BANDTAIL` containing a `BandTail` protobuf, only for
+A band tail is a file `BANDTAIL` containing a json dictionary, only for
 finished bands: it is the presence of this file that defines the band as
 complete.
 
+TODO: Describe compression.
 
 Blocks
 ------
@@ -140,7 +128,7 @@ A block contains the complete text of one or more files.  The files are
 stored in sorted order.  The block data is simply the concatenation of
 all the file texts.
 
-The block index is a protobuf describing the files within the block:
+The block index is a json sequence describing the files within the block:
 
  - a list of all files included in the block, and for each:
    - the name of the file
@@ -185,5 +173,3 @@ is a *version*: extracting all the contents of the version recreates
 the source directory as it existed at the time the most recent band
 was recorded.  (Modulo any changes that happened during the recording
 of that band.)
-
-[1]: [https://code.google.com/p/protobuf/]
