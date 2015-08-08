@@ -3,7 +3,7 @@
 
 use std;
 use std::fs::{File};
-use std::io::{Error, Result, Write};
+use std::io::{Error, ErrorKind, Result, Read, Write};
 use std::path::{Path, PathBuf} ;
 
 use rustc_serialize::json;
@@ -17,7 +17,7 @@ pub struct Archive {
     dir: PathBuf,
 }
 
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Debug, RustcDecodable, RustcEncodable)]
 struct ArchiveHeader {
     conserve_archive_version: String,
 }
@@ -39,6 +39,40 @@ impl Archive {
             return Err(e)
         };
         info!("Created new archive in {:?}", dir.display());
+        Ok(archive)
+    }
+    
+    pub fn open(dir: &Path) -> Result<Archive> {
+        let archive = Archive {
+            dir: dir.to_path_buf(),
+        };
+        let header_path = dir.join(HEADER_FILENAME);
+        let mut header_file = match File::open(header_path.as_path()) {
+            Ok(f) => f,
+            Err(e) => {
+                error!("Couldn't open archive header {:?}: {}",
+                    header_path.display(), e);
+                return Err(e);
+            }
+        };
+        let mut header_string = String::new();
+        if let Err(e) = header_file.read_to_string(&mut header_string) {
+            error!("Failed to read archive header {:?}: {}",
+                header_file, e);
+            return Err(e);
+        }
+        let header: ArchiveHeader = match json::decode(&header_string) {
+            Ok(h) => h,
+            Err(e) => {
+                error!("Couldn't deserialize archive header: {}", e);
+                return Err(Error::new(ErrorKind::InvalidInput, e));
+            }
+        };
+        if header.conserve_archive_version != String::from(ARCHIVE_VERSION) {
+            error!("Wrong archive version in header {:?}: {:?}",
+                header, header.conserve_archive_version);
+            return Err(Error::new(ErrorKind::InvalidInput, header.conserve_archive_version));
+        }
         Ok(archive)
     }
 
@@ -78,10 +112,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_create_archive() {
+    fn test_create_then_open_archive() {
         let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
-        let arch = Archive::init(&testdir.path().join("arch")).unwrap();
+        let arch_path = &testdir.path().join("arch");
+        let arch = Archive::init(arch_path).unwrap();
 
-        assert_eq!(arch.path(), testdir.path().join("arch").as_path());
+        assert_eq!(arch.path(), arch_path.as_path());
+        
+        // We can re-open it.
+        Archive::open(arch_path).unwrap();
     }
 }
