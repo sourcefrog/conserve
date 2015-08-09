@@ -1,6 +1,12 @@
 // Conserve backup system.
 // Copyright 2015 Martin Pool.
 
+//! Archives holding backup material.
+//!
+//! Archives must be initialized before use, which creates the directory.
+//!
+//! Archives can contain a tree of bands, which themselves contain file versions.
+
 use std;
 use std::fs::{File};
 use std::io::{Error, ErrorKind, Result, Read, Write};
@@ -44,6 +50,9 @@ impl Archive {
         Ok(archive)
     }
     
+    /// Open an existing archive.
+    ///
+    /// Checks that the header is correct.
     pub fn open(dir: &Path) -> Result<Archive> {
         let archive = Archive {
             dir: dir.to_path_buf(),
@@ -106,6 +115,10 @@ impl Archive {
         Ok(Vec::<BandId>::new())
     }
 
+    /// Returns the top-level directory for the archive.
+    ///
+    /// The top-level directory contains a `CONSERVE` header file, and zero or more
+    /// band directories.
     pub fn path(self: &Archive) -> &Path {
         self.dir.as_path()
     }
