@@ -3,8 +3,11 @@ name = "conserve"
 version = "0.2.0"
 authors = ["Martin Pool <mbp@sourcefrog.net>"]
 
-[dependencies]
+[[bin]]
+name = "conserve"
+doc = false
 
+[dependencies]
 docopt = "*"
 log = "*"
 rustc-serialize = "*"
