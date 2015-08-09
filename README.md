@@ -87,12 +87,9 @@ For a comparison to other backup systems, see
 Dependencies
 ============
 
-Ubuntu/Debian package names are listed in `debian_dependencies` for ease
-of installation:
+Most dependencies will be automatically installed by `cargo build`.
 
-    sudo apt-get install --no-install-recommends `cat debian_dependencies`
-
-To run the tests, [cram](https://pypi.python.org/pypi/cram) is needed:
+To run the blackbox tests, [cram](https://pypi.python.org/pypi/cram) is needed:
 
     pip install cram
 
