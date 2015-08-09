@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf} ;
 
 use rustc_serialize::json;
 
+use super::BandId;
+
 const HEADER_FILENAME: &'static str = "CONSERVE";
 const ARCHIVE_VERSION: &'static str = "0.2.0";
 
@@ -98,6 +100,11 @@ impl Archive {
         }
         Ok(())
     }
+    
+    /// Returns a vector of ids for bands currently present.
+    pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
+        Ok(Vec::<BandId>::new())
+    }
 
     pub fn path(self: &Archive) -> &Path {
         self.dir.as_path()
@@ -121,5 +128,12 @@ mod tests {
         
         // We can re-open it.
         Archive::open(arch_path).unwrap();
+    }
+    
+    #[test]
+    fn test_new_archive_has_no_bands() {
+        let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
+        let arch = Archive::init(&testdir.path().join("arch")).unwrap();
+        assert!(arch.list_bands().unwrap().is_empty());
     }
 }
