@@ -112,7 +112,7 @@ impl Archive {
     
     /// Returns a vector of ids for bands currently present.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
-        Ok(Vec::<BandId>::new())
+        Ok(Vec::new())
     }
 
     /// Returns the top-level directory for the archive.
