@@ -25,6 +25,9 @@
 ///            "b1000000-2000000")
 /// ```
 
+use super::Archive;
+use std::path::{Path,PathBuf};
+
 #[derive(Debug, PartialEq)]
 pub struct BandId {
     /// The sequence numbers at each tier.
@@ -90,12 +93,35 @@ impl BandId {
     // TODO: Maybe a more concise debug form?
 }
 
+
+/// All backup data is stored in a band.
+#[derive(Debug)]
+pub struct Band<'a> {
+    id: BandId,
+    archive: &'a Archive,
+    path_buf: PathBuf,
+}
+
+
+impl<'a> Band<'a> {
+    pub fn create(archive: &'a Archive, id: BandId) -> Band<'a> {
+        let mut path = archive.path().to_path_buf();
+        path.push(id.as_string());
+        Band{archive: archive, id: id, path_buf: path}
+    }
+    
+    pub fn path_buf(self: &Band<'a>) -> PathBuf {
+        self.path_buf.clone()
+    }
+}
+
  
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
 
     use super::*;
+    use super::super::archive::scratch_archive;
 
     #[test]
     #[should_panic]
@@ -125,5 +151,12 @@ mod tests {
         assert_eq!(BandId::from_string("b123456").unwrap().as_string(), "b123456");
         assert_eq!(BandId::from_string("b0001-0100-0234").unwrap().as_string(),
             "b0001-0100-0234");
+    }
+    
+    #[test]
+    fn create_band() {
+        let (_tmpdir, archive) = scratch_archive();
+        let band = Band::create(&archive, BandId::from_string("b0001").unwrap());
+        assert!(band.path_buf().to_str().unwrap().ends_with("b0001"));
     }
 }
