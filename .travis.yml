@@ -4,3 +4,5 @@ rust:
   - stable
   - beta
   - nightly
+before_install:
+    - pip install cram
