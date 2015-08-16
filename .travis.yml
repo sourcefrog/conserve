@@ -5,4 +5,5 @@ rust:
   - beta
   - nightly
 before_install:
-    - pip install cram
+    - export PATH=$HOME/.local/bin:$PATH
+    - pip install --user cram
