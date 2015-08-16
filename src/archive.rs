@@ -126,6 +126,20 @@ impl Archive {
 
 
 #[cfg(test)]
+extern crate tempdir;
+
+/// Makes an archive in a temporary directory, that will be deleted when it goes out of
+/// scope.
+#[cfg(test)]
+pub fn scratch_archive() -> (tempdir::TempDir, Archive) {
+    let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
+    let arch_path = &testdir.path().join("arch");
+    let arch = Archive::init(arch_path).unwrap();
+    (testdir, arch)
+}
+
+
+#[cfg(test)]
 mod tests {
     extern crate tempdir;
 
@@ -145,8 +159,8 @@ mod tests {
     
     #[test]
     fn test_new_archive_has_no_bands() {
-        let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
-        let arch = Archive::init(&testdir.path().join("arch")).unwrap();
+        let (_tempdir, arch) = scratch_archive();
         assert!(arch.list_bands().unwrap().is_empty());
+        panic!();
     }
 }
