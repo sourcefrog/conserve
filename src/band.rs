@@ -50,36 +50,25 @@ impl BandId {
     /// ```
     /// use conserve::band::BandId;
     /// let band = BandId::from_string("b0001-1234").unwrap();
-    /// // assert_eq!(band.as_string(), "b0001-1234");
+    /// assert_eq!(band.as_string(), "b0001-1234");
     /// ```
     pub fn from_string(s: &str) -> Option<BandId> {
-        let mut char_iter = s.chars();
-        match char_iter.next() {
-            None => return None,
-            Some('b') => (),
-            _ => return None,
+        if s.chars().next() != Some('b') {
+            return None
         }
         let mut seqs = Vec::<u32>::new();
-        let mut current_num: Option<u32> = None;
-        for c in char_iter {
-            match c {
-                '0' ... '9' => {
-                    current_num = Some(current_num.unwrap_or(0) * 10 + c.to_digit(10).unwrap());
-                },
-                '-' => {
-                    match current_num {
-                        None => return None,
-                        Some(c) => seqs.push(c),
-                    }
-                    current_num = None;
-                },
-                _ => return None,
+        for num_part in s[1..].split('-') {
+            match num_part.parse::<u32>() {
+                Ok(num) => seqs.push(num),
+                Err(..) => return None,
             }
         }
-        if seqs.is_empty() || current_num.is_none() {
-            return None;
+        if seqs.is_empty() {
+            None
+        } else {
+            // This rebuilds a new string form to get it into the canonical form.
+            Some(BandId::new(&seqs))
         }
-        Some(BandId::new(&seqs))
     }
     
     /// Returns the string representation of this BandId.
@@ -115,7 +104,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_string() {
+    fn test_from_string_detects_invalid() {
         assert_eq!(BandId::from_string(""), None);
         assert_eq!(BandId::from_string("hello"), None);
         assert_eq!(BandId::from_string("b"), None);
@@ -124,5 +113,17 @@ mod tests {
         assert_eq!(BandId::from_string("b-2"), None);
         assert_eq!(BandId::from_string("b2-1-"), None);
         assert_eq!(BandId::from_string("b2--1"), None);
+        assert_eq!(BandId::from_string("beta"), None);
+        assert_eq!(BandId::from_string("b-eta"), None);
+        assert_eq!(BandId::from_string("b-1eta"), None);
+        assert_eq!(BandId::from_string("b-1-eta"), None);
+    }
+
+    #[test]
+    fn test_from_string_valid() {
+        assert_eq!(BandId::from_string("b0001").unwrap().as_string(), "b0001");
+        assert_eq!(BandId::from_string("b123456").unwrap().as_string(), "b123456");
+        assert_eq!(BandId::from_string("b0001-0100-0234").unwrap().as_string(),
+            "b0001-0100-0234");
     }
 }
