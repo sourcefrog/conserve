@@ -112,6 +112,7 @@ impl Archive {
     
     /// Returns a vector of ids for bands currently present.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
+        // TODO: Not really implemented.
         Ok(Vec::new())
     }
 
@@ -161,6 +162,5 @@ mod tests {
     fn test_new_archive_has_no_bands() {
         let (_tempdir, arch) = scratch_archive();
         assert!(arch.list_bands().unwrap().is_empty());
-        panic!();
     }
 }
