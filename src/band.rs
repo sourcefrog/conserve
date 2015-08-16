@@ -25,7 +25,7 @@
 ///            "b1000000-2000000")
 /// ```
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct BandId {
     /// The sequence numbers at each tier.
     seqs: Vec<u32>,
@@ -43,6 +43,23 @@ impl BandId {
             seqs: seqs.to_vec(),
             string_form: BandId::make_string_form(seqs),
         }
+    }
+
+    /// Make a new BandId from a string form.
+    /// 
+    /// ```
+    /// use conserve::band::BandId;
+    /// let band = BandId::from_string("b0001-1234").unwrap();
+    /// assert_eq!(band.as_string(), "b0001-1234");
+    /// ```
+    pub fn from_string(s: &str) -> Option<BandId> {
+        let mut char_iter = s.chars();
+        match char_iter.next() {
+            None => return None,
+            Some('b') => (),
+            _ => return None,
+        }
+        unimplemented!();
     }
     
     /// Returns the string representation of this BandId.
@@ -75,5 +92,11 @@ mod tests {
     #[should_panic]
     fn test_empty_id_not_allowed() {
         BandId::new(&[]);
+    }
+
+    #[test]
+    fn test_from_string() {
+        assert_eq!(BandId::from_string(""), None);
+        assert_eq!(BandId::from_string("hello"), None);
     }
 }
