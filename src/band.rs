@@ -26,7 +26,7 @@
 /// ```
 
 use super::Archive;
-use std::path::{Path,PathBuf};
+use std::path::{PathBuf};
 
 #[derive(Debug, PartialEq)]
 pub struct BandId {
@@ -105,9 +105,13 @@ pub struct Band<'a> {
 
 impl<'a> Band<'a> {
     pub fn create(archive: &'a Archive, id: BandId) -> Band<'a> {
-        let mut path = archive.path().to_path_buf();
-        path.push(id.as_string());
-        Band{archive: archive, id: id, path_buf: path}
+        let mut path_buf = archive.path().to_path_buf();
+        path_buf.push(id.as_string());
+        Band{
+            archive: archive,
+            id: id,
+            path_buf: path_buf,
+        }
     }
     
     pub fn path_buf(self: &Band<'a>) -> PathBuf {
