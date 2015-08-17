@@ -144,6 +144,9 @@ pub fn scratch_archive() -> (tempdir::TempDir, Archive) {
 mod tests {
     extern crate tempdir;
 
+    use std::fs;
+    use std::io::Read;
+    
     use super::*;
 
     #[test]
@@ -164,18 +167,30 @@ mod tests {
         assert!(arch.list_bands().unwrap().is_empty());
     }
     
+    /// The header is readable json containing only a version number.
     #[test]
     fn test_archive_header_contents() {
-        use std::fs::File;
-        use std::io::Read;
         let (_tempdir, arch) = scratch_archive();
         let mut header_path = arch.path().to_path_buf();
         header_path.push("CONSERVE");
-        let mut header_file = File::open(&header_path).unwrap();
+        let mut header_file = fs::File::open(&header_path).unwrap();
         let mut contents = String::new();
         header_file.read_to_string(&mut contents).unwrap();
         assert_eq!(
             contents,
             "{\"conserve_archive_version\":\"0.2.0\"}\n");
+    }
+    
+    /// A new archive contains just one header file.
+    #[test]
+    fn new_archive_has_only_header() {
+        let (_tempdir, arch) = scratch_archive();
+        let files: Vec<(fs::FileType, String)> = fs::read_dir(arch.path()).unwrap()
+            .map(|s| {s.unwrap()})
+            .map(|fe| { (fe.file_type().unwrap(), fe.file_name().into_string().unwrap()) })
+            .collect();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].1, "CONSERVE");
+        assert!(files[0].0.is_file());
     }
 }
