@@ -163,4 +163,19 @@ mod tests {
         let (_tempdir, arch) = scratch_archive();
         assert!(arch.list_bands().unwrap().is_empty());
     }
+    
+    #[test]
+    fn test_archive_header_contents() {
+        use std::fs::File;
+        use std::io::Read;
+        let (_tempdir, arch) = scratch_archive();
+        let mut header_path = arch.path().to_path_buf();
+        header_path.push("CONSERVE");
+        let mut header_file = File::open(&header_path).unwrap();
+        let mut contents = String::new();
+        header_file.read_to_string(&mut contents).unwrap();
+        assert_eq!(
+            contents,
+            "{\"conserve_archive_version\":\"0.2.0\"}\n");
+    }
 }
