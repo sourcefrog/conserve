@@ -18,20 +18,23 @@ Copyright 2015 Martin Pool, GNU GPL v2+.
 https://github.com/sourcefrog/conserve
 
 Usage:
-    conserve init <dir>
+    conserve init <archivedir>
+    conserve backup <archivedir> <source>...
     conserve --version
     conserve --help
 ";
 
 #[derive(RustcDecodable)]
 struct Args {
+    cmd_backup: bool,
     cmd_init: bool,
-    arg_dir: String,
+    arg_archivedir: String,
+    arg_source: Vec<String>,
 }
 
 
 fn run_init(args: &Args) -> std::io::Result<()> {
-    conserve::Archive::init(Path::new(&args.arg_dir)).and(Ok(()))
+    conserve::Archive::init(Path::new(&args.arg_archivedir)).and(Ok(()))
 }
 
 
@@ -50,6 +53,11 @@ fn main() {
 
     let result = if args.cmd_init {
         run_init(&args)
+    } else if args.cmd_backup {
+        let sources = args.arg_source.iter().map(
+            |s| { Path::new(s) }
+            ).collect();
+        conserve::backup::run_backup(Path::new(&args.arg_archivedir), sources)
     } else {
         panic!("unreachable?")
     };

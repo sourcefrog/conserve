@@ -115,6 +115,7 @@ impl Archive {
         // TODO: Not really implemented.
         Ok(Vec::new())
     }
+    
 
     /// Returns the top-level directory for the archive.
     ///

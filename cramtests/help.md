@@ -11,6 +11,7 @@ and ask for help:
     https://github.com/sourcefrog/conserve
     
     Usage:
-        conserve init <dir>
+        conserve init <archivedir>
+        conserve backup <archivedir> <source>...
         conserve --version
         conserve --help
