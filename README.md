@@ -3,7 +3,7 @@ Conserve - a robust backup program
 
 **At this time Conserve is not ready for production use.**
 
-Copyright 2012-2015 [Martin Pool][1], mbp@sourcefrog.net.
+Copyright 2012-2016 [Martin Pool][1], mbp@sourcefrog.net.
 
 _This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -34,11 +34,12 @@ For more details see the
 man page.
 
 
-Manifesto
----------
+Manifesto / Requirements
+------------------------
 
 * The most important thing is that data be retrieved when it's needed;
-  within reason it's worth trading off other attributes for that.
+  within reason it's worth trading off space, speed, or other attributes for
+  that.
 
 * The format should be robust: if some data is lost, it should still be
   possible to retrieve the rest of the tree.
@@ -52,7 +53,7 @@ Manifesto
   for local online disk, removable storage, and remote (ssh) smart servers.
 
 * Optional storage layers: compression (bzip2/gzip/lzo), encryption (gpg),
-  redundancy (Reed-Solomon).
+  redundancy (maybe Reed-Solomon).
 
 * Backups should always make forward progress, even if they are never
   given enough time to read the whole source or the whole destination.
@@ -79,6 +80,11 @@ Manifesto
 * The backup archive should be a pure function of the source directory
   and history of backup operations.  (If the backup metadata includes
   a timestamp, you can pass in the timestamp to get the same result.)
+  
+* Store, reasonably efficiently, large files that are partially rewritten over
+  time, such as databases or VM images. We don't expect data will be _inserted_
+  with the rest of it being moved along, so an rsync-style sliding window is
+  not needed. However some ranges or blocks of the file may be overwritten.
 
 For a comparison to other backup systems, see
 <https://github.com/sourcefrog/conserve/wiki/Compared-to-others>.

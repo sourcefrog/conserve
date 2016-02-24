@@ -1,10 +1,8 @@
 * Write some files into a band.
 
 * Validate names are clean
-* Validate name ordering
+* Sort names and validate ordering
 * Add tests for unicode names
-
-* recurse through source directory
 
 * more validation (what?)
 
@@ -37,3 +35,15 @@
 * Auto-resume incomplete bands
 
 * Migrate from Cram to native Rust tests
+
+* fsck
+  * check ordering
+  * no unexpected files
+  * hash of data files is as expected
+
+* restore
+  * can simply restore
+  * cannot overwrite existing directory (unless forced?)
+  
+* backup
+  * test you can only backup into an existing archive directory
