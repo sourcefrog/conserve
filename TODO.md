@@ -36,4 +36,4 @@
 
 * Auto-resume incomplete bands
 
-* Run cram tests from Cargo, or otherwise automatically?
+* Migrate from Cram to native Rust tests

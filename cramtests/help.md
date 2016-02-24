@@ -7,7 +7,7 @@ and ask for help:
 
     $ conserve --help
     Conserve: an (incomplete) backup tool.
-    Copyright 2015 Martin Pool, GNU GPL v2+.
+    Copyright 2015, 2016 Martin Pool, GNU GPL v2+.
     https://github.com/sourcefrog/conserve
     
     Usage:

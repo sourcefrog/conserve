@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015 Martin Pool.
+// Copyright 2015, 2016 Martin Pool.
 
 extern crate conserve;
 extern crate docopt;
@@ -8,13 +8,11 @@ extern crate log;
 extern crate rustc_serialize;
 
 use docopt::Docopt;
-use log::{LogLevelFilter};
-use std::io::{Error};
 use std::path::{Path};
 
 static USAGE: &'static str = "
 Conserve: an (incomplete) backup tool.
-Copyright 2015 Martin Pool, GNU GPL v2+.
+Copyright 2015, 2016 Martin Pool, GNU GPL v2+.
 https://github.com/sourcefrog/conserve
 
 Usage:
@@ -40,10 +38,7 @@ fn run_init(args: &Args) -> std::io::Result<()> {
 
 #[cfg_attr(test, allow(dead_code))] // https://github.com/rust-lang/rust/issues/12327
 fn main() {
-    log::set_logger(|max_log_level| {
-        max_log_level.set(LogLevelFilter::Info);
-        Box::new(conserve::logger::ConsoleLogger)
-    }).ok();
+    conserve::logger::establish_a_logger();
 
     let args: Args = Docopt::new(USAGE).unwrap()
         .version(Some(conserve::VERSION.to_string()))
