@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015 Martin Pool.
+// Copyright 2015, 2016 Martin Pool.
 
 //! Bands are the top-level structure inside an archive.
 //!
@@ -26,6 +26,8 @@
 /// ```
 
 use super::Archive;
+use std::fs;
+use std::io;
 use std::path::{PathBuf};
 
 #[derive(Debug, PartialEq)]
@@ -104,14 +106,15 @@ pub struct Band<'a> {
 
 
 impl<'a> Band<'a> {
-    pub fn create(archive: &'a Archive, id: BandId) -> Band<'a> {
+    pub fn create(archive: &'a Archive, id: BandId) -> io::Result<Band<'a>> {
         let mut path_buf = archive.path().to_path_buf();
         path_buf.push(id.as_string());
-        Band{
-            archive: archive,
-            id: id,
-            path_buf: path_buf,
-        }
+        fs::create_dir(path_buf.as_path()).and(
+            Ok(Band{
+                archive: archive,
+                id: id,
+                path_buf: path_buf,
+            }))
     }
     
     pub fn path_buf(self: &Band<'a>) -> PathBuf {
@@ -126,6 +129,7 @@ mod tests {
 
     use super::*;
     use super::super::archive::scratch_archive;
+    use std::fs;
 
     #[test]
     #[should_panic]
@@ -160,7 +164,8 @@ mod tests {
     #[test]
     fn create_band() {
         let (_tmpdir, archive) = scratch_archive();
-        let band = Band::create(&archive, BandId::from_string("b0001").unwrap());
+        let band = Band::create(&archive, BandId::from_string("b0001").unwrap()).unwrap();
         assert!(band.path_buf().to_str().unwrap().ends_with("b0001"));
+        assert!(fs::metadata(band.path_buf()).unwrap().is_dir());
     }
 }

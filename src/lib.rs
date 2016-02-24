@@ -7,7 +7,7 @@ extern crate rustc_serialize;
 extern crate term;
 extern crate walkdir;
 
-mod archive;
+pub mod archive;
 pub use archive::Archive;
 pub mod backup;
 pub mod band;
