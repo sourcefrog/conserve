@@ -3,10 +3,9 @@
 
 #[macro_use]
 extern crate log;
-
 extern crate rustc_serialize;
-
 extern crate term;
+extern crate walkdir;
 
 mod archive;
 pub use archive::Archive;
