@@ -1,15 +1,20 @@
 Conserve scaling
 ============
 
-Conceptual numbers: Source directory typically 1TB, stretch to 1000PB.
+Conceptual numbers: Source directory typically 1TB, stretch to 1PB,
+the largest foreseeably likely to be on a single machine or linearly
+readable in a reasonable amount of time.
 
 Blocks perhaps 100MB each.  So that would be 10,000 blocks for 1TB, 10,000,000
 blocks for 1PB.  (Perhaps if you're doing such a large backup you should make
 a larger goal block size.)
 
+Index directories have 10,000 files per subdirectory and with 10M blocks
+there'll be 1000 directories in `i`.
+
 Reasonably small number of tiers, less than ten: typically annual, monthly,
-weekly, daily,  hourly.  That produces band filenames like
-`b0000-0000-0000-0000-0000-0000-0000-0000-0000-0000`, ie 51 characters.
+weekly, daily,  hourly.  That produces band directory names like
+`b0000/b0000/b0000/b0000/b0000` which is reasonable.
 
 Assume the storage must read a directory listing in a single operation.
 (In practice, many can stream it?)  But, it may not be sorted.

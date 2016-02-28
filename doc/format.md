@@ -157,11 +157,11 @@ contents.
 Index hunks contain the name and metadata of a stored file, plus a
 reference to the data hunks holding its full text.
 
-Index hunks are stored in an `i/` subdirectory of the band, and
-within that in a subdirectory named for the first three characters of
-their name.
-
 Index hunks are named with decimal sequence numbers padded to 9 digits.
+
+Index hunks are stored in an `i/` subdirectory of the band, and then
+in a subdirectory for the sequence number divided by 10000 and
+padded to five digits.  So, the first block is `i/00000/000000000`.
 
 Index hunks are stored in json and gzip compressed.
 
