@@ -1,6 +1,7 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
+extern crate blake2_rfc;
 extern crate brotli2;
 #[macro_use]
 extern crate log;

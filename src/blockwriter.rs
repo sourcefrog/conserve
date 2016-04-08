@@ -9,9 +9,11 @@
 
 use std::io;
 use std::io::Write;
+use blake2_rfc::blake2b::Blake2b;
 use brotli2::write::BrotliEncoder;
 
 const BROTLI_COMPRESSION_LEVEL: u32 = 4;
+const BLAKE_HASH_SIZE_BYTES: usize = 64;
 
 /// Single-use writer to a data block.  Data is compressed and its hash is
 /// accumulated until writing is complete.
@@ -19,26 +21,31 @@ const BROTLI_COMPRESSION_LEVEL: u32 = 4;
 /// TODO: Implement all of std::io::Write?
 pub struct BlockWriter {
     encoder: BrotliEncoder<Vec<u8>>,
+    hasher: Blake2b,
 }
     
 impl BlockWriter {
     pub fn new() -> BlockWriter {
         BlockWriter {
             encoder: BrotliEncoder::new(Vec::<u8>::new(), BROTLI_COMPRESSION_LEVEL),
+            hasher: Blake2b::new(BLAKE_HASH_SIZE_BYTES),
         }
     }
     
     pub fn write_all(self: &mut BlockWriter, buf: &[u8]) -> io::Result<()> {
+        self.hasher.update(buf);
         self.encoder.write_all(buf)
-        // TODO: Hash it
+        // TODO: If we fail to compress the data for some reason, the hash
+        // will be wrong and this block should probably be discarded.
     }
     
-    /// Finish writing, and return a vector containing all the compressed
-    /// data.
+    /// Finish writing.
     ///
-    /// TODO: Also return the hash here?
-    pub fn finish(self: BlockWriter) -> io::Result<Vec<u8>> {
-        self.encoder.finish()
+    /// Returns a vector containing all the compressed data, and a byte
+    /// array of the hash.
+    pub fn finish(self: BlockWriter) -> io::Result<(Vec<u8>, Vec<u8>)> {
+        let compressed = try!(self.encoder.finish());
+        Ok((compressed, self.hasher.finalize().as_bytes().to_vec()))
     }
 
 }
@@ -51,10 +58,12 @@ mod tests {
     pub fn test_simple_write_all() {
         let mut writer = BlockWriter::new();
         writer.write_all("hello!".as_bytes()).unwrap();
-        let result = writer.finish().unwrap();
-        println!("Compressed result: {:?}", result);
-        assert!(result.len() == 10);
+        let (compressed, hash) = writer.finish().unwrap();
+        println!("Compressed result: {:?}", compressed);
+        assert!(compressed.len() == 10);
+        assert!(hash.len() == 64);
         
         // TODO: Test uncompressing?
+        // TODO: Test hash is as expected.
     }
 }
