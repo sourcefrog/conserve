@@ -130,25 +130,25 @@ Band footer contains:
  - the hash of all of the block footers
 
 
-## Data hunks
+## Data blocks
 
-Data hunks contain parts of the full text of stored files.
+Data blocks contain parts of the full text of stored files.
 
-One data hunk may contain data for a whole file, the concatenated
-text for several files, or just part of a file.  One data hunk
-might be referenced from the index hunks of any number of files
+One data block may contain data for a whole file, the concatenated
+text for several files, or just part of a file.  One data block
+might be referenced from the index block of any number of files
 from the current or any descendent band.
 
-Data hunks may be of arbitrary compressed length, and arbitrary
-uncompressed length, chosen at the writer's convenience.
+The writer may choose the data block size, except that both the uncompressed
+and compressed blocks must be <1GB, so they can reasonably fit in memory.
 
-All the data hunks for a band are stored within a `d/` subdirectory
+All the data block for a band are stored within a `d/` subdirectory
 of the band, and then within a directory for the first three characters
 of their name.
 
-Data hunks are gzip-compressed.
+Data block are compressed in the Brotli format.
 
-The name of the data hunk file is the BLAKE2 hash of the uncompressed
+The name of the data block file is the BLAKE2 hash of the uncompressed
 contents.
 
 

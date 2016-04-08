@@ -1,31 +1,46 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
-///! Write data to a data block, compressed, and stored by its hash.
-///!
-///! Blocks are required to be not too big in their compressed form
-///! to fit in memory on the machines
-///! that are reading and writing them: say 1GB.
+//! Write body data to a data block, compressed, and stored by its hash.
+//!
+//! Blocks are required to be not too big in their compressed form
+//! to fit in memory on the machines
+//! that are reading and writing them: say 1GB.
 
 use std::io;
+use std::io::Write;
+use brotli2::write::BrotliEncoder;
 
-#[derive(Debug)]
+const BROTLI_COMPRESSION_LEVEL: u32 = 4;
+
+/// Single-use writer to a data block.  Data is compressed and its hash is
+/// accumulated until writing is complete.
+///
+/// TODO: Implement all of std::io::Write?
 pub struct BlockWriter {
+    encoder: BrotliEncoder<Vec<u8>>,
 }
-
+    
 impl BlockWriter {
     pub fn new() -> BlockWriter {
-        BlockWriter{}
+        BlockWriter {
+            encoder: BrotliEncoder::new(Vec::<u8>::new(), BROTLI_COMPRESSION_LEVEL),
+        }
     }
     
-    // TODO: Implement all of std::io::Write?
-    pub fn write(self: &mut BlockWriter, buf: &[u8]) -> io::Result<usize> {
-        // TODO: Compress and save the compressed data
+    pub fn write_all(self: &mut BlockWriter, buf: &[u8]) -> io::Result<()> {
+        self.encoder.write_all(buf)
         // TODO: Hash it
-        Ok(buf.len())
     }
     
-    // TODO: Allow retrieving the hash when ready
+    /// Finish writing, and return a vector containing all the compressed
+    /// data.
+    ///
+    /// TODO: Also return the hash here?
+    pub fn finish(self: BlockWriter) -> io::Result<Vec<u8>> {
+        self.encoder.finish()
+    }
+
 }
 
 #[cfg(test)]
@@ -33,8 +48,13 @@ mod tests {
     use super::BlockWriter;
     
     #[test]
-    pub fn test_simple_write() {
+    pub fn test_simple_write_all() {
         let mut writer = BlockWriter::new();
-        assert_eq!(writer.write("hello!".as_bytes()).unwrap(), 6);
+        writer.write_all("hello!".as_bytes()).unwrap();
+        let result = writer.finish().unwrap();
+        println!("Compressed result: {:?}", result);
+        assert!(result.len() == 10);
+        
+        // TODO: Test uncompressing?
     }
 }

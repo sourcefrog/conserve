@@ -1,6 +1,7 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
+extern crate brotli2;
 #[macro_use]
 extern crate log;
 extern crate rustc_serialize;

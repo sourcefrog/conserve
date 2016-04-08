@@ -8,6 +8,7 @@ name = "conserve"
 doc = false
 
 [dependencies]
+brotli2 = "^0.1"
 docopt = "*"
 log = "*"
 rustc-serialize = "*"
