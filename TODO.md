@@ -1,3 +1,7 @@
+* Write some data to a data block:
+  - Hasher implementation that passes through to a file
+  - Maybe send a pr to add the Writer interface to blake2
+  
 * Write some files into a band.
 
 * Validate names are clean

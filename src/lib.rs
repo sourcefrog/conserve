@@ -12,6 +12,7 @@ pub use archive::Archive;
 pub mod backup;
 pub mod band;
 pub use band::BandId;
+pub mod blockwriter;
 pub mod logger;
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
