@@ -13,7 +13,7 @@
 ///
 /// ```
 /// use conserve::band::BandId;
-/// let band_id = BandId::new(&[1, 10, 20]);
+/// let band_id = BandId::new(&[1, 10, 20]).unwrap();
 /// assert_eq!(band_id.as_string(), "b0001-0010-0020");
 /// ```
 ///
@@ -21,7 +21,9 @@
 /// overflow:
 ///
 /// ```
-/// assert_eq!(conserve::band::BandId::new(&[1000000, 2000000]).as_string(),
+/// use conserve::band::BandId;
+/// let band_id = BandId::new(&[1000000, 2000000]).unwrap();
+/// assert_eq!(band_id.as_string(),
 ///            "b1000000-2000000")
 /// ```
 
@@ -42,11 +44,14 @@ pub struct BandId {
 
 impl BandId {
     /// Makes a new BandId from a sequence of integers.
-    pub fn new(seqs: &[u32]) -> BandId {
-        assert!(seqs.len() > 0);
-        BandId{
-            seqs: seqs.to_vec(),
-            string_form: BandId::make_string_form(seqs),
+    pub fn new(seqs: &[u32]) -> Option<BandId> {
+        if seqs.len() > 0 {
+            Some(BandId{
+                seqs: seqs.to_vec(),
+                string_form: BandId::make_string_form(seqs),
+            })
+        } else {
+            None
         }
     }
 
@@ -72,7 +77,7 @@ impl BandId {
             None
         } else {
             // This rebuilds a new string form to get it into the canonical form.
-            Some(BandId::new(&seqs))
+            BandId::new(&seqs)
         }
     }
     
@@ -132,9 +137,8 @@ mod tests {
     use std::fs;
 
     #[test]
-    #[should_panic]
     fn test_empty_id_not_allowed() {
-        BandId::new(&[]);
+        assert!(BandId::new(&[]).is_none());
     }
 
     #[test]
