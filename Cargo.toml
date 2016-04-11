@@ -2,6 +2,10 @@
 name = "conserve"
 version = "0.2.0"
 authors = ["Martin Pool <mbp@sourcefrog.net>"]
+homepage = "https://github.com/sourcefrog/conserve/"
+repository = "https://github.com/sourcefrog/conserve/"
+readme = "README.md"
+keywords = ["archive", "backup"]
 
 [[bin]]
 name = "conserve"
