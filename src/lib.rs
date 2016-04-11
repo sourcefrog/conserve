@@ -1,4 +1,4 @@
-//! Conserve backup system.
+//! *Conserve* backup system.
 //!
 //! Copyright 2015, 2016 Martin Pool.
 //!
@@ -16,7 +16,7 @@ extern crate walkdir;
 pub mod archive;
 pub mod backup;
 pub mod band;
-pub mod blockwriter;
+pub mod block;
 pub mod logger;
 
 /// Conserve version number as a semver string.

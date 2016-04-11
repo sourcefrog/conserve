@@ -1,7 +1,7 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
-//! Write body data to a data block, compressed, and stored by its hash.
+//! File contents are stored in data blocks within an archive band.
 //!
 //! Blocks are required to be less than 1GB uncompressed, so they can be held
 //! entirely in memory on a typical machine.
@@ -11,10 +11,19 @@ use std::io::Write;
 use blake2_rfc::blake2b::Blake2b;
 use brotli2::write::BrotliEncoder;
 
+/// Use a moderate Brotli compression level.
+///
+/// TODO: Is this a good tradeoff?
 const BROTLI_COMPRESSION_LEVEL: u32 = 4;
+
+/// Use the maximum 64-byte hash.
 const BLAKE_HASH_SIZE_BYTES: usize = 64;
 
-/// Single-use writer to a data block.  Data is compressed and its hash is
+/// Write body data to a data block, compressed, and stored by its hash.
+///
+/// A `BlockWriter` is a single-use object that writes a single block.
+///
+/// Data is compressed and its hash is
 /// accumulated until writing is complete.
 ///
 /// TODO: Implement all of std::io::Write?
