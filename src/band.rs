@@ -27,10 +27,11 @@
 ///            "b1000000-2000000")
 /// ```
 
-use super::Archive;
 use std::fs;
 use std::io;
 use std::path::{PathBuf};
+
+use super::archive::Archive;
 
 #[derive(Debug, PartialEq)]
 pub struct BandId {

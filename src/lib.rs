@@ -14,10 +14,8 @@ extern crate term;
 extern crate walkdir;
 
 pub mod archive;
-pub use archive::Archive;
 pub mod backup;
 pub mod band;
-pub use band::BandId;
 pub mod blockwriter;
 pub mod logger;
 

@@ -8,7 +8,7 @@ use std::path::{Path};
 use std::io::{Result};
 use walkdir::WalkDir;
 
-use super::Archive;
+use super::archive::Archive;
 
 
 pub fn run_backup(archive_path: &Path, sources: Vec<&Path>) -> Result<()> {

@@ -1,6 +1,8 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
+//! Command-line entry point for Conserve backups.
+
 extern crate conserve;
 extern crate docopt;
 #[macro_use]
@@ -9,6 +11,8 @@ extern crate rustc_serialize;
 
 use docopt::Docopt;
 use std::path::{Path};
+
+use conserve::archive::Archive;
 
 static USAGE: &'static str = "
 Conserve: an (incomplete) backup tool.
@@ -32,7 +36,7 @@ struct Args {
 
 
 fn run_init(args: &Args) -> std::io::Result<()> {
-    conserve::Archive::init(Path::new(&args.arg_archivedir)).and(Ok(()))
+    Archive::init(Path::new(&args.arg_archivedir)).and(Ok(()))
 }
 
 

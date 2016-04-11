@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf} ;
 
 use rustc_serialize::json;
 
-use super::BandId;
+use super::band::BandId;
 
 const HEADER_FILENAME: &'static str = "CONSERVE";
 const ARCHIVE_VERSION: &'static str = "0.2.0";
