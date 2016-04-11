@@ -6,6 +6,7 @@ homepage = "https://github.com/sourcefrog/conserve/"
 repository = "https://github.com/sourcefrog/conserve/"
 readme = "README.md"
 keywords = ["archive", "backup"]
+license = "GPL-2.0"
 
 [[bin]]
 name = "conserve"
