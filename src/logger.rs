@@ -1,6 +1,8 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
+//! Log info, errors, etc to the console or a file.
+
 extern crate log;
 extern crate term;
 
