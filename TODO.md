@@ -1,6 +1,9 @@
 * Write some data to a data block:
-  - Hasher implementation that passes through to a file
-  - Maybe send a pr to add the Writer interface to blake2
+  - Give the writer the directory to write into.
+  - Make a function to generate the actual name given the hash, spreading
+    across some subdirectories.
+  - Create and write the file when all the data is ready.  
+  - Make the subdirectory if necessary?
   
 * Write some files into a band.
 
