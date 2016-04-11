@@ -31,11 +31,14 @@ impl BlockWriter {
         }
     }
     
+    /// Write all the contents of `buf` into this block.
+    ///
+    /// If this returns an error then it's possible that the block was partly
+    /// written, and the caller should discard it.
     pub fn write_all(self: &mut BlockWriter, buf: &[u8]) -> io::Result<()> {
+        try!(self.encoder.write_all(buf));
         self.hasher.update(buf);
-        self.encoder.write_all(buf)
-        // TODO: If we fail to compress the data for some reason, the hash
-        // will be wrong and this block should probably be discarded.
+        Ok(())
     }
     
     /// Finish writing.
