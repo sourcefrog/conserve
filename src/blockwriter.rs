@@ -55,6 +55,7 @@ impl BlockWriter {
 #[cfg(test)]
 mod tests {
     use super::BlockWriter;
+    use rustc_serialize::hex::ToHex;
     
     #[test]
     pub fn test_simple_write_all() {
@@ -64,8 +65,10 @@ mod tests {
         println!("Compressed result: {:?}", compressed);
         assert!(compressed.len() == 10);
         assert!(hash.len() == 64);
+        assert_eq!(hash.to_hex(),
+            "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
+             45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c");
         
         // TODO: Test uncompressing?
-        // TODO: Test hash is as expected.
     }
 }
