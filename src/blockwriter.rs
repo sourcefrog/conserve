@@ -3,9 +3,8 @@
 
 //! Write body data to a data block, compressed, and stored by its hash.
 //!
-//! Blocks are required to be not too big in their compressed form
-//! to fit in memory on the machines
-//! that are reading and writing them: say 1GB.
+//! Blocks are required to be less than 1GB uncompressed, so they can be held
+//! entirely in memory on a typical machine.
 
 use std::io;
 use std::io::Write;
