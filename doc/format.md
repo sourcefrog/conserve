@@ -47,13 +47,15 @@ together, and ahead of any subdirectories.
 
 ## Archive
 
-A backup *archive* is a possibly-remote directory, containing archive
-files.
+A backup *archive* is a directory, containing archive files.
 
+Archives can be stored on cloud or other remote storage.
 The archive makes minimal assumptions about the filesystem it's stored on: in
 particular, it need not support case sensitivity, it need not store times or
 other metadata, and it only needs to support 8.3 characters.  It must supported
-nested subdirectories but only of moderate length.
+nested subdirectories with a total path length up to 100 characters.  
+
+Archive filesystems must allow many files per directory.
 
 ## Archive header
 
@@ -72,10 +74,10 @@ identify them as being in the same tier.
 ## Bands
 
 Within each tier, there are multiple *bands*.  (For example, "the monthly
-backup made on 2012-10-01.")  A band may have a *parent* band, which is one
-particular band in the immediately lower tier.
+backup made on 2012-10-01.")  A band that is not in the base tier has a
+*parent band* in the immediately lower tier.
 
-A band may be *open*, while it is receiving data, or *closed* when
+A band can be *open*, while it is receiving data, or *closed* when
 everything from the source has been written.  Bands may remain open
 indefinitely, across multiple Conserve invocations, until they are finished.
 Once the band is finished, it will not be changed.
@@ -133,11 +135,11 @@ Band footer contains:
 Data blocks contain parts of the full text of stored files.
 
 One data block may contain data for a whole file, the concatenated
-text for several files, or just part of a file.  One data block
-might be referenced from the index block of any number of files
+text for several files, or part of a file.  One data block
+may be referenced from the index block of any number of files
 from the current or any descendent band.
 
-The writer may choose the data block size, except that both the uncompressed
+The writer can choose the data block size, except that both the uncompressed
 and compressed blocks must be <1GB, so they can reasonably fit in memory.
 
 All the data block for a band are stored within a `d/` subdirectory
@@ -175,7 +177,7 @@ which is a dict of
 
    - `name`: the name of the file
    - `mtime`: in seconds past the unix epoch
-   - possibly ownership, permissions, and other filesystem metadata
+   - ownership, permissions, and other filesystem metadata
    - `type`: one of `"file"`, `"dir"`, `"symlink"`
    - `deleted`: true if it was present in a parent band and was
      deleted in this band
