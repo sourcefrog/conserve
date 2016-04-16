@@ -64,8 +64,7 @@ impl BlockWriter {
     /// Callers normally want `BlockDir.store` instead, which will
     /// finish and consume the writer.
     pub fn finish(self: BlockWriter) -> io::Result<(Vec<u8>, String)> {
-        let compressed: Vec<u8> = self.encoder.finish().unwrap();
-        Ok((compressed,
+        Ok((try!(self.encoder.finish()),
             self.hasher.finalize().as_bytes().to_hex()))
     }
 }
