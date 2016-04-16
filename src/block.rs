@@ -25,6 +25,9 @@ const BLAKE_HASH_SIZE_BYTES: usize = 64;
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
 
+/// The unique identifier for a block: its hexadecimal BLAKE2b hash.
+pub type BlockHash = String;
+
 
 /// Write body data to a data block, compressed, and stored by its hash.
 ///
@@ -63,7 +66,7 @@ impl BlockWriter {
     ///
     /// Callers normally want `BlockDir.store` instead, which will
     /// finish and consume the writer.
-    pub fn finish(self: BlockWriter) -> io::Result<(Vec<u8>, String)> {
+    pub fn finish(self: BlockWriter) -> io::Result<(Vec<u8>, BlockHash)> {
         Ok((try!(self.encoder.finish()),
             self.hasher.finalize().as_bytes().to_hex()))
     }
@@ -88,14 +91,14 @@ impl BlockDir {
     }
     
     /// Return the subdirectory in which we'd put a file called `hash_hex`.
-    fn subdir_for(self: &BlockDir, hash_hex: &str) -> PathBuf {
+    fn subdir_for(self: &BlockDir, hash_hex: &BlockHash) -> PathBuf {
         let mut buf = self.path.clone();
         buf.push(block_name_to_subdirectory(hash_hex));
         buf
     }
     
     /// Return the full path for a file called `hex_hash`.
-    fn path_for_file(self: &BlockDir, hash_hex: &str) -> PathBuf {
+    fn path_for_file(self: &BlockDir, hash_hex: &BlockHash) -> PathBuf {
         let mut buf = self.subdir_for(hash_hex);
         buf.push(hash_hex);
         buf
@@ -104,7 +107,7 @@ impl BlockDir {
     /// Finish and store the contents of a BlockWriter.
     ///
     /// Returns the hex hash of the block.
-    pub fn store(self: &BlockDir, bw: BlockWriter) -> io::Result<String> {
+    pub fn store(self: &BlockDir, bw: BlockWriter) -> io::Result<BlockHash> {
         let (compressed_bytes, hex_hash) = try!(bw.finish());
         let subdir = self.subdir_for(&hex_hash);
         if let Err(e) = create_dir(subdir) {
