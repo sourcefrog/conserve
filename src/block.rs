@@ -19,6 +19,10 @@ const BROTLI_COMPRESSION_LEVEL: u32 = 4;
 /// Use the maximum 64-byte hash.
 const BLAKE_HASH_SIZE_BYTES: usize = 64;
 
+/// Take this many characters from the block hash to form the subdirectory name.
+const SUBDIR_NAME_CHARS: usize = 3;
+
+
 /// Write body data to a data block, compressed, and stored by its hash.
 ///
 /// A `BlockWriter` is a single-use object that writes a single block.
@@ -30,6 +34,10 @@ const BLAKE_HASH_SIZE_BYTES: usize = 64;
 pub struct BlockWriter {
     encoder: BrotliEncoder<Vec<u8>>,
     hasher: Blake2b,
+}
+
+pub fn block_name_to_subdirectory(block_hash: &str) -> &str {
+    &block_hash[..SUBDIR_NAME_CHARS]
 }
     
 impl BlockWriter {
@@ -65,6 +73,16 @@ impl BlockWriter {
 mod tests {
     use super::BlockWriter;
     use rustc_serialize::hex::ToHex;
+    
+    const EXAMPLE_BLOCK_HASH: &'static str =
+        "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
+         45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
+         
+    #[test]
+    pub fn test_block_name_to_subdirectory() {
+        assert_eq!(super::block_name_to_subdirectory(EXAMPLE_BLOCK_HASH),
+            "66a");
+    }
     
     #[test]
     pub fn test_simple_write_all() {
