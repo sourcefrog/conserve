@@ -6,10 +6,8 @@ All metadata is stored as json dictionaries.
 
 ## Software version
 
-Conserve archives include the version of the software that wrote them, which is an
-_x.y.z_ tuple. Changes to the `x` major version imply a non-backward-compatible change:
-older versions may not be able to read it. Changes to the `y` minor version may
-include backward-compatible extensions.  (See [Versioning](versioning.md).)
+Conserve archives include the version of the software that wrote them, which is
+an _x.y.z_ tuple.  See [versioning.md](versioning.md) for the semantics.
 
 
 ## Filenames
