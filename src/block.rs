@@ -76,7 +76,7 @@ pub struct BlockDir {
     path: PathBuf,
 }
 
-pub fn block_name_to_subdirectory(block_hash: &str) -> &str {
+fn block_name_to_subdirectory(block_hash: &str) -> &str {
     &block_hash[..SUBDIR_NAME_CHARS]
 }
 
@@ -132,12 +132,6 @@ mod tests {
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
          45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
          
-    #[test]
-    pub fn test_block_name_to_subdirectory() {
-        assert_eq!(super::block_name_to_subdirectory(EXAMPLE_BLOCK_HASH),
-            "66a");
-    }
-    
     #[test]
     pub fn test_write_all_to_memory() {
         let mut writer = BlockWriter::new();
