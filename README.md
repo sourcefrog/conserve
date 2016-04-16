@@ -19,6 +19,8 @@ Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
 [![Build Status](https://travis-ci.org/sourcefrog/conserve.png?branch=rust)](https://travis-ci.org/sourcefrog/conserve)
 
+[![Clippy Linting Result](https://clippy.bashy.io/github/sourcefrog/conserve/master/badge.svg)](https://clippy.bashy.io/github/sourcefrog/conserve/master/log)
+
 Use
 ---
 
