@@ -10,6 +10,7 @@ extern crate brotli2;
 #[macro_use]
 extern crate log;
 extern crate rustc_serialize;
+extern crate tempdir;
 extern crate term;
 extern crate walkdir;
 
