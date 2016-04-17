@@ -58,8 +58,10 @@ The primary target is cloud storage, though local disks or removable
 disks are also important.
 
 Cloud storage (and to a lesser extent local network or USB storage)
-is high-latency and limited bandwidth.  We cannot assume a remote
-smart server.
+is high-latency and limited bandwidth.  
+
+We cannot assume a remote smart server: the only network calls are
+read, write, list, delete, etc.
 
 Cloud storage has underlying redundancy so is unlikely to have
 IO errors, although error-correcting formats may be useful on USB
@@ -70,13 +72,16 @@ may not strictly serialize operations. Writes or deletes may take
 some time to be visible to readers. So, locking patterns that would
 work locally will not work.
 
-Storage may need to be encrypted. However there is a risk the keys
+Storage is private by an ACL, but still held by a third party so 
+should have an option for encryption.  However there is a risk the keys
 will be lost so encryption should be optional.
 
 Backing storage may be limited in what filenames it allows, eg
 only case-insensitive ASCII.
 
-Cloud storage has a cost per byte but unlimited capacity.
+Cloud storage has a cost per byte (currently ~$0.12/GB/year)
+but unlimited available capacity.
+
 
 
 ## Scaling
