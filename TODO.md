@@ -1,10 +1,13 @@
-* Write some data to a data block:
-  - Give the writer the directory to write into.
-  - Make a function to generate the actual name given the hash, spreading
+- [ ] Write some data to a data block:
+  - [x] Give the writer the directory to write into.
+  - [x] Make a function to generate the actual name given the hash, spreading
     across some subdirectories.
-  - Create and write the file when all the data is ready.  
-  - Make the subdirectory if necessary?
-  
+  - [x] Create and write the file when all the data is ready.
+  - [x] Make the subdirectory if necessary?
+  - [ ] It's ok if an identical file already exists
+
+- [ ] Read back blocks from the block data directory.
+
 * Write some files into a band.
 
 * Validate names are clean
