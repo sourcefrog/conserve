@@ -6,13 +6,16 @@
 //! Blocks are required to be less than 1GB uncompressed, so they can be held
 //! entirely in memory on a typical machine.
 
-use std::fs::{create_dir, File, remove_file};
+use std::fs::create_dir;
 use std::io;
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
+
 use blake2_rfc::blake2b::Blake2b;
 use brotli2::write::BrotliEncoder;
 use rustc_serialize::hex::ToHex;
+
+use super::io::write_file_entire;
 
 /// Use a moderate Brotli compression level.
 ///
@@ -51,7 +54,7 @@ impl BlockWriter {
             hasher: Blake2b::new(BLAKE_HASH_SIZE_BYTES),
         }
     }
-    
+
     /// Write all the contents of `buf` into this block.
     ///
     /// If this returns an error then it's possible that the block was partly
@@ -115,25 +118,9 @@ impl BlockDir {
                 return Err(e);
             }
         }
-        try!(write_file(&self.path_for_file(&hex_hash),
+        try!(write_file_entire(&self.path_for_file(&hex_hash),
             compressed_bytes.as_slice()));
         Ok(hex_hash)
-    }
-}
-
-
-/// Write bytes to a file, and close.  If writing fails, delete the file.
-fn write_file(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let mut f = try!(File::create(path));
-    if let Err(e) = f.write_all(bytes) {
-        drop(f);
-        // Removing it might fail, but the original error is more interesting.
-        // TODO: Log failure?
-        // TODO: Somehow test this path.
-        remove_file(path).is_ok();
-        Err(e)
-    } else {
-        Ok(())
     }
 }
 

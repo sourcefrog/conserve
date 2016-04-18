@@ -18,6 +18,7 @@ pub mod archive;
 pub mod backup;
 pub mod band;
 pub mod block;
+mod io;
 pub mod logger;
 
 /// Conserve version number as a semver string.

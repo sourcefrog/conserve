@@ -9,12 +9,14 @@
 
 use std;
 use std::fs::{File};
-use std::io::{Error, ErrorKind, Result, Read, Write};
+use std::io::{Error, ErrorKind, Result, Read};
 use std::path::{Path, PathBuf} ;
 
 use rustc_serialize::json;
 
 use super::band::BandId;
+use super::io::write_file_entire;
+
 
 const HEADER_FILENAME: &'static str = "CONSERVE";
 const ARCHIVE_VERSION: &'static str = "0.2.0";
@@ -92,22 +94,9 @@ impl Archive {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
         let header_path = self.dir.join(HEADER_FILENAME);
-        let mut header_file = match File::create(&header_path) {
-            Ok(f) => f,
-            Err(e) => {
-                error!("Couldn't open archive header {:?}: {}",
-                    header_path.display(), e);
-                return Err(e)
-            }
-        };
         let header_json = json::encode(&header).unwrap() + "\n";
         debug!("header json = {}", header_json);
-        if let Err(e) = header_file.write_all(header_json.as_bytes()) {
-            error!("Couldn't write header file {:?}: {}",
-                header_path.display(), e);
-            return Err(e)
-        }
-        Ok(())
+        write_file_entire(&header_path, header_json.as_bytes())
     }
     
     /// Returns a vector of ids for bands currently present.
