@@ -4,6 +4,7 @@ version = "0.2.0"
 authors = ["Martin Pool <mbp@sourcefrog.net>"]
 homepage = "https://github.com/sourcefrog/conserve/"
 repository = "https://github.com/sourcefrog/conserve/"
+description = "A robust backup tool. Not for production use yet."
 readme = "README.md"
 keywords = ["archive", "backup"]
 license = "GPL-2.0"
