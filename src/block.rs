@@ -118,8 +118,12 @@ impl BlockDir {
                 return Err(e);
             }
         }
-        try!(write_file_entire(&self.path_for_file(&hex_hash),
-            compressed_bytes.as_slice()));
+        if let Err(e) = write_file_entire(&self.path_for_file(&hex_hash),
+            compressed_bytes.as_slice()) {
+            if e.kind() != ErrorKind::AlreadyExists {
+                return Err(e);
+            }
+        }
         Ok(hex_hash)
     }
 }
@@ -163,6 +167,22 @@ mod tests {
         let expected_file = testdir.path().join("66a").join(EXAMPLE_BLOCK_HASH);
         let attr = fs::metadata(expected_file).unwrap();
         assert!(attr.is_file());
+    }
+
+    #[test]
+    pub fn test_write_same_data_again() {
+        let testdir = tempdir::TempDir::new("block_test").unwrap();
+        let block_dir = BlockDir::new(testdir.path());
+
+        let mut writer = BlockWriter::new();
+        writer.write_all("hello!".as_bytes()).unwrap();
+        let hash1 = block_dir.store(writer).unwrap();
+
+        let mut writer = BlockWriter::new();
+        writer.write_all("hello!".as_bytes()).unwrap();
+        let hash2 = block_dir.store(writer).unwrap();
+
+        assert_eq!(hash1, hash2);
     }
 
     // TODO: Try reading data back.
