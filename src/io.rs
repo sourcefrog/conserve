@@ -3,36 +3,29 @@
 
 //! IO utilities.
 
-use std::fs::{OpenOptions, remove_file};
 use std::io;
 use std::io::{Write};
 use std::path::{Path, };
+
+use tempfile;
 
 
 /// Write bytes to a file, and close.
 /// If writing fails, delete the file.
 /// The file must not already exist.
-///
-/// NOTE: This requires Rust >= 1.9 for `OpenOptions::create_new`.
 pub fn write_file_entire(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    // TODO: Somehow test the error cases.
-    let mut f = match OpenOptions::new().write(true).create_new(true).open(path) {
-        Ok(f) => f,
-        Err(e) => {
-            error!("Couldn't create {:?}: {}", path.display(), e);
-            return Err(e);
-        }
-    };
+    let dir = path.parent().unwrap();
+    let mut f = try!(tempfile::NamedTempFileOptions::new()
+        .prefix("tmp").create_in(dir));
     if let Err(e) = f.write_all(bytes) {
         error!("Couldn't write {:?}: {}", path.display(), e);
-        drop(f);
-        if let Err(remove_err) = remove_file(path) {
-            error!("Couldn't remove {:?}: {}", path.display(), remove_err);
-        }
-        Err(e)
-    } else {
-        Ok(())
-    }
+        return Err(e)
+    };
+    try!(f.sync_all());
+    if let Err(e) = f.persist_noclobber(path) {
+        return Err(e.error);
+    };
+    Ok(())
 }
 
 
@@ -58,4 +51,6 @@ mod tests {
         assert_eq!(fs::metadata(&testfile).unwrap().len(),
             "hello".len() as u64);
     }
+
+    // TODO: Somehow test the error cases.
 }
