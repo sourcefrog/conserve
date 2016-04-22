@@ -6,7 +6,7 @@
 //! Blocks are required to be less than 1GB uncompressed, so they can be held
 //! entirely in memory on a typical machine.
 
-use std::fs::create_dir;
+use std::fs;
 use std::io;
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
@@ -113,7 +113,7 @@ impl BlockDir {
     pub fn store(self: &BlockDir, bw: BlockWriter) -> io::Result<BlockHash> {
         let (compressed_bytes, hex_hash) = try!(bw.finish());
         let subdir = self.subdir_for(&hex_hash);
-        if let Err(e) = create_dir(subdir) {
+        if let Err(e) = fs::create_dir(subdir) {
             if e.kind() != ErrorKind::AlreadyExists {
                 return Err(e);
             }
@@ -125,6 +125,19 @@ impl BlockDir {
             }
         }
         Ok(hex_hash)
+    }
+
+    /// True if the named block is present in this directory.
+    pub fn contains(self: &BlockDir, hash: &BlockHash) -> io::Result<bool> {
+        if let Err(e) = fs::metadata(self.path_for_file(hash)) {
+            if e.kind() == ErrorKind::NotFound {
+                Ok(false)
+            } else {
+                Err(e)
+            }
+        } else {
+            Ok(true)
+        }
     }
 }
 
@@ -158,6 +171,10 @@ mod tests {
         let testdir = tempdir::TempDir::new("block_test").unwrap();
         let mut writer = BlockWriter::new();
         let block_dir = BlockDir::new(testdir.path());
+        let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
+
+        assert_eq!(block_dir.contains(&expected_hash).unwrap(),
+            false);
         
         writer.write_all("hello!".as_bytes()).unwrap();
         let hash_hex = block_dir.store(writer).unwrap();
@@ -167,6 +184,9 @@ mod tests {
         let expected_file = testdir.path().join("66a").join(EXAMPLE_BLOCK_HASH);
         let attr = fs::metadata(expected_file).unwrap();
         assert!(attr.is_file());
+
+        assert_eq!(block_dir.contains(&expected_hash).unwrap(),
+            true);
     }
 
     #[test]
