@@ -21,6 +21,7 @@ pub mod band;
 pub mod block;
 mod io;
 pub mod logger;
+pub mod report;
 
 /// Conserve version number as a semver string.
 ///
