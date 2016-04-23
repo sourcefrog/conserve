@@ -143,14 +143,10 @@ impl<'a> BlockDir<'a> {
 
     /// True if the named block is present in this directory.
     pub fn contains(self: &'a BlockDir<'a>, hash: &BlockHash) -> io::Result<bool> {
-        if let Err(e) = fs::metadata(self.path_for_file(hash)) {
-            if e.kind() == ErrorKind::NotFound {
-                Ok(false)
-            } else {
-                Err(e)
-            }
-        } else {
-            Ok(true)
+        match fs::metadata(self.path_for_file(hash)) {
+            Err(ref e) if e.kind() == ErrorKind::NotFound => Ok(false),
+            Ok(_) => Ok(true),
+            Err(e) => Err(e),
         }
     }
 }
