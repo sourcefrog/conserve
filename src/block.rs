@@ -149,9 +149,9 @@ impl BlockDir {
 
 #[cfg(test)]
 mod tests {
-    use super::{BlockDir,BlockWriter};
     use std::fs;
     use tempdir;
+    use super::{BlockDir, BlockWriter};
 
     const EXAMPLE_BLOCK_HASH: &'static str =
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
@@ -171,12 +171,17 @@ mod tests {
              45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c");
     }
 
+    fn setup() -> (tempdir::TempDir, BlockDir) {
+        let testdir = tempdir::TempDir::new("block_test").unwrap();
+        let block_dir = BlockDir::new(testdir.path());
+        return (testdir, block_dir);
+    }
+
     #[test]
     pub fn test_write_to_file() {
-        let testdir = tempdir::TempDir::new("block_test").unwrap();
         let mut writer = BlockWriter::new();
-        let block_dir = BlockDir::new(testdir.path());
         let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
+        let (testdir, block_dir) = setup();
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(),
             false);
@@ -196,8 +201,7 @@ mod tests {
 
     #[test]
     pub fn test_write_same_data_again() {
-        let testdir = tempdir::TempDir::new("block_test").unwrap();
-        let block_dir = BlockDir::new(testdir.path());
+        let (testdir, block_dir) = setup();
 
         let mut writer = BlockWriter::new();
         writer.write_all("hello!".as_bytes()).unwrap();
