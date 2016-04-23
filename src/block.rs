@@ -8,11 +8,11 @@
 
 use std::fs;
 use std::io;
-use std::io::{ErrorKind, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b::Blake2b;
-use brotli2::write::BrotliEncoder;
+use brotli2::write::{BrotliDecoder, BrotliEncoder};
 use rustc_serialize::hex::ToHex;
 
 use super::io::write_file_entire;
@@ -149,6 +149,25 @@ impl<'a> BlockDir<'a> {
             Err(e) => Err(e),
         }
     }
+
+    /// Read back the contents of a block, as a byte array.
+    pub fn get(self: &'a BlockDir<'a>, hash: &BlockHash) -> io::Result<Vec<u8>> {
+        let path = self.path_for_file(hash);
+        let mut f = match fs::File::open(&path) {
+            Ok(f) => f,
+            Err(e) => {
+                error!("Block file {:?} can't be opened: {:?}", path, e);
+                return Err(e);
+            }
+        };
+        let mut compressed = Vec::<u8>::new();
+        try!(f.read_to_end(&mut compressed));
+        let outbuf = Vec::<u8>::new();
+        let mut decoder = BrotliDecoder::new(outbuf);
+        try!(decoder.write_all(&compressed));
+        self.report.increment("block.read");
+        decoder.finish()
+    }
 }
 
 
@@ -159,6 +178,7 @@ mod tests {
     use super::{BlockDir, BlockWriter};
     use super::super::report::SyncReport;
 
+    const EXAMPLE_TEXT: &'static str = "hello!";
     const EXAMPLE_BLOCK_HASH: &'static str =
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
          45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
@@ -191,7 +211,7 @@ mod tests {
         assert_eq!(block_dir.contains(&expected_hash).unwrap(),
             false);
 
-        writer.write_all("hello!".as_bytes()).unwrap();
+        writer.write_all(EXAMPLE_TEXT.as_bytes()).unwrap();
         let hash_hex = block_dir.store(writer).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
 
@@ -204,6 +224,12 @@ mod tests {
 
         assert_eq!(report.get_count("block.already_present"), 0);
         assert_eq!(report.get_count("block.written"), 1);
+
+        // Try to read back
+        assert_eq!(report.get_count("block.read"), 0);
+        let back = block_dir.get(&expected_hash).unwrap();
+        assert_eq!(back, EXAMPLE_TEXT.as_bytes());
+        assert_eq!(report.get_count("block.read"), 1);
     }
 
     #[test]
