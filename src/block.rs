@@ -16,6 +16,7 @@ use brotli2::write::BrotliEncoder;
 use rustc_serialize::hex::ToHex;
 
 use super::io::write_file_entire;
+use super::report::Report;
 
 /// Use a moderate Brotli compression level.
 ///
@@ -64,7 +65,7 @@ impl BlockWriter {
         self.hasher.update(buf);
         Ok(())
     }
-    
+
     /// Finish compression, and return the compressed bytes and a hex hash.
     ///
     /// Callers normally want `BlockDir.store` instead, which will
@@ -78,7 +79,10 @@ impl BlockWriter {
 
 /// A readable, writable directory within a band holding data blocks.
 pub struct BlockDir {
-    path: PathBuf,
+    pub path: PathBuf,
+
+    /// Counters and errors for access to this BlockDir.
+    pub report: Report,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
@@ -90,23 +94,24 @@ impl BlockDir {
     pub fn new(path: &Path) -> BlockDir {
         BlockDir {
             path: path.to_path_buf(),
+            report: Report::new(),
         }
     }
-    
+
     /// Return the subdirectory in which we'd put a file called `hash_hex`.
     fn subdir_for(self: &BlockDir, hash_hex: &BlockHash) -> PathBuf {
         let mut buf = self.path.clone();
         buf.push(block_name_to_subdirectory(hash_hex));
         buf
     }
-    
+
     /// Return the full path for a file called `hex_hash`.
     fn path_for_file(self: &BlockDir, hash_hex: &BlockHash) -> PathBuf {
         let mut buf = self.subdir_for(hash_hex);
         buf.push(hash_hex);
         buf
     }
-    
+
     /// Finish and store the contents of a BlockWriter.
     ///
     /// Returns the hex hash of the block.
@@ -147,15 +152,15 @@ mod tests {
     use super::{BlockDir,BlockWriter};
     use std::fs;
     use tempdir;
-    
+
     const EXAMPLE_BLOCK_HASH: &'static str =
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
          45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
-         
+
     #[test]
     pub fn test_write_all_to_memory() {
         let mut writer = BlockWriter::new();
-        
+
         writer.write_all("hello!".as_bytes()).unwrap();
         let (compressed, hash_hex) = writer.finish().unwrap();
         println!("Compressed result: {:?}", compressed);
@@ -165,7 +170,7 @@ mod tests {
             "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
              45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c");
     }
-    
+
     #[test]
     pub fn test_write_to_file() {
         let testdir = tempdir::TempDir::new("block_test").unwrap();
@@ -175,11 +180,11 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(),
             false);
-        
+
         writer.write_all("hello!".as_bytes()).unwrap();
         let hash_hex = block_dir.store(writer).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
-        
+
         // Subdirectory and file should exist
         let expected_file = testdir.path().join("66a").join(EXAMPLE_BLOCK_HASH);
         let attr = fs::metadata(expected_file).unwrap();
