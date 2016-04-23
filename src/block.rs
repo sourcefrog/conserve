@@ -129,10 +129,15 @@ impl<'a> BlockDir<'a> {
         }
         if let Err(e) = write_file_entire(&self.path_for_file(&hex_hash),
             compressed_bytes.as_slice()) {
-            if e.kind() != ErrorKind::AlreadyExists {
+            if e.kind() == ErrorKind::AlreadyExists {
+                // Suprising we saw this rather than detecting it above.
+                warn!("Unexpected late detection of existing block {:?}", hex_hash);
+                self.report.increment("block.matched");
+            } else {
                 return Err(e);
             }
         }
+        self.report.increment("block.written");
         Ok(hex_hash)
     }
 
@@ -199,8 +204,10 @@ mod tests {
         let attr = fs::metadata(expected_file).unwrap();
         assert!(attr.is_file());
 
-        assert_eq!(block_dir.contains(&expected_hash).unwrap(),
-            true);
+        assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
+
+        assert_eq!(report.get_count("block.matched"), 0);
+        assert_eq!(report.get_count("block.written"), 1);
     }
 
     #[test]
@@ -211,10 +218,14 @@ mod tests {
         let mut writer = BlockWriter::new();
         writer.write_all("hello!".as_bytes()).unwrap();
         let hash1 = block_dir.store(writer).unwrap();
+        assert_eq!(report.get_count("block.matched"), 0);
+        assert_eq!(report.get_count("block.written"), 1);
 
         let mut writer = BlockWriter::new();
         writer.write_all("hello!".as_bytes()).unwrap();
         let hash2 = block_dir.store(writer).unwrap();
+        assert_eq!(report.get_count("block.matched"), 1);
+        assert_eq!(report.get_count("block.written"), 1);
 
         assert_eq!(hash1, hash2);
     }
