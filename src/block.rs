@@ -118,7 +118,7 @@ impl<'a> BlockDir<'a> {
     pub fn store(self: &'a BlockDir<'a>, bw: BlockWriter) -> io::Result<BlockHash> {
         let (compressed_bytes, hex_hash) = try!(bw.finish());
         if try!(self.contains(&hex_hash)) {
-            self.report.increment("block.matched");
+            self.report.increment("block.already_present");
             return Ok(hex_hash);
         }
         let subdir = self.subdir_for(&hex_hash);
@@ -132,7 +132,7 @@ impl<'a> BlockDir<'a> {
             if e.kind() == ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);
-                self.report.increment("block.matched");
+                self.report.increment("block.already_present");
             } else {
                 return Err(e);
             }
@@ -206,7 +206,7 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
 
-        assert_eq!(report.get_count("block.matched"), 0);
+        assert_eq!(report.get_count("block.already_present"), 0);
         assert_eq!(report.get_count("block.written"), 1);
     }
 
@@ -218,13 +218,13 @@ mod tests {
         let mut writer = BlockWriter::new();
         writer.write_all("hello!".as_bytes()).unwrap();
         let hash1 = block_dir.store(writer).unwrap();
-        assert_eq!(report.get_count("block.matched"), 0);
+        assert_eq!(report.get_count("block.already_present"), 0);
         assert_eq!(report.get_count("block.written"), 1);
 
         let mut writer = BlockWriter::new();
         writer.write_all("hello!".as_bytes()).unwrap();
         let hash2 = block_dir.store(writer).unwrap();
-        assert_eq!(report.get_count("block.matched"), 1);
+        assert_eq!(report.get_count("block.already_present"), 1);
         assert_eq!(report.get_count("block.written"), 1);
 
         assert_eq!(hash1, hash2);
