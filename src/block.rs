@@ -211,6 +211,4 @@ mod tests {
 
         assert_eq!(hash1, hash2);
     }
-
-    // TODO: Try reading data back.
 }
