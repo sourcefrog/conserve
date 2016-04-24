@@ -23,11 +23,11 @@ impl Report {
         }
     }
 
-    /// Increment a counter (by 1).
+    /// Increment a counter by a given amount.
     ///
     /// The name must be a static string.  Counters implicitly start at 0.
-    pub fn increment(self: &mut Report, counter_name: &'static str) {
-        *self.count.entry(counter_name).or_insert(0) += 1;
+    pub fn increment(self: &mut Report, counter_name: &'static str, delta: u64) {
+        *self.count.entry(counter_name).or_insert(0) += delta;
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
@@ -50,10 +50,14 @@ impl SyncReport {
         }
     }
 
-    pub fn increment(self: &SyncReport, counter_name: &'static str) {
-        self.inner.lock().unwrap().increment(counter_name)
+    /// Increment a counter by a given amount.
+    ///
+    /// The name must be a static string.  Counters implicitly start at 0.
+    pub fn increment(self: &SyncReport, counter_name: &'static str, delta: u64) {
+        self.inner.lock().unwrap().increment(counter_name, delta)
     }
 
+    /// Return the value of a counter.  A counter that has not yet been updated is 0.
     pub fn get_count(self: &SyncReport, counter_name: &'static str) -> u64 {
         self.inner.lock().unwrap().get_count(counter_name)
     }
@@ -68,9 +72,9 @@ mod tests {
     pub fn test_count() {
         let mut r = Report::new();
         assert_eq!(r.get_count("splines_reticulated"), 0);
-        r.increment("splines_reticulated");
+        r.increment("splines_reticulated", 1);
         assert_eq!(r.get_count("splines_reticulated"), 1);
-        r.increment("splines_reticulated");
-        assert_eq!(r.get_count("splines_reticulated"), 2);
+        r.increment("splines_reticulated", 10);
+        assert_eq!(r.get_count("splines_reticulated"), 11);
     }
 }

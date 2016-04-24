@@ -120,7 +120,7 @@ impl<'a> BlockDir<'a> {
     pub fn store(self: &'a BlockDir<'a>, bw: BlockWriter) -> io::Result<BlockHash> {
         let (compressed_bytes, hex_hash) = try!(bw.finish());
         if try!(self.contains(&hex_hash)) {
-            self.report.increment("block.already_present");
+            self.report.increment("block.already_present", 1);
             return Ok(hex_hash);
         }
         let subdir = self.subdir_for(&hex_hash);
@@ -134,12 +134,12 @@ impl<'a> BlockDir<'a> {
             if e.kind() == ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);
-                self.report.increment("block.already_present");
+                self.report.increment("block.already_present", 1);
             } else {
                 return Err(e);
             }
         }
-        self.report.increment("block.written");
+        self.report.increment("block.written", 1);
         Ok(hex_hash)
     }
 
@@ -159,16 +159,16 @@ impl<'a> BlockDir<'a> {
             Ok(d) => d,
             Err(e) => {
                 error!("Block file {:?} couldn't be decompressed: {:?}", path, e);
-                self.report.increment("block.corrupt");
+                self.report.increment("block.corrupt", 1);
                 return Err(e);
             }
         };
-        self.report.increment("block.read");
+        self.report.increment("block.read", 1);
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
             .as_bytes().to_hex();
         if actual_hash != *hash {
-            self.report.increment("block.corrupt");
+            self.report.increment("block.corrupt", 1);
             error!("Block file {:?} has actual decompressed hash {:?}",
                 path, actual_hash);
             return Err(io::Error::new(ErrorKind::InvalidData, "block.corrupt"));
