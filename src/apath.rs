@@ -24,25 +24,33 @@ use std::cmp::Ordering;
 
 /// Compare two apaths.
 pub fn apath_cmp(a: &str, b: &str) -> Ordering {
-    let mut ait = a.split('/').peekable();
-    let mut bit = b.split('/').peekable();
+    let mut ait = a.split('/');
+    let mut bit = b.split('/');
+    let mut oa = ait.next().expect("paths must not be empty");
+    let mut ob = bit.next().expect("paths must not be empty");
     loop {
         match (ait.next(), bit.next()) {
-            (None, None) => return Ordering::Equal,
+            // Both paths end here: eg ".../aa" < ".../zz"
+            (None, None) => return oa.cmp(ob),
+
+            // If one is a direct child and the other is in a subdirectory,
+            // the direct child comes first.
+            // eg ".../zz" < ".../aa/bb"
             (None, Some(_bc)) => return Ordering::Less,
             (Some(_ac), None) => return Ordering::Greater,
-            (Some(ac), Some(bc)) =>
-                // If one is a direct child and the other is in a subdirectory,
-                // the direct child comes first.
-                match (ait.peek().is_none(), bit.peek().is_none()) {
-                    (true, true) => return ac.cmp(bc),
-                    (true, false) => return Ordering::Less,
-                    (false, true) => return Ordering::Greater,
-                    (false, false) => match ac.cmp(bc) {
-                        Ordering::Equal => continue,
-                        o => return o,
-                    }
+
+            // If both have children then continue if they're the same
+            // eg ".../aa/bb" cmp ".../aa/cc"
+            // or return if they differ here,
+            // eg ".../aa/zz" < ".../bb/yy"
+            (Some(ac), Some(bc)) => {
+                match oa.cmp(ob) {
+                    Ordering::Equal => {
+                        oa = ac; ob = bc; continue;
+                    },
+                    o => return o,
                 }
+            }
         }
     }
 }
