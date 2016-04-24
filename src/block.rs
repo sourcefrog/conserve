@@ -140,6 +140,7 @@ impl<'a> BlockDir<'a> {
             }
         }
         self.report.increment("block.write.count", 1);
+        self.report.increment("block.write.compressed_bytes", compressed_bytes.len() as u64);
         Ok(hex_hash)
     }
 
@@ -239,6 +240,7 @@ mod tests {
 
         assert_eq!(report.get_count("block.write.already_present"), 0);
         assert_eq!(report.get_count("block.write.count"), 1);
+        assert_eq!(report.get_count("block.write.compressed_bytes"), 10);
 
         // Try to read back
         assert_eq!(report.get_count("block.read"), 0);
