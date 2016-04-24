@@ -15,6 +15,7 @@ extern crate tempfile;
 extern crate term;
 extern crate walkdir;
 
+mod apath;
 pub mod archive;
 pub mod backup;
 pub mod band;
