@@ -11,6 +11,7 @@ use std::io;
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 
+use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use brotli2::write::{BrotliDecoder, BrotliEncoder};
 use rustc_serialize::hex::ToHex;
@@ -153,21 +154,35 @@ impl<'a> BlockDir<'a> {
     /// Read back the contents of a block, as a byte array.
     pub fn get(self: &'a BlockDir<'a>, hash: &BlockHash) -> io::Result<Vec<u8>> {
         let path = self.path_for_file(hash);
-        let mut f = match fs::File::open(&path) {
-            Ok(f) => f,
+        let decompressed = match read_and_decompress(&path) {
+            Ok(d) => d,
             Err(e) => {
-                error!("Block file {:?} can't be opened: {:?}", path, e);
+                error!("Block file {:?} couldn't be decompressed: {:?}", path, e);
+                self.report.increment("block.corrupt");
                 return Err(e);
             }
         };
-        let mut compressed = Vec::<u8>::new();
-        try!(f.read_to_end(&mut compressed));
-        let outbuf = Vec::<u8>::new();
-        let mut decoder = BrotliDecoder::new(outbuf);
-        try!(decoder.write_all(&compressed));
         self.report.increment("block.read");
-        decoder.finish()
+
+        let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
+            .as_bytes().to_hex();
+        if actual_hash != *hash {
+            self.report.increment("block.corrupt");
+            error!("Block file {:?} has actual decompressed hash {:?}",
+                path, actual_hash);
+            return Err(io::Error::new(ErrorKind::InvalidData, "block.corrupt"));
+        }
+        return Ok(decompressed);
     }
+}
+
+fn read_and_decompress(path: &Path) -> io::Result<Vec<u8>> {
+    let mut f = try!(fs::File::open(&path));
+    let mut compressed = Vec::<u8>::new();
+    try!(f.read_to_end(&mut compressed));
+    let mut decoder = BrotliDecoder::new(Vec::<u8>::new());
+    try!(decoder.write_all(&compressed));
+    decoder.finish()
 }
 
 
