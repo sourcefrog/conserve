@@ -13,7 +13,8 @@ use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use brotli2::write::{BrotliDecoder, BrotliEncoder};
+use brotli2;
+use brotli2::write::{BrotliEncoder};
 use rustc_serialize::hex::ToHex;
 
 use super::io::write_file_entire;
@@ -177,12 +178,11 @@ impl<'a> BlockDir<'a> {
 }
 
 fn read_and_decompress(path: &Path) -> io::Result<Vec<u8>> {
-    let mut f = try!(fs::File::open(&path));
-    let mut compressed = Vec::<u8>::new();
-    try!(f.read_to_end(&mut compressed));
-    let mut decoder = BrotliDecoder::new(Vec::<u8>::new());
-    try!(decoder.write_all(&compressed));
-    decoder.finish()
+    let f = try!(fs::File::open(&path));
+    let mut decoder = brotli2::read::BrotliDecoder::new(f);
+    let mut decompressed = Vec::<u8>::new();
+    try!(decoder.read_to_end(&mut decompressed));
+    Ok(decompressed)
 }
 
 
