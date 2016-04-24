@@ -1,7 +1,7 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
-//! Record, and report problems or other events that occur during a run.
+//! Count interesting events that occur during a run.
 
 use std::collections;
 use std::sync;
