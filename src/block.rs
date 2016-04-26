@@ -18,7 +18,7 @@ use brotli2::write::{BrotliEncoder};
 use rustc_serialize::hex::ToHex;
 
 use super::io::write_file_entire;
-use super::report::SyncReport;
+use super::report::Report;
 
 /// Use a moderate Brotli compression level.
 ///
@@ -80,35 +80,31 @@ impl BlockWriter {
 
 
 /// A readable, writable directory within a band holding data blocks.
-pub struct BlockDir<'a> {
+pub struct BlockDir {
     pub path: PathBuf,
-
-    /// Counters and errors for access to this BlockDir.
-    pub report: &'a SyncReport,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
     &block_hash[..SUBDIR_NAME_CHARS]
 }
 
-impl<'a> BlockDir<'a> {
+impl BlockDir {
     /// Create a BlockDir accessing `path`, which must exist as a directory.
-    pub fn new(path: &Path, report: &'a SyncReport) -> BlockDir<'a> {
+    pub fn new(path: &Path) -> BlockDir {
         BlockDir {
             path: path.to_path_buf(),
-            report: report,
         }
     }
 
     /// Return the subdirectory in which we'd put a file called `hash_hex`.
-    fn subdir_for(self: &'a BlockDir<'a>, hash_hex: &BlockHash) -> PathBuf {
+    fn subdir_for(self: &BlockDir, hash_hex: &BlockHash) -> PathBuf {
         let mut buf = self.path.clone();
         buf.push(block_name_to_subdirectory(hash_hex));
         buf
     }
 
     /// Return the full path for a file called `hex_hash`.
-    fn path_for_file(self: &'a BlockDir<'a>, hash_hex: &BlockHash) -> PathBuf {
+    fn path_for_file(self: &BlockDir, hash_hex: &BlockHash) -> PathBuf {
         let mut buf = self.subdir_for(hash_hex);
         buf.push(hash_hex);
         buf
@@ -117,10 +113,10 @@ impl<'a> BlockDir<'a> {
     /// Finish and store the contents of a BlockWriter.
     ///
     /// Returns the hex hash of the block.
-    pub fn store(self: &'a BlockDir<'a>, bw: BlockWriter) -> io::Result<BlockHash> {
+    pub fn store(self: &BlockDir, bw: BlockWriter, report: &mut Report) -> io::Result<BlockHash> {
         let (compressed_bytes, hex_hash) = try!(bw.finish());
         if try!(self.contains(&hex_hash)) {
-            self.report.increment("block.write.already_present", 1);
+            report.increment("block.write.already_present", 1);
             return Ok(hex_hash);
         }
         let subdir = self.subdir_for(&hex_hash);
@@ -134,18 +130,18 @@ impl<'a> BlockDir<'a> {
             if e.kind() == ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);
-                self.report.increment("block.write.already_present", 1);
+                report.increment("block.write.already_present", 1);
             } else {
                 return Err(e);
             }
         }
-        self.report.increment("block.write.count", 1);
-        self.report.increment("block.write.compressed_bytes", compressed_bytes.len() as u64);
+        report.increment("block.write.count", 1);
+        report.increment("block.write.compressed_bytes", compressed_bytes.len() as u64);
         Ok(hex_hash)
     }
 
     /// True if the named block is present in this directory.
-    pub fn contains(self: &'a BlockDir<'a>, hash: &BlockHash) -> io::Result<bool> {
+    pub fn contains(self: &BlockDir, hash: &BlockHash) -> io::Result<bool> {
         match fs::metadata(self.path_for_file(hash)) {
             Err(ref e) if e.kind() == ErrorKind::NotFound => Ok(false),
             Ok(_) => Ok(true),
@@ -154,22 +150,22 @@ impl<'a> BlockDir<'a> {
     }
 
     /// Read back the contents of a block, as a byte array.
-    pub fn get(self: &'a BlockDir<'a>, hash: &BlockHash) -> io::Result<Vec<u8>> {
+    pub fn get(self: &BlockDir, hash: &BlockHash, report: &mut Report) -> io::Result<Vec<u8>> {
         let path = self.path_for_file(hash);
         let decompressed = match read_and_decompress(&path) {
             Ok(d) => d,
             Err(e) => {
                 error!("Block file {:?} couldn't be decompressed: {:?}", path, e);
-                self.report.increment("block.read.corrupt", 1);
+                report.increment("block.read.corrupt", 1);
                 return Err(e);
             }
         };
-        self.report.increment("block.read", 1);
+        report.increment("block.read", 1);
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
             .as_bytes().to_hex();
         if actual_hash != *hash {
-            self.report.increment("block.read.misplaced", 1);
+            report.increment("block.read.misplaced", 1);
             error!("Block file {:?} has actual decompressed hash {:?}",
                 path, actual_hash);
             return Err(io::Error::new(ErrorKind::InvalidData, "block.read.misplaced"));
@@ -192,7 +188,7 @@ mod tests {
     use std::fs;
     use tempdir;
     use super::{BlockDir, BlockWriter};
-    use super::super::report::SyncReport;
+    use super::super::report::Report;
 
     const EXAMPLE_TEXT: &'static str = "hello!";
     const EXAMPLE_BLOCK_HASH: &'static str =
@@ -211,9 +207,9 @@ mod tests {
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
     }
 
-    fn setup<'a>(report: &'a SyncReport) -> (tempdir::TempDir, BlockDir<'a>) {
+    fn setup() -> (tempdir::TempDir, BlockDir) {
         let testdir = tempdir::TempDir::new("block_test").unwrap();
-        let block_dir = BlockDir::new(testdir.path(), report);
+        let block_dir = BlockDir::new(testdir.path());
         return (testdir, block_dir);
     }
 
@@ -221,14 +217,14 @@ mod tests {
     pub fn test_write_to_file() {
         let mut writer = BlockWriter::new();
         let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
-        let report = SyncReport::new();
-        let (testdir, block_dir) = setup(&report);
+        let mut report = Report::new();
+        let (testdir, block_dir) = setup();
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(),
             false);
 
         writer.write_all(EXAMPLE_TEXT.as_bytes()).unwrap();
-        let hash_hex = block_dir.store(writer).unwrap();
+        let hash_hex = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
 
         // Subdirectory and file should exist
@@ -244,25 +240,25 @@ mod tests {
 
         // Try to read back
         assert_eq!(report.get_count("block.read"), 0);
-        let back = block_dir.get(&expected_hash).unwrap();
+        let back = block_dir.get(&expected_hash, &mut report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT.as_bytes());
         assert_eq!(report.get_count("block.read"), 1);
     }
 
     #[test]
     pub fn test_write_same_data_again() {
-        let report = SyncReport::new();
-        let (_testdir, block_dir) = setup(&report);
+        let mut report = Report::new();
+        let (_testdir, block_dir) = setup();
 
         let mut writer = BlockWriter::new();
         writer.write_all("hello!".as_bytes()).unwrap();
-        let hash1 = block_dir.store(writer).unwrap();
+        let hash1 = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 0);
         assert_eq!(report.get_count("block.write.count"), 1);
 
         let mut writer = BlockWriter::new();
         writer.write_all("hello!".as_bytes()).unwrap();
-        let hash2 = block_dir.store(writer).unwrap();
+        let hash2 = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 1);
         assert_eq!(report.get_count("block.write.count"), 1);
 
