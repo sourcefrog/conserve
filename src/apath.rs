@@ -80,24 +80,6 @@ mod tests {
     use super::{apath_cmp, apath_valid};
 
     #[test]
-    pub fn test_apath_valid() {
-        let valid_cases = [
-            "a",
-            "a/b",
-            "a/b/c",
-            "a/.config",
-            "a/..obscure",
-            "a/...",
-            "kleine Katze Fuß",
-        ];
-        for v in valid_cases.into_iter() {
-            if !apath_valid(&v) {
-                panic!("{:?} incorrectly marked invalid", v);
-            }
-        }
-    }
-
-    #[test]
     pub fn test_apath_invalid() {
         let invalid_cases = [
             "/",
@@ -120,18 +102,23 @@ mod tests {
     }
 
     #[test]
-    pub fn test_apath_cmp() {
+    pub fn test_apath_valid_and_ordered() {
         let ordered = [
             "...a",
             ".a",
             "a",
             "b",
+            "kleine Katze Fuß",
             "~~",
             "ñ",
+            "a/...",
+            "a/..obscure",
+            "a/.config",
             "a/1",
             "a/100",
             "a/2",
             "a/añejo",
+            "a/b/c",
             "b/((",
             "b/,",
             "b/A",
@@ -146,6 +133,9 @@ mod tests {
         ];
         for i in 0..ordered.len() {
             let a = ordered[i];
+            if !apath_valid(&a) {
+                panic!("{:?} incorrectly marked invalid", a);
+            }
             for j in 0..ordered.len() {
                 let b = ordered[j];
                 let expected_order = i.cmp(&j);
