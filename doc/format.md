@@ -105,7 +105,7 @@ parent.
       b0000/b0000/
       b0000/b0001/
       b0000/b0001/b0000/
-      
+
 ## Band head
 
 A band head is a file `BANDHEAD` containing a json dictionary.
@@ -175,10 +175,10 @@ blocks or the length of the index hunk.
 The uncompressed index hunk contains a json list each element of
 which is a dict of
 
-   - `name`: the name of the file
+   - `apath`: the name of the file
    - `mtime`: in seconds past the unix epoch
    - ownership, permissions, and other filesystem metadata
-   - `type`: one of `"file"`, `"dir"`, `"symlink"`
+   - `kind`: one of `"File"`, `"Dir"`, `"Symlink"`
    - `deleted`: true if it was present in a parent band and was
      deleted in this band
    - `blake2`: the BLAKE2 hash in hex of the full text of the file

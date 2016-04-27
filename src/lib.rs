@@ -20,6 +20,7 @@ pub mod archive;
 pub mod backup;
 pub mod band;
 pub mod block;
+pub mod index;
 mod io;
 pub mod logger;
 pub mod report;
