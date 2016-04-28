@@ -1,8 +1,6 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
-#![allow(dead_code)]  // Until linked in
-
 //! "Apaths" (for archive paths) are platform-independent relative file paths used inside archive
 //! snapshots.
 //!
