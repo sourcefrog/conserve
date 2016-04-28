@@ -6,7 +6,8 @@
 // use rustc_serialize::json;
 
 use std::cmp::Ordering;
-use super::apath::apath_cmp;
+use std::path::{Path, PathBuf};
+use super::apath::{apath_cmp, apath_valid};
 
 /// Kind of file that can be stored in the archive.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
@@ -35,18 +36,27 @@ pub struct IndexEntry {
 
 /// Accumulates ordered changes to the index and streams them out to index files.
 pub struct IndexBuilder {
+    dir: PathBuf,
     entries: Vec<IndexEntry>,
 }
 
 
+/// Accumulate and write out index entries into files in an index directory.
 impl IndexBuilder {
-    pub fn new() -> IndexBuilder {
+    /// Make a new builder that will write files into the given directory.
+    pub fn new(dir: &Path) -> IndexBuilder {
         IndexBuilder {
+            dir: dir.to_path_buf(),
             entries: Vec::<IndexEntry>::new(),
         }
     }
 
     pub fn push(&mut self, entry: IndexEntry) {
+        // We do this check here rather than the Index constructor so that we
+        // can still read invalid apaths...
+        if !apath_valid(&entry.apath) {
+            panic!("invalid apath: {:?}", &entry.apath);
+        }
         if !self.entries.is_empty() {
             let last_apath = &self.entries.last().unwrap().apath;
             assert_eq!(apath_cmp(last_apath, &entry.apath), Ordering::Less);
@@ -59,8 +69,10 @@ impl IndexBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::{IndexEntry, IndexKind};
     use rustc_serialize::json;
+    use tempdir;
+
+    use super::{IndexBuilder, IndexEntry, IndexKind};
 
     const EXAMPLE_HASH: &'static str =
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
@@ -83,5 +95,37 @@ mod tests {
             \"kind\":\"File\",\
             \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117\
             b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c\"}]");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_index_builder_checks_order() {
+        let testdir = tempdir::TempDir::new("index_test").unwrap();
+        let mut ib = IndexBuilder::new(testdir.path());
+        ib.push(IndexEntry {
+            apath: "zzz".to_string(),
+            mtime: 0,
+            kind: IndexKind::File,
+            blake2b: EXAMPLE_HASH.to_string(),
+        });
+        ib.push(IndexEntry {
+            apath: "aaa".to_string(),
+            mtime: 0,
+            kind: IndexKind::File,
+            blake2b: EXAMPLE_HASH.to_string(),
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_index_builder_checks_names() {
+        let testdir = tempdir::TempDir::new("index_test").unwrap();
+        let mut ib = IndexBuilder::new(testdir.path());
+        ib.push(IndexEntry {
+            apath: "/dev/null".to_string(),
+            mtime: 0,
+            kind: IndexKind::File,
+            blake2b: EXAMPLE_HASH.to_string(),
+        })
     }
 }
