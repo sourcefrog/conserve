@@ -5,9 +5,12 @@
 
 // use rustc_serialize::json;
 
+use std::cmp::Ordering;
+use super::apath::apath_cmp;
+
 /// Kind of file that can be stored in the archive.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-enum IndexKind {
+pub enum IndexKind {
     File,
     Dir,
     Symlink,
@@ -15,7 +18,7 @@ enum IndexKind {
 
 /// Description of one archived file.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-struct IndexEntry {
+pub struct IndexEntry {
     /// Path of this entry relative to the base of the backup, in `apath` form.
     pub apath: String,
 
@@ -28,6 +31,31 @@ struct IndexEntry {
     /// BLAKE2b hash of the entire original file.
     pub blake2b: String,
 }
+
+
+/// Accumulates ordered changes to the index and streams them out to index files.
+pub struct IndexBuilder {
+    entries: Vec<IndexEntry>,
+}
+
+
+impl IndexBuilder {
+    pub fn new() -> IndexBuilder {
+        IndexBuilder {
+            entries: Vec::<IndexEntry>::new(),
+        }
+    }
+
+    pub fn push(&mut self, entry: IndexEntry) {
+        if !self.entries.is_empty() {
+            let last_apath = &self.entries.last().unwrap().apath;
+            assert_eq!(apath_cmp(last_apath, &entry.apath), Ordering::Less);
+        }
+
+        self.entries.push(entry);
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
