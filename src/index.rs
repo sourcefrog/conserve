@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015 Martin Pool.
+// Copyright 2015, 2016 Martin Pool.
 
 ///! Listing of files in a band in the archive.
 
@@ -7,6 +7,9 @@
 
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
+
+use rustc_serialize::json;
+
 use super::apath::{apath_cmp, apath_valid};
 
 /// Kind of file that can be stored in the archive.
@@ -64,6 +67,10 @@ impl IndexBuilder {
 
         self.entries.push(entry);
     }
+
+    pub fn to_json(&self) -> String {
+        json::encode(&self.entries).unwrap()
+    }
 }
 
 
@@ -78,6 +85,12 @@ mod tests {
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
          45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
+    fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder) {
+        let testdir = tempdir::TempDir::new("index_test").unwrap();
+        let ib = IndexBuilder::new(testdir.path());
+        (testdir, ib)
+    }
+
     #[test]
     fn test_serialize_index() {
         let entries = [IndexEntry {
@@ -90,18 +103,13 @@ mod tests {
         println!("{}", index_json);
         assert_eq!(
             index_json,
-            "[{\"apath\":\"a/b\",\
-            \"mtime\":1461736377,\
-            \"kind\":\"File\",\
-            \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117\
-            b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c\"}]");
+            r#"[{"apath":"a/b","mtime":1461736377,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#);
     }
 
     #[test]
     #[should_panic]
     fn test_index_builder_checks_order() {
-        let testdir = tempdir::TempDir::new("index_test").unwrap();
-        let mut ib = IndexBuilder::new(testdir.path());
+        let (_testdir, mut ib) = scratch_indexbuilder();
         ib.push(IndexEntry {
             apath: "zzz".to_string(),
             mtime: 0,
@@ -119,13 +127,26 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_index_builder_checks_names() {
-        let testdir = tempdir::TempDir::new("index_test").unwrap();
-        let mut ib = IndexBuilder::new(testdir.path());
+        let (_testdir, mut ib) = scratch_indexbuilder();
         ib.push(IndexEntry {
             apath: "/dev/null".to_string(),
             mtime: 0,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
         })
+    }
+
+    #[test]
+    fn test_index_to_json() {
+        let (_testdir, mut ib) = scratch_indexbuilder();
+        ib.push(IndexEntry {
+            apath: "hello".to_string(),
+            mtime: 0,
+            kind: IndexKind::File,
+            blake2b: EXAMPLE_HASH.to_string(),
+        });
+        let json = ib.to_json();
+        assert_eq!(json,
+            r#"[{"apath":"hello","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#)
     }
 }
