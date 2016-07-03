@@ -6,11 +6,14 @@
 // use rustc_serialize::json;
 
 use std::cmp::Ordering;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use rustc_serialize::json;
 
 use super::apath::{apath_cmp, apath_valid};
+use super::io::{write_compressed_bytes};
+use super::report::Report;
 
 /// Kind of file that can be stored in the archive.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
@@ -38,9 +41,13 @@ pub struct IndexEntry {
 
 
 /// Accumulates ordered changes to the index and streams them out to index files.
+#[derive(Debug)]
 pub struct IndexBuilder {
     dir: PathBuf,
     entries: Vec<IndexEntry>,
+
+    /// Index hunk number, starting at 0.
+    sequence: u32,
 }
 
 
@@ -51,9 +58,13 @@ impl IndexBuilder {
         IndexBuilder {
             dir: dir.to_path_buf(),
             entries: Vec::<IndexEntry>::new(),
+            sequence: 0,
         }
     }
 
+    /// Append an entry to the index.
+    ///
+    /// The new entry must sort after everything already written to the index.
     pub fn push(&mut self, entry: IndexEntry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
@@ -85,20 +96,47 @@ impl IndexBuilder {
         buf.push(format!("{:09}", hunk_number));
         buf
     }
+
+    /// Finish this hunk of the index.
+    ///
+    /// This writes all the currently queued entries into a new index file
+    /// in the band directory, and then clears the index to start receiving
+    /// entries for the next hunk.
+    pub fn finish_hunk(&mut self, report: &mut Report) -> io::Result<()> {
+        let json_str = self.to_json();
+        let json_bytes = json_str.as_bytes();
+        try!(super::io::ensure_dir_exists(
+            &self.subdir_for_hunk(self.sequence)));
+        let hunk_path = &self.path_for_hunk(self.sequence);
+        let compressed_len = try!(write_compressed_bytes(hunk_path, json_bytes));
+
+        report.increment("index.write.uncompressed_bytes", json_bytes.len() as u64);
+        report.increment("index.write.compressed_bytes", compressed_len as u64);
+        report.increment("index.write.hunks", 1);
+
+        // Ready for the next hunk.
+        self.entries.clear();
+        self.sequence += 1;
+        Ok(())
+    }
 }
 
 
 #[cfg(test)]
 mod tests {
     use rustc_serialize::json;
-    use std::path::Path;
+    use std::path::{Path};
     use tempdir;
 
     use super::{IndexBuilder, IndexEntry, IndexKind};
+    use super::super::io::read_and_decompress;
+    use super::super::report::Report;
 
     const EXAMPLE_HASH: &'static str =
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
          45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
+
+    const ONE_ENTRY_INDEX_JSON: &'static str =             r#"[{"apath":"hello","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#;
 
     fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder) {
         let testdir = tempdir::TempDir::new("index_test").unwrap();
@@ -151,18 +189,21 @@ mod tests {
         })
     }
 
-    #[test]
-    fn test_index_to_json() {
-        let (_testdir, mut ib) = scratch_indexbuilder();
+    fn add_an_entry(ib: &mut IndexBuilder) {
         ib.push(IndexEntry {
             apath: "hello".to_string(),
             mtime: 0,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
         });
+    }
+
+    #[test]
+    fn test_index_to_json() {
+        let (_testdir, mut ib) = scratch_indexbuilder();
+        add_an_entry(&mut ib);
         let json = ib.to_json();
-        assert_eq!(json,
-            r#"[{"apath":"hello","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#)
+        assert_eq!(json, ONE_ENTRY_INDEX_JSON);
     }
 
     #[test]
@@ -170,9 +211,34 @@ mod tests {
         let index_dir = Path::new("/foo");
         let ib = IndexBuilder::new(index_dir);
         let hunk_path = ib.path_for_hunk(0);
-        assert_eq!(hunk_path.file_name().unwrap().to_str().unwrap(),
-            "000000000");
-        assert_eq!(hunk_path.parent().unwrap().file_name().unwrap().to_str().unwrap(),
-            "00000");
+        assert_eq!(file_name_as_str(&hunk_path), "000000000");
+        assert_eq!(last_dir_name_as_str(&hunk_path), "00000");
+    }
+
+    fn file_name_as_str(p: &Path) -> &str {
+        p.file_name().unwrap().to_str().unwrap()
+    }
+
+    fn last_dir_name_as_str(p: &Path) -> &str {
+        p.parent().unwrap().file_name().unwrap().to_str().unwrap()
+    }
+
+    #[test]
+    fn test_write_a_hunk() {
+        use std::str;
+
+        let (_testdir, mut ib) = scratch_indexbuilder();
+        let mut report = Report::new();
+        add_an_entry(&mut ib);
+        ib.finish_hunk(&mut report).unwrap();
+
+        // The first hunk exists.
+        let mut expected_path = ib.dir.to_path_buf();
+        expected_path.push("00000");
+        expected_path.push("000000000");
+
+        let retrieved_bytes = read_and_decompress(&expected_path).unwrap();
+        let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
+        assert_eq!(retrieved, ONE_ENTRY_INDEX_JSON);
     }
 }
