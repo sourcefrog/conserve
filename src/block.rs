@@ -8,12 +8,11 @@
 
 use std::fs;
 use std::io;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use brotli2;
 use brotli2::write::{BrotliEncoder};
 use rustc_serialize::hex::ToHex;
 
@@ -120,11 +119,7 @@ impl BlockDir {
             return Ok(hex_hash);
         }
         let subdir = self.subdir_for(&hex_hash);
-        if let Err(e) = fs::create_dir(subdir) {
-            if e.kind() != ErrorKind::AlreadyExists {
-                return Err(e);
-            }
-        }
+        try!(super::io::ensure_dir_exists(&subdir));
         if let Err(e) = write_file_entire(&self.path_for_file(&hex_hash),
             compressed_bytes.as_slice()) {
             if e.kind() == ErrorKind::AlreadyExists {

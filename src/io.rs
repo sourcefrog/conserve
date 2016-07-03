@@ -7,7 +7,7 @@ use brotli2;
 
 use std::fs;
 use std::io;
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, };
 
 use tempfile;
@@ -41,6 +41,28 @@ pub fn read_and_decompress(path: &Path) -> io::Result<Vec<u8>> {
 }
 
 
+/// Compress some bytes and write to a new file.
+///
+/// Returns the length of compressed bytes written.
+pub fn write_compressed_bytes(to_path: &Path, uncompressed: &[u8]) -> io::Result<(usize)> {
+    let mut compressed = Vec::<u8>::with_capacity(uncompressed.len());
+    let params = brotli2::stream::CompressParams::new();
+    try!(brotli2::stream::compress_vec(&params, &uncompressed, &mut compressed));
+    try!(write_file_entire(to_path, &compressed));
+    Ok(compressed.len())
+}
+
+
+pub fn ensure_dir_exists(path: &Path) -> io::Result<()> {
+    if let Err(e) = fs::create_dir(path) {
+        if e.kind() != ErrorKind::AlreadyExists {
+            return Err(e);
+        }
+    }
+    Ok(())
+}
+
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -65,4 +87,5 @@ mod tests {
     }
 
     // TODO: Somehow test the error cases.
+    // TODO: Specific test for write_compressed_bytes.
 }
