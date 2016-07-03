@@ -43,11 +43,19 @@ pub struct IndexEntry {
 /// Accumulates ordered changes to the index and streams them out to index files.
 #[derive(Debug)]
 pub struct IndexBuilder {
+    /// The `i` directory within the band where all files for this index are written.
     dir: PathBuf,
+
+    /// Currently queued entries to be written out.
     entries: Vec<IndexEntry>,
 
     /// Index hunk number, starting at 0.
     sequence: u32,
+
+    /// The last-added filename, to enforce ordering.  At the start of the first hunk
+    /// this is empty; at the start of a later hunk it's the last path from the previous
+    /// hunk, and otherwise it's the last path from `entries`.
+    last_apath: Option<String>,
 }
 
 
@@ -59,6 +67,7 @@ impl IndexBuilder {
             dir: dir.to_path_buf(),
             entries: Vec::<IndexEntry>::new(),
             sequence: 0,
+            last_apath: None,
         }
     }
 
@@ -71,11 +80,10 @@ impl IndexBuilder {
         if !apath_valid(&entry.apath) {
             panic!("invalid apath: {:?}", &entry.apath);
         }
-        if !self.entries.is_empty() {
-            let last_apath = &self.entries.last().unwrap().apath;
-            assert_eq!(apath_cmp(last_apath, &entry.apath), Ordering::Less);
+        if let Some(ref last_apath) = self.last_apath {
+            assert_eq!(apath_cmp(&last_apath, &entry.apath), Ordering::Less);
         }
-
+        self.last_apath = Some(entry.apath.clone());
         self.entries.push(entry);
     }
 
@@ -138,10 +146,10 @@ mod tests {
 
     const ONE_ENTRY_INDEX_JSON: &'static str =             r#"[{"apath":"hello","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#;
 
-    fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder) {
+    fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder, Report) {
         let testdir = tempdir::TempDir::new("index_test").unwrap();
         let ib = IndexBuilder::new(testdir.path());
-        (testdir, ib)
+        (testdir, ib, Report::new())
     }
 
     #[test]
@@ -162,7 +170,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_index_builder_checks_order() {
-        let (_testdir, mut ib) = scratch_indexbuilder();
+        let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
             apath: "zzz".to_string(),
             mtime: 0,
@@ -180,7 +188,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_index_builder_checks_names() {
-        let (_testdir, mut ib) = scratch_indexbuilder();
+        let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
             apath: "/dev/null".to_string(),
             mtime: 0,
@@ -200,7 +208,7 @@ mod tests {
 
     #[test]
     fn test_index_to_json() {
-        let (_testdir, mut ib) = scratch_indexbuilder();
+        let (_testdir, mut ib, _report) = scratch_indexbuilder();
         add_an_entry(&mut ib);
         let json = ib.to_json();
         assert_eq!(json, ONE_ENTRY_INDEX_JSON);
@@ -227,8 +235,7 @@ mod tests {
     fn test_write_a_hunk() {
         use std::str;
 
-        let (_testdir, mut ib) = scratch_indexbuilder();
-        let mut report = Report::new();
+        let (_testdir, mut ib, mut report) = scratch_indexbuilder();
         add_an_entry(&mut ib);
         ib.finish_hunk(&mut report).unwrap();
 
@@ -240,5 +247,25 @@ mod tests {
         let retrieved_bytes = read_and_decompress(&expected_path).unwrap();
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
         assert_eq!(retrieved, ONE_ENTRY_INDEX_JSON);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_no_duplicate_paths() {
+        let (_testdir, mut ib, mut _report) = scratch_indexbuilder();
+        add_an_entry(&mut ib);
+        add_an_entry(&mut ib);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_no_duplicate_paths_across_hunks() {
+        let (_testdir, mut ib, mut report) = scratch_indexbuilder();
+        add_an_entry(&mut ib);
+        ib.finish_hunk(&mut report).unwrap();
+
+        // Try to add an identically-named file within the next hunk and it should error,
+        // because the IndexBuilder remembers the last file name written.
+        add_an_entry(&mut ib);
     }
 }
