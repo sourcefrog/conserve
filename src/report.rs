@@ -9,7 +9,8 @@ use std::sync;
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
 /// running.
 ///
-/// A Report holds counters, identified by a name.  All implicitly start at 0.  All the counter
+/// A Report holds counters, identified by a name.  All implicitly start at 0.  All the
+/// counter
 /// names must be static strings.
 #[derive(Debug)]
 pub struct Report {
