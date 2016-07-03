@@ -71,12 +71,27 @@ impl IndexBuilder {
     pub fn to_json(&self) -> String {
         json::encode(&self.entries).unwrap()
     }
+
+    /// Return the subdirectory for a hunk numbered `hunk_number`.
+    pub fn subdir_for_hunk(&self, hunk_number: u32) -> PathBuf {
+        let mut buf = self.dir.clone();
+        buf.push(format!("{:05}", hunk_number / 10000));
+        buf
+    }
+
+    /// Return the filename (in subdirectory) for a hunk.
+    pub fn path_for_hunk(&self, hunk_number: u32) -> PathBuf {
+        let mut buf = self.subdir_for_hunk(hunk_number);
+        buf.push(format!("{:09}", hunk_number));
+        buf
+    }
 }
 
 
 #[cfg(test)]
 mod tests {
     use rustc_serialize::json;
+    use std::path::Path;
     use tempdir;
 
     use super::{IndexBuilder, IndexEntry, IndexKind};
@@ -148,5 +163,16 @@ mod tests {
         let json = ib.to_json();
         assert_eq!(json,
             r#"[{"apath":"hello","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#)
+    }
+
+    #[test]
+    fn test_path_for_hunk() {
+        let index_dir = Path::new("/foo");
+        let ib = IndexBuilder::new(index_dir);
+        let hunk_path = ib.path_for_hunk(0);
+        assert_eq!(hunk_path.file_name().unwrap().to_str().unwrap(),
+            "000000000");
+        assert_eq!(hunk_path.parent().unwrap().file_name().unwrap().to_str().unwrap(),
+            "00000");
     }
 }
