@@ -17,7 +17,7 @@ use brotli2;
 use brotli2::write::{BrotliEncoder};
 use rustc_serialize::hex::ToHex;
 
-use super::io::write_file_entire;
+use super::io::{read_and_decompress, write_file_entire};
 use super::report::Report;
 
 /// Use a moderate Brotli compression level.
@@ -173,15 +173,6 @@ impl BlockDir {
         return Ok(decompressed);
     }
 }
-
-fn read_and_decompress(path: &Path) -> io::Result<Vec<u8>> {
-    let f = try!(fs::File::open(&path));
-    let mut decoder = brotli2::read::BrotliDecoder::new(f);
-    let mut decompressed = Vec::<u8>::new();
-    try!(decoder.read_to_end(&mut decompressed));
-    Ok(decompressed)
-}
-
 
 #[cfg(test)]
 mod tests {
