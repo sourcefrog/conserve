@@ -3,6 +3,9 @@
 
 /// Run conserve CLI and test it.
 
+// TODO: Maybe use https://github.com/dtolnay/indoc to make indented
+// examples tidier.
+
 
 use std::io;
 use std::env;
@@ -31,12 +34,34 @@ fn blackbox_version() {
         "0.2.0\n", "");
 }
 
+
+#[test]
+fn blackbox_help() {
+    assert_success_and_output(
+        &["--help"],
+        "\
+Conserve: an (incomplete) backup tool.
+Copyright 2015, 2016 Martin Pool, GNU GPL v2+.
+https://github.com/sourcefrog/conserve
+
+Usage:
+    conserve init <archivedir>
+    conserve backup <archivedir> <source>...
+    conserve --version
+    conserve --help
+",
+        "");
+}
+
+
 fn assert_success_and_output(args: &[&str], stdout: &str, stderr: &str) {
     let output = run_conserve(args).unwrap();
     assert!(output.status.success());
     assert_eq!(stderr, String::from_utf8_lossy(&output.stderr));
     assert_eq!(stdout, String::from_utf8_lossy(&output.stdout));
 }
+
+
 /// Run Conserve's binary and return the status and output as strings.
 fn run_conserve(args: &[&str]) -> io::Result<process::Output> {
     // Allow stdout, stdenv from cram through to this test's descriptors, where they can be
