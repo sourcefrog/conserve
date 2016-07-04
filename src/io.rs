@@ -5,6 +5,7 @@
 
 use brotli2;
 
+use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::io::{ErrorKind, Read, Write};
@@ -60,6 +61,30 @@ pub fn ensure_dir_exists(path: &Path) -> io::Result<()> {
         }
     }
     Ok(())
+}
+
+
+/// List a directory.
+///
+/// Returns a set of filenames and a set of directory names respectively.
+#[cfg(test)]
+pub fn list_dir(path: &Path) -> io::Result<(HashSet<String>, HashSet<String>)>
+{
+    let mut file_names = HashSet::<String>::new();
+    let mut dir_names = HashSet::<String>::new();
+    for entry in try!(fs::read_dir(path)) {
+        let entry = entry.unwrap();
+        let entry_filename = entry.file_name().into_string().unwrap();
+        let entry_type = try!(entry.file_type());
+        if entry_type.is_file() {
+            file_names.insert(entry_filename);
+        } else if entry_type.is_dir() {
+            dir_names.insert(entry_filename);
+        } else {
+            panic!("don't recognize file type of {:?}", entry_filename);
+        }
+    }
+    Ok((file_names, dir_names))
 }
 
 
