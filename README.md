@@ -3,7 +3,7 @@ Conserve - a robust backup program
 
 **At this time Conserve is not ready for production use.**
 
-Copyright 2012-2016 [Martin Pool][1], mbp@sourcefrog.net.
+Copyright 2012-2016 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
 
 _This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -40,12 +40,7 @@ Dependencies
 
 Most dependencies will be automatically installed by `cargo build`.
 
-To run the blackbox tests, [cram](https://pypi.python.org/pypi/cram) is needed:
-
-    pip install cram
-
-[1]: http://sourcefrog.net/
-[2]: https://www.apache.org/licenses/LICENSE-2.0.html
+[sourcefrog]: http://sourcefrog.net/
 
 More documentation
 ==================
@@ -54,7 +49,7 @@ More documentation
 
  * [A comparison to other backup systems](
    https://github.com/sourcefrog/conserve/wiki/Compared-to-others)
-   
+
  * [Versioning](doc/versioning.md)
 
  * [Archive format](doc/format.md)

@@ -4,6 +4,3 @@ rust:
   - stable
   - beta
   - nightly
-before_install:
-    - export PATH=$HOME/.local/bin:$PATH
-    - pip install --user cram

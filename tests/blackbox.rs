@@ -86,9 +86,6 @@ fn assert_success_and_output(args: &[&str], stdout: &str, stderr: &str) {
 
 /// Run Conserve's binary and return the status and output as strings.
 fn run_conserve(args: &[&str]) -> io::Result<process::Output> {
-    // Allow stdout, stdenv from cram through to this test's descriptors, where they can be
-    // captured by Cargo.
-
     let mut conserve_path = env::current_exe().unwrap().to_path_buf();
     conserve_path.pop();
     conserve_path.push("conserve");
