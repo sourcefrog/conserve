@@ -1,15 +1,18 @@
 // Conserve backup system.
 // Copyright 2016 Martin Pool.
 
-/// Run conserve CLI and test it.
+/// Run conserve CLI as a subprocess and test it.
 
 // TODO: Maybe use https://github.com/dtolnay/indoc to make indented
-// examples tidier.
+// examples tidier.  But, not supported yet on stable.
 
 
 use std::io;
 use std::env;
 use std::process;
+
+extern crate tempdir;
+
 
 #[test]
 fn blackbox_no_args() {
@@ -51,6 +54,25 @@ Usage:
     conserve --help
 ",
         "");
+}
+
+
+#[test]
+fn blackbox_init() {
+    let testdir = make_tempdir();
+    let mut arch_dir = testdir.path().to_path_buf();
+    arch_dir.push("a");
+    let args = ["init", arch_dir.to_str().unwrap()];
+    let output = run_conserve(&args).unwrap();
+    assert!(output.status.success());
+    assert_eq!(0, output.stderr.len());
+    assert!(String::from_utf8_lossy(&output.stdout)
+        .starts_with("Created new archive"));
+}
+
+
+fn make_tempdir() -> tempdir::TempDir {
+    tempdir::TempDir::new("conserve_blackbox").unwrap()
 }
 
 
