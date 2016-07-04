@@ -46,6 +46,7 @@ pub type BlockHash = String;
 pub struct BlockWriter {
     encoder: BrotliEncoder<Vec<u8>>,
     hasher: Blake2b,
+    uncompressed_length: u64,
 }
 
 
@@ -55,6 +56,7 @@ impl BlockWriter {
         BlockWriter {
             encoder: BrotliEncoder::new(Vec::<u8>::new(), BROTLI_COMPRESSION_LEVEL),
             hasher: Blake2b::new(BLAKE_HASH_SIZE_BYTES),
+            uncompressed_length: 0,
         }
     }
 
@@ -64,6 +66,7 @@ impl BlockWriter {
     /// written, and the caller should discard it.
     pub fn write_all(self: &mut BlockWriter, buf: &[u8]) -> io::Result<()> {
         try!(self.encoder.write_all(buf));
+        self.uncompressed_length += buf.len() as u64;
         self.hasher.update(buf);
         Ok(())
     }
@@ -122,6 +125,7 @@ impl BlockDir {
     ///
     /// Returns the hex hash of the block.
     pub fn store(self: &BlockDir, bw: BlockWriter, report: &mut Report) -> io::Result<BlockHash> {
+        report.increment("block.write.uncompressed_bytes", bw.uncompressed_length);
         let (compressed_bytes, hex_hash) = try!(bw.finish());
         if try!(self.contains(&hex_hash)) {
             report.increment("block.write.already_present", 1);
