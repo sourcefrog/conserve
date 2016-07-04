@@ -27,12 +27,9 @@
 ///            "b1000000-2000000")
 /// ```
 
-use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-
-use super::archive::Archive;
 
 static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
@@ -108,18 +105,16 @@ impl BandId {
 
 /// All backup data is stored in a band.
 #[derive(Debug)]
-pub struct Band<'a> {
+pub struct Band {
     id: BandId,
-    // TODO: Maybe avoid holding a reference to the archive and just take the band path
-    // instead?  Would avoid managing lifetimes.
-    archive: &'a Archive,
     path_buf: PathBuf,
 }
 
 
-impl<'a> Band<'a> {
-    pub fn create(archive: &'a Archive, id: BandId) -> io::Result<Band<'a>> {
-        let mut path_buf = archive.path().to_path_buf();
+impl Band {
+    /// Make a new band (and its on-disk directory).
+    pub fn create(in_directory: &Path, id: BandId) -> io::Result<Band> {
+        let mut path_buf = in_directory.to_path_buf();
         path_buf.push(id.as_string());
         try!(fs::create_dir(path_buf.as_path()));
 
@@ -129,17 +124,16 @@ impl<'a> Band<'a> {
         subdir_path.set_file_name(INDEX_DIR);
         try!(fs::create_dir(&subdir_path));
         Ok(Band{
-            archive: archive,
             id: id,
             path_buf: path_buf,
         })
     }
 
-    pub fn path_buf(self: &Band<'a>) -> PathBuf {
+    pub fn path_buf(self: &Band) -> PathBuf {
         self.path_buf.clone()
     }
 
-    pub fn path(self: &'a Band<'a>) -> &'a Path {
+    pub fn path(self: &Band) -> &Path {
         &self.path_buf
     }
 }
@@ -187,7 +181,7 @@ mod tests {
     fn create_band() {
         use super::super::io::list_dir;
         let (_tmpdir, archive) = scratch_archive();
-        let band = Band::create(&archive, BandId::from_string("b0001").unwrap()).unwrap();
+        let band = Band::create(&archive.path(), BandId::from_string("b0001").unwrap()).unwrap();
         assert!(band.path_buf().to_str().unwrap().ends_with("b0001"));
         assert!(fs::metadata(band.path_buf()).unwrap().is_dir());
 
