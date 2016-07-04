@@ -22,6 +22,7 @@ pub fn run_backup(archive_path: &Path, sources: Vec<&Path>, mut report: &mut Rep
     let mut block_dir = band.block_dir();
     for source_dir in sources {
         // TODO: Cope if sources are files rather than directories.
+        // TODO: Backup directories too.
         for entry in WalkDir::new(source_dir) {
             match entry {
                 Ok(entry) => if entry.metadata().unwrap().is_file() {
@@ -33,6 +34,7 @@ pub fn run_backup(archive_path: &Path, sources: Vec<&Path>, mut report: &mut Rep
             }
         }
     };
+    // TODO: Mark band complete.
     Ok(())
 }
 
