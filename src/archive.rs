@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015 Martin Pool.
+// Copyright 2015, 2016 Martin Pool.
 
 //! Archives holding backup material.
 //!
@@ -9,12 +9,13 @@
 
 use std;
 use std::fs::{File};
+use std::io;
 use std::io::{Error, ErrorKind, Result, Read};
 use std::path::{Path, PathBuf} ;
 
 use rustc_serialize::json;
 
-use super::band::BandId;
+use super::band::{Band, BandId};
 use super::io::write_file_entire;
 
 
@@ -113,6 +114,12 @@ impl Archive {
     pub fn path(self: &Archive) -> &Path {
         self.dir.as_path()
     }
+
+    /// Make a new band. Bands are numbered sequentially.
+    pub fn create_band(self: &Archive) -> io::Result<Band> {
+        // TODO: Increment id if directory is not empty.
+        Band::create(self.path(), BandId::new(&[0]).unwrap())
+    }
 }
 
 
@@ -138,6 +145,7 @@ mod tests {
     use std::io::Read;
 
     use super::*;
+    use super::super::io::list_dir;
 
     #[test]
     fn test_create_then_open_archive() {
@@ -174,11 +182,23 @@ mod tests {
     /// A new archive contains just one header file.
     #[test]
     fn new_archive_has_only_header() {
-        use super::super::io::list_dir;
         let (_tempdir, arch) = scratch_archive();
         let (file_names, dir_names) = list_dir(arch.path()).unwrap();
         assert_eq!(file_names.len(), 1);
         assert!(file_names.contains("CONSERVE"));
         assert_eq!(dir_names.len(), 0);
+    }
+
+    /// Can create bands in an archive.
+    #[test]
+    fn create_band() {
+        use super::super::io::directory_exists;
+        let (_tempdir, arch) = scratch_archive();
+        let band1 = arch.create_band();
+        assert!(directory_exists(arch.path()).unwrap());
+        let (file_names, dir_names) = list_dir(arch.path()).unwrap();
+        println!("dirs: {:?}", dir_names);
+        assert!(dir_names.contains("b0000"));
+        // TODO: Try creating a second band.
     }
 }
