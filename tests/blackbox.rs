@@ -5,15 +5,13 @@
 
 
 use std::io;
-use std::iter;
 use std::env;
-use std::path;
 use std::process;
 
 #[test]
 fn test_run_conserve_no_args() {
     // Run with no arguments, should fail with a usage message.
-    let output = run_conserve().unwrap();
+    let output = run_conserve(&[]).unwrap();
     assert_eq!(output.status.code(), Some(1));
     let expected_out = "\
 Invalid arguments.
@@ -27,25 +25,17 @@ Usage:
     assert_eq!(expected_out, &output.stderr as &[u8]);
 }
 
-fn run_conserve() -> io::Result<process::Output> {
+/// Run Conserve's binary and return the status and output as strings.
+fn run_conserve(args: &[&str]) -> io::Result<process::Output> {
     // Allow stdout, stdenv from cram through to this test's descriptors, where they can be
     // captured by Cargo.
 
-    // TODO: Better means to get the source root directory?
-    // TODO: Clear path entirely?
+    let mut conserve_path = env::current_exe().unwrap().to_path_buf();
+    conserve_path.pop();
+    conserve_path.push("conserve");
 
-    let old_path = &env::var("PATH").unwrap();
-    let old_paths = env::split_paths(old_path);
-
-    let exe_dir = env::current_exe().unwrap();
-    let mut addition = path::PathBuf::from(exe_dir);
-    addition.pop();
-    println!("addition {:?}", addition);
-
-    let path = env::join_paths(iter::once(addition).chain(old_paths)).unwrap();
-    println!("new path is: {:?}", path);
-
-    process::Command::new("conserve")
-        .env("PATH", path)
+    process::Command::new(&conserve_path)
+        .args(args)
+        .env_clear()
         .output()
 }
