@@ -129,10 +129,6 @@ impl Band {
         })
     }
 
-    pub fn path_buf(self: &Band) -> PathBuf {
-        self.path_buf.clone()
-    }
-
     pub fn path(self: &Band) -> &Path {
         &self.path_buf
     }
@@ -182,8 +178,8 @@ mod tests {
         use super::super::io::list_dir;
         let (_tmpdir, archive) = scratch_archive();
         let band = Band::create(&archive.path(), BandId::from_string("b0001").unwrap()).unwrap();
-        assert!(band.path_buf().to_str().unwrap().ends_with("b0001"));
-        assert!(fs::metadata(band.path_buf()).unwrap().is_dir());
+        assert!(band.path().to_str().unwrap().ends_with("b0001"));
+        assert!(fs::metadata(band.path()).unwrap().is_dir());
 
         let (file_names, dir_names) = list_dir(band.path()).unwrap();
         assert_eq!(file_names.len(), 0);
