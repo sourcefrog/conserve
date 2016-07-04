@@ -14,20 +14,52 @@ use std::process;
 extern crate tempdir;
 
 
+/// Strip from every line, the amount of indentation on the first line.
+///
+/// (Spaces only, no tabs.)
+fn strip_indents(s: &str) -> String {
+    let mut indent = 0;
+    // Skip initial newline.
+    for line in s[1..].split('\n') {
+        for ch in line.chars() {
+            if ch == ' ' {
+                indent += 1;
+            } else {
+                break;
+            }
+        }
+        break;
+    }
+    assert!(indent > 0);
+    let mut r = String::new();
+    let mut first = true;
+    for line in s[1..].split('\n') {
+        if !first {
+            r.push('\n');
+        }
+        if line.len() > indent {
+            r.push_str(&line[indent..]);
+        }
+        first = false;
+    }
+    r
+}
+
+
 #[test]
 fn blackbox_no_args() {
     // Run with no arguments, should fail with a usage message.
     let output = run_conserve(&[]).unwrap();
     assert_eq!(output.status.code(), Some(1));
-    let expected_out = "\
-Invalid arguments.
+    let expected_out = strip_indents("
+        Invalid arguments.
 
-Usage:
-    conserve init <archivedir>
-    conserve backup <archivedir> <source>...
-    conserve --version
-    conserve --help
-";
+        Usage:
+            conserve init <archivedir>
+            conserve backup <archivedir> <source>...
+            conserve --version
+            conserve --help
+        ");
     assert_eq!(expected_out, String::from_utf8_lossy(&output.stderr));
 }
 
@@ -42,17 +74,17 @@ fn blackbox_version() {
 fn blackbox_help() {
     assert_success_and_output(
         &["--help"],
-        "\
-Conserve: an (incomplete) backup tool.
-Copyright 2015, 2016 Martin Pool, GNU GPL v2+.
-https://github.com/sourcefrog/conserve
+        &strip_indents("
+            Conserve: an (incomplete) backup tool.
+            Copyright 2015, 2016 Martin Pool, GNU GPL v2+.
+            https://github.com/sourcefrog/conserve
 
-Usage:
-    conserve init <archivedir>
-    conserve backup <archivedir> <source>...
-    conserve --version
-    conserve --help
-",
+            Usage:
+                conserve init <archivedir>
+                conserve backup <archivedir> <source>...
+                conserve --version
+                conserve --help
+            "),
         "");
 }
 
