@@ -27,17 +27,21 @@
 ///            "b1000000-2000000")
 /// ```
 
+use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::path::{PathBuf};
+use std::path::{Path, PathBuf};
 
 use super::archive::Archive;
+
+static BLOCK_DIR: &'static str = "d";
+static INDEX_DIR: &'static str = "i";
 
 #[derive(Debug, PartialEq)]
 pub struct BandId {
     /// The sequence numbers at each tier.
     seqs: Vec<u32>,
-    
+
     /// The pre-calculated string form for this id.
     string_form: String,
 }
@@ -81,12 +85,12 @@ impl BandId {
             BandId::new(&seqs)
         }
     }
-    
+
     /// Returns the string representation of this BandId.
     pub fn as_string(self: &BandId) -> &String {
         &self.string_form
     }
-    
+
     fn make_string_form(seqs: &[u32]) -> String {
         let mut result = String::with_capacity(30);
         result.push_str("b");
@@ -97,7 +101,7 @@ impl BandId {
         result.shrink_to_fit();
         result
     }
-    
+
     // TODO: Maybe a more concise debug form?
 }
 
@@ -106,6 +110,8 @@ impl BandId {
 #[derive(Debug)]
 pub struct Band<'a> {
     id: BandId,
+    // TODO: Maybe avoid holding a reference to the archive and just take the band path
+    // instead?  Would avoid managing lifetimes.
     archive: &'a Archive,
     path_buf: PathBuf,
 }
@@ -115,27 +121,38 @@ impl<'a> Band<'a> {
     pub fn create(archive: &'a Archive, id: BandId) -> io::Result<Band<'a>> {
         let mut path_buf = archive.path().to_path_buf();
         path_buf.push(id.as_string());
-        fs::create_dir(path_buf.as_path()).and(
-            Ok(Band{
-                archive: archive,
-                id: id,
-                path_buf: path_buf,
-            }))
+        try!(fs::create_dir(path_buf.as_path()));
+
+        let mut subdir_path = path_buf.clone();
+        subdir_path.push(BLOCK_DIR);
+        try!(fs::create_dir(&subdir_path));
+        subdir_path.set_file_name(INDEX_DIR);
+        try!(fs::create_dir(&subdir_path));
+        Ok(Band{
+            archive: archive,
+            id: id,
+            path_buf: path_buf,
+        })
     }
-    
+
     pub fn path_buf(self: &Band<'a>) -> PathBuf {
         self.path_buf.clone()
     }
+
+    pub fn path(self: &'a Band<'a>) -> &'a Path {
+        &self.path_buf
+    }
 }
 
- 
+
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
 
+    use std::fs;
+
     use super::*;
     use super::super::archive::scratch_archive;
-    use std::fs;
 
     #[test]
     fn test_empty_id_not_allowed() {
@@ -165,12 +182,18 @@ mod tests {
         assert_eq!(BandId::from_string("b0001-0100-0234").unwrap().as_string(),
             "b0001-0100-0234");
     }
-    
+
     #[test]
     fn create_band() {
+        use super::super::io::list_dir;
         let (_tmpdir, archive) = scratch_archive();
         let band = Band::create(&archive, BandId::from_string("b0001").unwrap()).unwrap();
         assert!(band.path_buf().to_str().unwrap().ends_with("b0001"));
         assert!(fs::metadata(band.path_buf()).unwrap().is_dir());
+
+        let (file_names, dir_names) = list_dir(band.path()).unwrap();
+        assert_eq!(file_names.len(), 0);
+        assert_eq!(dir_names.len(), 2);
+        assert!(dir_names.contains("d") && dir_names.contains("i"));
     }
 }
