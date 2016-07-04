@@ -198,8 +198,9 @@ mod tests {
     #[test]
     fn create_existing_band() {
         let (_tmpdir, archive) = scratch_archive();
-        Band::create(&archive.path(), BandId::from_string("b0001").unwrap()).unwrap();
-        match Band::create(&archive.path(), BandId::from_string("b0001").unwrap()) {
+        let band_id = BandId::from_string("b0001").unwrap();
+        Band::create(&archive.path(), band_id.clone()).unwrap();
+        match Band::create(&archive.path(), band_id) {
             Ok(_) => panic!("expected an error from existing band"),
             Err(e) => {
                 assert_eq!(e.kind(), io::ErrorKind::AlreadyExists);
