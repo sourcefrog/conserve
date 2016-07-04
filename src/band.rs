@@ -31,6 +31,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::io::directory_exists;
+
 static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
 
@@ -113,9 +115,14 @@ pub struct Band {
 
 impl Band {
     /// Make a new band (and its on-disk directory).
+    ///
+    /// Publicly, prefer Archive::create_band.
     pub fn create(in_directory: &Path, id: BandId) -> io::Result<Band> {
         let mut path_buf = in_directory.to_path_buf();
         path_buf.push(id.as_string());
+        if try!(directory_exists(&path_buf)) {
+            return Err(io::Error::new(io::ErrorKind::AlreadyExists, "band directory exists"));
+        }
         try!(fs::create_dir(path_buf.as_path()));
 
         let mut subdir_path = path_buf.clone();
@@ -140,6 +147,7 @@ mod tests {
     extern crate tempdir;
 
     use std::fs;
+    use std::io;
 
     use super::*;
     use super::super::archive::scratch_archive;
@@ -185,5 +193,17 @@ mod tests {
         assert_eq!(file_names.len(), 0);
         assert_eq!(dir_names.len(), 2);
         assert!(dir_names.contains("d") && dir_names.contains("i"));
+    }
+
+    #[test]
+    fn create_existing_band() {
+        let (_tmpdir, archive) = scratch_archive();
+        Band::create(&archive.path(), BandId::from_string("b0001").unwrap()).unwrap();
+        match Band::create(&archive.path(), BandId::from_string("b0001").unwrap()) {
+            Ok(_) => panic!("expected an error from existing band"),
+            Err(e) => {
+                assert_eq!(e.kind(), io::ErrorKind::AlreadyExists);
+            }
+        }
     }
 }
