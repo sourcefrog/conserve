@@ -27,10 +27,15 @@ Usage:
 
 #[test]
 fn blackbox_version() {
-    let output = run_conserve(&["--version"]).unwrap();
+    assert_success_and_output(&["--version"],
+        "0.2.0\n", "");
+}
+
+fn assert_success_and_output(args: &[&str], stdout: &str, stderr: &str) {
+    let output = run_conserve(args).unwrap();
     assert!(output.status.success());
-    assert_eq!("0.2.0\n", String::from_utf8_lossy(&output.stdout));
-    assert_eq!("", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(stderr, String::from_utf8_lossy(&output.stderr));
+    assert_eq!(stdout, String::from_utf8_lossy(&output.stdout));
 }
 /// Run Conserve's binary and return the status and output as strings.
 fn run_conserve(args: &[&str]) -> io::Result<process::Output> {
