@@ -31,6 +31,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::block::BlockDir;
 use super::io::directory_exists;
 
 static BLOCK_DIR: &'static str = "d";
@@ -110,6 +111,8 @@ impl BandId {
 pub struct Band {
     id: BandId,
     path_buf: PathBuf,
+    block_dir_path: PathBuf,
+    index_dir_path: PathBuf,
 }
 
 
@@ -123,21 +126,30 @@ impl Band {
         if try!(directory_exists(&path_buf)) {
             return Err(io::Error::new(io::ErrorKind::AlreadyExists, "band directory exists"));
         }
-        try!(fs::create_dir(path_buf.as_path()));
 
-        let mut subdir_path = path_buf.clone();
-        subdir_path.push(BLOCK_DIR);
-        try!(fs::create_dir(&subdir_path));
-        subdir_path.set_file_name(INDEX_DIR);
-        try!(fs::create_dir(&subdir_path));
+        let mut block_dir_path = path_buf.clone();
+        block_dir_path.push(BLOCK_DIR);
+
+        let mut index_dir_path = path_buf.clone();
+        index_dir_path.push(INDEX_DIR);
+
+        try!(fs::create_dir(path_buf.as_path()));
+        try!(fs::create_dir(&block_dir_path));
+        try!(fs::create_dir(&index_dir_path));
         Ok(Band{
             id: id,
             path_buf: path_buf,
+            block_dir_path: block_dir_path,
+            index_dir_path: index_dir_path,
         })
     }
 
     pub fn path(self: &Band) -> &Path {
         &self.path_buf
+    }
+
+    pub fn block_dir(self: &Band) -> BlockDir {
+        BlockDir::new(&self.block_dir_path)
     }
 }
 
