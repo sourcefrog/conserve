@@ -36,7 +36,7 @@ use super::io::directory_exists;
 static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BandId {
     /// The sequence numbers at each tier.
     seqs: Vec<u32>,
