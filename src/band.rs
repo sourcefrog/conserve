@@ -66,6 +66,8 @@ impl BandId {
     /// use conserve::band::BandId;
     /// let band = BandId::from_string("b0001-1234").unwrap();
     /// assert_eq!(band.as_string(), "b0001-1234");
+    /// assert!(BandId::from_string("apricot").is_none());
+    /// assert!(BandId::from_string("banana").is_none());
     /// ```
     pub fn from_string(s: &str) -> Option<BandId> {
         if s.chars().next() != Some('b') {
