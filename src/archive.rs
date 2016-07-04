@@ -118,7 +118,7 @@ impl Archive {
     /// Make a new band. Bands are numbered sequentially.
     pub fn create_band(self: &Archive) -> io::Result<Band> {
         // TODO: Increment id if directory is not empty.
-        Band::create(self.path(), BandId::new(&[0]).unwrap())
+        Band::create(self.path(), BandId::zero())
     }
 }
 

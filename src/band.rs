@@ -13,7 +13,7 @@
 ///
 /// ```
 /// use conserve::band::BandId;
-/// let band_id = BandId::new(&[1, 10, 20]).unwrap();
+/// let band_id = BandId::new(&[1, 10, 20]);
 /// assert_eq!(band_id.as_string(), "b0001-0010-0020");
 /// ```
 ///
@@ -22,7 +22,7 @@
 ///
 /// ```
 /// use conserve::band::BandId;
-/// let band_id = BandId::new(&[1000000, 2000000]).unwrap();
+/// let band_id = BandId::new(&[1000000, 2000000]);
 /// assert_eq!(band_id.as_string(),
 ///            "b1000000-2000000")
 /// ```
@@ -49,23 +49,30 @@ pub struct BandId {
 
 impl BandId {
     /// Makes a new BandId from a sequence of integers.
-    pub fn new(seqs: &[u32]) -> Option<BandId> {
-        if seqs.len() > 0 {
-            Some(BandId{
-                seqs: seqs.to_vec(),
-                string_form: BandId::make_string_form(seqs),
-            })
-        } else {
-            None
+    pub fn new(seqs: &[u32]) -> BandId {
+        assert!(seqs.len() > 0);
+        BandId{
+            seqs: seqs.to_vec(),
+            string_form: BandId::make_string_form(seqs),
         }
+    }
+
+    /// Return the origin BandId.
+    ///
+    /// ```
+    /// use conserve::band::BandId;
+    /// assert_eq!(BandId::zero().as_string(), "b0000");
+    /// ```
+    pub fn zero() -> BandId {
+        BandId::new(&[0])
     }
 
     /// Make a new BandId from a string form.
     ///
     /// ```
     /// use conserve::band::BandId;
-    /// let band = BandId::from_string("b0001-1234").unwrap();
-    /// assert_eq!(band.as_string(), "b0001-1234");
+    /// let band_id = BandId::from_string("b0001-1234").unwrap();
+    /// assert_eq!(band_id.as_string(), "b0001-1234");
     /// assert!(BandId::from_string("apricot").is_none());
     /// assert!(BandId::from_string("banana").is_none());
     /// ```
@@ -84,7 +91,7 @@ impl BandId {
             None
         } else {
             // This rebuilds a new string form to get it into the canonical form.
-            BandId::new(&seqs)
+            Some(BandId::new(&seqs))
         }
     }
 
@@ -167,8 +174,9 @@ mod tests {
     use super::super::archive::scratch_archive;
 
     #[test]
+    #[should_panic]
     fn test_empty_id_not_allowed() {
-        assert!(BandId::new(&[]).is_none());
+        BandId::new(&[]);
     }
 
     #[test]
