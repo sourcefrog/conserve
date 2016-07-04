@@ -66,8 +66,8 @@ pub fn ensure_dir_exists(path: &Path) -> io::Result<()> {
 
 /// List a directory.
 ///
-/// Returns a set of filenames and a set of directory names respectively.
-#[cfg(test)]
+/// Returns a set of filenames and a set of directory names respectively, forced to UTF-8.
+#[allow(dead_code)] // Only from tests at the moment but could be more general.
 pub fn list_dir(path: &Path) -> io::Result<(HashSet<String>, HashSet<String>)>
 {
     let mut file_names = HashSet::<String>::new();
