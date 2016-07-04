@@ -103,7 +103,7 @@ impl Archive {
     /// Returns a vector of ids for bands currently present.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
         // TODO: Not really implemented.
-        Ok(Vec::new())
+        unimplemented!();
     }
 
 
