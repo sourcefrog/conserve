@@ -51,7 +51,7 @@ impl Archive {
         info!("Created new archive in {:?}", dir.display());
         Ok(archive)
     }
-    
+
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
@@ -98,13 +98,13 @@ impl Archive {
         debug!("header json = {}", header_json);
         write_file_entire(&header_path, header_json.as_bytes())
     }
-    
+
     /// Returns a vector of ids for bands currently present.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
         // TODO: Not really implemented.
         Ok(Vec::new())
     }
-    
+
 
     /// Returns the top-level directory for the archive.
     ///
@@ -136,7 +136,7 @@ mod tests {
 
     use std::fs;
     use std::io::Read;
-    
+
     use super::*;
 
     #[test]
@@ -146,17 +146,17 @@ mod tests {
         let arch = Archive::init(arch_path).unwrap();
 
         assert_eq!(arch.path(), arch_path.as_path());
-        
+
         // We can re-open it.
         Archive::open(arch_path).unwrap();
     }
-    
+
     #[test]
     fn test_new_archive_has_no_bands() {
         let (_tempdir, arch) = scratch_archive();
         assert!(arch.list_bands().unwrap().is_empty());
     }
-    
+
     /// The header is readable json containing only a version number.
     #[test]
     fn test_archive_header_contents() {
@@ -170,17 +170,15 @@ mod tests {
             contents,
             "{\"conserve_archive_version\":\"0.2.0\"}\n");
     }
-    
+
     /// A new archive contains just one header file.
     #[test]
     fn new_archive_has_only_header() {
+        use super::super::io::list_dir;
         let (_tempdir, arch) = scratch_archive();
-        let files: Vec<(fs::FileType, String)> = fs::read_dir(arch.path()).unwrap()
-            .map(|s| {s.unwrap()})
-            .map(|fe| { (fe.file_type().unwrap(), fe.file_name().into_string().unwrap()) })
-            .collect();
-        assert_eq!(files.len(), 1);
-        assert_eq!(files[0].1, "CONSERVE");
-        assert!(files[0].0.is_file());
+        let (file_names, dir_names) = list_dir(arch.path()).unwrap();
+        assert_eq!(file_names.len(), 1);
+        assert!(file_names.contains("CONSERVE"));
+        assert_eq!(dir_names.len(), 0);
     }
 }
