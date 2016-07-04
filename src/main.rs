@@ -13,6 +13,7 @@ use docopt::Docopt;
 use std::path::{Path};
 
 use conserve::archive::Archive;
+use conserve::report::Report;
 
 static USAGE: &'static str = "
 Conserve: an (incomplete) backup tool.
@@ -43,6 +44,7 @@ fn run_init(args: &Args) -> std::io::Result<()> {
 #[cfg_attr(test, allow(dead_code))] // https://github.com/rust-lang/rust/issues/12327
 fn main() {
     conserve::logger::establish_a_logger();
+    let mut report = Report::new();
 
     let args: Args = Docopt::new(USAGE).unwrap()
         .version(Some(conserve::VERSION.to_string()))
@@ -56,11 +58,12 @@ fn main() {
         let sources = args.arg_source.iter().map(
             |s| { Path::new(s) }
             ).collect();
-        conserve::backup::run_backup(Path::new(&args.arg_archivedir), sources)
+        conserve::backup::run_backup(Path::new(&args.arg_archivedir), sources, &mut report)
     } else {
         panic!("unreachable?")
     };
 
+    println!("{:?}", report);
     if result.is_err() {
         std::process::exit(1)
     }
