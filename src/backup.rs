@@ -10,7 +10,6 @@ use std::io;
 use walkdir::WalkDir;
 
 use super::archive::Archive;
-use super::band::Band;
 use super::block::{BlockDir, BlockWriter};
 use super::report::Report;
 
@@ -22,10 +21,11 @@ pub fn run_backup(archive_path: &Path, sources: Vec<&Path>, mut report: &mut Rep
     let band = try!(archive.create_band());
     let mut block_dir = band.block_dir();
     for source_dir in sources {
+        // TODO: Cope if sources are files rather than directories.
         for entry in WalkDir::new(source_dir) {
             match entry {
                 Ok(entry) => if entry.metadata().unwrap().is_file() {
-                    backup_one(&mut block_dir, entry.path(), &mut report);
+                    try!(backup_one_file(&mut block_dir, entry.path(), &mut report));
                 },
                 Err(e) => {
                     warn!("{}", e);
@@ -36,13 +36,14 @@ pub fn run_backup(archive_path: &Path, sources: Vec<&Path>, mut report: &mut Rep
     Ok(())
 }
 
-fn backup_one(block_dir: &BlockDir, path: &Path, mut report: &mut Report) -> io::Result<()> {
+fn backup_one_file(block_dir: &BlockDir, path: &Path, mut report: &mut Report) -> io::Result<()> {
     info!("backup {}", path.display());
     let mut bw = BlockWriter::new();
     let mut f = try!(fs::File::open(&path));
     try!(bw.copy_from_file(&mut f));
     let _hash = try!(block_dir.store(bw, &mut report));
     // TODO: Add to the index too.  Get the hash and length from the writer.
+    report.increment("backup.file.count", 1);
     Ok(())
 }
 
