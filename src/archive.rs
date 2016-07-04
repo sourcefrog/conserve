@@ -191,14 +191,22 @@ mod tests {
 
     /// Can create bands in an archive.
     #[test]
-    fn create_band() {
+    fn create_bands() {
         use super::super::io::directory_exists;
         let (_tempdir, arch) = scratch_archive();
-        let band1 = arch.create_band();
+
+        // Make one band
+        let _band1 = arch.create_band().unwrap();
         assert!(directory_exists(arch.path()).unwrap());
-        let (file_names, dir_names) = list_dir(arch.path()).unwrap();
+        let (_file_names, dir_names) = list_dir(arch.path()).unwrap();
         println!("dirs: {:?}", dir_names);
         assert!(dir_names.contains("b0000"));
-        // TODO: Try creating a second band.
+
+        // // Try creating a second band.
+        // let _band2 = arch.create_band().unwrap();
+        // let (_file_names, dir_names) = list_dir(arch.path()).unwrap();
+        // println!("dirs: {:?}", dir_names);
+        // assert_eq!(dir_names.len(), 2);
+
     }
 }
