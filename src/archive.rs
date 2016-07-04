@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_new_archive_has_no_bands() {
-        let (_tempdir, arch) = scratch_archive();
+        // let (_tempdir, _arch) = scratch_archive();
         // TODO: Implement list_bands
         // assert!(arch.list_bands().unwrap().is_empty());
     }
