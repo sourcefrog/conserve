@@ -8,7 +8,8 @@
 
 use std::fs;
 use std::io;
-use std::io::{ErrorKind, Write};
+use std::io::prelude::*;
+use std::io::{ErrorKind};
 use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
@@ -65,6 +66,14 @@ impl BlockWriter {
         try!(self.encoder.write_all(buf));
         self.hasher.update(buf);
         Ok(())
+    }
+
+    pub fn copy_from_file(self: &mut BlockWriter, from_file: &mut fs::File) -> io::Result<()> {
+        // TODO: Don't read the whole thing in one go, use smaller buffers to cope with
+        // large files.
+        let mut body = Vec::<u8>::new();
+        try!(from_file.read_to_end(&mut body));
+        self.write_all(&body)
     }
 
     /// Finish compression, and return the compressed bytes and a hex hash.
