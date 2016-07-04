@@ -64,6 +64,24 @@ pub fn ensure_dir_exists(path: &Path) -> io::Result<()> {
 }
 
 
+/// True if path exists and is a directory, false if does not exist, error otherwise.
+pub fn directory_exists(path: &Path) -> io::Result<bool> {
+    match fs::metadata(path) {
+        Ok(metadata) => {
+            if metadata.is_dir() {
+                Ok(true)
+            } else {
+                Err(io::Error::new(io::ErrorKind::AlreadyExists, "exists but not a directory"))
+            }
+        },
+        Err(e) => match e.kind() {
+            io::ErrorKind::NotFound => Ok(false),
+            _ => Err(e),
+        }
+    }
+}
+
+
 /// List a directory.
 ///
 /// Returns a set of filenames and a set of directory names respectively, forced to UTF-8.
