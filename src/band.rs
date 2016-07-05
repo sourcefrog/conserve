@@ -50,6 +50,20 @@ impl BandId {
         BandId::new(&[0])
     }
 
+    /// Return the next BandId at the same level as self.
+    ///
+    /// ```
+    /// use conserve::band::BandId;
+    /// assert_eq!(BandId::zero().next_sibling().as_string(), "b0001");
+    /// assert_eq!(BandId::new(&[2, 3]).next_sibling().as_string(),
+    ///     "b0002-0004");
+    /// ```
+    pub fn next_sibling(self: &BandId) -> BandId {
+        let mut next_seqs = self.seqs.clone();
+        next_seqs[self.seqs.len() - 1] += 1;
+        BandId::new(&next_seqs)
+    }
+
     /// Make a new BandId from a string form.
     ///
     /// ```
