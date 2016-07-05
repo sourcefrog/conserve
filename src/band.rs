@@ -166,6 +166,7 @@ impl Band {
         try!(fs::create_dir(path_buf.as_path()));
         try!(fs::create_dir(&block_dir_path));
         try!(fs::create_dir(&index_dir_path));
+        info!("create band {:?}", path_buf);
         Ok(Band{
             id: id,
             path_buf: path_buf,

@@ -101,8 +101,9 @@ impl Archive {
     }
 
     /// Returns a vector of ids for bands currently present.
+    ///
+    /// Returned ids are in sorted order.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
-        // TODO: Maybe make this an iterator?
         let mut band_ids = Vec::<BandId>::new();
         for entry_result in try!(read_dir(&self.path)) {
             let entry = try!(entry_result);
@@ -119,6 +120,7 @@ impl Archive {
                 }
             }
         }
+        band_ids.sort();
         Ok(band_ids)
     }
 
@@ -132,8 +134,13 @@ impl Archive {
 
     /// Make a new band. Bands are numbered sequentially.
     pub fn create_band(self: &Archive) -> io::Result<Band> {
-        // TODO: Increment id if directory is not empty.
-        Band::create(self.path(), BandId::zero())
+        let new_band_id =
+            // TODO: Could actually avoid storing all of them and just get the maximum.
+            match try!(self.list_bands()).last() {
+                None => BandId::zero(),
+                Some(b) => b.next_sibling(),
+            };
+        Band::create(self.path(), new_band_id)
     }
 }
 
@@ -216,10 +223,8 @@ mod tests {
             vec![BandId::new(&[0])]);
 
         // // Try creating a second band.
-        // let _band2 = arch.create_band().unwrap();
-        // let (_file_names, dir_names) = list_dir(arch.path()).unwrap();
-        // println!("dirs: {:?}", dir_names);
-        // assert_eq!(dir_names.len(), 2);
-
+        let _band2 = arch.create_band().unwrap();
+        assert_eq!(arch.list_bands().unwrap(),
+            vec![BandId::new(&[0]), BandId::new(&[1])]);
     }
 }
