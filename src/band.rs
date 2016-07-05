@@ -29,7 +29,7 @@ static INDEX_DIR: &'static str = "i";
 /// use std::cmp::Ordering;
 /// assert_eq!(BandId::new(&[1]), BandId::new(&[1]))
 /// ```
-#[derive(Debug, PartialEq, Clone,  Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
 pub struct BandId {
     /// The sequence numbers at each tier.
     seqs: Vec<u32>,

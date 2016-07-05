@@ -50,7 +50,6 @@ fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
     let mut f = try!(fs::File::open(&path));
     try!(bw.copy_from_file(&mut f));
     let block_hash = try!(block_dir.store(bw, &mut report));
-    // TODO: Add to the index too.  Get the hash and length from the writer.
     report.increment("backup.file.count", 1);
 
     // TODO: Get the whole path relative to the top level source directory.
@@ -58,7 +57,7 @@ fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
     assert!(apath_valid(apath));
 
     // TODO: Get mtime.
-    // TODO: Store whole-file hash.
+    // TODO: Store list of blocks as well as whole-file hash?  Maybe not if it's not split?
 
     let index_entry = IndexEntry {
         apath: apath.to_string(),
@@ -81,7 +80,7 @@ mod tests {
     use super::super::testfixtures::TreeFixture;
 
     #[test]
-    pub fn test_simple_backup() {
+    pub fn simple_backup() {
         let (_tempdir, archive) = scratch_archive();
         let srcdir = TreeFixture::new();
         srcdir.create_file("hello");
