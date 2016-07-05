@@ -24,6 +24,7 @@ pub mod index;
 mod io;
 pub mod logger;
 pub mod report;
+pub mod testfixtures;
 
 /// Conserve version number as a semver string.
 ///
