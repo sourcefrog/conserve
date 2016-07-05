@@ -32,6 +32,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use super::block::BlockDir;
+use super::index::IndexBuilder;
 use super::io::directory_exists;
 
 static BLOCK_DIR: &'static str = "d";
@@ -159,6 +160,10 @@ impl Band {
 
     pub fn block_dir(self: &Band) -> BlockDir {
         BlockDir::new(&self.block_dir_path)
+    }
+
+    pub fn index_builder(self: &Band) -> IndexBuilder {
+        IndexBuilder::new(&self.index_dir_path)
     }
 }
 
