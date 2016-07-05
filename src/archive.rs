@@ -128,6 +128,8 @@ extern crate tempdir;
 
 /// Makes an archive in a temporary directory, that will be deleted when it goes out of
 /// scope.
+//
+// TODO: Merge with ArchiveFixture.
 #[cfg(test)]
 pub fn scratch_archive() -> (tempdir::TempDir, Archive) {
     let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
