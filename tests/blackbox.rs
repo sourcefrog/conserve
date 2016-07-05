@@ -133,12 +133,10 @@ fn run_conserve(args: &[&str]) -> process::Output {
     let mut conserve_path = env::current_exe().unwrap().to_path_buf();
     conserve_path.pop();  // Remove name of test binary
     conserve_path.push("conserve");
-    match process::Command::new(&conserve_path)
-        .args(args)
-        .output() {
-            Ok(p) => p,
-            Err(e) => {
-                panic!("Failed to run conserve: {}", e);
-            }
+    match process::Command::new(&conserve_path).args(args).output() {
+        Ok(p) => p,
+        Err(e) => {
+            panic!("Failed to run conserve: {}", e);
         }
+    }
 }
