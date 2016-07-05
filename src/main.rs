@@ -41,7 +41,6 @@ fn run_init(args: &Args) -> std::io::Result<()> {
 }
 
 
-#[cfg_attr(test, allow(dead_code))] // https://github.com/rust-lang/rust/issues/12327
 fn main() {
     conserve::logger::establish_a_logger();
     let mut report = Report::new();
