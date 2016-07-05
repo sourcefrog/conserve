@@ -50,7 +50,7 @@ fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
     let mut bw = BlockWriter::new();
     let mut f = try!(fs::File::open(&path));
     try!(bw.copy_from_file(&mut f));
-    let _hash = try!(block_dir.store(bw, &mut report));
+    let block_hash = try!(block_dir.store(bw, &mut report));
     // TODO: Add to the index too.  Get the hash and length from the writer.
     report.increment("backup.file.count", 1);
 
@@ -59,12 +59,13 @@ fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
     assert!(apath_valid(apath));
 
     // TODO: Get mtime.
+    // TODO: Store whole-file hash.
 
     let index_entry = IndexEntry {
         apath: apath.to_string(),
         mtime: 0,
         kind: IndexKind::File,
-        blake2b: String::new(),
+        blake2b: block_hash,
     };
     index_builder.push(index_entry);
 
