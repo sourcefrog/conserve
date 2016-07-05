@@ -8,24 +8,6 @@
 //!
 //! Bands can stack on top of each other to create a tree of incremental backups.
 
-/// Bands have an id which is a sequence of one or more non-negative integers. This is externally
-/// represented as a string like `b0001-0010`, which becomes their directory name in the archive.
-///
-/// ```
-/// use conserve::band::BandId;
-/// let band_id = BandId::new(&[1, 10, 20]);
-/// assert_eq!(band_id.as_string(), "b0001-0010-0020");
-/// ```
-///
-/// Numbers are zero-padded to what should normally be a reasonable length, but they can
-/// overflow:
-///
-/// ```
-/// use conserve::band::BandId;
-/// let band_id = BandId::new(&[1000000, 2000000]);
-/// assert_eq!(band_id.as_string(),
-///            "b1000000-2000000")
-/// ```
 
 use std::fs;
 use std::io;
@@ -97,6 +79,21 @@ impl BandId {
     }
 
     /// Returns the string representation of this BandId.
+    ///
+    /// Bands have an id which is a sequence of one or more non-negative integers.
+    /// This is externally represented as a string like `b0001-0010`, which becomes
+    /// their directory name in the archive.
+    ///
+    /// Numbers are zero-padded to what should normally be a reasonable length, but they can
+    /// be longer.
+    ///
+    /// ```
+    /// use conserve::band::BandId;
+    /// let band_id = BandId::new(&[1, 10, 20]);
+    /// assert_eq!(band_id.as_string(), "b0001-0010-0020");
+    /// assert_eq!(BandId::new(&[1000000, 2000000]).as_string(),
+    ///            "b1000000-2000000")
+    /// ```
     pub fn as_string(self: &BandId) -> &String {
         &self.string_form
     }
