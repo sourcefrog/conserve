@@ -64,6 +64,7 @@ fn main() {
     };
 
     println!("{:?}", report);
+    println!("{:?}", result);
     if result.is_err() {
         std::process::exit(1)
     }
