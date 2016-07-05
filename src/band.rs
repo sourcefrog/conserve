@@ -20,7 +20,16 @@ use super::io::directory_exists;
 static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
 
-#[derive(Debug, PartialEq, Clone)]
+/// Identifier for a band within an archive, eg 'b0001' or 'b0001-0020'.
+///
+/// BandIds implement a total ordering std::cmp::Ord.
+///
+/// ```
+/// use conserve::band::BandId;
+/// use std::cmp::Ordering;
+/// assert_eq!(BandId::new(&[1]), BandId::new(&[1]))
+/// ```
+#[derive(Debug, PartialEq, Clone,  Eq, PartialOrd, Ord)]
 pub struct BandId {
     /// The sequence numbers at each tier.
     seqs: Vec<u32>,
@@ -28,6 +37,8 @@ pub struct BandId {
     /// The pre-calculated string form for this id.
     string_form: String,
 }
+
+// TODO: Maybe a more concise debug form?
 
 
 impl BandId {
@@ -122,8 +133,6 @@ impl BandId {
         result.shrink_to_fit();
         result
     }
-
-    // TODO: Maybe a more concise debug form?
 }
 
 
