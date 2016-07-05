@@ -7,7 +7,7 @@
 /// Fixtures that create directories will be automatically deleted when the object
 /// is deleted.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use tempdir;
 
@@ -52,6 +52,10 @@ impl TreeFixture {
             _tempdir: tempdir,
             root: root,
         }
+    }
+
+    pub fn path(self: &TreeFixture) -> &Path {
+        &self.root
     }
 
     pub fn create_file(self: &TreeFixture, relative_path: &str) {

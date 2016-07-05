@@ -54,8 +54,8 @@ fn blackbox_no_args() {
         Invalid arguments.
 
         Usage:
-            conserve init <archivedir>
-            conserve backup <archivedir> <source>...
+            conserve init <archive>
+            conserve backup <archive> <source>
             conserve --version
             conserve --help
         ");
@@ -79,8 +79,8 @@ fn blackbox_help() {
             https://github.com/sourcefrog/conserve
 
             Usage:
-                conserve init <archivedir>
-                conserve backup <archivedir> <source>...
+                conserve init <archive>
+                conserve backup <archive> <source>
                 conserve --version
                 conserve --help
             "),

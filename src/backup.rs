@@ -16,7 +16,7 @@ use super::index::{IndexBuilder, IndexEntry, IndexKind};
 use super::report::Report;
 
 
-pub fn run_backup(archive_path: &Path, sources: Vec<&Path>, mut report: &mut Report)
+pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
     -> io::Result<()> {
     // TODO: Sort the results: probably grouping together everything in a
     // directory, and then by file within that directory.
@@ -24,21 +24,20 @@ pub fn run_backup(archive_path: &Path, sources: Vec<&Path>, mut report: &mut Rep
     let band = try!(archive.create_band());
     let mut block_dir = band.block_dir();
     let mut index_builder = band.index_builder();
-    for source_dir in sources {
-        // TODO: Cope if sources are files rather than directories.
-        // TODO: Backup directories too.
-        for entry in WalkDir::new(source_dir) {
-            match entry {
-                Ok(entry) => if entry.metadata().unwrap().is_file() {
-                    try!(backup_one_file(&mut block_dir, &mut index_builder,
-                            entry.path(), &mut report));
-                },
-                Err(e) => {
-                    warn!("{}", e);
-                }
+    // TODO: Clean error if source is a file not a directory.
+    // TODO: Test the case where
+    // TODO: Backup directories too.
+    for entry in WalkDir::new(source) {
+        match entry {
+            Ok(entry) => if entry.metadata().unwrap().is_file() {
+                try!(backup_one_file(&mut block_dir, &mut index_builder,
+                        entry.path(), &mut report));
+            },
+            Err(e) => {
+                warn!("{}", e);
             }
         }
-    };
+    }
     try!(index_builder.finish_hunk(&mut report));
     // TODO: Mark band complete.
     Ok(())
@@ -76,17 +75,22 @@ fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
 mod tests {
     extern crate tempdir;
 
+    use super::run_backup;
     use super::super::archive::scratch_archive;
     use super::super::report::Report;
-    use super::run_backup;
+    use super::super::testfixtures::TreeFixture;
 
     #[test]
     pub fn test_simple_backup() {
         let (_tempdir, archive) = scratch_archive();
-        let srcdir = tempdir::TempDir::new("conserve-srcdir").unwrap();
+        let srcdir = TreeFixture::new();
+        srcdir.create_file("hello");
         let mut report = Report::new();
-        run_backup(archive.path(), vec![srcdir.path()], &mut report).unwrap();
+        run_backup(archive.path(), srcdir.path(), &mut report).unwrap();
         // TODO: list bands, should have one band.
-        assert_eq!(0, report.get_count("block.write.count"));
+        // TODO: List files in that band.
+        // TODO: Check contents of that file.
+        assert_eq!(1, report.get_count("block.write.count"));
+        assert_eq!(1, report.get_count("backup.file.count"));
     }
 }
