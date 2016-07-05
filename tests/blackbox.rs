@@ -8,6 +8,9 @@ use std::env;
 use std::process;
 
 extern crate tempdir;
+extern crate conserve;
+
+use conserve::testfixtures::TreeFixture;
 
 
 /// Strip from every line, the amount of indentation on the first line.
@@ -88,14 +91,30 @@ fn blackbox_help() {
 #[test]
 fn blackbox_init() {
     let testdir = make_tempdir();
-    let mut arch_dir = testdir.path().to_path_buf();
-    arch_dir.push("a");
+    let arch_dir = testdir.path().join("a");
     let args = ["init", arch_dir.to_str().unwrap()];
     let output = run_conserve(&args);
     assert!(output.status.success());
     assert_eq!(0, output.stderr.len());
     assert!(String::from_utf8_lossy(&output.stdout)
         .starts_with("Created new archive"));
+}
+
+
+
+#[test]
+fn blackbox_backup() {
+    let testdir = make_tempdir();
+    let arch_dir = testdir.path().join("archive");
+    let output = run_conserve(&["init", arch_dir.to_str().unwrap()]);
+    assert!(output.status.success());
+
+    let src = TreeFixture::new();
+    src.create_file("hello");
+
+    let output = run_conserve(&["backup", arch_dir.to_str().unwrap(), src.root.to_str().unwrap()]);
+    assert!(output.status.success());
+    // TODO: Inspect the archive
 }
 
 
