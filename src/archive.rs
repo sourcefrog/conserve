@@ -12,7 +12,7 @@ use std::fs;
 use std::fs::{File, read_dir};
 use std::io;
 use std::io::{Error, ErrorKind, Result, Read};
-use std::path::{Path, PathBuf} ;
+use std::path::{Path, PathBuf};
 
 use rustc_serialize::json;
 
@@ -38,17 +38,16 @@ impl Archive {
     /// Make a new directory to hold an archive, and write the header.
     pub fn init(path: &Path) -> Result<Archive> {
         debug!("Creating archive directory {:?}", path.display());
-        let archive = Archive {
-            path: path.to_path_buf(),
-        };
+        let archive = Archive { path: path.to_path_buf() };
         if let Err(e) = std::fs::create_dir(&archive.path) {
             error!("Failed to create archive directory {:?}: {}",
-                archive.path.display(), e);
+                   archive.path.display(),
+                   e);
             return Err(e);
         };
         if let Err(e) = archive.write_archive_header() {
             error!("Failed to write archive header: {}", e);
-            return Err(e)
+            return Err(e);
         };
         info!("Created new archive in {:?}", path.display());
         Ok(archive)
@@ -58,22 +57,20 @@ impl Archive {
     ///
     /// Checks that the header is correct.
     pub fn open(path: &Path) -> Result<Archive> {
-        let archive = Archive {
-            path: path.to_path_buf(),
-        };
+        let archive = Archive { path: path.to_path_buf() };
         let header_path = path.join(HEADER_FILENAME);
         let mut header_file = match File::open(header_path.as_path()) {
             Ok(f) => f,
             Err(e) => {
                 error!("Couldn't open archive header {:?}: {}",
-                    header_path.display(), e);
+                       header_path.display(),
+                       e);
                 return Err(e);
             }
         };
         let mut header_string = String::new();
         if let Err(e) = header_file.read_to_string(&mut header_string) {
-            error!("Failed to read archive header {:?}: {}",
-                header_file, e);
+            error!("Failed to read archive header {:?}: {}", header_file, e);
             return Err(e);
         }
         let header: ArchiveHeader = match json::decode(&header_string) {
@@ -85,16 +82,15 @@ impl Archive {
         };
         if header.conserve_archive_version != String::from(ARCHIVE_VERSION) {
             error!("Wrong archive version in header {:?}: {:?}",
-                header, header.conserve_archive_version);
+                   header,
+                   header.conserve_archive_version);
             return Err(Error::new(ErrorKind::InvalidInput, header.conserve_archive_version));
         }
         Ok(archive)
     }
 
     fn write_archive_header(self: &Archive) -> Result<()> {
-        let header = ArchiveHeader{
-            conserve_archive_version: String::from(ARCHIVE_VERSION),
-        };
+        let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
         let header_path = self.path.join(HEADER_FILENAME);
         let header_json = json::encode(&header).unwrap() + "\n";
         debug!("header json = {}", header_json);
@@ -110,7 +106,10 @@ impl Archive {
                 return Err(e);
             }
         };
-        Ok(IterBands { dir_iter: read_dir, path: self.path.clone() })
+        Ok(IterBands {
+            dir_iter: read_dir,
+            path: self.path.clone(),
+        })
     }
 
     /// Returns a vector of band ids, in sorted order.
@@ -171,14 +170,14 @@ impl Iterator for IterBands {
                 Some(Err(e)) => {
                     error!("%{:?} reading directory entry from {:?}", e, self.path);
                     return Some(Err(e));
-                },
+                }
                 None => return None,
             };
             let ft = match entry.file_type() {
                 Err(e) => {
                     error!("%{:?} reading directory entry from {:?}", e, self.path);
                     return Some(Err(e));
-                },
+                }
                 Ok(ft) => ft,
             };
             if !ft.is_dir() {
@@ -192,7 +191,7 @@ impl Iterator for IterBands {
                 }
             } else {
                 warn!("unexpected archive subdirectory with un-decodable name {:?}",
-                    entry.file_name())
+                      entry.file_name())
             }
         }
     }
@@ -204,7 +203,6 @@ extern crate tempdir;
 
 /// Makes an archive in a temporary directory, that will be deleted when it goes out of
 /// scope.
-//
 // TODO: Merge with ArchiveFixture.
 #[cfg(test)]
 pub fn scratch_archive() -> (tempdir::TempDir, Archive) {
@@ -255,9 +253,7 @@ mod tests {
         let mut header_file = fs::File::open(&header_path).unwrap();
         let mut contents = String::new();
         header_file.read_to_string(&mut contents).unwrap();
-        assert_eq!(
-            contents,
-            "{\"conserve_archive_version\":\"0.2.0\"}\n");
+        assert_eq!(contents, "{\"conserve_archive_version\":\"0.2.0\"}\n");
     }
 
     /// Can create bands in an archive.
@@ -273,12 +269,11 @@ mod tests {
         println!("dirs: {:?}", dir_names);
         assert!(dir_names.contains("b0000"));
 
-        assert_eq!(arch.list_bands().unwrap(),
-            vec![BandId::new(&[0])]);
+        assert_eq!(arch.list_bands().unwrap(), vec![BandId::new(&[0])]);
 
         // // Try creating a second band.
         let _band2 = arch.create_band().unwrap();
         assert_eq!(arch.list_bands().unwrap(),
-            vec![BandId::new(&[0]), BandId::new(&[1])]);
+                   vec![BandId::new(&[0]), BandId::new(&[1])]);
     }
 }
