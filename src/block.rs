@@ -9,12 +9,12 @@
 use std::fs;
 use std::io;
 use std::io::prelude::*;
-use std::io::{ErrorKind};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use brotli2::write::{BrotliEncoder};
+use brotli2::write::BrotliEncoder;
 use rustc_serialize::hex::ToHex;
 
 use super::io::{read_and_decompress, write_file_entire};
@@ -84,8 +84,7 @@ impl BlockWriter {
     /// Callers normally want `BlockDir.store` instead, which will
     /// finish and consume the writer.
     pub fn finish(self: BlockWriter) -> io::Result<(Vec<u8>, BlockHash)> {
-        Ok((try!(self.encoder.finish()),
-            self.hasher.finalize().as_bytes().to_hex()))
+        Ok((try!(self.encoder.finish()), self.hasher.finalize().as_bytes().to_hex()))
     }
 }
 
@@ -102,9 +101,7 @@ fn block_name_to_subdirectory(block_hash: &str) -> &str {
 impl BlockDir {
     /// Create a BlockDir accessing `path`, which must exist as a directory.
     pub fn new(path: &Path) -> BlockDir {
-        BlockDir {
-            path: path.to_path_buf(),
-        }
+        BlockDir { path: path.to_path_buf() }
     }
 
     /// Return the subdirectory in which we'd put a file called `hash_hex`.
@@ -134,7 +131,7 @@ impl BlockDir {
         let subdir = self.subdir_for(&hex_hash);
         try!(super::io::ensure_dir_exists(&subdir));
         if let Err(e) = write_file_entire(&self.path_for_file(&hex_hash),
-            compressed_bytes.as_slice()) {
+                                          compressed_bytes.as_slice()) {
             if e.kind() == ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);
@@ -144,7 +141,8 @@ impl BlockDir {
             }
         }
         report.increment("block.write.count", 1);
-        report.increment("block.write.compressed_bytes", compressed_bytes.len() as u64);
+        report.increment("block.write.compressed_bytes",
+                         compressed_bytes.len() as u64);
         Ok(hex_hash)
     }
 
@@ -171,11 +169,13 @@ impl BlockDir {
         report.increment("block.read", 1);
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
-            .as_bytes().to_hex();
+            .as_bytes()
+            .to_hex();
         if actual_hash != *hash {
             report.increment("block.read.misplaced", 1);
             error!("Block file {:?} has actual decompressed hash {:?}",
-                path, actual_hash);
+                   path,
+                   actual_hash);
             return Err(io::Error::new(ErrorKind::InvalidData, "block.read.misplaced"));
         }
         return Ok(decompressed);
@@ -191,14 +191,14 @@ mod tests {
 
     const EXAMPLE_TEXT: &'static str = "hello!";
     const EXAMPLE_BLOCK_HASH: &'static str =
-        "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
-         45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
+        "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee\
+        31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
-     fn setup() -> (tempdir::TempDir, BlockDir) {
-         let testdir = tempdir::TempDir::new("block_test").unwrap();
-         let block_dir = BlockDir::new(testdir.path());
-         return (testdir, block_dir);
-     }
+    fn setup() -> (tempdir::TempDir, BlockDir) {
+        let testdir = tempdir::TempDir::new("block_test").unwrap();
+        let block_dir = BlockDir::new(testdir.path());
+        return (testdir, block_dir);
+    }
 
     #[test]
     pub fn write_all_to_memory() {
@@ -219,8 +219,7 @@ mod tests {
         let mut report = Report::new();
         let (testdir, block_dir) = setup();
 
-        assert_eq!(block_dir.contains(&expected_hash).unwrap(),
-            false);
+        assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
         writer.write_all(EXAMPLE_TEXT.as_bytes()).unwrap();
         let hash_hex = block_dir.store(writer, &mut report).unwrap();
