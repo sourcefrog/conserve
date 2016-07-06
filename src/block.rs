@@ -194,8 +194,14 @@ mod tests {
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
          45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
+     fn setup() -> (tempdir::TempDir, BlockDir) {
+         let testdir = tempdir::TempDir::new("block_test").unwrap();
+         let block_dir = BlockDir::new(testdir.path());
+         return (testdir, block_dir);
+     }
+
     #[test]
-    pub fn test_write_all_to_memory() {
+    pub fn write_all_to_memory() {
         let mut writer = BlockWriter::new();
 
         writer.write_all("hello!".as_bytes()).unwrap();
@@ -206,14 +212,8 @@ mod tests {
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
     }
 
-    fn setup() -> (tempdir::TempDir, BlockDir) {
-        let testdir = tempdir::TempDir::new("block_test").unwrap();
-        let block_dir = BlockDir::new(testdir.path());
-        return (testdir, block_dir);
-    }
-
     #[test]
-    pub fn test_write_to_file() {
+    pub fn write_to_file() {
         let mut writer = BlockWriter::new();
         let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
         let mut report = Report::new();
@@ -245,7 +245,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_write_same_data_again() {
+    pub fn write_same_data_again() {
         let mut report = Report::new();
         let (_testdir, block_dir) = setup();
 
