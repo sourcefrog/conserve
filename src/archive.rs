@@ -8,6 +8,7 @@
 //! Archives can contain a tree of bands, which themselves contain file versions.
 
 use std;
+use std::fs;
 use std::fs::{File, read_dir};
 use std::io;
 use std::io::{Error, ErrorKind, Result, Read};
@@ -100,25 +101,23 @@ impl Archive {
         write_file_entire(&header_path, header_json.as_bytes())
     }
 
-    /// Returns a vector of ids for bands currently present.
-    ///
-    /// Returned ids are in sorted order.
+    /// Returns a iterator of ids for bands currently present, in arbitrary order.
+    pub fn iter_bands(self: &Archive) -> Result<IterBands> {
+        let read_dir = match read_dir(&self.path) {
+            Ok(r) => r,
+            Err(e) => {
+                error!("{:?} reading directory {:?}", e, &self.path);
+                return Err(e);
+            }
+        };
+        Ok(IterBands { dir_iter: read_dir, path: self.path.clone() })
+    }
+
+    /// Returns a vector of band ids, in sorted order.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
         let mut band_ids = Vec::<BandId>::new();
-        for entry_result in try!(read_dir(&self.path)) {
-            let entry = try!(entry_result);
-            if try!(entry.file_type()).is_dir() {
-                if let Ok(name_string) = entry.file_name().into_string() {
-                    if let Some(band_id) = BandId::from_string(&name_string) {
-                        band_ids.push(band_id);
-                    } else {
-                        warn!("unexpected archive subdirectory {:?}", &name_string);
-                    }
-                } else {
-                    warn!("unexpected archive subdirectory with un-decodable name {:?}",
-                        entry.file_name())
-                }
-            }
+        for r in try!(self.iter_bands()) {
+            band_ids.push(try!(r));
         }
         band_ids.sort();
         Ok(band_ids)
@@ -132,15 +131,70 @@ impl Archive {
         self.path.as_path()
     }
 
+    // Return the id of the highest-numbered band, or None if empty.
+    pub fn last_band_id(self: &Archive) -> io::Result<Option<BandId>> {
+        let mut max: Option<BandId> = None;
+        for i in try!(self.iter_bands()) {
+            let b = try!(i);
+            if max.is_none() || (b > *max.as_ref().unwrap()) {
+                max = Some(b)
+            };
+        }
+        Ok(max)
+    }
+
     /// Make a new band. Bands are numbered sequentially.
     pub fn create_band(self: &Archive) -> io::Result<Band> {
-        let new_band_id =
-            // TODO: Could actually avoid storing all of them and just get the maximum.
-            match try!(self.list_bands()).last() {
-                None => BandId::zero(),
-                Some(b) => b.next_sibling(),
-            };
+        let new_band_id = match self.last_band_id() {
+            Err(e) => return Err(e),
+            Ok(None) => BandId::zero(),
+            Ok(Some(b)) => b.next_sibling(),
+        };
         Band::create(self.path(), new_band_id)
+    }
+}
+
+
+pub struct IterBands {
+    dir_iter: fs::ReadDir,
+    path: PathBuf,
+}
+
+
+impl Iterator for IterBands {
+    type Item = Result<BandId>;
+
+    fn next(&mut self) -> Option<Result<BandId>> {
+        loop {
+            let entry = match self.dir_iter.next() {
+                Some(Ok(entry)) => entry,
+                Some(Err(e)) => {
+                    error!("%{:?} reading directory entry from {:?}", e, self.path);
+                    return Some(Err(e));
+                },
+                None => return None,
+            };
+            let ft = match entry.file_type() {
+                Err(e) => {
+                    error!("%{:?} reading directory entry from {:?}", e, self.path);
+                    return Some(Err(e));
+                },
+                Ok(ft) => ft,
+            };
+            if !ft.is_dir() {
+                continue;
+            }
+            if let Ok(name_string) = entry.file_name().into_string() {
+                if let Some(band_id) = BandId::from_string(&name_string) {
+                    return Some(Ok(band_id));
+                } else {
+                    warn!("unexpected archive subdirectory {:?}", &name_string);
+                }
+            } else {
+                warn!("unexpected archive subdirectory with un-decodable name {:?}",
+                    entry.file_name())
+            }
+        }
     }
 }
 
