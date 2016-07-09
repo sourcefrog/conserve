@@ -31,6 +31,7 @@ mod band;
 mod block;
 mod index;
 mod io;
+mod itertools;
 mod logger;
 mod report;
 #[cfg(test)]
