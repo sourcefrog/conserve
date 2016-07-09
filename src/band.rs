@@ -39,7 +39,7 @@ impl BandId {
     /// Makes a new BandId from a sequence of integers.
     pub fn new(seqs: &[u32]) -> BandId {
         assert!(seqs.len() > 0);
-        BandId{
+        BandId {
             seqs: seqs.to_vec(),
             string_form: BandId::make_string_form(seqs),
         }
@@ -60,7 +60,7 @@ impl BandId {
     /// Make a new BandId from a string form.
     pub fn from_string(s: &str) -> Option<BandId> {
         if s.chars().next() != Some('b') {
-            return None
+            return None;
         }
         let mut seqs = Vec::<u32>::new();
         for num_part in s[1..].split('-') {
@@ -133,7 +133,7 @@ impl Band {
         try!(fs::create_dir(&block_dir_path));
         try!(fs::create_dir(&index_dir_path));
         info!("create band {:?}", path_buf);
-        Ok(Band{
+        Ok(Band {
             id: id,
             path_buf: path_buf,
             block_dir_path: block_dir_path,
@@ -185,7 +185,7 @@ mod tests {
     fn next() {
         assert_eq!(BandId::zero().next_sibling().as_string(), "b0001");
         assert_eq!(BandId::new(&[2, 3]).next_sibling().as_string(),
-            "b0002-0004");
+                   "b0002-0004");
     }
 
     #[test]
@@ -193,7 +193,7 @@ mod tests {
         let band_id = BandId::new(&[1, 10, 20]);
         assert_eq!(band_id.as_string(), "b0001-0010-0020");
         assert_eq!(BandId::new(&[1000000, 2000000]).as_string(),
-                "b1000000-2000000")
+                   "b1000000-2000000")
     }
 
     #[test]
@@ -215,9 +215,10 @@ mod tests {
     #[test]
     fn from_string_valid() {
         assert_eq!(BandId::from_string("b0001").unwrap().as_string(), "b0001");
-        assert_eq!(BandId::from_string("b123456").unwrap().as_string(), "b123456");
+        assert_eq!(BandId::from_string("b123456").unwrap().as_string(),
+                   "b123456");
         assert_eq!(BandId::from_string("b0001-0100-0234").unwrap().as_string(),
-            "b0001-0100-0234");
+                   "b0001-0100-0234");
     }
 
     #[test]
