@@ -4,7 +4,6 @@
 //! Count interesting events that occur during a run.
 
 use std::collections;
-use std::sync;
 
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
 /// running.
@@ -34,33 +33,6 @@ impl Report {
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
     pub fn get_count(self: &Report, counter_name: &str) -> u64 {
         *self.count.get(counter_name).unwrap_or(&0)
-    }
-}
-
-
-/// A wrapper for a Report that implicitly serializes on updates.
-#[derive(Debug)]
-pub struct SyncReport {
-    inner: sync::Mutex<Report>,
-}
-
-impl SyncReport {
-    pub fn new() -> SyncReport {
-        SyncReport {
-            inner: sync::Mutex::new(Report::new())
-        }
-    }
-
-    /// Increment a counter by a given amount.
-    ///
-    /// The name must be a static string.  Counters implicitly start at 0.
-    pub fn increment(self: &SyncReport, counter_name: &'static str, delta: u64) {
-        self.inner.lock().unwrap().increment(counter_name, delta)
-    }
-
-    /// Return the value of a counter.  A counter that has not yet been updated is 0.
-    pub fn get_count(self: &SyncReport, counter_name: &'static str) -> u64 {
-        self.inner.lock().unwrap().get_count(counter_name)
     }
 }
 
