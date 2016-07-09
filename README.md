@@ -22,8 +22,6 @@ Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
 ## Use
 
-This doesn't work yet:
-
     conserve init /backup/my-source
     conserve backup ~/ /backup/my-source
     conserve validate /backup/my-source
@@ -34,6 +32,8 @@ For more details see the
 man page.
 
 ## Install
+
+Conserve runs on Unix, OS X, and Windows.
 
 To build Conserve you need [Rust][rust] and a C compiler that can be used by
 Rust.
