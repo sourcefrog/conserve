@@ -34,6 +34,7 @@ mod io;
 mod itertools;
 mod logger;
 mod report;
+mod sources;
 #[cfg(test)]
 mod testfixtures;
 mod version;
