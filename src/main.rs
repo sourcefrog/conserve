@@ -33,6 +33,7 @@ mod index;
 mod io;
 mod logger;
 mod report;
+#[cfg(test)]
 mod testfixtures;
 mod version;
 

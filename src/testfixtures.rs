@@ -60,6 +60,6 @@ impl TreeFixture {
 
     pub fn create_file(self: &TreeFixture, relative_path: &str) {
         let full_path = self.root.join(relative_path);
-        write_file_entire(&full_path, "contents".as_bytes()).unwrap();
+        write_file_entire(&full_path, b"contents").unwrap();
     }
 }

@@ -22,7 +22,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
     // directory, and then by file within that directory.
     let archive = Archive::open(archive_path).unwrap();
     let band = try!(archive.create_band());
-    let mut block_dir = band.block_dir();
+    let block_dir = band.block_dir();
     let mut index_builder = band.index_builder();
     // TODO: Clean error if source is a file not a directory.
     // TODO: Test the case where
@@ -30,7 +30,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
     for entry in WalkDir::new(source) {
         match entry {
             Ok(entry) => if entry.metadata().unwrap().is_file() {
-                try!(backup_one_file(&mut block_dir, &mut index_builder,
+                try!(backup_one_file(&block_dir, &mut index_builder,
                         entry.path(), &mut report));
             },
             Err(e) => {

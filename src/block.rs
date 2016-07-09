@@ -31,7 +31,7 @@ const BLAKE_HASH_SIZE_BYTES: usize = 64;
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
 
-/// The unique identifier for a block: its hexadecimal BLAKE2b hash.
+/// The unique identifier for a block: its hexadecimal `BLAKE2b` hash.
 pub type BlockHash = String;
 
 
@@ -41,15 +41,13 @@ pub type BlockHash = String;
 ///
 /// Data is compressed and its hash is
 /// accumulated until writing is complete.
-///
-/// TODO: Implement all of std::io::Write?
 pub struct BlockWriter {
     encoder: BrotliEncoder<Vec<u8>>,
     hasher: Blake2b,
     uncompressed_length: u64,
 }
 
-
+// TODO: Implement all of `std::io::Write`?
 impl BlockWriter {
     /// Make a new BlockWriter, to write one block into a block data directory `dir`.
     pub fn new() -> BlockWriter {
@@ -105,14 +103,14 @@ impl BlockDir {
     }
 
     /// Return the subdirectory in which we'd put a file called `hash_hex`.
-    fn subdir_for(self: &BlockDir, hash_hex: &BlockHash) -> PathBuf {
+    fn subdir_for(self: &BlockDir, hash_hex: &str) -> PathBuf {
         let mut buf = self.path.clone();
         buf.push(block_name_to_subdirectory(hash_hex));
         buf
     }
 
     /// Return the full path for a file called `hex_hash`.
-    fn path_for_file(self: &BlockDir, hash_hex: &BlockHash) -> PathBuf {
+    fn path_for_file(self: &BlockDir, hash_hex: &str) -> PathBuf {
         let mut buf = self.subdir_for(hash_hex);
         buf.push(hash_hex);
         buf
@@ -147,7 +145,7 @@ impl BlockDir {
     }
 
     /// True if the named block is present in this directory.
-    pub fn contains(self: &BlockDir, hash: &BlockHash) -> io::Result<bool> {
+    pub fn contains(self: &BlockDir, hash: &str) -> io::Result<bool> {
         match fs::metadata(self.path_for_file(hash)) {
             Err(ref e) if e.kind() == ErrorKind::NotFound => Ok(false),
             Ok(_) => Ok(true),
@@ -156,7 +154,7 @@ impl BlockDir {
     }
 
     /// Read back the contents of a block, as a byte array.
-    pub fn get(self: &BlockDir, hash: &BlockHash, report: &mut Report) -> io::Result<Vec<u8>> {
+    pub fn get(self: &BlockDir, hash: &str, report: &mut Report) -> io::Result<Vec<u8>> {
         let path = self.path_for_file(hash);
         let decompressed = match read_and_decompress(&path) {
             Ok(d) => d,
@@ -178,7 +176,7 @@ impl BlockDir {
                    actual_hash);
             return Err(io::Error::new(ErrorKind::InvalidData, "block.read.misplaced"));
         }
-        return Ok(decompressed);
+        Ok(decompressed)
     }
 }
 

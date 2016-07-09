@@ -57,15 +57,12 @@ pub fn apath_cmp(a: &str, b: &str) -> Ordering {
 /// True if this apath is well-formed.
 ///
 /// Rust strings are by contract always valid UTF-8, so to meet that requirement for apaths it's
-/// enough to use a checked conversion from bytes or an OSString.
+/// enough to use a checked conversion from bytes or an `OSString`.
 pub fn apath_valid(a: &str) -> bool {
     for part in a.split('/') {
-        if part.is_empty() {
-            // Repeated slash or slash at start of string.
-            return false;
-        } else if part == "." || part == ".." {
-            return false;
-        } else if part.contains('\0') {
+        if part.is_empty() // Repeated slash or slash at start of string.
+            || part == "." || part == ".."
+            || part.contains('\0') {
             return false;
         }
     }

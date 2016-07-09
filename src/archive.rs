@@ -80,7 +80,7 @@ impl Archive {
                 return Err(Error::new(ErrorKind::InvalidInput, e));
             }
         };
-        if header.conserve_archive_version != String::from(ARCHIVE_VERSION) {
+        if header.conserve_archive_version != ARCHIVE_VERSION {
             error!("Wrong archive version in header {:?}: {:?}",
                    header,
                    header.conserve_archive_version);

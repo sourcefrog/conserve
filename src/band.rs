@@ -22,7 +22,7 @@ static INDEX_DIR: &'static str = "i";
 
 /// Identifier for a band within an archive, eg 'b0001' or 'b0001-0020'.
 ///
-/// BandIds implement a total ordering std::cmp::Ord.
+/// `BandId`s implement a total ordering `std::cmp::Ord`.
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
 pub struct BandId {
     /// The sequence numbers at each tier.
@@ -59,7 +59,7 @@ impl BandId {
 
     /// Make a new BandId from a string form.
     pub fn from_string(s: &str) -> Option<BandId> {
-        if s.chars().next() != Some('b') {
+        if !s.starts_with('b') {
             return None;
         }
         let mut seqs = Vec::<u32>::new();
