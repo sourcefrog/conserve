@@ -5,12 +5,11 @@
 
 
 use std::env;
+use std::io::prelude::*;
+use std::path::{Path, PathBuf};
 use std::process;
 
 extern crate tempdir;
-extern crate conserve;
-
-use conserve::testfixtures::{ArchiveFixture, TreeFixture};
 
 
 /// Strip from every line, the amount of indentation on the first line.
@@ -104,11 +103,16 @@ fn blackbox_init() {
 
 #[test]
 fn blackbox_backup() {
-    let af = ArchiveFixture::new();
+    let testdir = make_tempdir();
+    let arch_dir = testdir.path().join("a");
+    let arch_dir_str = arch_dir.to_str().unwrap();
+    let output = run_conserve(&["init", &arch_dir_str]);
+    assert!(output.status.success());
+
     let src = TreeFixture::new();
     src.create_file("hello");
 
-    let output = run_conserve(&["backup", af.archive_dir_str(), src.root.to_str().unwrap()]);
+    let output = run_conserve(&["backup", &arch_dir_str, src.root.to_str().unwrap()]);
     assert!(output.status.success());
     // TODO: Inspect the archive
 }
@@ -138,5 +142,36 @@ fn run_conserve(args: &[&str]) -> process::Output {
         Err(e) => {
             panic!("Failed to run conserve: {}", e);
         }
+    }
+}
+
+
+
+/// A temporary tree for running a test.
+///
+/// Created in a temporary directory and automatically disposed when done.
+pub struct TreeFixture {
+    pub root: PathBuf,
+    _tempdir: tempdir::TempDir, // held only for cleanup
+}
+
+impl TreeFixture {
+    pub fn new() -> TreeFixture {
+        let tempdir = tempdir::TempDir::new("conserve_TreeFixture").unwrap();
+        let root = tempdir.path().to_path_buf();
+        TreeFixture {
+            _tempdir: tempdir,
+            root: root,
+        }
+    }
+
+    pub fn path(self: &TreeFixture) -> &Path {
+        &self.root
+    }
+
+    pub fn create_file(self: &TreeFixture, relative_path: &str) {
+        let full_path = self.root.join(relative_path);
+        let mut f = std::fs::File::create(full_path).unwrap();
+        f.write_all("contents".as_bytes()).unwrap();
     }
 }

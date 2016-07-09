@@ -3,17 +3,36 @@
 
 //! Command-line entry point for Conserve backups.
 
-extern crate conserve;
-extern crate docopt;
 #[macro_use]
 extern crate log;
-extern crate rustc_serialize;
+#[macro_use]
+extern crate docopt;
 
-use docopt::Docopt;
+extern crate blake2_rfc;
+extern crate brotli2;
+extern crate rustc_serialize;
+extern crate tempdir;
+extern crate tempfile;
+extern crate term;
+extern crate walkdir;
+
 use std::path::{Path};
 
-use conserve::archive::Archive;
-use conserve::report::Report;
+use docopt::Docopt;
+
+// Conserve implementation modules.
+mod apath;
+mod archive;
+mod backup;
+mod band;
+mod block;
+mod index;
+mod io;
+mod logger;
+mod report;
+mod testfixtures;
+mod version;
+
 
 static USAGE: &'static str = "
 Conserve: an (incomplete) backup tool.
@@ -37,19 +56,19 @@ struct Args {
 
 
 fn main() {
-    conserve::logger::establish_a_logger();
-    let mut report = Report::new();
+    logger::establish_a_logger();
+    let mut report = report::Report::new();
 
     let args: Args = Docopt::new(USAGE).unwrap()
-        .version(Some(conserve::VERSION.to_string()))
+        .version(Some(version::VERSION.to_string()))
         .help(true)
         .decode()
         .unwrap_or_else(|e| e.exit());
 
     let result = if args.cmd_init {
-        Archive::init(Path::new(&args.arg_archive)).and(Ok(()))
+        archive::Archive::init(Path::new(&args.arg_archive)).and(Ok(()))
     } else if args.cmd_backup {
-        conserve::backup::run_backup(
+        backup::run_backup(
             Path::new(&args.arg_archive),
             Path::new(&args.arg_source),
             &mut report)
