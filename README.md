@@ -1,5 +1,4 @@
-Conserve - a robust backup program
-==================================
+# Conserve - a robust backup program
 
 **At this time Conserve is not ready for production use.**
 
@@ -21,8 +20,7 @@ Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
 [![Clippy Linting Result](https://clippy.bashy.io/github/sourcefrog/conserve/master/badge.svg)](https://clippy.bashy.io/github/sourcefrog/conserve/master/log)
 
-Use
----
+## Use
 
 This doesn't work yet:
 
@@ -35,15 +33,19 @@ For more details see the
 [`conserve(1)`](https://github.com/sourcefrog/conserve/blob/master/man/conserve.asciidoc)
 man page.
 
-Dependencies
-============
+## Install
 
-Most dependencies will be automatically installed by `cargo build`.
+To build Conserve you need [Rust][rust] and a C compiler that can be used by
+Rust.
 
+Then simply run
+
+    $ cargo build
+
+[rust]: https://rust-lang.org/
 [sourcefrog]: http://sourcefrog.net/
 
-More documentation
-==================
+## More documentation
 
  * [Conserve Manifesto](doc/manifesto.md)
 
