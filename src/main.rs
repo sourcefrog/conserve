@@ -3,6 +3,9 @@
 
 //! Command-line entry point for Conserve backups.
 
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+
 #[macro_use]
 extern crate log;
 #[macro_use]
