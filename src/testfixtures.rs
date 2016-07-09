@@ -7,6 +7,7 @@
 /// Fixtures that create directories will be automatically deleted when the object
 /// is deleted.
 
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use tempdir;
@@ -61,5 +62,9 @@ impl TreeFixture {
     pub fn create_file(self: &TreeFixture, relative_path: &str) {
         let full_path = self.root.join(relative_path);
         write_file_entire(&full_path, b"contents").unwrap();
+    }
+
+    pub fn create_dir(self: &TreeFixture, relative_path: &str) {
+        fs::create_dir(self.root.join(relative_path)).unwrap();
     }
 }
