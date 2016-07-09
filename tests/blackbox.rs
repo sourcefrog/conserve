@@ -55,6 +55,7 @@ fn blackbox_no_args() {
         Usage:
             conserve init <archive>
             conserve backup <archive> <source>
+            conserve list-source <source>
             conserve --version
             conserve --help
         ");
@@ -80,6 +81,7 @@ fn blackbox_help() {
             Usage:
                 conserve init <archive>
                 conserve backup <archive> <source>
+                conserve list-source <source>
                 conserve --version
                 conserve --help
             "),

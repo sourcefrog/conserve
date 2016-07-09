@@ -48,6 +48,7 @@ https://github.com/sourcefrog/conserve
 Usage:
     conserve init <archive>
     conserve backup <archive> <source>
+    conserve list-source <source>
     conserve --version
     conserve --help
 ";
@@ -56,6 +57,7 @@ Usage:
 struct Args {
     cmd_backup: bool,
     cmd_init: bool,
+    cmd_list_source: bool,
     arg_archive: String,
     arg_source: String,
 }
@@ -78,6 +80,11 @@ fn main() {
             Path::new(&args.arg_archive),
             Path::new(&args.arg_source),
             &mut report)
+    } else if args.cmd_list_source {
+        for entry in sources::iter(Path::new(&args.arg_source)) {
+            println!("{}", entry.unwrap().apath);
+        };
+        Ok(())
     } else {
         panic!("unreachable?")
     };
