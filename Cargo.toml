@@ -12,7 +12,6 @@ license = "GPL-2.0"
 [[bin]]
 name = "conserve"
 doc = true
-doctest = true
 
 [dependencies]
 blake2-rfc = "^0.2.17"

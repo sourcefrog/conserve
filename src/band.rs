@@ -23,12 +23,6 @@ static INDEX_DIR: &'static str = "i";
 /// Identifier for a band within an archive, eg 'b0001' or 'b0001-0020'.
 ///
 /// BandIds implement a total ordering std::cmp::Ord.
-///
-/// ```
-/// use conserve::band::BandId;
-/// use std::cmp::Ordering;
-/// assert_eq!(BandId::new(&[1]), BandId::new(&[1]))
-/// ```
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
 pub struct BandId {
     /// The sequence numbers at each tier.
@@ -52,23 +46,11 @@ impl BandId {
     }
 
     /// Return the origin BandId.
-    ///
-    /// ```
-    /// use conserve::band::BandId;
-    /// assert_eq!(BandId::zero().as_string(), "b0000");
-    /// ```
     pub fn zero() -> BandId {
         BandId::new(&[0])
     }
 
     /// Return the next BandId at the same level as self.
-    ///
-    /// ```
-    /// use conserve::band::BandId;
-    /// assert_eq!(BandId::zero().next_sibling().as_string(), "b0001");
-    /// assert_eq!(BandId::new(&[2, 3]).next_sibling().as_string(),
-    ///     "b0002-0004");
-    /// ```
     pub fn next_sibling(self: &BandId) -> BandId {
         let mut next_seqs = self.seqs.clone();
         next_seqs[self.seqs.len() - 1] += 1;
@@ -76,14 +58,6 @@ impl BandId {
     }
 
     /// Make a new BandId from a string form.
-    ///
-    /// ```
-    /// use conserve::band::BandId;
-    /// let band_id = BandId::from_string("b0001-1234").unwrap();
-    /// assert_eq!(band_id.as_string(), "b0001-1234");
-    /// assert!(BandId::from_string("apricot").is_none());
-    /// assert!(BandId::from_string("banana").is_none());
-    /// ```
     pub fn from_string(s: &str) -> Option<BandId> {
         if s.chars().next() != Some('b') {
             return None
@@ -111,14 +85,6 @@ impl BandId {
     ///
     /// Numbers are zero-padded to what should normally be a reasonable length, but they can
     /// be longer.
-    ///
-    /// ```
-    /// use conserve::band::BandId;
-    /// let band_id = BandId::new(&[1, 10, 20]);
-    /// assert_eq!(band_id.as_string(), "b0001-0010-0020");
-    /// assert_eq!(BandId::new(&[1000000, 2000000]).as_string(),
-    ///            "b1000000-2000000")
-    /// ```
     pub fn as_string(self: &BandId) -> &String {
         &self.string_form
     }
@@ -201,12 +167,37 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_empty_id_not_allowed() {
+    fn empty_id_not_allowed() {
         BandId::new(&[]);
     }
 
     #[test]
-    fn test_from_string_detects_invalid() {
+    fn equality() {
+        assert_eq!(BandId::new(&[1]), BandId::new(&[1]))
+    }
+
+    #[test]
+    fn zero() {
+        assert_eq!(BandId::zero().as_string(), "b0000");
+    }
+
+    #[test]
+    fn next() {
+        assert_eq!(BandId::zero().next_sibling().as_string(), "b0001");
+        assert_eq!(BandId::new(&[2, 3]).next_sibling().as_string(),
+            "b0002-0004");
+    }
+
+    #[test]
+    fn band_id_as_string() {
+        let band_id = BandId::new(&[1, 10, 20]);
+        assert_eq!(band_id.as_string(), "b0001-0010-0020");
+        assert_eq!(BandId::new(&[1000000, 2000000]).as_string(),
+                "b1000000-2000000")
+    }
+
+    #[test]
+    fn from_string_detects_invalid() {
         assert_eq!(BandId::from_string(""), None);
         assert_eq!(BandId::from_string("hello"), None);
         assert_eq!(BandId::from_string("b"), None);
@@ -222,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_string_valid() {
+    fn from_string_valid() {
         assert_eq!(BandId::from_string("b0001").unwrap().as_string(), "b0001");
         assert_eq!(BandId::from_string("b123456").unwrap().as_string(), "b123456");
         assert_eq!(BandId::from_string("b0001-0100-0234").unwrap().as_string(),
