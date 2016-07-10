@@ -15,9 +15,10 @@ pub fn init(archive: &str) -> io::Result<()> {
 }
 
 pub fn list_source(source: &str, report: &mut Report) -> io::Result<()> {
-    let _ = report;  // TODO: Pass into source iter.
-    for entry in sources::iter(Path::new(source)) {
-        println!("{}", entry.unwrap().apath);
+    let mut source_iter = sources::iter(Path::new(source));
+    for entry in &mut source_iter {
+        println!("{}", try!(entry).apath);
     }
+    report.merge_from(source_iter.get_report());
     Ok(())
 }
