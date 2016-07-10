@@ -9,7 +9,7 @@ use std::path::{Path};
 use std::io;
 use walkdir::WalkDir;
 
-use super::apath::apath_valid;
+use super::apath;
 use super::archive::Archive;
 use super::block::{BlockDir, BlockWriter};
 use super::index::{IndexBuilder, IndexEntry, IndexKind};
@@ -55,7 +55,7 @@ fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
     // TODO: Get the whole path relative to the top level source directory.
     let mut apath = String::from("/");
     apath.push_str(path.file_name().unwrap().to_str().unwrap());
-    assert!(apath_valid(&apath));
+    assert!(apath::valid(&apath));
 
     // TODO: Get mtime.
     // TODO: Store list of blocks as well as whole-file hash?  Maybe not if it's not split?

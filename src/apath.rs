@@ -12,7 +12,7 @@ use std::cmp::Ordering;
 
 
 /// Compare two apaths.
-pub fn apath_cmp(a: &str, b: &str) -> Ordering {
+pub fn cmp(a: &str, b: &str) -> Ordering {
     let mut ait = a.split('/');
     let mut bit = b.split('/');
     let mut oa = ait.next().expect("paths must not be empty");
@@ -49,7 +49,7 @@ pub fn apath_cmp(a: &str, b: &str) -> Ordering {
 ///
 /// Rust strings are by contract always valid UTF-8, so to meet that requirement for apaths it's
 /// enough to use a checked conversion from bytes or an `OSString`.
-pub fn apath_valid(a: &str) -> bool {
+pub fn valid(a: &str) -> bool {
     if ! a.starts_with('/') {
         return false;
     }
@@ -66,10 +66,10 @@ pub fn apath_valid(a: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{apath_cmp, apath_valid};
+    use super::{cmp, valid};
 
     #[test]
-    pub fn test_apath_invalid() {
+    pub fn invalid() {
         let invalid_cases = [
             "",
             "//",
@@ -86,14 +86,14 @@ mod tests {
             "/hello\0",
         ];
         for v in invalid_cases.into_iter() {
-            if apath_valid(&v) {
+            if valid(&v) {
                 panic!("{:?} incorrectly marked valid", v);
             }
         }
     }
 
     #[test]
-    pub fn test_apath_valid_and_ordered() {
+    pub fn valid_and_ordered() {
         let ordered = [
             "/...a",
             "/.a",
@@ -124,15 +124,15 @@ mod tests {
         ];
         for i in 0..ordered.len() {
             let a = ordered[i];
-            if !apath_valid(&a) {
+            if !valid(&a) {
                 panic!("{:?} incorrectly marked invalid", a);
             }
             for j in 0..ordered.len() {
                 let b = ordered[j];
                 let expected_order = i.cmp(&j);
-                let r = apath_cmp(a, b);
+                let r = cmp(a, b);
                 if r != expected_order {
-                    panic!("apath_cmp({:?}, {:?}): returned {:?} expected {:?}",
+                    panic!("cmp({:?}, {:?}): returned {:?} expected {:?}",
                         a, b, r, expected_order);
                 }
             }

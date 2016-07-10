@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use rustc_serialize::json;
 
-use super::apath::{apath_cmp, apath_valid};
+use super::apath;
 use super::io::{write_compressed_bytes};
 use super::report::Report;
 
@@ -77,11 +77,11 @@ impl IndexBuilder {
     pub fn push(&mut self, entry: IndexEntry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
-        if !apath_valid(&entry.apath) {
+        if !apath::valid(&entry.apath) {
             panic!("invalid apath: {:?}", &entry.apath);
         }
         if let Some(ref last_apath) = self.last_apath {
-            assert_eq!(apath_cmp(&last_apath, &entry.apath), Ordering::Less);
+            assert_eq!(apath::cmp(&last_apath, &entry.apath), Ordering::Less);
         }
         self.last_apath = Some(entry.apath.clone());
         self.entries.push(entry);
