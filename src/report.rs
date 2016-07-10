@@ -5,6 +5,23 @@
 
 use std::collections;
 
+#[allow(unused)]
+static KNOWN_COUNTERS: &'static [&'static str] = &[
+    "backup.file.count",
+    "block.read.count",
+    "block.read.corrupt",
+    "block.read.misplaced",
+    "block.write.already_present",
+    "block.write.compressed_bytes",
+    "block.write.count",
+    "block.write.uncompressed_bytes",
+    "index.write.compressed_bytes",
+    "index.write.hunks",
+    "source.returned.directories.count",
+    "source.returned.leaves.count",
+    "source.visited.directories.count",
+];
+
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
 /// running.
 ///

@@ -165,7 +165,7 @@ impl BlockDir {
                 return Err(e);
             }
         };
-        report.increment("block.read", 1);
+        report.increment("block.read.count", 1);
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
             .as_bytes()
@@ -236,10 +236,10 @@ mod tests {
         assert_eq!(report.get_count("block.write.compressed_bytes"), 10);
 
         // Try to read back
-        assert_eq!(report.get_count("block.read"), 0);
+        assert_eq!(report.get_count("block.read.count"), 0);
         let back = block_dir.get(&expected_hash, &mut report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT.as_bytes());
-        assert_eq!(report.get_count("block.read"), 1);
+        assert_eq!(report.get_count("block.read.count"), 1);
     }
 
     #[test]
