@@ -13,8 +13,9 @@ an _x.y.z_ tuple.  See [versioning.md](versioning.md) for the semantics.
 ## Filenames
 
 Files have names in the source and restore directories, and within the archive.
+
 In source and restore directories, file naming is defined by the OS: on Windows as UTF-16,
-on OS X as UTF-8 and on Linux as an arbitrary 8-bit encoding.  
+on OS X as UTF-8 and on Linux as an arbitrary 8-bit encoding.
 
 (Linux filenames are very commonly UTF-8, but there are important exceptions: users who
 choose to use different encodings for whole filesystems; network or USB filesystems
@@ -24,11 +25,16 @@ oddly-named file in the backup, and also for users with non-UTF-8 encodings to b
 configure this. The filename encoding is not easily detectable.  Linux does require that the
 separator `/` have the same byte value.)
 
-In the archive, filenames are stored as UTF-8 byte strings. UTF-8 filenames are
+In the archive, Conserve uses "apaths" as a platform-independent path format.
+
+apaths are stored as UTF-8 byte strings. UTF-8 filenames are
 stored as received from the OS with no normalization.
 
-Filenames are always stored as Unix-style paths separated by `/` characters.
-None of the path components can be `.`, `..`, or empty.
+apaths always have `/` separators and start with a `/`.
+
+None of the apath components can be `.`, `..`, or empty.
+
+The apath `/` within the archive is the top source directory.
 
 Filenames are treated as case-sensitive.
 
@@ -42,6 +48,8 @@ and a non-empty tail part.  Compare by the directory first using a
 byte-by-byte comparison of their (typically UTF-8) byte string form.
 Then, similarly compare the filenames.
 
+Note that this is not the same as a simple comparison of the strings.
+
 This means that all the files in a single directory are stored
 together, and ahead of any subdirectories.
 
@@ -53,7 +61,7 @@ Archives can be stored on cloud or other remote storage.
 The archive makes minimal assumptions about the filesystem it's stored on: in
 particular, it need not support case sensitivity, it need not store times or
 other metadata, and it only needs to support 8.3 characters.  It must supported
-nested subdirectories with a total path length up to 100 characters.  
+nested subdirectories with a total path length up to 100 characters.
 
 Archive filesystems must allow many files per directory.
 

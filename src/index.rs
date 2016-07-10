@@ -144,7 +144,7 @@ mod tests {
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
          45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
-    const ONE_ENTRY_INDEX_JSON: &'static str =             r#"[{"apath":"hello","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#;
+    const ONE_ENTRY_INDEX_JSON: &'static str =             r#"[{"apath":"/hello","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#;
 
     fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder, Report) {
         let testdir = tempdir::TempDir::new("index_test").unwrap();
@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn test_serialize_index() {
         let entries = [IndexEntry {
-            apath: "a/b".to_string(),
+            apath: "/a/b".to_string(),
             mtime: 1461736377,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
@@ -164,7 +164,7 @@ mod tests {
         println!("{}", index_json);
         assert_eq!(
             index_json,
-            r#"[{"apath":"a/b","mtime":1461736377,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#);
+            r#"[{"apath":"/a/b","mtime":1461736377,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#);
     }
 
     #[test]
@@ -172,7 +172,7 @@ mod tests {
     fn test_index_builder_checks_order() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
-            apath: "zzz".to_string(),
+            apath: "/zzz".to_string(),
             mtime: 0,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
@@ -190,7 +190,7 @@ mod tests {
     fn test_index_builder_checks_names() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
-            apath: "/dev/null".to_string(),
+            apath: "../escapecat".to_string(),
             mtime: 0,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
@@ -199,7 +199,7 @@ mod tests {
 
     fn add_an_entry(ib: &mut IndexBuilder) {
         ib.push(IndexEntry {
-            apath: "hello".to_string(),
+            apath: "/hello".to_string(),
             mtime: 0,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),

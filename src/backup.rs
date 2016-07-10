@@ -53,14 +53,15 @@ fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
     report.increment("backup.file.count", 1);
 
     // TODO: Get the whole path relative to the top level source directory.
-    let apath = path.file_name().unwrap().to_str().unwrap();
-    assert!(apath_valid(apath));
+    let mut apath = String::from("/");
+    apath.push_str(path.file_name().unwrap().to_str().unwrap());
+    assert!(apath_valid(&apath));
 
     // TODO: Get mtime.
     // TODO: Store list of blocks as well as whole-file hash?  Maybe not if it's not split?
 
     let index_entry = IndexEntry {
-        apath: apath.to_string(),
+        apath: apath,
         mtime: 0,
         kind: IndexKind::File,
         blake2b: block_hash,

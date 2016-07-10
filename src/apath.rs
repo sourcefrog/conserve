@@ -4,16 +4,7 @@
 //! "Apaths" (for archive paths) are platform-independent relative file paths used inside archive
 //! snapshots.
 //!
-//! Archive paths are:
-//!
-//!  * Case-sensitive.
-//!  * Components are separated by `/`.
-//!  * UTF-8, without consideration of normalization.
-//!  * Do not contain `.`, `..`, or empty components.
-//!  * Implicitly relative to the base of the backup directory.
-//!
-//! There is a total ordering of apaths such that all the direct children of an directory sort
-//! before its subdirectories, and the contents of a directory are sorted in UTF-8 order.
+//! The format and semantics of apaths are defined in ../doc/format.md.
 //!
 //! Apaths in memory are simply strings.
 
@@ -59,8 +50,11 @@ pub fn apath_cmp(a: &str, b: &str) -> Ordering {
 /// Rust strings are by contract always valid UTF-8, so to meet that requirement for apaths it's
 /// enough to use a checked conversion from bytes or an `OSString`.
 pub fn apath_valid(a: &str) -> bool {
-    for part in a.split('/') {
-        if part.is_empty() // Repeated slash or slash at start of string.
+    if ! a.starts_with('/') {
+        return false;
+    }
+    for part in a[1..].split('/') {
+        if part.is_empty()
             || part == "." || part == ".."
             || part.contains('\0') {
             return false;
@@ -77,17 +71,19 @@ mod tests {
     #[test]
     pub fn test_apath_invalid() {
         let invalid_cases = [
-            "/",
-            "/a",
-            "a//b",
-            "a/",
-            "a//",
+            "",
+            "//",
+            "//a",
+            "/a//b",
+            "/a/",
+            "/a//",
             "./a/b",
-            "a/b/.",
-            "a/./b",
-            "a/b/../c",
+            "/./a/b",
+            "/a/b/.",
+            "/a/./b",
+            "/a/b/../c",
             "../a",
-            "hello\0",
+            "/hello\0",
         ];
         for v in invalid_cases.into_iter() {
             if apath_valid(&v) {
@@ -99,32 +95,32 @@ mod tests {
     #[test]
     pub fn test_apath_valid_and_ordered() {
         let ordered = [
-            "...a",
-            ".a",
-            "a",
-            "b",
-            "kleine Katze Fuß",
-            "~~",
-            "ñ",
-            "a/...",
-            "a/..obscure",
-            "a/.config",
-            "a/1",
-            "a/100",
-            "a/2",
-            "a/añejo",
-            "a/b/c",
-            "b/((",
-            "b/,",
-            "b/A",
-            "b/AAAA",
-            "b/a",
-            "b/b",
-            "b/c",
-            "b/a/c",
-            "b/b/c",
-            "b/b/b/z",
-            "b/b/b/{zz}",
+            "/...a",
+            "/.a",
+            "/a",
+            "/b",
+            "/kleine Katze Fuß",
+            "/~~",
+            "/ñ",
+            "/a/...",
+            "/a/..obscure",
+            "/a/.config",
+            "/a/1",
+            "/a/100",
+            "/a/2",
+            "/a/añejo",
+            "/a/b/c",
+            "/b/((",
+            "/b/,",
+            "/b/A",
+            "/b/AAAA",
+            "/b/a",
+            "/b/b",
+            "/b/c",
+            "/b/a/c",
+            "/b/b/c",
+            "/b/b/b/z",
+            "/b/b/b/{zz}",
         ];
         for i in 0..ordered.len() {
             let a = ordered[i];
