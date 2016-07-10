@@ -17,8 +17,7 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "block.write.uncompressed_bytes",
     "index.write.compressed_bytes",
     "index.write.hunks",
-    "source.returned.directories.count",
-    "source.returned.leaves.count",
+    "source.selected.count",
     "source.visited.directories.count",
 ];
 

@@ -43,15 +43,18 @@ Filenames are treated as case-sensitive.
 There is a total order between filenames.  Within a band, entries are
 stored in this order.
 
+This ordering allows binary search for files within the index, and to
+efficiently list the direct or recursive contents of a directory.
+
+The ordering puts all the direct contents of a directory together, followed
+by those of each of its children.
+
 The order is defined as: split the filenames into a directory part
 and a non-empty tail part.  Compare by the directory first using a
 byte-by-byte comparison of their (typically UTF-8) byte string form.
 Then, similarly compare the filenames.
 
 Note that this is not the same as a simple comparison of the strings.
-
-This means that all the files in a single directory are stored
-together, and ahead of any subdirectories.
 
 ## Archive
 
