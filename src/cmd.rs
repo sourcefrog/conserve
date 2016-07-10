@@ -19,6 +19,6 @@ pub fn list_source(source: &str, report: &mut Report) -> io::Result<()> {
     for entry in &mut source_iter {
         println!("{}", try!(entry).apath);
     }
-    report.merge_from(source_iter.get_report());
+    report.merge_from(&source_iter.get_report());
     Ok(())
 }

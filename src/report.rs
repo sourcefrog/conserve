@@ -52,9 +52,9 @@ impl Report {
     }
 
     /// Merge the contents of `from_report` into `self`.
-    pub fn merge_from(self: &mut Report, from_report: Report) {
-        for (name, value) in from_report.count {
-            self.increment(name, value);
+    pub fn merge_from(self: &mut Report, from_report: &Report) {
+        for (name, value) in &from_report.count {
+            self.increment(name, *value);
         }
     }
 }
@@ -82,7 +82,7 @@ mod tests {
         r1.increment("common", 2);
         r2.increment("inr2", 1);
         r2.increment("common", 10);
-        r1.merge_from(r2);
+        r1.merge_from(&r2);
         assert_eq!(r1.get_count("a"), 1);
         assert_eq!(r1.get_count("common"), 12);
         assert_eq!(r1.get_count("inr2"), 1);
