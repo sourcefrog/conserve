@@ -32,6 +32,9 @@ pub struct Iter {
 
     /// Count of directories and files visited by this iterator.
     report: Report,
+
+    /// Copy of the last-emitted apath, for the purposes of checking they're in apath order.
+    last_apath: Option<String>,
 }
 
 
@@ -39,30 +42,8 @@ impl Iter {
     pub fn get_report(self: &Iter) -> Report {
         self.report.clone()
     }
-}
 
-
-// The source iterator yields one path at a time as it walks through the source directories.
-//
-// It has to read each directory entirely so that it can sort the entries.  The entries are
-// divided into files (or other non-directories) that can be returned directly, and
-// subdirectories that can be visited when there are no more files to return.
-//
-// It also has to manage a stack of directories which might be partially walked.
-//
-// The next function then is:
-//
-// If there are already-queued leaf nodes (files, symlinks, etc), return the next of them.
-//
-// Otherwise, read a directory and queue up its results. The directory to read is the first
-// on the directory queue.  It is read completely, the contents separated into leaves and
-// subdirectories, and both queues are sorted.  The subdirectories are inserted onto the
-// subdirectory queue to be read next.  And then the entry for the directory itself is
-// returned.  The new directories are pushed at the start of the directory queue.
-impl Iterator for Iter {
-    type Item = io::Result<Entry>;
-
-    fn next(&mut self) -> Option<io::Result<Entry>> {
+    fn unchecked_next(&mut self) -> Option<io::Result<Entry>> {
         // Some files (or non-directories) have already been read and sorted:
         // return the next of them.
         if let Some(next_file) = self.file_deque.pop_front() {
@@ -118,6 +99,46 @@ impl Iterator for Iter {
     }
 }
 
+
+// The source iterator yields one path at a time as it walks through the source directories.
+//
+// It has to read each directory entirely so that it can sort the entries.  The entries are
+// divided into files (or other non-directories) that can be returned directly, and
+// subdirectories that can be visited when there are no more files to return.
+//
+// It also has to manage a stack of directories which might be partially walked.
+//
+// The next function then is:
+//
+// If there are already-queued leaf nodes (files, symlinks, etc), return the next of them.
+//
+// Otherwise, read a directory and queue up its results. The directory to read is the first
+// on the directory queue.  It is read completely, the contents separated into leaves and
+// subdirectories, and both queues are sorted.  The subdirectories are inserted onto the
+// subdirectory queue to be read next.  And then the entry for the directory itself is
+// returned.  The new directories are pushed at the start of the directory queue.
+impl Iterator for Iter {
+    type Item = io::Result<Entry>;
+
+    fn next(&mut self) -> Option<io::Result<Entry>> {
+        // Check that all the returned paths are in correct order.
+        // TODO: Maybe this can be skipped in non-debug builds?
+        match self.unchecked_next() {
+            None => None,
+            e @ Some(Err(_)) => e,
+            Some(Ok(entry)) => {
+                if let Some(ref last_apath) = self.last_apath {
+                    assert!(last_apath < &entry.apath,
+                        "sources returned out of order: {} >= {}",
+                        last_apath, entry.apath);
+                }
+                self.last_apath = Some(entry.apath.clone());
+                Some(Ok(entry))
+            },
+        }
+    }
+}
+
 /// Iterate source files descending through a source directory.
 ///
 /// Visit the files in a directory before descending into its children, as
@@ -136,6 +157,7 @@ pub fn iter(source_dir: &Path) -> Iter {
         file_deque: VecDeque::<Entry>::new(),
         dir_deque: dir_deque,
         report: Report::new(),
+        last_apath: None,
     }
 }
 
