@@ -9,6 +9,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::report::Report;
+
 
 /// An entry found in the source directory.
 pub struct Entry {
@@ -27,6 +29,9 @@ pub struct Iter {
 
     /// Files yet to be returned.
     file_deque: VecDeque<Entry>,
+
+    /// Count of directories and files visited by this iterator.
+    pub report: Report,
 }
 
 
@@ -54,6 +59,7 @@ impl Iterator for Iter {
         // Some files (or non-directories) have already been read and sorted:
         // return the next of them.
         if let Some(next_file) = self.file_deque.pop_front() {
+            self.report.increment("source.returned.leaves.count", 1);
             return Some(Ok(next_file))
         }
         // Read the next directory, or stop if there are no more.
@@ -65,6 +71,7 @@ impl Iterator for Iter {
             Ok(rd) => rd,
             Err(e) => { return Some(Err(e)) },
         };
+        self.report.increment("source.visited.directories.count", 1);
         let mut children = Vec::<(OsString, bool)>::new();
         for entry in readdir {
             match entry {
@@ -99,6 +106,7 @@ impl Iterator for Iter {
         }
 
         // TODO: Self-check that they're in order vs the last apath emitted.
+        self.report.increment("source.returned.directories.count", 1);
         Some(Ok(dir_entry))
     }
 }
@@ -109,6 +117,8 @@ impl Iterator for Iter {
 /// is the defined order for files stored in an archive.  Within those files and
 /// child directories, visit them according to a sorted comparison by their UTF-8
 /// name.
+///
+/// The `Iter` has its own `Report` of how many directories and files were visited.
 pub fn iter(source_dir: &Path) -> Iter {
     let mut dir_deque = VecDeque::<Entry>::with_capacity(1);
     dir_deque.push_back( Entry {
@@ -118,6 +128,7 @@ pub fn iter(source_dir: &Path) -> Iter {
     Iter {
         file_deque: VecDeque::<Entry>::new(),
         dir_deque: dir_deque,
+        report: Report::new(),
     }
 }
 
@@ -126,6 +137,7 @@ mod tests {
     use super::*;
     use super::super::itertools;
     use super::super::testfixtures::TreeFixture;
+    use super::super::report::Report;
 
     #[test]
     fn simple_directory() {
@@ -135,7 +147,8 @@ mod tests {
         tf.create_dir("jam");
         tf.create_file("jam/apricot");
         tf.create_dir("jelly");
-        let result = itertools::result_iter_to_vec(&mut iter(tf.path())).unwrap();
+        let mut source_iter = iter(tf.path());
+        let result = itertools::result_iter_to_vec(&mut source_iter).unwrap();
         assert_eq!(result.len(), 6);
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -150,5 +163,9 @@ mod tests {
         assert_eq!(&result[4].path, &tf.root.join("jam").join("apricot"));
         assert_eq!(&result[5].apath, "/jelly");
         assert_eq!(&result[5].path, &tf.root.join("jelly"));
+
+        assert_eq!(source_iter.report.get_count("source.visited.directories.count"), 3);
+        assert_eq!(source_iter.report.get_count("source.returned.directories.count"), 3);
+        assert_eq!(source_iter.report.get_count("source.returned.leaves.count"), 3);
     }
 }
