@@ -28,7 +28,7 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
 /// A Report holds counters, identified by a name.  All implicitly start at 0.  All the
 /// counter
 /// names must be static strings.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Report {
     count: collections::HashMap<&'static str, u64>,
 }

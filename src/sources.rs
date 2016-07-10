@@ -31,7 +31,14 @@ pub struct Iter {
     file_deque: VecDeque<Entry>,
 
     /// Count of directories and files visited by this iterator.
-    pub report: Report,
+    report: Report,
+}
+
+
+impl Iter {
+    pub fn get_report(self: &Iter) -> Report {
+        self.report.clone()
+    }
 }
 
 
@@ -164,8 +171,9 @@ mod tests {
         assert_eq!(&result[5].apath, "/jelly");
         assert_eq!(&result[5].path, &tf.root.join("jelly"));
 
-        assert_eq!(source_iter.report.get_count("source.visited.directories.count"), 3);
-        assert_eq!(source_iter.report.get_count("source.returned.directories.count"), 3);
-        assert_eq!(source_iter.report.get_count("source.returned.leaves.count"), 3);
+        let report = source_iter.get_report();
+        assert_eq!(report.get_count("source.visited.directories.count"), 3);
+        assert_eq!(report.get_count("source.returned.directories.count"), 3);
+        assert_eq!(report.get_count("source.returned.leaves.count"), 3);
     }
 }
