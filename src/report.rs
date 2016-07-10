@@ -31,6 +31,7 @@ impl Report {
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
+    #[allow(unused)]
     pub fn get_count(self: &Report, counter_name: &str) -> u64 {
         *self.count.get(counter_name).unwrap_or(&0)
     }

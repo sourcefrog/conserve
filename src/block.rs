@@ -154,6 +154,7 @@ impl BlockDir {
     }
 
     /// Read back the contents of a block, as a byte array.
+    #[allow(unused)]
     pub fn get(self: &BlockDir, hash: &str, report: &mut Report) -> io::Result<Vec<u8>> {
         let path = self.path_for_file(hash);
         let decompressed = match read_and_decompress(&path) {

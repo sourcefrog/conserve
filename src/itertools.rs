@@ -1,3 +1,4 @@
+#[cfg(test)]
 use std::io;
 
 
@@ -6,6 +7,7 @@ use std::io;
 ///
 /// If there are any errors in the iterator, return the first of them.
 // TODO: Test this
+#[cfg(test)]
 pub fn result_iter_to_vec<T>(it: &mut Iterator<Item=io::Result<T>>) -> io::Result<Vec<T>> {
     let mut result = Vec::<T>::new();
     for i in it {

@@ -141,6 +141,7 @@ impl Band {
         })
     }
 
+    #[allow(unused)]
     pub fn path(self: &Band) -> &Path {
         &self.path_buf
     }
