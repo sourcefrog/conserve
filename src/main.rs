@@ -19,8 +19,6 @@ extern crate tempfile;
 extern crate term;
 extern crate walkdir;
 
-use std::path::{Path};
-
 use docopt::Docopt;
 
 // Conserve implementation modules.
@@ -29,6 +27,7 @@ mod archive;
 mod backup;
 mod band;
 mod block;
+mod cmd;
 mod index;
 mod io;
 mod itertools;
@@ -67,24 +66,19 @@ fn main() {
     logger::establish_a_logger();
     let mut report = report::Report::new();
 
-    let args: Args = Docopt::new(USAGE).unwrap()
+    let args: Args = Docopt::new(USAGE)
+        .unwrap()
         .version(Some(version::VERSION.to_string()))
         .help(true)
         .decode()
         .unwrap_or_else(|e| e.exit());
 
     let result = if args.cmd_init {
-        archive::Archive::init(Path::new(&args.arg_archive)).and(Ok(()))
+        cmd::init(&args.arg_archive)
     } else if args.cmd_backup {
-        backup::run_backup(
-            Path::new(&args.arg_archive),
-            Path::new(&args.arg_source),
-            &mut report)
+        cmd::backup(&args.arg_archive, &args.arg_source, &mut report)
     } else if args.cmd_list_source {
-        for entry in sources::iter(Path::new(&args.arg_source)) {
-            println!("{}", entry.unwrap().apath);
-        };
-        Ok(())
+        cmd::list_source(&args.arg_source, &mut report)
     } else {
         panic!("unreachable?")
     };
