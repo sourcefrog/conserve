@@ -18,9 +18,7 @@ pub struct Report {
 
 impl Report {
     pub fn new() -> Report {
-        Report {
-            count: collections::HashMap::new()
-        }
+        Report { count: collections::HashMap::new() }
     }
 
     /// Increment a counter by a given amount.
@@ -35,6 +33,13 @@ impl Report {
     pub fn get_count(self: &Report, counter_name: &str) -> u64 {
         *self.count.get(counter_name).unwrap_or(&0)
     }
+
+    /// Merge the contents of `from_report` into `self`.
+    pub fn merge_from(self: &mut Report, from_report: Report) {
+        for (name, value) in from_report.count {
+            self.increment(name, value);
+        }
+    }
 }
 
 
@@ -43,12 +48,26 @@ mod tests {
     use super::Report;
 
     #[test]
-    pub fn test_count() {
+    pub fn count() {
         let mut r = Report::new();
         assert_eq!(r.get_count("splines_reticulated"), 0);
         r.increment("splines_reticulated", 1);
         assert_eq!(r.get_count("splines_reticulated"), 1);
         r.increment("splines_reticulated", 10);
         assert_eq!(r.get_count("splines_reticulated"), 11);
+    }
+
+    #[test]
+    pub fn merge() {
+        let mut r1 = Report::new();
+        let mut r2 = Report::new();
+        r1.increment("a", 1);
+        r1.increment("common", 2);
+        r2.increment("inr2", 1);
+        r2.increment("common", 10);
+        r1.merge_from(r2);
+        assert_eq!(r1.get_count("a"), 1);
+        assert_eq!(r1.get_count("common"), 12);
+        assert_eq!(r1.get_count("inr2"), 1);
     }
 }
