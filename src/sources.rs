@@ -22,6 +22,8 @@ pub struct Entry {
 
     /// Possibly absolute path through which the file can be opened.
     pub path: PathBuf,
+
+    pub is_dir: bool,
 }
 
 
@@ -85,6 +87,7 @@ impl Iter {
             let new_entry = Entry {
                 apath: new_apath,
                 path: dir_entry.path.join(child_name).to_path_buf(),
+                is_dir: is_dir,
             };
             if is_dir {
                 self.dir_deque.insert(directory_insert_point, new_entry.clone());
@@ -140,6 +143,7 @@ pub fn iter(source_dir: &Path) -> Iter {
     let root_entry = Entry {
         apath: "/".to_string(),
         path: source_dir.to_path_buf(),
+        is_dir: true,
     };
     // Preload iter to return the root and then recurse into it.
     let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();
