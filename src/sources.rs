@@ -116,9 +116,8 @@ impl Iterator for Iter {
             e @ Some(Err(_)) => e,
             Some(Ok(entry)) => {
                 if let Some(ref last_apath) = self.last_apath {
-                    assert_eq!(
-                        apath::cmp(last_apath, &entry.apath),
-                        Ordering::Less,
+                    assert!(
+                        apath::cmp(last_apath, &entry.apath) == Ordering::Less,
                         "sources returned out of order: {} >= {}",
                         last_apath, entry.apath);
                 }
