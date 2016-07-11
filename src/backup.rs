@@ -7,7 +7,6 @@
 use std::fs;
 use std::path::{Path};
 use std::io;
-use walkdir::WalkDir;
 
 use super::apath;
 use super::archive::Archive;
