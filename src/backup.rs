@@ -14,28 +14,32 @@ use super::archive::Archive;
 use super::block::{BlockDir, BlockWriter};
 use super::index::{IndexBuilder, IndexEntry, IndexKind};
 use super::report::Report;
+use super::sources;
 
 
 pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
     -> io::Result<()> {
-    // TODO: Sort the results: probably grouping together everything in a
-    // directory, and then by file within that directory.
+    // TODO: More tests.
+    // TODO: Backup directories and symlinks too.
+
     let archive = Archive::open(archive_path).unwrap();
     let band = try!(archive.create_band());
     let block_dir = band.block_dir();
     let mut index_builder = band.index_builder();
-    // TODO: Clean error if source is a file not a directory.
-    // TODO: Test the case where
-    // TODO: Backup directories too.
-    for entry in WalkDir::new(source) {
-        match entry {
-            Ok(entry) => if entry.metadata().unwrap().is_file() {
-                try!(backup_one_file(&block_dir, &mut index_builder,
-                        entry.path(), &mut report));
-            },
+
+    let source_iter = sources::iter(source);
+    for entry in source_iter {
+        let entry = match entry {
+            Ok(entry) => entry,
             Err(e) => {
+                // TODO: Optionally continue?
                 warn!("{}", e);
+                return Err(e);
             }
+        };
+        if !entry.is_dir {
+            try!(backup_one_file(&block_dir, &mut index_builder,
+                &entry.path, entry.apath, &mut report));
         }
     }
     try!(index_builder.finish_hunk(&mut report));
@@ -44,18 +48,16 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
 }
 
 fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
-    path: &Path, mut report: &mut Report) -> io::Result<()> {
+    path: &Path, apath: String, mut report: &mut Report) -> io::Result<()> {
     info!("backup {}", path.display());
+
     let mut bw = BlockWriter::new();
     let mut f = try!(fs::File::open(&path));
     try!(bw.copy_from_file(&mut f));
     let block_hash = try!(block_dir.store(bw, &mut report));
     report.increment("backup.file.count", 1);
 
-    // TODO: Get the whole path relative to the top level source directory.
-    let mut apath = String::from("/");
-    apath.push_str(path.file_name().unwrap().to_str().unwrap());
-    assert!(apath::valid(&apath));
+    assert!(apath::valid(&apath), "invalid apath: {:?}", &apath);
 
     // TODO: Get mtime.
     // TODO: Store list of blocks as well as whole-file hash?  Maybe not if it's not split?
