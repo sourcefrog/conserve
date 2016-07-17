@@ -163,7 +163,6 @@ mod tests {
     use super::*;
     use super::super::itertools;
     use super::super::testfixtures::TreeFixture;
-    use super::super::report::Report;
 
     #[test]
     fn simple_directory() {
