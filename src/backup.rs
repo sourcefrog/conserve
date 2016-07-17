@@ -42,7 +42,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
         }
     }
     try!(index_builder.finish_hunk(&mut report));
-    // TODO: Mark band complete.
+    try!(band.close());
     Ok(())
 }
 
@@ -88,7 +88,7 @@ mod tests {
         srcdir.create_file("hello");
         let mut report = Report::new();
         run_backup(archive.path(), srcdir.path(), &mut report).unwrap();
-        // TODO: list bands, should have one band.
+        // TODO: list bands, should have one band, and it should be closed.
         // TODO: List files in that band.
         // TODO: Check contents of that file.
         assert_eq!(1, report.get_count("block.write.count"));

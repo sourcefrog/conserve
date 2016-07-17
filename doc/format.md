@@ -135,8 +135,7 @@ closed.
 
 Band footer contains:
 
- - the time the band started and ended
- - the hash of all of the block footers
+ - `end_time`: the Unix time the band started and ended
 
 
 ## Data blocks

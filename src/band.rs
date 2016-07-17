@@ -18,7 +18,7 @@ use time;
 use super::BandId;
 use super::block::BlockDir;
 use super::index::IndexBuilder;
-use super::io::{directory_exists, write_json_uncompressed};
+use super::io::{directory_exists, file_exists, write_json_uncompressed};
 
 static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
@@ -38,6 +38,12 @@ pub struct Band {
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct BandHead {
     start_time: u64,
+}
+
+
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+struct BandTail {
+    end_time: u64,
 }
 
 
@@ -73,9 +79,27 @@ impl Band {
         Ok(band)
     }
 
+    /// Mark this band closed: no more blocks should be written after this.
+    pub fn close(self: &Band) -> io::Result<()> {
+        self.create_tail()
+    }
+
+    pub fn is_closed(self: &Band) -> io::Result<bool> {
+        file_exists(&self.tail_path())
+    }
+
     fn create_head(self: &Band) -> io::Result<()> {
         let head = BandHead { start_time: time::get_time().sec as u64 };
         write_json_uncompressed(&self.path_buf.join(HEAD_FILENAME), &head)
+    }
+
+    fn create_tail(self: &Band) -> io::Result<()> {
+        let tail = BandTail { end_time: time::get_time().sec as u64 };
+        write_json_uncompressed(&self.tail_path(), &tail)
+    }
+
+    fn tail_path(self: &Band) -> PathBuf {
+        self.path_buf.join(TAIL_FILENAME)
     }
 
     #[allow(unused)]
@@ -117,6 +141,15 @@ mod tests {
         assert_eq!(dir_names.len(), 2);
         assert!(dir_names.contains("d") && dir_names.contains("i"));
         assert!(file_names.contains("BANDHEAD"));
+        assert!(!band.is_closed().unwrap());
+
+        band.close().unwrap();
+        let (file_names, dir_names) = list_dir(band.path()).unwrap();
+        assert_eq!(file_names.len(), 2);
+        assert_eq!(dir_names.len(), 2);
+        assert!(file_names.contains("BANDTAIL"));
+
+        assert!(band.is_closed().unwrap());
     }
 
     #[test]
