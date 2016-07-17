@@ -84,8 +84,8 @@ fn main() {
     };
 
     println!("{:?}", report);
-    println!("{:?}", result);
     if result.is_err() {
+        println!("{:?}", result);
         std::process::exit(1)
     }
 }
