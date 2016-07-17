@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use rustc_serialize::json;
 
 use super::{Band, BandId};
-use super::io::write_file_entire;
+use super::io::write_json_uncompressed;
 
 
 const HEADER_FILENAME: &'static str = "CONSERVE";
@@ -91,10 +91,7 @@ impl Archive {
 
     fn write_archive_header(self: &Archive) -> Result<()> {
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
-        let header_path = self.path.join(HEADER_FILENAME);
-        let header_json = json::encode(&header).unwrap() + "\n";
-        debug!("header json = {}", header_json);
-        write_file_entire(&header_path, header_json.as_bytes())
+        write_json_uncompressed(&self.path.join(HEADER_FILENAME), &header)
     }
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.

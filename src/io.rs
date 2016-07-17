@@ -4,6 +4,8 @@
 //! IO utilities.
 
 use brotli2;
+use rustc_serialize::json;
+use rustc_serialize;
 
 use std::collections::HashSet;
 use std::fs;
@@ -40,6 +42,12 @@ pub fn read_and_decompress(path: &Path) -> io::Result<Vec<u8>> {
     let mut decompressed = Vec::<u8>::new();
     try!(decoder.read_to_end(&mut decompressed));
     Ok(decompressed)
+}
+
+
+pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(path: &Path, obj: &T) -> io::Result<()> {
+    let json = json::encode(&obj).unwrap() + "\n";
+    write_file_entire(&path, json.as_bytes())
 }
 
 

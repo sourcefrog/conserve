@@ -13,13 +13,12 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use rustc_serialize::json;
 use time;
 
 use super::BandId;
 use super::block::BlockDir;
 use super::index::IndexBuilder;
-use super::io::{directory_exists, write_file_entire};
+use super::io::{directory_exists, write_json_uncompressed};
 
 static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
@@ -76,10 +75,7 @@ impl Band {
 
     fn create_head(self: &Band) -> io::Result<()> {
         let head = BandHead { start_time: time::get_time().sec as u64 };
-        let header_path = self.path_buf.join(HEAD_FILENAME);
-        let header_json = json::encode(&head).unwrap() + "\n";
-        debug!("header json = {}", header_json);
-        write_file_entire(&header_path, header_json.as_bytes())
+        write_json_uncompressed(&self.path_buf.join(HEAD_FILENAME), &head)
     }
 
     #[allow(unused)]
