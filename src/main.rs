@@ -83,7 +83,7 @@ fn main() {
         panic!("unreachable?")
     };
 
-    println!("{:?}", report);
+    // println!("{:?}", report);
     if result.is_err() {
         println!("{:?}", result);
         std::process::exit(1)
