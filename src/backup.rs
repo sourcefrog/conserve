@@ -88,10 +88,15 @@ mod tests {
         srcdir.create_file("hello");
         let mut report = Report::new();
         run_backup(archive.path(), srcdir.path(), &mut report).unwrap();
-        // TODO: list bands, should have one band, and it should be closed.
-        // TODO: List files in that band.
-        // TODO: Check contents of that file.
         assert_eq!(1, report.get_count("block.write.count"));
         assert_eq!(1, report.get_count("backup.file.count"));
+
+        let band_ids = archive.list_bands().unwrap();
+        assert_eq!(1, band_ids.len());
+        assert_eq!("b0000", band_ids[0].as_string());
+
+        // TODO: Check band is closed.
+        // TODO: List files in that band.
+        // TODO: Check contents of that file.
     }
 }
