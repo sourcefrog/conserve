@@ -108,14 +108,13 @@ particular time can be extracted by reading the closest band, plus all of its
 parents.
 
 Bands are represented as a subdirectory within the archive directory,
-as `b` followed by the number.  Sub-bands are stored inside their
-parent.
+as `b` followed by the number.  All bands are in the top-level directory.
 
     my-archive/
       b0000/
-      b0000/b0000/
-      b0000/b0001/
-      b0000/b0001/b0000/
+      b0000-0000/
+      b0000-0001/
+      b0000-0001-0000/
 
 ## Band head
 
