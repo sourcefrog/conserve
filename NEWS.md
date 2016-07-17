@@ -9,7 +9,7 @@ Conserve 0.2.0 not released yet
     supported.
   * `conserve list-source`: show what files are in the source directory and will
     potentially be backed up.
-  * `conserve list-bands`: show what backups are in the archive.
+  * `conserve list-versions`: show what backups are in the archive.
 * Changed format:
   * Metadata in json.
   * BLAKE2b hashes.

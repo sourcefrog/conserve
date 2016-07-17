@@ -50,18 +50,19 @@ fn blackbox_no_args() {
     // Run with no arguments, should fail with a usage message.
     let (status, stdout, stderr) = run_conserve(&[]);
     assert_eq!(status.code(), Some(1));
-    let expected_out = strip_indents("
+    let expected_err = strip_indents("
         Invalid arguments.
 
         Usage:
             conserve init [options] <archive>
             conserve backup [options] <archive> <source>
-            conserve list-bands [options] <archive>
+            conserve list-versions [options] <archive>
             conserve list-source [options] <source>
             conserve --version
             conserve --help
         ");
-    assert_eq!(expected_out, stderr);
+    assert_eq!(expected_err, stderr);
+    assert_eq!("", stdout);
 }
 
 #[test]
@@ -83,7 +84,7 @@ fn blackbox_help() {
             Usage:
                 conserve init [options] <archive>
                 conserve backup [options] <archive> <source>
-                conserve list-bands [options] <archive>
+                conserve list-versions [options] <archive>
                 conserve list-source [options] <source>
                 conserve --version
                 conserve --help
@@ -109,7 +110,7 @@ fn blackbox_backup() {
     assert_eq!(stderr, "");
 
     // New archive contains no versions.
-    let (status, stdout, stderr) = run_conserve(&["list-bands", &arch_dir_str]);
+    let (status, stdout, stderr) = run_conserve(&["list-versions", &arch_dir_str]);
     assert_eq!(stderr, "");
     assert_eq!(stdout, "");
     assert!(status.success());
@@ -117,12 +118,13 @@ fn blackbox_backup() {
     let src = TreeFixture::new();
     src.create_file("hello");
 
-    let (status, stdout, stderr) = run_conserve(
+    let (status, _stdout, stderr) = run_conserve(
         &["backup", &arch_dir_str, src.root.to_str().unwrap()]);
     assert!(status.success());
+    assert_eq!("", stderr);
     // TODO: Inspect the archive
 
-    assert_success_and_output(&["list-bands", &arch_dir_str],
+    assert_success_and_output(&["list-versions", &arch_dir_str],
         "b0000\n", "");
 }
 

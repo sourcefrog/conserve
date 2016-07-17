@@ -23,7 +23,7 @@ pub fn list_source(source: &str, report: &mut Report) -> io::Result<()> {
     Ok(())
 }
 
-pub fn list_bands(archive_str: &str) -> io::Result<()> {
+pub fn list_versions(archive_str: &str) -> io::Result<()> {
     let archive = try!(Archive::open(Path::new(archive_str)));
     for band_id in try!(archive.list_bands()) {
         println!("{}", band_id.as_string());

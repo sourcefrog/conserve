@@ -7,7 +7,7 @@ Conserve is a backup system: from local files, to files on other local filesyste
 Creating an archive
 -------------------
 
-Backed-up files are stored in an *archive* directory.  There should be one 
+Backed-up files are stored in an *archive* directory.  There should be one
 archive per source directory to be backed up.
 
 To start making a backup:
@@ -20,33 +20,33 @@ This creates a directory containing a header file.
 Making a backup
 ---------------
 
-To store a backup of some source files into the archive, use the 
+To store a backup of some source files into the archive, use the
 `backup` command.  In the current version all files must be explicitly
 listed, eg with the `find` command:
 
     % conserve backup `find ~/src` /backup/my-src.conserve
 
 
-Bands
+Version
 -----
 
-Each backup command creates a new backup *band*, which contains one 
-version of all files from the source.  
+Each backup command creates a new backup *band*, which contains one
+version of all files from the source.
 
-Bands are only ever appended to the archive, and they're identified by 
-sequential integers.
+Bands are only ever appended to the archive, and they're identified by
+a string of integers starting with b, like `b0000`.
 
 
 Examining bands
 ---------------
 
-The `list-bands` command shows all the bands in an archive:
+The `list-versions` command shows all the bands in an archive:
 
-    % conserve list-bands /backup/my-src.conserve
+    % conserve list-versions /backup/my-src.conserve
     0000       2012-12-02T16:24:33   conservetesthost.local
     0001       2012-12-02T16:24:45   conservetesthost.local
 
-`list-files` shows all the files in a band, including the 
+`list-files` shows all the files in a band, including the
 time they were made and the host from which they were made.
 Like all commands that read a band from an archive, it operates
 on the most recent by default.
@@ -56,5 +56,5 @@ Validation
 
 `conserve validate` checks whether the contents of an archive are internally
 consistent.  It makes no reference to a source directory, just checks that
-the archive seems to represent reasonable data and that it can all be 
+the archive seems to represent reasonable data and that it can all be
 read and interpreted.
