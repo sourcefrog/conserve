@@ -9,5 +9,8 @@ install:
 build: false
 
 test_script:
-  - cargo build
-  - cargo test --verbose
+  - cargo build -j4
+  - cargo test --verbose -j4
+
+artifacts:
+  - path: target\debug\conserve.exe
