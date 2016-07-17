@@ -13,14 +13,18 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use rustc_serialize::json;
+use time;
+
 use super::BandId;
 use super::block::BlockDir;
 use super::index::IndexBuilder;
-use super::io::directory_exists;
+use super::io::{directory_exists, write_file_entire};
 
 static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
-
+static HEAD_FILENAME: &'static str = "BANDHEAD";
+static TAIL_FILENAME: &'static str = "BANDTAIL";
 
 /// All backup data is stored in a band.
 #[derive(Debug)]
@@ -29,6 +33,12 @@ pub struct Band {
     path_buf: PathBuf,
     block_dir_path: PathBuf,
     index_dir_path: PathBuf,
+}
+
+
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+struct BandHead {
+    start_time: u64,
 }
 
 
@@ -53,12 +63,23 @@ impl Band {
         try!(fs::create_dir(&block_dir_path));
         try!(fs::create_dir(&index_dir_path));
         info!("create band {:?}", path_buf);
-        Ok(Band {
+
+        let band = Band {
             id: id,
             path_buf: path_buf,
             block_dir_path: block_dir_path,
             index_dir_path: index_dir_path,
-        })
+        };
+        try!(band.create_head());
+        Ok(band)
+    }
+
+    fn create_head(self: &Band) -> io::Result<()> {
+        let head = BandHead { start_time: time::get_time().sec as u64 };
+        let header_path = self.path_buf.join(HEAD_FILENAME);
+        let header_json = json::encode(&head).unwrap() + "\n";
+        debug!("header json = {}", header_json);
+        write_file_entire(&header_path, header_json.as_bytes())
     }
 
     #[allow(unused)]
@@ -96,9 +117,10 @@ mod tests {
         assert!(fs::metadata(band.path()).unwrap().is_dir());
 
         let (file_names, dir_names) = list_dir(band.path()).unwrap();
-        assert_eq!(file_names.len(), 0);
+        assert_eq!(file_names.len(), 1);
         assert_eq!(dir_names.len(), 2);
         assert!(dir_names.contains("d") && dir_names.contains("i"));
+        assert!(file_names.contains("BANDHEAD"));
     }
 
     #[test]

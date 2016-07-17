@@ -125,8 +125,7 @@ not changed again.
 
 The head file contains:
 
- - the time the band was started
-
+ - `start_time`: the Unix time the band was started
 
 ## Band tail
 
