@@ -188,7 +188,7 @@ mod tests {
     use super::{BlockDir, BlockWriter};
     use super::super::report::Report;
 
-    const EXAMPLE_TEXT: &'static str = "hello!";
+    const EXAMPLE_TEXT: &'static [u8] = b"hello!";
     const EXAMPLE_BLOCK_HASH: &'static str =
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee\
         31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
@@ -196,14 +196,14 @@ mod tests {
     fn setup() -> (tempdir::TempDir, BlockDir) {
         let testdir = tempdir::TempDir::new("block_test").unwrap();
         let block_dir = BlockDir::new(testdir.path());
-        return (testdir, block_dir);
+        (testdir, block_dir)
     }
 
     #[test]
     pub fn write_all_to_memory() {
         let mut writer = BlockWriter::new();
 
-        writer.write_all("hello!".as_bytes()).unwrap();
+        writer.write_all(b"hello!").unwrap();
         let (compressed, hash_hex) = writer.finish().unwrap();
         println!("Compressed result: {:?}", compressed);
         assert!(compressed.len() == 10);
@@ -220,7 +220,7 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
-        writer.write_all(EXAMPLE_TEXT.as_bytes()).unwrap();
+        writer.write_all(EXAMPLE_TEXT).unwrap();
         let hash_hex = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
 
@@ -238,7 +238,7 @@ mod tests {
         // Try to read back
         assert_eq!(report.get_count("block.read.count"), 0);
         let back = block_dir.get(&expected_hash, &mut report).unwrap();
-        assert_eq!(back, EXAMPLE_TEXT.as_bytes());
+        assert_eq!(back, EXAMPLE_TEXT);
         assert_eq!(report.get_count("block.read.count"), 1);
     }
 
@@ -248,13 +248,13 @@ mod tests {
         let (_testdir, block_dir) = setup();
 
         let mut writer = BlockWriter::new();
-        writer.write_all("hello!".as_bytes()).unwrap();
+        writer.write_all(b"hello!").unwrap();
         let hash1 = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 0);
         assert_eq!(report.get_count("block.write.count"), 1);
 
         let mut writer = BlockWriter::new();
-        writer.write_all("hello!".as_bytes()).unwrap();
+        writer.write_all(b"hello!").unwrap();
         let hash2 = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 1);
         assert_eq!(report.get_count("block.write.count"), 1);

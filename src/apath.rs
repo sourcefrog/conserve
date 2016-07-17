@@ -86,7 +86,7 @@ mod tests {
             "/hello\0",
         ];
         for v in invalid_cases.into_iter() {
-            if valid(&v) {
+            if valid(v) {
                 panic!("{:?} incorrectly marked valid", v);
             }
         }
@@ -122,13 +122,11 @@ mod tests {
             "/b/b/b/z",
             "/b/b/b/{zz}",
         ];
-        for i in 0..ordered.len() {
-            let a = ordered[i];
-            if !valid(&a) {
+        for (i, a) in ordered.iter().enumerate() {
+            if !valid(a) {
                 panic!("{:?} incorrectly marked invalid", a);
             }
-            for j in 0..ordered.len() {
-                let b = ordered[j];
+            for (j, b) in ordered.iter().enumerate() {
                 let expected_order = i.cmp(&j);
                 let r = cmp(a, b);
                 if r != expected_order {

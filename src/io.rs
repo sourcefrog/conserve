@@ -118,9 +118,9 @@ mod tests {
     pub fn test_write_file_entire_repeated() {
         let tmp = tempdir::TempDir::new("write_new_file_test").unwrap();
         let testfile = tmp.path().join("afile");
-        write_file_entire(&testfile, "hello".as_bytes()).unwrap();
+        write_file_entire(&testfile, b"hello").unwrap();
 
-        assert_eq!(write_file_entire(&testfile, "goodbye".as_bytes())
+        assert_eq!(write_file_entire(&testfile, b"goodbye")
                    .unwrap_err().kind(),
                    io::ErrorKind::AlreadyExists);
 
