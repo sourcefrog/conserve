@@ -45,12 +45,15 @@ Copyright 2015, 2016 Martin Pool, GNU GPL v2+.
 https://github.com/sourcefrog/conserve
 
 Usage:
-    conserve init <archive>
-    conserve backup <archive> <source>
-    conserve list-bands <archive>
-    conserve list-source <source>
+    conserve init [options] <archive>
+    conserve backup [options] <archive> <source>
+    conserve list-bands [options] <archive>
+    conserve list-source [options] <source>
     conserve --version
     conserve --help
+
+Options:
+    --stats         Show statistics at completion.
 ";
 
 #[derive(RustcDecodable)]
@@ -61,6 +64,7 @@ struct Args {
     cmd_list_source: bool,
     arg_archive: String,
     arg_source: String,
+    flag_stats: bool,
 }
 
 
@@ -87,7 +91,9 @@ fn main() {
         unimplemented!();
     };
 
-    // println!("{:?}", report);
+    if args.flag_stats {
+        println!("{:?}", report);
+    }
     if result.is_err() {
         println!("{:?}", result);
         std::process::exit(1)

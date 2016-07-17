@@ -54,10 +54,10 @@ fn blackbox_no_args() {
         Invalid arguments.
 
         Usage:
-            conserve init <archive>
-            conserve backup <archive> <source>
-            conserve list-bands <archive>
-            conserve list-source <source>
+            conserve init [options] <archive>
+            conserve backup [options] <archive> <source>
+            conserve list-bands [options] <archive>
+            conserve list-source [options] <source>
             conserve --version
             conserve --help
         ");
@@ -81,12 +81,15 @@ fn blackbox_help() {
             https://github.com/sourcefrog/conserve
 
             Usage:
-                conserve init <archive>
-                conserve backup <archive> <source>
-                conserve list-bands <archive>
-                conserve list-source <source>
+                conserve init [options] <archive>
+                conserve backup [options] <archive> <source>
+                conserve list-bands [options] <archive>
+                conserve list-source [options] <source>
                 conserve --version
                 conserve --help
+
+            Options:
+                --stats         Show statistics at completion.
             "),
         "");
 }
