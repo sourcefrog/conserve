@@ -48,8 +48,8 @@ fn strip_indents(s: &str) -> String {
 #[test]
 fn blackbox_no_args() {
     // Run with no arguments, should fail with a usage message.
-    let output = run_conserve(&[]);
-    assert_eq!(output.status.code(), Some(1));
+    let (status, stdout, stderr) = run_conserve(&[]);
+    assert_eq!(status.code(), Some(1));
     let expected_out = strip_indents("
         Invalid arguments.
 
@@ -61,7 +61,7 @@ fn blackbox_no_args() {
             conserve --version
             conserve --help
         ");
-    assert_eq!(expected_out, String::from_utf8_lossy(&output.stderr));
+    assert_eq!(expected_out, stderr);
 }
 
 #[test]
@@ -102,23 +102,24 @@ fn blackbox_backup() {
     let arch_dir_str = arch_dir.to_str().unwrap();
 
     // conserve init
-    let output = run_conserve(&["init", &arch_dir_str]);
-    assert!(output.status.success());
-    assert!(String::from_utf8_lossy(&output.stdout)
+    let (status, stdout, stderr) = run_conserve(&["init", &arch_dir_str]);
+    assert!(status.success());
+    assert!(stdout
         .starts_with("Created new archive"));
-        assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+    assert_eq!(stderr, "");
 
-    // New archive contains no bands.
-    let output = run_conserve(&["list-bands", &arch_dir_str]);
-    assert_eq!(str::from_utf8(&output.stderr).unwrap(), "");
-    assert_eq!(str::from_utf8(&output.stdout).unwrap(), "");
-    assert!(output.status.success());
+    // New archive contains no versions.
+    let (status, stdout, stderr) = run_conserve(&["list-bands", &arch_dir_str]);
+    assert_eq!(stderr, "");
+    assert_eq!(stdout, "");
+    assert!(status.success());
 
     let src = TreeFixture::new();
     src.create_file("hello");
 
-    let output = run_conserve(&["backup", &arch_dir_str, src.root.to_str().unwrap()]);
-    assert!(output.status.success());
+    let (status, stdout, stderr) = run_conserve(
+        &["backup", &arch_dir_str, src.root.to_str().unwrap()]);
+    assert!(status.success());
     // TODO: Inspect the archive
 
     assert_success_and_output(&["list-bands", &arch_dir_str],
@@ -131,26 +132,27 @@ fn make_tempdir() -> tempdir::TempDir {
 }
 
 
-fn assert_success_and_output(args: &[&str], stdout: &str, stderr: &str) {
-    let output = run_conserve(args);
-    assert!(output.status.success());
-    assert_eq!(stderr, String::from_utf8_lossy(&output.stderr));
-    assert_eq!(stdout, String::from_utf8_lossy(&output.stdout));
+fn assert_success_and_output(args: &[&str], expected_stdout: &str, expected_stderr: &str) {
+    let (status, stdout, stderr) = run_conserve(args);
+    assert!(status.success(), "command {:?} failed unexpected", args);
+    assert_eq!(expected_stderr, stderr);
+    assert_eq!(expected_stdout, stdout);
 }
 
 
 /// Run Conserve's binary and return a `process::Output` including its return code, stdout
 /// and stderr text.
-fn run_conserve(args: &[&str]) -> process::Output {
+///
+/// Returns a tuple of: status, stdout_string, stderr_string.
+fn run_conserve(args: &[&str]) -> (process::ExitStatus, String, String) {
     let mut conserve_path = env::current_exe().unwrap().to_path_buf();
     conserve_path.pop();  // Remove name of test binary
     conserve_path.push("conserve");
-    match process::Command::new(&conserve_path).args(args).output() {
-        Ok(p) => p,
-        Err(e) => {
-            panic!("Failed to run conserve: {}", e);
-        }
-    }
+    let output = process::Command::new(&conserve_path).args(args).output()
+        .expect("Failed to run conserve");
+    (output.status,
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned())
 }
 
 
