@@ -26,6 +26,7 @@ mod apath;
 mod archive;
 mod backup;
 mod band;
+mod bandid;
 mod block;
 mod cmd;
 mod index;
@@ -37,6 +38,10 @@ mod sources;
 #[cfg(test)]
 mod testfixtures;
 mod version;
+
+// Re-export important classes.
+pub use band::Band;
+pub use bandid::BandId;
 
 
 static USAGE: &'static str = "

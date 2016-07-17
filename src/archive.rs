@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use rustc_serialize::json;
 
-use super::band::{Band, BandId};
+use super::{Band, BandId};
 use super::io::write_file_entire;
 
 
@@ -221,7 +221,7 @@ mod tests {
     use std::io::Read;
 
     use super::*;
-    use super::super::band::BandId;
+    use super::super::BandId;
     use super::super::io::list_dir;
 
     #[test]
