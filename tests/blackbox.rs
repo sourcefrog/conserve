@@ -8,6 +8,7 @@ use std::env;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::str;
 
 extern crate tempdir;
 
@@ -55,6 +56,7 @@ fn blackbox_no_args() {
         Usage:
             conserve init <archive>
             conserve backup <archive> <source>
+            conserve list-bands <archive>
             conserve list-source <source>
             conserve --version
             conserve --help
@@ -81,6 +83,7 @@ fn blackbox_help() {
             Usage:
                 conserve init <archive>
                 conserve backup <archive> <source>
+                conserve list-bands <archive>
                 conserve list-source <source>
                 conserve --version
                 conserve --help
@@ -90,25 +93,22 @@ fn blackbox_help() {
 
 
 #[test]
-fn blackbox_init() {
-    let testdir = make_tempdir();
-    let arch_dir = testdir.path().join("a");
-    let args = ["init", arch_dir.to_str().unwrap()];
-    let output = run_conserve(&args);
-    assert!(output.status.success());
-    assert_eq!(0, output.stderr.len());
-    assert!(String::from_utf8_lossy(&output.stdout)
-        .starts_with("Created new archive"));
-}
-
-
-
-#[test]
 fn blackbox_backup() {
     let testdir = make_tempdir();
     let arch_dir = testdir.path().join("a");
     let arch_dir_str = arch_dir.to_str().unwrap();
+
+    // conserve init
     let output = run_conserve(&["init", &arch_dir_str]);
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout)
+        .starts_with("Created new archive"));
+        assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+
+    // New archive contains no bands.
+    let output = run_conserve(&["list-bands", &arch_dir_str]);
+    assert_eq!(str::from_utf8(&output.stderr).unwrap(), "");
+    assert_eq!(str::from_utf8(&output.stdout).unwrap(), "");
     assert!(output.status.success());
 
     let src = TreeFixture::new();
@@ -117,6 +117,9 @@ fn blackbox_backup() {
     let output = run_conserve(&["backup", &arch_dir_str, src.root.to_str().unwrap()]);
     assert!(output.status.success());
     // TODO: Inspect the archive
+
+    assert_success_and_output(&["list-bands", &arch_dir_str],
+        "b0000\n", "");
 }
 
 

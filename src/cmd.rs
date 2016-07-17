@@ -22,3 +22,11 @@ pub fn list_source(source: &str, report: &mut Report) -> io::Result<()> {
     report.merge_from(&source_iter.get_report());
     Ok(())
 }
+
+pub fn list_bands(archive_str: &str) -> io::Result<()> {
+    let archive = try!(Archive::open(Path::new(archive_str)));
+    for band_id in try!(archive.list_bands()) {
+        println!("{}", band_id.as_string());
+    }
+    Ok(())
+}
