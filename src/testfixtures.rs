@@ -67,4 +67,11 @@ impl TreeFixture {
     pub fn create_dir(self: &TreeFixture, relative_path: &str) {
         fs::create_dir(self.root.join(relative_path)).unwrap();
     }
+    
+    #[cfg(unix)]
+    pub fn create_symlink(self: &TreeFixture, relative_path: &str, target: &str) {
+        use std::os::unix::fs as unix_fs;
+        
+        unix_fs::symlink(target, self.root.join(relative_path)).unwrap();
+    }
 }
