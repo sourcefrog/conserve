@@ -36,9 +36,19 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
                 return Err(e);
             }
         };
-        if !entry.is_dir {
+        let attr = match fs::symlink_metadata(&entry.path) {
+            Ok(attr) => attr,
+            Err(e) => {
+                warn!("{}", e);
+                return Err(e);
+            }
+        };
+        if attr.is_file() {
             try!(backup_one_file(&block_dir, &mut index_builder,
                 &entry.path, entry.apath, &mut report));
+        } else {
+            // TODO: Backup directories, symlinks, etc.
+            warn!("Skipping non-file {}", &entry.apath);
         }
     }
     try!(index_builder.finish_hunk(&mut report));
@@ -98,5 +108,6 @@ mod tests {
         // TODO: Check band is closed.
         // TODO: List files in that band.
         // TODO: Check contents of that file.
+        // TODO: Include a symlink in the tree: it should be skipped.
     }
 }
