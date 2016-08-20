@@ -196,4 +196,20 @@ mod tests {
         assert_eq!(report.get_count("source.visited.directories.count"), 4);
         assert_eq!(report.get_count("source.selected.count"), 7);
     }
+    
+    #[cfg(unix)]
+    #[test]
+    fn symlinks() {
+        let tf = TreeFixture::new();
+        tf.create_symlink("from", "to");
+        
+        let mut source_iter = iter(tf.path());
+        let result = itertools::result_iter_to_vec(&mut source_iter).unwrap();
+
+        assert_eq!(&result[0].apath, "/");
+        assert_eq!(&result[0].path, &tf.root);
+        
+        assert_eq!(&result[1].apath, "/from");
+        assert_eq!(&result[1].path, &tf.root.join("from"));
+    }
 }
