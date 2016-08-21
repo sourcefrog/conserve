@@ -49,6 +49,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
         } else {
             // TODO: Backup directories, symlinks, etc.
             warn!("Skipping non-file {}", &entry.apath);
+            report.increment("backup.skipped.unsupported_file_kind", 1);
         }
     }
     try!(index_builder.finish_hunk(&mut report));
@@ -101,6 +102,9 @@ mod tests {
         assert_eq!(1, report.get_count("block.write.count"));
         assert_eq!(1, report.get_count("backup.file.count"));
 
+        // Directory is not stored yet, but should be.
+        assert_eq!(1, report.get_count("backup.skipped.unsupported_file_kind"));
+
         let band_ids = archive.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
         assert_eq!("b0000", band_ids[0].as_string());
@@ -120,6 +124,8 @@ mod tests {
         run_backup(archive.path(), srcdir.path(), &mut report).unwrap();
         assert_eq!(0, report.get_count("block.write.count"));
         assert_eq!(0, report.get_count("backup.file.count"));
+        // Skipped both the directory and the symlink.
+        assert_eq!(2, report.get_count("backup.skipped.unsupported_file_kind"));
 
         let band_ids = archive.list_bands().unwrap();
         assert_eq!(1, band_ids.len());

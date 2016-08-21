@@ -18,6 +18,7 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "index.write.compressed_bytes",
     "index.write.hunks",
     "source.selected.count",
+    "source.skipped.unsupported_file_kind",
     "source.visited.directories.count",
 ];
 
