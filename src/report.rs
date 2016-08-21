@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::time::{Duration, Instant};
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "backup.file.count",
@@ -40,6 +41,7 @@ static KNOWN_SIZES: &'static [&'static str] = &[
 pub struct Report {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, (u64, u64)>,
+    times: BTreeMap<&'static str, Duration>,
 }
 
 impl Report {
@@ -47,12 +49,16 @@ impl Report {
         let mut new = Report {
             count: BTreeMap::new(),
             sizes: BTreeMap::new(),
+            times: BTreeMap::new(),
         };
         for counter_name in KNOWN_COUNTERS {
             new.count.insert(*counter_name, 0);
         }
         for counter_name in KNOWN_SIZES {
             new.sizes.insert(*counter_name, (0, 0));
+        }
+        for name in ["sync", "test"].iter() {
+            new.times.insert(name, Duration::new(0, 0));
         }
         new
     }
@@ -74,6 +80,11 @@ impl Report {
         let mut e = self.sizes.get_mut(counter_name).expect("unregistered size counter");
         e.0 += uncompressed_bytes;
         e.1 += compressed_bytes;
+    }
+
+    pub fn increment_duration(&mut self, name: &str, duration: Duration) {
+        let mut e = self.times.get_mut(name).expect("undefined duration counter");
+        *e += duration;
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
@@ -112,6 +123,14 @@ impl Display for Report {
                     uncompressed_bytes, compressed_bytes, compression_pct));
             }
         }
+        try!(write!(f, "Durations (seconds):\n"));
+        for (key, &dur) in self.times.iter() {
+            let nanos = dur.subsec_nanos();
+            let secs = dur.as_secs();
+            if nanos > 0 || secs > 0 {
+                try!(write!(f, "  {:<40} {:>9}.{:<09}\n", key, secs, nanos));
+            }
+        }
         Ok(())
     }
 }
@@ -119,6 +138,7 @@ impl Display for Report {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
     use super::Report;
 
     #[test]
@@ -151,6 +171,7 @@ mod tests {
         r1.increment("block.read.count", 10);
         r1.increment("block.write.count", 5);
         r1.increment_size("block.write", 300, 100);
+        r1.increment_duration("test", Duration::new(42, 479760000));
 
         let formatted = format!("{}", r1);
         assert_eq!(formatted, "\
@@ -159,6 +180,8 @@ Counts:
   block.write.count                                          5
 Bytes (before and after compression):
   block.write                                              300       100        67%
+Durations (seconds):
+  test                                            42.479760000
 ");
     }
 }
