@@ -108,6 +108,23 @@ mod tests {
         // TODO: Check band is closed.
         // TODO: List files in that band.
         // TODO: Check contents of that file.
-        // TODO: Include a symlink in the tree: it should be skipped.
+    }
+
+    #[cfg(unix)]
+    #[test]
+    pub fn symlink() {
+        let (_tempdir, archive) = scratch_archive();
+        let srcdir = TreeFixture::new();
+        srcdir.create_symlink("symlink", "/a/broken/destination");
+        let mut report = Report::new();
+        run_backup(archive.path(), srcdir.path(), &mut report).unwrap();
+        assert_eq!(0, report.get_count("block.write.count"));
+        assert_eq!(0, report.get_count("backup.file.count"));
+
+        let band_ids = archive.list_bands().unwrap();
+        assert_eq!(1, band_ids.len());
+        assert_eq!("b0000", band_ids[0].as_string());
+
+        // TODO: Once implemented  check the symlink is included.
     }
 }
