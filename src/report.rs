@@ -4,6 +4,8 @@
 //! Count interesting events that occur during a run.
 
 use std::collections;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[allow(unused)]
 static KNOWN_COUNTERS: &'static [&'static str] = &[
@@ -30,12 +32,12 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
 /// A Report holds counters, identified by a name.  The name must be in `KNOWN_COUNTERS`.
 #[derive(Clone, Debug)]
 pub struct Report {
-    count: collections::HashMap<&'static str, u64>,
+    count: collections::BTreeMap<&'static str, u64>,
 }
 
 impl Report {
     pub fn new() -> Report {
-        let mut count = collections::HashMap::with_capacity(KNOWN_COUNTERS.len());
+        let mut count = collections::BTreeMap::new();
         for counter_name in KNOWN_COUNTERS {
             count.insert(*counter_name, 0);
         }
@@ -69,6 +71,18 @@ impl Report {
 }
 
 
+impl Display for Report {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        for (key, value) in self.count.iter() {
+            if *value > 0 {
+                try!(write!(f, "{:<50}{:>10}\n", *key, *value));
+            }
+        }
+        Ok(())
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::Report;
@@ -95,5 +109,18 @@ mod tests {
         assert_eq!(r1.get_count("block.read.count"), 1);
         assert_eq!(r1.get_count("block.read.corrupt"), 12);
         assert_eq!(r1.get_count("block.write.count"), 1);
+    }
+
+    #[test]
+    pub fn display() {
+        let mut r1 = Report::new();
+        r1.increment("block.read.count", 10);
+        r1.increment("block.write.count", 5);
+
+        let formatted = format!("{}", r1);
+        assert_eq!(formatted, "\
+block.read.count                                          10
+block.write.count                                          5
+");
     }
 }

@@ -98,7 +98,7 @@ fn main() {
     };
 
     if args.flag_stats {
-        println!("{:?}", report);
+        println!("{}", report);
     }
     if result.is_err() {
         println!("{:?}", result);
