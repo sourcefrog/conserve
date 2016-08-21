@@ -205,7 +205,7 @@ mod tests {
     use super::*;
     use super::super::BandId;
     use super::super::io::list_dir;
-    use super::super::testfixtures::ArchiveFixture;
+    use super::super::testfixtures::ScratchArchive;
 
     #[test]
     fn create_then_open_archive() {
@@ -225,8 +225,8 @@ mod tests {
     /// The header is readable json containing only a version number.
     #[test]
     fn new_archive_header_contents() {
-        let af = ArchiveFixture::new();
-        let (file_names, dir_names) = list_dir(af.archive.path()).unwrap();
+        let af = ScratchArchive::new();
+        let (file_names, dir_names) = list_dir(af.path()).unwrap();
         assert_eq!(file_names.len(), 1);
         assert!(file_names.contains("CONSERVE"));
         assert_eq!(dir_names.len(), 0);
@@ -242,20 +242,19 @@ mod tests {
     #[test]
     fn create_bands() {
         use super::super::io::directory_exists;
-        let af = ArchiveFixture::new();
-        let arch = &af.archive;
+        let af = ScratchArchive::new();
         // Make one band
-        let _band1 = arch.create_band().unwrap();
-        assert!(directory_exists(arch.path()).unwrap());
-        let (_file_names, dir_names) = list_dir(arch.path()).unwrap();
+        let _band1 = af.create_band().unwrap();
+        assert!(directory_exists(af.path()).unwrap());
+        let (_file_names, dir_names) = list_dir(af.path()).unwrap();
         println!("dirs: {:?}", dir_names);
         assert!(dir_names.contains("b0000"));
 
-        assert_eq!(arch.list_bands().unwrap(), vec![BandId::new(&[0])]);
+        assert_eq!(af.list_bands().unwrap(), vec![BandId::new(&[0])]);
 
         // // Try creating a second band.
-        let _band2 = arch.create_band().unwrap();
-        assert_eq!(arch.list_bands().unwrap(),
+        let _band2 = &af.create_band().unwrap();
+        assert_eq!(af.list_bands().unwrap(),
                    vec![BandId::new(&[0]), BandId::new(&[1])]);
     }
 }

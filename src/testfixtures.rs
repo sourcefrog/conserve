@@ -8,6 +8,7 @@
 /// is deleted.
 
 use std::fs;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use tempdir;
@@ -16,17 +17,17 @@ use super::archive::Archive;
 use super::io::write_file_entire;
 
 /// A temporary archive.
-pub struct ArchiveFixture {
+pub struct ScratchArchive {
     _tempdir: tempdir::TempDir, // held only for cleanup
-    pub archive: Archive,
+    archive: Archive,
 }
 
-impl ArchiveFixture {
-    pub fn new() -> ArchiveFixture {
-        let tempdir = tempdir::TempDir::new("conserve_ArchiveFixture").unwrap();
+impl ScratchArchive {
+    pub fn new() -> ScratchArchive {
+        let tempdir = tempdir::TempDir::new("conserve_ScratchArchive").unwrap();
         let arch_dir = tempdir.path().join("archive");
         let archive = Archive::init(&arch_dir).unwrap();
-        ArchiveFixture {
+        ScratchArchive {
             _tempdir: tempdir,
             archive: archive,
         }
@@ -37,8 +38,17 @@ impl ArchiveFixture {
     }
 
     #[allow(unused)]
-    pub fn archive_dir_str(self: &ArchiveFixture) -> &str {
+    pub fn archive_dir_str(self: &ScratchArchive) -> &str {
         self.archive.path().to_str().unwrap()
+    }
+}
+
+impl Deref for ScratchArchive {
+    type Target = Archive;
+
+    /// ScratchArchive can be directly used as an archive.
+    fn deref(&self) -> &Archive {
+        &self.archive
     }
 }
 

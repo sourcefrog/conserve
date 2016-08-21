@@ -89,22 +89,22 @@ mod tests {
 
     use super::run_backup;
     use super::super::report::Report;
-    use super::super::testfixtures::{ArchiveFixture, TreeFixture};
+    use super::super::testfixtures::{ScratchArchive, TreeFixture};
 
     #[test]
     pub fn simple_backup() {
-        let af = ArchiveFixture::new();
+        let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_file("hello");
         let mut report = Report::new();
-        run_backup(af.archive.path(), srcdir.path(), &mut report).unwrap();
+        run_backup(af.path(), srcdir.path(), &mut report).unwrap();
         assert_eq!(1, report.get_count("block.write.count"));
         assert_eq!(1, report.get_count("backup.file.count"));
 
         // Directory is not stored yet, but should be.
         assert_eq!(1, report.get_count("backup.skipped.unsupported_file_kind"));
 
-        let band_ids = af.archive.list_bands().unwrap();
+        let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
         assert_eq!("b0000", band_ids[0].as_string());
 
@@ -116,17 +116,17 @@ mod tests {
     #[cfg(unix)]
     #[test]
     pub fn symlink() {
-        let af = ArchiveFixture::new();
+        let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
         let mut report = Report::new();
-        run_backup(af.archive.path(), srcdir.path(), &mut report).unwrap();
+        run_backup(af.path(), srcdir.path(), &mut report).unwrap();
         assert_eq!(0, report.get_count("block.write.count"));
         assert_eq!(0, report.get_count("backup.file.count"));
         // Skipped both the directory and the symlink.
         assert_eq!(2, report.get_count("backup.skipped.unsupported_file_kind"));
 
-        let band_ids = af.archive.list_bands().unwrap();
+        let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
         assert_eq!("b0000", band_ids[0].as_string());
 
