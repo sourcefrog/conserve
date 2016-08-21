@@ -119,20 +119,18 @@ impl Band {
 
 #[cfg(test)]
 mod tests {
-    extern crate tempdir;
-
     use std::fs;
     use std::io;
 
     use super::*;
+    use super::super::testfixtures::ArchiveFixture;
     use super::super::BandId;
-    use super::super::archive::scratch_archive;
 
     #[test]
     fn create_band() {
         use super::super::io::list_dir;
-        let (_tmpdir, archive) = scratch_archive();
-        let band = Band::create(archive.path(), BandId::from_string("b0001").unwrap()).unwrap();
+        let af = ArchiveFixture::new();
+        let band = Band::create(af.archive.path(), BandId::from_string("b0001").unwrap()).unwrap();
         assert!(band.path().to_str().unwrap().ends_with("b0001"));
         assert!(fs::metadata(band.path()).unwrap().is_dir());
 
@@ -154,10 +152,10 @@ mod tests {
 
     #[test]
     fn create_existing_band() {
-        let (_tmpdir, archive) = scratch_archive();
+        let af = ArchiveFixture::new();
         let band_id = BandId::from_string("b0001").unwrap();
-        Band::create(archive.path(), band_id.clone()).unwrap();
-        match Band::create(archive.path(), band_id) {
+        Band::create(af.archive.path(), band_id.clone()).unwrap();
+        match Band::create(af.archive.path(), band_id) {
             Ok(_) => panic!("expected an error from existing band"),
             Err(e) => {
                 assert_eq!(e.kind(), io::ErrorKind::AlreadyExists);

@@ -196,21 +196,6 @@ impl Iterator for IterBands {
 
 
 #[cfg(test)]
-extern crate tempdir;
-
-/// Makes an archive in a temporary directory, that will be deleted when it goes out of
-/// scope.
-// TODO: Merge with ArchiveFixture.
-#[cfg(test)]
-pub fn scratch_archive() -> (tempdir::TempDir, Archive) {
-    let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
-    let arch_path = &testdir.path().join("arch");
-    let arch = Archive::init(arch_path).unwrap();
-    (testdir, arch)
-}
-
-
-#[cfg(test)]
 mod tests {
     extern crate tempdir;
 
@@ -220,6 +205,7 @@ mod tests {
     use super::*;
     use super::super::BandId;
     use super::super::io::list_dir;
+    use super::super::testfixtures::ArchiveFixture;
 
     #[test]
     fn create_then_open_archive() {
@@ -239,14 +225,13 @@ mod tests {
     /// The header is readable json containing only a version number.
     #[test]
     fn new_archive_header_contents() {
-        let (_tempdir, arch) = scratch_archive();
-
-        let (file_names, dir_names) = list_dir(arch.path()).unwrap();
+        let af = ArchiveFixture::new();
+        let (file_names, dir_names) = list_dir(af.archive.path()).unwrap();
         assert_eq!(file_names.len(), 1);
         assert!(file_names.contains("CONSERVE"));
         assert_eq!(dir_names.len(), 0);
 
-        let header_path = arch.path().join("CONSERVE");
+        let header_path = af.path().join("CONSERVE");
         let mut header_file = fs::File::open(&header_path).unwrap();
         let mut contents = String::new();
         header_file.read_to_string(&mut contents).unwrap();
@@ -257,8 +242,8 @@ mod tests {
     #[test]
     fn create_bands() {
         use super::super::io::directory_exists;
-        let (_tempdir, arch) = scratch_archive();
-
+        let af = ArchiveFixture::new();
+        let arch = &af.archive;
         // Make one band
         let _band1 = arch.create_band().unwrap();
         assert!(directory_exists(arch.path()).unwrap());
