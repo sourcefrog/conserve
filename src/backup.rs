@@ -45,7 +45,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
         };
         if attr.is_file() {
             try!(backup_one_file(&block_dir, &mut index_builder,
-                &entry.path, entry.apath, &mut report));
+                &attr, &entry.path, entry.apath, &mut report));
         } else {
             // TODO: Backup directories, symlinks, etc.
             warn!("Skipping non-file {}", &entry.apath);
@@ -58,12 +58,13 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
 }
 
 fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
+    attr: &fs::Metadata,
     path: &Path, apath: String, mut report: &mut Report) -> io::Result<()> {
     info!("backup {}", path.display());
 
     let mut bw = BlockWriter::new();
     let mut f = try!(fs::File::open(&path));
-    try!(bw.copy_from_file(&mut f));
+    try!(bw.copy_from_file(&mut f, attr.len()));
     let block_hash = try!(block_dir.store(bw, &mut report));
     report.increment("backup.file.count", 1);
 

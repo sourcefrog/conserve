@@ -69,12 +69,12 @@ impl BlockWriter {
         Ok(())
     }
 
-    pub fn copy_from_file(self: &mut BlockWriter, from_file: &mut fs::File) -> io::Result<()> {
+    pub fn copy_from_file(self: &mut BlockWriter, from_file: &mut fs::File, length_advice: u64) -> io::Result<()> {
         // TODO: Don't read the whole thing in one go, use smaller buffers to cope with
         //       large files.
-        // TODO: We probably have the metadata for the file and can use that as
-        //       a hint to preallocate the buffer.
-        let mut body = Vec::<u8>::new();
+
+        // Use the stat size as guidance for a buffer, but always read the whole thing.
+        let mut body = Vec::<u8>::with_capacity(length_advice as usize);
         try!(from_file.read_to_end(&mut body));
         self.write_all(&body)
     }
