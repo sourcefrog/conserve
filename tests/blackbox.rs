@@ -126,6 +126,11 @@ fn blackbox_backup() {
 
     assert_success_and_output(&["list-versions", &arch_dir_str],
         "b0000\n", "");
+
+    // TODO: List files in the archive.
+    // TODO: Restore.
+    // TODO: Validate.
+    // TODO: Compare vs source tree.
 }
 
 
