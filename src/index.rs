@@ -118,8 +118,7 @@ impl IndexBuilder {
         let hunk_path = &self.path_for_hunk(self.sequence);
         let compressed_len = try!(write_compressed_bytes(hunk_path, json_bytes));
 
-        report.increment("index.write.uncompressed_bytes", json_bytes.len() as u64);
-        report.increment("index.write.compressed_bytes", compressed_len as u64);
+        report.increment_size("index.write", json_bytes.len() as u64, compressed_len as u64);
         report.increment("index.write.hunks", 1);
 
         // Ready for the next hunk.

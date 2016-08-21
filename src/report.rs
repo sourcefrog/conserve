@@ -1,13 +1,16 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
-//! Count interesting events that occur during a run.
+//! Accumulate statistics about a Conserve operation.
+//!
+//! A report includes counters of events, and also sizes for files.
+//!
+//! Sizes can be reported in both compressed and uncompressed form.
 
-use std::collections;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-#[allow(unused)]
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "backup.file.count",
     "backup.skipped.unsupported_file_kind",
@@ -15,16 +18,19 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "block.read.corrupt",
     "block.read.misplaced",
     "block.write.already_present",
-    "block.write.compressed_bytes",
     "block.write.count",
-    "block.write.uncompressed_bytes",
-    "index.write.compressed_bytes",
-    "index.write.uncompressed_bytes",
     "index.write.hunks",
     "source.selected.count",
     "source.skipped.unsupported_file_kind",
     "source.visited.directories.count",
 ];
+
+
+static KNOWN_SIZES: &'static [&'static str] = &[
+    "block.write",
+    "index.write",
+];
+
 
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
 /// running.
@@ -32,16 +38,23 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
 /// A Report holds counters, identified by a name.  The name must be in `KNOWN_COUNTERS`.
 #[derive(Clone, Debug)]
 pub struct Report {
-    count: collections::BTreeMap<&'static str, u64>,
+    count: BTreeMap<&'static str, u64>,
+    sizes: BTreeMap<&'static str, (u64, u64)>,
 }
 
 impl Report {
     pub fn new() -> Report {
-        let mut count = collections::BTreeMap::new();
+        let mut new = Report {
+            count: BTreeMap::new(),
+            sizes: BTreeMap::new(),
+        };
         for counter_name in KNOWN_COUNTERS {
-            count.insert(*counter_name, 0);
+            new.count.insert(*counter_name, 0);
         }
-        Report { count: count }
+        for counter_name in KNOWN_SIZES {
+            new.sizes.insert(*counter_name, (0, 0));
+        }
+        new
     }
 
     /// Increment a counter by a given amount.
@@ -56,10 +69,21 @@ impl Report {
         }
     }
 
+    pub fn increment_size(&mut self, counter_name: &str, uncompressed_bytes: u64,
+        compressed_bytes: u64) {
+        let mut e = self.sizes.get_mut(counter_name).expect("unregistered size counter");
+        e.0 += uncompressed_bytes;
+        e.1 += compressed_bytes;
+    }
+
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
     #[allow(unused)]
-    pub fn get_count(self: &Report, counter_name: &str) -> u64 {
+    pub fn get_count(&self, counter_name: &str) -> u64 {
         *self.count.get(counter_name).unwrap_or(&0)
+    }
+
+    pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
+        *self.sizes.get(counter_name).expect("unknown size counter")
     }
 
     /// Merge the contents of `from_report` into `self`.
@@ -73,9 +97,19 @@ impl Report {
 
 impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        try!(write!(f, "Counts:\n"));
         for (key, value) in self.count.iter() {
             if *value > 0 {
-                try!(write!(f, "{:<50}{:>10}\n", *key, *value));
+                try!(write!(f, "  {:<50}{:>10}\n", *key, *value));
+            }
+        }
+        try!(write!(f, "Bytes (before and after compression):\n"));
+        for (key, &(uncompressed_bytes, compressed_bytes)) in self.sizes.iter() {
+            if uncompressed_bytes > 0 {
+                let compression_pct =
+                    100 - ((100 * compressed_bytes) / uncompressed_bytes);
+                try!(write!(f, "  {:<50} {:>9} {:>9} {:>9}%\n", *key,
+                    uncompressed_bytes, compressed_bytes, compression_pct));
             }
         }
         Ok(())
@@ -116,11 +150,15 @@ mod tests {
         let mut r1 = Report::new();
         r1.increment("block.read.count", 10);
         r1.increment("block.write.count", 5);
+        r1.increment_size("block.write", 300, 100);
 
         let formatted = format!("{}", r1);
         assert_eq!(formatted, "\
-block.read.count                                          10
-block.write.count                                          5
+Counts:
+  block.read.count                                          10
+  block.write.count                                          5
+Bytes (before and after compression):
+  block.write                                              300       100        67%
 ");
     }
 }

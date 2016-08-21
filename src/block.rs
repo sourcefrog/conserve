@@ -122,7 +122,7 @@ impl BlockDir {
     ///
     /// Returns the hex hash of the block.
     pub fn store(self: &BlockDir, bw: BlockWriter, report: &mut Report) -> io::Result<BlockHash> {
-        report.increment("block.write.uncompressed_bytes", bw.uncompressed_length);
+        let uncompressed_length: u64 = bw.uncompressed_length;
         let (compressed_bytes, hex_hash) = try!(bw.finish());
         if try!(self.contains(&hex_hash)) {
             report.increment("block.write.already_present", 1);
@@ -141,8 +141,7 @@ impl BlockDir {
             }
         }
         report.increment("block.write.count", 1);
-        report.increment("block.write.compressed_bytes",
-                         compressed_bytes.len() as u64);
+        report.increment_size("block.write", uncompressed_length, compressed_bytes.len() as u64);
         Ok(hex_hash)
     }
 
@@ -235,7 +234,7 @@ mod tests {
 
         assert_eq!(report.get_count("block.write.already_present"), 0);
         assert_eq!(report.get_count("block.write.count"), 1);
-        assert_eq!(report.get_count("block.write.compressed_bytes"), 10);
+        assert_eq!(report.get_size("block.write"), (6, 10));
 
         // Try to read back
         assert_eq!(report.get_count("block.read.count"), 0);
