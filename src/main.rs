@@ -41,8 +41,10 @@ mod testfixtures;
 mod version;
 
 // Re-export important classes.
+pub use archive::Archive;
 pub use band::Band;
 pub use bandid::BandId;
+pub use report::Report;
 
 
 static USAGE: &'static str = "

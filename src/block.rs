@@ -121,7 +121,7 @@ impl BlockDir {
     /// Finish and store the contents of a BlockWriter.
     ///
     /// Returns the hex hash of the block.
-    pub fn store(self: &BlockDir, bw: BlockWriter, report: &mut Report) -> io::Result<BlockHash> {
+    pub fn store(self: &BlockDir, bw: BlockWriter, mut report: &mut Report) -> io::Result<BlockHash> {
         let uncompressed_length: u64 = bw.uncompressed_length;
         let (compressed_bytes, hex_hash) = try!(bw.finish());
         if try!(self.contains(&hex_hash)) {
@@ -130,8 +130,10 @@ impl BlockDir {
         }
         let subdir = self.subdir_for(&hex_hash);
         try!(super::io::ensure_dir_exists(&subdir));
-        if let Err(e) = write_file_entire(&self.path_for_file(&hex_hash),
-                                          compressed_bytes.as_slice()) {
+        if let Err(e) = write_file_entire(
+            &self.path_for_file(&hex_hash),
+            compressed_bytes.as_slice(),
+            &mut report) {
             if e.kind() == ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);

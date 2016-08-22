@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use tempdir;
 
-use super::archive::Archive;
+use super::{Archive, Report};
 use super::io::write_file_entire;
 
 /// A temporary archive.
@@ -76,7 +76,7 @@ impl TreeFixture {
 
     pub fn create_file(self: &TreeFixture, relative_path: &str) {
         let full_path = self.root.join(relative_path);
-        write_file_entire(&full_path, b"contents").unwrap();
+        write_file_entire(&full_path, b"contents", &mut Report::new()).unwrap();
     }
 
     pub fn create_dir(self: &TreeFixture, relative_path: &str) {

@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use rustc_serialize::json;
 
-use super::{Band, BandId};
+use super::{Band, BandId, Report};
 use super::io::write_json_uncompressed;
 
 
@@ -39,13 +39,17 @@ impl Archive {
     pub fn init(path: &Path) -> Result<Archive> {
         debug!("Creating archive directory {:?}", path.display());
         let archive = Archive { path: path.to_path_buf() };
+        // Report is not consumed because the results for init aren't so interesting.
+        let mut report = Report::new();
         if let Err(e) = std::fs::create_dir(&archive.path) {
             error!("Failed to create archive directory {:?}: {}",
                    archive.path.display(),
                    e);
             return Err(e);
         };
-        if let Err(e) = archive.write_archive_header() {
+        let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
+        if let Err(e) = write_json_uncompressed(&path.join(HEADER_FILENAME), &header,
+            &mut report) {
             error!("Failed to write archive header: {}", e);
             return Err(e);
         };
@@ -87,11 +91,6 @@ impl Archive {
             return Err(Error::new(ErrorKind::InvalidInput, header.conserve_archive_version));
         }
         Ok(archive)
-    }
-
-    fn write_archive_header(self: &Archive) -> Result<()> {
-        let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
-        write_json_uncompressed(&self.path.join(HEADER_FILENAME), &header)
     }
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
@@ -140,13 +139,13 @@ impl Archive {
     }
 
     /// Make a new band. Bands are numbered sequentially.
-    pub fn create_band(self: &Archive) -> io::Result<Band> {
+    pub fn create_band(self: &Archive, mut report: &mut Report) -> io::Result<Band> {
         let new_band_id = match self.last_band_id() {
             Err(e) => return Err(e),
             Ok(None) => BandId::zero(),
             Ok(Some(b)) => b.next_sibling(),
         };
-        Band::create(self.path(), new_band_id)
+        Band::create(self.path(), new_band_id, &mut report)
     }
 }
 
@@ -203,7 +202,7 @@ mod tests {
     use std::io::Read;
 
     use super::*;
-    use super::super::BandId;
+    use super::super::{BandId, Report};
     use super::super::io::list_dir;
     use super::super::testfixtures::ScratchArchive;
 
@@ -244,7 +243,7 @@ mod tests {
         use super::super::io::directory_exists;
         let af = ScratchArchive::new();
         // Make one band
-        let _band1 = af.create_band().unwrap();
+        let _band1 = af.create_band(&mut Report::new()).unwrap();
         assert!(directory_exists(af.path()).unwrap());
         let (_file_names, dir_names) = list_dir(af.path()).unwrap();
         println!("dirs: {:?}", dir_names);
@@ -253,7 +252,7 @@ mod tests {
         assert_eq!(af.list_bands().unwrap(), vec![BandId::new(&[0])]);
 
         // // Try creating a second band.
-        let _band2 = &af.create_band().unwrap();
+        let _band2 = &af.create_band(&mut Report::new()).unwrap();
         assert_eq!(af.list_bands().unwrap(),
                    vec![BandId::new(&[0]), BandId::new(&[1])]);
     }

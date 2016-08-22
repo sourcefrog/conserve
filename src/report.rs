@@ -10,7 +10,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::time::{Duration, Instant};
+use std::time::{Duration};
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "backup.file.count",

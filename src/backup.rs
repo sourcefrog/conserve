@@ -22,7 +22,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
     // TODO: Backup directories and symlinks too.
 
     let archive = Archive::open(archive_path).unwrap();
-    let band = try!(archive.create_band());
+    let band = try!(archive.create_band(&mut report));
     let block_dir = band.block_dir();
     let mut index_builder = band.index_builder();
 
@@ -53,7 +53,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
         }
     }
     try!(index_builder.finish_hunk(&mut report));
-    try!(band.close());
+    try!(band.close(&mut report));
     Ok(())
 }
 

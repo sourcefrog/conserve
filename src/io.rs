@@ -3,23 +3,25 @@
 
 //! IO utilities.
 
-use brotli2;
-use rustc_serialize::json;
-use rustc_serialize;
-
 use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, };
+use std::time::Instant;
 
+use brotli2;
+use rustc_serialize::json;
+use rustc_serialize;
 use tempfile;
+
+use super::Report;
 
 
 /// Write bytes to a file, and close.
 /// If writing fails, delete the file.
 /// The file must not already exist.
-pub fn write_file_entire(path: &Path, bytes: &[u8]) -> io::Result<()> {
+pub fn write_file_entire(path: &Path, bytes: &[u8], report: &mut Report) -> io::Result<()> {
     let dir = path.parent().unwrap();
     let mut f = try!(tempfile::NamedTempFileOptions::new()
         .prefix("tmp").create_in(dir));
@@ -27,7 +29,11 @@ pub fn write_file_entire(path: &Path, bytes: &[u8]) -> io::Result<()> {
         error!("Couldn't write {:?}: {}", path.display(), e);
         return Err(e)
     };
+
+    let start_sync = Instant::now();
     try!(f.sync_all());
+    report.increment_duration("sync", start_sync.elapsed());
+
     if let Err(e) = f.persist_noclobber(path) {
         return Err(e.error);
     };
@@ -45,20 +51,23 @@ pub fn read_and_decompress(path: &Path) -> io::Result<Vec<u8>> {
 }
 
 
-pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(path: &Path, obj: &T) -> io::Result<()> {
+pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
+    path: &Path,
+    obj: &T,
+    report: &mut Report) -> io::Result<()> {
     let json = json::encode(&obj).unwrap() + "\n";
-    write_file_entire(&path, json.as_bytes())
+    write_file_entire(&path, json.as_bytes(), report)
 }
 
 
 /// Compress some bytes and write to a new file.
 ///
 /// Returns the length of compressed bytes written.
-pub fn write_compressed_bytes(to_path: &Path, uncompressed: &[u8]) -> io::Result<(usize)> {
+pub fn write_compressed_bytes(to_path: &Path, uncompressed: &[u8], report: &mut Report) -> io::Result<(usize)> {
     let mut compressed = Vec::<u8>::with_capacity(uncompressed.len());
     let params = brotli2::stream::CompressParams::new();
     try!(brotli2::stream::compress_vec(&params, &uncompressed, &mut compressed));
-    try!(write_file_entire(to_path, &compressed));
+    try!(write_file_entire(to_path, &compressed, report));
     Ok(compressed.len())
 }
 
@@ -140,14 +149,16 @@ mod tests {
     use tempdir;
 
     use super::write_file_entire;
+    use super::super::Report;
 
     #[test]
     pub fn test_write_file_entire_repeated() {
         let tmp = tempdir::TempDir::new("write_new_file_test").unwrap();
+        let report = &mut Report::new();
         let testfile = tmp.path().join("afile");
-        write_file_entire(&testfile, b"hello").unwrap();
+        write_file_entire(&testfile, b"hello", report).unwrap();
 
-        assert_eq!(write_file_entire(&testfile, b"goodbye")
+        assert_eq!(write_file_entire(&testfile, b"goodbye", report)
                    .unwrap_err().kind(),
                    io::ErrorKind::AlreadyExists);
 
