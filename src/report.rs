@@ -57,7 +57,7 @@ impl Report {
         for counter_name in KNOWN_SIZES {
             new.sizes.insert(*counter_name, (0, 0));
         }
-        for name in ["sync", "test"].iter() {
+        for name in ["source.read", "sync", "test"].iter() {
             new.times.insert(name, Duration::new(0, 0));
         }
         new
@@ -95,6 +95,10 @@ impl Report {
 
     pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
         *self.sizes.get(counter_name).expect("unknown size counter")
+    }
+
+    pub fn get_duration(&self, name: &str) -> Duration {
+        *self.times.get(name).expect("unknown duration name")
     }
 
     /// Merge the contents of `from_report` into `self`.

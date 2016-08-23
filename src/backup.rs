@@ -64,7 +64,7 @@ fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
 
     let mut bw = BlockWriter::new();
     let mut f = try!(fs::File::open(&path));
-    try!(bw.copy_from_file(&mut f, attr.len()));
+    try!(bw.copy_from_file(&mut f, attr.len(), report));
     let block_hash = try!(block_dir.store(bw, &mut report));
     report.increment("backup.file.count", 1);
 
@@ -108,6 +108,10 @@ mod tests {
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
         assert_eq!("b0000", band_ids[0].as_string());
+
+        let dur = report.get_duration("source.read");
+        let read_us = (dur.subsec_nanos() as u64) / 1000u64 + dur.as_secs() * 1000000u64;
+        assert!(read_us > 0);
 
         // TODO: Check band is closed.
         // TODO: List files in that band.

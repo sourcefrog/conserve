@@ -11,6 +11,7 @@ use std::io;
 use std::io::prelude::*;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::time;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
@@ -69,13 +70,18 @@ impl BlockWriter {
         Ok(())
     }
 
-    pub fn copy_from_file(self: &mut BlockWriter, from_file: &mut fs::File, length_advice: u64) -> io::Result<()> {
+    pub fn copy_from_file(self: &mut BlockWriter, from_file: &mut fs::File, length_advice: u64,
+        report: &mut Report) -> io::Result<()> {
         // TODO: Don't read the whole thing in one go, use smaller buffers to cope with
         //       large files.
 
         // Use the stat size as guidance for a buffer, but always read the whole thing.
         let mut body = Vec::<u8>::with_capacity(length_advice as usize);
+
+        let start_read = time::Instant::now();
         try!(from_file.read_to_end(&mut body));
+        report.increment_duration("source.read", start_read.elapsed());
+
         self.write_all(&body)
     }
 
