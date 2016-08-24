@@ -21,7 +21,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
     // TODO: More tests.
     // TODO: Backup directories and symlinks too.
 
-    let archive = Archive::open(archive_path).unwrap();
+    let archive = try!(Archive::open(archive_path));
     let band = try!(archive.create_band(&mut report));
     let block_dir = band.block_dir();
     let mut index_builder = band.index_builder();
