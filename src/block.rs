@@ -51,6 +51,7 @@ pub struct BlockWriter {
 // TODO: Implement all of `std::io::Write`?
 impl BlockWriter {
     /// Make a new BlockWriter, to write one block into a block data directory `dir`.
+    #[allow(unknown_lints, new_without_default)]
     pub fn new() -> BlockWriter {
         BlockWriter {
             encoder: BrotliEncoder::new(Vec::<u8>::new(), BROTLI_COMPRESSION_LEVEL),
