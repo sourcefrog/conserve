@@ -66,9 +66,13 @@ impl Archive {
         let mut header_file = match File::open(header_path.as_path()) {
             Ok(f) => f,
             Err(e) => {
-                error!("Couldn't open archive header {:?}: {}",
-                       header_path.display(),
-                       e);
+                if e.kind() == io::ErrorKind::NotFound {
+                    error!("{} is not a Conserve archive", path.as_os_str().to_string_lossy());
+                } else {
+                    error!("Couldn't open archive header {:?}: {}",
+                           header_path.display(),
+                           e);
+                }
                 return Err(e);
             }
         };

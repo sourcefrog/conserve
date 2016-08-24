@@ -105,8 +105,7 @@ fn clean_error_on_non_archive() {
     // TODO: Errors really should go to stderr not stdout.
     let error_string = stdout;
     assert!(!status.success());
-    assert!(error_string.contains("Couldn't open archive header"), stderr);
-    assert!(error_string.contains("No such file"), stderr);
+    assert!(error_string.contains("is not a Conserve archive"), stderr);
 }
 
 
