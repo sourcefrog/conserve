@@ -56,7 +56,7 @@ pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
     obj: &T,
     report: &mut Report) -> io::Result<()> {
     let json = json::encode(&obj).unwrap() + "\n";
-    write_file_entire(&path, json.as_bytes(), report)
+    write_file_entire(path, json.as_bytes(), report)
 }
 
 

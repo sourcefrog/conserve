@@ -57,7 +57,7 @@ impl Report {
         for counter_name in KNOWN_SIZES {
             new.sizes.insert(*counter_name, (0, 0));
         }
-        for name in ["source.read", "sync", "test"].iter() {
+        for name in &["source.read", "sync", "test"] {
             new.times.insert(name, Duration::new(0, 0));
         }
         new
@@ -113,13 +113,13 @@ impl Report {
 impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         try!(write!(f, "Counts:\n"));
-        for (key, value) in self.count.iter() {
+        for (key, value) in &self.count {
             if *value > 0 {
                 try!(write!(f, "  {:<50}{:>10}\n", *key, *value));
             }
         }
         try!(write!(f, "Bytes (before and after compression):\n"));
-        for (key, &(uncompressed_bytes, compressed_bytes)) in self.sizes.iter() {
+        for (key, &(uncompressed_bytes, compressed_bytes)) in &self.sizes {
             if uncompressed_bytes > 0 {
                 let compression_pct =
                     100 - ((100 * compressed_bytes) / uncompressed_bytes);
@@ -128,7 +128,7 @@ impl Display for Report {
             }
         }
         try!(write!(f, "Durations (seconds):\n"));
-        for (key, &dur) in self.times.iter() {
+        for (key, &dur) in &self.times {
             let nanos = dur.subsec_nanos();
             let secs = dur.as_secs();
             if nanos > 0 || secs > 0 {
