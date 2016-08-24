@@ -7,7 +7,8 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::io::{ErrorKind, Read, Write};
-use std::path::{Path, };
+use std::ops::{Deref, DerefMut};
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use brotli2;
@@ -18,25 +19,55 @@ use tempfile;
 use super::Report;
 
 
+struct AtomicFile {
+    path: PathBuf,
+    f: tempfile::NamedTempFile,
+}
+
+impl AtomicFile {
+    fn new(path: &Path) -> io::Result<AtomicFile> {
+        let dir = path.parent().unwrap();
+        Ok(AtomicFile {
+            path: path.to_path_buf(),
+            f: try!(tempfile::NamedTempFileOptions::new().prefix("tmp").create_in(dir)),
+        })
+    }
+
+    fn close(self: AtomicFile, report: &mut Report) -> io::Result<()> {
+        let start_sync = Instant::now();
+        try!(self.f.sync_all());
+        report.increment_duration("sync", start_sync.elapsed());
+        if let Err(e) = self.f.persist_noclobber(&self.path) {
+            return Err(e.error);
+        };
+        Ok(())
+    }
+}
+
+
+impl Deref for AtomicFile {
+    type Target = fs::File;
+
+    fn deref(&self) -> &Self::Target {
+        &self.f
+    }
+}
+
+
+impl DerefMut for AtomicFile {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.f
+    }
+}
+
+
 /// Write bytes to a file, and close.
 /// If writing fails, delete the file.
 /// The file must not already exist.
 pub fn write_file_entire(path: &Path, bytes: &[u8], report: &mut Report) -> io::Result<()> {
-    let dir = path.parent().unwrap();
-    let mut f = try!(tempfile::NamedTempFileOptions::new()
-        .prefix("tmp").create_in(dir));
-    if let Err(e) = f.write_all(bytes) {
-        error!("Couldn't write {:?}: {}", path.display(), e);
-        return Err(e)
-    };
-
-    let start_sync = Instant::now();
-    try!(f.sync_all());
-    report.increment_duration("sync", start_sync.elapsed());
-
-    if let Err(e) = f.persist_noclobber(path) {
-        return Err(e.error);
-    };
+    let mut f = try!(AtomicFile::new(path));
+    try!(f.write_all(bytes));
+    try!(f.close(report));
     Ok(())
 }
 
