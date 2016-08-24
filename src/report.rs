@@ -37,7 +37,7 @@ static KNOWN_SIZES: &'static [&'static str] = &[
 /// running.
 ///
 /// A Report holds counters, identified by a name.  The name must be in `KNOWN_COUNTERS`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Report {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, (u64, u64)>,
