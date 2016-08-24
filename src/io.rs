@@ -63,10 +63,15 @@ pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
 /// Compress some bytes and write to a new file.
 ///
 /// Returns the length of compressed bytes written.
-pub fn write_compressed_bytes(to_path: &Path, uncompressed: &[u8], report: &mut Report) -> io::Result<(usize)> {
-    let mut compressed = Vec::<u8>::with_capacity(uncompressed.len());
-    let params = brotli2::stream::CompressParams::new();
-    try!(brotli2::stream::compress_vec(&params, &uncompressed, &mut compressed));
+pub fn write_compressed_bytes(to_path: &Path, input: &[u8], report: &mut Report) -> io::Result<(usize)> {
+    let mut compressed = Vec::<u8>::with_capacity(input.len());
+    let mut compress = brotli2::stream::Compress::new();
+    for chunk in input.chunks(compress.input_block_size()) {
+        compress.copy_input(chunk);
+        compressed.extend_from_slice(&try!(compress.compress(false, false)));
+    }
+    compressed.extend_from_slice(&try!(compress.compress(true, false)));
+    // TODO: Write it gradually as it's produced?
     try!(write_file_entire(to_path, &compressed, report));
     Ok(compressed.len())
 }
