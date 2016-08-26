@@ -194,7 +194,7 @@ mod tests {
     use super::super::Report;
 
     #[test]
-    pub fn test_write_file_entire_repeated() {
+    pub fn write_file_entire_repeated() {
         let tmp = tempdir::TempDir::new("write_new_file_test").unwrap();
         let report = &mut Report::new();
         let testfile = tmp.path().join("afile");

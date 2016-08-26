@@ -152,7 +152,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize_index() {
+    fn serialize_index() {
         let entries = [IndexEntry {
             apath: "/a/b".to_string(),
             mtime: 1461736377,
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_index_builder_checks_order() {
+    fn index_builder_checks_order() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
             apath: "/zzz".to_string(),
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_index_builder_checks_names() {
+    fn index_builder_checks_names() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
             apath: "../escapecat".to_string(),
@@ -206,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn test_index_to_json() {
+    fn index_to_json() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         add_an_entry(&mut ib);
         let json = ib.to_json();
@@ -214,7 +214,7 @@ mod tests {
     }
 
     #[test]
-    fn test_path_for_hunk() {
+    fn path_for_hunk() {
         let index_dir = Path::new("/foo");
         let ib = IndexBuilder::new(index_dir);
         let hunk_path = ib.path_for_hunk(0);
@@ -231,7 +231,7 @@ mod tests {
     }
 
     #[test]
-    fn test_write_a_hunk() {
+    fn write_a_hunk() {
         use std::str;
 
         let (_testdir, mut ib, mut report) = scratch_indexbuilder();
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_no_duplicate_paths() {
+    fn no_duplicate_paths() {
         let (_testdir, mut ib, mut _report) = scratch_indexbuilder();
         add_an_entry(&mut ib);
         add_an_entry(&mut ib);
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_no_duplicate_paths_across_hunks() {
+    fn no_duplicate_paths_across_hunks() {
         let (_testdir, mut ib, mut report) = scratch_indexbuilder();
         add_an_entry(&mut ib);
         ib.finish_hunk(&mut report).unwrap();
