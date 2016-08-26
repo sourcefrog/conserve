@@ -14,6 +14,7 @@ use std::time::{Duration};
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "backup.file.count",
+    "backup.error.stat",
     "backup.skipped.unsupported_file_kind",
     "block.read.count",
     "block.read.corrupt",

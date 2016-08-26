@@ -40,7 +40,8 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
             Ok(attr) => attr,
             Err(e) => {
                 warn!("{}", e);
-                return Err(e);
+                report.increment("backup.error.stat", 1);
+                continue;
             }
         };
         if attr.is_file() {
