@@ -85,17 +85,13 @@ impl IndexBuilder {
         self.entries.push(entry);
     }
 
-    pub fn to_json(&self) -> String {
-        json::encode(&self.entries).unwrap()
-    }
-
     /// Finish this hunk of the index.
     ///
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
     pub fn finish_hunk(&mut self, report: &mut Report) -> io::Result<()> {
-        let json_str = self.to_json();
+        let json_str = json::encode(&self.entries).unwrap();
         let json_bytes = json_str.as_bytes();
         try!(super::io::ensure_dir_exists(
             &subdir_for_hunk(&self.dir, self.sequence)));
@@ -228,14 +224,6 @@ mod tests {
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
         });
-    }
-
-    #[test]
-    fn index_to_json() {
-        let (_testdir, mut ib, _report) = scratch_indexbuilder();
-        add_an_entry(&mut ib);
-        let json = ib.to_json();
-        assert_eq!(json, ONE_ENTRY_INDEX_JSON);
     }
 
     #[test]
