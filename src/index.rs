@@ -3,8 +3,6 @@
 
 ///! Listing of files in a band in the archive.
 
-// use rustc_serialize::json;
-
 use std::cmp::Ordering;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -91,20 +89,6 @@ impl IndexBuilder {
         json::encode(&self.entries).unwrap()
     }
 
-    /// Return the subdirectory for a hunk numbered `hunk_number`.
-    pub fn subdir_for_hunk(&self, hunk_number: u32) -> PathBuf {
-        let mut buf = self.dir.clone();
-        buf.push(format!("{:05}", hunk_number / 10000));
-        buf
-    }
-
-    /// Return the filename (in subdirectory) for a hunk.
-    pub fn path_for_hunk(&self, hunk_number: u32) -> PathBuf {
-        let mut buf = self.subdir_for_hunk(hunk_number);
-        buf.push(format!("{:09}", hunk_number));
-        buf
-    }
-
     /// Finish this hunk of the index.
     ///
     /// This writes all the currently queued entries into a new index file
@@ -114,8 +98,8 @@ impl IndexBuilder {
         let json_str = self.to_json();
         let json_bytes = json_str.as_bytes();
         try!(super::io::ensure_dir_exists(
-            &self.subdir_for_hunk(self.sequence)));
-        let hunk_path = &self.path_for_hunk(self.sequence);
+            &subdir_for_hunk(&self.dir, self.sequence)));
+        let hunk_path = &path_for_hunk(&self.dir, self.sequence);
         let compressed_len = try!(write_compressed_bytes(hunk_path, json_bytes, report));
 
         report.increment_size("index.write", json_bytes.len() as u64, compressed_len as u64);
@@ -125,6 +109,47 @@ impl IndexBuilder {
         self.entries.clear();
         self.sequence += 1;
         Ok(())
+    }
+}
+
+
+/// Return the subdirectory for a hunk numbered `hunk_number`.
+fn subdir_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
+    let mut buf = dir.to_path_buf();
+    buf.push(format!("{:05}", hunk_number / 10000));
+    buf
+}
+
+/// Return the filename (in subdirectory) for a hunk.
+fn path_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
+    let mut buf = subdir_for_hunk(dir, hunk_number);
+    buf.push(format!("{:09}", hunk_number));
+    buf
+}
+
+
+/// Read out all the entries from an existing index.
+pub struct Iter {
+    /// The `i` directory within the band where all files for this index are written.
+    dir: PathBuf,
+}
+
+
+/// Create an iterator that will read all entires from an existing index.
+pub fn read(dir: &Path) -> io::Result<Iter> {
+    Ok(Iter {
+        dir: dir.to_path_buf(),
+    })
+}
+
+
+impl Iterator for Iter {
+    type Item = io::Result<IndexEntry>;
+
+    fn next(&mut self) -> Option<io::Result<IndexEntry>> {
+        // TODO: Read and decompress and deserialize the next whole file.
+        let hunk_path = path_for_hunk(&self.dir, 0);
+        None
     }
 }
 
@@ -216,8 +241,7 @@ mod tests {
     #[test]
     fn path_for_hunk() {
         let index_dir = Path::new("/foo");
-        let ib = IndexBuilder::new(index_dir);
-        let hunk_path = ib.path_for_hunk(0);
+        let hunk_path = super::path_for_hunk(&index_dir, 0);
         assert_eq!(file_name_as_str(&hunk_path), "000000000");
         assert_eq!(last_dir_name_as_str(&hunk_path), "00000");
     }
@@ -246,6 +270,11 @@ mod tests {
         let retrieved_bytes = read_and_decompress(&expected_path).unwrap();
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
         assert_eq!(retrieved, ONE_ENTRY_INDEX_JSON);
+
+        let mut it = super::read(&ib.dir).unwrap();
+        // TODO: Test that it has a single entry.
+        // let entry = it.next().unwrap().unwrap();
+        assert!(it.next().is_none(), "No more entries");
     }
 
     #[test]
