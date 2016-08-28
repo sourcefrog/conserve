@@ -7,14 +7,12 @@
 /// Fixtures that create directories will be automatically deleted when the object
 /// is deleted.
 
-use std::fs;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 
 use tempdir;
 
-use super::{Archive, Report};
-use super::io::write_file_entire;
+use super::{Archive};
 
 /// A temporary archive.
 pub struct ScratchArchive {
@@ -49,44 +47,5 @@ impl Deref for ScratchArchive {
     /// ScratchArchive can be directly used as an archive.
     fn deref(&self) -> &Archive {
         &self.archive
-    }
-}
-
-/// A temporary tree for running a test.
-///
-/// Created in a temporary directory and automatically disposed when done.
-pub struct TreeFixture {
-    pub root: PathBuf,
-    _tempdir: tempdir::TempDir, // held only for cleanup
-}
-
-impl TreeFixture {
-    pub fn new() -> TreeFixture {
-        let tempdir = tempdir::TempDir::new("conserve_TreeFixture").unwrap();
-        let root = tempdir.path().to_path_buf();
-        TreeFixture {
-            _tempdir: tempdir,
-            root: root,
-        }
-    }
-
-    pub fn path(self: &TreeFixture) -> &Path {
-        &self.root
-    }
-
-    pub fn create_file(self: &TreeFixture, relative_path: &str) {
-        let full_path = self.root.join(relative_path);
-        write_file_entire(&full_path, b"contents", &mut Report::new()).unwrap();
-    }
-
-    pub fn create_dir(self: &TreeFixture, relative_path: &str) {
-        fs::create_dir(self.root.join(relative_path)).unwrap();
-    }
-
-    #[cfg(unix)]
-    pub fn create_symlink(self: &TreeFixture, relative_path: &str, target: &str) {
-        use std::os::unix::fs as unix_fs;
-
-        unix_fs::symlink(target, self.root.join(relative_path)).unwrap();
     }
 }

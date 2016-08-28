@@ -20,6 +20,8 @@ extern crate term;
 extern crate time;
 extern crate walkdir;
 
+extern crate conserve_testsupport;
+
 use docopt::Docopt;
 
 // Conserve implementation modules.

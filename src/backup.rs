@@ -91,7 +91,8 @@ mod tests {
 
     use super::run_backup;
     use super::super::report::Report;
-    use super::super::testfixtures::{ScratchArchive, TreeFixture};
+    use super::super::testfixtures::{ScratchArchive};
+    use conserve_testsupport::TreeFixture;
 
     #[test]
     pub fn simple_backup() {

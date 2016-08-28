@@ -5,12 +5,13 @@
 
 
 use std::env;
-use std::io::prelude::*;
-use std::path::{Path, PathBuf};
 use std::process;
 use std::str;
 
+extern crate conserve_testsupport;
 extern crate tempdir;
+
+use conserve_testsupport::TreeFixture;
 
 
 /// Strip from every line, the amount of indentation on the first line.
@@ -173,35 +174,4 @@ fn run_conserve(args: &[&str]) -> (process::ExitStatus, String, String) {
     (output.status,
         String::from_utf8_lossy(&output.stdout).into_owned(),
         String::from_utf8_lossy(&output.stderr).into_owned())
-}
-
-
-
-/// A temporary tree for running a test.
-///
-/// Created in a temporary directory and automatically disposed when done.
-pub struct TreeFixture {
-    pub root: PathBuf,
-    _tempdir: tempdir::TempDir, // held only for cleanup
-}
-
-impl TreeFixture {
-    pub fn new() -> TreeFixture {
-        let tempdir = tempdir::TempDir::new("conserve_TreeFixture").unwrap();
-        let root = tempdir.path().to_path_buf();
-        TreeFixture {
-            _tempdir: tempdir,
-            root: root,
-        }
-    }
-
-    pub fn path(self: &TreeFixture) -> &Path {
-        &self.root
-    }
-
-    pub fn create_file(self: &TreeFixture, relative_path: &str) {
-        let full_path = self.root.join(relative_path);
-        let mut f = std::fs::File::create(full_path).unwrap();
-        f.write_all("contents".as_bytes()).unwrap();
-    }
 }
