@@ -4,6 +4,7 @@
 ///! Listing of files in a band in the archive.
 
 use std::cmp::Ordering;
+use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str;
@@ -132,6 +133,17 @@ pub struct Iter {
     dir: PathBuf,
     buffered_entries: vec::IntoIter<IndexEntry>,
     next_hunk_number: u32,
+}
+
+
+impl fmt::Debug for Iter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("index::Iter")
+            .field("dir", &self.dir)
+            .field("next_hunk_number", &self.next_hunk_number)
+            // buffered_entries has no Debug itself
+            .finish()
+    }
 }
 
 
@@ -324,8 +336,11 @@ mod tests {
         ib.finish_hunk(&mut report).unwrap();
 
         let it = super::read(&ib.dir).unwrap();
-        let names: Vec<String> = it.map(|x| x.unwrap().apath).collect();
+        assert_eq!(
+            format!("{:?}", &it),
+            format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));
 
+        let names: Vec<String> = it.map(|x| x.unwrap().apath).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
     }
 
