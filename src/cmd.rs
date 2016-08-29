@@ -35,9 +35,11 @@ pub fn ls(archive_str: &str, report: &mut Report) -> io::Result<()> {
     // TODO: Option to choose version.
     let band_id = archive.last_band_id().unwrap().expect("archive is empty");
     let band = Band::open(archive.path(), band_id, report).unwrap();
-    for i in try!(band.index_iter()) {
+    let mut iter = try!(band.index_iter());
+    for i in iter.by_ref() {
         let entry = try!(i);
         println!("{}", entry.apath);
     }
+    report.merge_from(&iter.report);
     Ok(())
 }
