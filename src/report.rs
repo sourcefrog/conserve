@@ -21,6 +21,7 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "block.read.misplaced",
     "block.write.already_present",
     "block.write.count",
+    "index.read.hunks",
     "index.write.hunks",
     "source.selected.count",
     "source.skipped.unsupported_file_kind",
@@ -30,6 +31,7 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
 
 static KNOWN_SIZES: &'static [&'static str] = &[
     "block.write",
+    "index.read",
     "index.write",
 ];
 

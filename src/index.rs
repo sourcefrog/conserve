@@ -133,6 +133,7 @@ pub struct Iter {
     dir: PathBuf,
     buffered_entries: vec::IntoIter<IndexEntry>,
     next_hunk_number: u32,
+    pub report: Report,
 }
 
 
@@ -141,6 +142,7 @@ impl fmt::Debug for Iter {
         f.debug_struct("index::Iter")
             .field("dir", &self.dir)
             .field("next_hunk_number", &self.next_hunk_number)
+            // .field("report", &self.report)
             // buffered_entries has no Debug itself
             .finish()
     }
@@ -153,6 +155,7 @@ pub fn read(index_dir: &Path) -> io::Result<Iter> {
         dir: index_dir.to_path_buf(),
         buffered_entries: Vec::<IndexEntry>::new().into_iter(),
         next_hunk_number: 0,
+        report: Report::new(),
     })
 }
 
@@ -178,6 +181,7 @@ impl Iterator for Iter {
                     }
                 },
             };
+            self.report.increment("index.read.hunks", 1);
             let index_json = match str::from_utf8(&index_bytes) {
                 Ok(s) => s,
                 Err(e) => {
