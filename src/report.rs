@@ -109,6 +109,12 @@ impl Report {
         for (name, value) in &from_report.count {
             self.increment(name, *value);
         }
+        for (name, &(uncompressed, compressed)) in &from_report.sizes {
+            self.increment_size(name, uncompressed, compressed);
+        }
+        for (name, duration) in &from_report.times {
+            self.increment_duration(name, *duration);
+        }
     }
 }
 
@@ -166,10 +172,14 @@ mod tests {
         r1.increment("block.read.corrupt", 2);
         r2.increment("block.write.count", 1);
         r2.increment("block.read.corrupt", 10);
+        r2.increment_size("block.write", 300, 100);
+        r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
         assert_eq!(r1.get_count("block.read.count"), 1);
         assert_eq!(r1.get_count("block.read.corrupt"), 12);
         assert_eq!(r1.get_count("block.write.count"), 1);
+        assert_eq!(r1.get_size("block.write"), (300, 100));
+        assert_eq!(r1.get_duration("test"), Duration::new(5, 0));
     }
 
     #[test]
