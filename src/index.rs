@@ -148,9 +148,9 @@ impl fmt::Debug for Iter {
 
 
 /// Create an iterator that will read all entires from an existing index.
-pub fn read(dir: &Path) -> io::Result<Iter> {
+pub fn read(index_dir: &Path) -> io::Result<Iter> {
     Ok(Iter {
-        dir: dir.to_path_buf(),
+        dir: index_dir.to_path_buf(),
         buffered_entries: Vec::<IndexEntry>::new().into_iter(),
         next_hunk_number: 0,
     })

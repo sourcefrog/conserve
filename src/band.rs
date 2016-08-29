@@ -51,9 +51,9 @@ impl Band {
     /// Make a new band (and its on-disk directory).
     ///
     /// Publicly, prefer Archive::create_band.
-    pub fn create(in_directory: &Path, id: BandId, mut report: &mut Report)
+    pub fn create(archive_dir: &Path, id: BandId, mut report: &mut Report)
         -> io::Result<Band> {
-        let new = Band::new(in_directory, id);
+        let new = Band::new(archive_dir, id);
 
         if try!(directory_exists(&new.path_buf)) {
             return Err(io::Error::new(
@@ -77,17 +77,17 @@ impl Band {
         write_json_uncompressed(&self.tail_path(), &tail, &mut report)
     }
 
-    pub fn open(in_directory: &Path, id: BandId, report: &Report) -> io::Result<Band> {
+    pub fn open(archive_dir: &Path, id: BandId, report: &Report) -> io::Result<Band> {
         // TODO: Check header file.
         let _ = report;
-        Ok(Band::new(in_directory, id))
+        Ok(Band::new(archive_dir, id))
     }
 
     /// Create a new in-memory Band object.
     ///
     /// Use `create` or `open` to create or open the on-disk directory.
-    fn new(in_directory: &Path, id: BandId) -> Band {
-        let mut path_buf = in_directory.to_path_buf();
+    fn new(archive_dir: &Path, id: BandId) -> Band {
+        let mut path_buf = archive_dir.to_path_buf();
         path_buf.push(id.as_string());
         let mut block_dir_path = path_buf.clone();
         block_dir_path.push(BLOCK_DIR);
@@ -161,7 +161,7 @@ mod tests {
         let band_id = BandId::from_string("b0001").unwrap();
         let band2 = Band::open(af.path(), band_id, report)
             .expect("failed to open archive");
-        assert!(band2.is_closed().unwrap());    
+        assert!(band2.is_closed().unwrap());
     }
 
     #[test]
