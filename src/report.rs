@@ -31,7 +31,6 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
 
 static KNOWN_SIZES: &'static [&'static str] = &[
     "block.write",
-    "index.read",
     "index.write",
 ];
 
@@ -60,7 +59,7 @@ impl Report {
         for counter_name in KNOWN_SIZES {
             new.sizes.insert(*counter_name, (0, 0));
         }
-        for name in &["source.read", "sync", "test"] {
+        for name in &["index.parse", "index.read", "source.read", "sync", "test"] {
             new.times.insert(name, Duration::new(0, 0));
         }
         new

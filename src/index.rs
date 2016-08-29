@@ -8,6 +8,7 @@ use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str;
+use std::time;
 use std::vec;
 
 use rustc_serialize::json;
@@ -168,6 +169,8 @@ impl Iterator for Iter {
             if let Some(entry) = self.buffered_entries.next() {
                 return Some(Ok(entry));
             }
+
+            let start_read = time::Instant::now();
             // Load the next index hunk into buffered_entries.
             let hunk_path = path_for_hunk(&self.dir, self.next_hunk_number);
             let index_bytes = match read_and_decompress(&hunk_path) {
@@ -181,7 +184,10 @@ impl Iterator for Iter {
                     }
                 },
             };
+            self.report.increment_duration("index.read", start_read.elapsed());
             self.report.increment("index.read.hunks", 1);
+
+            let start_parse = time::Instant::now();
             let index_json = match str::from_utf8(&index_bytes) {
                 Ok(s) => s,
                 Err(e) => {
@@ -199,6 +205,8 @@ impl Iterator for Iter {
             if entries.is_empty() {
                 warn!("Index hunk {} is empty", hunk_path.display());
             }
+            self.report.increment_duration("index.parse", start_parse.elapsed());
+
             self.buffered_entries = entries.into_iter();
             self.next_hunk_number += 1;
         }
