@@ -43,7 +43,7 @@ static KNOWN_SIZES: &'static [&'static str] = &[
 pub struct Report {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, (u64, u64)>,
-    times: BTreeMap<&'static str, Duration>,
+    durations: BTreeMap<&'static str, Duration>,
 }
 
 impl Report {
@@ -51,7 +51,7 @@ impl Report {
         let mut new = Report {
             count: BTreeMap::new(),
             sizes: BTreeMap::new(),
-            times: BTreeMap::new(),
+            durations: BTreeMap::new(),
         };
         for counter_name in KNOWN_COUNTERS {
             new.count.insert(*counter_name, 0);
@@ -60,7 +60,7 @@ impl Report {
             new.sizes.insert(*counter_name, (0, 0));
         }
         for name in &["index.parse", "index.read", "source.read", "sync", "test"] {
-            new.times.insert(name, Duration::new(0, 0));
+            new.durations.insert(name, Duration::new(0, 0));
         }
         new
     }
@@ -85,7 +85,7 @@ impl Report {
     }
 
     pub fn increment_duration(&mut self, name: &str, duration: Duration) {
-        let mut e = self.times.get_mut(name).expect("undefined duration counter");
+        let mut e = self.durations.get_mut(name).expect("undefined duration counter");
         *e += duration;
     }
 
@@ -100,7 +100,7 @@ impl Report {
     }
 
     pub fn get_duration(&self, name: &str) -> Duration {
-        *self.times.get(name).expect("unknown duration name")
+        *self.durations.get(name).expect("unknown duration name")
     }
 
     /// Merge the contents of `from_report` into `self`.
@@ -111,7 +111,7 @@ impl Report {
         for (name, &(uncompressed, compressed)) in &from_report.sizes {
             self.increment_size(name, uncompressed, compressed);
         }
-        for (name, duration) in &from_report.times {
+        for (name, duration) in &from_report.durations {
             self.increment_duration(name, *duration);
         }
     }
@@ -136,7 +136,7 @@ impl Display for Report {
             }
         }
         try!(write!(f, "Durations (seconds):\n"));
-        for (key, &dur) in &self.times {
+        for (key, &dur) in &self.durations {
             let nanos = dur.subsec_nanos();
             let secs = dur.as_secs();
             if nanos > 0 || secs > 0 {
