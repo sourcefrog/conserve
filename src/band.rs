@@ -17,6 +17,7 @@ use time;
 
 use super::{BandId, Report};
 use super::block::BlockDir;
+use super::index;
 use super::index::IndexBuilder;
 use super::io::{directory_exists, file_exists, write_json_uncompressed};
 
@@ -121,6 +122,11 @@ impl Band {
 
     pub fn index_builder(self: &Band) -> IndexBuilder {
         IndexBuilder::new(&self.index_dir_path)
+    }
+
+    /// Make an iterator that will return all entries in this band.
+    pub fn index_iter(&self) -> io::Result<index::Iter> {
+        index::read(&self.index_dir_path)
     }
 }
 
