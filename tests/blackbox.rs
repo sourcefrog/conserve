@@ -57,8 +57,9 @@ fn blackbox_no_args() {
         Usage:
             conserve init [options] <archive>
             conserve backup [options] <archive> <source>
-            conserve list-versions [options] <archive>
             conserve list-source [options] <source>
+            conserve list-versions [options] <archive>
+            conserve ls [options] <archive>
             conserve --version
             conserve --help
         ");
@@ -85,8 +86,9 @@ fn blackbox_help() {
             Usage:
                 conserve init [options] <archive>
                 conserve backup [options] <archive> <source>
-                conserve list-versions [options] <archive>
                 conserve list-source [options] <source>
+                conserve list-versions [options] <archive>
+                conserve ls [options] <archive>
                 conserve --version
                 conserve --help
 
@@ -141,7 +143,10 @@ fn blackbox_backup() {
     assert_success_and_output(&["list-versions", &arch_dir_str],
         "b0000\n", "");
 
-    // TODO: List files in the archive.
+    assert_success_and_output(&["ls", &arch_dir_str],
+        "/hello\n",
+        "");
+
     // TODO: Restore.
     // TODO: Validate.
     // TODO: Compare vs source tree.

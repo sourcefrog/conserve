@@ -57,8 +57,9 @@ https://github.com/sourcefrog/conserve
 Usage:
     conserve init [options] <archive>
     conserve backup [options] <archive> <source>
-    conserve list-versions [options] <archive>
     conserve list-source [options] <source>
+    conserve list-versions [options] <archive>
+    conserve ls [options] <archive>
     conserve --version
     conserve --help
 
@@ -72,6 +73,7 @@ struct Args {
     cmd_init: bool,
     cmd_list_versions: bool,
     cmd_list_source: bool,
+    cmd_ls: bool,
     arg_archive: String,
     arg_source: String,
     flag_stats: bool,
@@ -97,6 +99,8 @@ fn main() {
         cmd::list_source(&args.arg_source, &mut report)
     } else if args.cmd_list_versions {
         cmd::list_versions(&args.arg_archive)
+    } else if args.cmd_ls {
+        cmd::ls(&args.arg_archive, &mut report)
     } else {
         unimplemented!();
     };
