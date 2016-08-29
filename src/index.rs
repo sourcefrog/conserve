@@ -6,11 +6,13 @@
 use std::cmp::Ordering;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::str;
+use std::vec;
 
 use rustc_serialize::json;
 
 use super::apath;
-use super::io::{write_compressed_bytes};
+use super::io::{read_and_decompress, write_compressed_bytes};
 use super::report::Report;
 
 /// Kind of file that can be stored in the archive.
@@ -128,6 +130,8 @@ fn path_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
 pub struct Iter {
     /// The `i` directory within the band where all files for this index are written.
     dir: PathBuf,
+    buffered_entries: vec::IntoIter<IndexEntry>,
+    next_hunk_number: u32,
 }
 
 
@@ -135,6 +139,8 @@ pub struct Iter {
 pub fn read(dir: &Path) -> io::Result<Iter> {
     Ok(Iter {
         dir: dir.to_path_buf(),
+        buffered_entries: Vec::<IndexEntry>::new().into_iter(),
+        next_hunk_number: 0,
     })
 }
 
@@ -143,9 +149,43 @@ impl Iterator for Iter {
     type Item = io::Result<IndexEntry>;
 
     fn next(&mut self) -> Option<io::Result<IndexEntry>> {
-        // TODO: Read and decompress and deserialize the next whole file.
-        let hunk_path = path_for_hunk(&self.dir, 0);
-        None
+        loop {
+            if let Some(entry) = self.buffered_entries.next() {
+                return Some(Ok(entry));
+            }
+            // Load the next index hunk into buffered_entries.
+            let hunk_path = path_for_hunk(&self.dir, self.next_hunk_number);
+            let index_bytes = match read_and_decompress(&hunk_path) {
+                Ok(i) => i,
+                Err(e) => {
+                    if e.kind() == io::ErrorKind::NotFound {
+                        // No (more) index hunk files.
+                        return None;
+                    } else {
+                        return Some(Err(e));
+                    }
+                },
+            };
+            let index_json = match str::from_utf8(&index_bytes) {
+                Ok(s) => s,
+                Err(e) => {
+                    error!("Index file {} is not UTF-8: {}", hunk_path.display(), e);
+                    return Some(Err(io::Error::new(io::ErrorKind::InvalidInput, e)));
+                },
+            };
+            let entries: Vec<IndexEntry> = match json::decode(&index_json) {
+                Ok(h) => h,
+                Err(e) => {
+                    error!("Couldn't deserialize index hunk {}: {}", hunk_path.display(), e);
+                    return Some(Err(io::Error::new(io::ErrorKind::InvalidInput, e)));
+                }
+            };
+            if entries.is_empty() {
+                warn!("Index hunk {} is empty", hunk_path.display());
+            }
+            self.buffered_entries = entries.into_iter();
+            self.next_hunk_number += 1;
+        }
     }
 }
 
@@ -163,8 +203,6 @@ mod tests {
     const EXAMPLE_HASH: &'static str =
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
          45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
-
-    const ONE_ENTRY_INDEX_JSON: &'static str =             r#"[{"apath":"/hello","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#;
 
     fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder, Report) {
         let testdir = tempdir::TempDir::new("index_test").unwrap();
@@ -217,9 +255,9 @@ mod tests {
         })
     }
 
-    fn add_an_entry(ib: &mut IndexBuilder) {
+    fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
         ib.push(IndexEntry {
-            apath: "/hello".to_string(),
+            apath: apath.to_string(),
             mtime: 0,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
@@ -243,11 +281,12 @@ mod tests {
     }
 
     #[test]
-    fn write_a_hunk() {
+    fn basic() {
         use std::str;
 
         let (_testdir, mut ib, mut report) = scratch_indexbuilder();
-        add_an_entry(&mut ib);
+        add_an_entry(&mut ib, "/apple");
+        add_an_entry(&mut ib, "/banana");
         ib.finish_hunk(&mut report).unwrap();
 
         // The first hunk exists.
@@ -255,33 +294,58 @@ mod tests {
         expected_path.push("00000");
         expected_path.push("000000000");
 
+        // Check the stored json version
         let retrieved_bytes = read_and_decompress(&expected_path).unwrap();
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
-        assert_eq!(retrieved, ONE_ENTRY_INDEX_JSON);
+        assert_eq!(retrieved,  r#"[{"apath":"/apple","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"},{"apath":"/banana","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#);
 
         let mut it = super::read(&ib.dir).unwrap();
-        // TODO: Test that it has a single entry.
-        // let entry = it.next().unwrap().unwrap();
-        assert!(it.next().is_none(), "No more entries");
+        let entry = it.next().expect("Get first entry").expect("First entry isn't an error");
+        assert_eq!(entry.apath, "/apple");
+        let entry = it.next().expect("Get second entry").expect("Entry isn't an error");
+        assert_eq!(entry.apath, "/banana");
+        let opt_entry = it.next();
+        if ! opt_entry.is_none() {
+            panic!("Expected no more entries but got {:?}", opt_entry);
+        }
+    }
+
+    #[test]
+    fn multiple_hunks() {
+        use std::str;
+
+        let (_testdir, mut ib, mut report) = scratch_indexbuilder();
+        add_an_entry(&mut ib, "/1.1");
+        add_an_entry(&mut ib, "/1.2");
+        ib.finish_hunk(&mut report).unwrap();
+
+        add_an_entry(&mut ib, "/2.1");
+        add_an_entry(&mut ib, "/2.2");
+        ib.finish_hunk(&mut report).unwrap();
+
+        let it = super::read(&ib.dir).unwrap();
+        let names: Vec<String> = it.map(|x| x.unwrap().apath).collect();
+
+        assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
     }
 
     #[test]
     #[should_panic]
     fn no_duplicate_paths() {
         let (_testdir, mut ib, mut _report) = scratch_indexbuilder();
-        add_an_entry(&mut ib);
-        add_an_entry(&mut ib);
+        add_an_entry(&mut ib, "/hello");
+        add_an_entry(&mut ib, "/hello");
     }
 
     #[test]
     #[should_panic]
     fn no_duplicate_paths_across_hunks() {
         let (_testdir, mut ib, mut report) = scratch_indexbuilder();
-        add_an_entry(&mut ib);
+        add_an_entry(&mut ib, "/hello");
         ib.finish_hunk(&mut report).unwrap();
 
         // Try to add an identically-named file within the next hunk and it should error,
         // because the IndexBuilder remembers the last file name written.
-        add_an_entry(&mut ib);
+        add_an_entry(&mut ib, "hello");
     }
 }
