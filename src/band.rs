@@ -51,30 +51,20 @@ impl Band {
     /// Make a new band (and its on-disk directory).
     ///
     /// Publicly, prefer Archive::create_band.
-    pub fn create(in_directory: &Path, id: BandId, mut report: &mut Report) -> io::Result<Band> {
-        let mut path_buf = in_directory.to_path_buf();
-        path_buf.push(id.as_string());
-        if try!(directory_exists(&path_buf)) {
-            return Err(io::Error::new(io::ErrorKind::AlreadyExists, "band directory exists"));
-        }
+    pub fn create(in_directory: &Path, id: BandId, mut report: &mut Report)
+        -> io::Result<Band> {
+        let new = Band::new(in_directory, id);
 
-        let mut block_dir_path = path_buf.clone();
-        block_dir_path.push(BLOCK_DIR);
-
-        let mut index_dir_path = path_buf.clone();
-        index_dir_path.push(INDEX_DIR);
-
-        try!(fs::create_dir(path_buf.as_path()));
-        try!(fs::create_dir(&block_dir_path));
-        try!(fs::create_dir(&index_dir_path));
-        info!("create band {:?}", path_buf);
-
-        let new = Band {
-            id: id,
-            path_buf: path_buf,
-            block_dir_path: block_dir_path,
-            index_dir_path: index_dir_path,
+        if try!(directory_exists(&new.path_buf)) {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                format!("band directory {:?} already exists",
+                    &new.path_buf.display())));
         };
+        try!(fs::create_dir(&new.path_buf));
+        try!(fs::create_dir(&new.block_dir_path));
+        try!(fs::create_dir(&new.index_dir_path));
+        info!("create band {:?}", &new.path_buf);
 
         let head = BandHead { start_time: time::get_time().sec as u64 };
         try!(write_json_uncompressed(&new.path_buf.join(HEAD_FILENAME), &head, &mut report));
@@ -85,6 +75,31 @@ impl Band {
     pub fn close(self: &Band, mut report: &mut Report) -> io::Result<()> {
         let tail = BandTail { end_time: time::get_time().sec as u64 };
         write_json_uncompressed(&self.tail_path(), &tail, &mut report)
+    }
+
+    pub fn open(in_directory: &Path, id: BandId, report: &Report) -> io::Result<Band> {
+        // TODO: Check header file.
+        let _ = report;
+        Ok(Band::new(in_directory, id))
+    }
+
+    /// Create a new in-memory Band object.
+    ///
+    /// Use `create` or `open` to create or open the on-disk directory.
+    fn new(in_directory: &Path, id: BandId) -> Band {
+        let mut path_buf = in_directory.to_path_buf();
+        path_buf.push(id.as_string());
+        let mut block_dir_path = path_buf.clone();
+        block_dir_path.push(BLOCK_DIR);
+        let mut index_dir_path = path_buf.clone();
+        index_dir_path.push(INDEX_DIR);
+
+        Band {
+            id: id,
+            path_buf: path_buf,
+            block_dir_path: block_dir_path,
+            index_dir_path: index_dir_path,
+        }
     }
 
     pub fn is_closed(self: &Band) -> io::Result<bool> {
@@ -142,6 +157,11 @@ mod tests {
         assert!(file_names.contains("BANDTAIL"));
 
         assert!(band.is_closed().unwrap());
+
+        let band_id = BandId::from_string("b0001").unwrap();
+        let band2 = Band::open(af.path(), band_id, report)
+            .expect("failed to open archive");
+        assert!(band2.is_closed().unwrap());    
     }
 
     #[test]
