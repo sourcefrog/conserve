@@ -63,7 +63,7 @@ impl Archive {
     pub fn open(path: &Path) -> Result<Archive> {
         let archive = Archive { path: path.to_path_buf() };
         let header_path = path.join(HEADER_FILENAME);
-        let mut header_file = match File::open(header_path.as_path()) {
+        let mut header_file = match File::open(&header_path) {
             Ok(f) => f,
             Err(e) => {
                 if e.kind() == io::ErrorKind::NotFound {
