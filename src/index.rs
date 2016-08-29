@@ -89,6 +89,14 @@ impl IndexBuilder {
         self.entries.push(entry);
     }
 
+    pub fn maybe_flush(&mut self, report: &mut Report) -> io::Result<()> {
+        if self.entries.len() >= 10000 {
+            self.finish_hunk(report)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Finish this hunk of the index.
     ///
     /// This writes all the currently queued entries into a new index file

@@ -60,13 +60,13 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
 
 fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
     attr: &fs::Metadata,
-    path: &Path, apath: String, mut report: &mut Report) -> io::Result<()> {
+    path: &Path, apath: String, report: &mut Report) -> io::Result<()> {
     info!("backup {}", path.display());
 
     let mut bw = BlockWriter::new();
     let mut f = try!(fs::File::open(&path));
     try!(bw.copy_from_file(&mut f, attr.len(), report));
-    let block_hash = try!(block_dir.store(bw, &mut report));
+    let block_hash = try!(block_dir.store(bw, report));
     report.increment("backup.file.count", 1);
 
     assert!(apath::valid(&apath), "invalid apath: {:?}", &apath);
@@ -81,8 +81,7 @@ fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
         blake2b: block_hash,
     };
     index_builder.push(index_entry);
-
-    Ok(())
+    index_builder.maybe_flush(report)
 }
 
 #[cfg(test)]
