@@ -7,6 +7,7 @@
 use std::fs;
 use std::path::{Path};
 use std::io;
+use std::time;
 
 use super::apath;
 use super::archive::Archive;
@@ -25,8 +26,6 @@ struct Backup {
 
 pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -> io::Result<()> {
     // TODO: More tests.
-    // TODO: Backup directories and symlinks too.
-
     let archive = try!(Archive::open(archive_path));
     let band = try!(archive.create_band(&mut report));
     let mut backup = Backup {
@@ -58,7 +57,7 @@ fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> io::R
         try!(backup_one_file(backup, entry));
     } else {
         // TODO: Backup directories, symlinks, etc.
-        warn!("Skipping non-file {}", &entry.apath);
+        warn!("Skipping unsupported file kind {}", &entry.apath);
         backup.report.increment("backup.skipped.unsupported_file_kind", 1);
     }
     Ok(())
@@ -76,12 +75,14 @@ fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()
 
     assert!(apath::valid(&entry.apath), "invalid apath: {:?}", &entry.apath);
 
-    // TODO: Get mtime.
     // TODO: Store list of blocks as well as whole-file hash?  Maybe not if it's not split?
+    let mtime = entry.metadata.modified().ok()
+        .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
+        .and_then(|dur| Some(dur.as_secs()));
 
     let index_entry = IndexEntry {
         apath: entry.apath.clone(),
-        mtime: 0,
+        mtime: mtime,
         kind: IndexKind::File,
         blake2b: block_hash,
     };
@@ -121,6 +122,7 @@ mod tests {
         assert!(read_us > 0);
 
         // TODO: Check band is closed.
+        // TODO: Check entries in that band have mtimes.
         // TODO: List files in that band.
         // TODO: Check contents of that file.
     }

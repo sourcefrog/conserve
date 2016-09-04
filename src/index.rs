@@ -32,7 +32,7 @@ pub struct IndexEntry {
     pub apath: String,
 
     /// File modification time, in whole seconds past the Unix epoch.
-    pub mtime: u64,
+    pub mtime: Option<u64>,
 
     /// Type of file.
     pub kind: IndexKind,
@@ -246,7 +246,7 @@ mod tests {
     fn serialize_index() {
         let entries = [IndexEntry {
             apath: "/a/b".to_string(),
-            mtime: 1461736377,
+            mtime: Some(1461736377),
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
         }];
@@ -263,13 +263,13 @@ mod tests {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
             apath: "/zzz".to_string(),
-            mtime: 0,
+            mtime: None,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
         });
         ib.push(IndexEntry {
             apath: "aaa".to_string(),
-            mtime: 0,
+            mtime: None,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
         });
@@ -281,7 +281,7 @@ mod tests {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
             apath: "../escapecat".to_string(),
-            mtime: 0,
+            mtime: None,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
         })
@@ -290,7 +290,7 @@ mod tests {
     fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
         ib.push(IndexEntry {
             apath: apath.to_string(),
-            mtime: 0,
+            mtime: None,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
         });
@@ -329,7 +329,7 @@ mod tests {
         // Check the stored json version
         let retrieved_bytes = read_and_decompress(&expected_path).unwrap();
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
-        assert_eq!(retrieved,  r#"[{"apath":"/apple","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"},{"apath":"/banana","mtime":0,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#);
+        assert_eq!(retrieved,  r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c"}]"#);
 
         let mut it = super::read(&ib.dir).unwrap();
         let entry = it.next().expect("Get first entry").expect("First entry isn't an error");
