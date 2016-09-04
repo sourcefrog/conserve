@@ -9,7 +9,7 @@
 use std::fs;
 use std::io;
 use std::io::prelude::*;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::time;
 
@@ -18,7 +18,9 @@ use blake2_rfc::blake2b::Blake2b;
 use brotli2::write::BrotliEncoder;
 use rustc_serialize::hex::ToHex;
 
-use super::io::{read_and_decompress, write_file_entire};
+use tempfile;
+
+use super::io::{read_and_decompress};
 use super::report::Report;
 
 /// Use a moderate Brotli compression level.
@@ -53,65 +55,6 @@ pub struct Reference {
 }
 
 
-/// Write body data to a data block, compressed, and stored by its hash.
-///
-/// A `BlockWriter` is a single-use object that writes a single block.
-///
-/// Data is compressed and its hash is
-/// accumulated until writing is complete.
-pub struct BlockWriter {
-    encoder: BrotliEncoder<Vec<u8>>,
-    hasher: Blake2b,
-    uncompressed_length: u64,
-}
-
-
-impl BlockWriter {
-    /// Make a new BlockWriter, to write one block into a block data directory `dir`.
-    #[allow(unknown_lints, new_without_default)]
-    pub fn new() -> BlockWriter {
-        BlockWriter {
-            encoder: BrotliEncoder::new(Vec::<u8>::new(), BROTLI_COMPRESSION_LEVEL),
-            hasher: Blake2b::new(BLAKE_HASH_SIZE_BYTES),
-            uncompressed_length: 0,
-        }
-    }
-
-    pub fn copy_from_file(self: &mut BlockWriter, from_file: &mut fs::File, length_advice: u64,
-        report: &mut Report) -> io::Result<()> {
-        // TODO: Don't read the whole thing in one go, use smaller buffers to cope with
-        //       large files.
-
-        // Use the stat size as guidance for a buffer, but always read the whole thing.
-        let mut buf = Vec::<u8>::with_capacity(length_advice as usize);
-
-        let start_read = time::Instant::now();
-        try!(from_file.read_to_end(&mut buf));
-        report.increment_duration("source.read", start_read.elapsed());
-
-        let start_compress = time::Instant::now();
-        try!(self.encoder.write_all(&buf));
-        report.increment_duration("block.compress", start_compress.elapsed());
-
-        self.uncompressed_length += buf.len() as u64;
-
-        let start_hash = time::Instant::now();
-        self.hasher.update(&buf);
-        report.increment_duration("block.hash", start_hash.elapsed());        
-
-        Ok(())
-    }
-
-    /// Finish compression, and return the compressed bytes and a hex hash.
-    ///
-    /// Callers normally want `BlockDir.store` instead, which will
-    /// finish and consume the writer.
-    pub fn finish(self: BlockWriter) -> io::Result<(Vec<u8>, BlockHash)> {
-        Ok((try!(self.encoder.finish()), self.hasher.finalize().as_bytes().to_hex()))
-    }
-}
-
-
 /// A readable, writable directory within a band holding data blocks.
 pub struct BlockDir {
     pub path: PathBuf,
@@ -141,13 +84,39 @@ impl BlockDir {
         buf
     }
 
-    /// Finish and store the contents of a BlockWriter.
-    ///
-    /// Returns references to where it is stored plus, the hex hash of the uncompressed data.
-    /// They may differ when the file is split up or if the storage hash is salted.
-    pub fn store(self: &BlockDir, bw: BlockWriter, mut report: &mut Report) -> io::Result<(Vec<Reference>, BlockHash)> {
-        let uncompressed_length: u64 = bw.uncompressed_length;
-        let (compressed_bytes, hex_hash) = try!(bw.finish());
+    pub fn store_file(&self, from_file: &mut fs::File, length_advice: u64, report: &mut Report)
+    -> io::Result<(Vec<Reference>, BlockHash)> {
+        // TODO: Don't read the whole thing in one go, use smaller buffers to cope with
+        //       large files.
+        // TODO: Incrementally store compressed data into a tempfile in the block dir,
+        //       rather than returning the whole thing from `finish`.
+
+        let tempf = try!(tempfile::NamedTempFileOptions::new()
+            .prefix("tmp").create_in(&self.path));
+        let mut encoder = BrotliEncoder::new(tempf, BROTLI_COMPRESSION_LEVEL);
+        let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
+        let mut uncompressed_length: u64 = 0;
+
+        // Use the stat size as guidance for a buffer, but always read the whole thing.
+        let mut buf = Vec::<u8>::with_capacity(length_advice as usize);
+
+        let start_read = time::Instant::now();
+        try!(from_file.read_to_end(&mut buf));
+        report.increment_duration("source.read", start_read.elapsed());
+
+        let start_compress = time::Instant::now();
+        try!(encoder.write_all(&buf));
+        report.increment_duration("block.compress", start_compress.elapsed());
+
+        uncompressed_length += buf.len() as u64;
+
+        let start_hash = time::Instant::now();
+        hasher.update(&buf);
+        report.increment_duration("block.hash", start_hash.elapsed());
+
+        let mut tempf = try!(encoder.finish());
+        let hex_hash = hasher.finalize().as_bytes().to_hex();
+
         // TODO: Update this when the stored blocks can be different from body hash.
         let refs = vec![Reference {
             hash: hex_hash.clone(),
@@ -158,22 +127,20 @@ impl BlockDir {
             report.increment("block.write.already_present", 1);
             return Ok((refs, hex_hash));
         }
-        let subdir = self.subdir_for(&hex_hash);
-        try!(super::io::ensure_dir_exists(&subdir));
-        if let Err(e) = write_file_entire(
-            &self.path_for_file(&hex_hash),
-            compressed_bytes.as_slice(),
-            &mut report) {
-            if e.kind() == ErrorKind::AlreadyExists {
+        let compressed_length: u64 = try!(tempf.seek(SeekFrom::Current(0)));
+        try!(super::io::ensure_dir_exists(&self.subdir_for(&hex_hash)));
+        if let Err(e) = tempf.persist_noclobber(&self.path_for_file(&hex_hash)) {
+            if e.error.kind() == ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);
                 report.increment("block.write.already_present", 1);
+                return Ok((refs, hex_hash));
             } else {
-                return Err(e);
+                return Err(e.error);
             }
         }
         report.increment("block.write.count", 1);
-        report.increment_size("block.write", uncompressed_length, compressed_bytes.len() as u64);
+        report.increment_size("block.write", uncompressed_length, compressed_length);
         Ok((refs, hex_hash))
     }
 
@@ -221,7 +188,7 @@ mod tests {
     use std::io::prelude::*;
     use tempdir;
     use tempfile;
-    use super::{BlockDir, BlockWriter};
+    use super::{BlockDir};
     use super::super::report::Report;
 
     const EXAMPLE_TEXT: &'static [u8] = b"hello!";
@@ -245,7 +212,6 @@ mod tests {
 
     #[test]
     pub fn write_to_file() {
-        let mut writer = BlockWriter::new();
         let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
         let mut report = Report::new();
         let (testdir, block_dir) = setup();
@@ -253,8 +219,7 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
-        writer.copy_from_file(&mut example_file, 0, &mut report).unwrap();
-        let (refs, hash_hex) = block_dir.store(writer, &mut report).unwrap();
+        let (refs, hash_hex) = block_dir.store_file(&mut example_file, 0, &mut report).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
 
         // Should be in one block, and as it's currently unsalted the hash is the same.
@@ -287,17 +252,13 @@ mod tests {
         let mut report = Report::new();
         let (_testdir, block_dir) = setup();
 
-        let mut writer = BlockWriter::new();
         let mut example_file = make_example_file();
-        writer.copy_from_file(&mut example_file, 0, &mut report).unwrap();
-        let (refs1, hash1) = block_dir.store(writer, &mut report).unwrap();
+        let (refs1, hash1) = block_dir.store_file(&mut example_file, 0, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 0);
         assert_eq!(report.get_count("block.write.count"), 1);
 
-        let mut writer = BlockWriter::new();
         let mut example_file = make_example_file();
-        writer.copy_from_file(&mut example_file, 0, &mut report).unwrap();
-        let (refs2, hash2)= block_dir.store(writer, &mut report).unwrap();
+        let (refs2, hash2) = block_dir.store_file(&mut example_file, 0, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 1);
         assert_eq!(report.get_count("block.write.count"), 1);
 

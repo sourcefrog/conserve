@@ -11,7 +11,7 @@ use std::time;
 
 use super::apath;
 use super::archive::Archive;
-use super::block::{BlockDir, BlockWriter};
+use super::block::{BlockDir};
 use super::index::{IndexBuilder, Entry, IndexKind};
 use super::report::Report;
 use super::sources;
@@ -67,10 +67,9 @@ fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> io::R
 fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()> {
     info!("backup {}", entry.path.display());
 
-    let mut bw = BlockWriter::new();
     let mut f = try!(fs::File::open(&entry.path));
-    try!(bw.copy_from_file(&mut f, entry.metadata.len(), &mut backup.report));
-    let (refs, body_hash) = try!(backup.block_dir.store(bw, &mut backup.report));
+    let (refs, body_hash) = try!(
+        backup.block_dir.store_file(&mut f, entry.metadata.len(), &mut backup.report));
 
     backup.report.increment("backup.file.count", 1);
 
