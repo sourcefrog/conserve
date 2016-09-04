@@ -96,6 +96,7 @@ mod tests {
     extern crate tempdir;
 
     use super::run_backup;
+    use super::super::index;
     use super::super::report::Report;
     use super::super::testfixtures::{ScratchArchive};
     use conserve_testsupport::TreeFixture;
@@ -124,9 +125,16 @@ mod tests {
         let band = af.open_band(&band_ids[0], &mut report).unwrap();
         assert!(band.is_closed().unwrap());
 
-        // TODO: Check entries in that band have mtimes.
-        // TODO: List files in that band.
-        // TODO: Check contents of that file.
+        let index_entries = band.index_iter().unwrap()
+            .filter_map(|i| i.ok())
+            .collect::<Vec<index::Entry>>();
+        assert_eq!(1, index_entries.len());
+        assert_eq!("/hello", index_entries[0].apath);
+        assert!(index_entries[0].mtime.unwrap() > 0);
+        assert_eq!("9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
+            index_entries[0].blake2b);
+
+        // TODO: Read back contents of that file.
     }
 
     #[cfg(unix)]
