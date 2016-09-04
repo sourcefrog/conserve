@@ -15,7 +15,7 @@ use super::report::Report;
 
 
 /// An entry found in the source directory.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Entry {
     /// Conserve apath, relative to the top-level directory.
     pub apath: String,
@@ -24,11 +24,15 @@ pub struct Entry {
     pub path: PathBuf,
 
     pub is_dir: bool,
+
+    /// stat-like structure including kind, mtime, etc.
+    pub metadata: fs::Metadata,
 }
+
+// TODO: Implement Debug on Entry and Iter.
 
 
 /// Recursive iterator of the contents of a source directory.
-#[derive(Debug)]
 pub struct Iter {
     /// Directories yet to be visited.
     dir_deque: VecDeque<Entry>,
@@ -83,11 +87,22 @@ impl Iter {
             if new_apath != "/" {
                 new_apath.push('/');
             }
+            let child_path = dir_entry.path.join(&child_name).to_path_buf();
+            let metadata = match fs::symlink_metadata(&child_path) {
+                Ok(metadata) => metadata,
+                Err(e) => {
+                    warn!("{}", e);
+                    self.report.increment("source.error.metadata", 1);
+                    continue;
+                }
+            };
+            // TODO: Don't be lossy, error if not convertible.
             new_apath.push_str(&child_name.to_string_lossy());
             let new_entry = Entry {
                 apath: new_apath,
-                path: dir_entry.path.join(child_name).to_path_buf(),
+                path: child_path,
                 is_dir: is_dir,
+                metadata: metadata,
             };
             if is_dir {
                 self.dir_deque.insert(directory_insert_point, new_entry.clone());
@@ -140,10 +155,20 @@ impl Iterator for Iter {
 ///
 /// The `Iter` has its own `Report` of how many directories and files were visited.
 pub fn iter(source_dir: &Path) -> Iter {
+    let metadata = match fs::symlink_metadata(&source_dir) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            // TODO: Unify this with the regular tree walker, by just making a directory
+            // that needs to be descended?  Or, make this return an io::Result?
+            warn!("{}", e);
+            panic!();
+        }
+    };
     let root_entry = Entry {
         apath: "/".to_string(),
         path: source_dir.to_path_buf(),
         is_dir: true,
+        metadata: metadata,
     };
     // Preload iter to return the root and then recurse into it.
     let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();

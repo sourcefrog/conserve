@@ -55,16 +55,8 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
 }
 
 fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()> {
-    let attr = match fs::symlink_metadata(&entry.path) {
-        Ok(attr) => attr,
-        Err(e) => {
-            warn!("{}", e);
-            backup.report.increment("backup.error.stat", 1);
-            return Ok(());
-        }
-    };
-    if attr.is_file() {
-        try!(backup_one_file(backup, &attr, entry));
+    if entry.metadata.is_file() {
+        try!(backup_one_file(backup, entry));
     } else {
         // TODO: Backup directories, symlinks, etc.
         warn!("Skipping non-file {}", &entry.apath);
@@ -74,12 +66,12 @@ fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> io::R
 }
 
 
-fn backup_one_file(backup: &mut Backup, attr: &fs::Metadata, entry: &sources::Entry) -> io::Result<()> {
+fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()> {
     info!("backup {}", entry.path.display());
 
     let mut bw = BlockWriter::new();
     let mut f = try!(fs::File::open(&entry.path));
-    try!(bw.copy_from_file(&mut f, attr.len(), &mut backup.report));
+    try!(bw.copy_from_file(&mut f, entry.metadata.len(), &mut backup.report));
     let block_hash = try!(backup.block_dir.store(bw, &mut backup.report));
     backup.report.increment("backup.file.count", 1);
 

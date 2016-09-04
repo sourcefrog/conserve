@@ -23,6 +23,7 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "block.write.count",
     "index.read.hunks",
     "index.write.hunks",
+    "source.error.metadata",
     "source.selected.count",
     "source.skipped.unsupported_file_kind",
     "source.visited.directories.count",
