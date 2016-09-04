@@ -18,7 +18,6 @@ extern crate tempdir;
 extern crate tempfile;
 extern crate term;
 extern crate time;
-extern crate walkdir;
 
 extern crate conserve_testsupport;
 
