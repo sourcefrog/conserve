@@ -65,7 +65,7 @@ pub struct BlockWriter {
     uncompressed_length: u64,
 }
 
-// TODO: Implement all of `std::io::Write`?
+
 impl BlockWriter {
     /// Make a new BlockWriter, to write one block into a block data directory `dir`.
     #[allow(unknown_lints, new_without_default)]
@@ -77,30 +77,23 @@ impl BlockWriter {
         }
     }
 
-    /// Write all the contents of `buf` into this block.
-    ///
-    /// If this returns an error then it's possible that the block was partly
-    /// written, and the caller should discard it.
-    pub fn write_all(self: &mut BlockWriter, buf: &[u8]) -> io::Result<()> {
-        try!(self.encoder.write_all(buf));
-        self.uncompressed_length += buf.len() as u64;
-        self.hasher.update(buf);
-        Ok(())
-    }
-
     pub fn copy_from_file(self: &mut BlockWriter, from_file: &mut fs::File, length_advice: u64,
         report: &mut Report) -> io::Result<()> {
         // TODO: Don't read the whole thing in one go, use smaller buffers to cope with
         //       large files.
 
         // Use the stat size as guidance for a buffer, but always read the whole thing.
-        let mut body = Vec::<u8>::with_capacity(length_advice as usize);
+        let mut buf = Vec::<u8>::with_capacity(length_advice as usize);
 
         let start_read = time::Instant::now();
-        try!(from_file.read_to_end(&mut body));
+        try!(from_file.read_to_end(&mut buf));
         report.increment_duration("source.read", start_read.elapsed());
 
-        self.write_all(&body)
+        try!(self.encoder.write_all(&buf));
+        self.uncompressed_length += buf.len() as u64;
+        self.hasher.update(&buf);
+
+        Ok(())
     }
 
     /// Finish compression, and return the compressed bytes and a hex hash.
@@ -218,7 +211,10 @@ impl BlockDir {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::io::SeekFrom;
+    use std::io::prelude::*;
     use tempdir;
+    use tempfile;
     use super::{BlockDir, BlockWriter};
     use super::super::report::Report;
 
@@ -227,22 +223,18 @@ mod tests {
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee\
         31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
+    fn make_example_file() -> tempfile::NamedTempFile {
+        let mut tf = tempfile::NamedTempFile::new().unwrap();
+        tf.write_all(EXAMPLE_TEXT).unwrap();
+        tf.flush().unwrap();
+        tf.seek(SeekFrom::Start(0)).unwrap();
+        tf
+    }
+
     fn setup() -> (tempdir::TempDir, BlockDir) {
         let testdir = tempdir::TempDir::new("block_test").unwrap();
         let block_dir = BlockDir::new(testdir.path());
         (testdir, block_dir)
-    }
-
-    #[test]
-    pub fn write_all_to_memory() {
-        let mut writer = BlockWriter::new();
-
-        writer.write_all(b"hello!").unwrap();
-        let (compressed, hash_hex) = writer.finish().unwrap();
-        println!("Compressed result: {:?}", compressed);
-        assert!(compressed.len() == 10);
-        assert!(hash_hex.len() == 128);
-        assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
     }
 
     #[test]
@@ -251,10 +243,11 @@ mod tests {
         let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
         let mut report = Report::new();
         let (testdir, block_dir) = setup();
+        let mut example_file = make_example_file();
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
-        writer.write_all(EXAMPLE_TEXT).unwrap();
+        writer.copy_from_file(&mut example_file, 0, &mut report).unwrap();
         let (refs, hash_hex) = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
 
@@ -289,13 +282,15 @@ mod tests {
         let (_testdir, block_dir) = setup();
 
         let mut writer = BlockWriter::new();
-        writer.write_all(b"hello!").unwrap();
+        let mut example_file = make_example_file();
+        writer.copy_from_file(&mut example_file, 0, &mut report).unwrap();
         let (refs1, hash1) = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 0);
         assert_eq!(report.get_count("block.write.count"), 1);
 
         let mut writer = BlockWriter::new();
-        writer.write_all(b"hello!").unwrap();
+        let mut example_file = make_example_file();
+        writer.copy_from_file(&mut example_file, 0, &mut report).unwrap();
         let (refs2, hash2)= block_dir.store(writer, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 1);
         assert_eq!(report.get_count("block.write.count"), 1);
