@@ -28,6 +28,7 @@ time = "^0"
 
 [features]
 default = []
+sync = []
 
 [workspace]
 members = ["testsupport"]
