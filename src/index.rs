@@ -210,7 +210,7 @@ impl Iterator for Iter {
                     return Some(Err(io::Error::new(io::ErrorKind::InvalidInput, e)));
                 },
             };
-            let entries: Vec<Entry> = match json::decode(&index_json) {
+            let entries: Vec<Entry> = match json::decode(index_json) {
                 Ok(h) => h,
                 Err(e) => {
                     error!("Couldn't deserialize index hunk {}: {}", hunk_path.display(), e);
