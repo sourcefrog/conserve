@@ -34,9 +34,11 @@ impl AtomicFile {
     }
 
     fn close(self: AtomicFile, report: &mut Report) -> io::Result<()> {
-        let start_sync = Instant::now();
-        try!(self.f.sync_all());
-        report.increment_duration("sync", start_sync.elapsed());
+        if cfg!(feature = "sync") {
+            let start_sync = Instant::now();
+            try!(self.f.sync_all());
+            report.increment_duration("sync", start_sync.elapsed());
+        }
         if let Err(e) = self.f.persist_noclobber(&self.path) {
             return Err(e.error);
         };
