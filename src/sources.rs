@@ -5,6 +5,7 @@
 
 use std::cmp::Ordering;
 use std::collections::vec_deque::VecDeque;
+use std::fmt;
 use std::ffi::OsString;
 use std::fs;
 use std::io;
@@ -29,8 +30,15 @@ pub struct Entry {
     pub metadata: fs::Metadata,
 }
 
-// TODO: Implement Debug on Entry and Iter.
+impl fmt::Debug for Entry {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("sources::Entry")
+            .field("apath", &self.apath)
+            .field("path", &self.path)
+            .finish()
+    }
 
+}
 
 /// Recursive iterator of the contents of a source directory.
 pub struct Iter {
@@ -46,6 +54,8 @@ pub struct Iter {
     /// Copy of the last-emitted apath, for the purposes of checking they're in apath order.
     last_apath: Option<String>,
 }
+
+// TODO: Implement Debug on Iter.
 
 
 impl Iter {
@@ -214,6 +224,10 @@ mod tests {
         assert_eq!(&result[6].apath, "/jam/apricot");
         assert_eq!(&result[6].path, &tf.root.join("jam").join("apricot"));
         assert_eq!(result.len(), 7);
+
+        assert_eq!(format!("{:?}", &result[6]),
+            format!("sources::Entry {{ apath: {:?}, path: {:?} }}", "/jam/apricot",
+                    &tf.root.join("jam").join("apricot")));
 
         let report = source_iter.get_report();
         assert_eq!(report.get_count("source.visited.directories.count"), 4);
