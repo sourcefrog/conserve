@@ -258,6 +258,11 @@ mod tests {
         let (refs, hash_hex) = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
 
+        // Should be in one block, and as it's currently unsalted the hash is the same.
+        assert_eq!(1, refs.len());
+        assert_eq!(0, refs[0].start);
+        assert_eq!(EXAMPLE_BLOCK_HASH, refs[0].hash);
+
         // Subdirectory and file should exist
         let expected_file = testdir.path().join("66a").join(EXAMPLE_BLOCK_HASH);
         let attr = fs::metadata(expected_file).unwrap();
