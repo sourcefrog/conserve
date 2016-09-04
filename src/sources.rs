@@ -154,33 +154,31 @@ impl Iterator for Iter {
 /// name.
 ///
 /// The `Iter` has its own `Report` of how many directories and files were visited.
-pub fn iter(source_dir: &Path) -> Iter {
-    let metadata = match fs::symlink_metadata(&source_dir) {
+pub fn iter(source_dir: &Path) -> io::Result<Iter> {
+    let root_metadata = match fs::symlink_metadata(&source_dir) {
         Ok(metadata) => metadata,
         Err(e) => {
-            // TODO: Unify this with the regular tree walker, by just making a directory
-            // that needs to be descended?  Or, make this return an io::Result?
             warn!("{}", e);
-            panic!();
+            return Err(e);
         }
     };
     let root_entry = Entry {
         apath: "/".to_string(),
         path: source_dir.to_path_buf(),
         is_dir: true,
-        metadata: metadata,
+        metadata: root_metadata,
     };
     // Preload iter to return the root and then recurse into it.
     let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();
     entry_deque.push_back(root_entry.clone());
     let mut dir_deque = VecDeque::<Entry>::new();
     dir_deque.push_back(root_entry);
-    Iter {
+    Ok(Iter {
         entry_deque: entry_deque,
         dir_deque: dir_deque,
         report: Report::new(),
         last_apath: None,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -198,7 +196,7 @@ mod tests {
         tf.create_file("jam/apricot");
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
-        let mut source_iter = iter(tf.path());
+        let mut source_iter = iter(tf.path()).unwrap();
         let result = itertools::result_iter_to_vec(&mut source_iter).unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -228,7 +226,7 @@ mod tests {
         let tf = TreeFixture::new();
         tf.create_symlink("from", "to");
 
-        let mut source_iter = iter(tf.path());
+        let mut source_iter = iter(tf.path()).unwrap();
         let result = itertools::result_iter_to_vec(&mut source_iter).unwrap();
 
         assert_eq!(&result[0].apath, "/");

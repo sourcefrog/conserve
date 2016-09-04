@@ -23,8 +23,7 @@ struct Backup {
 }
 
 
-pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
-    -> io::Result<()> {
+pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -> io::Result<()> {
     // TODO: More tests.
     // TODO: Backup directories and symlinks too.
 
@@ -36,7 +35,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
         report: Report::new(),
     };
 
-    let source_iter = sources::iter(source);
+    let source_iter = try!(sources::iter(source));
     for entry in source_iter {
         let entry = match entry {
             Ok(entry) => entry,

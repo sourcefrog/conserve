@@ -14,7 +14,7 @@ pub fn init(archive: &str) -> io::Result<()> {
 }
 
 pub fn list_source(source: &str, report: &mut Report) -> io::Result<()> {
-    let mut source_iter = sources::iter(Path::new(source));
+    let mut source_iter = try!(sources::iter(Path::new(source)));
     for entry in &mut source_iter {
         println!("{}", try!(entry).apath);
     }
