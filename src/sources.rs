@@ -24,8 +24,6 @@ pub struct Entry {
     /// Possibly absolute path through which the file can be opened.
     pub path: PathBuf,
 
-    pub is_dir: bool,
-
     /// stat-like structure including kind, mtime, etc.
     pub metadata: fs::Metadata,
 }
@@ -111,7 +109,6 @@ impl Iter {
             let new_entry = Entry {
                 apath: new_apath,
                 path: child_path,
-                is_dir: is_dir,
                 metadata: metadata,
             };
             if is_dir {
@@ -175,12 +172,13 @@ pub fn iter(source_dir: &Path) -> io::Result<Iter> {
     let root_entry = Entry {
         apath: "/".to_string(),
         path: source_dir.to_path_buf(),
-        is_dir: true,
         metadata: root_metadata,
     };
     // Preload iter to return the root and then recurse into it.
     let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();
     entry_deque.push_back(root_entry.clone());
+    // TODO: Consider the case where the root is not actually a directory?
+    // Should that be supported?
     let mut dir_deque = VecDeque::<Entry>::new();
     dir_deque.push_back(root_entry);
     Ok(Iter {
