@@ -10,11 +10,13 @@ Conserve 0.2.0 not released yet
   * `conserve list-source`: show what files are in the source directory and will
     potentially be backed up.
   * `conserve list-versions`: show what backups are in the archive.
+  * `conserve ls`: lists files in the latest version in the archive.
 * Changed format:
   * Metadata in json.
   * BLAKE2b hashes.
   * Brotli compression.
-* `--stats` option shows how much IO was done.
+* `--stats` option shows how much IO was done, how much compression helped,
+  and how much time was taken for various sub-operations.
 
 Conserve 0.1.0 2013-10-01
 =========================
