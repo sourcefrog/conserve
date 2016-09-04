@@ -138,10 +138,10 @@ impl Display for Report {
         }
         try!(write!(f, "Durations (seconds):\n"));
         for (key, &dur) in &self.durations {
-            let nanos = dur.subsec_nanos();
+            let millis = dur.subsec_nanos() / 1000000;
             let secs = dur.as_secs();
-            if nanos > 0 || secs > 0 {
-                try!(write!(f, "  {:<40} {:>9}.{:<09}\n", key, secs, nanos));
+            if millis > 0 || secs > 0 {
+                try!(write!(f, "  {:<40} {:>15}.{:>03}\n", key, secs, millis));
             }
         }
         Ok(())
@@ -198,7 +198,7 @@ Counts:
 Bytes (before and after compression):
   block.write                                              300       100        67%
 Durations (seconds):
-  test                                            42.479760000
+  test                                                  42.479
 ");
     }
 }
