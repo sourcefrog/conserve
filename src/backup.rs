@@ -16,6 +16,13 @@ use super::report::Report;
 use super::sources;
 
 
+struct Backup {
+    block_dir: BlockDir,
+    index_builder: IndexBuilder,
+    report: Report,
+}
+
+
 pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
     -> io::Result<()> {
     // TODO: More tests.
@@ -23,8 +30,11 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
 
     let archive = try!(Archive::open(archive_path));
     let band = try!(archive.create_band(&mut report));
-    let block_dir = band.block_dir();
-    let mut index_builder = band.index_builder();
+    let mut backup = Backup {
+        block_dir: band.block_dir(),
+        index_builder: band.index_builder(),
+        report: Report::new(),
+    };
 
     let source_iter = sources::iter(source);
     for entry in source_iter {
@@ -36,53 +46,58 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report)
                 return Err(e);
             }
         };
-        let attr = match fs::symlink_metadata(&entry.path) {
-            Ok(attr) => attr,
-            Err(e) => {
-                warn!("{}", e);
-                report.increment("backup.error.stat", 1);
-                continue;
-            }
-        };
-        if attr.is_file() {
-            try!(backup_one_file(&block_dir, &mut index_builder,
-                &attr, &entry.path, entry.apath, &mut report));
-        } else {
-            // TODO: Backup directories, symlinks, etc.
-            warn!("Skipping non-file {}", &entry.apath);
-            report.increment("backup.skipped.unsupported_file_kind", 1);
-        }
+        try!(backup_one_source_entry(&mut backup, &entry));
     }
-    try!(index_builder.finish_hunk(&mut report));
-    try!(band.close(&mut report));
+    try!(backup.index_builder.finish_hunk(report));
+    try!(band.close(&mut backup.report));
+    report.merge_from(&backup.report);
     Ok(())
 }
 
-fn backup_one_file(block_dir: &BlockDir, index_builder: &mut IndexBuilder,
-    attr: &fs::Metadata,
-    path: &Path, apath: String, report: &mut Report) -> io::Result<()> {
-    info!("backup {}", path.display());
+fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()> {
+    let attr = match fs::symlink_metadata(&entry.path) {
+        Ok(attr) => attr,
+        Err(e) => {
+            warn!("{}", e);
+            backup.report.increment("backup.error.stat", 1);
+            return Ok(());
+        }
+    };
+    if attr.is_file() {
+        try!(backup_one_file(backup, &attr, entry));
+    } else {
+        // TODO: Backup directories, symlinks, etc.
+        warn!("Skipping non-file {}", &entry.apath);
+        backup.report.increment("backup.skipped.unsupported_file_kind", 1);
+    }
+    Ok(())
+}
+
+
+fn backup_one_file(backup: &mut Backup, attr: &fs::Metadata, entry: &sources::Entry) -> io::Result<()> {
+    info!("backup {}", entry.path.display());
 
     let mut bw = BlockWriter::new();
-    let mut f = try!(fs::File::open(&path));
-    try!(bw.copy_from_file(&mut f, attr.len(), report));
-    let block_hash = try!(block_dir.store(bw, report));
-    report.increment("backup.file.count", 1);
+    let mut f = try!(fs::File::open(&entry.path));
+    try!(bw.copy_from_file(&mut f, attr.len(), &mut backup.report));
+    let block_hash = try!(backup.block_dir.store(bw, &mut backup.report));
+    backup.report.increment("backup.file.count", 1);
 
-    assert!(apath::valid(&apath), "invalid apath: {:?}", &apath);
+    assert!(apath::valid(&entry.apath), "invalid apath: {:?}", &entry.apath);
 
     // TODO: Get mtime.
     // TODO: Store list of blocks as well as whole-file hash?  Maybe not if it's not split?
 
     let index_entry = IndexEntry {
-        apath: apath,
+        apath: entry.apath.clone(),
         mtime: 0,
         kind: IndexKind::File,
         blake2b: block_hash,
     };
-    index_builder.push(index_entry);
-    index_builder.maybe_flush(report)
+    backup.index_builder.push(index_entry);
+    backup.index_builder.maybe_flush(&mut backup.report)
 }
+
 
 #[cfg(test)]
 mod tests {
