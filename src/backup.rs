@@ -70,7 +70,8 @@ fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()
     let mut bw = BlockWriter::new();
     let mut f = try!(fs::File::open(&entry.path));
     try!(bw.copy_from_file(&mut f, entry.metadata.len(), &mut backup.report));
-    let block_hash = try!(backup.block_dir.store(bw, &mut backup.report));
+    let (refs, body_hash) = try!(backup.block_dir.store(bw, &mut backup.report));
+
     backup.report.increment("backup.file.count", 1);
 
     assert!(apath::valid(&entry.apath), "invalid apath: {:?}", &entry.apath);
@@ -84,7 +85,8 @@ fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()
         apath: entry.apath.clone(),
         mtime: mtime,
         kind: IndexKind::File,
-        blake2b: block_hash,
+        blake2b: body_hash,
+        refs: refs,
     };
     backup.index_builder.push(index_entry);
     backup.index_builder.maybe_flush(&mut backup.report)

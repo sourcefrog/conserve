@@ -36,6 +36,23 @@ const SUBDIR_NAME_CHARS: usize = 3;
 pub type BlockHash = String;
 
 
+/// Points to some compressed data inside the block dir.
+///
+/// Identifiers are: which file contains it, at what (pre-compression) offset,
+/// and what (pre-compression) length.
+#[derive(Debug, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct Reference {
+    /// ID of the block storing this info (in future, salted.)
+    pub hash: String,
+
+    /// Position in this block where data begins.
+    pub start: u64,
+
+    /// Length of this block to be used.
+    pub len: u64,
+}
+
+
 /// Write body data to a data block, compressed, and stored by its hash.
 ///
 /// A `BlockWriter` is a single-use object that writes a single block.
@@ -127,13 +144,20 @@ impl BlockDir {
 
     /// Finish and store the contents of a BlockWriter.
     ///
-    /// Returns the hex hash of the block.
-    pub fn store(self: &BlockDir, bw: BlockWriter, mut report: &mut Report) -> io::Result<BlockHash> {
+    /// Returns references to where it is stored plus, the hex hash of the uncompressed data.
+    /// They may differ when the file is split up or if the storage hash is salted.
+    pub fn store(self: &BlockDir, bw: BlockWriter, mut report: &mut Report) -> io::Result<(Vec<Reference>, BlockHash)> {
         let uncompressed_length: u64 = bw.uncompressed_length;
         let (compressed_bytes, hex_hash) = try!(bw.finish());
+        // TODO: Update this when the stored blocks can be different from body hash.
+        let refs = vec![Reference {
+            hash: hex_hash.clone(),
+            start: 0,
+            len: uncompressed_length,
+        }];
         if try!(self.contains(&hex_hash)) {
             report.increment("block.write.already_present", 1);
-            return Ok(hex_hash);
+            return Ok((refs, hex_hash));
         }
         let subdir = self.subdir_for(&hex_hash);
         try!(super::io::ensure_dir_exists(&subdir));
@@ -151,7 +175,7 @@ impl BlockDir {
         }
         report.increment("block.write.count", 1);
         report.increment_size("block.write", uncompressed_length, compressed_bytes.len() as u64);
-        Ok(hex_hash)
+        Ok((refs, hex_hash))
     }
 
     /// True if the named block is present in this directory.
@@ -231,13 +255,15 @@ mod tests {
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
         writer.write_all(EXAMPLE_TEXT).unwrap();
-        let hash_hex = block_dir.store(writer, &mut report).unwrap();
+        let (refs, hash_hex) = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
 
         // Subdirectory and file should exist
         let expected_file = testdir.path().join("66a").join(EXAMPLE_BLOCK_HASH);
         let attr = fs::metadata(expected_file).unwrap();
         assert!(attr.is_file());
+
+        // TODO: Inspect `refs`
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
 
@@ -259,16 +285,17 @@ mod tests {
 
         let mut writer = BlockWriter::new();
         writer.write_all(b"hello!").unwrap();
-        let hash1 = block_dir.store(writer, &mut report).unwrap();
+        let (refs1, hash1) = block_dir.store(writer, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 0);
         assert_eq!(report.get_count("block.write.count"), 1);
 
         let mut writer = BlockWriter::new();
         writer.write_all(b"hello!").unwrap();
-        let hash2 = block_dir.store(writer, &mut report).unwrap();
+        let (refs2, hash2)= block_dir.store(writer, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 1);
         assert_eq!(report.get_count("block.write.count"), 1);
 
         assert_eq!(hash1, hash2);
+        assert_eq!(refs1, refs2);
     }
 }
