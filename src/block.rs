@@ -88,8 +88,6 @@ impl BlockDir {
     -> io::Result<(Vec<Reference>, BlockHash)> {
         // TODO: Don't read the whole thing in one go, use smaller buffers to cope with
         //       large files.
-        // TODO: Incrementally store compressed data into a tempfile in the block dir,
-        //       rather than returning the whole thing from `finish`.
 
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp").create_in(&self.path));
