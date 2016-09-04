@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn path_for_hunk() {
         let index_dir = Path::new("/foo");
-        let hunk_path = super::path_for_hunk(&index_dir, 0);
+        let hunk_path = super::path_for_hunk(index_dir, 0);
         assert_eq!(file_name_as_str(&hunk_path), "000000000");
         assert_eq!(last_dir_name_as_str(&hunk_path), "00000");
     }
