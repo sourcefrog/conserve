@@ -36,6 +36,14 @@ static KNOWN_SIZES: &'static [&'static str] = &[
 ];
 
 
+static KNOWN_DURATIONS: &'static [&'static str] = &[
+    "index.parse",
+    "index.read",
+    "source.read",
+    "sync",
+    "test",
+];
+
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
 /// running.
 ///
@@ -60,7 +68,7 @@ impl Report {
         for counter_name in KNOWN_SIZES {
             new.sizes.insert(*counter_name, (0, 0));
         }
-        for name in &["index.parse", "index.read", "source.read", "sync", "test"] {
+        for name in KNOWN_DURATIONS {
             new.durations.insert(name, Duration::new(0, 0));
         }
         new
