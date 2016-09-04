@@ -89,9 +89,15 @@ impl BlockWriter {
         try!(from_file.read_to_end(&mut buf));
         report.increment_duration("source.read", start_read.elapsed());
 
+        let start_compress = time::Instant::now();
         try!(self.encoder.write_all(&buf));
+        report.increment_duration("block.compress", start_compress.elapsed());
+
         self.uncompressed_length += buf.len() as u64;
+
+        let start_hash = time::Instant::now();
         self.hasher.update(&buf);
+        report.increment_duration("block.hash", start_hash.elapsed());        
 
         Ok(())
     }
