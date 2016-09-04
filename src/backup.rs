@@ -12,7 +12,7 @@ use std::time;
 use super::apath;
 use super::archive::Archive;
 use super::block::{BlockDir, BlockWriter};
-use super::index::{IndexBuilder, IndexEntry, IndexKind};
+use super::index::{IndexBuilder, Entry, IndexKind};
 use super::report::Report;
 use super::sources;
 
@@ -80,7 +80,7 @@ fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()
         .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
         .and_then(|dur| Some(dur.as_secs()));
 
-    let index_entry = IndexEntry {
+    let index_entry = Entry {
         apath: entry.apath.clone(),
         mtime: mtime,
         kind: IndexKind::File,

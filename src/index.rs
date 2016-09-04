@@ -27,7 +27,7 @@ pub enum IndexKind {
 
 /// Description of one archived file.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-pub struct IndexEntry {
+pub struct Entry {
     /// Path of this entry relative to the base of the backup, in `apath` form.
     pub apath: String,
 
@@ -49,7 +49,7 @@ pub struct IndexBuilder {
     dir: PathBuf,
 
     /// Currently queued entries to be written out.
-    entries: Vec<IndexEntry>,
+    entries: Vec<Entry>,
 
     /// Index hunk number, starting at 0.
     sequence: u32,
@@ -67,7 +67,7 @@ impl IndexBuilder {
     pub fn new(dir: &Path) -> IndexBuilder {
         IndexBuilder {
             dir: dir.to_path_buf(),
-            entries: Vec::<IndexEntry>::new(),
+            entries: Vec::<Entry>::new(),
             sequence: 0,
             last_apath: None,
         }
@@ -76,7 +76,7 @@ impl IndexBuilder {
     /// Append an entry to the index.
     ///
     /// The new entry must sort after everything already written to the index.
-    pub fn push(&mut self, entry: IndexEntry) {
+    pub fn push(&mut self, entry: Entry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
         if !apath::valid(&entry.apath) {
@@ -140,7 +140,7 @@ fn path_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
 pub struct Iter {
     /// The `i` directory within the band where all files for this index are written.
     dir: PathBuf,
-    buffered_entries: vec::IntoIter<IndexEntry>,
+    buffered_entries: vec::IntoIter<Entry>,
     next_hunk_number: u32,
     pub report: Report,
 }
@@ -164,7 +164,7 @@ impl fmt::Debug for Iter {
 pub fn read(index_dir: &Path) -> io::Result<Iter> {
     Ok(Iter {
         dir: index_dir.to_path_buf(),
-        buffered_entries: Vec::<IndexEntry>::new().into_iter(),
+        buffered_entries: Vec::<Entry>::new().into_iter(),
         next_hunk_number: 0,
         report: Report::new(),
     })
@@ -172,9 +172,9 @@ pub fn read(index_dir: &Path) -> io::Result<Iter> {
 
 
 impl Iterator for Iter {
-    type Item = io::Result<IndexEntry>;
+    type Item = io::Result<Entry>;
 
-    fn next(&mut self) -> Option<io::Result<IndexEntry>> {
+    fn next(&mut self) -> Option<io::Result<Entry>> {
         loop {
             if let Some(entry) = self.buffered_entries.next() {
                 return Some(Ok(entry));
@@ -205,7 +205,7 @@ impl Iterator for Iter {
                     return Some(Err(io::Error::new(io::ErrorKind::InvalidInput, e)));
                 },
             };
-            let entries: Vec<IndexEntry> = match json::decode(&index_json) {
+            let entries: Vec<Entry> = match json::decode(&index_json) {
                 Ok(h) => h,
                 Err(e) => {
                     error!("Couldn't deserialize index hunk {}: {}", hunk_path.display(), e);
@@ -230,7 +230,7 @@ mod tests {
     use std::path::{Path};
     use tempdir;
 
-    use super::{IndexBuilder, IndexEntry, IndexKind};
+    use super::{IndexBuilder, Entry, IndexKind};
     use super::super::io::read_and_decompress;
     use super::super::report::Report;
 
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn serialize_index() {
-        let entries = [IndexEntry {
+        let entries = [Entry {
             apath: "/a/b".to_string(),
             mtime: Some(1461736377),
             kind: IndexKind::File,
@@ -263,13 +263,13 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_order() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
-        ib.push(IndexEntry {
+        ib.push(Entry {
             apath: "/zzz".to_string(),
             mtime: None,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
         });
-        ib.push(IndexEntry {
+        ib.push(Entry {
             apath: "aaa".to_string(),
             mtime: None,
             kind: IndexKind::File,
@@ -281,7 +281,7 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_names() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
-        ib.push(IndexEntry {
+        ib.push(Entry {
             apath: "../escapecat".to_string(),
             mtime: None,
             kind: IndexKind::File,
@@ -290,7 +290,7 @@ mod tests {
     }
 
     fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
-        ib.push(IndexEntry {
+        ib.push(Entry {
             apath: apath.to_string(),
             mtime: None,
             kind: IndexKind::File,
