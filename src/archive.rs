@@ -151,6 +151,10 @@ impl Archive {
         };
         Band::create(self.path(), new_band_id, &mut report)
     }
+
+    pub fn open_band(&self, band_id: &BandId, report: &mut Report) -> io::Result<Band> {
+        Band::open(self.path(), band_id, report)
+    }
 }
 
 

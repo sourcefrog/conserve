@@ -78,10 +78,10 @@ impl Band {
         write_json_uncompressed(&self.tail_path(), &tail, &mut report)
     }
 
-    pub fn open(archive_dir: &Path, id: BandId, report: &Report) -> io::Result<Band> {
+    pub fn open(archive_dir: &Path, id: &BandId, report: &Report) -> io::Result<Band> {
         // TODO: Check header file.
         let _ = report;
-        Ok(Band::new(archive_dir, id))
+        Ok(Band::new(archive_dir, id.clone()))
     }
 
     /// Create a new in-memory Band object.
@@ -165,8 +165,8 @@ mod tests {
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_string("b0001").unwrap();
-        let band2 = Band::open(af.path(), band_id, report)
-            .expect("failed to open archive");
+        let band2 = Band::open(af.path(), &band_id, report)
+            .expect("failed to open band");
         assert!(band2.is_closed().unwrap());
     }
 

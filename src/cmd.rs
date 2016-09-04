@@ -34,7 +34,7 @@ pub fn ls(archive_str: &str, report: &mut Report) -> io::Result<()> {
     let archive = try!(Archive::open(Path::new(archive_str)));
     // TODO: Option to choose version.
     let band_id = archive.last_band_id().unwrap().expect("archive is empty");
-    let band = Band::open(archive.path(), band_id, report).unwrap();
+    let band = Band::open(archive.path(), &band_id, report).unwrap();
     let mut iter = try!(band.index_iter());
     for i in iter.by_ref() {
         let entry = try!(i);

@@ -121,7 +121,9 @@ mod tests {
         let read_us = (dur.subsec_nanos() as u64) / 1000u64 + dur.as_secs() * 1000000u64;
         assert!(read_us > 0);
 
-        // TODO: Check band is closed.
+        let band = af.open_band(&band_ids[0], &mut report).unwrap();
+        assert!(band.is_closed().unwrap());
+
         // TODO: Check entries in that band have mtimes.
         // TODO: List files in that band.
         // TODO: Check contents of that file.
