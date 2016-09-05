@@ -159,6 +159,8 @@ impl BlockDir {
     }
 
     /// Read back the contents of a block, as a byte array.
+    ///
+    /// TODO: Take a list of References rather than a hash string.
     #[allow(unused)]
     pub fn get(self: &BlockDir, hash: &str, report: &mut Report) -> io::Result<Vec<u8>> {
         let path = self.path_for_file(hash);
@@ -219,7 +221,7 @@ mod tests {
     pub fn write_to_file() {
         let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
         let mut report = Report::new();
-        let (testdir, block_dir) = setup();
+        let (testdir, mut block_dir) = setup();
         let mut example_file = make_example_file();
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
@@ -255,7 +257,7 @@ mod tests {
     #[test]
     pub fn write_same_data_again() {
         let mut report = Report::new();
-        let (_testdir, block_dir) = setup();
+        let (_testdir, mut block_dir) = setup();
 
         let mut example_file = make_example_file();
         let (refs1, hash1) = block_dir.store_file(&mut example_file, &mut report).unwrap();
