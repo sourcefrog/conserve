@@ -160,10 +160,14 @@ impl BlockDir {
 
     /// Read back the contents of a block, as a byte array.
     ///
-    /// TODO: Take a list of References rather than a hash string.
+    /// TODO: Return a Read rather than a Vec.
+    /// TODO: Handle files broken across blocks.
     #[allow(unused)]
-    pub fn get(self: &BlockDir, hash: &str, report: &mut Report) -> io::Result<Vec<u8>> {
-        let path = self.path_for_file(hash);
+    pub fn get(self: &BlockDir, refs: &Vec<Reference>, report: &mut Report) -> io::Result<Vec<u8>> {
+        assert_eq!(1, refs.len());
+        let ref hash = refs[0].hash;
+        assert_eq!(0, refs[0].start);
+        let path = self.path_for_file(&hash);
         let decompressed = match read_and_decompress(&path) {
             Ok(d) => d,
             Err(e) => {
@@ -172,6 +176,7 @@ impl BlockDir {
                 return Err(e);
             }
         };
+        assert_eq!(decompressed.len(), refs[0].len as usize);
         report.increment("block.read.count", 1);
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
@@ -239,8 +244,6 @@ mod tests {
         let attr = fs::metadata(expected_file).unwrap();
         assert!(attr.is_file());
 
-        // TODO: Inspect `refs`
-
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
 
         assert_eq!(report.get_count("block.write.already_present"), 0);
@@ -249,7 +252,7 @@ mod tests {
 
         // Try to read back
         assert_eq!(report.get_count("block.read.count"), 0);
-        let back = block_dir.get(&expected_hash, &mut report).unwrap();
+        let back = block_dir.get(&refs, &mut report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
         assert_eq!(report.get_count("block.read.count"), 1);
     }
