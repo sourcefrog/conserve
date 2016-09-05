@@ -16,12 +16,11 @@ use std::path::{Path, PathBuf};
 
 use rustc_serialize::json;
 
-use super::{Band, BandId, Report};
+use super::{ARCHIVE_VERSION, Band, BandId, Report};
 use super::io::write_json_uncompressed;
 
 
 const HEADER_FILENAME: &'static str = "CONSERVE";
-const ARCHIVE_VERSION: &'static str = "0.2.0";
 
 #[derive(Debug)]
 pub struct Archive {

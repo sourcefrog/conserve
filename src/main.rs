@@ -39,7 +39,6 @@ mod report;
 mod sources;
 #[cfg(test)]
 mod testfixtures;
-mod version;
 
 // Re-export important classes.
 pub use archive::Archive;
@@ -47,6 +46,14 @@ pub use band::Band;
 pub use bandid::BandId;
 pub use report::Report;
 
+
+/// Conserve version number as a semver string.
+///
+/// This is populated at compile time from `Cargo.toml`.
+pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
+/// Format-compatibility version, normally the first two components of the package version.
+const ARCHIVE_VERSION: &'static str = "0.2.0";
 
 static USAGE: &'static str = "
 Conserve: an (incomplete) backup tool.
@@ -85,7 +92,7 @@ fn main() {
 
     let args: Args = Docopt::new(USAGE)
         .unwrap()
-        .version(Some(version::VERSION.to_string()))
+        .version(Some(VERSION.to_string()))
         .help(true)
         .decode()
         .unwrap_or_else(|e| e.exit());
