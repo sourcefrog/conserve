@@ -2,16 +2,12 @@
 // Copyright 2015, 2016 Martin Pool.
 
 //! File contents are stored in data blocks within an archive band.
-//!
-//! Blocks are required to be less than 1GB uncompressed, so they can be held
-//! entirely in memory on a typical machine.
 
 use std::fs;
 use std::io;
 use std::io::prelude::*;
 use std::io::{ErrorKind, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::time;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
@@ -102,21 +98,14 @@ impl BlockDir {
             self.buf.resize(BUF_SIZE, 0u8);
         }
         loop {
-            let start_read = time::Instant::now();
-            let read_size = try!(from_file.read(self.buf.as_mut_slice()));
-            let input = &self.buf[.. read_size];
-            report.increment_duration("source.read", start_read.elapsed());
-            if read_size == 0 { break; }
+            let buf_slice = self.buf.as_mut_slice();
+            let read_size = try!(report.measure_duration("source.read", || from_file.read(buf_slice)));
+            let input = &buf_slice[.. read_size];
+            if read_size == 0 { break; } // eof
+            uncompressed_length += read_size as u64;
 
-            let start_compress = time::Instant::now();
-            try!(encoder.write_all(input));
-            report.increment_duration("block.compress", start_compress.elapsed());
-
-            uncompressed_length += input.len() as u64;
-
-            let start_hash = time::Instant::now();
-            hasher.update(input);
-            report.increment_duration("block.hash", start_hash.elapsed());
+            try!(report.measure_duration("block.compress", || encoder.write_all(input)));
+            report.measure_duration("block.hash", || hasher.update(input));
         }
 
         let mut tempf = try!(encoder.finish());

@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::time;
 use std::time::{Duration};
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[
@@ -125,6 +126,14 @@ impl Report {
         for (name, duration) in &from_report.durations {
             self.increment_duration(name, *duration);
         }
+    }
+
+    pub fn measure_duration<T, F>(&mut self, duration_name: &str, mut closure: F) -> T 
+        where F: FnMut() -> T {
+        let start = time::Instant::now();
+        let result = closure();
+        self.increment_duration(duration_name, start.elapsed());
+        result
     }
 }
 
