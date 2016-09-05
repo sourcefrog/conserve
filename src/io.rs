@@ -99,15 +99,20 @@ pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
 /// Compress some bytes and write to a new file.
 ///
 /// Returns the length of compressed bytes written.
-pub fn write_compressed_bytes(to_path: &Path, input: &[u8], report: &mut Report) -> io::Result<(u64)> {
+pub fn write_json_compressed<T: rustc_serialize::Encodable>(to_path: &Path, obj: &T, report: &mut Report)
+-> io::Result<(u64, u64)> {
+    let json_string = json::encode(obj).unwrap();
+    let uncompressed_len = json_string.len() as u64;
+
     let af = try!(AtomicFile::new(to_path));
     const BROTLI_COMPRESSION_LEVEL: u32 = 9;
     let mut encoder = BrotliEncoder::new(af, BROTLI_COMPRESSION_LEVEL);
-    try!(encoder.write_all(input));
+    try!(encoder.write(json_string.as_bytes()));
+
     let mut af = try!(encoder.finish());
     let compressed_len: u64 = try!(af.seek(SeekFrom::Current(0)));
     try!(af.close(report));
-    Ok(compressed_len)
+    Ok((uncompressed_len, compressed_len))
 }
 
 

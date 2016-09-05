@@ -15,7 +15,7 @@ use rustc_serialize::json;
 
 use super::apath;
 use super::block;
-use super::io::{read_and_decompress, write_compressed_bytes};
+use super::io::{read_and_decompress, write_json_compressed};
 use super::report::Report;
 
 /// Kind of file that can be stored in the archive.
@@ -108,14 +108,12 @@ impl IndexBuilder {
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
     pub fn finish_hunk(&mut self, report: &mut Report) -> io::Result<()> {
-        let json_str = json::encode(&self.entries).unwrap();
-        let json_bytes = json_str.as_bytes();
         try!(super::io::ensure_dir_exists(
             &subdir_for_hunk(&self.dir, self.sequence)));
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
-        let compressed_len = try!(write_compressed_bytes(hunk_path, json_bytes, report));
+        let (uncompressed_len, compressed_len) = try!(write_json_compressed(hunk_path, &self.entries, report));
 
-        report.increment_size("index.write", json_bytes.len() as u64, compressed_len as u64);
+        report.increment_size("index.write", uncompressed_len as u64, compressed_len as u64);
         report.increment("index.write.hunks", 1);
 
         // Ready for the next hunk.
