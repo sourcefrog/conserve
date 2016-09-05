@@ -53,7 +53,7 @@ pub use report::Report;
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 /// Format-compatibility version, normally the first two components of the package version.
-const ARCHIVE_VERSION: &'static str = "0.2.0";
+const ARCHIVE_VERSION: &'static str = "0.3";
 
 static USAGE: &'static str = "
 Conserve: an (incomplete) backup tool.

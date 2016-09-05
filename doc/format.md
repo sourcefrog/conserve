@@ -73,7 +73,7 @@ Archive filesystems must allow many files per directory.
 In the root directory of the archive there is a file called `CONSERVE`,
 which is contains a json dict:
 
-    {"conserve_archive_version":"0.2.0"}
+    {"conserve_archive_version":"0.3"}
 
 ## Tiers
 
@@ -190,8 +190,8 @@ which is a dict of
    - `deleted`: true if it was present in a parent band and was
      deleted in this band
    - `blake2`: the BLAKE2 hash in hex of the full text of the file
-   - `blocks`: a list of tuples of:
-     - `block`: data block hash: from the current or any
+   - `addrs`: a list of tuples of:
+     - `hash`: data block hash: from the current or any
        parent directory
      - `start`: the offset within the uncompressed content of the
        block for the start of this file

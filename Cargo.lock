@@ -1,6 +1,6 @@
 [root]
 name = "conserve"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "blake2-rfc 0.2.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "brotli2 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",

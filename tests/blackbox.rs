@@ -70,7 +70,7 @@ fn blackbox_no_args() {
 #[test]
 fn blackbox_version() {
     assert_success_and_output(&["--version"],
-        "0.2.0\n", "");
+        "0.3.0\n", "");
 }
 
 

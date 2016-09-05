@@ -241,7 +241,7 @@ mod tests {
         let mut header_file = fs::File::open(&header_path).unwrap();
         let mut contents = String::new();
         header_file.read_to_string(&mut contents).unwrap();
-        assert_eq!(contents, "{\"conserve_archive_version\":\"0.2.0\"}\n");
+        assert_eq!(contents, "{\"conserve_archive_version\":\"0.3\"}\n");
     }
 
     /// Can create bands in an archive.

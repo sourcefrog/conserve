@@ -1,5 +1,9 @@
-Conserve 0.2.0 not released yet
-===============================
+## Conserve 0.3.0
+
+ * Breaking archive format change:
+   * Separate whole-file hash from the hash of the blocks making it up.
+
+## Conserve 0.2.0 (never formally released)
 
 * Rewrite in lovely Rust.
 * Newly implmented commands:
@@ -18,7 +22,6 @@ Conserve 0.2.0 not released yet
 * `--stats` option shows how much IO was done, how much compression helped,
   and how much time was taken for various sub-operations.
 
-Conserve 0.1.0 2013-10-01
-=========================
+## Conserve 0.1.0 2013-10-01
 
 * Very basic but functional backup, restore, and validate.
