@@ -43,7 +43,7 @@ pub type BlockHash = String;
 /// Identifiers are: which file contains it, at what (pre-compression) offset,
 /// and what (pre-compression) length.
 #[derive(Debug, PartialEq, RustcDecodable, RustcEncodable)]
-pub struct Reference {
+pub struct Address {
     /// ID of the block storing this info (in future, salted.)
     pub hash: String,
 
@@ -91,7 +91,7 @@ impl BlockDir {
     }
 
     pub fn store_file(&mut self, from_file: &mut fs::File, report: &mut Report)
-    -> io::Result<(Vec<Reference>, BlockHash)> {
+    -> io::Result<(Vec<Address>, BlockHash)> {
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp").create_in(&self.path));
         let mut encoder = BrotliEncoder::new(tempf, BROTLI_COMPRESSION_LEVEL);
@@ -123,7 +123,7 @@ impl BlockDir {
         let hex_hash = hasher.finalize().as_bytes().to_hex();
 
         // TODO: Update this when the stored blocks can be different from body hash.
-        let refs = vec![Reference {
+        let refs = vec![Address {
             hash: hex_hash.clone(),
             start: 0,
             len: uncompressed_length,
@@ -163,7 +163,7 @@ impl BlockDir {
     /// TODO: Return a Read rather than a Vec.
     /// TODO: Handle files broken across blocks.
     #[allow(unused)]
-    pub fn get(self: &BlockDir, refs: &Vec<Reference>, report: &mut Report) -> io::Result<Vec<u8>> {
+    pub fn get(self: &BlockDir, refs: &Vec<Address>, report: &mut Report) -> io::Result<Vec<u8>> {
         assert_eq!(1, refs.len());
         let ref hash = refs[0].hash;
         assert_eq!(0, refs[0].start);

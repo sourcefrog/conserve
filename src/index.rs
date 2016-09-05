@@ -43,7 +43,7 @@ pub struct Entry {
     pub blake2b: String,
 
     /// Blocks holding the file contents.
-    pub refs: Vec<block::Reference>,
+    pub addrs: Vec<block::Address>,
 }
 
 
@@ -256,13 +256,13 @@ mod tests {
             mtime: Some(1461736377),
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
-            refs: vec![],
+            addrs: vec![],
         }];
         let index_json = json::encode(&entries).unwrap();
         println!("{}", index_json);
         assert_eq!(
             index_json,
-            r#"[{"apath":"/a/b","mtime":1461736377,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","refs":[]}]"#);
+            r#"[{"apath":"/a/b","mtime":1461736377,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[]}]"#);
     }
 
     #[test]
@@ -274,14 +274,14 @@ mod tests {
             mtime: None,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
-            refs: vec![],
+            addrs: vec![],
         });
         ib.push(Entry {
             apath: "aaa".to_string(),
             mtime: None,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
-            refs: vec![],
+            addrs: vec![],
         });
     }
 
@@ -294,7 +294,7 @@ mod tests {
             mtime: None,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
-            refs: vec![],
+            addrs: vec![],
         })
     }
 
@@ -304,7 +304,7 @@ mod tests {
             mtime: None,
             kind: IndexKind::File,
             blake2b: EXAMPLE_HASH.to_string(),
-            refs: vec![],
+            addrs: vec![],
         });
     }
 
@@ -341,7 +341,7 @@ mod tests {
         // Check the stored json version
         let retrieved_bytes = read_and_decompress(&expected_path).unwrap();
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
-        assert_eq!(retrieved,  r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","refs":[]},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","refs":[]}]"#);
+        assert_eq!(retrieved,  r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[]},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[]}]"#);
 
         let mut it = super::read(&ib.dir).unwrap();
         let entry = it.next().expect("Get first entry").expect("First entry isn't an error");
