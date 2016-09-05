@@ -58,6 +58,9 @@ pub struct Reference {
 /// A readable, writable directory within a band holding data blocks.
 pub struct BlockDir {
     pub path: PathBuf,
+
+    /// Internal-use buffer for reading.
+    buf: Vec<u8>,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
@@ -67,7 +70,10 @@ fn block_name_to_subdirectory(block_hash: &str) -> &str {
 impl BlockDir {
     /// Create a BlockDir accessing `path`, which must exist as a directory.
     pub fn new(path: &Path) -> BlockDir {
-        BlockDir { path: path.to_path_buf() }
+        BlockDir {
+            path: path.to_path_buf(),
+            buf: vec![],
+        }
     }
 
     /// Return the subdirectory in which we'd put a file called `hash_hex`.
@@ -84,7 +90,7 @@ impl BlockDir {
         buf
     }
 
-    pub fn store_file(&self, from_file: &mut fs::File, report: &mut Report)
+    pub fn store_file(&mut self, from_file: &mut fs::File, report: &mut Report)
     -> io::Result<(Vec<Reference>, BlockHash)> {
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp").create_in(&self.path));
@@ -92,15 +98,15 @@ impl BlockDir {
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
         let mut uncompressed_length: u64 = 0;
         const BUF_SIZE: usize = 1 << 20;
-        // TODO: Maybe keep the buf in the BlockDir to avoid repeatedly allocating and zeroing?
-        let mut buf = vec![0; BUF_SIZE];
+        if self.buf.len() < BUF_SIZE {
+            self.buf.resize(BUF_SIZE, 0u8);
+        }
         loop {
             let start_read = time::Instant::now();
-            let read_size = try!(from_file.read(buf.as_mut_slice()));
+            let read_size = try!(from_file.read(self.buf.as_mut_slice()));
+            let input = &self.buf[.. read_size];
             report.increment_duration("source.read", start_read.elapsed());
             if read_size == 0 { break; }
-
-            let input = &buf[.. read_size];
 
             let start_compress = time::Instant::now();
             try!(encoder.write_all(input));
@@ -112,7 +118,6 @@ impl BlockDir {
             hasher.update(input);
             report.increment_duration("block.hash", start_hash.elapsed());
         }
-        drop(buf);
 
         let mut tempf = try!(encoder.finish());
         let hex_hash = hasher.finalize().as_bytes().to_hex();
