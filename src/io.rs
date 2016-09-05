@@ -63,17 +63,6 @@ impl DerefMut for AtomicFile {
 }
 
 
-/// Write bytes to a file, and close.
-/// If writing fails, delete the file.
-/// The file must not already exist.
-pub fn write_file_entire(path: &Path, bytes: &[u8], report: &mut Report) -> io::Result<()> {
-    let mut f = try!(AtomicFile::new(path));
-    try!(f.write_all(bytes));
-    try!(f.close(report));
-    Ok(())
-}
-
-
 #[allow(unused)]
 pub fn read_and_decompress(path: &Path) -> io::Result<Vec<u8>> {
     let f = try!(fs::File::open(&path));
@@ -85,11 +74,12 @@ pub fn read_and_decompress(path: &Path) -> io::Result<Vec<u8>> {
 
 
 pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
-    path: &Path,
-    obj: &T,
-    report: &mut Report) -> io::Result<()> {
-    let json = json::encode(&obj).unwrap() + "\n";
-    write_file_entire(path, json.as_bytes(), report)
+    path: &Path, obj: &T, report: &mut Report) -> io::Result<()> {
+    let mut f = try!(AtomicFile::new(path));
+    try!(f.write_all(json::encode(&obj).unwrap().as_bytes()));
+    try!(f.write_all(b"\n"));
+    try!(f.close(report));
+    Ok(())
 }
 
 
@@ -188,29 +178,6 @@ pub fn list_dir(path: &Path) -> io::Result<(HashSet<String>, HashSet<String>)>
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    use std::io;
-    use tempdir;
-
-    use super::write_file_entire;
-    use super::super::Report;
-
-    #[test]
-    pub fn write_file_entire_repeated() {
-        let tmp = tempdir::TempDir::new("write_new_file_test").unwrap();
-        let report = &mut Report::new();
-        let testfile = tmp.path().join("afile");
-        write_file_entire(&testfile, b"hello", report).unwrap();
-
-        assert_eq!(write_file_entire(&testfile, b"goodbye", report)
-                   .unwrap_err().kind(),
-                   io::ErrorKind::AlreadyExists);
-
-        // Should not have been overwritten.
-        assert_eq!(fs::metadata(&testfile).unwrap().len(),
-            "hello".len() as u64);
-    }
-
     // TODO: Somehow test the error cases.
     // TODO: Specific test for write_compressed_bytes.
 }
