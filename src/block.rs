@@ -84,33 +84,35 @@ impl BlockDir {
         buf
     }
 
-    pub fn store_file(&self, from_file: &mut fs::File, length_advice: u64, report: &mut Report)
+    pub fn store_file(&self, from_file: &mut fs::File, report: &mut Report)
     -> io::Result<(Vec<Reference>, BlockHash)> {
-        // TODO: Don't read the whole thing in one go, use smaller buffers to cope with
-        //       large files.
-
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp").create_in(&self.path));
         let mut encoder = BrotliEncoder::new(tempf, BROTLI_COMPRESSION_LEVEL);
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
         let mut uncompressed_length: u64 = 0;
+        const BUF_SIZE: usize = 1 << 20;
+        // TODO: Maybe keep the buf in the BlockDir to avoid repeatedly allocating and zeroing?
+        let mut buf = vec![0; BUF_SIZE];
+        loop {
+            let start_read = time::Instant::now();
+            let read_size = try!(from_file.read(buf.as_mut_slice()));
+            report.increment_duration("source.read", start_read.elapsed());
+            if read_size == 0 { break; }
 
-        // Use the stat size as guidance for a buffer, but always read the whole thing.
-        let mut buf = Vec::<u8>::with_capacity(length_advice as usize);
+            let input = &buf[.. read_size];
 
-        let start_read = time::Instant::now();
-        try!(from_file.read_to_end(&mut buf));
-        report.increment_duration("source.read", start_read.elapsed());
+            let start_compress = time::Instant::now();
+            try!(encoder.write_all(input));
+            report.increment_duration("block.compress", start_compress.elapsed());
 
-        let start_compress = time::Instant::now();
-        try!(encoder.write_all(&buf));
-        report.increment_duration("block.compress", start_compress.elapsed());
+            uncompressed_length += input.len() as u64;
 
-        uncompressed_length += buf.len() as u64;
-
-        let start_hash = time::Instant::now();
-        hasher.update(&buf);
-        report.increment_duration("block.hash", start_hash.elapsed());
+            let start_hash = time::Instant::now();
+            hasher.update(input);
+            report.increment_duration("block.hash", start_hash.elapsed());
+        }
+        drop(buf);
 
         let mut tempf = try!(encoder.finish());
         let hex_hash = hasher.finalize().as_bytes().to_hex();
@@ -217,7 +219,7 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
-        let (refs, hash_hex) = block_dir.store_file(&mut example_file, 0, &mut report).unwrap();
+        let (refs, hash_hex) = block_dir.store_file(&mut example_file, &mut report).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
 
         // Should be in one block, and as it's currently unsalted the hash is the same.
@@ -251,12 +253,12 @@ mod tests {
         let (_testdir, block_dir) = setup();
 
         let mut example_file = make_example_file();
-        let (refs1, hash1) = block_dir.store_file(&mut example_file, 0, &mut report).unwrap();
+        let (refs1, hash1) = block_dir.store_file(&mut example_file, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 0);
         assert_eq!(report.get_count("block.write.count"), 1);
 
         let mut example_file = make_example_file();
-        let (refs2, hash2) = block_dir.store_file(&mut example_file, 0, &mut report).unwrap();
+        let (refs2, hash2) = block_dir.store_file(&mut example_file, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 1);
         assert_eq!(report.get_count("block.write.count"), 1);
 

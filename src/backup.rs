@@ -69,7 +69,7 @@ fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()
 
     let mut f = try!(fs::File::open(&entry.path));
     let (refs, body_hash) = try!(
-        backup.block_dir.store_file(&mut f, entry.metadata.len(), &mut backup.report));
+        backup.block_dir.store_file(&mut f, &mut backup.report));
 
     backup.report.increment("backup.file.count", 1);
 
