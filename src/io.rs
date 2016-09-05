@@ -7,12 +7,13 @@
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use brotli2;
+use brotli2::write::BrotliEncoder;
 use rustc_serialize::json;
 use rustc_serialize;
 use tempfile;
@@ -44,6 +45,17 @@ impl AtomicFile {
             return Err(e.error);
         };
         Ok(())
+    }
+}
+
+
+impl Write for AtomicFile {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.f.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.f.flush()
     }
 }
 
@@ -87,22 +99,14 @@ pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
 /// Compress some bytes and write to a new file.
 ///
 /// Returns the length of compressed bytes written.
-// TODO: Return u64 to correctly represent long file lengths.
-pub fn write_compressed_bytes(to_path: &Path, input: &[u8], report: &mut Report) -> io::Result<(usize)> {
-    let mut f = try!(AtomicFile::new(to_path));
-    let mut compress = brotli2::stream::Compress::new();
-    let mut compressed_len: usize = 0;
-    for chunk in input.chunks(compress.input_block_size()) {
-        compress.copy_input(chunk);
-        let compressed_chunk = &try!(compress.compress(false, false));
-        compressed_len += compressed_chunk.len();
-        try!(f.write_all(compressed_chunk));
-    }
-    // Last chunk
-    let compressed_chunk = &try!(compress.compress(true, false));
-    compressed_len += compressed_chunk.len();
-    try!(f.write_all(compressed_chunk));
-    try!(f.close(report));
+pub fn write_compressed_bytes(to_path: &Path, input: &[u8], report: &mut Report) -> io::Result<(u64)> {
+    let af = try!(AtomicFile::new(to_path));
+    const BROTLI_COMPRESSION_LEVEL: u32 = 9;
+    let mut encoder = BrotliEncoder::new(af, BROTLI_COMPRESSION_LEVEL);
+    try!(encoder.write_all(input));
+    let mut af = try!(encoder.finish());
+    let compressed_len: u64 = try!(af.seek(SeekFrom::Current(0)));
+    try!(af.close(report));
     Ok(compressed_len)
 }
 
