@@ -10,7 +10,6 @@ use std::io;
 use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 
 use brotli2;
 use brotli2::write::BrotliEncoder;
@@ -37,9 +36,7 @@ impl AtomicFile {
 
     fn close(self: AtomicFile, report: &mut Report) -> io::Result<()> {
         if cfg!(feature = "sync") {
-            let start_sync = Instant::now();
-            try!(self.f.sync_all());
-            report.increment_duration("sync", start_sync.elapsed());
+            try!(report.measure_duration("sync", || self.f.sync_all()));
         }
         if let Err(e) = self.f.persist_noclobber(&self.path) {
             return Err(e.error);
