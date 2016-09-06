@@ -104,7 +104,7 @@ pub fn write_json_compressed<T: rustc_serialize::Encodable>(to_path: &Path, obj:
     let af = try!(AtomicFile::new(to_path));
     const BROTLI_COMPRESSION_LEVEL: u32 = 9;
     let mut encoder = BrotliEncoder::new(af, BROTLI_COMPRESSION_LEVEL);
-    try!(encoder.write(json_string.as_bytes()));
+    try!(encoder.write_all(json_string.as_bytes()));
 
     let mut af = try!(encoder.finish());
     let compressed_len: u64 = try!(af.seek(SeekFrom::Current(0)));
