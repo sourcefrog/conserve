@@ -152,11 +152,11 @@ impl BlockDir {
     /// TODO: Return a Read rather than a Vec.
     /// TODO: Handle files broken across blocks.
     #[allow(unused)]
-    pub fn get(self: &BlockDir, refs: &Vec<Address>, report: &mut Report) -> io::Result<Vec<u8>> {
+    pub fn get(self: &BlockDir, refs: &[Address], report: &mut Report) -> io::Result<Vec<u8>> {
         assert_eq!(1, refs.len());
-        let ref hash = refs[0].hash;
+        let hash = &refs[0].hash;
         assert_eq!(0, refs[0].start);
-        let path = self.path_for_file(&hash);
+        let path = self.path_for_file(hash);
         let decompressed = match read_and_decompress(&path) {
             Ok(d) => d,
             Err(e) => {
