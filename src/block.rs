@@ -19,11 +19,6 @@ use tempfile;
 use super::io::{read_and_decompress};
 use super::report::Report;
 
-/// Use a moderate Brotli compression level.
-///
-/// TODO: Is this a good tradeoff?
-const BROTLI_COMPRESSION_LEVEL: u32 = 4;
-
 /// Use the maximum 64-byte hash.
 const BLAKE_HASH_SIZE_BYTES: usize = 64;
 
@@ -90,7 +85,7 @@ impl BlockDir {
     -> io::Result<(Vec<Address>, BlockHash)> {
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp").create_in(&self.path));
-        let mut encoder = BrotliEncoder::new(tempf, BROTLI_COMPRESSION_LEVEL);
+        let mut encoder = BrotliEncoder::new(tempf, super::BROTLI_COMPRESSION_LEVEL);
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
         let mut uncompressed_length: u64 = 0;
         const BUF_SIZE: usize = 1 << 20;

@@ -55,6 +55,8 @@ pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 /// Format-compatibility version, normally the first two components of the package version.
 const ARCHIVE_VERSION: &'static str = "0.3";
 
+const BROTLI_COMPRESSION_LEVEL: u32 = 9;
+
 static USAGE: &'static str = "
 Conserve: an (incomplete) backup tool.
 Copyright 2015, 2016 Martin Pool, GNU GPL v2+.
