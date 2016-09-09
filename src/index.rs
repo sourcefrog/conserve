@@ -6,16 +6,19 @@
 use std::cmp::Ordering;
 use std::fmt;
 use std::io;
+use std::io::SeekFrom;
+use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::str;
 use std::time;
 use std::vec;
 
 use rustc_serialize::json;
+use brotli2::write::BrotliEncoder;
 
 use super::apath;
 use super::block;
-use super::io::{read_and_decompress, write_json_compressed};
+use super::io::{AtomicFile, ensure_dir_exists, read_and_decompress};
 use super::report::Report;
 
 /// Kind of file that can be stored in the archive.
@@ -108,10 +111,25 @@ impl IndexBuilder {
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
     pub fn finish_hunk(&mut self, report: &mut Report) -> io::Result<()> {
-        try!(super::io::ensure_dir_exists(
-            &subdir_for_hunk(&self.dir, self.sequence)));
+        try!(ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)));
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
-        let (uncompressed_len, compressed_len) = try!(write_json_compressed(hunk_path, &self.entries, report));
+
+        let json_string = report.measure_duration("index.encode",
+            || json::encode(&self.entries)).unwrap();
+        let uncompressed_len = json_string.len() as u64;
+
+        let af = try!(AtomicFile::new(hunk_path));
+        let mut encoder = BrotliEncoder::new(af, super::BROTLI_COMPRESSION_LEVEL);
+
+        let start_compress = time::Instant::now();
+        try!(encoder.write_all(json_string.as_bytes()));
+        let mut af = try!(encoder.finish());
+        report.increment_duration("index.compress", start_compress.elapsed());
+
+        // TODO: Don't seek, just count bytes as they're compressed.
+        // TODO: Measure time to compress separately from time to write.
+        let compressed_len: u64 = try!(af.seek(SeekFrom::Current(0)));
+        try!(af.close(report));
 
         report.increment_size("index.write", uncompressed_len as u64, compressed_len as u64);
         report.increment("index.write.hunks", 1);

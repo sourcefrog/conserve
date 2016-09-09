@@ -7,12 +7,11 @@
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
 use brotli2;
-use brotli2::write::BrotliEncoder;
 use rustc_serialize::json;
 use rustc_serialize;
 use tempfile;
@@ -20,13 +19,13 @@ use tempfile;
 use super::Report;
 
 
-struct AtomicFile {
+pub struct AtomicFile {
     path: PathBuf,
     f: tempfile::NamedTempFile,
 }
 
 impl AtomicFile {
-    fn new(path: &Path) -> io::Result<AtomicFile> {
+    pub fn new(path: &Path) -> io::Result<AtomicFile> {
         let dir = path.parent().unwrap();
         Ok(AtomicFile {
             path: path.to_path_buf(),
@@ -34,7 +33,7 @@ impl AtomicFile {
         })
     }
 
-    fn close(self: AtomicFile, report: &mut Report) -> io::Result<()> {
+    pub fn close(self: AtomicFile, report: &mut Report) -> io::Result<()> {
         if cfg!(feature = "sync") {
             try!(report.measure_duration("sync", || self.f.sync_all()));
         }
@@ -90,25 +89,6 @@ pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
     try!(f.write_all(b"\n"));
     try!(f.close(report));
     Ok(())
-}
-
-
-/// Compress some bytes and write to a new file.
-///
-/// Returns the length of compressed bytes written.
-pub fn write_json_compressed<T: rustc_serialize::Encodable>(to_path: &Path, obj: &T, report: &mut Report)
--> io::Result<(u64, u64)> {
-    let json_string = json::encode(obj).unwrap();
-    let uncompressed_len = json_string.len() as u64;
-
-    let af = try!(AtomicFile::new(to_path));
-    let mut encoder = BrotliEncoder::new(af, super::BROTLI_COMPRESSION_LEVEL);
-    try!(encoder.write_all(json_string.as_bytes()));
-
-    let mut af = try!(encoder.finish());
-    let compressed_len: u64 = try!(af.seek(SeekFrom::Current(0)));
-    try!(af.close(report));
-    Ok((uncompressed_len, compressed_len))
 }
 
 
