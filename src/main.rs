@@ -33,7 +33,6 @@ mod block;
 mod cmd;
 mod index;
 mod io;
-mod itertools;
 mod logger;
 mod report;
 mod sources;

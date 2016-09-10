@@ -191,8 +191,9 @@ pub fn iter(source_dir: &Path) -> io::Result<Iter> {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use super::*;
-    use super::super::itertools;
     use conserve_testsupport::TreeFixture;
 
     #[test]
@@ -205,7 +206,7 @@ mod tests {
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
         let mut source_iter = iter(tf.path()).unwrap();
-        let result = itertools::result_iter_to_vec(&mut source_iter).unwrap();
+        let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[0].path, &tf.root);
@@ -238,8 +239,7 @@ mod tests {
         let tf = TreeFixture::new();
         tf.create_symlink("from", "to");
 
-        let mut source_iter = iter(tf.path()).unwrap();
-        let result = itertools::result_iter_to_vec(&mut source_iter).unwrap();
+        let result = iter(tf.path()).unwrap().collect::<io::Result<Vec<_>>>().unwrap();
 
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[0].path, &tf.root);
