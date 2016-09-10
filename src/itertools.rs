@@ -9,12 +9,5 @@ use std::io;
 // TODO: Test this
 #[cfg(test)]
 pub fn result_iter_to_vec<T>(it: &mut Iterator<Item=io::Result<T>>) -> io::Result<Vec<T>> {
-    let mut result = Vec::<T>::new();
-    for i in it {
-        match i {
-            Ok(val) => { result.push(val) },
-            Err(e) => { return Err(e) },
-        }
-    }
-    Ok(result)
+    it.collect::<io::Result<Vec<T>>>()
 }
