@@ -25,7 +25,6 @@ struct Backup {
 
 
 pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -> Result<()> {
-    // TODO: More tests.
     let archive = try!(Archive::open(archive_path));
     let band = try!(archive.create_band(&mut report));
     let mut backup = Backup {
@@ -33,7 +32,6 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -
         index_builder: band.index_builder(),
         report: Report::new(),
     };
-
     let source_iter = try!(sources::iter(source));
     for entry in source_iter {
         try!(backup_one_source_entry(&mut backup, &try!(entry)));
@@ -43,6 +41,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -
     report.merge_from(&backup.report);
     Ok(())
 }
+
 
 fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
     if entry.metadata.is_file() {
@@ -58,20 +57,16 @@ fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> Resul
 
 fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
     info!("backup {}", entry.path.display());
-
-    let mut f = try!(fs::File::open(&entry.path));
-    let (addrs, body_hash) = try!(
-        backup.block_dir.store_file(&mut f, &mut backup.report));
-
+    assert!(apath::valid(&entry.apath), "invalid apath: {:?}", &entry.apath);
     backup.report.increment("backup.file.count", 1);
 
-    assert!(apath::valid(&entry.apath), "invalid apath: {:?}", &entry.apath);
+    let mut f = try!(fs::File::open(&entry.path));
+    let (addrs, body_hash) = try!(backup.block_dir.store_file(&mut f, &mut backup.report));
+    drop(f);
 
-    // TODO: Store list of blocks as well as whole-file hash?  Maybe not if it's not split?
     let mtime = entry.metadata.modified().ok()
         .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
         .and_then(|dur| Some(dur.as_secs()));
-
     let index_entry = Entry {
         apath: entry.apath.clone(),
         mtime: mtime,
