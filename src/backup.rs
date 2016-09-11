@@ -48,11 +48,33 @@ fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> Resul
     assert!(apath::valid(&entry.apath), "invalid apath: {:?}", &entry.apath);
     if entry.metadata.is_file() {
         try!(backup_one_file(backup, entry));
+    } else if entry.metadata.is_dir() {
+        try!(backup_one_dir(backup, entry));
     } else {
         // TODO: Backup directories, symlinks, etc.
         warn!("Skipping unsupported file kind {}", &entry.apath);
         backup.report.increment("backup.skipped.unsupported_file_kind", 1);
+        return Ok(())
     }
+    try!(backup.index_builder.maybe_flush(&mut backup.report));
+    Ok(())
+}
+
+
+fn backup_one_dir(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
+    backup.report.increment("backup.dir.count", 1);
+
+    let mtime = entry.metadata.modified().ok()
+        .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
+        .and_then(|dur| Some(dur.as_secs()));
+    let index_entry = Entry {
+        apath: entry.apath.clone(),
+        mtime: mtime,
+        kind: IndexKind::Dir,
+        addrs: vec![],
+        blake2b: None,
+    };
+    backup.index_builder.push(index_entry);
     Ok(())
 }
 
@@ -71,11 +93,11 @@ fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
         apath: entry.apath.clone(),
         mtime: mtime,
         kind: IndexKind::File,
-        blake2b: body_hash,
+        blake2b: Some(body_hash),
         addrs: addrs,
     };
     backup.index_builder.push(index_entry);
-    backup.index_builder.maybe_flush(&mut backup.report)
+    Ok(())
 }
 
 
@@ -98,9 +120,8 @@ mod tests {
         run_backup(af.path(), srcdir.path(), &mut report).unwrap();
         assert_eq!(1, report.get_count("block.write.count"));
         assert_eq!(1, report.get_count("backup.file.count"));
-
-        // Directory is not stored yet, but should be.
-        assert_eq!(1, report.get_count("backup.skipped.unsupported_file_kind"));
+        assert_eq!(1, report.get_count("backup.dir.count"));
+        assert_eq!(0, report.get_count("backup.skipped.unsupported_file_kind"));
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
@@ -116,11 +137,20 @@ mod tests {
         let index_entries = band.index_iter().unwrap()
             .filter_map(|i| i.ok())
             .collect::<Vec<index::Entry>>();
-        assert_eq!(1, index_entries.len());
-        assert_eq!("/hello", index_entries[0].apath);
-        assert!(index_entries[0].mtime.unwrap() > 0);
+        assert_eq!(2, index_entries.len());
+
+        let root_entry = &index_entries[0];
+        assert_eq!("/", root_entry.apath);
+        assert_eq!(index::IndexKind::Dir, root_entry.kind);
+        assert!(root_entry.mtime.unwrap() > 0);
+
+        let file_entry = &index_entries[1];
+        assert_eq!("/hello", file_entry.apath);
+        assert_eq!(index::IndexKind::File, file_entry.kind);
+        assert!(file_entry.mtime.unwrap() > 0);
+        let hash = file_entry.blake2b.as_ref().unwrap();
         assert_eq!("9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
-            index_entries[0].blake2b);
+            hash);
 
         // TODO: Read back contents of that file.
     }
@@ -135,8 +165,8 @@ mod tests {
         run_backup(af.path(), srcdir.path(), &mut report).unwrap();
         assert_eq!(0, report.get_count("block.write.count"));
         assert_eq!(0, report.get_count("backup.file.count"));
-        // Skipped both the directory and the symlink.
-        assert_eq!(2, report.get_count("backup.skipped.unsupported_file_kind"));
+        // TODO: Actually store the symlink.
+        assert_eq!(1, report.get_count("backup.skipped.unsupported_file_kind"));
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());

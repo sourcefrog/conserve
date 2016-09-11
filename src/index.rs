@@ -23,7 +23,7 @@ use super::io::{AtomicFile, ensure_dir_exists, read_and_decompress};
 use super::report::Report;
 
 /// Kind of file that can be stored in the archive.
-#[derive(Debug, RustcDecodable, RustcEncodable)]
+#[derive(Debug, PartialEq, RustcDecodable, RustcEncodable)]
 pub enum IndexKind {
     File,
     Dir,
@@ -44,7 +44,7 @@ pub struct Entry {
     pub kind: IndexKind,
 
     /// BLAKE2b hash of the entire original file, without salt.
-    pub blake2b: String,
+    pub blake2b: Option<String>,
 
     /// Blocks holding the file contents.
     pub addrs: Vec<block::Address>,
@@ -272,7 +272,7 @@ mod tests {
             apath: "/a/b".to_string(),
             mtime: Some(1461736377),
             kind: IndexKind::File,
-            blake2b: EXAMPLE_HASH.to_string(),
+            blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
         }];
         let index_json = json::encode(&entries).unwrap();
@@ -290,14 +290,14 @@ mod tests {
             apath: "/zzz".to_string(),
             mtime: None,
             kind: IndexKind::File,
-            blake2b: EXAMPLE_HASH.to_string(),
+            blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
         });
         ib.push(Entry {
             apath: "aaa".to_string(),
             mtime: None,
             kind: IndexKind::File,
-            blake2b: EXAMPLE_HASH.to_string(),
+            blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
         });
     }
@@ -310,7 +310,7 @@ mod tests {
             apath: "../escapecat".to_string(),
             mtime: None,
             kind: IndexKind::File,
-            blake2b: EXAMPLE_HASH.to_string(),
+            blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
         })
     }
@@ -320,7 +320,7 @@ mod tests {
             apath: apath.to_string(),
             mtime: None,
             kind: IndexKind::File,
-            blake2b: EXAMPLE_HASH.to_string(),
+            blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
         });
     }

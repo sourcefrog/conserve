@@ -144,7 +144,7 @@ fn blackbox_backup() {
         "b0000\n", "");
 
     assert_success_and_output(&["ls", &arch_dir_str],
-        "/hello\n",
+        "/\n/hello\n",
         "");
 
     // TODO: Restore.
