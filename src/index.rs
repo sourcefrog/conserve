@@ -201,47 +201,60 @@ impl Iterator for Iter {
             if let Some(entry) = self.buffered_entries.next() {
                 return Some(Ok(entry));
             }
-
-            let start_read = time::Instant::now();
-            // Load the next index hunk into buffered_entries.
-            let hunk_path = path_for_hunk(&self.dir, self.next_hunk_number);
-            let index_bytes = match read_and_decompress(&hunk_path) {
-                Ok(i) => i,
-                Err(e) => {
-                    if e.kind() == io::ErrorKind::NotFound {
-                        // No (more) index hunk files.
-                        return None;
-                    } else {
-                        return Some(Err(e.into()));
-                    }
-                },
-            };
-            self.report.increment_duration("index.read", start_read.elapsed());
-            self.report.increment("index.read.hunks", 1);
-
-            let start_parse = time::Instant::now();
-            let index_json = match str::from_utf8(&index_bytes) {
-                Ok(s) => s,
-                Err(e) => {
-                    return Some(Err(format!(
-                        "index file {:?} is not UTF-8: {}", hunk_path, e).into()));
-                },
-            };
-            let entries: Vec<Entry> = match json::decode(index_json) {
-                Ok(h) => h,
-                Err(e) => {
-                    return Some(Err(format!(
-                        "couldn't deserialize index hunk {:?}: {}", hunk_path, e).into()));
-                }
-            };
-            if entries.is_empty() {
-                warn!("Index hunk {} is empty", hunk_path.display());
+            match self.refill_entry_buffer() {
+                Err(e) => return Some(Err(e)),
+                Ok(false) => return None, // No more hunks
+                Ok(true) => (),
             }
-            self.report.increment_duration("index.parse", start_parse.elapsed());
-
-            self.buffered_entries = entries.into_iter();
-            self.next_hunk_number += 1;
         }
+    }
+}
+
+impl Iter {
+    /// Read another hunk file and put it into buffered_entries.
+    /// Returns true if another hunk could be found, otherwise false.
+    /// (It's possible though unlikely the hunks can be empty.)
+    fn refill_entry_buffer(&mut self) -> Result<bool> {
+        let start_read = time::Instant::now();
+        // Load the next index hunk into buffered_entries.
+        let hunk_path = path_for_hunk(&self.dir, self.next_hunk_number);
+        let index_bytes = match read_and_decompress(&hunk_path) {
+            Ok(i) => i,
+            Err(e) => {
+                if e.kind() == io::ErrorKind::NotFound {
+                    // No (more) index hunk files.
+                    return Ok(false);
+                } else {
+                    return Err(e.into());
+                }
+            },
+        };
+        self.report.increment_duration("index.read", start_read.elapsed());
+        self.report.increment("index.read.hunks", 1);
+
+        let start_parse = time::Instant::now();
+        let index_json = match str::from_utf8(&index_bytes) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(format!(
+                    "index file {:?} is not UTF-8: {}", hunk_path, e).into());
+            },
+        };
+        let entries: Vec<Entry> = match json::decode(index_json) {
+            Ok(h) => h,
+            Err(e) => {
+                return Err(format!(
+                    "couldn't deserialize index hunk {:?}: {}", hunk_path, e).into());
+            }
+        };
+        if entries.is_empty() {
+            warn!("Index hunk {} is empty", hunk_path.display());
+        }
+        self.report.increment_duration("index.parse", start_parse.elapsed());
+
+        self.buffered_entries = entries.into_iter();
+        self.next_hunk_number += 1;
+        Ok(true)
     }
 }
 
