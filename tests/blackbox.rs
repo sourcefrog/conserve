@@ -104,11 +104,11 @@ fn clean_error_on_non_archive() {
     // Try to backup into a directory that is not an archive.
     let testdir = make_tempdir();
     let not_archive_path_str = testdir.path().to_str().unwrap();
-    let (status, stdout, stderr) = run_conserve(&["backup", &not_archive_path_str, "."]);
+    let (status, stdout, _stderr) = run_conserve(&["backup", &not_archive_path_str, "."]);
     // TODO: Errors really should go to stderr not stdout.
     let error_string = stdout;
     assert!(!status.success());
-    assert!(error_string.contains("is not a Conserve archive"), stderr);
+    assert!(error_string.contains("not a Conserve archive"), error_string);
 }
 
 

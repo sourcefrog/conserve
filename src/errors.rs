@@ -12,6 +12,7 @@ error_chain! {
         BlockCorrupt(block_hash: String) {
         }
         NotAnArchive(path: PathBuf) {
+            display("not a Conserve archive: {:?}", path)
         }
         UnsupportedArchiveVersion(version: String) {
             display("unsupported archive version: {:?}", version)
