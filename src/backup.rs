@@ -6,12 +6,12 @@
 
 use std::fs;
 use std::path::{Path};
-use std::io;
 use std::time;
 
 use super::apath;
 use super::archive::Archive;
 use super::block::{BlockDir};
+use super::errors::*;
 use super::index::{IndexBuilder, Entry, IndexKind};
 use super::report::Report;
 use super::sources;
@@ -24,7 +24,7 @@ struct Backup {
 }
 
 
-pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -> io::Result<()> {
+pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -> Result<()> {
     // TODO: More tests.
     let archive = try!(Archive::open(archive_path));
     let band = try!(archive.create_band(&mut report));
@@ -36,15 +36,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -
 
     let source_iter = try!(sources::iter(source));
     for entry in source_iter {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(e) => {
-                // TODO: Optionally continue?
-                warn!("{}", e);
-                return Err(e);
-            }
-        };
-        try!(backup_one_source_entry(&mut backup, &entry));
+        try!(backup_one_source_entry(&mut backup, &try!(entry)));
     }
     try!(backup.index_builder.finish_hunk(report));
     try!(band.close(&mut backup.report));
@@ -52,7 +44,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -
     Ok(())
 }
 
-fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()> {
+fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
     if entry.metadata.is_file() {
         try!(backup_one_file(backup, entry));
     } else {
@@ -64,7 +56,7 @@ fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> io::R
 }
 
 
-fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> io::Result<()> {
+fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
     info!("backup {}", entry.path.display());
 
     let mut f = try!(fs::File::open(&entry.path));

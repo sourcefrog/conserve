@@ -6,7 +6,7 @@
 use std::fs;
 use std::io;
 use std::io::prelude::*;
-use std::io::{ErrorKind, SeekFrom};
+use std::io::{SeekFrom};
 use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
@@ -16,6 +16,7 @@ use rustc_serialize::hex::ToHex;
 
 use tempfile;
 
+use super::errors::*;
 use super::io::{read_and_decompress};
 use super::report::Report;
 
@@ -81,8 +82,7 @@ impl BlockDir {
         buf
     }
 
-    pub fn store_file(&mut self, from_file: &mut fs::File, report: &mut Report)
-    -> io::Result<(Vec<Address>, BlockHash)> {
+    pub fn store_file(&mut self, from_file: &mut fs::File, report: &mut Report) -> Result<(Vec<Address>, BlockHash)> {
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp").create_in(&self.path));
         let mut encoder = BrotliEncoder::new(tempf, super::BROTLI_COMPRESSION_LEVEL);
@@ -119,13 +119,13 @@ impl BlockDir {
         let compressed_length: u64 = try!(tempf.seek(SeekFrom::Current(0)));
         try!(super::io::ensure_dir_exists(&self.subdir_for(&hex_hash)));
         if let Err(e) = tempf.persist_noclobber(&self.path_for_file(&hex_hash)) {
-            if e.error.kind() == ErrorKind::AlreadyExists {
+            if e.error.kind() == io::ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);
                 report.increment("block.write.already_present", 1);
                 return Ok((refs, hex_hash));
             } else {
-                return Err(e.error);
+                return Err(e.error.into());
             }
         }
         report.increment("block.write.count", 1);
@@ -134,11 +134,11 @@ impl BlockDir {
     }
 
     /// True if the named block is present in this directory.
-    pub fn contains(self: &BlockDir, hash: &str) -> io::Result<bool> {
+    pub fn contains(self: &BlockDir, hash: &str) -> Result<bool> {
         match fs::metadata(self.path_for_file(hash)) {
-            Err(ref e) if e.kind() == ErrorKind::NotFound => Ok(false),
+            Err(ref e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
             Ok(_) => Ok(true),
-            Err(e) => Err(e),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -147,17 +147,18 @@ impl BlockDir {
     /// TODO: Return a Read rather than a Vec.
     /// TODO: Handle files broken across blocks.
     #[allow(unused)]
-    pub fn get(self: &BlockDir, refs: &[Address], report: &mut Report) -> io::Result<Vec<u8>> {
+    pub fn get(self: &BlockDir, refs: &[Address], report: &mut Report) -> Result<Vec<u8>> {
         assert_eq!(1, refs.len());
         let hash = &refs[0].hash;
         assert_eq!(0, refs[0].start);
         let path = self.path_for_file(hash);
+        // TODO: Specific error for compression failure (corruption?) vs io errors.
         let decompressed = match read_and_decompress(&path) {
             Ok(d) => d,
             Err(e) => {
-                error!("Block file {:?} couldn't be decompressed: {:?}", path, e);
                 report.increment("block.read.corrupt", 1);
-                return Err(e);
+                error!("Block file {:?} read error {:?}", path, e);
+                return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
             }
         };
         assert_eq!(decompressed.len(), refs[0].len as usize);
@@ -168,10 +169,8 @@ impl BlockDir {
             .to_hex();
         if actual_hash != *hash {
             report.increment("block.read.misplaced", 1);
-            error!("Block file {:?} has actual decompressed hash {:?}",
-                   path,
-                   actual_hash);
-            return Err(io::Error::new(ErrorKind::InvalidData, "block.read.misplaced"));
+            error!("Block file {:?} has actual decompressed hash {:?}", path, actual_hash);
+            return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
         Ok(decompressed)
     }

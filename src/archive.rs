@@ -11,12 +11,13 @@ use std;
 use std::fs;
 use std::fs::{File, read_dir};
 use std::io;
-use std::io::{Error, ErrorKind, Result, Read};
+use std::io::{Read};
 use std::path::{Path, PathBuf};
 
 use rustc_serialize::json;
 
 use super::{ARCHIVE_VERSION, Band, BandId, Report};
+use super::errors::*;
 use super::io::write_json_uncompressed;
 
 
@@ -40,18 +41,13 @@ impl Archive {
         let archive = Archive { path: path.to_path_buf() };
         // Report is not consumed because the results for init aren't so interesting.
         let mut report = Report::new();
-        if let Err(e) = std::fs::create_dir(&archive.path) {
-            error!("Failed to create archive directory {:?}: {}",
-                   archive.path.display(),
-                   e);
-            return Err(e);
-        };
+        try!(std::fs::create_dir(&archive.path)
+            .chain_err(|| format!("failed to create archive directory {:?}",
+                archive.path)));
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
-        if let Err(e) = write_json_uncompressed(&path.join(HEADER_FILENAME), &header,
-            &mut report) {
-            error!("Failed to write archive header: {}", e);
-            return Err(e);
-        };
+        let header_filename = path.join(HEADER_FILENAME);
+        try!(write_json_uncompressed(&header_filename, &header, &mut report)
+            .chain_err(|| format!("failed to write archive header: {:?}", header_filename)));
         info!("Created new archive in {:?}", path.display());
         Ok(archive)
     }
@@ -66,48 +62,27 @@ impl Archive {
             Ok(f) => f,
             Err(e) => {
                 if e.kind() == io::ErrorKind::NotFound {
-                    error!("{} is not a Conserve archive", path.as_os_str().to_string_lossy());
+                    return Err(ErrorKind::NotAnArchive(path.into()).into());
                 } else {
-                    error!("Couldn't open archive header {:?}: {}",
-                           header_path.display(),
-                           e);
+                    return Err(e.into());
                 }
-                return Err(e);
             }
         };
         let mut header_string = String::new();
-        if let Err(e) = header_file.read_to_string(&mut header_string) {
-            error!("Failed to read archive header {:?}: {}", header_file, e);
-            return Err(e);
-        }
-        let header: ArchiveHeader = match json::decode(&header_string) {
-            Ok(h) => h,
-            Err(e) => {
-                error!("Couldn't deserialize archive header: {}", e);
-                return Err(Error::new(ErrorKind::InvalidInput, e));
-            }
-        };
+        try!(header_file.read_to_string(&mut header_string));
+        let header: ArchiveHeader = try!(json::decode(&header_string));
         if header.conserve_archive_version != ARCHIVE_VERSION {
-            error!("Wrong archive version in header {:?}: {:?}",
-                   header,
-                   header.conserve_archive_version);
-            return Err(Error::new(ErrorKind::InvalidInput, header.conserve_archive_version));
+            return Err(ErrorKind::UnsupportedArchiveVersion(header.conserve_archive_version).into());
         }
         Ok(archive)
     }
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
     pub fn iter_bands(self: &Archive) -> Result<IterBands> {
-        let read_dir = match read_dir(&self.path) {
-            Ok(r) => r,
-            Err(e) => {
-                error!("{:?} reading directory {:?}", e, &self.path);
-                return Err(e);
-            }
-        };
+        let read_dir = try!(read_dir(&self.path)
+            .chain_err(|| format!("failed reading directory {:?}", &self.path)));
         Ok(IterBands {
             dir_iter: read_dir,
-            path: self.path.clone(),
         })
     }
 
@@ -130,7 +105,7 @@ impl Archive {
     }
 
     // Return the id of the highest-numbered band, or None if empty.
-    pub fn last_band_id(self: &Archive) -> io::Result<Option<BandId>> {
+    pub fn last_band_id(self: &Archive) -> Result<Option<BandId>> {
         let mut max: Option<BandId> = None;
         for i in try!(self.iter_bands()) {
             let b = try!(i);
@@ -142,16 +117,15 @@ impl Archive {
     }
 
     /// Make a new band. Bands are numbered sequentially.
-    pub fn create_band(self: &Archive, mut report: &mut Report) -> io::Result<Band> {
-        let new_band_id = match self.last_band_id() {
-            Err(e) => return Err(e),
-            Ok(None) => BandId::zero(),
-            Ok(Some(b)) => b.next_sibling(),
+    pub fn create_band(self: &Archive, mut report: &mut Report) -> Result<Band> {
+        let new_band_id = match try!(self.last_band_id()) {
+            None => BandId::zero(),
+            Some(b) => b.next_sibling(),
         };
         Band::create(self.path(), new_band_id, &mut report)
     }
 
-    pub fn open_band(&self, band_id: &BandId, report: &mut Report) -> io::Result<Band> {
+    pub fn open_band(&self, band_id: &BandId, report: &mut Report) -> Result<Band> {
         Band::open(self.path(), band_id, report)
     }
 }
@@ -159,7 +133,6 @@ impl Archive {
 
 pub struct IterBands {
     dir_iter: fs::ReadDir,
-    path: PathBuf,
 }
 
 
@@ -169,19 +142,17 @@ impl Iterator for IterBands {
     fn next(&mut self) -> Option<Result<BandId>> {
         loop {
             let entry = match self.dir_iter.next() {
+                None => return None,
                 Some(Ok(entry)) => entry,
                 Some(Err(e)) => {
-                    error!("%{:?} reading directory entry from {:?}", e, self.path);
-                    return Some(Err(e));
-                }
-                None => return None,
+                    return Some(Err(e.into()));
+                },
             };
             let ft = match entry.file_type() {
-                Err(e) => {
-                    error!("%{:?} reading directory entry from {:?}", e, self.path);
-                    return Some(Err(e));
-                }
                 Ok(ft) => ft,
+                Err(e) => {
+                    return Some(Err(e.into()));
+                }
             };
             if !ft.is_dir() {
                 continue;

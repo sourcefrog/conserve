@@ -10,16 +10,16 @@
 
 
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use time;
 
 use super::{BandId, Report};
 use super::block::BlockDir;
+use super::errors::*;
 use super::index;
 use super::index::IndexBuilder;
-use super::io::{directory_exists, file_exists, write_json_uncompressed};
+use super::io::{file_exists, write_json_uncompressed};
 
 static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
@@ -52,16 +52,9 @@ impl Band {
     /// Make a new band (and its on-disk directory).
     ///
     /// Publicly, prefer Archive::create_band.
-    pub fn create(archive_dir: &Path, id: BandId, mut report: &mut Report)
-        -> io::Result<Band> {
+    pub fn create(archive_dir: &Path, id: BandId, mut report: &mut Report) -> Result<Band> {
         let new = Band::new(archive_dir, id);
 
-        if try!(directory_exists(&new.path_buf)) {
-            return Err(io::Error::new(
-                io::ErrorKind::AlreadyExists,
-                format!("band directory {:?} already exists",
-                    &new.path_buf.display())));
-        };
         try!(fs::create_dir(&new.path_buf));
         try!(fs::create_dir(&new.block_dir_path));
         try!(fs::create_dir(&new.index_dir_path));
@@ -73,12 +66,12 @@ impl Band {
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(self: &Band, mut report: &mut Report) -> io::Result<()> {
+    pub fn close(self: &Band, mut report: &mut Report) -> Result<()> {
         let tail = BandTail { end_time: time::get_time().sec as u64 };
         write_json_uncompressed(&self.tail_path(), &tail, &mut report)
     }
 
-    pub fn open(archive_dir: &Path, id: &BandId, report: &Report) -> io::Result<Band> {
+    pub fn open(archive_dir: &Path, id: &BandId, report: &Report) -> Result<Band> {
         // TODO: Check header file.
         let _ = report;
         Ok(Band::new(archive_dir, id.clone()))
@@ -103,7 +96,7 @@ impl Band {
         }
     }
 
-    pub fn is_closed(self: &Band) -> io::Result<bool> {
+    pub fn is_closed(self: &Band) -> Result<bool> {
         file_exists(&self.tail_path())
     }
 
@@ -125,7 +118,7 @@ impl Band {
     }
 
     /// Make an iterator that will return all entries in this band.
-    pub fn index_iter(&self) -> io::Result<index::Iter> {
+    pub fn index_iter(&self) -> Result<index::Iter> {
         index::read(&self.index_dir_path)
     }
 }
@@ -137,6 +130,7 @@ mod tests {
     use std::io;
 
     use super::*;
+    use super::super::errors::*;
     use super::super::testfixtures::ScratchArchive;
     use super::super::{BandId, Report};
 
@@ -175,11 +169,11 @@ mod tests {
         let af = ScratchArchive::new();
         let band_id = BandId::from_string("b0001").unwrap();
         Band::create(af.path(), band_id.clone(), &mut Report::new()).unwrap();
-        match Band::create(af.path(), band_id, &mut Report::new()) {
-            Ok(_) => panic!("expected an error from existing band"),
-            Err(e) => {
-                assert_eq!(e.kind(), io::ErrorKind::AlreadyExists);
-            }
-        }
+        let e = Band::create(af.path(), band_id, &mut Report::new()).unwrap_err();
+        if let ErrorKind::Io(ref ioerror) = *e.kind() {
+            assert_eq!(ioerror.kind(), io::ErrorKind::AlreadyExists);
+        } else {
+            panic!("expected an ioerror, got {:?}", e);
+        };
     }
 }

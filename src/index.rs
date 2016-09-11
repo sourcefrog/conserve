@@ -18,6 +18,7 @@ use brotli2::write::BrotliEncoder;
 
 use super::apath;
 use super::block;
+use super::errors::*;
 use super::io::{AtomicFile, ensure_dir_exists, read_and_decompress};
 use super::report::Report;
 
@@ -97,7 +98,7 @@ impl IndexBuilder {
         self.entries.push(entry);
     }
 
-    pub fn maybe_flush(&mut self, report: &mut Report) -> io::Result<()> {
+    pub fn maybe_flush(&mut self, report: &mut Report) -> Result<()> {
         if self.entries.len() >= 10000 {
             self.finish_hunk(report)
         } else {
@@ -110,7 +111,7 @@ impl IndexBuilder {
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
-    pub fn finish_hunk(&mut self, report: &mut Report) -> io::Result<()> {
+    pub fn finish_hunk(&mut self, report: &mut Report) -> Result<()> {
         try!(ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)));
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
 
@@ -182,7 +183,7 @@ impl fmt::Debug for Iter {
 /// Create an iterator that will read all entires from an existing index.
 ///
 /// Prefer to use `Band::index_iter` instead.
-pub fn read(index_dir: &Path) -> io::Result<Iter> {
+pub fn read(index_dir: &Path) -> Result<Iter> {
     Ok(Iter {
         dir: index_dir.to_path_buf(),
         buffered_entries: Vec::<Entry>::new().into_iter(),
@@ -193,9 +194,9 @@ pub fn read(index_dir: &Path) -> io::Result<Iter> {
 
 
 impl Iterator for Iter {
-    type Item = io::Result<Entry>;
+    type Item = Result<Entry>;
 
-    fn next(&mut self) -> Option<io::Result<Entry>> {
+    fn next(&mut self) -> Option<Result<Entry>> {
         loop {
             if let Some(entry) = self.buffered_entries.next() {
                 return Some(Ok(entry));
@@ -211,7 +212,7 @@ impl Iterator for Iter {
                         // No (more) index hunk files.
                         return None;
                     } else {
-                        return Some(Err(e));
+                        return Some(Err(e.into()));
                     }
                 },
             };
@@ -222,15 +223,15 @@ impl Iterator for Iter {
             let index_json = match str::from_utf8(&index_bytes) {
                 Ok(s) => s,
                 Err(e) => {
-                    error!("Index file {} is not UTF-8: {}", hunk_path.display(), e);
-                    return Some(Err(io::Error::new(io::ErrorKind::InvalidInput, e)));
+                    return Some(Err(format!(
+                        "index file {:?} is not UTF-8: {}", hunk_path, e).into()));
                 },
             };
             let entries: Vec<Entry> = match json::decode(index_json) {
                 Ok(h) => h,
                 Err(e) => {
-                    error!("Couldn't deserialize index hunk {}: {}", hunk_path.display(), e);
-                    return Some(Err(io::Error::new(io::ErrorKind::InvalidInput, e)));
+                    return Some(Err(format!(
+                        "couldn't deserialize index hunk {:?}: {}", hunk_path, e).into()));
                 }
             };
             if entries.is_empty() {

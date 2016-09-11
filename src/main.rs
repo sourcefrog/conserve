@@ -6,10 +6,14 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 
-#[macro_use]
-extern crate log;
+#![recursion_limit = "1024"]  // Needed by error-chain
+
 #[macro_use]
 extern crate docopt;
+#[macro_use]
+extern crate error_chain;
+#[macro_use]
+extern crate log;
 
 extern crate blake2_rfc;
 extern crate brotli2;
@@ -31,6 +35,7 @@ mod band;
 mod bandid;
 mod block;
 mod cmd;
+mod errors;
 mod index;
 mod io;
 mod logger;
@@ -44,7 +49,6 @@ pub use archive::Archive;
 pub use band::Band;
 pub use bandid::BandId;
 pub use report::Report;
-
 
 /// Conserve version number as a semver string.
 ///
@@ -113,10 +117,13 @@ fn main() {
     };
 
     if args.flag_stats {
-        println!("{}", report);
+        info!("Stats:\n{}", report);
     }
-    if result.is_err() {
-        println!("{:?}", result);
+    if let Err(e) = result {
+        error!("{}", e);
+        if let Some(bt) = e.backtrace() {
+            println!("{:?}", bt)
+        }
         std::process::exit(1)
     }
 }

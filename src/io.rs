@@ -7,7 +7,7 @@
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
@@ -17,6 +17,7 @@ use rustc_serialize;
 use tempfile;
 
 use super::Report;
+use super::errors::*;
 
 
 pub struct AtomicFile {
@@ -25,7 +26,7 @@ pub struct AtomicFile {
 }
 
 impl AtomicFile {
-    pub fn new(path: &Path) -> io::Result<AtomicFile> {
+    pub fn new(path: &Path) -> Result<AtomicFile> {
         let dir = path.parent().unwrap();
         Ok(AtomicFile {
             path: path.to_path_buf(),
@@ -33,12 +34,12 @@ impl AtomicFile {
         })
     }
 
-    pub fn close(self: AtomicFile, report: &mut Report) -> io::Result<()> {
+    pub fn close(self: AtomicFile, report: &mut Report) -> Result<()> {
         if cfg!(feature = "sync") {
             try!(report.measure_duration("sync", || self.f.sync_all()));
         }
         if let Err(e) = self.f.persist_noclobber(&self.path) {
-            return Err(e.error);
+            return Err(e.error.into());
         };
         Ok(())
     }
@@ -83,7 +84,7 @@ pub fn read_and_decompress(path: &Path) -> io::Result<Vec<u8>> {
 
 
 pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
-    path: &Path, obj: &T, report: &mut Report) -> io::Result<()> {
+    path: &Path, obj: &T, report: &mut Report) -> Result<()> {
     let mut f = try!(AtomicFile::new(path));
     try!(f.write_all(json::encode(&obj).unwrap().as_bytes()));
     try!(f.write_all(b"\n"));
@@ -92,10 +93,10 @@ pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
 }
 
 
-pub fn ensure_dir_exists(path: &Path) -> io::Result<()> {
+pub fn ensure_dir_exists(path: &Path) -> Result<()> {
     if let Err(e) = fs::create_dir(path) {
-        if e.kind() != ErrorKind::AlreadyExists {
-            return Err(e);
+        if e.kind() != io::ErrorKind::AlreadyExists {
+            return Err(e.into());
         }
     }
     Ok(())
@@ -103,36 +104,37 @@ pub fn ensure_dir_exists(path: &Path) -> io::Result<()> {
 
 
 /// True if path exists and is a directory, false if does not exist, error otherwise.
-pub fn directory_exists(path: &Path) -> io::Result<bool> {
+#[allow(dead_code)]
+pub fn directory_exists(path: &Path) -> Result<bool> {
     match fs::metadata(path) {
         Ok(metadata) => {
             if metadata.is_dir() {
                 Ok(true)
             } else {
-                Err(io::Error::new(io::ErrorKind::AlreadyExists, "exists but not a directory"))
+                Err("exists but not a directory".into())
             }
         },
         Err(e) => match e.kind() {
             io::ErrorKind::NotFound => Ok(false),
-            _ => Err(e),
+            _ => Err(e.into()),
         }
     }
 }
 
 
 /// True if path exists and is a file, false if does not exist, error otherwise.
-pub fn file_exists(path: &Path) -> io::Result<bool> {
+pub fn file_exists(path: &Path) -> Result<bool> {
     match fs::metadata(path) {
         Ok(metadata) => {
             if metadata.is_file() {
                 Ok(true)
             } else {
-                Err(io::Error::new(io::ErrorKind::AlreadyExists, "exists but not a file"))
+                Err("exists but not a file".into())
             }
         },
         Err(e) => match e.kind() {
             io::ErrorKind::NotFound => Ok(false),
-            _ => Err(e),
+            _ => Err(e.into()),
         }
     }
 }
@@ -142,7 +144,7 @@ pub fn file_exists(path: &Path) -> io::Result<bool> {
 ///
 /// Returns a set of filenames and a set of directory names respectively, forced to UTF-8.
 #[cfg(test)] // Only from tests at the moment but could be more general.
-pub fn list_dir(path: &Path) -> io::Result<(HashSet<String>, HashSet<String>)>
+pub fn list_dir(path: &Path) -> Result<(HashSet<String>, HashSet<String>)>
 {
     let mut file_names = HashSet::<String>::new();
     let mut dir_names = HashSet::<String>::new();
