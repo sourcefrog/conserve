@@ -88,9 +88,7 @@ impl IndexBuilder {
     pub fn push(&mut self, entry: Entry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
-        if !apath::valid(&entry.apath) {
-            panic!("invalid apath: {:?}", &entry.apath);
-        }
+        assert!(apath::valid(&entry.apath), format!("invalid apath: {:?}", &entry.apath));
         if let Some(ref last_apath) = self.last_apath {
             assert_eq!(apath::cmp(&last_apath, &entry.apath), Ordering::Less);
         }
