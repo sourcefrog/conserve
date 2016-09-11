@@ -8,7 +8,6 @@ use std::fs;
 use std::path::{Path};
 use std::time;
 
-use super::apath;
 use super::archive::Archive;
 use super::block::{BlockDir};
 use super::errors::*;
@@ -35,7 +34,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -
     };
     let source_iter = try!(sources::iter(source));
     for entry in source_iter {
-        try!(backup_one_source_entry(&mut backup, &try!(entry)));
+        try!(backup.store_one_source_entry(&try!(entry)));
     }
     try!(backup.index_builder.finish_hunk(report));
     try!(band.close(&mut backup.report));
@@ -44,58 +43,56 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -
 }
 
 
-fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
-    info!("backup {}", entry.path.display());
-    assert!(apath::valid(&entry.apath), "invalid apath: {:?}", &entry.apath);
-    let new_entry: index::Entry = if entry.metadata.is_file() {
-        try!(backup_one_file(backup, entry))
-    } else if entry.metadata.is_dir() {
-        try!(backup_one_dir(backup, entry))
-    } else {
-        // TODO: Backup directories, symlinks, etc.
-        warn!("Skipping unsupported file kind {}", &entry.apath);
-        backup.report.increment("backup.skipped.unsupported_file_kind", 1);
-        return Ok(())
-    };
-    backup.index_builder.push(new_entry);
-    try!(backup.index_builder.maybe_flush(&mut backup.report));
-    Ok(())
-}
+impl Backup {
+    fn store_one_source_entry(&mut self, source_entry: &sources::Entry) -> Result<()> {
+        info!("backup {}", source_entry.path.display());
+        let store_fn = if source_entry.metadata.is_file() {
+            Backup::store_file
+        } else if source_entry.metadata.is_dir() {
+            Backup::store_dir
+        } else {
+            // TODO: Backup directories, symlinks, etc.
+            warn!("Skipping unsupported file kind {}", &source_entry.apath);
+            self.report.increment("backup.skipped.unsupported_file_kind", 1);
+            return Ok(())
+        };
+        let new_index_entry = try!(store_fn(self, source_entry));
+        self.index_builder.push(new_index_entry);
+        try!(self.index_builder.maybe_flush(&mut self.report));
+        Ok(())
+    }
 
 
-fn backup_one_dir(backup: &mut Backup, entry: &sources::Entry) -> Result<index::Entry> {
-    backup.report.increment("backup.dir.count", 1);
+    fn store_dir(&mut self, entry: &sources::Entry) -> Result<index::Entry> {
+        self.report.increment("backup.dir.count", 1);
+        let mtime = entry.metadata.modified().ok()
+            .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
+            .and_then(|dur| Some(dur.as_secs()));
+        Ok(index::Entry {
+            apath: entry.apath.clone(),
+            mtime: mtime,
+            kind: IndexKind::Dir,
+            addrs: vec![],
+            blake2b: None,
+        })
+    }
 
-    let mtime = entry.metadata.modified().ok()
-        .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
-        .and_then(|dur| Some(dur.as_secs()));
-    Ok(index::Entry {
-        apath: entry.apath.clone(),
-        mtime: mtime,
-        kind: IndexKind::Dir,
-        addrs: vec![],
-        blake2b: None,
-    })
-}
 
-
-fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> Result<(index::Entry)> {
-    backup.report.increment("backup.file.count", 1);
-
-    let mut f = try!(fs::File::open(&entry.path));
-    let (addrs, body_hash) = try!(backup.block_dir.store_file(&mut f, &mut backup.report));
-    drop(f);
-
-    let mtime = entry.metadata.modified().ok()
-        .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
-        .and_then(|dur| Some(dur.as_secs()));
-    Ok(index::Entry {
-        apath: entry.apath.clone(),
-        mtime: mtime,
-        kind: IndexKind::File,
-        blake2b: Some(body_hash),
-        addrs: addrs,
-    })
+    fn store_file(&mut self, entry: &sources::Entry) -> Result<(index::Entry)> {
+        self.report.increment("backup.file.count", 1);
+        let mut f = try!(fs::File::open(&entry.path));
+        let (addrs, body_hash) = try!(self.block_dir.store_file(&mut f, &mut self.report));
+        let mtime = entry.metadata.modified().ok()
+            .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
+            .and_then(|dur| Some(dur.as_secs()));
+        Ok(index::Entry {
+            apath: entry.apath.clone(),
+            mtime: mtime,
+            kind: IndexKind::File,
+            blake2b: Some(body_hash),
+            addrs: addrs,
+        })
+    }
 }
 
 
