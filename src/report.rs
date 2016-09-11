@@ -14,21 +14,22 @@ use std::time;
 use std::time::{Duration};
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[
-    "backup.dir.count",
-    "backup.file.count",
+    "backup.dir",
+    "backup.file",
+    "backup.symlink",
     "backup.error.stat",
     "backup.skipped.unsupported_file_kind",
-    "block.read.count",
+    "block.read",
     "block.read.corrupt",
     "block.read.misplaced",
     "block.write.already_present",
-    "block.write.count",
+    "block.write",
     "index.read.hunks",
     "index.write.hunks",
     "source.error.metadata",
-    "source.selected.count",
+    "source.selected",
     "source.skipped.unsupported_file_kind",
-    "source.visited.directories.count",
+    "source.visited.directories",
 ];
 
 
@@ -107,7 +108,7 @@ impl Report {
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
     #[allow(unused)]
     pub fn get_count(&self, counter_name: &str) -> u64 {
-        *self.count.get(counter_name).unwrap_or(&0)
+        *self.count.get(counter_name).expect("unknown counter")
     }
 
     pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
@@ -179,27 +180,27 @@ mod tests {
     #[test]
     pub fn count() {
         let mut r = Report::new();
-        assert_eq!(r.get_count("block.read.count"), 0);
-        r.increment("block.read.count", 1);
-        assert_eq!(r.get_count("block.read.count"), 1);
-        r.increment("block.read.count", 10);
-        assert_eq!(r.get_count("block.read.count"), 11);
+        assert_eq!(r.get_count("block.read"), 0);
+        r.increment("block.read", 1);
+        assert_eq!(r.get_count("block.read"), 1);
+        r.increment("block.read", 10);
+        assert_eq!(r.get_count("block.read"), 11);
     }
 
     #[test]
     pub fn merge_reports() {
         let mut r1 = Report::new();
         let mut r2 = Report::new();
-        r1.increment("block.read.count", 1);
+        r1.increment("block.read", 1);
         r1.increment("block.read.corrupt", 2);
-        r2.increment("block.write.count", 1);
+        r2.increment("block.write", 1);
         r2.increment("block.read.corrupt", 10);
         r2.increment_size("block.write", 300, 100);
         r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
-        assert_eq!(r1.get_count("block.read.count"), 1);
+        assert_eq!(r1.get_count("block.read"), 1);
         assert_eq!(r1.get_count("block.read.corrupt"), 12);
-        assert_eq!(r1.get_count("block.write.count"), 1);
+        assert_eq!(r1.get_count("block.write"), 1);
         assert_eq!(r1.get_size("block.write"), (300, 100));
         assert_eq!(r1.get_duration("test"), Duration::new(5, 0));
     }
@@ -207,16 +208,16 @@ mod tests {
     #[test]
     pub fn display() {
         let mut r1 = Report::new();
-        r1.increment("block.read.count", 10);
-        r1.increment("block.write.count", 5);
+        r1.increment("block.read", 10);
+        r1.increment("block.write", 5);
         r1.increment_size("block.write", 300, 100);
         r1.increment_duration("test", Duration::new(42, 479760000));
 
         let formatted = format!("{}", r1);
         assert_eq!(formatted, "\
 Counts:
-  block.read.count                                          10
-  block.write.count                                          5
+  block.read                                                10
+  block.write                                                5
 Bytes (before and after compression):
   block.write                                              300       100        67%
 Durations (seconds):

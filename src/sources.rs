@@ -65,7 +65,7 @@ impl Iter {
         loop {
             if let Some(entry) = self.entry_deque.pop_front() {
                 // Have already found some entries and just need to return them.
-                self.report.increment("source.selected.count", 1);
+                self.report.increment("source.selected", 1);
                 return Some(Ok(entry));
             } else if let Some(entry) = self.dir_deque.pop_front() {
                 if let Err(e) = self.visit_next_directory(entry) {
@@ -81,7 +81,7 @@ impl Iter {
 
     fn visit_next_directory(&mut self, dir_entry: Entry) -> io::Result<()> {
         let readdir = try!(fs::read_dir(&dir_entry.path));
-        self.report.increment("source.visited.directories.count", 1);
+        self.report.increment("source.visited.directories", 1);
         let mut children = Vec::<(OsString, bool)>::new();
         for entry in readdir {
             let entry = try!(entry);
@@ -229,8 +229,8 @@ mod tests {
                     &tf.root.join("jam").join("apricot")));
 
         let report = source_iter.get_report();
-        assert_eq!(report.get_count("source.visited.directories.count"), 4);
-        assert_eq!(report.get_count("source.selected.count"), 7);
+        assert_eq!(report.get_count("source.visited.directories"), 4);
+        assert_eq!(report.get_count("source.selected"), 7);
     }
 
     #[cfg(unix)]

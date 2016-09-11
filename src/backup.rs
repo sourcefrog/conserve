@@ -64,7 +64,7 @@ impl Backup {
 
 
     fn store_dir(&mut self, entry: &sources::Entry) -> Result<index::Entry> {
-        self.report.increment("backup.dir.count", 1);
+        self.report.increment("backup.dir", 1);
         let mtime = entry.metadata.modified().ok()
             .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
             .and_then(|dur| Some(dur.as_secs()));
@@ -79,7 +79,7 @@ impl Backup {
 
 
     fn store_file(&mut self, entry: &sources::Entry) -> Result<(index::Entry)> {
-        self.report.increment("backup.file.count", 1);
+        self.report.increment("backup.file", 1);
         let mut f = try!(fs::File::open(&entry.path));
         let (addrs, body_hash) = try!(self.block_dir.store_file(&mut f, &mut self.report));
         let mtime = entry.metadata.modified().ok()
@@ -113,9 +113,9 @@ mod tests {
         srcdir.create_file("hello");
         let mut report = Report::new();
         run_backup(af.path(), srcdir.path(), &mut report).unwrap();
-        assert_eq!(1, report.get_count("block.write.count"));
-        assert_eq!(1, report.get_count("backup.file.count"));
-        assert_eq!(1, report.get_count("backup.dir.count"));
+        assert_eq!(1, report.get_count("block.write"));
+        assert_eq!(1, report.get_count("backup.file"));
+        assert_eq!(1, report.get_count("backup.dir"));
         assert_eq!(0, report.get_count("backup.skipped.unsupported_file_kind"));
 
         let band_ids = af.list_bands().unwrap();
@@ -158,8 +158,8 @@ mod tests {
         srcdir.create_symlink("symlink", "/a/broken/destination");
         let mut report = Report::new();
         run_backup(af.path(), srcdir.path(), &mut report).unwrap();
-        assert_eq!(0, report.get_count("block.write.count"));
-        assert_eq!(0, report.get_count("backup.file.count"));
+        assert_eq!(0, report.get_count("block.write"));
+        assert_eq!(0, report.get_count("backup.file"));
         // TODO: Actually store the symlink.
         assert_eq!(1, report.get_count("backup.skipped.unsupported_file_kind"));
 

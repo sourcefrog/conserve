@@ -128,7 +128,7 @@ impl BlockDir {
                 return Err(e.error.into());
             }
         }
-        report.increment("block.write.count", 1);
+        report.increment("block.write", 1);
         report.increment_size("block.write", uncompressed_length, compressed_length);
         Ok((refs, hex_hash))
     }
@@ -162,7 +162,7 @@ impl BlockDir {
             }
         };
         assert_eq!(decompressed.len(), refs[0].len as usize);
-        report.increment("block.read.count", 1);
+        report.increment("block.read", 1);
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
             .as_bytes()
@@ -230,14 +230,14 @@ mod tests {
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
 
         assert_eq!(report.get_count("block.write.already_present"), 0);
-        assert_eq!(report.get_count("block.write.count"), 1);
+        assert_eq!(report.get_count("block.write"), 1);
         assert_eq!(report.get_size("block.write"), (6, 10));
 
         // Try to read back
-        assert_eq!(report.get_count("block.read.count"), 0);
+        assert_eq!(report.get_count("block.read"), 0);
         let back = block_dir.get(&refs, &mut report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
-        assert_eq!(report.get_count("block.read.count"), 1);
+        assert_eq!(report.get_count("block.read"), 1);
     }
 
     #[test]
@@ -248,12 +248,12 @@ mod tests {
         let mut example_file = make_example_file();
         let (refs1, hash1) = block_dir.store_file(&mut example_file, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 0);
-        assert_eq!(report.get_count("block.write.count"), 1);
+        assert_eq!(report.get_count("block.write"), 1);
 
         let mut example_file = make_example_file();
         let (refs2, hash2) = block_dir.store_file(&mut example_file, &mut report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 1);
-        assert_eq!(report.get_count("block.write.count"), 1);
+        assert_eq!(report.get_count("block.write"), 1);
 
         assert_eq!(hash1, hash2);
         assert_eq!(refs1, refs2);
