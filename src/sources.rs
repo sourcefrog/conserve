@@ -10,6 +10,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time;
 
 use super::apath;
 use super::report::Report;
@@ -27,6 +28,17 @@ pub struct Entry {
     /// stat-like structure including kind, mtime, etc.
     pub metadata: fs::Metadata,
 }
+
+
+impl Entry {
+    /// Return Unix-format mtime if possible.
+    pub fn unix_mtime(&self) -> Option<u64> {
+        self.metadata.modified().ok()
+            .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
+            .and_then(|dur| Some(dur.as_secs()))
+    }
+}
+
 
 impl fmt::Debug for Entry {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
@@ -169,6 +181,7 @@ pub fn iter(source_dir: &Path) -> io::Result<Iter> {
             return Err(e);
         }
     };
+    // TODO: Common Entry::from_metadata?
     let root_entry = Entry {
         apath: "/".to_string(),
         path: source_dir.to_path_buf(),

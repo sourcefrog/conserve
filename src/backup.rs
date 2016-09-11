@@ -6,7 +6,6 @@
 
 use std::fs;
 use std::path::{Path};
-use std::time;
 
 use super::archive::Archive;
 use super::block::{BlockDir};
@@ -57,12 +56,10 @@ impl Backup {
             self.report.increment("backup.skipped.unsupported_file_kind", 1);
             return Ok(())
         };
-        let mtime = source_entry.metadata.modified().ok()
-            .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
-            .and_then(|dur| Some(dur.as_secs()));
+
         let mut new_index_entry = index::Entry {
             apath: source_entry.apath.clone(),
-            mtime: mtime,
+            mtime: source_entry.unix_mtime(),
             kind: IndexKind::File,
             addrs: vec![],
             blake2b: None,
