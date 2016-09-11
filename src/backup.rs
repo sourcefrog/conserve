@@ -44,6 +44,8 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -
 
 
 fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
+    info!("backup {}", entry.path.display());
+    assert!(apath::valid(&entry.apath), "invalid apath: {:?}", &entry.apath);
     if entry.metadata.is_file() {
         try!(backup_one_file(backup, entry));
     } else {
@@ -56,8 +58,6 @@ fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> Resul
 
 
 fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
-    info!("backup {}", entry.path.display());
-    assert!(apath::valid(&entry.apath), "invalid apath: {:?}", &entry.apath);
     backup.report.increment("backup.file.count", 1);
 
     let mut f = try!(fs::File::open(&entry.path));

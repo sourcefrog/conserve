@@ -52,6 +52,8 @@ pub fn cmp(a: &str, b: &str) -> Ordering {
 pub fn valid(a: &str) -> bool {
     if ! a.starts_with('/') {
         return false;
+    } else if a.len() == 1 {
+        return true;
     }
     for part in a[1..].split('/') {
         if part.is_empty()
@@ -95,6 +97,7 @@ mod tests {
     #[test]
     pub fn valid_and_ordered() {
         let ordered = [
+            "/",
             "/...a",
             "/.a",
             "/a",
