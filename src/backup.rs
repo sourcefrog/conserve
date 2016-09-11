@@ -50,48 +50,58 @@ impl Backup {
             Backup::store_file
         } else if source_entry.metadata.is_dir() {
             Backup::store_dir
+        } else if source_entry.metadata.file_type().is_symlink() {
+            Backup::store_symlink
         } else {
-            // TODO: Backup directories, symlinks, etc.
             warn!("Skipping unsupported file kind {}", &source_entry.apath);
             self.report.increment("backup.skipped.unsupported_file_kind", 1);
             return Ok(())
         };
-        let new_index_entry = try!(store_fn(self, source_entry));
+        let mtime = source_entry.metadata.modified().ok()
+            .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
+            .and_then(|dur| Some(dur.as_secs()));
+        let mut new_index_entry = index::Entry {
+            apath: source_entry.apath.clone(),
+            mtime: mtime,
+            kind: IndexKind::File,
+            addrs: vec![],
+            blake2b: None,
+            target: None,
+        };
+        try!(store_fn(self, source_entry, &mut new_index_entry));
         self.index_builder.push(new_index_entry);
         try!(self.index_builder.maybe_flush(&mut self.report));
         Ok(())
     }
 
 
-    fn store_dir(&mut self, entry: &sources::Entry) -> Result<index::Entry> {
+    fn store_dir(&mut self, entry: &sources::Entry, index_entry: &mut index::Entry) -> Result<()> {
+        let _ = entry;
         self.report.increment("backup.dir", 1);
-        let mtime = entry.metadata.modified().ok()
-            .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
-            .and_then(|dur| Some(dur.as_secs()));
-        Ok(index::Entry {
-            apath: entry.apath.clone(),
-            mtime: mtime,
-            kind: IndexKind::Dir,
-            addrs: vec![],
-            blake2b: None,
-        })
+        index_entry.kind = IndexKind::Dir;
+        Ok(())
     }
 
 
-    fn store_file(&mut self, entry: &sources::Entry) -> Result<(index::Entry)> {
+    fn store_file(&mut self, entry: &sources::Entry, index_entry: &mut index::Entry) -> Result<()> {
         self.report.increment("backup.file", 1);
         let mut f = try!(fs::File::open(&entry.path));
         let (addrs, body_hash) = try!(self.block_dir.store_file(&mut f, &mut self.report));
-        let mtime = entry.metadata.modified().ok()
-            .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
-            .and_then(|dur| Some(dur.as_secs()));
-        Ok(index::Entry {
-            apath: entry.apath.clone(),
-            mtime: mtime,
-            kind: IndexKind::File,
-            blake2b: Some(body_hash),
-            addrs: addrs,
-        })
+        index_entry.blake2b = Some(body_hash);
+        index_entry.addrs = addrs;
+        index_entry.kind = IndexKind::File;
+        Ok(())
+    }
+
+
+    fn store_symlink(&mut self, entry: &sources::Entry, index_entry: &mut index::Entry) -> Result<()> {
+        self.report.increment("backup.symlink", 1);
+        // TODO: Maybe log a warning if the target is not decodable rather than silently
+        // losing.
+        let target = try!(fs::read_link(&entry.path)).to_string_lossy().to_string();
+        index_entry.kind = IndexKind::Symlink;
+        index_entry.target = Some(target);
+        Ok(())
     }
 }
 
@@ -160,13 +170,24 @@ mod tests {
         run_backup(af.path(), srcdir.path(), &mut report).unwrap();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("backup.file"));
-        // TODO: Actually store the symlink.
-        assert_eq!(1, report.get_count("backup.skipped.unsupported_file_kind"));
+        assert_eq!(1, report.get_count("backup.symlink"));
+        assert_eq!(0, report.get_count("backup.skipped.unsupported_file_kind"));
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
         assert_eq!("b0000", band_ids[0].as_string());
 
-        // TODO: Once implemented  check the symlink is included.
+        let band = af.open_band(&band_ids[0], &mut report).unwrap();
+        assert!(band.is_closed().unwrap());
+
+        let index_entries = band.index_iter().unwrap()
+            .filter_map(|i| i.ok())
+            .collect::<Vec<index::Entry>>();
+        assert_eq!(2, index_entries.len());
+
+        let e2 = &index_entries[1];
+        assert_eq!(e2.kind, index::IndexKind::Symlink);
+        assert_eq!(e2.apath, "/symlink");
+        assert_eq!(e2.target.as_ref().unwrap(), "/a/broken/destination");
     }
 }
