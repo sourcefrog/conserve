@@ -197,6 +197,7 @@ which is a dict of
        block for the start of this file
      - `length`: the number of bytes of uncompressed data block
        content to store in this file
+     `target`: For symlinks, the string target of the symlink.
 
 So, the length of any file is the sum of the `length` entries for all
 its `blocks`.
