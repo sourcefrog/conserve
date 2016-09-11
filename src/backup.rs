@@ -12,7 +12,8 @@ use super::apath;
 use super::archive::Archive;
 use super::block::{BlockDir};
 use super::errors::*;
-use super::index::{IndexBuilder, Entry, IndexKind};
+use super::index;
+use super::index::{IndexBuilder, IndexKind};
 use super::report::Report;
 use super::sources;
 
@@ -46,40 +47,39 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -
 fn backup_one_source_entry(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
     info!("backup {}", entry.path.display());
     assert!(apath::valid(&entry.apath), "invalid apath: {:?}", &entry.apath);
-    if entry.metadata.is_file() {
-        try!(backup_one_file(backup, entry));
+    let new_entry: index::Entry = if entry.metadata.is_file() {
+        try!(backup_one_file(backup, entry))
     } else if entry.metadata.is_dir() {
-        try!(backup_one_dir(backup, entry));
+        try!(backup_one_dir(backup, entry))
     } else {
         // TODO: Backup directories, symlinks, etc.
         warn!("Skipping unsupported file kind {}", &entry.apath);
         backup.report.increment("backup.skipped.unsupported_file_kind", 1);
         return Ok(())
-    }
+    };
+    backup.index_builder.push(new_entry);
     try!(backup.index_builder.maybe_flush(&mut backup.report));
     Ok(())
 }
 
 
-fn backup_one_dir(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
+fn backup_one_dir(backup: &mut Backup, entry: &sources::Entry) -> Result<index::Entry> {
     backup.report.increment("backup.dir.count", 1);
 
     let mtime = entry.metadata.modified().ok()
         .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
         .and_then(|dur| Some(dur.as_secs()));
-    let index_entry = Entry {
+    Ok(index::Entry {
         apath: entry.apath.clone(),
         mtime: mtime,
         kind: IndexKind::Dir,
         addrs: vec![],
         blake2b: None,
-    };
-    backup.index_builder.push(index_entry);
-    Ok(())
+    })
 }
 
 
-fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
+fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> Result<(index::Entry)> {
     backup.report.increment("backup.file.count", 1);
 
     let mut f = try!(fs::File::open(&entry.path));
@@ -89,15 +89,13 @@ fn backup_one_file(backup: &mut Backup, entry: &sources::Entry) -> Result<()> {
     let mtime = entry.metadata.modified().ok()
         .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
         .and_then(|dur| Some(dur.as_secs()));
-    let index_entry = Entry {
+    Ok(index::Entry {
         apath: entry.apath.clone(),
         mtime: mtime,
         kind: IndexKind::File,
         blake2b: Some(body_hash),
         addrs: addrs,
-    };
-    backup.index_builder.push(index_entry);
-    Ok(())
+    })
 }
 
 
