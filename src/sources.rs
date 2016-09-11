@@ -181,7 +181,6 @@ pub fn iter(source_dir: &Path) -> io::Result<Iter> {
             return Err(e);
         }
     };
-    // TODO: Common Entry::from_metadata?
     let root_entry = Entry {
         apath: "/".to_string(),
         path: source_dir.to_path_buf(),

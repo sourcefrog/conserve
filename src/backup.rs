@@ -56,49 +56,55 @@ impl Backup {
             self.report.increment("backup.skipped.unsupported_file_kind", 1);
             return Ok(())
         };
-
-        let mut new_index_entry = index::Entry {
-            apath: source_entry.apath.clone(),
-            mtime: source_entry.unix_mtime(),
-            kind: IndexKind::File,
-            addrs: vec![],
-            blake2b: None,
-            target: None,
-        };
-        try!(store_fn(self, source_entry, &mut new_index_entry));
+        let new_index_entry = try!(store_fn(self, source_entry));
         self.index_builder.push(new_index_entry);
         try!(self.index_builder.maybe_flush(&mut self.report));
         Ok(())
     }
 
 
-    fn store_dir(&mut self, entry: &sources::Entry, index_entry: &mut index::Entry) -> Result<()> {
-        let _ = entry;
+    fn store_dir(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
         self.report.increment("backup.dir", 1);
-        index_entry.kind = IndexKind::Dir;
-        Ok(())
+        Ok(index::Entry {
+            apath: source_entry.apath.clone(),
+            mtime: source_entry.unix_mtime(),
+            kind: IndexKind::Dir,
+            addrs: vec![],
+            blake2b: None,
+            target: None,
+        })
     }
 
 
-    fn store_file(&mut self, entry: &sources::Entry, index_entry: &mut index::Entry) -> Result<()> {
+    fn store_file(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
         self.report.increment("backup.file", 1);
-        let mut f = try!(fs::File::open(&entry.path));
+        // TODO: Cope graciously if the file disappeared after readdir.
+        let mut f = try!(fs::File::open(&source_entry.path));
         let (addrs, body_hash) = try!(self.block_dir.store_file(&mut f, &mut self.report));
-        index_entry.blake2b = Some(body_hash);
-        index_entry.addrs = addrs;
-        index_entry.kind = IndexKind::File;
-        Ok(())
+        Ok(index::Entry {
+            apath: source_entry.apath.clone(),
+            mtime: source_entry.unix_mtime(),
+            kind: IndexKind::File,
+            addrs: addrs,
+            blake2b: Some(body_hash),
+            target: None,
+        })
     }
 
 
-    fn store_symlink(&mut self, entry: &sources::Entry, index_entry: &mut index::Entry) -> Result<()> {
+    fn store_symlink(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
         self.report.increment("backup.symlink", 1);
         // TODO: Maybe log a warning if the target is not decodable rather than silently
         // losing.
-        let target = try!(fs::read_link(&entry.path)).to_string_lossy().to_string();
-        index_entry.kind = IndexKind::Symlink;
-        index_entry.target = Some(target);
-        Ok(())
+        let target = try!(fs::read_link(&source_entry.path)).to_string_lossy().to_string();
+        Ok(index::Entry {
+            apath: source_entry.apath.clone(),
+            mtime: source_entry.unix_mtime(),
+            kind: IndexKind::Symlink,
+            addrs: vec![],
+            blake2b: None,
+            target: Some(target),
+        })
     }
 }
 
