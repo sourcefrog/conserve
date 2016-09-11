@@ -220,33 +220,22 @@ impl Iter {
         let hunk_path = path_for_hunk(&self.dir, self.next_hunk_number);
         let index_bytes = match read_and_decompress(&hunk_path) {
             Ok(i) => i,
+            Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
+                // No (more) index hunk files.
+                return Ok(false);
+            },
             Err(e) => {
-                if e.kind() == io::ErrorKind::NotFound {
-                    // No (more) index hunk files.
-                    return Ok(false);
-                } else {
-                    return Err(e.into());
-                }
+                return Err(e.into());
             },
         };
         self.report.increment_duration("index.read", start_read.elapsed());
         self.report.increment("index.read.hunks", 1);
 
         let start_parse = time::Instant::now();
-        let index_json = match str::from_utf8(&index_bytes) {
-            Ok(s) => s,
-            Err(e) => {
-                return Err(format!(
-                    "index file {:?} is not UTF-8: {}", hunk_path, e).into());
-            },
-        };
-        let entries: Vec<Entry> = match json::decode(index_json) {
-            Ok(h) => h,
-            Err(e) => {
-                return Err(format!(
-                    "couldn't deserialize index hunk {:?}: {}", hunk_path, e).into());
-            }
-        };
+        let index_json = try!(str::from_utf8(&index_bytes).chain_err(
+            || format!("index file {:?} is not UTF-8", hunk_path)));
+        let entries: Vec<Entry> = try!(json::decode(index_json)
+            .chain_err(|| format!("couldn't deserialize index hunk {:?}", hunk_path)));
         if entries.is_empty() {
             warn!("Index hunk {} is empty", hunk_path.display());
         }
