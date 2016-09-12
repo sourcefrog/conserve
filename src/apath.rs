@@ -15,32 +15,33 @@ use std::cmp::Ordering;
 pub fn cmp(a: &str, b: &str) -> Ordering {
     let mut ait = a.split('/');
     let mut bit = b.split('/');
+    // Maybe this should return Option<Ordering> instead and not have
+    // these panics?
     let mut oa = ait.next().expect("paths must not be empty");
     let mut ob = bit.next().expect("paths must not be empty");
+
     loop {
-        match (ait.next(), bit.next()) {
+        return match (ait.next(), bit.next(), oa.cmp(ob)) {
             // Both paths end here: eg ".../aa" < ".../zz"
-            (None, None) => return oa.cmp(ob),
+            (None, None, head) => head,
 
             // If one is a direct child and the other is in a subdirectory,
             // the direct child comes first.
             // eg ".../zz" < ".../aa/bb"
-            (None, Some(_bc)) => return Ordering::Less,
-            (Some(_ac), None) => return Ordering::Greater,
+            (None, Some(_bc), _) => Ordering::Less,
+            (Some(_ac), None, _) => Ordering::Greater,
 
             // If both have children then continue if they're the same
             // eg ".../aa/bb" cmp ".../aa/cc"
             // or return if they differ here,
             // eg ".../aa/zz" < ".../bb/yy"
-            (Some(ac), Some(bc)) => {
-                match oa.cmp(ob) {
-                    Ordering::Equal => {
-                        oa = ac; ob = bc; continue;
-                    },
-                    o => return o,
-                }
+            (Some(ac), Some(bc), Ordering::Equal) => {
+                oa = ac;
+                ob = bc;
+                continue;
             }
-        }
+            (Some(_), Some(_), head) => head,
+        };
     }
 }
 

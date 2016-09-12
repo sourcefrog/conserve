@@ -62,31 +62,28 @@ impl Archive {
     pub fn open(path: &Path) -> Result<Archive> {
         let archive = Archive { path: path.to_path_buf() };
         let header_path = path.join(HEADER_FILENAME);
-        let mut header_file = match File::open(&header_path) {
-            Ok(f) => f,
-            Err(e) => {
-                if e.kind() == io::ErrorKind::NotFound {
-                    error!("{} is not a Conserve archive", path.as_os_str().to_string_lossy());
-                } else {
-                    error!("Couldn't open archive header {:?}: {}",
-                           header_path.display(),
-                           e);
-                }
-                return Err(e);
+        let mut header_file = try!(File::open(&header_path).map_err(|e| {
+            if e.kind() == io::ErrorKind::NotFound {
+                error!("{} is not a Conserve archive", path.as_os_str().to_string_lossy());
+            } else {
+                error!("Couldn't open archive header {:?}: {}",
+                        header_path.display(),
+                        e);
             }
-        };
+            e
+        }));
+
         let mut header_string = String::new();
         if let Err(e) = header_file.read_to_string(&mut header_string) {
             error!("Failed to read archive header {:?}: {}", header_file, e);
             return Err(e);
         }
-        let header: ArchiveHeader = match json::decode(&header_string) {
-            Ok(h) => h,
-            Err(e) => {
-                error!("Couldn't deserialize archive header: {}", e);
-                return Err(Error::new(ErrorKind::InvalidInput, e));
-            }
-        };
+
+        let header: ArchiveHeader = try!(json::decode(&header_string).map_err(|e| {
+            error!("Couldn't deserialize archive header: {}", e);
+            Error::new(ErrorKind::InvalidInput, e)
+        }));
+
         if header.conserve_archive_version != ARCHIVE_VERSION {
             error!("Wrong archive version in header {:?}: {:?}",
                    header,
@@ -113,10 +110,7 @@ impl Archive {
 
     /// Returns a vector of band ids, in sorted order.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
-        let mut band_ids = Vec::<BandId>::new();
-        for r in try!(self.iter_bands()) {
-            band_ids.push(try!(r));
-        }
+        let mut band_ids: Vec<_> = try!(try!(self.iter_bands()).collect());
         band_ids.sort();
         Ok(band_ids)
     }
@@ -131,13 +125,7 @@ impl Archive {
 
     // Return the id of the highest-numbered band, or None if empty.
     pub fn last_band_id(self: &Archive) -> io::Result<Option<BandId>> {
-        let mut max: Option<BandId> = None;
-        for i in try!(self.iter_bands()) {
-            let b = try!(i);
-            if max.is_none() || (b > *max.as_ref().unwrap()) {
-                max = Some(b)
-            };
-        }
+        let max = try!(self.list_bands()).pop();
         Ok(max)
     }
 
