@@ -1,6 +1,7 @@
 # Conserve - a robust backup program
 
-**At this time Conserve is not ready for production use.**
+**At this time Conserve is not ready for production use.  The format is
+not guaranteed stable, and some important features are not implemented.**
 
 Copyright 2012-2016 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
 
