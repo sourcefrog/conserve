@@ -40,6 +40,7 @@ mod index;
 mod io;
 mod logger;
 mod report;
+mod restore;
 mod sources;
 #[cfg(test)]
 mod testfixtures;
@@ -71,6 +72,7 @@ Usage:
     conserve list-source [options] <source>
     conserve list-versions [options] <archive>
     conserve ls [options] <archive>
+    conserve restore <archive> <destination>
     conserve --version
     conserve --help
 
@@ -85,7 +87,9 @@ struct Args {
     cmd_list_versions: bool,
     cmd_list_source: bool,
     cmd_ls: bool,
+    cmd_restore: bool,
     arg_archive: String,
+    arg_destination: String,
     arg_source: String,
     flag_stats: bool,
 }
@@ -112,6 +116,8 @@ fn main() {
         cmd::list_versions(&args.arg_archive)
     } else if args.cmd_ls {
         cmd::ls(&args.arg_archive, &mut report)
+    } else if args.cmd_restore {
+        cmd::restore(&args.arg_archive, &args.arg_destination, &mut report)
     } else {
         unimplemented!();
     };

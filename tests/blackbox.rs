@@ -5,6 +5,7 @@
 
 
 use std::env;
+use std::fs;
 use std::process;
 use std::str;
 
@@ -60,6 +61,7 @@ fn blackbox_no_args() {
             conserve list-source [options] <source>
             conserve list-versions [options] <archive>
             conserve ls [options] <archive>
+            conserve restore <archive> <destination>
             conserve --version
             conserve --help
         ");
@@ -89,6 +91,7 @@ fn blackbox_help() {
                 conserve list-source [options] <source>
                 conserve list-versions [options] <archive>
                 conserve ls [options] <archive>
+                conserve restore <archive> <destination>
                 conserve --version
                 conserve --help
 
@@ -133,6 +136,7 @@ fn blackbox_backup() {
 
     let src = TreeFixture::new();
     src.create_file("hello");
+    src.create_dir("subdir");
 
     let (status, _stdout, stderr) = run_conserve(
         &["backup", &arch_dir_str, src.root.to_str().unwrap()]);
@@ -144,10 +148,16 @@ fn blackbox_backup() {
         "b0000\n", "");
 
     assert_success_and_output(&["ls", &arch_dir_str],
-        "/\n/hello\n",
+        "/\n/hello\n/subdir\n",
         "");
 
-    // TODO: Restore.
+    let restore_dir = make_tempdir();
+    let restore_dir_str = restore_dir.path().to_str().unwrap();
+    let (status, stdout, stderr) = run_conserve(&["restore", &arch_dir_str, &restore_dir_str]);
+    assert!(status.success());
+    assert!(fs::metadata(restore_dir.path().join("subdir")).unwrap().is_dir());
+    // TODO: Check file is extracted too
+
     // TODO: Validate.
     // TODO: Compare vs source tree.
     //
