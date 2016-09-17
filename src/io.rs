@@ -34,7 +34,7 @@ impl AtomicFile {
         })
     }
 
-    pub fn close(self: AtomicFile, report: &mut Report) -> Result<()> {
+    pub fn close(self: AtomicFile, report: &Report) -> Result<()> {
         if cfg!(feature = "sync") {
             try!(report.measure_duration("sync", || self.f.sync_all()));
         }
@@ -84,7 +84,7 @@ pub fn read_and_decompress(path: &Path) -> io::Result<Vec<u8>> {
 
 
 pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
-    path: &Path, obj: &T, report: &mut Report) -> Result<()> {
+    path: &Path, obj: &T, report: &Report) -> Result<()> {
     let mut f = try!(AtomicFile::new(path));
     try!(f.write_all(json::encode(&obj).unwrap().as_bytes()));
     try!(f.write_all(b"\n"));

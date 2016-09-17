@@ -82,7 +82,7 @@ impl BlockDir {
         buf
     }
 
-    pub fn store_file(&mut self, from_file: &mut fs::File, report: &mut Report) -> Result<(Vec<Address>, BlockHash)> {
+    pub fn store_file(&mut self, from_file: &mut fs::File, report: &Report) -> Result<(Vec<Address>, BlockHash)> {
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp").create_in(&self.path));
         let mut encoder = BrotliEncoder::new(tempf, super::BROTLI_COMPRESSION_LEVEL);
@@ -147,7 +147,7 @@ impl BlockDir {
     /// TODO: Return a Read rather than a Vec.
     /// TODO: Handle files broken across blocks.
     #[allow(unused)]
-    pub fn get(self: &BlockDir, refs: &[Address], report: &mut Report) -> Result<Vec<u8>> {
+    pub fn get(self: &BlockDir, refs: &[Address], report: &Report) -> Result<Vec<u8>> {
         assert_eq!(1, refs.len());
         let hash = &refs[0].hash;
         assert_eq!(0, refs[0].start);

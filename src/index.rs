@@ -99,7 +99,7 @@ impl IndexBuilder {
         self.entries.push(entry);
     }
 
-    pub fn maybe_flush(&mut self, report: &mut Report) -> Result<()> {
+    pub fn maybe_flush(&mut self, report: &Report) -> Result<()> {
         if self.entries.len() >= 10000 {
             self.finish_hunk(report)
         } else {
@@ -112,7 +112,7 @@ impl IndexBuilder {
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
-    pub fn finish_hunk(&mut self, report: &mut Report) -> Result<()> {
+    pub fn finish_hunk(&mut self, report: &Report) -> Result<()> {
         try!(ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)));
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
 

@@ -52,7 +52,7 @@ impl Band {
     /// Make a new band (and its on-disk directory).
     ///
     /// Publicly, prefer Archive::create_band.
-    pub fn create(archive_dir: &Path, id: BandId, mut report: &mut Report) -> Result<Band> {
+    pub fn create(archive_dir: &Path, id: BandId, report: &Report) -> Result<Band> {
         let new = Band::new(archive_dir, id);
 
         try!(fs::create_dir(&new.path_buf));
@@ -61,14 +61,14 @@ impl Band {
         info!("create band {:?}", &new.path_buf);
 
         let head = BandHead { start_time: time::get_time().sec as u64 };
-        try!(write_json_uncompressed(&new.path_buf.join(HEAD_FILENAME), &head, &mut report));
+        try!(write_json_uncompressed(&new.path_buf.join(HEAD_FILENAME), &head, report));
         Ok(new)
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(self: &Band, mut report: &mut Report) -> Result<()> {
+    pub fn close(self: &Band, report: &Report) -> Result<()> {
         let tail = BandTail { end_time: time::get_time().sec as u64 };
-        write_json_uncompressed(&self.tail_path(), &tail, &mut report)
+        write_json_uncompressed(&self.tail_path(), &tail, report)
     }
 
     pub fn open(archive_dir: &Path, id: &BandId, report: &Report) -> Result<Band> {
@@ -138,7 +138,7 @@ mod tests {
     fn create_band() {
         use super::super::io::list_dir;
         let af = ScratchArchive::new();
-        let report = &mut Report::new();
+        let report = &Report::new();
         let band = Band::create(af.path(), BandId::from_string("b0001").unwrap(), report).unwrap();
         assert!(band.path().to_str().unwrap().ends_with("b0001"));
         assert!(fs::metadata(band.path()).unwrap().is_dir());
@@ -168,8 +168,8 @@ mod tests {
     fn create_existing_band() {
         let af = ScratchArchive::new();
         let band_id = BandId::from_string("b0001").unwrap();
-        Band::create(af.path(), band_id.clone(), &mut Report::new()).unwrap();
-        let e = Band::create(af.path(), band_id, &mut Report::new()).unwrap_err();
+        Band::create(af.path(), band_id.clone(), &Report::new()).unwrap();
+        let e = Band::create(af.path(), band_id, &Report::new()).unwrap_err();
         if let ErrorKind::Io(ref ioerror) = *e.kind() {
             assert_eq!(ioerror.kind(), io::ErrorKind::AlreadyExists);
         } else {

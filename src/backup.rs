@@ -23,7 +23,7 @@ struct Backup {
 }
 
 
-pub fn run_backup(archive_path: &Path, source: &Path, mut report: &mut Report) -> Result<()> {
+pub fn run_backup(archive_path: &Path, source: &Path, mut report: &Report) -> Result<()> {
     let archive = try!(Archive::open(archive_path));
     let band = try!(archive.create_band(&mut report));
     let mut backup = Backup {

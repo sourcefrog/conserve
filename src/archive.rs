@@ -117,15 +117,15 @@ impl Archive {
     }
 
     /// Make a new band. Bands are numbered sequentially.
-    pub fn create_band(self: &Archive, mut report: &mut Report) -> Result<Band> {
+    pub fn create_band(self: &Archive, report: &Report) -> Result<Band> {
         let new_band_id = match try!(self.last_band_id()) {
             None => BandId::zero(),
             Some(b) => b.next_sibling(),
         };
-        Band::create(self.path(), new_band_id, &mut report)
+        Band::create(self.path(), new_band_id, report)
     }
 
-    pub fn open_band(&self, band_id: &BandId, report: &mut Report) -> Result<Band> {
+    pub fn open_band(&self, band_id: &BandId, report: &Report) -> Result<Band> {
         Band::open(self.path(), band_id, report)
     }
 }
@@ -221,7 +221,7 @@ mod tests {
         use super::super::io::directory_exists;
         let af = ScratchArchive::new();
         // Make one band
-        let _band1 = af.create_band(&mut Report::new()).unwrap();
+        let _band1 = af.create_band(&Report::new()).unwrap();
         assert!(directory_exists(af.path()).unwrap());
         let (_file_names, dir_names) = list_dir(af.path()).unwrap();
         println!("dirs: {:?}", dir_names);
@@ -230,7 +230,7 @@ mod tests {
         assert_eq!(af.list_bands().unwrap(), vec![BandId::new(&[0])]);
 
         // // Try creating a second band.
-        let _band2 = &af.create_band(&mut Report::new()).unwrap();
+        let _band2 = &af.create_band(&Report::new()).unwrap();
         assert_eq!(af.list_bands().unwrap(),
                    vec![BandId::new(&[0]), BandId::new(&[1])]);
     }
