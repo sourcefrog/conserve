@@ -7,6 +7,7 @@
 //!
 //! Sizes can be reported in both compressed and uncompressed form.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
@@ -58,84 +59,91 @@ static KNOWN_DURATIONS: &'static [&'static str] = &[
 /// running.
 ///
 /// A Report holds counters, identified by a name.  The name must be in `KNOWN_COUNTERS`.
+///
+/// A Report is internally mutable, so a single instance can be shared by multiple objects
+/// or scopes (on the same thread) who all append to it.
 #[derive(Clone, Debug, Default)]
 pub struct Report {
-    count: BTreeMap<&'static str, u64>,
-    sizes: BTreeMap<&'static str, (u64, u64)>,
-    durations: BTreeMap<&'static str, Duration>,
+    count: RefCell<BTreeMap<&'static str, u64>>,
+    sizes: RefCell<BTreeMap<&'static str, (u64, u64)>>,
+    durations: RefCell<BTreeMap<&'static str, Duration>>,
 }
 
 impl Report {
     pub fn new() -> Report {
-        let mut new = Report {
-            count: BTreeMap::new(),
-            sizes: BTreeMap::new(),
-            durations: BTreeMap::new(),
-        };
+        let mut inner_count = BTreeMap::new();
+        let mut inner_sizes = BTreeMap::new();
+        let mut inner_durations: BTreeMap<&'static str, Duration> = BTreeMap::new();
         for counter_name in KNOWN_COUNTERS {
-            new.count.insert(*counter_name, 0);
-        }
+            inner_count.insert(*counter_name, 0);
+        };
         for counter_name in KNOWN_SIZES {
-            new.sizes.insert(*counter_name, (0, 0));
-        }
+            inner_sizes.insert(*counter_name, (0, 0));
+        };
         for name in KNOWN_DURATIONS {
-            new.durations.insert(name, Duration::new(0, 0));
+            inner_durations.insert(name, Duration::new(0, 0));
+        };
+        Report {
+            count: RefCell::new(inner_count),
+            sizes: RefCell::new(inner_sizes),
+            durations: RefCell::new(inner_durations),
         }
-        new
     }
 
     /// Increment a counter by a given amount.
     ///
     /// The name must be a static string.  Counters implicitly start at 0.
-    pub fn increment(self: &mut Report, counter_name: &'static str, delta: u64) {
+    pub fn increment(&self, counter_name: &'static str, delta: u64) {
         // Entries are created from the list of known names when this is constructed.
-        if let Some(mut c) = self.count.get_mut(counter_name) {
+        if let Some(mut c) = self.count.borrow_mut().get_mut(counter_name) {
             *c += delta;
         } else {
             panic!("unregistered counter {:?}", counter_name);
         }
     }
 
-    pub fn increment_size(&mut self, counter_name: &str, uncompressed_bytes: u64,
+    pub fn increment_size(&self, counter_name: &str, uncompressed_bytes: u64,
         compressed_bytes: u64) {
-        let mut e = self.sizes.get_mut(counter_name).expect("unregistered size counter");
+        let mut inner_sizes = self.sizes.borrow_mut();
+        let mut e = inner_sizes.get_mut(counter_name).expect("unregistered size counter");
         e.0 += uncompressed_bytes;
         e.1 += compressed_bytes;
     }
 
-    pub fn increment_duration(&mut self, name: &str, duration: Duration) {
-        let mut e = self.durations.get_mut(name).expect("undefined duration counter");
-        *e += duration;
+    pub fn increment_duration(&self, name: &str, duration: Duration) {
+        *self.durations.borrow_mut()
+            .get_mut(name).expect("undefined duration counter")
+            += duration;
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
     #[allow(unused)]
     pub fn get_count(&self, counter_name: &str) -> u64 {
-        *self.count.get(counter_name).expect("unknown counter")
+        *self.count.borrow().get(counter_name).expect("unknown counter")
     }
 
     pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
-        *self.sizes.get(counter_name).expect("unknown size counter")
+        *self.sizes.borrow().get(counter_name).expect("unknown size counter")
     }
 
     pub fn get_duration(&self, name: &str) -> Duration {
-        *self.durations.get(name).expect("unknown duration name")
+        *self.durations.borrow().get(name).expect("unknown duration name")
     }
 
     /// Merge the contents of `from_report` into `self`.
-    pub fn merge_from(self: &mut Report, from_report: &Report) {
-        for (name, value) in &from_report.count {
+    pub fn merge_from(&self, from_report: &Report) {
+        for (name, value) in from_report.count.borrow().iter() {
             self.increment(name, *value);
         }
-        for (name, &(uncompressed, compressed)) in &from_report.sizes {
+        for (name, &(uncompressed, compressed)) in from_report.sizes.borrow().iter() {
             self.increment_size(name, uncompressed, compressed);
         }
-        for (name, duration) in &from_report.durations {
+        for (name, duration) in from_report.durations.borrow().iter() {
             self.increment_duration(name, *duration);
         }
     }
 
-    pub fn measure_duration<T, F>(&mut self, duration_name: &str, mut closure: F) -> T
+    pub fn measure_duration<T, F>(&self, duration_name: &str, mut closure: F) -> T
         where F: FnMut() -> T {
         let start = time::Instant::now();
         let result = closure();
@@ -148,13 +156,13 @@ impl Report {
 impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         try!(write!(f, "Counts:\n"));
-        for (key, value) in &self.count {
+        for (key, value) in self.count.borrow().iter() {
             if *value > 0 {
                 try!(write!(f, "  {:<50}{:>10}\n", *key, *value));
             }
         }
         try!(write!(f, "Bytes (before and after compression):\n"));
-        for (key, &(uncompressed_bytes, compressed_bytes)) in &self.sizes {
+        for (key, &(uncompressed_bytes, compressed_bytes)) in self.sizes.borrow().iter() {
             if uncompressed_bytes > 0 {
                 let compression_pct =
                     100 - ((100 * compressed_bytes) / uncompressed_bytes);
@@ -163,7 +171,7 @@ impl Display for Report {
             }
         }
         try!(write!(f, "Durations (seconds):\n"));
-        for (key, &dur) in &self.durations {
+        for (key, &dur) in self.durations.borrow().iter() {
             let millis = dur.subsec_nanos() / 1000000;
             let secs = dur.as_secs();
             if millis > 0 || secs > 0 {
@@ -182,7 +190,7 @@ mod tests {
 
     #[test]
     pub fn count() {
-        let mut r = Report::new();
+        let r = Report::new();
         assert_eq!(r.get_count("block.read"), 0);
         r.increment("block.read", 1);
         assert_eq!(r.get_count("block.read"), 1);
@@ -192,8 +200,8 @@ mod tests {
 
     #[test]
     pub fn merge_reports() {
-        let mut r1 = Report::new();
-        let mut r2 = Report::new();
+        let r1 = Report::new();
+        let r2 = Report::new();
         r1.increment("block.read", 1);
         r1.increment("block.read.corrupt", 2);
         r2.increment("block.write", 1);
@@ -210,7 +218,7 @@ mod tests {
 
     #[test]
     pub fn display() {
-        let mut r1 = Report::new();
+        let r1 = Report::new();
         r1.increment("block.read", 10);
         r1.increment("block.write", 5);
         r1.increment_size("block.write", 300, 100);
