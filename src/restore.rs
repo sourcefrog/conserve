@@ -43,7 +43,8 @@ impl<'a> Restore<'a> {
         // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
     }
 
-    fn restore_dir(&self, _entry: &index::Entry, dest: &Path) -> Result<()> {
+    fn restore_dir(&mut self, _entry: &index::Entry, dest: &Path) -> Result<()> {
+        self.report.increment("restore.dir", 1);
         match fs::create_dir(dest) {
             Ok(_) => Ok(()),
             Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
