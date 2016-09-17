@@ -61,7 +61,7 @@ fn blackbox_no_args() {
             conserve list-source [options] <source>
             conserve list-versions [options] <archive>
             conserve ls [options] <archive>
-            conserve restore <archive> <destination>
+            conserve restore [options] <archive> <destination>
             conserve --version
             conserve --help
         ");
@@ -91,7 +91,7 @@ fn blackbox_help() {
                 conserve list-source [options] <source>
                 conserve list-versions [options] <archive>
                 conserve ls [options] <archive>
-                conserve restore <archive> <destination>
+                conserve restore [options] <archive> <destination>
                 conserve --version
                 conserve --help
 
