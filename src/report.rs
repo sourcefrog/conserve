@@ -152,13 +152,13 @@ impl Report {
     /// Merge the contents of `from_report` into `self`.
     pub fn merge_from(&self, from_report: &Report) {
         let from_inner = from_report.mut_inner();
-        for (name, value) in from_inner.count.iter() {
+        for (name, value) in &from_inner.count {
             self.increment(name, *value);
         }
-        for (name, &(uncompressed, compressed)) in from_inner.sizes.iter() {
+        for (name, &(uncompressed, compressed)) in &from_inner.sizes {
             self.increment_size(name, uncompressed, compressed);
         }
-        for (name, duration) in from_inner.durations.iter() {
+        for (name, duration) in &from_inner.durations {
             self.increment_duration(name, *duration);
         }
     }
@@ -177,13 +177,13 @@ impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         try!(write!(f, "Counts:\n"));
         let inner = self.mut_inner();
-        for (key, value) in inner.count.iter() {
+        for (key, value) in &inner.count {
             if *value > 0 {
                 try!(write!(f, "  {:<50}{:>10}\n", *key, *value));
             }
         }
         try!(write!(f, "Bytes (before and after compression):\n"));
-        for (key, &(uncompressed_bytes, compressed_bytes)) in inner.sizes.iter() {
+        for (key, &(uncompressed_bytes, compressed_bytes)) in &inner.sizes {
             if uncompressed_bytes > 0 {
                 let compression_pct =
                     100 - ((100 * compressed_bytes) / uncompressed_bytes);
@@ -192,7 +192,7 @@ impl Display for Report {
             }
         }
         try!(write!(f, "Durations (seconds):\n"));
-        for (key, &dur) in inner.durations.iter() {
+        for (key, &dur) in &inner.durations {
             let millis = dur.subsec_nanos() / 1000000;
             let secs = dur.as_secs();
             if millis > 0 || secs > 0 {
