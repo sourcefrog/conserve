@@ -142,7 +142,7 @@ mod tests {
         let band = af.open_band(&band_ids[0], &mut report).unwrap();
         assert!(band.is_closed().unwrap());
 
-        let index_entries = band.index_iter().unwrap()
+        let index_entries = band.index_iter(&report).unwrap()
             .filter_map(|i| i.ok())
             .collect::<Vec<index::Entry>>();
         assert_eq!(2, index_entries.len());
@@ -183,7 +183,7 @@ mod tests {
         let band = af.open_band(&band_ids[0], &mut report).unwrap();
         assert!(band.is_closed().unwrap());
 
-        let index_entries = band.index_iter().unwrap()
+        let index_entries = band.index_iter(&report).unwrap()
             .filter_map(|i| i.ok())
             .collect::<Vec<index::Entry>>();
         assert_eq!(2, index_entries.len());
