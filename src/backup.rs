@@ -23,9 +23,9 @@ struct Backup {
 }
 
 
-pub fn run_backup(archive_path: &Path, source: &Path, mut report: &Report) -> Result<()> {
+pub fn run_backup(archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
     let archive = try!(Archive::open(archive_path));
-    let band = try!(archive.create_band(&mut report));
+    let band = try!(archive.create_band(&report));
     let mut backup = Backup {
         block_dir: band.block_dir(),
         index_builder: band.index_builder(),
@@ -36,7 +36,7 @@ pub fn run_backup(archive_path: &Path, source: &Path, mut report: &Report) -> Re
         try!(backup.store_one_source_entry(&try!(entry)));
     }
     try!(backup.index_builder.finish_hunk(report));
-    try!(band.close(&mut backup.report));
+    try!(band.close(&backup.report));
     report.merge_from(&backup.report);
     Ok(())
 }
@@ -58,7 +58,7 @@ impl Backup {
         };
         let new_index_entry = try!(store_fn(self, source_entry));
         self.index_builder.push(new_index_entry);
-        try!(self.index_builder.maybe_flush(&mut self.report));
+        try!(self.index_builder.maybe_flush(&self.report));
         Ok(())
     }
 
@@ -80,7 +80,7 @@ impl Backup {
         self.report.increment("backup.file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
         let mut f = try!(fs::File::open(&source_entry.path));
-        let (addrs, body_hash) = try!(self.block_dir.store_file(&mut f, &mut self.report));
+        let (addrs, body_hash) = try!(self.block_dir.store_file(&mut f, &self.report));
         Ok(index::Entry {
             apath: source_entry.apath.clone(),
             mtime: source_entry.unix_mtime(),
@@ -124,8 +124,8 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_file("hello");
-        let mut report = Report::new();
-        run_backup(af.path(), srcdir.path(), &mut report).unwrap();
+        let report = Report::new();
+        run_backup(af.path(), srcdir.path(), &report).unwrap();
         assert_eq!(1, report.get_count("block.write"));
         assert_eq!(1, report.get_count("backup.file"));
         assert_eq!(1, report.get_count("backup.dir"));
@@ -139,7 +139,7 @@ mod tests {
         let read_us = (dur.subsec_nanos() as u64) / 1000u64 + dur.as_secs() * 1000000u64;
         assert!(read_us > 0);
 
-        let band = af.open_band(&band_ids[0], &mut report).unwrap();
+        let band = af.open_band(&band_ids[0], &report).unwrap();
         assert!(band.is_closed().unwrap());
 
         let index_entries = band.index_iter(&report).unwrap()
@@ -169,8 +169,8 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
-        let mut report = Report::new();
-        run_backup(af.path(), srcdir.path(), &mut report).unwrap();
+        let report = Report::new();
+        run_backup(af.path(), srcdir.path(), &report).unwrap();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("backup.file"));
         assert_eq!(1, report.get_count("backup.symlink"));
@@ -180,7 +180,7 @@ mod tests {
         assert_eq!(1, band_ids.len());
         assert_eq!("b0000", band_ids[0].as_string());
 
-        let band = af.open_band(&band_ids[0], &mut report).unwrap();
+        let band = af.open_band(&band_ids[0], &report).unwrap();
         assert!(band.is_closed().unwrap());
 
         let index_entries = band.index_iter(&report).unwrap()

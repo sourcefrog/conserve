@@ -40,13 +40,13 @@ impl Archive {
         debug!("Creating archive directory {:?}", path.display());
         let archive = Archive { path: path.to_path_buf() };
         // Report is not consumed because the results for init aren't so interesting.
-        let mut report = Report::new();
+        let report = Report::new();
         try!(std::fs::create_dir(&archive.path)
             .chain_err(|| format!("failed to create archive directory {:?}",
                 archive.path)));
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
         let header_filename = path.join(HEADER_FILENAME);
-        try!(write_json_uncompressed(&header_filename, &header, &mut report)
+        try!(write_json_uncompressed(&header_filename, &header, &report)
             .chain_err(|| format!("failed to write archive header: {:?}", header_filename)));
         info!("Created new archive in {:?}", path.display());
         Ok(archive)

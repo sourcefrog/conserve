@@ -208,13 +208,13 @@ mod tests {
     #[test]
     pub fn write_to_file() {
         let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
-        let mut report = Report::new();
+        let report = Report::new();
         let (testdir, mut block_dir) = setup();
         let mut example_file = make_example_file();
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
-        let (refs, hash_hex) = block_dir.store_file(&mut example_file, &mut report).unwrap();
+        let (refs, hash_hex) = block_dir.store_file(&mut example_file, &report).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
 
         // Should be in one block, and as it's currently unsalted the hash is the same.
@@ -235,23 +235,23 @@ mod tests {
 
         // Try to read back
         assert_eq!(report.get_count("block.read"), 0);
-        let back = block_dir.get(&refs, &mut report).unwrap();
+        let back = block_dir.get(&refs, &report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
         assert_eq!(report.get_count("block.read"), 1);
     }
 
     #[test]
     pub fn write_same_data_again() {
-        let mut report = Report::new();
+        let report = Report::new();
         let (_testdir, mut block_dir) = setup();
 
         let mut example_file = make_example_file();
-        let (refs1, hash1) = block_dir.store_file(&mut example_file, &mut report).unwrap();
+        let (refs1, hash1) = block_dir.store_file(&mut example_file, &report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 0);
         assert_eq!(report.get_count("block.write"), 1);
 
         let mut example_file = make_example_file();
-        let (refs2, hash2) = block_dir.store_file(&mut example_file, &mut report).unwrap();
+        let (refs2, hash2) = block_dir.store_file(&mut example_file, &report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 1);
         assert_eq!(report.get_count("block.write"), 1);
 

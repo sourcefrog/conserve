@@ -353,10 +353,10 @@ mod tests {
     fn basic() {
         use std::str;
 
-        let (_testdir, mut ib, mut report) = scratch_indexbuilder();
+        let (_testdir, mut ib, report) = scratch_indexbuilder();
         add_an_entry(&mut ib, "/apple");
         add_an_entry(&mut ib, "/banana");
-        ib.finish_hunk(&mut report).unwrap();
+        ib.finish_hunk(&report).unwrap();
 
         // The first hunk exists.
         let mut expected_path = ib.dir.to_path_buf();
@@ -383,14 +383,14 @@ mod tests {
     fn multiple_hunks() {
         use std::str;
 
-        let (_testdir, mut ib, mut report) = scratch_indexbuilder();
+        let (_testdir, mut ib, report) = scratch_indexbuilder();
         add_an_entry(&mut ib, "/1.1");
         add_an_entry(&mut ib, "/1.2");
-        ib.finish_hunk(&mut report).unwrap();
+        ib.finish_hunk(&report).unwrap();
 
         add_an_entry(&mut ib, "/2.1");
         add_an_entry(&mut ib, "/2.2");
-        ib.finish_hunk(&mut report).unwrap();
+        ib.finish_hunk(&report).unwrap();
 
         let it = super::read(&ib.dir, &report).unwrap();
         assert_eq!(
@@ -412,9 +412,9 @@ mod tests {
     #[test]
     #[should_panic]
     fn no_duplicate_paths_across_hunks() {
-        let (_testdir, mut ib, mut report) = scratch_indexbuilder();
+        let (_testdir, mut ib, report) = scratch_indexbuilder();
         add_an_entry(&mut ib, "/hello");
-        ib.finish_hunk(&mut report).unwrap();
+        ib.finish_hunk(&report).unwrap();
 
         // Try to add an identically-named file within the next hunk and it should error,
         // because the IndexBuilder remembers the last file name written.

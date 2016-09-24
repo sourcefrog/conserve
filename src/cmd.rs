@@ -6,15 +6,15 @@ use super::errors::*;
 use super::restore;
 use super::sources;
 
-pub fn backup(archive: &str, source: &str, mut report: &mut Report) -> Result<()> {
-    backup::run_backup(Path::new(archive), Path::new(source), &mut report)
+pub fn backup(archive: &str, source: &str, report: &Report) -> Result<()> {
+    backup::run_backup(Path::new(archive), Path::new(source), report)
 }
 
 pub fn init(archive: &str) -> Result<()> {
     Archive::init(Path::new(archive)).and(Ok(()))
 }
 
-pub fn list_source(source: &str, report: &mut Report) -> Result<()> {
+pub fn list_source(source: &str, report: &Report) -> Result<()> {
     let mut source_iter = try!(sources::iter(Path::new(source)));
     for entry in &mut source_iter {
         println!("{}", try!(entry).apath);
@@ -31,7 +31,7 @@ pub fn list_versions(archive_str: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn ls(archive_str: &str, report: &mut Report) -> Result<()> {
+pub fn ls(archive_str: &str, report: &Report) -> Result<()> {
     let archive = try!(Archive::open(Path::new(archive_str)));
     // TODO: Option to choose version.
     let band_id = archive.last_band_id().unwrap().expect("archive is empty");
@@ -44,7 +44,7 @@ pub fn ls(archive_str: &str, report: &mut Report) -> Result<()> {
 }
 
 
-pub fn restore(archive_str: &str, destination: &str, report: &mut Report) -> Result<()> {
+pub fn restore(archive_str: &str, destination: &str, report: &Report) -> Result<()> {
     let archive = try!(Archive::open(Path::new(archive_str)));
     let band_id = archive.last_band_id().unwrap().expect("archive is empty");
     let band = Band::open(archive.path(), &band_id, report).unwrap();

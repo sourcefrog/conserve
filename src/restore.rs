@@ -9,7 +9,7 @@ use super::index;
 
 pub struct Restore<'a> {
     pub band: Band,
-    pub report: &'a mut Report,
+    pub report: &'a Report,
     pub destination: PathBuf,
 }
 

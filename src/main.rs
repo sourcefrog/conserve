@@ -97,7 +97,7 @@ struct Args {
 
 fn main() {
     logger::establish_a_logger();
-    let mut report = report::Report::new();
+    let report = report::Report::new();
 
     let args: Args = Docopt::new(USAGE)
         .unwrap()
@@ -109,15 +109,15 @@ fn main() {
     let result = if args.cmd_init {
         cmd::init(&args.arg_archive)
     } else if args.cmd_backup {
-        cmd::backup(&args.arg_archive, &args.arg_source, &mut report)
+        cmd::backup(&args.arg_archive, &args.arg_source, &report)
     } else if args.cmd_list_source {
-        cmd::list_source(&args.arg_source, &mut report)
+        cmd::list_source(&args.arg_source, &report)
     } else if args.cmd_list_versions {
         cmd::list_versions(&args.arg_archive)
     } else if args.cmd_ls {
-        cmd::ls(&args.arg_archive, &mut report)
+        cmd::ls(&args.arg_archive, &report)
     } else if args.cmd_restore {
-        cmd::restore(&args.arg_archive, &args.arg_destination, &mut report)
+        cmd::restore(&args.arg_archive, &args.arg_destination, &report)
     } else {
         unimplemented!();
     };
