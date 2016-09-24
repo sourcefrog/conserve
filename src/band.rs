@@ -118,8 +118,8 @@ impl Band {
     }
 
     /// Make an iterator that will return all entries in this band.
-    pub fn index_iter(&self) -> Result<index::Iter> {
-        index::read(&self.index_dir_path)
+    pub fn index_iter(&self, report: &Report) -> Result<index::Iter> {
+        index::read(&self.index_dir_path, report)
     }
 }
 

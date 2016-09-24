@@ -15,13 +15,12 @@ pub struct Restore<'a> {
 
 impl<'a> Restore<'a> {
     pub fn run(&mut self) -> Result<()> {
-        let mut iter = try!(self.band.index_iter());
+        let mut iter = try!(self.band.index_iter(self.report));
         for entry in iter.by_ref() {
             let entry = try!(entry);
             // TODO: Continue even if one fails
             try!(self.restore_one(&entry));
         }
-        self.report.merge_from(&iter.report);
         Ok(())
     }
 

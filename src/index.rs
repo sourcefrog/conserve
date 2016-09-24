@@ -184,12 +184,12 @@ impl fmt::Debug for Iter {
 /// Create an iterator that will read all entires from an existing index.
 ///
 /// Prefer to use `Band::index_iter` instead.
-pub fn read(index_dir: &Path) -> Result<Iter> {
+pub fn read(index_dir: &Path, report: &Report) -> Result<Iter> {
     Ok(Iter {
         dir: index_dir.to_path_buf(),
         buffered_entries: Vec::<Entry>::new().into_iter(),
         next_hunk_number: 0,
-        report: Report::new(),
+        report: report.clone(),
     })
 }
 
