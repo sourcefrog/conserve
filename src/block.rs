@@ -6,7 +6,7 @@
 use std::fs;
 use std::io;
 use std::io::prelude::*;
-use std::io::{SeekFrom};
+use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
@@ -174,6 +174,7 @@ impl BlockDir {
         Ok(decompressed)
     }
 }
+
 
 #[cfg(test)]
 mod tests {

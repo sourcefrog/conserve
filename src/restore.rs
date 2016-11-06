@@ -79,9 +79,8 @@ impl<'a> Restore<'a> {
         let mut af = try!(AtomicFile::new(dest));
         info!("file block addresses are: {:?}", entry.addrs);
         for addr in &entry.addrs {
-            let block_content = try!(self.block_dir.get(&addr, self.report));
-            try!(af.write_all(block_content.as_slice()).chain_err(
-                || format!("failed to write restored file {:?}", dest)));
+            let block_vec = try!(self.block_dir.get(&addr, self.report));
+            try!(io::copy(&mut block_vec.as_slice(), &mut af));
         }
         af.close(self.report)
     }
