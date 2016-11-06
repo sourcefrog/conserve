@@ -19,24 +19,26 @@ pub struct Restore<'a> {
     pub block_dir: BlockDir,
 }
 
-impl<'a> Restore<'a> {
-    pub fn run(archive: PathBuf, destination: PathBuf, report: &Report) -> Result<()> {
-        // TODO: Maybe Move this to a method on Restore?
-        let archive = try!(Archive::open(&archive));
-        let band_id = archive.last_band_id().unwrap().expect("archive is empty");
-        let band = Band::open(archive.path(), &band_id, report).unwrap();
-        let block_dir = band.block_dir();
-        let mut job = Restore {
-            band: band,
-            block_dir: block_dir,
-            report: report,
-            destination: destination
-        };
+pub fn run(archive: PathBuf, destination: PathBuf, report: &Report) -> Result<()> {
+    // TODO: Maybe Move this to a method on Restore?
+    let archive = try!(Archive::open(&archive));
+    let band_id = archive.last_band_id().unwrap().expect("archive is empty");
+    let band = Band::open(archive.path(), &band_id, report).unwrap();
+    let block_dir = band.block_dir();
+    Restore {
+        band: band,
+        block_dir: block_dir,
+        report: report,
+        destination: destination
+    }.run()
+}
 
-        for entry in try!(job.band.index_iter(job.report)) {
+impl<'a> Restore<'a> {
+    fn run(mut self) -> Result<()> {
+        for entry in try!(self.band.index_iter(self.report)) {
             let entry = try!(entry);
             // TODO: Continue even if one fails
-            try!(job.restore_one(&entry));
+            try!(self.restore_one(&entry));
         }
         Ok(())
     }

@@ -45,5 +45,5 @@ pub fn ls(archive_str: &str, report: &Report) -> Result<()> {
 
 
 pub fn restore(archive_str: &str, destination: &str, report: &Report) -> Result<()> {
-    restore::Restore::run(archive_str.into(), destination.into(), report)
+    restore::run(archive_str.into(), destination.into(), report)
 }
