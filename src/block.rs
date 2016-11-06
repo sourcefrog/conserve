@@ -50,9 +50,6 @@ pub struct Address {
 /// A readable, writable directory within a band holding data blocks.
 pub struct BlockDir {
     pub path: PathBuf,
-
-    /// Internal-use buffer for reading.
-    buf: Vec<u8>,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
@@ -64,7 +61,6 @@ impl BlockDir {
     pub fn new(path: &Path) -> BlockDir {
         BlockDir {
             path: path.to_path_buf(),
-            buf: vec![],
         }
     }
 
@@ -88,17 +84,12 @@ impl BlockDir {
         let mut encoder = BrotliEncoder::new(tempf, super::BROTLI_COMPRESSION_LEVEL);
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
         let mut uncompressed_length: u64 = 0;
-        const BUF_SIZE: usize = 1 << 20;
-        if self.buf.len() < BUF_SIZE {
-            self.buf.resize(BUF_SIZE, 0u8);
-        }
         loop {
-            let buf_slice = self.buf.as_mut_slice();
-            let read_size = try!(report.measure_duration("source.read", || from_file.read(buf_slice)));
-            let input = &buf_slice[.. read_size];
+            let read_buf = &mut [0; 1 << 20];
+            let read_size = try!(report.measure_duration("source.read", || from_file.read(read_buf)));
+            let input = &read_buf[.. read_size];
             if read_size == 0 { break; } // eof
             uncompressed_length += read_size as u64;
-
             try!(report.measure_duration("block.compress", || encoder.write_all(input)));
             report.measure_duration("block.hash", || hasher.update(input));
         }
