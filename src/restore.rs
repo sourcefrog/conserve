@@ -78,7 +78,8 @@ impl<'a> Restore<'a> {
         info!("file block addresses are: {:?}", entry.addrs);
         for addr in &entry.addrs {
             let block_content = try!(self.block_dir.get(&addr, self.report));
-            af.write_all(block_content.as_slice()).expect("failed to write restored file");
+            try!(af.write_all(block_content.as_slice()).chain_err(
+                || format!("failed to write restored file {:?}", dest)));
         }
         af.close(self.report)
     }
