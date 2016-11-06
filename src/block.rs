@@ -145,7 +145,6 @@ impl BlockDir {
     /// Read back the contents of a block, as a byte array.
     ///
     /// TODO: Return a Read rather than a Vec.
-    #[allow(unused)]
     pub fn get(self: &BlockDir, addr: &Address, report: &Report) -> Result<Vec<u8>> {
         // TODO: Accept vectors of multiple addresess, maybe in another function.
         let hash = &addr.hash;
