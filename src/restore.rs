@@ -20,7 +20,6 @@ pub struct Restore<'a> {
 }
 
 pub fn run(archive: PathBuf, destination: PathBuf, report: &Report) -> Result<()> {
-    // TODO: Maybe Move this to a method on Restore?
     let archive = try!(Archive::open(&archive));
     let band_id = archive.last_band_id().unwrap().expect("archive is empty");
     let band = Band::open(archive.path(), &band_id, report).unwrap();
@@ -77,7 +76,6 @@ impl<'a> Restore<'a> {
         // Here too we write a temporary file and then move it into place: so the file
         // under its real name only appears
         let mut af = try!(AtomicFile::new(dest));
-        info!("file block addresses are: {:?}", entry.addrs);
         for addr in &entry.addrs {
             let block_vec = try!(self.block_dir.get(&addr, self.report));
             try!(io::copy(&mut block_vec.as_slice(), &mut af));
