@@ -49,6 +49,7 @@ mod testfixtures;
 pub use archive::Archive;
 pub use band::Band;
 pub use bandid::BandId;
+pub use block::BlockDir;
 pub use report::Report;
 
 /// Conserve version number as a semver string.

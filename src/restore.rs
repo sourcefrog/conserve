@@ -1,3 +1,5 @@
+//! Restore from the archive to the filesystem.
+
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -6,19 +8,34 @@ use super::*;
 use super::apath;
 use super::errors::*;
 use super::index;
+use super::io::AtomicFile;
 
+/// Restore operation.
 pub struct Restore<'a> {
     pub band: Band,
     pub report: &'a Report,
     pub destination: PathBuf,
+    pub block_dir: BlockDir,
 }
 
 impl<'a> Restore<'a> {
-    pub fn run(&mut self) -> Result<()> {
-        for entry in try!(self.band.index_iter(self.report)) {
+    pub fn run(archive: PathBuf, destination: PathBuf, report: &Report) -> Result<()> {
+        // TODO: Maybe Move this to a method on Restore?
+        let archive = try!(Archive::open(&archive));
+        let band_id = archive.last_band_id().unwrap().expect("archive is empty");
+        let band = Band::open(archive.path(), &band_id, report).unwrap();
+        let block_dir = band.block_dir();
+        let mut job = Restore {
+            band: band,
+            block_dir: block_dir,
+            report: report,
+            destination: destination
+        };
+
+        for entry in try!(job.band.index_iter(job.report)) {
             let entry = try!(entry);
             // TODO: Continue even if one fails
-            try!(self.restore_one(&entry));
+            try!(job.restore_one(&entry));
         }
         Ok(())
     }
@@ -32,6 +49,8 @@ impl<'a> Restore<'a> {
         info!("restore {:?} to {:?}", &entry.apath, &dest_path);
         match entry.kind {
             index::IndexKind::Dir => self.restore_dir(entry, &dest_path),
+            index::IndexKind::File => self.restore_file(entry, &dest_path),
+            // TODO: Restore symlinks.
             ref k => {
                 warn!("unimplemented kind {:?}", k);
                 return Ok(())
@@ -48,5 +67,17 @@ impl<'a> Restore<'a> {
             Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
             Err(e) => Err(e.into()),
         }
+    }
+
+    fn restore_file(&mut self, entry: &index::Entry, dest: &Path) -> Result<()> {
+        self.report.increment("restore.file", 1);
+        // Here too we write a temporary file and then move it into place: so the file
+        // under its real name only appears
+        let af = try!(AtomicFile::new(dest));
+        info!("file block addresses are: {:?}", entry.addrs);
+        // for addr in entry.addrs {
+        //
+        // }
+        af.close(self.report)
     }
 }

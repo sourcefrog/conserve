@@ -5,6 +5,7 @@
 
 
 use std::env;
+use std::io::prelude::*;
 use std::fs;
 use std::process;
 use std::str;
@@ -151,12 +152,18 @@ fn blackbox_backup() {
         "/\n/hello\n/subdir\n",
         "");
 
+    // TODO: Factor out comparison to expected tree.
     let restore_dir = make_tempdir();
     let restore_dir_str = restore_dir.path().to_str().unwrap();
-    let (status, stdout, stderr) = run_conserve(&["restore", &arch_dir_str, &restore_dir_str]);
+    let (status, _stdout, _stderr) = run_conserve(&["restore", &arch_dir_str, &restore_dir_str]);
     assert!(status.success());
     assert!(fs::metadata(restore_dir.path().join("subdir")).unwrap().is_dir());
-    // TODO: Check file is extracted too
+
+    let restore_hello = restore_dir.path().join("hello");
+    assert!(fs::metadata(&restore_hello).unwrap().is_file());
+    let mut file_contents = String::new();
+    fs::File::open(&restore_hello).unwrap().read_to_string(&mut file_contents).unwrap();
+    // assert_eq!(file_contents, "contents\n");
 
     // TODO: Validate.
     // TODO: Compare vs source tree.

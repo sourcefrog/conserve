@@ -45,13 +45,5 @@ pub fn ls(archive_str: &str, report: &Report) -> Result<()> {
 
 
 pub fn restore(archive_str: &str, destination: &str, report: &Report) -> Result<()> {
-    let archive = try!(Archive::open(Path::new(archive_str)));
-    let band_id = archive.last_band_id().unwrap().expect("archive is empty");
-    let band = Band::open(archive.path(), &band_id, report).unwrap();
-
-    restore::Restore {
-        band: band,
-        report: report,
-        destination: destination.into(),
-    }.run()
+    restore::Restore::run(archive_str.into(), destination.into(), report)
 }
