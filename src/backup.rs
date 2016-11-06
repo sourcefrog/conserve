@@ -80,7 +80,7 @@ impl Backup {
         self.report.increment("backup.file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
         let mut f = try!(fs::File::open(&source_entry.path));
-        let (addrs, body_hash) = try!(self.block_dir.store_file(&mut f, &self.report));
+        let (addrs, body_hash) = try!(self.block_dir.store(&mut f, &self.report));
         Ok(index::Entry {
             apath: source_entry.apath.clone(),
             mtime: source_entry.unix_mtime(),

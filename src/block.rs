@@ -82,7 +82,7 @@ impl BlockDir {
         buf
     }
 
-    pub fn store_file(&mut self, from_file: &mut fs::File, report: &Report) -> Result<(Vec<Address>, BlockHash)> {
+    pub fn store(&mut self, from_file: &mut Read, report: &Report) -> Result<(Vec<Address>, BlockHash)> {
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp").create_in(&self.path));
         let mut encoder = BrotliEncoder::new(tempf, super::BROTLI_COMPRESSION_LEVEL);
@@ -214,7 +214,7 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
-        let (refs, hash_hex) = block_dir.store_file(&mut example_file, &report).unwrap();
+        let (refs, hash_hex) = block_dir.store(&mut example_file, &report).unwrap();
         assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
 
         // Should be in one block, and as it's currently unsalted the hash is the same.
@@ -246,12 +246,12 @@ mod tests {
         let (_testdir, mut block_dir) = setup();
 
         let mut example_file = make_example_file();
-        let (refs1, hash1) = block_dir.store_file(&mut example_file, &report).unwrap();
+        let (refs1, hash1) = block_dir.store(&mut example_file, &report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 0);
         assert_eq!(report.get_count("block.write"), 1);
 
         let mut example_file = make_example_file();
-        let (refs2, hash2) = block_dir.store_file(&mut example_file, &report).unwrap();
+        let (refs2, hash2) = block_dir.store(&mut example_file, &report).unwrap();
         assert_eq!(report.get_count("block.write.already_present"), 1);
         assert_eq!(report.get_count("block.write"), 1);
 
