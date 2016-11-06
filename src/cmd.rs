@@ -7,7 +7,7 @@ use super::restore;
 use super::sources;
 
 pub fn backup(archive: &str, source: &str, report: &Report) -> Result<()> {
-    backup::run_backup(Path::new(archive), Path::new(source), report)
+    backup::backup(Path::new(archive), Path::new(source), report)
 }
 
 pub fn init(archive: &str) -> Result<()> {
@@ -45,5 +45,5 @@ pub fn ls(archive_str: &str, report: &Report) -> Result<()> {
 
 
 pub fn restore(archive_str: &str, destination: &str, report: &Report) -> Result<()> {
-    restore::run(archive_str.into(), destination.into(), report)
+    restore::restore(Path::new(archive_str), Path::new(destination), report)
 }

@@ -23,7 +23,7 @@ struct Backup {
 }
 
 
-pub fn run_backup(archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
+pub fn backup(archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
     let archive = try!(Archive::open(archive_path));
     let band = try!(archive.create_band(&report));
     let mut backup = Backup {
@@ -113,7 +113,7 @@ impl Backup {
 mod tests {
     extern crate tempdir;
 
-    use super::run_backup;
+    use super::backup;
     use super::super::index;
     use super::super::report::Report;
     use super::super::testfixtures::{ScratchArchive};
@@ -125,7 +125,7 @@ mod tests {
         let srcdir = TreeFixture::new();
         srcdir.create_file("hello");
         let report = Report::new();
-        run_backup(af.path(), srcdir.path(), &report).unwrap();
+        backup(af.path(), srcdir.path(), &report).unwrap();
         assert_eq!(1, report.get_count("block.write"));
         assert_eq!(1, report.get_count("backup.file"));
         assert_eq!(1, report.get_count("backup.dir"));
@@ -170,7 +170,7 @@ mod tests {
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
         let report = Report::new();
-        run_backup(af.path(), srcdir.path(), &report).unwrap();
+        backup(af.path(), srcdir.path(), &report).unwrap();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("backup.file"));
         assert_eq!(1, report.get_count("backup.symlink"));

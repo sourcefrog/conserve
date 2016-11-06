@@ -2,7 +2,6 @@
 
 use std::fs;
 use std::io;
-use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 use super::*;
@@ -19,8 +18,8 @@ pub struct Restore<'a> {
     pub block_dir: BlockDir,
 }
 
-pub fn run(archive: PathBuf, destination: PathBuf, report: &Report) -> Result<()> {
-    let archive = try!(Archive::open(&archive));
+pub fn restore(archive_path: &Path, destination: &Path, report: &Report) -> Result<()> {
+    let archive = try!(Archive::open(&archive_path));
     let band_id = archive.last_band_id().unwrap().expect("archive is empty");
     let band = Band::open(archive.path(), &band_id, report).unwrap();
     let block_dir = band.block_dir();
@@ -28,7 +27,7 @@ pub fn run(archive: PathBuf, destination: PathBuf, report: &Report) -> Result<()
         band: band,
         block_dir: block_dir,
         report: report,
-        destination: destination
+        destination: destination.to_path_buf(),
     }.run()
 }
 
@@ -81,5 +80,34 @@ impl<'a> Restore<'a> {
             try!(io::copy(&mut block_vec.as_slice(), &mut af));
         }
         af.close(self.report)
+    }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    extern crate tempdir;
+
+    use super::restore;
+    use super::super::backup::backup;
+    use super::super::report::Report;
+    use super::super::testfixtures::ScratchArchive;
+    use conserve_testsupport::TreeFixture;
+
+    #[test]
+    pub fn simple_restore() {
+        let af = ScratchArchive::new();
+        let srcdir = TreeFixture::new();
+        srcdir.create_file("hello");
+        srcdir.create_dir("subdir");
+        srcdir.create_file("subdir/subfile");
+
+        let report = Report::new();
+        backup(af.path(), srcdir.path(), &report).unwrap();
+
+        let destdir = TreeFixture::new();
+        restore(af.path(), destdir.path(), &report).unwrap();
+
     }
 }
