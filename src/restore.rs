@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::io;
+use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 use super::*;
@@ -73,11 +74,12 @@ impl<'a> Restore<'a> {
         self.report.increment("restore.file", 1);
         // Here too we write a temporary file and then move it into place: so the file
         // under its real name only appears
-        let af = try!(AtomicFile::new(dest));
+        let mut af = try!(AtomicFile::new(dest));
         info!("file block addresses are: {:?}", entry.addrs);
-        // for addr in entry.addrs {
-        //
-        // }
+        for addr in &entry.addrs {
+            let block_content = try!(self.block_dir.get(&addr, self.report));
+            af.write_all(block_content.as_slice()).expect("failed to write restored file");
+        }
         af.close(self.report)
     }
 }

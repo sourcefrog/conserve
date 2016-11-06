@@ -163,7 +163,7 @@ fn blackbox_backup() {
     assert!(fs::metadata(&restore_hello).unwrap().is_file());
     let mut file_contents = String::new();
     fs::File::open(&restore_hello).unwrap().read_to_string(&mut file_contents).unwrap();
-    // assert_eq!(file_contents, "contents\n");
+    assert_eq!(file_contents, "contents");
 
     // TODO: Validate.
     // TODO: Compare vs source tree.
