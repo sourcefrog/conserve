@@ -145,12 +145,11 @@ impl BlockDir {
     /// Read back the contents of a block, as a byte array.
     ///
     /// TODO: Return a Read rather than a Vec.
-    /// TODO: Handle files broken across blocks.
     #[allow(unused)]
-    pub fn get(self: &BlockDir, refs: &[Address], report: &Report) -> Result<Vec<u8>> {
-        assert_eq!(1, refs.len());
-        let hash = &refs[0].hash;
-        assert_eq!(0, refs[0].start);
+    pub fn get(self: &BlockDir, addr: &Address, report: &Report) -> Result<Vec<u8>> {
+        // TODO: Accept vectors of multiple addresess, maybe in another function.
+        let hash = &addr.hash;
+        assert_eq!(0, addr.start);
         let path = self.path_for_file(hash);
         // TODO: Specific error for compression failure (corruption?) vs io errors.
         let decompressed = match read_and_decompress(&path) {
@@ -161,7 +160,8 @@ impl BlockDir {
                 return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
             }
         };
-        assert_eq!(decompressed.len(), refs[0].len as usize);
+        // TODO: Accept addresses referring to only part of a block.
+        assert_eq!(decompressed.len(), addr.len as usize);
         report.increment("block.read", 1);
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
@@ -235,7 +235,7 @@ mod tests {
 
         // Try to read back
         assert_eq!(report.get_count("block.read"), 0);
-        let back = block_dir.get(&refs, &report).unwrap();
+        let back = block_dir.get(&refs[0], &report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
         assert_eq!(report.get_count("block.read"), 1);
     }
