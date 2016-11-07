@@ -4,14 +4,18 @@
 /// Run conserve CLI as a subprocess and test it.
 
 
+extern crate conserve_testsupport;
+#[macro_use]
+extern crate spectral;
+extern crate tempdir;
+
 use std::env;
 use std::io::prelude::*;
 use std::fs;
 use std::process;
 use std::str;
 
-extern crate conserve_testsupport;
-extern crate tempdir;
+use spectral::prelude::*;
 
 use conserve_testsupport::TreeFixture;
 
@@ -66,7 +70,7 @@ fn blackbox_no_args() {
             conserve --version
             conserve --help
         ");
-    assert_eq!(expected_err, stderr);
+    assert_that(&stderr).is_equal_to(&expected_err);
     assert_eq!("", stdout);
 }
 
@@ -111,8 +115,8 @@ fn clean_error_on_non_archive() {
     let (status, stdout, _) = run_conserve(&["backup", &not_archive_path_str, "."]);
     // TODO: Errors really should go to stderr not stdout.
     let error_string = stdout;
-    assert!(!status.success());
-    assert!(error_string.contains("not a Conserve archive"), error_string);
+    assert_that(&status).matches(|s| !s.success());
+    assert_that(&error_string.as_str()).contains(&"not a Conserve archive");
 }
 
 
@@ -125,8 +129,7 @@ fn blackbox_backup() {
     // conserve init
     let (status, stdout, stderr) = run_conserve(&["init", &arch_dir_str]);
     assert!(status.success());
-    assert!(stdout
-        .starts_with("Created new archive"));
+    assert_that(&stdout.as_str()).starts_with(&"Created new archive");
     assert_eq!(stderr, "");
 
     // New archive contains no versions.
