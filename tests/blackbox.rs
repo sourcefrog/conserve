@@ -144,8 +144,8 @@ fn blackbox_backup() {
 
     let (status, _stdout, stderr) = run_conserve(
         &["backup", &arch_dir_str, src.root.to_str().unwrap()]);
+    assert_that(&stderr.as_str()).is_equal_to(&"");
     assert!(status.success());
-    assert_eq!("", stderr);
     // TODO: Inspect the archive
 
     assert_success_and_output(&["list-versions", &arch_dir_str],
@@ -216,9 +216,12 @@ fn run_conserve(args: &[&str]) -> (process::ExitStatus, String, String) {
     let mut conserve_path = env::current_exe().unwrap().to_path_buf();
     conserve_path.pop();  // Remove name of test binary
     conserve_path.push("conserve");
+    println!("run conserve: {:?}", args);
     let output = process::Command::new(&conserve_path).args(args).output()
         .expect("Failed to run conserve");
-    (output.status,
-        String::from_utf8_lossy(&output.stdout).into_owned(),
-        String::from_utf8_lossy(&output.stderr).into_owned())
+    println!("status: {:?}", output.status);
+    let output_string = String::from_utf8_lossy(&output.stdout).into_owned();
+    let error_string = String::from_utf8_lossy(&output.stderr).into_owned();
+    println!("stdout:\n{:?}\nstderr:\n{:?}", &output_string, &error_string);
+    (output.status, output_string, error_string)
 }
