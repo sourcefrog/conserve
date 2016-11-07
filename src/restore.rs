@@ -87,7 +87,7 @@ impl<'a> Restore<'a> {
 
 #[cfg(test)]
 mod tests {
-    extern crate tempdir;
+    use spectral::prelude::*;
 
     use super::restore;
     use super::super::backup::backup;
@@ -109,5 +109,15 @@ mod tests {
         let destdir = TreeFixture::new();
         restore(af.path(), destdir.path(), &report).unwrap();
 
+        assert_eq!(2, report.get_count("restore.file"));
+        let dest = &destdir.path();
+        assert_that(&dest.join("hello").as_path()).is_a_file();
+        assert_that(&dest.join("subdir").as_path()).is_a_directory();
+        assert_that(&dest.join("subdir").join("subfile").as_path()).is_a_file();
+
+        // TODO: Test restore empty file.
+        // TODO: Test file contents are as expected.
+        // TODO: Test restore of larger files.
+        // TODO: Test restore of symlinks where supported.
     }
 }
