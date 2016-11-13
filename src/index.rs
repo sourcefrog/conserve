@@ -22,6 +22,10 @@ use super::errors::*;
 use super::io::{AtomicFile, ensure_dir_exists, read_and_decompress};
 use super::report::Report;
 
+
+const MAX_ENTRIES_PER_HUNK: usize = 1000;
+
+
 /// Kind of file that can be stored in the archive.
 #[derive(Debug, PartialEq, RustcDecodable, RustcEncodable)]
 pub enum IndexKind {
@@ -100,7 +104,7 @@ impl IndexBuilder {
     }
 
     pub fn maybe_flush(&mut self, report: &Report) -> Result<()> {
-        if self.entries.len() >= 10000 {
+        if self.entries.len() >= MAX_ENTRIES_PER_HUNK {
             self.finish_hunk(report)
         } else {
             Ok(())
