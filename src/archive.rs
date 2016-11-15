@@ -41,13 +41,22 @@ impl Archive {
         let archive = Archive { path: path.to_path_buf() };
         // Report is not consumed because the results for init aren't so interesting.
         let report = Report::new();
-        try!(std::fs::create_dir(&archive.path)
-            .chain_err(|| format!("failed to create archive directory {:?}",
-                archive.path)));
+        if let Err(e) = std::fs::create_dir(&archive.path) {
+            if e.kind() == io::ErrorKind::AlreadyExists {
+                // Exists and hopefully empty?
+                if try!(std::fs::read_dir(&archive.path)).next().is_some() {
+                    return Err(e).chain_err(|| format!("Archive directory exists and is not empty {:?}",
+                        archive.path));
+                }
+            } else {
+                return Err(e).chain_err(|| format!("Failed to create archive directory {:?}",
+                    archive.path));
+            }
+        }
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
         let header_filename = path.join(HEADER_FILENAME);
         try!(write_json_uncompressed(&header_filename, &header, &report)
-            .chain_err(|| format!("failed to write archive header: {:?}", header_filename)));
+            .chain_err(|| format!("Failed to write archive header: {:?}", header_filename)));
         info!("Created new archive in {:?}", path.display());
         Ok(archive)
     }
@@ -197,6 +206,20 @@ mod tests {
         Archive::open(arch_path).unwrap();
         assert!(arch.list_bands().unwrap().is_empty());
     }
+
+    #[test]
+    fn init_empty_dir() {
+        let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
+        let arch_path = testdir.path();
+        let arch = Archive::init(arch_path).unwrap();
+
+        assert_eq!(arch.path(), arch_path);
+        assert!(arch.list_bands().unwrap().is_empty());
+
+        Archive::open(arch_path).unwrap();
+        assert!(arch.list_bands().unwrap().is_empty());
+    }
+
 
     /// A new archive contains just one header file.
     /// The header is readable json containing only a version number.
