@@ -118,7 +118,8 @@ impl BlockDir {
         }
         let compressed_length: u64 = try!(tempf.seek(SeekFrom::Current(0)));
         try!(super::io::ensure_dir_exists(&self.subdir_for(&hex_hash)));
-        if let Err(e) = tempf.persist_noclobber(&self.path_for_file(&hex_hash)) {
+        // Also use plain `persist` not `persist_noclobber` to avoid calling `link` on Unix.
+        if let Err(e) = tempf.persist(&self.path_for_file(&hex_hash)) {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);
