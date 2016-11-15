@@ -38,7 +38,11 @@ impl AtomicFile {
         if cfg!(feature = "sync") {
             try!(report.measure_duration("sync", || self.f.sync_all()));
         }
-        if let Err(e) = self.f.persist_noclobber(&self.path) {
+        // We use `persist` rather than `persist_noclobber` here because the latter calls
+        // `link` on Unix, and some filesystems don't support it.  That's probably fine
+        // because the files being updated by this should never already exist, though
+        // it does mean we won't detect unexpected cases where it does.
+        if let Err(e) = self.f.persist(&self.path) {
             return Err(e.error.into());
         };
         Ok(())
