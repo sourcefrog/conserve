@@ -129,6 +129,9 @@ fn main() {
     }
     if let Err(e) = result {
         error!("{}", e);
+        for suberr in e.iter().skip(1) { // First was already printed
+            error!("  {}", suberr);
+        }
         if let Some(bt) = e.backtrace() {
             println!("{:?}", bt)
         }
