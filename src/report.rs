@@ -8,6 +8,7 @@
 //! Sizes can be reported in both compressed and uncompressed form.
 
 use std::cell;
+use std::cmp;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
@@ -60,11 +61,12 @@ static KNOWN_DURATIONS: &'static [&'static str] = &[
 
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct Inner {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, (u64, u64)>,
     durations: BTreeMap<&'static str, Duration>,
+    start: time::Instant,
 }
 
 
@@ -101,6 +103,7 @@ impl Report {
             count: inner_count,
             sizes: inner_sizes,
             durations: inner_durations,
+            start: time::Instant::now(),
         };
         Report {
             inner: Rc::new(cell::RefCell::new(inner)),
@@ -148,7 +151,16 @@ impl Report {
         let block_comp_pct = if block_sizes.0 > 0 {
             100i64 - (100 * block_sizes.1 / block_sizes.0) as i64
         } else { 0 };
-        write!(t, "{:8} files | {:8} dirs | {:9} => {:<9}MB | {:3}% compression | {:6}d | {:6}i",
+        let elapsed_secs = self.inner.borrow().start.elapsed().as_secs();
+        let uncomp_rate = block_uncomp_mb / cmp::max(elapsed_secs, 1);
+        // TODO: Truncate to screen width (or draw on multiple lines with cursor-up)?
+        // TODO: Rate limit etc.
+        // TODO: Also show current filename.
+        // TODO: Don't special-case for backups.
+        write!(t, "{:2}:{:02}:{:02} {:8} files {:8} dirs {:9} => {:<9}MB {:3}% {:4}d {:4}i {:6}MB/s",
+            elapsed_secs / 3600,
+            (elapsed_secs / 60) % 60,
+            elapsed_secs % 60,
             self.get_count("backup.file"),
             self.get_count("backup.dir"),
             block_uncomp_mb,
@@ -156,6 +168,7 @@ impl Report {
             block_comp_pct,
             self.get_count("block.write"),
             self.get_count("index.write.hunks"),
+            uncomp_rate,
         ).unwrap();
         t.carriage_return().unwrap();
     }
