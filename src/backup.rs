@@ -29,7 +29,7 @@ pub fn backup(archive_path: &Path, source: &Path, report: &Report) -> Result<()>
     let mut backup = Backup {
         block_dir: band.block_dir(),
         index_builder: band.index_builder(),
-        report: Report::new(),
+        report: report.clone(),
     };
     let source_iter = try!(sources::iter(source));
     for entry in source_iter {
@@ -37,7 +37,6 @@ pub fn backup(archive_path: &Path, source: &Path, report: &Report) -> Result<()>
     }
     try!(backup.index_builder.finish_hunk(report));
     try!(band.close(&backup.report));
-    report.merge_from(&backup.report);
     Ok(())
 }
 
