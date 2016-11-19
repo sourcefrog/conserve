@@ -25,7 +25,7 @@ rustc-serialize = "^0"
 spectral = "0.5.0"
 tempdir = "^0"
 tempfile = "^2"
-term = "^0"
+term = "^0.4"
 time = "^0"
 
 [features]
