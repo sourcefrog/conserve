@@ -43,7 +43,7 @@ pub fn backup(archive_path: &Path, source: &Path, report: &Report) -> Result<()>
 
 impl Backup {
     fn store_one_source_entry(&mut self, source_entry: &sources::Entry) -> Result<()> {
-        info!("backup {}", source_entry.path.display());
+        // info!("backup {}", source_entry.path.display());
         let store_fn = if source_entry.metadata.is_file() {
             Backup::store_file
         } else if source_entry.metadata.is_dir() {
