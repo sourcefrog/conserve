@@ -218,7 +218,7 @@ fn run_conserve(args: &[&str]) -> (process::ExitStatus, String, String) {
     conserve_path.push("conserve");
     println!("run conserve: {:?}", args);
     let output = process::Command::new(&conserve_path).args(args).output()
-        .expect("Failed to run conserve");
+        .expect(format!("Failed to run conserve: {:?} {:?}", &conserve_path, &args).as_str());
     println!("status: {:?}", output.status);
     let output_string = String::from_utf8_lossy(&output.stdout).into_owned();
     let error_string = String::from_utf8_lossy(&output.stderr).into_owned();
