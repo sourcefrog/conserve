@@ -69,10 +69,6 @@ pub struct Iter {
 
 
 impl Iter {
-    pub fn get_report(self: &Iter) -> Report {
-        self.report.clone()
-    }
-
     fn unchecked_next(&mut self) -> Option<io::Result<Entry>> {
         loop {
             if let Some(entry) = self.entry_deque.pop_front() {
@@ -173,7 +169,7 @@ impl Iterator for Iter {
 /// name.
 ///
 /// The `Iter` has its own `Report` of how many directories and files were visited.
-pub fn iter(source_dir: &Path) -> io::Result<Iter> {
+pub fn iter(source_dir: &Path, report: &Report) -> io::Result<Iter> {
     let root_metadata = match fs::symlink_metadata(&source_dir) {
         Ok(metadata) => metadata,
         Err(e) => {
@@ -196,7 +192,7 @@ pub fn iter(source_dir: &Path) -> io::Result<Iter> {
     Ok(Iter {
         entry_deque: entry_deque,
         dir_deque: dir_deque,
-        report: Report::new(),
+        report: report.clone(),
         last_apath: None,
     })
 }
@@ -206,6 +202,7 @@ mod tests {
     use std::io;
 
     use super::*;
+    use super::super::Report;
     use conserve_testsupport::TreeFixture;
 
     #[test]
@@ -217,7 +214,8 @@ mod tests {
         tf.create_file("jam/apricot");
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
-        let mut source_iter = iter(tf.path()).unwrap();
+        let report = Report::new();
+        let mut source_iter = iter(tf.path(), &report).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -240,7 +238,6 @@ mod tests {
             format!("sources::Entry {{ apath: {:?}, path: {:?} }}", "/jam/apricot",
                     &tf.root.join("jam").join("apricot")));
 
-        let report = source_iter.get_report();
         assert_eq!(report.get_count("source.visited.directories"), 4);
         assert_eq!(report.get_count("source.selected"), 7);
     }
@@ -250,8 +247,10 @@ mod tests {
     fn symlinks() {
         let tf = TreeFixture::new();
         tf.create_symlink("from", "to");
+        let report = Report::new();
 
-        let result = iter(tf.path()).unwrap().collect::<io::Result<Vec<_>>>().unwrap();
+        let result = iter(tf.path(), &report).unwrap()
+            .collect::<io::Result<Vec<_>>>().unwrap();
 
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[0].path, &tf.root);

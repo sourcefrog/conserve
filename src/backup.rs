@@ -31,7 +31,7 @@ pub fn backup(archive_path: &Path, source: &Path, report: &Report) -> Result<()>
         index_builder: band.index_builder(),
         report: Report::new(),
     };
-    let source_iter = try!(sources::iter(source));
+    let source_iter = try!(sources::iter(source, report));
     for entry in source_iter {
         try!(backup.store_one_source_entry(&try!(entry)));
     }
