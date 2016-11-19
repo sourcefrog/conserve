@@ -12,6 +12,7 @@ use std::cmp;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::io::prelude::*;
 use std::rc::Rc;
 use std::time;
 use std::time::{Duration};
@@ -171,6 +172,7 @@ impl Report {
             uncomp_rate,
         ).unwrap();
         t.carriage_return().unwrap();
+        t.get_mut().flush().unwrap();
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
