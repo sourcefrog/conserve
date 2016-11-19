@@ -15,11 +15,10 @@ pub fn init(archive: &str) -> Result<()> {
 }
 
 pub fn list_source(source: &str, report: &Report) -> Result<()> {
-    let mut source_iter = try!(sources::iter(Path::new(source)));
+    let mut source_iter = try!(sources::iter(Path::new(source), report));
     for entry in &mut source_iter {
         println!("{}", try!(entry).apath);
     }
-    report.merge_from(&source_iter.get_report());
     Ok(())
 }
 
