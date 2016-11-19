@@ -15,6 +15,8 @@ use std::rc::Rc;
 use std::time;
 use std::time::{Duration};
 
+use term;
+
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "backup.dir",
     "backup.file",
@@ -119,6 +121,7 @@ impl Report {
         } else {
             panic!("unregistered counter {:?}", counter_name);
         }
+        self.show_progress();
     }
 
     pub fn increment_size(&self, counter_name: &str, uncompressed_bytes: u64,
@@ -133,6 +136,28 @@ impl Report {
         *self.mut_inner().durations
             .get_mut(name).expect("undefined duration counter")
             += duration;
+    }
+
+    fn show_progress(&self) {
+        let mut t = term::stdout().unwrap();
+        t.fg(term::color::GREEN).unwrap();
+        // t.delete_line().unwrap();
+        // Measure compression on body bytes.
+        let block_sizes = self.get_size("block.write");
+        let block_uncomp_mb = block_sizes.0 / 1000000;
+        let block_comp_pct = if block_sizes.0 > 0 {
+            100i64 - (100 * block_sizes.1 / block_sizes.0) as i64
+        } else { 0 };
+        write!(t, "{:8} files | {:8} dirs | {:9} => {:<9}MB | {:3}% compression | {:6}d | {:6}i",
+            self.get_count("backup.file"),
+            self.get_count("backup.dir"),
+            block_uncomp_mb,
+            block_sizes.1 / 1000000,
+            block_comp_pct,
+            self.get_count("block.write"),
+            self.get_count("index.write.hunks"),
+        ).unwrap();
+        t.carriage_return().unwrap();
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
