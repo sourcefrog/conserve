@@ -141,6 +141,10 @@ impl Report {
         *self.mut_inner().count.get(counter_name).expect("unknown counter")
     }
 
+    /// Get size of data processed.
+    ///
+    /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
+    /// in bytes.
     pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
         *self.mut_inner().sizes.get(counter_name).expect("unknown size counter")
     }
