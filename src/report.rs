@@ -8,16 +8,14 @@
 //! Sizes can be reported in both compressed and uncompressed form.
 
 use std::cell;
-use std::cmp;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::io::prelude::*;
 use std::rc::Rc;
 use std::time;
 use std::time::{Duration};
-
-use term;
+use super::ui::UI;
+use super::ui::terminal::TermUI;
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "backup.dir",
@@ -62,12 +60,12 @@ static KNOWN_DURATIONS: &'static [&'static str] = &[
 
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
-#[derive(Clone, Debug)]
 struct Inner {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, (u64, u64)>,
     durations: BTreeMap<&'static str, Duration>,
     start: time::Instant,
+    ui: Option<TermUI>,
 }
 
 
@@ -80,7 +78,7 @@ struct Inner {
 /// or scopes (on the same thread) who all append to it.
 ///
 /// Cloning a Report makes another reference to the same underlying counters.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Report {
     inner: Rc<cell::RefCell<Inner>>,
 }
@@ -105,6 +103,7 @@ impl Report {
             sizes: inner_sizes,
             durations: inner_durations,
             start: time::Instant::now(),
+            ui: Some(TermUI::new()),
         };
         Report {
             inner: Rc::new(cell::RefCell::new(inner)),
@@ -125,7 +124,9 @@ impl Report {
         } else {
             panic!("unregistered counter {:?}", counter_name);
         }
-        self.show_progress();
+        if let Some(ref ui) = self.inner.borrow().ui {
+            ui.show_progress(self);
+        }
     }
 
     pub fn increment_size(&self, counter_name: &str, uncompressed_bytes: u64,
@@ -142,43 +143,9 @@ impl Report {
             += duration;
     }
 
-    fn show_progress(&self) {
-        let mut t = term::stdout().unwrap();
-        t.fg(term::color::GREEN).unwrap();
-        // t.delete_line().unwrap();
-        // Measure compression on body bytes.
-        let block_sizes = self.get_size("block.write");
-        let block_uncomp_mb = block_sizes.0 / 1000000;
-        let block_comp_pct = if block_sizes.0 > 0 {
-            100i64 - (100 * block_sizes.1 / block_sizes.0) as i64
-        } else { 0 };
-        let elapsed_secs = self.inner.borrow().start.elapsed().as_secs();
-        let uncomp_rate = block_uncomp_mb / cmp::max(elapsed_secs, 1);
-        // TODO: Truncate to screen width (or draw on multiple lines with cursor-up)?
-        // TODO: Rate limit etc.
-        // TODO: Also show current filename.
-        // TODO: Don't special-case for backups.
-        write!(t, "{:2}:{:02}:{:02} {:8} files {:8} dirs {:9} => {:<9}MB {:3}% {:4}d {:4}i {:6}MB/s",
-            elapsed_secs / 3600,
-            (elapsed_secs / 60) % 60,
-            elapsed_secs % 60,
-            self.get_count("backup.file"),
-            self.get_count("backup.dir"),
-            block_uncomp_mb,
-            block_sizes.1 / 1000000,
-            block_comp_pct,
-            self.get_count("block.write"),
-            self.get_count("index.write.hunks"),
-            uncomp_rate,
-        ).unwrap();
-        t.carriage_return().unwrap();
-        t.get_mut().flush().unwrap();
-    }
-
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
-    #[allow(unused)]
     pub fn get_count(&self, counter_name: &str) -> u64 {
-        *self.mut_inner().count.get(counter_name).expect("unknown counter")
+        *self.inner.borrow().count.get(counter_name).expect("unknown counter")
     }
 
     /// Get size of data processed.
@@ -186,11 +153,15 @@ impl Report {
     /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
     /// in bytes.
     pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
-        *self.mut_inner().sizes.get(counter_name).expect("unknown size counter")
+        *self.inner.borrow().sizes.get(counter_name).expect("unknown size counter")
     }
 
     pub fn get_duration(&self, name: &str) -> Duration {
-        *self.mut_inner().durations.get(name).expect("unknown duration name")
+        *self.inner.borrow().durations.get(name).expect("unknown duration name")
+    }
+
+    pub fn elapsed_time(&self) -> Duration {
+        self.inner.borrow().start.elapsed()
     }
 
     /// Merge the contents of `from_report` into `self`.

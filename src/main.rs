@@ -45,6 +45,7 @@ mod restore;
 mod sources;
 #[cfg(test)]
 mod testfixtures;
+mod ui;
 
 // Re-export important classes.
 pub use archive::Archive;
