@@ -58,6 +58,25 @@ static KNOWN_DURATIONS: &'static [&'static str] = &[
     "test",
 ];
 
+
+pub trait ReadReport {
+
+    fn get_duration(&self, name: &str) -> Duration;
+
+    /// Return the value of a counter.  A counter that has not yet been updated is 0.
+    fn get_count(&self, counter_name: &str) -> u64;
+
+    /// Get size of data processed.
+    ///
+    /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
+    /// in bytes.
+    fn get_size(&self, counter_name: &str) -> (u64, u64);
+
+    fn elapsed_time(&self) -> Duration;
+}
+
+
+
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
 struct Inner {
@@ -65,7 +84,6 @@ struct Inner {
     sizes: BTreeMap<&'static str, (u64, u64)>,
     durations: BTreeMap<&'static str, Duration>,
     start: time::Instant,
-    ui: Option<TermUI>,
 }
 
 
@@ -81,6 +99,7 @@ struct Inner {
 #[derive(Clone)]
 pub struct Report {
     inner: Rc<cell::RefCell<Inner>>,
+    ui: Rc<cell::RefCell<Option<TermUI>>>,
 }
 
 
@@ -103,10 +122,10 @@ impl Report {
             sizes: inner_sizes,
             durations: inner_durations,
             start: time::Instant::now(),
-            ui: TermUI::new(),
         };
         Report {
             inner: Rc::new(cell::RefCell::new(inner)),
+            ui: Rc::new(cell::RefCell::new(TermUI::new())),
         }
     }
 
@@ -124,8 +143,9 @@ impl Report {
         } else {
             panic!("unregistered counter {:?}", counter_name);
         }
-        if let Some(ref ui) = self.inner.borrow().ui {
-            ui.show_progress(self);
+        if let Some(ref mut ui) = *self.ui.borrow_mut() {
+            // Lock the inner data just once for the whole update
+            ui.show_progress(&*self.inner.borrow());
         }
     }
 
@@ -141,27 +161,6 @@ impl Report {
         *self.mut_inner().durations
             .get_mut(name).expect("undefined duration counter")
             += duration;
-    }
-
-    /// Return the value of a counter.  A counter that has not yet been updated is 0.
-    pub fn get_count(&self, counter_name: &str) -> u64 {
-        *self.inner.borrow().count.get(counter_name).expect("unknown counter")
-    }
-
-    /// Get size of data processed.
-    ///
-    /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
-    /// in bytes.
-    pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
-        *self.inner.borrow().sizes.get(counter_name).expect("unknown size counter")
-    }
-
-    pub fn get_duration(&self, name: &str) -> Duration {
-        *self.inner.borrow().durations.get(name).expect("unknown duration name")
-    }
-
-    pub fn elapsed_time(&self) -> Duration {
-        self.inner.borrow().start.elapsed()
     }
 
     /// Merge the contents of `from_report` into `self`.
@@ -184,6 +183,25 @@ impl Report {
         let result = closure();
         self.increment_duration(duration_name, start.elapsed());
         result
+    }
+}
+
+
+impl ReadReport for Report {
+    fn get_count(&self, counter_name: &str) -> u64 {
+        self.inner.borrow().get_count(counter_name)
+    }
+
+    fn get_size(&self, counter_name: &str) -> (u64, u64) {
+        self.inner.borrow().get_size(counter_name)
+    }
+
+    fn get_duration(&self, name: &str) -> Duration {
+        self.inner.borrow().get_duration(name)
+    }
+
+    fn elapsed_time(&self) -> Duration {
+        self.inner.borrow().elapsed_time()
     }
 }
 
@@ -219,10 +237,29 @@ impl Display for Report {
 }
 
 
+impl ReadReport for Inner {
+    fn get_duration(&self, name: &str) -> Duration {
+        *self.durations.get(name).expect("unknown duration name")
+    }
+
+    fn get_count(&self, counter_name: &str) -> u64 {
+        *self.count.get(counter_name).expect("unknown counter")
+    }
+
+    fn get_size(&self, counter_name: &str) -> (u64, u64) {
+        *self.sizes.get(counter_name).expect("unknown size counter")
+    }
+
+    fn elapsed_time(&self) -> Duration {
+        self.start.elapsed()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
-    use super::Report;
+    use super::{ReadReport, Report};
 
     #[test]
     pub fn count() {

@@ -185,7 +185,7 @@ mod tests {
     use tempdir;
     use tempfile;
     use super::{BlockDir};
-    use super::super::report::Report;
+    use super::super::report::{ReadReport, Report};
 
     const EXAMPLE_TEXT: &'static [u8] = b"hello!";
     const EXAMPLE_BLOCK_HASH: &'static str =

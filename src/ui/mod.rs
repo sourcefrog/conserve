@@ -3,10 +3,10 @@
 
 /// Generic UI trait.
 
-use super::Report;
+use super::report::ReadReport;
 
 pub mod terminal;
 
 pub trait UI {
-    fn show_progress(&self, &Report);
+    fn show_progress(&mut self, &ReadReport);
 }

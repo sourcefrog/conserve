@@ -5,17 +5,18 @@
 ///
 /// This acts as a view and the Report is the model.
 
-use std::cell;
 use std::io::prelude::*;
+use std::time::Instant;
 
 use term;
 
-use super::super::report::Report;
+use super::super::report::ReadReport;
 use super::UI;
 
 
 pub struct TermUI {
-    t: cell::RefCell<Box<term::StdoutTerminal>>,
+    t: Box<term::StdoutTerminal>,
+    last_update: Option<Instant>,
 }
 
 
@@ -23,7 +24,10 @@ impl TermUI {
     /// Return a new TermUI or None if there isn't a suitable terminal.
     pub fn new() -> Option<TermUI> {
         if let Some(t) = term::stdout() {
-            Some(TermUI{t: cell::RefCell::new(t)})
+            Some(TermUI{
+                t: t,
+                last_update: None,
+            })
         } else {
             None
         }
@@ -32,9 +36,10 @@ impl TermUI {
 
 
 impl UI for TermUI {
-    fn show_progress(&self, report: &Report) {
+    fn show_progress(&mut self, report: &ReadReport) {
         const MB: u64 = 1000000;
-        let mut t = self.t.borrow_mut();
+        let mut t = &mut self.t;
+
         // t.delete_line().unwrap();
         // Measure compression on body bytes.
         let block_sizes = report.get_size("block.write");
@@ -79,5 +84,6 @@ impl UI for TermUI {
         ).unwrap();
         t.carriage_return().unwrap();
         t.get_mut().flush().unwrap();
+
     }
 }
