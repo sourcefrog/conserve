@@ -54,6 +54,8 @@ Then simply run
  * [A comparison to other backup systems](
    https://github.com/sourcefrog/conserve/wiki/Compared-to-others)
 
- * [Versioning](doc/versioning.md)
+ * [Software and format versioning](doc/versioning.md)
 
  * [Archive format](doc/format.md)
+
+ * [Development to-do list](https://github.com/sourcefrog/conserve/wiki/TODO)
