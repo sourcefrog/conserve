@@ -105,6 +105,10 @@ pub struct Report {
 
 impl Report {
     pub fn new() -> Report {
+        Report::with_ui(None)
+    }
+
+    pub fn with_ui(ui: Option<TermUI>) -> Report {
         let mut inner_count = BTreeMap::new();
         let mut inner_sizes = BTreeMap::new();
         let mut inner_durations: BTreeMap<&'static str, Duration> = BTreeMap::new();
@@ -125,7 +129,7 @@ impl Report {
         };
         Report {
             inner: Rc::new(cell::RefCell::new(inner)),
-            ui: Rc::new(cell::RefCell::new(TermUI::new())),
+            ui: Rc::new(cell::RefCell::new(ui)),
         }
     }
 
