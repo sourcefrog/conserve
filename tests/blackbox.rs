@@ -102,6 +102,7 @@ fn blackbox_help() {
 
             Options:
                 --stats         Show statistics at completion.
+                --quiet         No progress bar or non-fatal messages.
             "),
         "");
 }
@@ -143,7 +144,7 @@ fn blackbox_backup() {
     src.create_dir("subdir");
 
     let (status, _stdout, stderr) = run_conserve(
-        &["backup", &arch_dir_str, src.root.to_str().unwrap()]);
+        &["backup", "--quiet", &arch_dir_str, src.root.to_str().unwrap()]);
     assert_that(&stderr.as_str()).is_equal_to(&"");
     assert!(status.success());
     // TODO: Inspect the archive
@@ -158,7 +159,7 @@ fn blackbox_backup() {
     // TODO: Factor out comparison to expected tree.
     let restore_dir = make_tempdir();
     let restore_dir_str = restore_dir.path().to_str().unwrap();
-    let (status, _stdout, _stderr) = run_conserve(&["restore", &arch_dir_str, &restore_dir_str]);
+    let (status, _stdout, _stderr) = run_conserve(&["restore", "--quiet", &arch_dir_str, &restore_dir_str]);
     assert!(status.success());
     assert!(fs::metadata(restore_dir.path().join("subdir")).unwrap().is_dir());
 

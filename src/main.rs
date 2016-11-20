@@ -109,7 +109,13 @@ fn main() {
         .decode()
         .unwrap_or_else(|e| e.exit());
 
-    let ui = if !args.flag_quiet { ui::terminal::TermUI::new() } else { None };
+    // Always turn off progress for commands that send their output to stdout:
+    // easier than trying to get them not to interfere, and you should see progress
+    // by the output appearing.
+    let be_quiet = args.flag_quiet || args.cmd_ls || args.cmd_list_source
+        || args.cmd_list_versions;
+
+    let ui = if !be_quiet { ui::terminal::TermUI::new() } else { None };
     let report = report::Report::with_ui(ui);
 
     let result = if args.cmd_init {
