@@ -202,7 +202,7 @@ mod tests {
     use std::io;
 
     use super::*;
-    use super::super::Report;
+    use super::super::report::{ReadReport, Report};
     use conserve_testsupport::TreeFixture;
 
     #[test]
