@@ -103,7 +103,7 @@ impl Report {
             sizes: inner_sizes,
             durations: inner_durations,
             start: time::Instant::now(),
-            ui: Some(TermUI::new()),
+            ui: TermUI::new(),
         };
         Report {
             inner: Rc::new(cell::RefCell::new(inner)),
