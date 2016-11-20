@@ -81,6 +81,7 @@ Usage:
 
 Options:
     --stats         Show statistics at completion.
+    --quiet         No progress bar or non-fatal messages.
 ";
 
 #[derive(RustcDecodable)]
@@ -94,20 +95,22 @@ struct Args {
     arg_archive: String,
     arg_destination: String,
     arg_source: String,
+    flag_quiet: bool,
     flag_stats: bool,
 }
 
 
 fn main() {
     logger::establish_a_logger();
-    let report = report::Report::new();
-
     let args: Args = Docopt::new(USAGE)
         .unwrap()
         .version(Some(VERSION.to_string()))
         .help(true)
         .decode()
         .unwrap_or_else(|e| e.exit());
+
+    let ui = if !args.flag_quiet { ui::terminal::TermUI::new() } else { None };
+    let report = report::Report::with_ui(ui);
 
     let result = if args.cmd_init {
         cmd::init(&args.arg_archive)
