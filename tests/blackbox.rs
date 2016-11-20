@@ -222,6 +222,6 @@ fn run_conserve(args: &[&str]) -> (process::ExitStatus, String, String) {
     println!("status: {:?}", output.status);
     let output_string = String::from_utf8_lossy(&output.stdout).into_owned();
     let error_string = String::from_utf8_lossy(&output.stderr).into_owned();
-    println!("stdout:\n{:?}\nstderr:\n{:?}", &output_string, &error_string);
+    println!(">> stdout:\n{}\n>> stderr:\n{}", &output_string, &error_string);
     (output.status, output_string, error_string)
 }
