@@ -1,6 +1,6 @@
 # Conserve - a robust backup program
 
-**At this time Conserve can make and restore backups, but should 
+**At this time Conserve can make and restore backups, but should
 not be relied upon for production use:
 [more details](#Shortcomings).**
 
@@ -19,7 +19,6 @@ GNU General Public License for more details._
 Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
 [![Linux build status](https://travis-ci.org/sourcefrog/conserve.svg)](https://travis-ci.org/sourcefrog/conserve)
-[![Clippy Linting Result](https://clippy.bashy.io/github/sourcefrog/conserve/master/badge.svg)](https://clippy.bashy.io/github/sourcefrog/conserve/master/log)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)
 
 
