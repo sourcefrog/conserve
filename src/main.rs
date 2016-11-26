@@ -8,6 +8,8 @@
 
 #![recursion_limit = "1024"]  // Needed by error-chain
 
+#![feature(test)]
+
 #[macro_use]
 extern crate docopt;
 #[macro_use]
@@ -22,6 +24,7 @@ extern crate spectral;
 extern crate tempdir;
 extern crate tempfile;
 extern crate term;
+extern crate test;
 extern crate time;
 
 extern crate conserve_testsupport;

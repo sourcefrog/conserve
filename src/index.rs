@@ -257,6 +257,7 @@ mod tests {
     use rustc_serialize::json;
     use std::path::{Path};
     use tempdir;
+    use test::Bencher;
 
     use super::{IndexBuilder, Entry, IndexKind};
     use super::super::io::read_and_decompress;
@@ -422,5 +423,18 @@ mod tests {
         // Try to add an identically-named file within the next hunk and it should error,
         // because the IndexBuilder remembers the last file name written.
         add_an_entry(&mut ib, "hello");
+    }
+
+    #[bench]
+    fn bench_serialize_index(b: &mut Bencher) {
+        let entries: Vec<_> = (0..100).map(|i| Entry {
+            apath: format!("/a/b{}", i),
+            mtime: Some(1461736377),
+            kind: IndexKind::File,
+            blake2b: Some(EXAMPLE_HASH.to_string()),
+            addrs: vec![],
+            target: None,
+        }).collect();
+        b.iter(|| json::encode(&entries).unwrap());
     }
 }
