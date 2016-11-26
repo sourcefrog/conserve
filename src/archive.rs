@@ -97,10 +97,7 @@ impl Archive {
 
     /// Returns a vector of band ids, in sorted order.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
-        let mut band_ids = Vec::<BandId>::new();
-        for r in try!(self.iter_bands_unsorted()) {
-            band_ids.push(try!(r));
-        }
+        let mut band_ids: Vec<BandId> = try!(try!(self.iter_bands_unsorted()).collect());
         band_ids.sort();
         Ok(band_ids)
     }
