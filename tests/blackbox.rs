@@ -220,11 +220,12 @@ fn find_conserve_binary() -> PathBuf {
         search_dir.pop();
         let mut conserve_path = search_dir.clone();
         conserve_path.push("conserve");
+        conserve_path.set_extension(std::env::consts::EXE_EXTENSION);
         if conserve_path.as_path().exists() {
             return conserve_path;
         }
     }
-    panic!("Can't find 'conserve' in {:?}", search_dir);
+    panic!("Can't find conserve binary under {:?}", search_dir);
 }
 
 /// Run Conserve's binary and return a `process::Output` including its return code, stdout
