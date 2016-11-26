@@ -1,3 +1,7 @@
+// Clippy warns about a redundant closure, but the closure is in the error-chain crate
+// and not useful to flag here.
+#![allow(redundant_closure)]
+
 use std::io;
 use std::path::PathBuf;
 use rustc_serialize;
