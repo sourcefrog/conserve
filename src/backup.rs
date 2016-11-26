@@ -65,7 +65,7 @@ impl Backup {
     fn store_dir(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
         self.report.increment("backup.dir", 1);
         Ok(index::Entry {
-            apath: source_entry.apath.clone(),
+            apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: IndexKind::Dir,
             addrs: vec![],
@@ -81,7 +81,7 @@ impl Backup {
         let mut f = try!(fs::File::open(&source_entry.path));
         let (addrs, body_hash) = try!(self.block_dir.store(&mut f, &self.report));
         Ok(index::Entry {
-            apath: source_entry.apath.clone(),
+            apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: IndexKind::File,
             addrs: addrs,
@@ -97,7 +97,7 @@ impl Backup {
         // losing.
         let target = try!(fs::read_link(&source_entry.path)).to_string_lossy().to_string();
         Ok(index::Entry {
-            apath: source_entry.apath.clone(),
+            apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: IndexKind::Symlink,
             addrs: vec![],

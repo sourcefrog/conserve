@@ -3,7 +3,6 @@
 
 ///! Listing of files in a band in the archive.
 
-use std::cmp::Ordering;
 use std::fmt;
 use std::io;
 use std::io::SeekFrom;
@@ -16,7 +15,7 @@ use std::vec;
 use rustc_serialize::json;
 use brotli2::write::BrotliEncoder;
 
-use super::apath;
+use super::apath::Apath;
 use super::block;
 use super::errors::*;
 use super::io::{AtomicFile, ensure_dir_exists, read_and_decompress};
@@ -73,7 +72,7 @@ pub struct IndexBuilder {
     /// The last-added filename, to enforce ordering.  At the start of the first hunk
     /// this is empty; at the start of a later hunk it's the last path from the previous
     /// hunk, and otherwise it's the last path from `entries`.
-    last_apath: Option<String>,
+    last_apath: Option<Apath>,
 }
 
 
@@ -95,11 +94,11 @@ impl IndexBuilder {
     pub fn push(&mut self, entry: Entry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
-        assert!(apath::valid(&entry.apath), format!("invalid apath: {:?}", &entry.apath));
+        let entry_apath = Apath::from_string(&entry.apath);
         if let Some(ref last_apath) = self.last_apath {
-            assert_eq!(apath::cmp(&last_apath, &entry.apath), Ordering::Less);
+            assert!(last_apath < &entry_apath);
         }
-        self.last_apath = Some(entry.apath.clone());
+        self.last_apath = Some(entry_apath.clone());
         self.entries.push(entry);
     }
 

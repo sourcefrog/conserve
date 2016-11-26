@@ -3,7 +3,6 @@
 
 //! Find source files within a source directory, in apath order.
 
-use std::cmp::Ordering;
 use std::collections::vec_deque::VecDeque;
 use std::fmt;
 use std::ffi::OsString;
@@ -12,7 +11,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time;
 
-use super::apath;
+use super::apath::Apath;
 use super::report::Report;
 
 
@@ -20,7 +19,7 @@ use super::report::Report;
 #[derive(Clone)]
 pub struct Entry {
     /// Conserve apath, relative to the top-level directory.
-    pub apath: String,
+    pub apath: Apath,
 
     /// Possibly absolute path through which the file can be opened.
     pub path: PathBuf,
@@ -62,7 +61,7 @@ pub struct Iter {
     report: Report,
 
     /// Copy of the last-emitted apath, for the purposes of checking they're in apath order.
-    last_apath: Option<String>,
+    last_apath: Option<Apath>,
 }
 
 // TODO: Implement Debug on Iter.
@@ -99,7 +98,7 @@ impl Iter {
         children.sort();
         let mut directory_insert_point = 0;
         for (child_name, is_dir) in children {
-            let mut new_apath = dir_entry.apath.to_string();
+            let mut new_apath = dir_entry.apath.to_string().clone();
             if new_apath != "/" {
                 new_apath.push('/');
             }
@@ -115,7 +114,7 @@ impl Iter {
             // TODO: Don't be lossy, error if not convertible.
             new_apath.push_str(&child_name.to_string_lossy());
             let new_entry = Entry {
-                apath: new_apath,
+                apath: Apath::from_string(&new_apath),
                 path: child_path,
                 metadata: metadata,
             };
@@ -150,8 +149,8 @@ impl Iterator for Iter {
             Some(Ok(entry)) => {
                 if let Some(ref last_apath) = self.last_apath {
                     assert!(
-                        apath::cmp(last_apath, &entry.apath) == Ordering::Less,
-                        "sources returned out of order: {} >= {}",
+                        last_apath < &entry.apath,
+                        "sources returned out of order: {:?} >= {:?}",
                         last_apath, entry.apath);
                 }
                 self.last_apath = Some(entry.apath.clone());
@@ -178,7 +177,7 @@ pub fn iter(source_dir: &Path, report: &Report) -> io::Result<Iter> {
         }
     };
     let root_entry = Entry {
-        apath: "/".to_string(),
+        apath: Apath::from_string("/"),
         path: source_dir.to_path_buf(),
         metadata: root_metadata,
     };
@@ -235,7 +234,7 @@ mod tests {
         assert_eq!(result.len(), 7);
 
         assert_eq!(format!("{:?}", &result[6]),
-            format!("sources::Entry {{ apath: {:?}, path: {:?} }}", "/jam/apricot",
+            format!("sources::Entry {{ apath: Apath({:?}), path: {:?} }}", "/jam/apricot",
                     &tf.root.join("jam").join("apricot")));
 
         assert_eq!(report.get_count("source.visited.directories"), 4);
