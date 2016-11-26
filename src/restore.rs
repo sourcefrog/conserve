@@ -91,7 +91,7 @@ mod tests {
 
     use super::restore;
     use super::super::backup::backup;
-    use super::super::report::{Counts, Report};
+    use super::super::report::Report;
     use super::super::testfixtures::ScratchArchive;
     use conserve_testsupport::TreeFixture;
 
