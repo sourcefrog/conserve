@@ -87,7 +87,7 @@ impl Archive {
     }
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
-    pub fn iter_bands(self: &Archive) -> Result<IterBands> {
+    pub fn iter_bands_unsorted(self: &Archive) -> Result<IterBands> {
         let read_dir = try!(read_dir(&self.path)
             .chain_err(|| format!("failed reading directory {:?}", &self.path)));
         Ok(IterBands {
@@ -98,7 +98,7 @@ impl Archive {
     /// Returns a vector of band ids, in sorted order.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
         let mut band_ids = Vec::<BandId>::new();
-        for r in try!(self.iter_bands()) {
+        for r in try!(self.iter_bands_unsorted()) {
             band_ids.push(try!(r));
         }
         band_ids.sort();
