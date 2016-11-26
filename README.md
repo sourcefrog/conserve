@@ -1,7 +1,7 @@
 # Conserve - a robust backup program
 
-**At this time Conserve is not ready for production use.  The format is
-not guaranteed stable, and some important features are not implemented.**
+**At this time Conserve is not ready for production use:
+[more details](#Shortcomings).**
 
 Copyright 2012-2016 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
 
@@ -47,6 +47,7 @@ Then simply run
 [rust]: https://rust-lang.org/
 [sourcefrog]: http://sourcefrog.net/
 
+
 ## More documentation
 
  * [Conserve Manifesto](doc/manifesto.md)
@@ -58,4 +59,30 @@ Then simply run
 
  * [Archive format](doc/format.md)
 
- * [Development to-do list](https://github.com/sourcefrog/conserve/wiki/TODO)
+
+## Shortcomings
+
+Conserve is still in a pre-1.0 alpha.  It can be used to make and restore
+backups, but there are some important performance and functional limitations,
+which will be fixed before 1.0.
+
+* There is no guarantee or testing of [forward and backward format
+  compatibility](doc/versioning.md):
+  you should restore using the same Conserve version that wrote
+  the backup.
+* Data compression is slow (#32).
+* Backup archives can contain too many small data files.
+* There are no incremental backups: all backups store all files.
+* There is no way to exclude files/subdirectories from backup or restore (#8).
+* The planned `validate` command is not implemented (#5), however testing
+  restore from the archive will effectively test it can all be read.
+* The planned feature of resuming an interrupted backup is not implemented:
+  Conserve will just create a new full backup from the beginning.
+* `conserve diff` is also not implemented, but can be simulated by restoring to
+  a temporary directory and comparing that to the source.
+* The `conserve cull` command to trim the backup archive is not implemented,
+  but the `b0123` band directories can be deleted directly.
+* You can only restore the most recent backup, not a named older one.
+
+For a longer list see [TODO](https://github.com/sourcefrog/conserve/wiki/TODO)
+in the wiki.
