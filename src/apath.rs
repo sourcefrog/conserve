@@ -13,6 +13,13 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 
 
+/// An ordered archive path.
+///
+/// The ordering groups all the direct parents of a directory together, followed
+/// by all the subdirectories.
+///
+/// Equal strings are equivalent to equal apaths, but the ordering is not the same as
+/// string ordering.
 #[derive(Clone,Debug,Eq,PartialEq)]
 pub struct Apath(String);
 
@@ -36,6 +43,7 @@ impl Display for Apath {
 }
 
 
+/// Compare for equality an Apath to a str.
 impl PartialEq<str> for Apath {
     fn eq(&self, other: &str) -> bool {
         self.0 == other
@@ -44,6 +52,9 @@ impl PartialEq<str> for Apath {
 
 
 /// Compare two apaths.
+///
+/// The ordering is _not_ the same as a simple string comparison, although
+/// equal strings imply equal apaths.
 impl Ord for Apath {
     fn cmp(&self, b: &Apath) -> Ordering {
         let &Apath(ref a) = self;
@@ -76,6 +87,7 @@ impl Ord for Apath {
         }
     }
 }
+
 
 impl PartialOrd for Apath {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
