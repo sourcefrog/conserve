@@ -16,6 +16,8 @@ use time;
 
 use super::{BandId, Report};
 use super::block::BlockDir;
+
+#[allow(unused_imports)]  // Needed for Result
 use super::errors::*;
 use super::index;
 use super::index::IndexBuilder;
@@ -130,6 +132,7 @@ mod tests {
     use std::io;
 
     use super::*;
+    #[allow(unused_imports)]
     use super::super::errors::*;
     use super::super::testfixtures::ScratchArchive;
     use super::super::{BandId, Report};
