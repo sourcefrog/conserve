@@ -130,7 +130,6 @@ mod tests {
     use std::io;
 
     use super::*;
-    use super::super::errors::*;
     use super::super::testfixtures::ScratchArchive;
     use super::super::{BandId, Report};
 
