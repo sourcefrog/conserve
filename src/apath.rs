@@ -64,6 +64,7 @@ impl Ord for Apath {
         let mut oa = ait.next().expect("paths must not be empty");
         let mut ob = bit.next().expect("paths must not be empty");
         loop {
+            #[allow(match_same_arms)] // Correct but unhelpful.
             return match (ait.next(), bit.next(), oa.cmp(ob)) {
                 // Both paths end here: eg ".../aa" < ".../zz"
                 (None, None, cmp) => cmp,
