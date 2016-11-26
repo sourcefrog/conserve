@@ -12,6 +12,7 @@ extern crate tempdir;
 use std::env;
 use std::io::prelude::*;
 use std::fs;
+use std::path::PathBuf;
 use std::process;
 use std::str;
 
@@ -208,18 +209,35 @@ fn assert_success_and_output(args: &[&str], expected_stdout: &str, expected_stde
     assert_eq!(expected_stdout, stdout);
 }
 
+/// Find the conserve binary.
+///
+/// It might be in the same directory as the test (if run from tests/debug) or
+/// in the parent, if the test happens to be run from tests/debug/deps.
+///
+/// See https://users.rust-lang.org/t/test-dependency-binary-no-longer-found-under-unqualified-name/8077.
+fn find_conserve_binary() -> PathBuf {
+    let mut search_dir = env::current_exe().unwrap().to_path_buf();
+    for _ in 0..2 {
+        search_dir.pop();
+        let mut conserve_path = search_dir.clone();
+        conserve_path.push("conserve");
+        conserve_path.set_extension(std::env::consts::EXE_EXTENSION);
+        if conserve_path.as_path().exists() {
+            return conserve_path;
+        }
+    }
+    panic!("Can't find conserve binary under {:?}", search_dir);
+}
 
 /// Run Conserve's binary and return a `process::Output` including its return code, stdout
 /// and stderr text.
 ///
 /// Returns a tuple of: status, stdout_string, stderr_string.
 fn run_conserve(args: &[&str]) -> (process::ExitStatus, String, String) {
-    let mut conserve_path = env::current_exe().unwrap().to_path_buf();
-    conserve_path.pop();  // Remove name of test binary
-    conserve_path.push("conserve");
+    let conserve_path = find_conserve_binary();
     println!("run conserve: {:?}", args);
     let output = process::Command::new(&conserve_path).args(args).output()
-        .expect("Failed to run conserve");
+        .expect(format!("Failed to run conserve: {:?} {:?}", &conserve_path, &args).as_str());
     println!("status: {:?}", output.status);
     let output_string = String::from_utf8_lossy(&output.stdout).into_owned();
     let error_string = String::from_utf8_lossy(&output.stderr).into_owned();
