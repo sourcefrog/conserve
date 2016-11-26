@@ -1,6 +1,7 @@
 # Conserve - a robust backup program
 
-**At this time Conserve is not ready for production use:
+**At this time Conserve can make and restore backups, but should 
+not be relied upon for production use:
 [more details](#Shortcomings).**
 
 Copyright 2012-2016 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
@@ -70,12 +71,13 @@ which will be fixed before 1.0.
   compatibility](doc/versioning.md):
   you should restore using the same Conserve version that wrote
   the backup.
-* Data compression is slow (#32).
-* Backup archives can contain too many small data files.
+* [Data compression is slow][32].
+* Backup data should be packed into medium-sized files, but at present
+  archives may contain too many small data files.
 * There are no incremental backups: all backups store all files.
-* There is no way to exclude files/subdirectories from backup or restore (#8).
-* The planned `validate` command is not implemented (#5), however testing
-  restore from the archive will effectively test it can all be read.
+* [There is no way to exclude files/subdirectories from backup or restore][8].
+* [The planned `validate` command is not implemented][5],
+  however a trial restore from the archive will .
 * The planned feature of resuming an interrupted backup is not implemented:
   Conserve will just create a new full backup from the beginning.
 * `conserve diff` is also not implemented, but can be simulated by restoring to
@@ -83,6 +85,11 @@ which will be fixed before 1.0.
 * The `conserve cull` command to trim the backup archive is not implemented,
   but the `b0123` band directories can be deleted directly.
 * You can only restore the most recent backup, not a named older one.
+* Permissions and ownership are not stored.
+
+[5]: https://github.com/sourcefrog/conserve/issues/5
+[8]: https://github.com/sourcefrog/conserve/issues/8
+[32]: https://github.com/sourcefrog/conserve/issues/32
 
 For a longer list see [TODO](https://github.com/sourcefrog/conserve/wiki/TODO)
 in the wiki.
