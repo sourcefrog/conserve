@@ -426,15 +426,27 @@ mod tests {
     }
 
     #[bench]
-    fn bench_serialize_index(b: &mut Bencher) {
-        let entries: Vec<_> = (0..100).map(|i| Entry {
-            apath: format!("/a/b{}", i),
-            mtime: Some(1461736377),
-            kind: IndexKind::File,
-            blake2b: Some(EXAMPLE_HASH.to_string()),
-            addrs: vec![],
-            target: None,
-        }).collect();
-        b.iter(|| json::encode(&entries).unwrap());
+    fn bench_write_index(b: &mut Bencher) {
+        b.iter(|| {
+            let (_testdir, mut ib, report) = scratch_indexbuilder();
+            for i in 0..100 {
+                add_an_entry(&mut ib, &format!("/banana{:04}", i));
+            }
+            ib.finish_hunk(&report).unwrap();
+        });
+    }
+
+    #[bench]
+    fn bench_read_index(b: &mut Bencher) {
+        let (_testdir, mut ib, report) = scratch_indexbuilder();
+        for i in 0..100 {
+            add_an_entry(&mut ib, &format!("/banana{:04}", i));
+        }
+        ib.finish_hunk(&report).unwrap();
+
+        b.iter(|| {
+            let it = super::read(&ib.dir, &report).unwrap();
+            let _entries: Vec<_> = it.collect();
+        });
     }
 }
