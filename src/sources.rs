@@ -202,7 +202,7 @@ mod tests {
     use std::io;
 
     use super::*;
-    use super::super::report::{ReadReport, Report};
+    use super::super::report::{Counts, Report};
     use conserve_testsupport::TreeFixture;
 
     #[test]
@@ -238,8 +238,8 @@ mod tests {
             format!("sources::Entry {{ apath: {:?}, path: {:?} }}", "/jam/apricot",
                     &tf.root.join("jam").join("apricot")));
 
-        assert_eq!(report.get_count("source.visited.directories"), 4);
-        assert_eq!(report.get_count("source.selected"), 7);
+        assert_eq!(report.borrow_counts().get_count("source.visited.directories"), 4);
+        assert_eq!(report.borrow_counts().get_count("source.selected"), 7);
     }
 
     #[cfg(unix)]

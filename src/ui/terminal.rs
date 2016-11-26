@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use term;
 
-use super::super::report::ReadReport;
+use super::super::report::Counts;
 use super::UI;
 
 const MB: u64 = 1_000_000;
@@ -81,7 +81,7 @@ fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
 
 
 impl UI for TermUI {
-    fn show_progress(&mut self, report: &ReadReport) {
+    fn show_progress(&mut self, counts: &Counts) {
         if self.throttle_updates() { return }
         self.last_update = Some(Instant::now());
 
@@ -91,9 +91,9 @@ impl UI for TermUI {
         // TODO: Input size should really be the number of source bytes before
         // block deduplication.
         // Measure compression on body bytes.
-        let block_sizes = report.get_size("block.write");
+        let block_sizes = counts.get_size("block.write");
         let block_comp_pct = compression_percent(block_sizes.0, block_sizes.1);
-        let elapsed = report.elapsed_time();
+        let elapsed = counts.elapsed_time();
         // TODO: Truncate to screen width (or draw on multiple lines with cursor-up)?
         // TODO: Rate limit etc.
         // TODO: Also show current filename.
@@ -105,11 +105,11 @@ impl UI for TermUI {
         let uncomp_rate = mbps_rate(block_sizes.0, elapsed);
 
         t.fg(term::color::GREEN).unwrap();
-        write!(t, "{:8}", report.get_count("backup.file")).unwrap();
+        write!(t, "{:8}", counts.get_count("backup.file")).unwrap();
         t.fg(term::color::WHITE).unwrap();
         write!(t, " files").unwrap();
         t.fg(term::color::GREEN).unwrap();
-        write!(t, "{:8}", report.get_count("backup.dir")).unwrap();
+        write!(t, "{:8}", counts.get_count("backup.dir")).unwrap();
         t.fg(term::color::WHITE).unwrap();
         write!(t, " dirs").unwrap();
         t.fg(term::color::GREEN).unwrap();

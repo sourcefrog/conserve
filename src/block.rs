@@ -185,7 +185,7 @@ mod tests {
     use tempdir;
     use tempfile;
     use super::{BlockDir};
-    use super::super::report::{ReadReport, Report};
+    use super::super::report::Report;
 
     const EXAMPLE_TEXT: &'static [u8] = b"hello!";
     const EXAMPLE_BLOCK_HASH: &'static str =
@@ -230,15 +230,15 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
 
-        assert_eq!(report.get_count("block.write.already_present"), 0);
-        assert_eq!(report.get_count("block.write"), 1);
-        assert_eq!(report.get_size("block.write"), (6, 10));
+        assert_eq!(report.borrow_counts().get_count("block.write.already_present"), 0);
+        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
+        assert_eq!(report.borrow_counts().get_size("block.write"), (6, 10));
 
         // Try to read back
-        assert_eq!(report.get_count("block.read"), 0);
+        assert_eq!(report.borrow_counts().get_count("block.read"), 0);
         let back = block_dir.get(&refs[0], &report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
-        assert_eq!(report.get_count("block.read"), 1);
+        assert_eq!(report.borrow_counts().get_count("block.read"), 1);
     }
 
     #[test]
@@ -248,13 +248,13 @@ mod tests {
 
         let mut example_file = make_example_file();
         let (refs1, hash1) = block_dir.store(&mut example_file, &report).unwrap();
-        assert_eq!(report.get_count("block.write.already_present"), 0);
-        assert_eq!(report.get_count("block.write"), 1);
+        assert_eq!(report.borrow_counts().get_count("block.write.already_present"), 0);
+        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
 
         let mut example_file = make_example_file();
         let (refs2, hash2) = block_dir.store(&mut example_file, &report).unwrap();
-        assert_eq!(report.get_count("block.write.already_present"), 1);
-        assert_eq!(report.get_count("block.write"), 1);
+        assert_eq!(report.borrow_counts().get_count("block.write.already_present"), 1);
+        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
 
         assert_eq!(hash1, hash2);
         assert_eq!(refs1, refs2);

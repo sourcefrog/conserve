@@ -59,27 +59,9 @@ static KNOWN_DURATIONS: &'static [&'static str] = &[
 ];
 
 
-pub trait ReadReport {
-
-    fn get_duration(&self, name: &str) -> Duration;
-
-    /// Return the value of a counter.  A counter that has not yet been updated is 0.
-    fn get_count(&self, counter_name: &str) -> u64;
-
-    /// Get size of data processed.
-    ///
-    /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
-    /// in bytes.
-    fn get_size(&self, counter_name: &str) -> (u64, u64);
-
-    fn elapsed_time(&self) -> Duration;
-}
-
-
-
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
-struct Inner {
+pub struct Counts {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, (u64, u64)>,
     durations: BTreeMap<&'static str, Duration>,
@@ -98,7 +80,7 @@ struct Inner {
 /// Cloning a Report makes another reference to the same underlying counters.
 #[derive(Clone)]
 pub struct Report {
-    inner: Rc<cell::RefCell<Inner>>,
+    inner: Rc<cell::RefCell<Counts>>,
     ui: Rc<cell::RefCell<Option<TermUI>>>,
 }
 
@@ -121,7 +103,7 @@ impl Report {
         for name in KNOWN_DURATIONS {
             inner_durations.insert(name, Duration::new(0, 0));
         };
-        let inner = Inner {
+        let inner = Counts {
             count: inner_count,
             sizes: inner_sizes,
             durations: inner_durations,
@@ -133,8 +115,12 @@ impl Report {
         }
     }
 
-    fn mut_inner(&self) -> cell::RefMut<Inner> {
+    fn mut_inner(&self) -> cell::RefMut<Counts> {
         self.inner.borrow_mut()
+    }
+
+    pub fn borrow_counts(&self) -> cell::Ref<Counts> {
+        self.inner.borrow()
     }
 
     /// Increment a counter by a given amount.
@@ -149,7 +135,7 @@ impl Report {
         }
         if let Some(ref mut ui) = *self.ui.borrow_mut() {
             // Lock the inner data just once for the whole update
-            ui.show_progress(&*self.inner.borrow());
+            ui.show_progress(&*self.borrow_counts());
         }
     }
 
@@ -191,25 +177,6 @@ impl Report {
 }
 
 
-impl ReadReport for Report {
-    fn get_count(&self, counter_name: &str) -> u64 {
-        self.inner.borrow().get_count(counter_name)
-    }
-
-    fn get_size(&self, counter_name: &str) -> (u64, u64) {
-        self.inner.borrow().get_size(counter_name)
-    }
-
-    fn get_duration(&self, name: &str) -> Duration {
-        self.inner.borrow().get_duration(name)
-    }
-
-    fn elapsed_time(&self) -> Duration {
-        self.inner.borrow().elapsed_time()
-    }
-}
-
-
 impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         try!(write!(f, "Counts:\n"));
@@ -241,20 +208,21 @@ impl Display for Report {
 }
 
 
-impl ReadReport for Inner {
-    fn get_duration(&self, name: &str) -> Duration {
+impl Counts {
+    #[allow(dead_code)]
+    pub fn get_duration(&self, name: &str) -> Duration {
         *self.durations.get(name).expect("unknown duration name")
     }
 
-    fn get_count(&self, counter_name: &str) -> u64 {
+    pub fn get_count(&self, counter_name: &str) -> u64 {
         *self.count.get(counter_name).expect("unknown counter")
     }
 
-    fn get_size(&self, counter_name: &str) -> (u64, u64) {
+    pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
         *self.sizes.get(counter_name).expect("unknown size counter")
     }
 
-    fn elapsed_time(&self) -> Duration {
+    pub fn elapsed_time(&self) -> Duration {
         self.start.elapsed()
     }
 }
@@ -263,16 +231,16 @@ impl ReadReport for Inner {
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
-    use super::{ReadReport, Report};
+    use super::Report;
 
     #[test]
     pub fn count() {
         let r = Report::new();
-        assert_eq!(r.get_count("block.read"), 0);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 0);
         r.increment("block.read", 1);
-        assert_eq!(r.get_count("block.read"), 1);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 1);
         r.increment("block.read", 10);
-        assert_eq!(r.get_count("block.read"), 11);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 11);
     }
 
     #[test]
@@ -286,11 +254,12 @@ mod tests {
         r2.increment_size("block.write", 300, 100);
         r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
-        assert_eq!(r1.get_count("block.read"), 1);
-        assert_eq!(r1.get_count("block.read.corrupt"), 12);
-        assert_eq!(r1.get_count("block.write"), 1);
-        assert_eq!(r1.get_size("block.write"), (300, 100));
-        assert_eq!(r1.get_duration("test"), Duration::new(5, 0));
+        let cs = r1.borrow_counts();
+        assert_eq!(cs.get_count("block.read"), 1);
+        assert_eq!(cs.get_count("block.read.corrupt"), 12);
+        assert_eq!(cs.get_count("block.write"), 1);
+        assert_eq!(cs.get_size("block.write"), (300, 100));
+        assert_eq!(cs.get_duration("test"), Duration::new(5, 0));
     }
 
     #[test]
