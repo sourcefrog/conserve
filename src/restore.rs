@@ -54,7 +54,7 @@ impl<'a> Restore<'a> {
             // TODO: Restore symlinks.
             ref k => {
                 warn!("unimplemented kind {:?}", k);
-                return Ok(())
+                Ok(())
             },
         }
         // TODO: Restore permissions.
