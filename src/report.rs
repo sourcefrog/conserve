@@ -14,6 +14,8 @@ use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use std::time;
 use std::time::{Duration};
+use super::ui::UI;
+use super::ui::terminal::TermUI;
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "backup.dir",
@@ -56,13 +58,14 @@ static KNOWN_DURATIONS: &'static [&'static str] = &[
     "test",
 ];
 
+
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
-#[derive(Clone, Debug, Default)]
-struct Inner {
+pub struct Counts {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, (u64, u64)>,
     durations: BTreeMap<&'static str, Duration>,
+    start: time::Instant,
 }
 
 
@@ -75,15 +78,20 @@ struct Inner {
 /// or scopes (on the same thread) who all append to it.
 ///
 /// Cloning a Report makes another reference to the same underlying counters.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Report {
-    inner: Rc<cell::RefCell<Inner>>,
+    inner: Rc<cell::RefCell<Counts>>,
+    ui: Rc<cell::RefCell<Option<TermUI>>>,
 }
 
 
 impl Report {
     #[allow(unknown_lints,new_without_default_derive)]
     pub fn new() -> Report {
+        Report::with_ui(None)
+    }
+
+    pub fn with_ui(ui: Option<TermUI>) -> Report {
         let mut inner_count = BTreeMap::new();
         let mut inner_sizes = BTreeMap::new();
         let mut inner_durations: BTreeMap<&'static str, Duration> = BTreeMap::new();
@@ -96,18 +104,24 @@ impl Report {
         for name in KNOWN_DURATIONS {
             inner_durations.insert(name, Duration::new(0, 0));
         };
-        let inner = Inner {
+        let inner = Counts {
             count: inner_count,
             sizes: inner_sizes,
             durations: inner_durations,
+            start: time::Instant::now(),
         };
         Report {
             inner: Rc::new(cell::RefCell::new(inner)),
+            ui: Rc::new(cell::RefCell::new(ui)),
         }
     }
 
-    fn mut_inner(&self) -> cell::RefMut<Inner> {
+    fn mut_inner(&self) -> cell::RefMut<Counts> {
         self.inner.borrow_mut()
+    }
+
+    pub fn borrow_counts(&self) -> cell::Ref<Counts> {
+        self.inner.borrow()
     }
 
     /// Increment a counter by a given amount.
@@ -119,6 +133,10 @@ impl Report {
             *c += delta;
         } else {
             panic!("unregistered counter {:?}", counter_name);
+        }
+        if let Some(ref mut ui) = *self.ui.borrow_mut() {
+            // Lock the inner data just once for the whole update
+            ui.show_progress(&*self.borrow_counts());
         }
     }
 
@@ -134,24 +152,6 @@ impl Report {
         *self.mut_inner().durations
             .get_mut(name).expect("undefined duration counter")
             += duration;
-    }
-
-    /// Return the value of a counter.  A counter that has not yet been updated is 0.
-    #[allow(unused)]
-    pub fn get_count(&self, counter_name: &str) -> u64 {
-        *self.mut_inner().count.get(counter_name).expect("unknown counter")
-    }
-
-    /// Get size of data processed.
-    ///
-    /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
-    /// in bytes.
-    pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
-        *self.mut_inner().sizes.get(counter_name).expect("unknown size counter")
-    }
-
-    pub fn get_duration(&self, name: &str) -> Duration {
-        *self.mut_inner().durations.get(name).expect("unknown duration name")
     }
 
     /// Merge the contents of `from_report` into `self`.
@@ -209,6 +209,31 @@ impl Display for Report {
 }
 
 
+impl Counts {
+    #[allow(dead_code)]
+    pub fn get_duration(&self, name: &str) -> Duration {
+        *self.durations.get(name).expect("unknown duration name")
+    }
+
+    /// Return the value of a counter.  A counter that has not yet been updated is 0.
+    pub fn get_count(&self, counter_name: &str) -> u64 {
+        *self.count.get(counter_name).expect("unknown counter")
+    }
+
+    /// Get size of data processed.
+    ///
+    /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
+    /// in bytes.
+    pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
+        *self.sizes.get(counter_name).expect("unknown size counter")
+    }
+
+    pub fn elapsed_time(&self) -> Duration {
+        self.start.elapsed()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -217,11 +242,11 @@ mod tests {
     #[test]
     pub fn count() {
         let r = Report::new();
-        assert_eq!(r.get_count("block.read"), 0);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 0);
         r.increment("block.read", 1);
-        assert_eq!(r.get_count("block.read"), 1);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 1);
         r.increment("block.read", 10);
-        assert_eq!(r.get_count("block.read"), 11);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 11);
     }
 
     #[test]
@@ -235,11 +260,12 @@ mod tests {
         r2.increment_size("block.write", 300, 100);
         r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
-        assert_eq!(r1.get_count("block.read"), 1);
-        assert_eq!(r1.get_count("block.read.corrupt"), 12);
-        assert_eq!(r1.get_count("block.write"), 1);
-        assert_eq!(r1.get_size("block.write"), (300, 100));
-        assert_eq!(r1.get_duration("test"), Duration::new(5, 0));
+        let cs = r1.borrow_counts();
+        assert_eq!(cs.get_count("block.read"), 1);
+        assert_eq!(cs.get_count("block.read.corrupt"), 12);
+        assert_eq!(cs.get_count("block.write"), 1);
+        assert_eq!(cs.get_size("block.write"), (300, 100));
+        assert_eq!(cs.get_duration("test"), Duration::new(5, 0));
     }
 
     #[test]

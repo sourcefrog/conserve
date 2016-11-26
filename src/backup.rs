@@ -43,7 +43,7 @@ pub fn backup(archive_path: &Path, source: &Path, report: &Report) -> Result<()>
 
 impl Backup {
     fn store_one_source_entry(&mut self, source_entry: &sources::Entry) -> Result<()> {
-        info!("backup {}", source_entry.path.display());
+        // info!("backup {}", source_entry.path.display());
         let store_fn = if source_entry.metadata.is_file() {
             Backup::store_file
         } else if source_entry.metadata.is_dir() {
@@ -125,16 +125,19 @@ mod tests {
         srcdir.create_file("hello");
         let report = Report::new();
         backup(af.path(), srcdir.path(), &report).unwrap();
-        assert_eq!(1, report.get_count("block.write"));
-        assert_eq!(1, report.get_count("backup.file"));
-        assert_eq!(1, report.get_count("backup.dir"));
-        assert_eq!(0, report.get_count("backup.skipped.unsupported_file_kind"));
+        {
+            let cs = report.borrow_counts();
+            assert_eq!(1, cs.get_count("block.write"));
+            assert_eq!(1, cs.get_count("backup.file"));
+            assert_eq!(1, cs.get_count("backup.dir"));
+            assert_eq!(0, cs.get_count("backup.skipped.unsupported_file_kind"));
+        }
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
         assert_eq!("b0000", band_ids[0].as_string());
 
-        let dur = report.get_duration("source.read");
+        let dur = report.borrow_counts().get_duration("source.read");
         let read_us = (dur.subsec_nanos() as u64) / 1000u64 + dur.as_secs() * 1000000u64;
         assert!(read_us > 0);
 
@@ -170,10 +173,10 @@ mod tests {
         srcdir.create_symlink("symlink", "/a/broken/destination");
         let report = Report::new();
         backup(af.path(), srcdir.path(), &report).unwrap();
-        assert_eq!(0, report.get_count("block.write"));
-        assert_eq!(0, report.get_count("backup.file"));
-        assert_eq!(1, report.get_count("backup.symlink"));
-        assert_eq!(0, report.get_count("backup.skipped.unsupported_file_kind"));
+        assert_eq!(0, report.borrow_counts().get_count("block.write"));
+        assert_eq!(0, report.borrow_counts().get_count("backup.file"));
+        assert_eq!(1, report.borrow_counts().get_count("backup.symlink"));
+        assert_eq!(0, report.borrow_counts().get_count("backup.skipped.unsupported_file_kind"));
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());

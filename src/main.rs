@@ -45,6 +45,7 @@ mod restore;
 mod sources;
 #[cfg(test)]
 mod testfixtures;
+mod ui;
 
 // Re-export important classes.
 pub use archive::Archive;
@@ -80,6 +81,7 @@ Usage:
 
 Options:
     --stats         Show statistics at completion.
+    --no-progress   No progress bar.
 ";
 
 #[derive(RustcDecodable)]
@@ -93,20 +95,28 @@ struct Args {
     arg_archive: String,
     arg_destination: String,
     arg_source: String,
+    flag_no_progress: bool,
     flag_stats: bool,
 }
 
 
 fn main() {
     logger::establish_a_logger();
-    let report = report::Report::new();
-
     let args: Args = Docopt::new(USAGE)
         .unwrap()
         .version(Some(VERSION.to_string()))
         .help(true)
         .decode()
         .unwrap_or_else(|e| e.exit());
+
+    // Always turn off progress for commands that send their output to stdout:
+    // easier than trying to get them not to interfere, and you should see progress
+    // by the output appearing.
+    let progress = !(args.flag_no_progress || args.cmd_ls || args.cmd_list_source
+        || args.cmd_list_versions);
+
+    let ui = if progress { ui::terminal::TermUI::new() } else { None };
+    let report = report::Report::with_ui(ui);
 
     let result = if args.cmd_init {
         cmd::init(&args.arg_archive)

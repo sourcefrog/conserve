@@ -109,7 +109,7 @@ mod tests {
         let destdir = TreeFixture::new();
         restore(af.path(), destdir.path(), &report).unwrap();
 
-        assert_eq!(2, report.get_count("restore.file"));
+        assert_eq!(2, report.borrow_counts().get_count("restore.file"));
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("subdir").as_path()).is_a_directory();
