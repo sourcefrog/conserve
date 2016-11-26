@@ -82,6 +82,7 @@ pub struct Report {
 
 
 impl Report {
+    #[allow(unknown_lints,new_without_default_derive)]
     pub fn new() -> Report {
         let mut inner_count = BTreeMap::new();
         let mut inner_sizes = BTreeMap::new();
