@@ -115,14 +115,7 @@ impl Archive {
 
     // Return the id of the highest-numbered band, or None if empty.
     pub fn last_band_id(self: &Archive) -> Result<Option<BandId>> {
-        let mut max: Option<BandId> = None;
-        for i in try!(self.iter_bands()) {
-            let b = try!(i);
-            if max.is_none() || (b > *max.as_ref().unwrap()) {
-                max = Some(b)
-            };
-        }
-        Ok(max)
+        Ok(try!(self.list_bands()).pop())
     }
 
     /// Make a new band. Bands are numbered sequentially.
