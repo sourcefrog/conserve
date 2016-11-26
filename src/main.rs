@@ -81,7 +81,7 @@ Usage:
 
 Options:
     --stats         Show statistics at completion.
-    --quiet         No progress bar or non-fatal messages.
+    --no-progress   No progress bar.
 ";
 
 #[derive(RustcDecodable)]
@@ -95,7 +95,7 @@ struct Args {
     arg_archive: String,
     arg_destination: String,
     arg_source: String,
-    flag_quiet: bool,
+    flag_no_progress: bool,
     flag_stats: bool,
 }
 
@@ -112,10 +112,10 @@ fn main() {
     // Always turn off progress for commands that send their output to stdout:
     // easier than trying to get them not to interfere, and you should see progress
     // by the output appearing.
-    let be_quiet = args.flag_quiet || args.cmd_ls || args.cmd_list_source
-        || args.cmd_list_versions;
+    let progress = !(args.flag_no_progress || args.cmd_ls || args.cmd_list_source
+        || args.cmd_list_versions);
 
-    let ui = if !be_quiet { ui::terminal::TermUI::new() } else { None };
+    let ui = if progress { ui::terminal::TermUI::new() } else { None };
     let report = report::Report::with_ui(ui);
 
     let result = if args.cmd_init {
