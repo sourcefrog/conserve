@@ -1,9 +1,13 @@
 ## Conserve 0.3.0
 
+ * New commands:
+   * `conserve restore`!
+ * Symlinks are backed up (but not yet restored).
  * Breaking archive format change:
    * Separate whole-file hash from the hash of the blocks making it up.
+ * New text-mode progress bar.
 
-## Conserve 0.2.0 (never formally released)
+## Conserve 0.2.0 (2016-04-18)
 
 * Rewrite in lovely Rust.
 * Newly implmented commands:
