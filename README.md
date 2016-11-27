@@ -20,7 +20,6 @@ Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
 [![Linux build status](https://travis-ci.org/sourcefrog/conserve.svg)](https://travis-ci.org/sourcefrog/conserve)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)
-
 [![Join the chat at https://gitter.im/sourcefrog/conserve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/sourcefrog/conserve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Use
@@ -67,25 +66,22 @@ Conserve is still in a pre-1.0 alpha.  It can be used to make and restore
 backups, but there are some important performance and functional limitations,
 which will be fixed before 1.0.
 
-* There is no guarantee or testing of [forward and backward format
-  compatibility](doc/versioning.md):
-  you should restore using the same Conserve version that wrote
-  the backup.
 * [Data compression is slow][32].
-* Backup data should be packed into medium-sized files, but at present
-  archives may contain too many small data files.
 * There are no incremental backups: all backups store all files.
 * [There is no way to exclude files/subdirectories from backup or restore][8].
 * [The planned `validate` command is not implemented][5],
-  however a trial restore from the archive will .
+however a trial restore from the archive will .
 * The planned feature of resuming an interrupted backup is not implemented:
-  Conserve will just create a new full backup from the beginning.
+Conserve will just create a new full backup from the beginning.
 * `conserve diff` is also not implemented, but can be simulated by restoring to
-  a temporary directory and comparing that to the source.
+a temporary directory and comparing that to the source.
 * The `conserve cull` command to trim the backup archive is not implemented,
-  but the `b0123` band directories can be deleted directly.
+but the `b0123` band directories can be deleted directly.
 * You can only restore the most recent backup, not a named older one.
 * Permissions and ownership are not stored.
+
+Prior to 1.0, data formats may change on each minor version number change (0.x):
+you should restore using the same version that you used to make the backup.
 
 [5]: https://github.com/sourcefrog/conserve/issues/5
 [8]: https://github.com/sourcefrog/conserve/issues/8
