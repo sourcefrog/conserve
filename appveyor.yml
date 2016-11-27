@@ -14,3 +14,10 @@ test_script:
 
 artifacts:
   - path: target\debug\conserve.exe
+
+notifications:
+  - provider: Webhook
+    url: https://webhooks.gitter.im/e/dd8ec17dedbc09d149e8
+    on_build_success: false
+    on_build_failure: true
+    on_build_status_changed: true
