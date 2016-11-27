@@ -31,6 +31,7 @@ time = "^0"
 [features]
 default = []
 sync = []
+bench = []
 
 [workspace]
 members = ["testsupport"]

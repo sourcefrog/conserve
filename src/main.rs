@@ -5,10 +5,9 @@
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(feature="bench", feature(test))] // Benchmark support currently only on nightly.
 
 #![recursion_limit = "1024"]  // Needed by error-chain
-
-#![feature(test)]
 
 #[macro_use]
 extern crate docopt;
@@ -24,8 +23,10 @@ extern crate spectral;
 extern crate tempdir;
 extern crate tempfile;
 extern crate term;
-extern crate test;
 extern crate time;
+
+#[cfg(feature="bench")]
+extern crate test;
 
 extern crate conserve_testsupport;
 

@@ -257,20 +257,30 @@ mod tests {
     use rustc_serialize::json;
     use std::path::{Path};
     use tempdir;
-    use test::Bencher;
 
     use super::{IndexBuilder, Entry, IndexKind};
     use super::super::io::read_and_decompress;
     use super::super::report::Report;
 
-    const EXAMPLE_HASH: &'static str =
+    pub const EXAMPLE_HASH: &'static str =
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
          45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
-    fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder, Report) {
+    pub fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder, Report) {
         let testdir = tempdir::TempDir::new("index_test").unwrap();
         let ib = IndexBuilder::new(testdir.path());
         (testdir, ib, Report::new())
+    }
+
+    pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
+        ib.push(Entry {
+            apath: apath.to_string(),
+            mtime: None,
+            kind: IndexKind::File,
+            blake2b: Some(EXAMPLE_HASH.to_string()),
+            addrs: vec![],
+            target: None,
+        });
     }
 
     #[test]
@@ -324,17 +334,6 @@ mod tests {
             addrs: vec![],
             target: None,
         })
-    }
-
-    fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
-        ib.push(Entry {
-            apath: apath.to_string(),
-            mtime: None,
-            kind: IndexKind::File,
-            blake2b: Some(EXAMPLE_HASH.to_string()),
-            addrs: vec![],
-            target: None,
-        });
     }
 
     #[test]
@@ -424,9 +423,15 @@ mod tests {
         // because the IndexBuilder remembers the last file name written.
         add_an_entry(&mut ib, "hello");
     }
+}
+
+#[cfg(all(feature="bench", test))]
+mod bench {
+    use test::Bencher;
+    use super::tests::{add_an_entry, scratch_indexbuilder};
 
     #[bench]
-    fn bench_write_index(b: &mut Bencher) {
+    fn write_index(b: &mut Bencher) {
         b.iter(|| {
             let (_testdir, mut ib, report) = scratch_indexbuilder();
             for i in 0..100 {
@@ -437,7 +442,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_read_index(b: &mut Bencher) {
+    fn read_index(b: &mut Bencher) {
         let (_testdir, mut ib, report) = scratch_indexbuilder();
         for i in 0..100 {
             add_an_entry(&mut ib, &format!("/banana{:04}", i));
