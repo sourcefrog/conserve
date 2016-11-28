@@ -33,6 +33,7 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "restore.dir",
     "restore.file",
     "restore.symlink",
+    "skipped.unsupported_file_kind",
     "source.error.metadata",
     "source.selected",
     "source.skipped.unsupported_file_kind",
