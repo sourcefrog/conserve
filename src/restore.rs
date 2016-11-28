@@ -51,14 +51,7 @@ impl<'a> Restore<'a> {
         match entry.kind {
             index::IndexKind::Dir => self.restore_dir(entry, &dest_path),
             index::IndexKind::File => self.restore_file(entry, &dest_path),
-            index::IndexKind::Symlink => {
-                if cfg!(unix) {
-                    self.restore_symlink(entry, &dest_path)
-                } else {
-                    warn!("Can't restore symlinks on Windows: {}", entry.apath);
-                    Ok(())
-                }
-            }
+            index::IndexKind::Symlink => self.restore_symlink(entry, &dest_path),
         }
         // TODO: Restore permissions.
         // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
@@ -94,6 +87,12 @@ impl<'a> Restore<'a> {
         } else {
             warn!("No target in symlink entry {}", entry.apath);
         }
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    fn restore_symlink(&mut self, entry: &index::Entry, _dest: &Path) -> Result<()> {
+        warn!("Can't restore symlinks on Windows: {}", entry.apath);
         Ok(())
     }
 }
