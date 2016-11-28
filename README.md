@@ -4,26 +4,39 @@
 not be relied upon for production use:
 [more details](#Shortcomings).**
 
-Conserve backs up trees of files and directories and (only on Unix)
-symlinks.  Data is compressed and stored into an *archive* directory
-which retains multiple versions of a single source tree.
-
 Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
 [![Linux build status](https://travis-ci.org/sourcefrog/conserve.svg)](https://travis-ci.org/sourcefrog/conserve)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)
 [![Join the chat at https://gitter.im/sourcefrog/conserve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/sourcefrog/conserve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-## Use
+## Using Conserve
 
-    conserve init /backup/home.conserve
-    conserve backup /backup/home.conserve ~
-    conserve restore /backup/home.conserve /tmp/source-restore
-    conserve --help
+Conserve makes compressed backups from a local *source* tree, to
+an *archive* directory.  Conserve backs up files and directories, and (only on
+Unix) symlinks.
 
-For more details see the
-[`conserve(1)`](https://github.com/sourcefrog/conserve/blob/master/man/conserve.asciidoc)
-man page.
+## 30-second user guide
+
+    $ conserve init /backup/home.conserve
+    $ conserve backup /backup/home.conserve ~
+    $ conserve restore /backup/home.conserve /tmp/trial-restore
+
+## Bands
+
+Conserve archives retain all previous versions of backups, stored in
+*bands*.  Bands are identified a string of integers starting with `b`,
+like `b0000`:
+
+    $ conserve list-versions /backup/home.conserve
+    b0000       2012-12-02T16:24:33   conservetesthost.local
+    b0001       2012-12-02T16:24:45   conservetesthost.local
+
+`ls` shows all the files in a band, including the
+time they were made and the host from which they were made.
+Like all commands that read a band from an archive, it operates
+on the most recent by default.
+
 
 ## Install
 
