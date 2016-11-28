@@ -22,7 +22,6 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "backup.file",
     "backup.symlink",
     "backup.error.stat",
-    "backup.skipped.unsupported_file_kind",
     "block.read",
     "block.read.corrupt",
     "block.read.misplaced",
@@ -33,10 +32,9 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "restore.dir",
     "restore.file",
     "restore.symlink",
-    "skipped.unsupported_file_kind",
     "source.error.metadata",
     "source.selected",
-    "source.skipped.unsupported_file_kind",
+    "skipped.unsupported_file_kind",
     "source.visited.directories",
 ];
 

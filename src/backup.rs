@@ -52,7 +52,7 @@ impl Backup {
             Backup::store_symlink
         } else {
             warn!("Skipping unsupported file kind {}", &source_entry.apath);
-            self.report.increment("backup.skipped.unsupported_file_kind", 1);
+            self.report.increment("skipped.unsupported_file_kind", 1);
             return Ok(())
         };
         let new_index_entry = try!(store_fn(self, source_entry));
@@ -130,7 +130,7 @@ mod tests {
             assert_eq!(1, cs.get_count("block.write"));
             assert_eq!(1, cs.get_count("backup.file"));
             assert_eq!(1, cs.get_count("backup.dir"));
-            assert_eq!(0, cs.get_count("backup.skipped.unsupported_file_kind"));
+            assert_eq!(0, cs.get_count("skipped.unsupported_file_kind"));
         }
 
         let band_ids = af.list_bands().unwrap();
@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(0, report.borrow_counts().get_count("block.write"));
         assert_eq!(0, report.borrow_counts().get_count("backup.file"));
         assert_eq!(1, report.borrow_counts().get_count("backup.symlink"));
-        assert_eq!(0, report.borrow_counts().get_count("backup.skipped.unsupported_file_kind"));
+        assert_eq!(0, report.borrow_counts().get_count("skipped.unsupported_file_kind"));
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
