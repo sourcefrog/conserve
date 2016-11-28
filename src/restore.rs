@@ -51,7 +51,14 @@ impl<'a> Restore<'a> {
         match entry.kind {
             index::IndexKind::Dir => self.restore_dir(entry, &dest_path),
             index::IndexKind::File => self.restore_file(entry, &dest_path),
-            index::IndexKind::Symlink => self.restore_symlink(entry, &dest_path),
+            index::IndexKind::Symlink => {
+                if cfg!(unix) {
+                    self.restore_symlink(entry, &dest_path)
+                } else {
+                    warn!("No target in symlink entry {}", entry.apath);
+                    Ok(())
+                }
+            }
         }
         // TODO: Restore permissions.
         // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
@@ -78,17 +85,14 @@ impl<'a> Restore<'a> {
         af.close(self.report)
     }
 
+    #[cfg(unix)]
     fn restore_symlink(&mut self, entry: &index::Entry, dest: &Path) -> Result<()> {
+        use std::os::unix::fs as unix_fs;
         self.report.increment("restore.symlink", 1);
-        if cfg!(unix) {
-            if let Some(ref target) = entry.target {
-                use std::os::unix::fs as unix_fs;
-                unix_fs::symlink(target, dest).unwrap();
-            } else {
-                warn!("No target in symlink entry {}", entry.apath);
-            }
+        if let Some(ref target) = entry.target {
+            unix_fs::symlink(target, dest).unwrap();
         } else {
-            warn!("Restoring symlink {:?} not supported on this OS", dest);
+            warn!("No target in symlink entry {}", entry.apath);
         }
         Ok(())
     }
