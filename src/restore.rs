@@ -55,7 +55,7 @@ impl<'a> Restore<'a> {
                 if cfg!(unix) {
                     self.restore_symlink(entry, &dest_path)
                 } else {
-                    warn!("No target in symlink entry {}", entry.apath);
+                    warn!("Can't restore symlinks on Windows: {}", entry.apath);
                     Ok(())
                 }
             }
