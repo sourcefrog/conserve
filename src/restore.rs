@@ -80,7 +80,7 @@ impl<'a> Restore<'a> {
 
     fn restore_symlink(&mut self, entry: &index::Entry, dest: &Path) -> Result<()> {
         self.report.increment("restore.symlink", 1);
-        if SYMLINKS_SUPPORTED {
+        if cfg!(unix) {
             if let Some(ref target) = entry.target {
                 use std::os::unix::fs as unix_fs;
                 unix_fs::symlink(target, dest).unwrap();
@@ -115,7 +115,7 @@ mod tests {
         srcdir.create_file("hello");
         srcdir.create_dir("subdir");
         srcdir.create_file("subdir/subfile");
-        if SYMLINKS_SUPPORTED {
+        if cfg!(unix) {
             srcdir.create_symlink("link", "target");
         }
 
@@ -130,7 +130,7 @@ mod tests {
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("subdir").as_path()).is_a_directory();
         assert_that(&dest.join("subdir").join("subfile").as_path()).is_a_file();
-        if SYMLINKS_SUPPORTED {
+        if cfg!(unix) {
             let dest = fs::read_link(&dest.join("link")).unwrap();
             assert_eq!(dest.to_string_lossy(), "target");
         }
