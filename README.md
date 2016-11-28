@@ -4,17 +4,9 @@
 not be relied upon for production use:
 [more details](#Shortcomings).**
 
-Copyright 2012-2016 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
-
-_This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version._
-
-_This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details._
+Conserve backs up trees of files and directories and (only on Unix)
+symlinks.  Data is compressed and stored into an *archive* directory
+which retains multiple versions of a single source tree.
 
 Conserve's homepage is: <https://github.com/sourcefrog/conserve>
 
@@ -89,3 +81,18 @@ you should restore using the same version that you used to make the backup.
 
 For a longer list see [TODO](https://github.com/sourcefrog/conserve/wiki/TODO)
 in the wiki.
+
+
+## Licence and non-warranty
+
+Copyright 2012-2016 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
+
+_This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version._
+
+_This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details._
