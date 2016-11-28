@@ -51,6 +51,11 @@ impl TreeFixture {
 
         unix_fs::symlink(target, self.root.join(relative_path)).unwrap();
     }
+
+    /// Symlinks are just not present on Windows.
+    #[cfg(windows)]
+    pub fn create_symlink(self: &TreeFixture, _relative_path: &str, _target: &str) {
+    }
 }
 
 impl Default for TreeFixture {

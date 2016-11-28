@@ -68,6 +68,8 @@ const ARCHIVE_VERSION: &'static str = "0.3";
 
 const BROTLI_COMPRESSION_LEVEL: u32 = 9;
 
+pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family="unix");
+
 static USAGE: &'static str = "
 Conserve: an (incomplete) backup tool.
 Copyright 2015, 2016 Martin Pool, GNU GPL v2+.
