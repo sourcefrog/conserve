@@ -92,6 +92,8 @@ impl<'a> Restore<'a> {
 
     #[cfg(not(unix))]
     fn restore_symlink(&mut self, entry: &index::Entry, _dest: &Path) -> Result<()> {
+        // TODO: Add a test with a canned index containing a symlink, and expect
+        // it cannot be restored on Windows and can be on Unix.
         warn!("Can't restore symlinks on Windows: {}", entry.apath);
         self.report.increment("skipped.unsupported_file_kind", 1);
         Ok(())
