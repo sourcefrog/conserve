@@ -2,7 +2,8 @@
 
  * New commands:
    * `conserve restore`!
- * Symlinks are backed up and restored, only on Unix.
+ * Symlinks are backed up and restored.
+   (Only on Unix, they're skipped on Windows.)
  * Breaking archive format change:
    * Separate whole-file hash from the hash of the blocks making it up.
  * New text-mode progress bar.
