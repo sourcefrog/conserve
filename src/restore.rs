@@ -51,11 +51,7 @@ impl<'a> Restore<'a> {
         match entry.kind {
             index::IndexKind::Dir => self.restore_dir(entry, &dest_path),
             index::IndexKind::File => self.restore_file(entry, &dest_path),
-            // TODO: Restore symlinks.
-            ref k => {
-                warn!("unimplemented kind {:?}", k);
-                Ok(())
-            },
+            index::IndexKind::Symlink => self.restore_symlink(entry, &dest_path),
         }
         // TODO: Restore permissions.
         // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
@@ -81,14 +77,31 @@ impl<'a> Restore<'a> {
         }
         af.close(self.report)
     }
-}
 
+    fn restore_symlink(&mut self, entry: &index::Entry, dest: &Path) -> Result<()> {
+        self.report.increment("restore.symlink", 1);
+        if SYMLINKS_SUPPORTED {
+            if let Some(ref target) = entry.target {
+                use std::os::unix::fs as unix_fs;
+                unix_fs::symlink(target, dest).unwrap();
+            } else {
+                warn!("No target in symlink entry {}", entry.apath);
+            }
+        } else {
+            warn!("Restoring symlink {:?} not supported on this OS", dest);
+        }
+        Ok(())
+    }
+}
 
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use spectral::prelude::*;
 
+    use super::super::SYMLINKS_SUPPORTED;
     use super::restore;
     use super::super::backup::backup;
     use super::super::report::Report;
@@ -102,6 +115,9 @@ mod tests {
         srcdir.create_file("hello");
         srcdir.create_dir("subdir");
         srcdir.create_file("subdir/subfile");
+        if SYMLINKS_SUPPORTED {
+            srcdir.create_symlink("link", "target");
+        }
 
         let report = Report::new();
         backup(af.path(), srcdir.path(), &report).unwrap();
@@ -114,10 +130,13 @@ mod tests {
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("subdir").as_path()).is_a_directory();
         assert_that(&dest.join("subdir").join("subfile").as_path()).is_a_file();
+        if SYMLINKS_SUPPORTED {
+            let dest = fs::read_link(&dest.join("link")).unwrap();
+            assert_eq!(dest.to_string_lossy(), "target");
+        }
 
         // TODO: Test restore empty file.
         // TODO: Test file contents are as expected.
         // TODO: Test restore of larger files.
-        // TODO: Test restore of symlinks where supported.
     }
 }
