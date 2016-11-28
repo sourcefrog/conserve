@@ -118,7 +118,7 @@ mod tests {
         srcdir.create_file("hello");
         srcdir.create_dir("subdir");
         srcdir.create_file("subdir/subfile");
-        if cfg!(unix) {
+        if SYMLINKS_SUPPORTED {
             srcdir.create_symlink("link", "target");
         }
 
@@ -133,7 +133,7 @@ mod tests {
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("subdir").as_path()).is_a_directory();
         assert_that(&dest.join("subdir").join("subfile").as_path()).is_a_file();
-        if cfg!(unix) {
+        if SYMLINKS_SUPPORTED {
             let dest = fs::read_link(&dest.join("link")).unwrap();
             assert_eq!(dest.to_string_lossy(), "target");
         }
