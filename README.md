@@ -1,7 +1,7 @@
-# Conserve - a robust backup program
+# Conserve: a robust backup program
 
 **This alpha version of Conserve can make and restore backups, but has
-[substantial limitations](#Limitations).**
+[some limitations](#Limitations).**
 
 [![Linux build status](https://travis-ci.org/sourcefrog/conserve.svg)](https://travis-ci.org/sourcefrog/conserve)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)
@@ -14,19 +14,22 @@ tree, to an *archive* directory, and retrieves them on demand.
 
 Conserve's [manifesto](doc/manifesto.md) sets some guiding principles:
 
- - The format is not fragile: if one file is corrupted in storage or due
-   to a bug in Conserve, you should still be able to restore others.
- - Data files already written are never touched or altered, unless you
-   choose to purge them.
- - Restoring just part of the backup files must be fast, and therefore
-   not require reading the whole archive.
- - You should be able to restore recently-written files even before the
-   backup completes, using a log-structured format.  This also allows
-   efficiently resuming an interrupted backup.
- - The storage format must be fast and reliable on on high-latency,
-   limited-capability, unlimited-capacity cloud object storage.
-
-Conserve's homepage is: <http://conserve.fyi/>
+ - **Safe**: Conserve is written in [Rust][rust], a fast systems programming
+   language with compile-time guarantees about types, memory safety, and
+   concurrency.
+ - **Robust**:  If one file is corrupted in storage or due
+   to a bug in Conserve, you can still restore others.
+ - **Careful**: Data files already written are never touched or altered,
+   unless you choose to purge them.
+ - **When you need help now**: Restoring a subset of a large backup is fast.
+ - **Always ready**: You can restore recently-written files before the backup
+   job completes.
+ - **Always making progress**: Even if the backup process or its network
+   connection is repeatedly killed, Conserve can quickly pick up
+   where it left off and make forward progress.
+ - **Ready for today**: The storage format is fast and reliable on on
+   high-latency, limited-capability, unlimited-capacity, eventually-consistent
+   cloud object storage.
 
 ## Quick start guide
 
@@ -81,9 +84,10 @@ Conserve is still in a pre-1.0 alpha.  It can be used to make and restore
 backups, but there are some important performance and functional limitations,
 which will be fixed before 1.0.
 
-* [Data compression is slow][32].
+* [Data compression is somewhat slow][32].
 * There are no incremental backups: all backups store all files.
 * [There is no way to exclude files/subdirectories from backup or restore][8].
+* You can only restore the most recent backup, not a named older one.
 * [The planned `validate` command is not implemented][5],
 however a trial restore from the archive will .
 * The planned feature of resuming an interrupted backup is not implemented:
@@ -92,7 +96,6 @@ Conserve will just create a new full backup from the beginning.
 a temporary directory and comparing that to the source.
 * The `conserve cull` command to trim the backup archive is not implemented,
 but the `b0123` band directories can be deleted directly.
-* You can only restore the most recent backup, not a named older one.
 * Permissions and ownership are not stored.
 
 Prior to 1.0, data formats may change on each minor version number change (0.x):
@@ -110,12 +113,18 @@ in the wiki.
 
 Copyright 2012-2016 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
 
-_This program is free software; you can redistribute it and/or
+This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version._
+of the License, or (at your option) any later version.
 
-_This program is distributed in the hope that it will be useful,
+This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details._
+GNU General Public License for more details.
+
+
+## Contact
+
+Conserve's homepage is: <http://conserve.fyi/> and you can talk
+to me in https://gitter.im/sourcefrog/conserve.
