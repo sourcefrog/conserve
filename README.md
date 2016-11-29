@@ -1,28 +1,40 @@
 # Conserve - a robust backup program
 
-**At this time Conserve can make and restore backups, but should
-not be relied upon for production use:
-[more details](#Shortcomings).**
-
-Conserve's homepage is: <https://github.com/sourcefrog/conserve>
+**This alpha version of Conserve can make and restore backups, but has
+[substantial limitations](#Limitations).**
 
 [![Linux build status](https://travis-ci.org/sourcefrog/conserve.svg)](https://travis-ci.org/sourcefrog/conserve)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)
 [![Join the chat at https://gitter.im/sourcefrog/conserve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/sourcefrog/conserve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-## Using Conserve
+## About Conserve
 
-Conserve makes compressed backups from a local *source* tree, to
-an *archive* directory.  Conserve backs up files and directories, and (only on
-Unix) symlinks.
+Conserve copies files, directories, and (on Unix) symlinks from a local *source*
+tree, to an *archive* directory, and retrieves them on demand.
 
-## 30-second user guide
+Conserve's [manifesto](doc/manifesto.md) sets some guiding principles:
+
+ - The format is not fragile: if one file is corrupted in storage or due
+   to a bug in Conserve, you should still be able to restore others.
+ - Data files already written are never touched or altered, unless you
+   choose to purge them.
+ - Restoring just part of the backup files must be fast, and therefore
+   not require reading the whole archive.
+ - You should be able to restore recently-written files even before the
+   backup completes, using a log-structured format.  This also allows
+   efficiently resuming an interrupted backup.
+ - The storage format must be fast and reliable on on high-latency,
+   limited-capability, unlimited-capacity cloud object storage.
+
+Conserve's homepage is: <http://conserve.fyi/>
+
+## Quick start guide
 
     $ conserve init /backup/home.conserve
     $ conserve backup /backup/home.conserve ~
     $ conserve restore /backup/home.conserve /tmp/trial-restore
 
-## Bands
+## Inspecting history
 
 Conserve archives retain all previous versions of backups, stored in
 *bands*.  Bands are identified a string of integers starting with `b`,
@@ -37,15 +49,13 @@ time they were made and the host from which they were made.
 Like all commands that read a band from an archive, it operates
 on the most recent by default.
 
-
 ## Install
 
-Conserve runs on Unix, OS X, and Windows.
+Conserve runs on Linux, OS X, Windows, and probably other systems that
+support Rust.
 
 To build Conserve you need [Rust][rust] and a C compiler that can be used by
-Rust.
-
-Then simply run
+Rust.  Then run
 
     $ cargo build
 
@@ -65,7 +75,7 @@ Then simply run
  * [Archive format](doc/format.md)
 
 
-## Shortcomings
+## Limitations
 
 Conserve is still in a pre-1.0 alpha.  It can be used to make and restore
 backups, but there are some important performance and functional limitations,
