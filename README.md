@@ -89,7 +89,7 @@ which will be fixed before 1.0.
 * [There is no way to exclude files/subdirectories from backup or restore][8].
 * You can only restore the most recent backup, not a named older one.
 * [The planned `validate` command is not implemented][5],
-however a trial restore from the archive will .
+however a trial restore from the archive will test everything can be read.
 * The planned feature of resuming an interrupted backup is not implemented:
 Conserve will just create a new full backup from the beginning.
 * `conserve diff` is also not implemented, but can be simulated by restoring to
