@@ -1,12 +1,14 @@
+# Conserve release history
+
 ## Conserve 0.3.0
 
- * New commands:
-   * `conserve restore`!
- * Symlinks are backed up and restored.
+* New commands:
+  * `conserve restore`!
+* Symlinks are backed up and restored.
    (Only on Unix, they're skipped on Windows.)
- * Breaking archive format change:
-   * Separate whole-file hash from the hash of the blocks making it up.
- * New text-mode progress bar.
+* Breaking archive format change:
+  * Separate whole-file hash from the hash of the blocks making it up.
+* New text-mode progress bar.
 
 ## Conserve 0.2.0 (2016-04-18)
 
