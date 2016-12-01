@@ -1,41 +1,36 @@
 # Conserve: a robust backup program
 
-**This alpha version of Conserve can make and restore backups, but has
-[some limitations](#Limitations).**
-
 [![Linux build status](https://travis-ci.org/sourcefrog/conserve.svg)](https://travis-ci.org/sourcefrog/conserve)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)
 [![Join the chat at https://gitter.im/sourcefrog/conserve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/sourcefrog/conserve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-## About Conserve
-
 Conserve copies files, directories, and (on Unix) symlinks from a local *source*
 tree, to an *archive* directory, and retrieves them on demand.
 
-Conserve's [manifesto](doc/manifesto.md) sets some guiding principles:
+Conserve's [guiding principles](doc/manifesto.md):
 
- - **Safe**: Conserve is written in [Rust][rust], a fast systems programming
+* **Safe**: Conserve is written in [Rust][rust], a fast systems programming
    language with compile-time guarantees about types, memory safety, and
    concurrency.
- - **Robust**:  If one file is corrupted in storage or due
+* **Robust**:  If one file is corrupted in storage or due
    to a bug in Conserve, you can still restore others.
- - **Careful**: Data files already written are never touched or altered,
+* **Careful**: Data files already written are never touched or altered,
    unless you choose to purge them.
- - **When you need help now**: Restoring a subset of a large backup is fast.
- - **Always ready**: You can restore recently-written files before the backup
+* **When you need help now**: Restoring a subset of a large backup is fast.
+* **Always ready**: You can restore recently-written files before the backup
    job completes.
- - **Always making progress**: Even if the backup process or its network
+* **Always making progress**: Even if the backup process or its network
    connection is repeatedly killed, Conserve can quickly pick up
    where it left off and make forward progress.
- - **Ready for today**: The storage format is fast and reliable on on
+* **Ready for today**: The storage format is fast and reliable on on
    high-latency, limited-capability, unlimited-capacity, eventually-consistent
    cloud object storage.
 
 ## Quick start guide
 
-    $ conserve init /backup/home.conserve
-    $ conserve backup /backup/home.conserve ~
-    $ conserve restore /backup/home.conserve /tmp/trial-restore
+    conserve init /backup/home.conserve
+    conserve backup /backup/home.conserve ~
+    conserve restore /backup/home.conserve /tmp/trial-restore
 
 ## Inspecting history
 
@@ -60,23 +55,20 @@ support Rust.
 To build Conserve you need [Rust][rust] and a C compiler that can be used by
 Rust.  Then run
 
-    $ cargo build
+    cargo build
 
 [rust]: https://rust-lang.org/
 [sourcefrog]: http://sourcefrog.net/
 
-
 ## More documentation
 
- * [Conserve Manifesto](doc/manifesto.md)
+* [A comparison to other backup systems][comparison]
 
- * [A comparison to other backup systems](
-   https://github.com/sourcefrog/conserve/wiki/Compared-to-others)
+[comparison]: https://github.com/sourcefrog/conserve/wiki/Compared-to-others
 
- * [Software and format versioning](doc/versioning.md)
+* [Software and format versioning](doc/versioning.md)
 
- * [Archive format](doc/format.md)
-
+* [Archive format](doc/format.md)
 
 ## Limitations
 
@@ -88,14 +80,14 @@ which will be fixed before 1.0.
 * There are no incremental backups: all backups store all files.
 * [There is no way to exclude files/subdirectories from backup or restore][8].
 * You can only restore the most recent backup, not a named older one.
-* [The planned `validate` command is not implemented][5],
-however a trial restore from the archive will test everything can be read.
+* The planned `validate` command is [not implemented][5],
+  however a trial restore from the archive will test everything can be read.
 * The planned feature of resuming an interrupted backup is not implemented:
-Conserve will just create a new full backup from the beginning.
+  Conserve will just create a new full backup from the beginning.
 * `conserve diff` is also not implemented, but can be simulated by restoring to
-a temporary directory and comparing that to the source.
+  a temporary directory and comparing that to the source.
 * The `conserve cull` command to trim the backup archive is not implemented,
-but the `b0123` band directories can be deleted directly.
+  but the `b0123` band directories can be deleted directly.
 * Permissions and ownership are not stored.
 
 Prior to 1.0, data formats may change on each minor version number change (0.x):
@@ -107,7 +99,6 @@ you should restore using the same version that you used to make the backup.
 
 For a longer list see [TODO](https://github.com/sourcefrog/conserve/wiki/TODO)
 in the wiki.
-
 
 ## Licence and non-warranty
 
@@ -123,8 +114,7 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
-
 ## Contact
 
 Conserve's homepage is: <http://conserve.fyi/> and you can talk
-to me in https://gitter.im/sourcefrog/conserve.
+to me in [Gitter](https://gitter.im/sourcefrog/conserve).
