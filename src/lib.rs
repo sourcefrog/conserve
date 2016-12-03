@@ -41,22 +41,23 @@ mod bandid;
 mod block;
 pub mod cmd;
 mod errors;
-mod index;
+pub mod index;
 mod io;
 pub mod logger;
 pub mod report;
 mod restore;
 mod sources;
-#[cfg(test)]
-mod testfixtures;
+pub mod testfixtures;
 pub mod ui;
 
 // Re-export important classes.
 pub use archive::Archive;
+pub use backup::backup;
 pub use band::Band;
 pub use bandid::BandId;
 pub use block::BlockDir;
 pub use report::Report;
+pub use restore::restore;
 
 /// Conserve version number as a semver string.
 ///
