@@ -87,9 +87,9 @@ fn blackbox_help() {
     assert_success_and_output(
         &["--help"],
         &strip_indents("
-            Conserve: an (incomplete) backup tool.
-            Copyright 2015, 2016 Martin Pool, GNU GPL v2+.
-            https://github.com/sourcefrog/conserve
+            Conserve: a robust backup tool.
+            Copyright 2015, 2016 Martin Pool, GNU GPL v2.
+            http://conserve.fyi/
 
             Usage:
                 conserve init [options] <archive>
