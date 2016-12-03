@@ -2,16 +2,16 @@
 name = "conserve"
 version = "0.3.0"
 authors = ["Martin Pool <mbp@sourcefrog.net>"]
-homepage = "https://github.com/sourcefrog/conserve/"
+homepage = "http://conserve.fyi/"
 repository = "https://github.com/sourcefrog/conserve/"
-description = "A robust backup tool. Not for production use yet."
+description = "A robust backup tool."
 readme = "README.md"
 keywords = ["archive", "backup"]
 license = "GPL-2.0"
 
 [[bin]]
 name = "conserve"
-doc = true
+doc = false  # Conflicts with library docs which are more useful.
 
 [dependencies]
 blake2-rfc = "^0"
@@ -31,8 +31,8 @@ time = "^0"
 
 [features]
 default = []
-sync = []
-bench = []
+sync = []  # Flush changes to disk.
+bench = []  # Build benchmarks (nightly compiler only)
 
 [workspace]
 members = ["testsupport"]
