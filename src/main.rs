@@ -18,6 +18,7 @@ extern crate log;
 
 extern crate blake2_rfc;
 extern crate brotli2;
+extern crate isatty;
 extern crate rustc_serialize;
 extern crate spectral;
 extern crate tempdir;
@@ -118,7 +119,8 @@ fn main() {
     // Always turn off progress for commands that send their output to stdout:
     // easier than trying to get them not to interfere, and you should see progress
     // by the output appearing.
-    let progress = !(args.flag_no_progress || args.cmd_ls || args.cmd_list_source
+    let progress = isatty::stdout_isatty() &&
+        !(args.flag_no_progress || args.cmd_ls || args.cmd_list_source
         || args.cmd_versions);
 
     let ui = if progress { ui::terminal::TermUI::new() } else { None };
