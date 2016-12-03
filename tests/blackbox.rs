@@ -65,9 +65,9 @@ fn blackbox_no_args() {
             conserve init [options] <archive>
             conserve backup [options] <archive> <source>
             conserve list-source [options] <source>
-            conserve list-versions [options] <archive>
             conserve ls [options] <archive>
             conserve restore [options] <archive> <destination>
+            conserve versions [options] <archive>
             conserve --version
             conserve --help
         ");
@@ -95,9 +95,9 @@ fn blackbox_help() {
                 conserve init [options] <archive>
                 conserve backup [options] <archive> <source>
                 conserve list-source [options] <source>
-                conserve list-versions [options] <archive>
                 conserve ls [options] <archive>
                 conserve restore [options] <archive> <destination>
+                conserve versions [options] <archive>
                 conserve --version
                 conserve --help
 
@@ -135,7 +135,7 @@ fn blackbox_backup() {
     assert_eq!(stderr, "");
 
     // New archive contains no versions.
-    let (status, stdout, stderr) = run_conserve(&["list-versions", &arch_dir_str]);
+    let (status, stdout, stderr) = run_conserve(&["versions", &arch_dir_str]);
     assert_eq!(stderr, "");
     assert_eq!(stdout, "");
     assert!(status.success());
@@ -150,7 +150,7 @@ fn blackbox_backup() {
     assert!(status.success());
     // TODO: Inspect the archive
 
-    assert_success_and_output(&["list-versions", &arch_dir_str],
+    assert_success_and_output(&["versions", &arch_dir_str],
         "b0000\n", "");
 
     assert_success_and_output(&["ls", &arch_dir_str],

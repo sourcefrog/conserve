@@ -79,9 +79,9 @@ Usage:
     conserve init [options] <archive>
     conserve backup [options] <archive> <source>
     conserve list-source [options] <source>
-    conserve list-versions [options] <archive>
     conserve ls [options] <archive>
     conserve restore [options] <archive> <destination>
+    conserve versions [options] <archive>
     conserve --version
     conserve --help
 
@@ -94,10 +94,10 @@ Options:
 struct Args {
     cmd_backup: bool,
     cmd_init: bool,
-    cmd_list_versions: bool,
     cmd_list_source: bool,
     cmd_ls: bool,
     cmd_restore: bool,
+    cmd_versions: bool,
     arg_archive: String,
     arg_destination: String,
     arg_source: String,
@@ -119,7 +119,7 @@ fn main() {
     // easier than trying to get them not to interfere, and you should see progress
     // by the output appearing.
     let progress = !(args.flag_no_progress || args.cmd_ls || args.cmd_list_source
-        || args.cmd_list_versions);
+        || args.cmd_versions);
 
     let ui = if progress { ui::terminal::TermUI::new() } else { None };
     let report = report::Report::with_ui(ui);
@@ -130,8 +130,8 @@ fn main() {
         cmd::backup(&args.arg_archive, &args.arg_source, &report)
     } else if args.cmd_list_source {
         cmd::list_source(&args.arg_source, &report)
-    } else if args.cmd_list_versions {
-        cmd::list_versions(&args.arg_archive)
+    } else if args.cmd_versions {
+        cmd::versions(&args.arg_archive)
     } else if args.cmd_ls {
         cmd::ls(&args.arg_archive, &report)
     } else if args.cmd_restore {

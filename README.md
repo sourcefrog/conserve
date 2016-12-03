@@ -38,7 +38,7 @@ Conserve archives retain all previous versions of backups, stored in
 *bands*.  Bands are identified a string of integers starting with `b`,
 like `b0000`:
 
-    $ conserve list-versions /backup/home.conserve
+    $ conserve versions /backup/home.conserve
     b0000       2012-12-02T16:24:33   conservetesthost.local
     b0001       2012-12-02T16:24:45   conservetesthost.local
 

@@ -4,6 +4,7 @@
 
 * New commands:
   * `conserve restore`!
+* Renamed `list-versions` to just `versions`.
 * Symlinks are backed up and restored.
    (Only on Unix, they're skipped on Windows.)
 * Breaking archive format change:
