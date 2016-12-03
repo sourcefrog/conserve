@@ -15,6 +15,9 @@ notifications:
 matrix:
   allow_failures:
     - rust: nightly
+  exclude:
+    - os: osx
+      rust: beta
 os:
  - linux
  - osx
