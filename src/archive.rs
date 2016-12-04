@@ -110,9 +110,19 @@ impl Archive {
         self.path.as_path()
     }
 
-    // Return the id of the highest-numbered band, or None if empty.
+    // Return the `BandId` of the highest-numbered band, or None if empty,
+    // or an Err if any occurred reading the directory.
     pub fn last_band_id(self: &Archive) -> Result<Option<BandId>> {
-        Ok(try!(self.list_bands()).pop())
+        // Walk through list of bands; if any error return that, otherwise return the greatest.
+        let mut accum: Option<BandId> = None;
+        for next in try!(self.iter_bands_unsorted()) {
+            accum = Some(match (next, accum) {
+                (Err(e), _) => return Err(e),
+                (Ok(b), None) => b,
+                (Ok(b), Some(a)) => std::cmp::max(b, a),
+            })
+        }
+        Ok(accum)
     }
 
     /// Make a new band. Bands are numbered sequentially.
@@ -233,6 +243,9 @@ mod tests {
     fn create_bands() {
         use super::super::io::directory_exists;
         let af = ScratchArchive::new();
+
+        assert_eq!(af.last_band_id().unwrap(), None);
+
         // Make one band
         let _band1 = af.create_band(&Report::new()).unwrap();
         assert!(directory_exists(af.path()).unwrap());
@@ -241,10 +254,12 @@ mod tests {
         assert!(dir_names.contains("b0000"));
 
         assert_eq!(af.list_bands().unwrap(), vec![BandId::new(&[0])]);
+        assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[0])));
 
         // // Try creating a second band.
         let _band2 = &af.create_band(&Report::new()).unwrap();
         assert_eq!(af.list_bands().unwrap(),
                    vec![BandId::new(&[0]), BandId::new(&[1])]);
+        assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
     }
 }
