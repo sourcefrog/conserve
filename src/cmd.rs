@@ -1,13 +1,11 @@
 use std::path::Path;
 
 use super::{Archive, Band, Report};
-use super::backup;
 use super::errors::*;
-use super::restore;
 use super::sources;
 
 pub fn backup(archive: &str, source: &str, report: &Report) -> Result<()> {
-    backup::backup(Path::new(archive), Path::new(source), report)
+    super::backup(Path::new(archive), Path::new(source), report)
 }
 
 pub fn init(archive: &str) -> Result<()> {
@@ -44,5 +42,5 @@ pub fn ls(archive_str: &str, report: &Report) -> Result<()> {
 
 
 pub fn restore(archive_str: &str, destination: &str, report: &Report) -> Result<()> {
-    restore::restore(Path::new(archive_str), Path::new(destination), report)
+    super::restore(Path::new(archive_str), Path::new(destination), report)
 }

@@ -4,7 +4,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use super::*;
+use super::{Archive, Band, BlockDir, Report};
 use super::apath;
 use super::errors::*;
 use super::index;

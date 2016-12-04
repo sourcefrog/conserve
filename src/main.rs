@@ -16,60 +16,14 @@ extern crate error_chain;
 #[macro_use]
 extern crate log;
 
-extern crate blake2_rfc;
-extern crate brotli2;
 extern crate isatty;
 extern crate rustc_serialize;
-extern crate spectral;
-extern crate tempdir;
-extern crate tempfile;
-extern crate term;
-extern crate time;
 
-#[cfg(feature="bench")]
-extern crate test;
+extern crate conserve;
 
-extern crate conserve_testsupport;
+use conserve::cmd;
+use conserve::report;
 
-use docopt::Docopt;
-
-// Conserve implementation modules.
-mod apath;
-mod archive;
-mod backup;
-mod band;
-mod bandid;
-mod block;
-mod cmd;
-mod errors;
-mod index;
-mod io;
-mod logger;
-mod report;
-mod restore;
-mod sources;
-#[cfg(test)]
-mod testfixtures;
-mod ui;
-
-// Re-export important classes.
-pub use archive::Archive;
-pub use band::Band;
-pub use bandid::BandId;
-pub use block::BlockDir;
-pub use report::Report;
-
-/// Conserve version number as a semver string.
-///
-/// This is populated at compile time from `Cargo.toml`.
-pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-
-/// Format-compatibility version, normally the first two components of the package version.
-const ARCHIVE_VERSION: &'static str = "0.3";
-
-const BROTLI_COMPRESSION_LEVEL: u32 = 9;
-
-pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family="unix");
 
 static USAGE: &'static str = "
 Conserve: a robust backup tool.
@@ -108,10 +62,10 @@ struct Args {
 
 
 fn main() {
-    logger::establish_a_logger();
-    let args: Args = Docopt::new(USAGE)
+    conserve::logger::establish_a_logger();
+    let args: Args = docopt::Docopt::new(USAGE)
         .unwrap()
-        .version(Some(VERSION.to_string()))
+        .version(Some(conserve::VERSION.to_string()))
         .help(true)
         .decode()
         .unwrap_or_else(|e| e.exit());
@@ -123,7 +77,7 @@ fn main() {
         !(args.flag_no_progress || args.cmd_ls || args.cmd_list_source
         || args.cmd_versions);
 
-    let ui = if progress { ui::terminal::TermUI::new() } else { None };
+    let ui = if progress { conserve::ui::terminal::TermUI::new() } else { None };
     let report = report::Report::with_ui(ui);
 
     let result = if args.cmd_init {
