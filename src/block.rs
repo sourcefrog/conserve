@@ -155,20 +155,20 @@ impl BlockDir {
         let decompressed = match read_and_decompress(&path) {
             Ok(d) => d,
             Err(e) => {
-                report.increment("block.read.corrupt", 1);
+                report.increment("block.corrupt", 1);
                 error!("Block file {:?} read error {:?}", path, e);
                 return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
             }
         };
         // TODO: Accept addresses referring to only part of a block.
         assert_eq!(decompressed.len(), addr.len as usize);
-        report.increment("block.read", 1);
+        report.increment("block", 1);
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
             .as_bytes()
             .to_hex();
         if actual_hash != *hash {
-            report.increment("block.read.misplaced", 1);
+            report.increment("block.misplaced", 1);
             error!("Block file {:?} has actual decompressed hash {:?}", path, actual_hash);
             return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
@@ -235,10 +235,10 @@ mod tests {
         assert_eq!(report.borrow_counts().get_size("block"), (6, 10));
 
         // Try to read back
-        assert_eq!(report.borrow_counts().get_count("block.read"), 0);
+        assert_eq!(report.borrow_counts().get_count("block"), 0);
         let back = block_dir.get(&refs[0], &report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
-        assert_eq!(report.borrow_counts().get_count("block.read"), 1);
+        assert_eq!(report.borrow_counts().get_count("block"), 1);
     }
 
     #[test]

@@ -22,13 +22,11 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "file",
     "symlink",
     "backup.error.stat",
-    "block.read",
-    "block.read.corrupt",
-    "block.read.misplaced",
-    "block.already_present",
     "block",
-    "index.read.hunks",
-    "index.hunks",
+    "block.corrupt",
+    "block.misplaced",
+    "block.already_present",
+    "index.hunk",
     "source.error.metadata",
     "source.selected",
     "skipped.unsupported_file_kind",
@@ -180,7 +178,7 @@ impl Display for Report {
         let inner = self.mut_inner();
         for (key, value) in &inner.count {
             if *value > 0 {
-                try!(write!(f, "  {:<50}{:>10}\n", *key, *value));
+                try!(write!(f, "  {:<40} {:>9}\n", *key, *value));
             }
         }
         try!(write!(f, "Bytes (before and after compression):\n"));
@@ -188,7 +186,7 @@ impl Display for Report {
             if uncompressed_bytes > 0 {
                 let compression_pct =
                     100 - ((100 * compressed_bytes) / uncompressed_bytes);
-                try!(write!(f, "  {:<50} {:>9} {:>9} {:>9}%\n", *key,
+                try!(write!(f, "  {:<40} {:>9} {:>9} {:>9}%\n", *key,
                     uncompressed_bytes, compressed_bytes, compression_pct));
             }
         }
@@ -197,7 +195,7 @@ impl Display for Report {
             let millis = dur.subsec_nanos() / 1000000;
             let secs = dur.as_secs();
             if millis > 0 || secs > 0 {
-                try!(write!(f, "  {:<40} {:>15}.{:>03}\n", key, secs, millis));
+                try!(write!(f, "  {:<40} {:>5}.{:>03}\n", key, secs, millis));
             }
         }
         Ok(())
@@ -238,28 +236,27 @@ mod tests {
     #[test]
     pub fn count() {
         let r = Report::new();
-        assert_eq!(r.borrow_counts().get_count("block.read"), 0);
-        r.increment("block.read", 1);
-        assert_eq!(r.borrow_counts().get_count("block.read"), 1);
-        r.increment("block.read", 10);
-        assert_eq!(r.borrow_counts().get_count("block.read"), 11);
+        assert_eq!(r.borrow_counts().get_count("block"), 0);
+        r.increment("block", 1);
+        assert_eq!(r.borrow_counts().get_count("block"), 1);
+        r.increment("block", 10);
+        assert_eq!(r.borrow_counts().get_count("block"), 11);
     }
 
     #[test]
     pub fn merge_reports() {
         let r1 = Report::new();
         let r2 = Report::new();
-        r1.increment("block.read", 1);
-        r1.increment("block.read.corrupt", 2);
+        r1.increment("block", 1);
+        r1.increment("block.corrupt", 2);
         r2.increment("block", 1);
-        r2.increment("block.read.corrupt", 10);
+        r2.increment("block.corrupt", 10);
         r2.increment_size("block", 300, 100);
         r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
         let cs = r1.borrow_counts();
-        assert_eq!(cs.get_count("block.read"), 1);
-        assert_eq!(cs.get_count("block.read.corrupt"), 12);
-        assert_eq!(cs.get_count("block"), 1);
+        assert_eq!(cs.get_count("block"), 2);
+        assert_eq!(cs.get_count("block.corrupt"), 12);
         assert_eq!(cs.get_size("block"), (300, 100));
         assert_eq!(cs.get_duration("test"), Duration::new(5, 0));
     }
@@ -267,7 +264,7 @@ mod tests {
     #[test]
     pub fn display() {
         let r1 = Report::new();
-        r1.increment("block.read", 10);
+        r1.increment("block", 10);
         r1.increment("block", 5);
         r1.increment_size("block", 300, 100);
         r1.increment_duration("test", Duration::new(42, 479760000));
@@ -275,12 +272,11 @@ mod tests {
         let formatted = format!("{}", r1);
         assert_eq!(formatted, "\
 Counts:
-  block.read                                                10
-  block                                                5
+  block                                           15
 Bytes (before and after compression):
-  block                                              300       100        67%
+  block                                          300       100        67%
 Durations (seconds):
-  test                                                  42.479
+  test                                        42.479
 ");
     }
 }

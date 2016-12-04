@@ -137,7 +137,7 @@ impl IndexBuilder {
         try!(af.close(report));
 
         report.increment_size("index", uncompressed_len as u64, compressed_len as u64);
-        report.increment("index.hunks", 1);
+        report.increment("index.hunk", 1);
 
         // Ready for the next hunk.
         self.entries.clear();
@@ -233,7 +233,7 @@ impl Iter {
             },
         };
         self.report.increment_duration("index.read", start_read.elapsed());
-        self.report.increment("index.read.hunks", 1);
+        self.report.increment("index.hunk", 1);
 
         let start_parse = time::Instant::now();
         let index_json = try!(str::from_utf8(&index_bytes).chain_err(
