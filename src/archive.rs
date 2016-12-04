@@ -110,9 +110,19 @@ impl Archive {
         self.path.as_path()
     }
 
-    // Return the id of the highest-numbered band, or None if empty.
+    // Return the `BandId` of the highest-numbered band, or None if empty,
+    // or an Err if any occurred reading the directory.
     pub fn last_band_id(self: &Archive) -> Result<Option<BandId>> {
-        Ok(try!(self.list_bands()).pop())
+        // Walk through list of bands; if any error return that, otherwise return the greatest.
+        let mut accum: Option<BandId> = None;
+        for next in try!(self.iter_bands_unsorted()) {
+            accum = Some(match (next, accum) {
+                (Err(e), _) => return Err(e),
+                (Ok(b), None) => b,
+                (Ok(b), Some(a)) => std::cmp::max(b, a),
+            })
+        }
+        Ok(accum)
     }
 
     /// Make a new band. Bands are numbered sequentially.
