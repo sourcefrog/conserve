@@ -134,8 +134,7 @@ impl Report {
         }
     }
 
-    pub fn increment_size(&self, counter_name: &str, uncompressed_bytes: u64,
-        compressed_bytes: u64) {
+    pub fn increment_size(&self, counter_name: &str, uncompressed_bytes: u64, compressed_bytes: u64) {
         let mut inner = self.mut_inner();
         let mut e = inner.sizes.get_mut(counter_name).expect("unregistered size counter");
         e.0 += uncompressed_bytes;
