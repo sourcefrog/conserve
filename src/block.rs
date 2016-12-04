@@ -152,7 +152,7 @@ impl BlockDir {
         assert_eq!(0, addr.start);
         let path = self.path_for_file(hash);
         // TODO: Specific error for compression failure (corruption?) vs io errors.
-        let decompressed = match read_and_decompress(&path) {
+        let (compressed_len, decompressed) = match read_and_decompress(&path) {
             Ok(d) => d,
             Err(e) => {
                 report.increment("block.corrupt", 1);
@@ -163,6 +163,7 @@ impl BlockDir {
         // TODO: Accept addresses referring to only part of a block.
         assert_eq!(decompressed.len(), addr.len as usize);
         report.increment("block", 1);
+        report.increment_size("block", decompressed.len() as u64, compressed_len as u64);
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
             .as_bytes()
@@ -235,10 +236,15 @@ mod tests {
         assert_eq!(report.borrow_counts().get_size("block"), (6, 10));
 
         // Try to read back
-        assert_eq!(report.borrow_counts().get_count("block"), 0);
-        let back = block_dir.get(&refs[0], &report).unwrap();
+        let read_report = Report::new();
+        assert_eq!(read_report.borrow_counts().get_count("block"), 0);
+        let back = block_dir.get(&refs[0], &read_report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
-        assert_eq!(report.borrow_counts().get_count("block"), 1);
+        {
+            let counts = read_report.borrow_counts();
+            assert_eq!(counts.get_count("block"), 1);
+            assert_eq!(counts.get_size("block"), (EXAMPLE_TEXT.len() as u64, 10u64));
+        }
     }
 
     #[test]

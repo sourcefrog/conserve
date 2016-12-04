@@ -222,7 +222,7 @@ impl Iter {
         let start_read = time::Instant::now();
         // Load the next index hunk into buffered_entries.
         let hunk_path = path_for_hunk(&self.dir, self.next_hunk_number);
-        let index_bytes = match read_and_decompress(&hunk_path) {
+        let (comp_len, index_bytes) = match read_and_decompress(&hunk_path) {
             Ok(i) => i,
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
                 // No (more) index hunk files.
@@ -233,6 +233,7 @@ impl Iter {
             },
         };
         self.report.increment_duration("index.read", start_read.elapsed());
+        self.report.increment_size("index", index_bytes.len() as u64, comp_len as u64);
         self.report.increment("index.hunk", 1);
 
         let start_parse = time::Instant::now();
@@ -367,7 +368,7 @@ mod tests {
         expected_path.push("000000000");
 
         // Check the stored json version
-        let retrieved_bytes = read_and_decompress(&expected_path).unwrap();
+        let (_comp_len, retrieved_bytes) = read_and_decompress(&expected_path).unwrap();
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
         assert_eq!(retrieved,  r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null}]"#);
 
