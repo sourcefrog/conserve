@@ -58,7 +58,7 @@ impl<'a> Restore<'a> {
     }
 
     fn restore_dir(&mut self, _entry: &index::Entry, dest: &Path) -> Result<()> {
-        self.report.increment("restore.dir", 1);
+        self.report.increment("dir", 1);
         match fs::create_dir(dest) {
             Ok(_) => Ok(()),
             Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
@@ -67,7 +67,7 @@ impl<'a> Restore<'a> {
     }
 
     fn restore_file(&mut self, entry: &index::Entry, dest: &Path) -> Result<()> {
-        self.report.increment("restore.file", 1);
+        self.report.increment("file", 1);
         // Here too we write a temporary file and then move it into place: so the file
         // under its real name only appears
         let mut af = try!(AtomicFile::new(dest));
@@ -81,7 +81,7 @@ impl<'a> Restore<'a> {
     #[cfg(unix)]
     fn restore_symlink(&mut self, entry: &index::Entry, dest: &Path) -> Result<()> {
         use std::os::unix::fs as unix_fs;
-        self.report.increment("restore.symlink", 1);
+        self.report.increment("symlink", 1);
         if let Some(ref target) = entry.target {
             unix_fs::symlink(target, dest).unwrap();
         } else {
@@ -125,13 +125,14 @@ mod tests {
             srcdir.create_symlink("link", "target");
         }
 
-        let report = Report::new();
-        backup(af.path(), srcdir.path(), &report).unwrap();
+        let backup_report = Report::new();
+        backup(af.path(), srcdir.path(), &backup_report).unwrap();
 
         let destdir = TreeFixture::new();
-        restore(af.path(), destdir.path(), &report).unwrap();
+        let restore_report = Report::new();
+        restore(af.path(), destdir.path(), &restore_report).unwrap();
 
-        assert_eq!(2, report.borrow_counts().get_count("restore.file"));
+        assert_eq!(2, restore_report.borrow_counts().get_count("file"));
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("subdir").as_path()).is_a_directory();

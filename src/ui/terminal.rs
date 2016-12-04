@@ -105,11 +105,11 @@ impl UI for TermUI {
         let uncomp_rate = mbps_rate(block_sizes.0, elapsed);
 
         t.fg(term::color::GREEN).unwrap();
-        write!(t, "{:8}", counts.get_count("backup.file")).unwrap();
+        write!(t, "{:8}", counts.get_count("file")).unwrap();
         t.fg(term::color::WHITE).unwrap();
         write!(t, " files").unwrap();
         t.fg(term::color::GREEN).unwrap();
-        write!(t, "{:8}", counts.get_count("backup.dir")).unwrap();
+        write!(t, "{:8}", counts.get_count("dir")).unwrap();
         t.fg(term::color::WHITE).unwrap();
         write!(t, " dirs").unwrap();
         t.fg(term::color::GREEN).unwrap();

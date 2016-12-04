@@ -18,9 +18,9 @@ use super::ui::UI;
 use super::ui::terminal::TermUI;
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[
-    "backup.dir",
-    "backup.file",
-    "backup.symlink",
+    "dir",
+    "file",
+    "symlink",
     "backup.error.stat",
     "block.read",
     "block.read.corrupt",
@@ -29,9 +29,6 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "block.write",
     "index.read.hunks",
     "index.write.hunks",
-    "restore.dir",
-    "restore.file",
-    "restore.symlink",
     "source.error.metadata",
     "source.selected",
     "skipped.unsupported_file_kind",

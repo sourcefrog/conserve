@@ -63,7 +63,7 @@ impl Backup {
 
 
     fn store_dir(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
-        self.report.increment("backup.dir", 1);
+        self.report.increment("dir", 1);
         Ok(index::Entry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
@@ -76,7 +76,7 @@ impl Backup {
 
 
     fn store_file(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
-        self.report.increment("backup.file", 1);
+        self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
         let mut f = try!(fs::File::open(&source_entry.path));
         let (addrs, body_hash) = try!(self.block_dir.store(&mut f, &self.report));
@@ -92,7 +92,7 @@ impl Backup {
 
 
     fn store_symlink(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
-        self.report.increment("backup.symlink", 1);
+        self.report.increment("symlink", 1);
         // TODO: Maybe log a warning if the target is not decodable rather than silently
         // losing.
         let target = try!(fs::read_link(&source_entry.path)).to_string_lossy().to_string();
@@ -127,8 +127,8 @@ mod tests {
         let report = Report::new();
         backup(af.path(), srcdir.path(), &report).unwrap();
         assert_eq!(0, report.borrow_counts().get_count("block.write"));
-        assert_eq!(0, report.borrow_counts().get_count("backup.file"));
-        assert_eq!(1, report.borrow_counts().get_count("backup.symlink"));
+        assert_eq!(0, report.borrow_counts().get_count("file"));
+        assert_eq!(1, report.borrow_counts().get_count("symlink"));
         assert_eq!(0, report.borrow_counts().get_count("skipped.unsupported_file_kind"));
 
         let band_ids = af.list_bands().unwrap();
