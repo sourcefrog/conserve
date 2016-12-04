@@ -91,7 +91,7 @@ impl UI for TermUI {
         // TODO: Input size should really be the number of source bytes before
         // block deduplication.
         // Measure compression on body bytes.
-        let block_sizes = counts.get_size("block.write");
+        let block_sizes = counts.get_size("block");
         let block_comp_pct = compression_percent(block_sizes.0, block_sizes.1);
         let elapsed = counts.elapsed_time();
         // TODO: Truncate to screen width (or draw on multiple lines with cursor-up)?

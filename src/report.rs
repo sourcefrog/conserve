@@ -25,10 +25,10 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "block.read",
     "block.read.corrupt",
     "block.read.misplaced",
-    "block.write.already_present",
-    "block.write",
+    "block.already_present",
+    "block",
     "index.read.hunks",
-    "index.write.hunks",
+    "index.hunks",
     "source.error.metadata",
     "source.selected",
     "skipped.unsupported_file_kind",
@@ -37,8 +37,8 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
 
 
 static KNOWN_SIZES: &'static [&'static str] = &[
-    "block.write",
-    "index.write",
+    "block",
+    "index",
 ];
 
 
@@ -251,16 +251,16 @@ mod tests {
         let r2 = Report::new();
         r1.increment("block.read", 1);
         r1.increment("block.read.corrupt", 2);
-        r2.increment("block.write", 1);
+        r2.increment("block", 1);
         r2.increment("block.read.corrupt", 10);
-        r2.increment_size("block.write", 300, 100);
+        r2.increment_size("block", 300, 100);
         r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
         let cs = r1.borrow_counts();
         assert_eq!(cs.get_count("block.read"), 1);
         assert_eq!(cs.get_count("block.read.corrupt"), 12);
-        assert_eq!(cs.get_count("block.write"), 1);
-        assert_eq!(cs.get_size("block.write"), (300, 100));
+        assert_eq!(cs.get_count("block"), 1);
+        assert_eq!(cs.get_size("block"), (300, 100));
         assert_eq!(cs.get_duration("test"), Duration::new(5, 0));
     }
 
@@ -268,17 +268,17 @@ mod tests {
     pub fn display() {
         let r1 = Report::new();
         r1.increment("block.read", 10);
-        r1.increment("block.write", 5);
-        r1.increment_size("block.write", 300, 100);
+        r1.increment("block", 5);
+        r1.increment_size("block", 300, 100);
         r1.increment_duration("test", Duration::new(42, 479760000));
 
         let formatted = format!("{}", r1);
         assert_eq!(formatted, "\
 Counts:
   block.read                                                10
-  block.write                                                5
+  block                                                5
 Bytes (before and after compression):
-  block.write                                              300       100        67%
+  block                                              300       100        67%
 Durations (seconds):
   test                                                  42.479
 ");

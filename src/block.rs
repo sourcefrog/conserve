@@ -113,7 +113,7 @@ impl BlockDir {
             len: uncompressed_length,
         }];
         if try!(self.contains(&hex_hash)) {
-            report.increment("block.write.already_present", 1);
+            report.increment("block.already_present", 1);
             return Ok((refs, hex_hash));
         }
         let compressed_length: u64 = try!(tempf.seek(SeekFrom::Current(0)));
@@ -123,14 +123,14 @@ impl BlockDir {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);
-                report.increment("block.write.already_present", 1);
+                report.increment("block.already_present", 1);
                 return Ok((refs, hex_hash));
             } else {
                 return Err(e.error.into());
             }
         }
-        report.increment("block.write", 1);
-        report.increment_size("block.write", uncompressed_length, compressed_length);
+        report.increment("block", 1);
+        report.increment_size("block", uncompressed_length, compressed_length);
         Ok((refs, hex_hash))
     }
 
@@ -230,9 +230,9 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
 
-        assert_eq!(report.borrow_counts().get_count("block.write.already_present"), 0);
-        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
-        assert_eq!(report.borrow_counts().get_size("block.write"), (6, 10));
+        assert_eq!(report.borrow_counts().get_count("block.already_present"), 0);
+        assert_eq!(report.borrow_counts().get_count("block"), 1);
+        assert_eq!(report.borrow_counts().get_size("block"), (6, 10));
 
         // Try to read back
         assert_eq!(report.borrow_counts().get_count("block.read"), 0);
@@ -248,13 +248,13 @@ mod tests {
 
         let mut example_file = make_example_file();
         let (refs1, hash1) = block_dir.store(&mut example_file, &report).unwrap();
-        assert_eq!(report.borrow_counts().get_count("block.write.already_present"), 0);
-        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
+        assert_eq!(report.borrow_counts().get_count("block.already_present"), 0);
+        assert_eq!(report.borrow_counts().get_count("block"), 1);
 
         let mut example_file = make_example_file();
         let (refs2, hash2) = block_dir.store(&mut example_file, &report).unwrap();
-        assert_eq!(report.borrow_counts().get_count("block.write.already_present"), 1);
-        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
+        assert_eq!(report.borrow_counts().get_count("block.already_present"), 1);
+        assert_eq!(report.borrow_counts().get_count("block"), 1);
 
         assert_eq!(hash1, hash2);
         assert_eq!(refs1, refs2);

@@ -136,8 +136,8 @@ impl IndexBuilder {
         let compressed_len: u64 = try!(af.seek(SeekFrom::Current(0)));
         try!(af.close(report));
 
-        report.increment_size("index.write", uncompressed_len as u64, compressed_len as u64);
-        report.increment("index.write.hunks", 1);
+        report.increment_size("index", uncompressed_len as u64, compressed_len as u64);
+        report.increment("index.hunks", 1);
 
         // Ready for the next hunk.
         self.entries.clear();

@@ -126,7 +126,7 @@ mod tests {
         srcdir.create_symlink("symlink", "/a/broken/destination");
         let report = Report::new();
         backup(af.path(), srcdir.path(), &report).unwrap();
-        assert_eq!(0, report.borrow_counts().get_count("block.write"));
+        assert_eq!(0, report.borrow_counts().get_count("block"));
         assert_eq!(0, report.borrow_counts().get_count("file"));
         assert_eq!(1, report.borrow_counts().get_count("symlink"));
         assert_eq!(0, report.borrow_counts().get_count("skipped.unsupported_file_kind"));
