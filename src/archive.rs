@@ -233,6 +233,9 @@ mod tests {
     fn create_bands() {
         use super::super::io::directory_exists;
         let af = ScratchArchive::new();
+
+        assert_eq!(af.last_band_id().unwrap(), None);
+
         // Make one band
         let _band1 = af.create_band(&Report::new()).unwrap();
         assert!(directory_exists(af.path()).unwrap());
@@ -241,10 +244,12 @@ mod tests {
         assert!(dir_names.contains("b0000"));
 
         assert_eq!(af.list_bands().unwrap(), vec![BandId::new(&[0])]);
+        assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[0])));
 
         // // Try creating a second band.
         let _band2 = &af.create_band(&Report::new()).unwrap();
         assert_eq!(af.list_bands().unwrap(),
                    vec![BandId::new(&[0]), BandId::new(&[1])]);
+        assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
     }
 }
