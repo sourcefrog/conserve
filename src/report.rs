@@ -203,14 +203,15 @@ impl Display for Report {
 
 
 impl Counts {
-    #[allow(dead_code)]
     pub fn get_duration(&self, name: &str) -> Duration {
-        *self.durations.get(name).expect("unknown duration name")
+        *self.durations.get(name).unwrap_or_else(
+            || panic!("unknown duration {:?}", name))
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
     pub fn get_count(&self, counter_name: &str) -> u64 {
-        *self.count.get(counter_name).expect("unknown counter")
+        *self.count.get(counter_name).unwrap_or_else(
+            || panic!("unknown counter {:?}", counter_name))
     }
 
     /// Get size of data processed.
@@ -218,7 +219,8 @@ impl Counts {
     /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
     /// in bytes.
     pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
-        *self.sizes.get(counter_name).expect("unknown size counter")
+        *self.sizes.get(counter_name).unwrap_or_else(
+            || panic!("unknown counter {:?}", counter_name))
     }
 
     pub fn elapsed_time(&self) -> Duration {
