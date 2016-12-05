@@ -77,7 +77,7 @@ backups, but there are some important performance and functional limitations,
 which will be fixed before 1.0.
 
 * [Data compression is somewhat slow][32].
-* There are no incremental backups: all backups store all files.
+* [There are no incremental backups][41]: all backups store all files.
 * [There is no way to exclude files/subdirectories from backup or restore][8].
 * You can only restore the most recent backup, not a named older one.
 * The planned `validate` command is [not implemented][5],
@@ -96,6 +96,7 @@ you should restore using the same version that you used to make the backup.
 [5]: https://github.com/sourcefrog/conserve/issues/5
 [8]: https://github.com/sourcefrog/conserve/issues/8
 [32]: https://github.com/sourcefrog/conserve/issues/32
+[41]: https://github.com/sourcefrog/conserve/issues/41
 
 For a longer list see [TODO](https://github.com/sourcefrog/conserve/wiki/TODO)
 in the wiki.
