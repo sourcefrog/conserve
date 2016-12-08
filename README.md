@@ -79,14 +79,14 @@ which will be fixed before 1.0.
 * [Data compression is somewhat slow][32].
 * [There are no incremental backups][41]: all backups store all files.
 * [There is no way to exclude files/subdirectories from backup or restore][8].
-* You can only restore the most recent backup, not a named older one.
+* [You can only restore the most recent backup, not a named older one][42].
 * The planned `validate` command is [not implemented][5],
   however a trial restore from the archive will test everything can be read.
 * The planned feature of resuming an interrupted backup is not implemented:
   Conserve will just create a new full backup from the beginning.
 * `conserve diff` is also not implemented, but can be simulated by restoring to
   a temporary directory and comparing that to the source.
-* The `conserve cull` command to trim the backup archive is not implemented,
+* [The `conserve purge` command to trim the backup archive is not implemented][43],
   but the `b0123` band directories can be deleted directly.
 * Permissions and ownership are not stored.
 
@@ -97,9 +97,14 @@ you should restore using the same version that you used to make the backup.
 [8]: https://github.com/sourcefrog/conserve/issues/8
 [32]: https://github.com/sourcefrog/conserve/issues/32
 [41]: https://github.com/sourcefrog/conserve/issues/41
+[42]:https://github.com/sourcefrog/conserve/issues/42
+[43]: https://github.com/sourcefrog/conserve/issues/43
 
-For a longer list see [TODO](https://github.com/sourcefrog/conserve/wiki/TODO)
-in the wiki.
+For a longer list see the [issue tracker][issues] and 
+[milestones][milestones].
+
+[issues]: https://github.com/sourcefrog/conserve/issues
+[milestones]: https://github.com/sourcefrog/conserve/milestones
 
 ## Licence and non-warranty
 
