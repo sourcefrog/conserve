@@ -12,10 +12,10 @@ use super::io::AtomicFile;
 
 /// Restore operation.
 pub struct Restore {
-    pub band: Band,
-    pub report: Report,
-    pub destination: PathBuf,
-    pub block_dir: BlockDir,
+    band: Band,
+    report: Report,
+    destination: PathBuf,
+    block_dir: BlockDir,
 }
 
 
