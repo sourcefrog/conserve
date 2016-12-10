@@ -18,13 +18,9 @@ pub struct Restore {
     pub block_dir: BlockDir,
 }
 
-pub fn restore(archive_path: &Path, destination: &Path, report: &Report) -> Result<()> {
-    let archive = try!(Archive::open(&archive_path));
-    Restore::new(archive, destination, report).run()
-}
 
 impl Restore {
-    pub fn new(archive: Archive, destination: &Path, report: &Report) -> Restore {
+    pub fn new(archive: &Archive, destination: &Path, report: &Report) -> Restore {
         // TODO: Open these later and return a clean error.
         let band_id = archive.last_band_id().unwrap().expect("archive is empty");
         let band = Band::open(archive.path(), &band_id, report).unwrap();
@@ -118,7 +114,7 @@ mod tests {
     use spectral::prelude::*;
 
     use super::super::SYMLINKS_SUPPORTED;
-    use super::restore;
+    use super::Restore;
     use super::super::backup::backup;
     use super::super::report::Report;
     use super::super::testfixtures::ScratchArchive;
@@ -144,7 +140,7 @@ mod tests {
         let af = setup_archive();
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
-        restore(af.path(), destdir.path(), &restore_report).unwrap();
+        Restore::new(&af, destdir.path(), &restore_report).run().unwrap();
 
         assert_eq!(2, restore_report.borrow_counts().get_count("file"));
         let dest = &destdir.path();
@@ -168,7 +164,7 @@ mod tests {
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
         let restore_report = Report::new();
-        let restore_err = restore(af.path(), destdir.path(), &restore_report).unwrap_err();
+        let restore_err = Restore::new(&af, destdir.path(), &restore_report).run().unwrap_err();
         let restore_err_str = restore_err.to_string();
         assert_that(&restore_err_str).contains(&"Destination directory not empty");
     }

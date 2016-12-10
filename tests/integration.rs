@@ -8,7 +8,7 @@ extern crate conserve_testsupport;
 use conserve::backup;
 use conserve::index;
 use conserve::report::Report;
-use conserve::restore;
+use conserve::Restore;
 use conserve::testfixtures::{ScratchArchive};
 use conserve_testsupport::TreeFixture;
 
@@ -60,6 +60,6 @@ pub fn simple_backup() {
     // TODO: Read back contents of that file.
     let restore_dir = TreeFixture::new();
     let restore_report = Report::new();
-    restore(af.path(), restore_dir.path(), &restore_report).unwrap();
+    Restore::new(&af, restore_dir.path(), &restore_report).run().unwrap();
     // TODO: Check what was restored.
 }

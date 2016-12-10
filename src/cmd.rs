@@ -42,5 +42,6 @@ pub fn ls(archive_str: &str, report: &Report) -> Result<()> {
 
 
 pub fn restore(archive_str: &str, destination: &str, report: &Report) -> Result<()> {
-    super::restore(Path::new(archive_str), Path::new(destination), report)
+    let archive = try!(Archive::open(Path::new(archive_str)));
+    super::Restore::new(&archive, Path::new(destination), report).run()
 }
