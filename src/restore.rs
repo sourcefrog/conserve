@@ -33,6 +33,11 @@ pub fn restore(archive_path: &Path, destination: &Path, report: &Report) -> Resu
 
 impl<'a> Restore<'a> {
     fn run(mut self) -> Result<()> {
+        if let Ok(mut it) = fs::read_dir(&self.destination) {
+            if it.next().is_some() {
+                return Err(ErrorKind::DestinationNotEmpty(self.destination).into());
+            }
+        }
         for entry in try!(self.band.index_iter(self.report)) {
             let entry = try!(entry);
             // TODO: Continue even if one fails
@@ -149,5 +154,17 @@ mod tests {
         // TODO: Test restore empty file.
         // TODO: Test file contents are as expected.
         // TODO: Test restore of larger files.
+    }
+
+
+    #[test]
+    pub fn decline_to_overwrite() {
+        let af = setup_archive();
+        let destdir = TreeFixture::new();
+        destdir.create_file("existing");
+        let restore_report = Report::new();
+        let restore_err = restore(af.path(), destdir.path(), &restore_report).unwrap_err();
+        let restore_err_str = restore_err.to_string();
+        assert_that(&restore_err_str).contains(&"Destination directory not empty");
     }
 }
