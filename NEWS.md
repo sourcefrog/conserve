@@ -1,20 +1,19 @@
 # Conserve release history
 
-## Conserve 0.3.0
+## Conserve 0.3.0 (not release yet)
 
-* New commands:
-  * `conserve restore`!
-* Renamed `list-versions` to just `versions`.
-* Symlinks are backed up and restored.
-   (Only on Unix, they're skipped on Windows.)
-* Breaking archive format change:
-  * Separate whole-file hash from the hash of the blocks making it up.
+* Archive format has changed from 0.2 without backward compatibility.
+* New and changed commands:
+  * `conserve restore` makes Conserve a much more useful backup tool!
+  * Renamed `list-versions` to just `versions`.
+* Symlinks are backed up and restored.  (Only on Unix, they're skipped on
+  Windows because they seem to be rare and to have complicated semantics.)
 * New text-mode progress bar.
 
 ## Conserve 0.2.0 (2016-04-18)
 
 * Rewrite in lovely Rust.
-* Newly implmented commands:
+* New commands:
   * `conserve init`: create an archive.  (Renamed from `init-archive`.)
   * `conserve backup`: copy a directory recursively into a new top-level
     version in the archive.  Incremental backups and exclusions are not yet
