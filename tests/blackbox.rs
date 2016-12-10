@@ -118,7 +118,7 @@ fn clean_error_on_non_archive() {
     // TODO: Errors really should go to stderr not stdout.
     let error_string = stdout;
     assert_that(&status).matches(|s| !s.success());
-    assert_that(&error_string.as_str()).contains(&"not a Conserve archive");
+    assert_that(&error_string.as_str()).contains(&"Not a Conserve archive");
 }
 
 
