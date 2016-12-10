@@ -11,9 +11,9 @@ use super::index;
 use super::io::AtomicFile;
 
 /// Restore operation.
-pub struct Restore<'a> {
+pub struct Restore {
     pub band: Band,
-    pub report: &'a Report,
+    pub report: Report,
     pub destination: PathBuf,
     pub block_dir: BlockDir,
 }
@@ -26,19 +26,19 @@ pub fn restore(archive_path: &Path, destination: &Path, report: &Report) -> Resu
     Restore {
         band: band,
         block_dir: block_dir,
-        report: report,
+        report: report.clone(),
         destination: destination.to_path_buf(),
     }.run()
 }
 
-impl<'a> Restore<'a> {
+impl Restore {
     fn run(mut self) -> Result<()> {
         if let Ok(mut it) = fs::read_dir(&self.destination) {
             if it.next().is_some() {
                 return Err(ErrorKind::DestinationNotEmpty(self.destination).into());
             }
         }
-        for entry in try!(self.band.index_iter(self.report)) {
+        for entry in try!(self.band.index_iter(&self.report)) {
             let entry = try!(entry);
             // TODO: Continue even if one fails
             try!(self.restore_one(&entry));
@@ -77,10 +77,10 @@ impl<'a> Restore<'a> {
         // under its real name only appears
         let mut af = try!(AtomicFile::new(dest));
         for addr in &entry.addrs {
-            let block_vec = try!(self.block_dir.get(&addr, self.report));
+            let block_vec = try!(self.block_dir.get(&addr, &self.report));
             try!(io::copy(&mut block_vec.as_slice(), &mut af));
         }
-        af.close(self.report)
+        af.close(&self.report)
     }
 
     #[cfg(unix)]
