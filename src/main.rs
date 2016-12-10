@@ -35,7 +35,7 @@ Usage:
     conserve backup [options] <archive> <source>
     conserve list-source [options] <source>
     conserve ls [options] <archive>
-    conserve restore [options] <archive> <destination>
+    conserve restore [--force-overwrite] [options] <archive> <destination>
     conserve versions [options] <archive>
     conserve --version
     conserve --help
@@ -56,6 +56,7 @@ struct Args {
     arg_archive: String,
     arg_destination: String,
     arg_source: String,
+    flag_force_overwrite: bool,
     flag_no_progress: bool,
     flag_stats: bool,
 }
@@ -91,7 +92,7 @@ fn main() {
     } else if args.cmd_ls {
         cmd::ls(&args.arg_archive, &report)
     } else if args.cmd_restore {
-        cmd::restore(&args.arg_archive, &args.arg_destination, &report)
+        cmd::restore(&args.arg_archive, &args.arg_destination, &report, args.flag_force_overwrite)
     } else {
         unimplemented!();
     };

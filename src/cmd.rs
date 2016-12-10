@@ -41,7 +41,7 @@ pub fn ls(archive_str: &str, report: &Report) -> Result<()> {
 }
 
 
-pub fn restore(archive_str: &str, destination: &str, report: &Report) -> Result<()> {
+pub fn restore(archive_str: &str, destination: &str, report: &Report, force_overwrite: bool) -> Result<()> {
     let archive = try!(Archive::open(Path::new(archive_str)));
-    super::Restore::new(&archive, Path::new(destination), report).run()
+    super::Restore::new(&archive, Path::new(destination), report).force_overwrite(force_overwrite).run()
 }

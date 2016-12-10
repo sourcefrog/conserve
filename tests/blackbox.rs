@@ -66,7 +66,7 @@ fn blackbox_no_args() {
             conserve backup [options] <archive> <source>
             conserve list-source [options] <source>
             conserve ls [options] <archive>
-            conserve restore [options] <archive> <destination>
+            conserve restore [--force-overwrite] [options] <archive> <destination>
             conserve versions [options] <archive>
             conserve --version
             conserve --help
@@ -96,7 +96,7 @@ fn blackbox_help() {
                 conserve backup [options] <archive> <source>
                 conserve list-source [options] <source>
                 conserve ls [options] <archive>
-                conserve restore [options] <archive> <destination>
+                conserve restore [--force-overwrite] [options] <archive> <destination>
                 conserve versions [options] <archive>
                 conserve --version
                 conserve --help
@@ -170,6 +170,11 @@ fn blackbox_backup() {
     let mut file_contents = String::new();
     fs::File::open(&restore_hello).unwrap().read_to_string(&mut file_contents).unwrap();
     assert_eq!(file_contents, "contents");
+
+    // Try to restore again over the same directory: should decline.
+    let (status, stdout, _stderr) = run_conserve(&["restore", &arch_dir_str, &restore_dir_str]);
+    assert!(!status.success());
+    assert_that(&stdout).contains("Destination directory not empty");
 
     // TODO: Validate.
     // TODO: Compare vs source tree.
