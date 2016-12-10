@@ -20,18 +20,23 @@ pub struct Restore {
 
 pub fn restore(archive_path: &Path, destination: &Path, report: &Report) -> Result<()> {
     let archive = try!(Archive::open(&archive_path));
-    let band_id = archive.last_band_id().unwrap().expect("archive is empty");
-    let band = Band::open(archive.path(), &band_id, report).unwrap();
-    let block_dir = band.block_dir();
-    Restore {
-        band: band,
-        block_dir: block_dir,
-        report: report.clone(),
-        destination: destination.to_path_buf(),
-    }.run()
+    Restore::new(archive, destination, report).run()
 }
 
 impl Restore {
+    pub fn new(archive: Archive, destination: &Path, report: &Report) -> Restore {
+        // TODO: Open these later and return a clean error.
+        let band_id = archive.last_band_id().unwrap().expect("archive is empty");
+        let band = Band::open(archive.path(), &band_id, report).unwrap();
+        let block_dir = band.block_dir();
+        Restore {
+            band: band,
+            block_dir: block_dir,
+            report: report.clone(),
+            destination: destination.to_path_buf(),
+        }
+    }
+
     fn run(mut self) -> Result<()> {
         if let Ok(mut it) = fs::read_dir(&self.destination) {
             if it.next().is_some() {
