@@ -37,7 +37,7 @@ impl Restore {
         }
     }
 
-    fn run(mut self) -> Result<()> {
+    pub fn run(mut self) -> Result<()> {
         if let Ok(mut it) = fs::read_dir(&self.destination) {
             if it.next().is_some() {
                 return Err(ErrorKind::DestinationNotEmpty(self.destination).into());
