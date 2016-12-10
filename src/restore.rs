@@ -114,8 +114,7 @@ mod tests {
     use super::super::testfixtures::ScratchArchive;
     use conserve_testsupport::TreeFixture;
 
-    #[test]
-    pub fn simple_restore() {
+    fn setup_archive() -> ScratchArchive {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_file("hello");
@@ -127,7 +126,12 @@ mod tests {
 
         let backup_report = Report::new();
         backup(af.path(), srcdir.path(), &backup_report).unwrap();
+        af
+    }
 
+    #[test]
+    pub fn simple_restore() {
+        let af = setup_archive();
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         restore(af.path(), destdir.path(), &restore_report).unwrap();
