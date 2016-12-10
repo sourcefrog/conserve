@@ -11,11 +11,14 @@ use super::index;
 use super::io::AtomicFile;
 
 /// Restore operation.
+///
+/// Call `from_archive_path` then `run`.
 pub struct Restore {
     band: Band,
     report: Report,
     destination: PathBuf,
     block_dir: BlockDir,
+    force_overwrite: bool,
 }
 
 
@@ -30,13 +33,21 @@ impl Restore {
             block_dir: block_dir,
             report: report.clone(),
             destination: destination.to_path_buf(),
+            force_overwrite: false,
         }
     }
 
+    pub fn force_overwrite(mut self, force: bool) -> Restore {
+        self.force_overwrite = force;
+        self
+    }
+
     pub fn run(mut self) -> Result<()> {
-        if let Ok(mut it) = fs::read_dir(&self.destination) {
-            if it.next().is_some() {
-                return Err(ErrorKind::DestinationNotEmpty(self.destination).into());
+        if !self.force_overwrite {
+            if let Ok(mut it) = fs::read_dir(&self.destination) {
+                if it.next().is_some() {
+                    return Err(ErrorKind::DestinationNotEmpty(self.destination).into());
+                }
             }
         }
         for entry in try!(self.band.index_iter(&self.report)) {
@@ -157,7 +168,6 @@ mod tests {
         // TODO: Test restore of larger files.
     }
 
-
     #[test]
     pub fn decline_to_overwrite() {
         let af = setup_archive();
@@ -167,5 +177,20 @@ mod tests {
         let restore_err = Restore::new(&af, destdir.path(), &restore_report).run().unwrap_err();
         let restore_err_str = restore_err.to_string();
         assert_that(&restore_err_str).contains(&"Destination directory not empty");
+    }
+
+    #[test]
+    pub fn forced_overwrite() {
+        let af = setup_archive();
+        let destdir = TreeFixture::new();
+        destdir.create_file("existing");
+        let restore_report = Report::new();
+        Restore::new(&af, destdir.path(), &restore_report).force_overwrite(true)
+            .run().unwrap();
+
+        assert_eq!(2, restore_report.borrow_counts().get_count("file"));
+        let dest = &destdir.path();
+        assert_that(&dest.join("hello").as_path()).is_a_file();
+        assert_that(&dest.join("existing").as_path()).is_a_file();
     }
 }
