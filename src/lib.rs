@@ -57,7 +57,7 @@ pub use band::Band;
 pub use bandid::BandId;
 pub use block::BlockDir;
 pub use report::Report;
-pub use restore::restore;
+pub use restore::{Restore, restore};
 
 /// Conserve version number as a semver string.
 ///
