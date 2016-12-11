@@ -8,8 +8,8 @@ use rustc_serialize;
 
 error_chain! {
     foreign_links {
-        io::Error, Io;
-        rustc_serialize::json::DecoderError, JsonDecode;
+        Io(io::Error);
+        JsonDecode(rustc_serialize::json::DecoderError);
     }
 
     errors {

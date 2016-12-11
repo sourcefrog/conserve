@@ -19,7 +19,7 @@ brotli2 = "^0"
 clap = "~2.19"
 clippy = {version = "*", optional = true}
 conserve_testsupport = {path = "testsupport", version = "0.3.0"}
-error-chain = "0.5"
+error-chain = "~0.7.1"
 isatty = "0.1"
 log = "^0"
 rustc-serialize = "^0"
