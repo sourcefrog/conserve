@@ -1,6 +1,8 @@
 # Conserve release history
 
-## Conserve 0.3.0 (not release yet)
+## Conserve 0.3.0
+
+Released 2016-12-11
 
 * Archive format has changed from 0.2 without backward compatibility.
 * New and changed commands:
@@ -9,8 +11,11 @@
 * Symlinks are backed up and restored.  (Only on Unix, they're skipped on
   Windows because they seem to be rare and to have complicated semantics.)
 * New text-mode progress bar.
+* Compression is substantially faster, through setting Brotli to level 4.
 
-## Conserve 0.2.0 (2016-04-18)
+## Conserve 0.2.0
+
+Released 2016-04-18
 
 * Rewrite in lovely Rust.
 * New commands:
@@ -29,6 +34,8 @@
 * `--stats` option shows how much IO was done, how much compression helped,
   and how much time was taken for various sub-operations.
 
-## Conserve 0.1.0 2013-10-01
+## Conserve 0.1.0
+
+Released 2013-10-01
 
 * Very basic but functional backup, restore, and validate.
