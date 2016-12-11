@@ -76,10 +76,8 @@ Conserve is still in a pre-1.0 alpha.  It can be used to make and restore
 backups, but there are some important performance and functional limitations,
 which will be fixed before 1.0.
 
-* [Data compression is somewhat slow][32].
 * [There are no incremental backups][41]: all backups store all files.
 * [There is no way to exclude files/subdirectories from backup or restore][8].
-* [You can only restore the most recent backup, not a named older one][42].
 * The planned `validate` command is [not implemented][5],
   however a trial restore from the archive will test everything can be read.
 * The planned feature of resuming an interrupted backup is not implemented:
@@ -100,7 +98,7 @@ you should restore using the same version that you used to make the backup.
 [42]:https://github.com/sourcefrog/conserve/issues/42
 [43]: https://github.com/sourcefrog/conserve/issues/43
 
-For a longer list see the [issue tracker][issues] and 
+For a longer list see the [issue tracker][issues] and
 [milestones][milestones].
 
 [issues]: https://github.com/sourcefrog/conserve/issues
