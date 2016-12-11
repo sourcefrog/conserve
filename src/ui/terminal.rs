@@ -119,6 +119,7 @@ impl UI for TermUI {
             block_comp_pct,
             uncomp_rate,
         ).unwrap();
+        t.fg(term::color::WHITE).unwrap();
         t.carriage_return().unwrap();
         t.get_mut().flush().unwrap();
     }
