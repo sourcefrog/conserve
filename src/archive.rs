@@ -23,7 +23,7 @@ use super::io::write_json_uncompressed;
 
 const HEADER_FILENAME: &'static str = "CONSERVE";
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Archive {
     /// Top-level directory for the archive.
     path: PathBuf,
