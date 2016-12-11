@@ -135,8 +135,18 @@ impl Archive {
         Band::create(self.path(), new_band_id, report)
     }
 
+    /// Open a specific named band.
     pub fn open_band(&self, band_id: &BandId, report: &Report) -> Result<Band> {
         Band::open(self.path(), band_id, report)
+    }
+
+    /// Open a band if specified, or the last.
+    pub fn open_band_or_last(&self, band_id: &Option<BandId>, report: &Report) -> Result<Band> {
+        let band_id = match band_id {
+            &Some(ref b) => b.clone(),
+            &None => try!(self.last_band_id()),
+        };
+        self.open_band(&band_id, report)
     }
 }
 
@@ -190,7 +200,7 @@ mod tests {
     use std::io::Read;
 
     use super::*;
-    use super::super::errors::*;
+    use super::super::errors::ErrorKind;
     use super::super::{BandId, Report};
     use super::super::io::list_dir;
     use super::super::testfixtures::ScratchArchive;
