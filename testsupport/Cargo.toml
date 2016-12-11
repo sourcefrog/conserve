@@ -1,7 +1,0 @@
-[package]
-name = "conserve_testsupport"
-version = "0.3.0"
-authors = ["Martin Pool <mbp@sourcefrog.net>"]
-
-[dependencies]
-tempdir = "^0"

@@ -135,7 +135,7 @@ mod tests {
     use super::super::backup::backup;
     use super::super::report::Report;
     use super::super::testfixtures::ScratchArchive;
-    use conserve_testsupport::TreeFixture;
+    use super::super::testfixtures::TreeFixture;
 
     fn setup_archive() -> ScratchArchive {
         let af = ScratchArchive::new();

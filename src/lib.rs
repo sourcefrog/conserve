@@ -28,8 +28,6 @@ extern crate time;
 #[cfg(feature="bench")]
 extern crate test;
 
-extern crate conserve_testsupport;
-
 // Conserve implementation modules.
 mod apath;
 mod archive;

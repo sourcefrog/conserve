@@ -4,7 +4,6 @@
 /// Run conserve CLI as a subprocess and test it.
 
 
-extern crate conserve_testsupport;
 #[macro_use]
 extern crate spectral;
 extern crate tempdir;
@@ -18,8 +17,8 @@ use std::str;
 
 use spectral::prelude::*;
 
-use conserve_testsupport::TreeFixture;
-
+extern crate conserve;
+use conserve::testfixtures::TreeFixture;
 
 
 #[test]

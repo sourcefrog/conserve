@@ -3,14 +3,14 @@
 extern crate tempdir;
 
 extern crate conserve;
-extern crate conserve_testsupport;
 
 use conserve::backup;
 use conserve::index;
 use conserve::report::Report;
 use conserve::Restore;
 use conserve::testfixtures::{ScratchArchive};
-use conserve_testsupport::TreeFixture;
+use conserve::testfixtures::TreeFixture;
+
 
 #[test]
 pub fn simple_backup() {

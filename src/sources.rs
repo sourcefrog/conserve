@@ -202,7 +202,7 @@ mod tests {
 
     use super::*;
     use super::super::report::Report;
-    use conserve_testsupport::TreeFixture;
+    use super::super::testfixtures::TreeFixture;
 
     #[test]
     fn simple_directory() {
