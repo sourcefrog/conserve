@@ -190,6 +190,7 @@ mod tests {
     use std::io::Read;
 
     use super::*;
+    use super::super::errors::*;
     use super::super::{BandId, Report};
     use super::super::io::list_dir;
     use super::super::testfixtures::ScratchArchive;
