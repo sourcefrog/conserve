@@ -143,6 +143,36 @@ fn blackbox_backup() {
 }
 
 
+#[test]
+fn empty_archive() {
+    let adir = make_tempdir();
+    let adir_str = adir.path().to_str().unwrap();
+    let (status, _, _) = run_conserve(&["init", adir_str]);
+    assert!(status.success());
+
+    let restore_dir = make_tempdir();
+    {
+        let (status, stdout, stderr) = run_conserve(&["restore", adir_str,
+            restore_dir.path().to_str().unwrap()]);
+        assert!(!status.success());
+        assert!(!stderr.contains("panic"));
+        assert!(stdout.contains("Archive is empty"));
+    }
+    {
+        let (status, stdout, stderr) = run_conserve(&["ls", adir_str]);
+        assert!(!status.success());
+        assert!(!stderr.contains("panic"));
+        assert!(stdout.contains("Archive is empty"));
+    }
+    {
+        let (status, stdout, stderr) = run_conserve(&["versions", adir_str]);
+        assert!(status.success());
+        assert!(!stderr.contains("panic"));
+        assert!(stdout.is_empty());
+    }
+}
+
+
 fn make_tempdir() -> tempdir::TempDir {
     tempdir::TempDir::new("conserve_blackbox").unwrap()
 }
