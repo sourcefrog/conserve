@@ -110,9 +110,9 @@ impl Archive {
         self.path.as_path()
     }
 
-    // Return the `BandId` of the highest-numbered band, or None if empty,
+    // Return the `BandId` of the highest-numbered band, or ArchiveEmpty,
     // or an Err if any occurred reading the directory.
-    pub fn last_band_id(self: &Archive) -> Result<Option<BandId>> {
+    pub fn last_band_id(self: &Archive) -> Result<BandId> {
         // Walk through list of bands; if any error return that, otherwise return the greatest.
         let mut accum: Option<BandId> = None;
         for next in try!(self.iter_bands_unsorted()) {
@@ -122,14 +122,15 @@ impl Archive {
                 (Ok(b), Some(a)) => std::cmp::max(b, a),
             })
         }
-        Ok(accum)
+        accum.ok_or(ErrorKind::ArchiveEmpty.into())
     }
 
     /// Make a new band. Bands are numbered sequentially.
     pub fn create_band(self: &Archive, report: &Report) -> Result<Band> {
-        let new_band_id = match try!(self.last_band_id()) {
-            None => BandId::zero(),
-            Some(b) => b.next_sibling(),
+        let new_band_id = match self.last_band_id() {
+            Err(Error(ErrorKind::ArchiveEmpty, _)) => BandId::zero(),
+            Ok(b) => b.next_sibling(),
+            Err(e) => return Err(e),
         };
         Band::create(self.path(), new_band_id, report)
     }
@@ -244,7 +245,10 @@ mod tests {
         use super::super::io::directory_exists;
         let af = ScratchArchive::new();
 
-        assert_eq!(af.last_band_id().unwrap(), None);
+        match *af.last_band_id().unwrap_err().kind() {
+            ErrorKind::ArchiveEmpty => (),
+            ref x => panic!("Unexpected error {:?}", x),
+        }
 
         // Make one band
         let _band1 = af.create_band(&Report::new()).unwrap();
@@ -254,12 +258,12 @@ mod tests {
         assert!(dir_names.contains("b0000"));
 
         assert_eq!(af.list_bands().unwrap(), vec![BandId::new(&[0])]);
-        assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[0])));
+        assert_eq!(af.last_band_id().unwrap(), BandId::new(&[0]));
 
-        // // Try creating a second band.
+        // Try creating a second band.
         let _band2 = &af.create_band(&Report::new()).unwrap();
         assert_eq!(af.list_bands().unwrap(),
                    vec![BandId::new(&[0]), BandId::new(&[1])]);
-        assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
+        assert_eq!(af.last_band_id().unwrap(), BandId::new(&[1]));
     }
 }

@@ -24,5 +24,8 @@ error_chain! {
         DestinationNotEmpty(destination: PathBuf) {
             display("Destination directory not empty: {:?}", destination)
         }
+        ArchiveEmpty {
+            display("Archive is empty")
+        }
     }
 }

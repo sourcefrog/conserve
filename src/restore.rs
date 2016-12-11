@@ -25,7 +25,7 @@ pub struct Restore {
 impl Restore {
     pub fn new(archive: &Archive, destination: &Path, report: &Report) -> Restore {
         // TODO: Open these later and return a clean error.
-        let band_id = archive.last_band_id().unwrap().expect("archive is empty");
+        let band_id = archive.last_band_id().unwrap();
         let band = Band::open(archive.path(), &band_id, report).unwrap();
         let block_dir = band.block_dir();
         Restore {

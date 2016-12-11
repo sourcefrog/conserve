@@ -166,7 +166,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = try!(Archive::open(Path::new(subm.value_of("archive").unwrap())));
     // TODO: Option to choose version.
     // TODO: Clean error if empty.
-    let band_id = archive.last_band_id().unwrap().expect("Archive is empty");
+    let band_id = try!(archive.last_band_id());
     let band = try!(archive.open_band(&band_id, report));
     for i in try!(band.index_iter(report)) {
         let entry = try!(i);
