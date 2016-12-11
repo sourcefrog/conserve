@@ -4,7 +4,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use super::{Archive, Band, BlockDir, Report};
+use super::{Archive, BandId, BlockDir, Report};
 use super::apath;
 use super::errors::*;
 use super::index;
@@ -18,6 +18,7 @@ pub struct Restore {
     report: Report,
     destination: PathBuf,
     force_overwrite: bool,
+    band_id: Option<BandId>,
 }
 
 
@@ -28,6 +29,7 @@ impl Restore {
             report: report.clone(),
             destination: destination.to_path_buf(),
             force_overwrite: false,
+            band_id: None,
         }
     }
 
@@ -36,9 +38,13 @@ impl Restore {
         self
     }
 
+    pub fn band_id(mut self, band_id: Option<BandId>) -> Restore {
+        self.band_id = band_id;
+        self
+    }
+
     pub fn run(mut self) -> Result<()> {
-        let band_id = try!(self.archive.last_band_id());
-        let band = try!(Band::open(self.archive.path(), &band_id, &self.report));
+        let band = try!(self.archive.open_band_or_last(&self.band_id, &self.report));
         let block_dir = band.block_dir();
 
         if !self.force_overwrite {
@@ -124,6 +130,7 @@ mod tests {
     use spectral::prelude::*;
 
     use super::super::SYMLINKS_SUPPORTED;
+    use super::super::BandId;
     use super::Restore;
     use super::super::backup::backup;
     use super::super::report::Report;
@@ -142,6 +149,10 @@ mod tests {
 
         let backup_report = Report::new();
         backup(af.path(), srcdir.path(), &backup_report).unwrap();
+
+        srcdir.create_file("hello2");
+        backup(af.path(), srcdir.path(), &Report::new()).unwrap();
+
         af
     }
 
@@ -152,9 +163,10 @@ mod tests {
         let restore_report = Report::new();
         Restore::new(&af, destdir.path(), &restore_report).run().unwrap();
 
-        assert_eq!(2, restore_report.borrow_counts().get_count("file"));
+        assert_eq!(3, restore_report.borrow_counts().get_count("file"));
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
+        assert_that(&dest.join("hello2")).is_a_file();
         assert_that(&dest.join("subdir").as_path()).is_a_directory();
         assert_that(&dest.join("subdir").join("subfile").as_path()).is_a_file();
         if SYMLINKS_SUPPORTED {
@@ -165,6 +177,18 @@ mod tests {
         // TODO: Test restore empty file.
         // TODO: Test file contents are as expected.
         // TODO: Test restore of larger files.
+    }
+
+    #[test]
+    fn restore_named_band() {
+        let af = setup_archive();
+        let destdir = TreeFixture::new();
+        let restore_report = Report::new();
+        Restore::new(&af, destdir.path(), &restore_report)
+            .band_id(Some(BandId::new(&[0])))
+            .run().unwrap();
+        // Does not have the 'hello2' file added in the second version.
+        assert_eq!(2, restore_report.borrow_counts().get_count("file"));
     }
 
     #[test]
@@ -187,7 +211,7 @@ mod tests {
         Restore::new(&af, destdir.path(), &restore_report).force_overwrite(true)
             .run().unwrap();
 
-        assert_eq!(2, restore_report.borrow_counts().get_count("file"));
+        assert_eq!(3, restore_report.borrow_counts().get_count("file"));
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("existing").as_path()).is_a_file();
