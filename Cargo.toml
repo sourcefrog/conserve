@@ -17,7 +17,7 @@ doc = false  # Conflicts with library docs which are more useful.
 blake2-rfc = "^0"
 brotli2 = "^0"
 clap = "~2.19"
-clippy = {version = "*", optional = true}
+clippy = {version = "0.0.103", optional = true}
 error-chain = "~0.7.1"
 isatty = "0.1"
 log = "^0"
