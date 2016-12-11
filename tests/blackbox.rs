@@ -21,91 +21,31 @@ use spectral::prelude::*;
 use conserve_testsupport::TreeFixture;
 
 
-/// Strip from every line, the amount of indentation on the first line.
-///
-/// (Spaces only, no tabs.)
-fn strip_indents(s: &str) -> String {
-    let mut indent = 0;
-    // Skip initial newline.
-    for line in s[1..].split('\n') {
-        for ch in line.chars() {
-            if ch == ' ' {
-                indent += 1;
-            } else {
-                break;
-            }
-        }
-        break;
-    }
-    assert!(indent > 0);
-    let mut r = String::new();
-    let mut first = true;
-    for line in s[1..].split('\n') {
-        if !first {
-            r.push('\n');
-        }
-        if line.len() > indent {
-            r.push_str(&line[indent..]);
-        }
-        first = false;
-    }
-    r
-}
-
 
 #[test]
 fn blackbox_no_args() {
-    // Run with no arguments, should fail with a usage message.
+    // Run with no arguments, should fail with a usage message to stderr.
     let (status, stdout, stderr) = run_conserve(&[]);
-    assert_eq!(status.code(), Some(1));
-    let expected_err = strip_indents("
-        Invalid arguments.
-
-        Usage:
-            conserve init [options] <archive>
-            conserve backup [options] <archive> <source>
-            conserve list-source [options] <source>
-            conserve ls [options] <archive>
-            conserve restore [--force-overwrite] [options] <archive> <destination>
-            conserve versions [options] <archive>
-            conserve --version
-            conserve --help
-        ");
-    assert_that(&stderr).is_equal_to(&expected_err);
-    assert_eq!("", stdout);
+    assert_that(&status).matches(|s| !s.success());
+    assert_that(&stderr).contains("USAGE:");
+    assert_that(&stdout).matches(String::is_empty);
 }
+
 
 #[test]
 fn blackbox_version() {
     assert_success_and_output(&["--version"],
-        "0.3.0\n", "");
+        "conserve 0.3.0\n", "");
 }
 
 
 #[test]
 fn blackbox_help() {
-    assert_success_and_output(
-        &["--help"],
-        &strip_indents("
-            Conserve: a robust backup tool.
-            Copyright 2015, 2016 Martin Pool, GNU GPL v2.
-            http://conserve.fyi/
-
-            Usage:
-                conserve init [options] <archive>
-                conserve backup [options] <archive> <source>
-                conserve list-source [options] <source>
-                conserve ls [options] <archive>
-                conserve restore [--force-overwrite] [options] <archive> <destination>
-                conserve versions [options] <archive>
-                conserve --version
-                conserve --help
-
-            Options:
-                --stats         Show statistics at completion.
-                --no-progress   No progress bar.
-            "),
-        "");
+    let (status, stdout, stderr) = run_conserve(&["--help"]);
+    assert_that(&status).matches(|s| s.success());
+    assert_that(&stdout).contains("A robust backup tool");
+    assert_that(&stdout).contains("Copy source directory into an archive");
+    assert_that(&stderr).matches(String::is_empty);
 }
 
 

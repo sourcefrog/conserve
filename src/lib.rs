@@ -11,8 +11,6 @@
 #![recursion_limit = "1024"]  // Needed by error-chain
 
 #[macro_use]
-extern crate docopt;
-#[macro_use]
 extern crate error_chain;
 #[macro_use]
 extern crate log;
@@ -39,14 +37,13 @@ mod backup;
 mod band;
 mod bandid;
 mod block;
-pub mod cmd;
-mod errors;
+pub mod errors;
 pub mod index;
 mod io;
 pub mod logger;
 pub mod report;
 mod restore;
-mod sources;
+pub mod sources;
 pub mod testfixtures;
 pub mod ui;
 

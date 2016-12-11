@@ -9,105 +9,176 @@
 
 #![recursion_limit = "1024"]  // Needed by error-chain
 
-#[macro_use]
-extern crate docopt;
+use std::path::Path;
+
 #[macro_use]
 extern crate error_chain;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate clap;
 
 extern crate isatty;
 extern crate rustc_serialize;
 
+use clap::{Arg, App, AppSettings, ArgMatches, SubCommand};
+
 extern crate conserve;
 
-use conserve::cmd;
-use conserve::report;
-
-
-static USAGE: &'static str = "
-Conserve: a robust backup tool.
-Copyright 2015, 2016 Martin Pool, GNU GPL v2.
-http://conserve.fyi/
-
-Usage:
-    conserve init [options] <archive>
-    conserve backup [options] <archive> <source>
-    conserve list-source [options] <source>
-    conserve ls [options] <archive>
-    conserve restore [--force-overwrite] [options] <archive> <destination>
-    conserve versions [options] <archive>
-    conserve --version
-    conserve --help
-
-Options:
-    --stats         Show statistics at completion.
-    --no-progress   No progress bar.
-";
-
-#[derive(RustcDecodable)]
-struct Args {
-    cmd_backup: bool,
-    cmd_init: bool,
-    cmd_list_source: bool,
-    cmd_ls: bool,
-    cmd_restore: bool,
-    cmd_versions: bool,
-    arg_archive: String,
-    arg_destination: String,
-    arg_source: String,
-    flag_force_overwrite: bool,
-    flag_no_progress: bool,
-    flag_stats: bool,
-}
+use conserve::Archive;
+use conserve::Report;
+use conserve::errors::*;
 
 
 fn main() {
-    conserve::logger::establish_a_logger();
-    let args: Args = docopt::Docopt::new(USAGE)
-        .unwrap()
-        .version(Some(conserve::VERSION.to_string()))
-        .help(true)
-        .decode()
-        .unwrap_or_else(|e| e.exit());
-
-    // Always turn off progress for commands that send their output to stdout:
-    // easier than trying to get them not to interfere, and you should see progress
-    // by the output appearing.
-    let progress = isatty::stdout_isatty() &&
-        !(args.flag_no_progress || args.cmd_ls || args.cmd_list_source
-        || args.cmd_versions);
-
-    let ui = if progress { conserve::ui::terminal::TermUI::new() } else { None };
-    let report = report::Report::with_ui(ui);
-
-    let result = if args.cmd_init {
-        cmd::init(&args.arg_archive)
-    } else if args.cmd_backup {
-        cmd::backup(&args.arg_archive, &args.arg_source, &report)
-    } else if args.cmd_list_source {
-        cmd::list_source(&args.arg_source, &report)
-    } else if args.cmd_versions {
-        cmd::versions(&args.arg_archive)
-    } else if args.cmd_ls {
-        cmd::ls(&args.arg_archive, &report)
-    } else if args.cmd_restore {
-        cmd::restore(&args.arg_archive, &args.arg_destination, &report, args.flag_force_overwrite)
-    } else {
-        unimplemented!();
+    fn archive_arg<'a, 'b>() -> Arg<'a, 'b> {
+        Arg::with_name("archive")
+            .help("Archive directory")
+            .required(true)
     };
 
-    if args.flag_stats {
+    let matches = App::new("conserve")
+        .about("A robust backup tool <http://conserve.fyi/>")
+        .author(crate_authors!())
+        .version(crate_version!())
+        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .arg(Arg::with_name("stats")
+            .long("stats")
+            .help("Show number of operations, bytes, seconds elapsed"))
+        .arg(Arg::with_name("no-progress")
+            .long("no-progress")
+            .help("Hide progress bars"))
+        .subcommand(SubCommand::with_name("backup")
+            .about("Copy source directory into an archive")
+            .arg(archive_arg())
+            .arg(Arg::with_name("source")
+                .help("Backup from this directory")
+                .required(true)))
+        .subcommand(SubCommand::with_name("init")
+            .about("Create a new archive")
+            .arg(Arg::with_name("archive")
+                .help("Path for new archive directory")
+                .required(true)))
+        .subcommand(SubCommand::with_name("list-source")
+            .about("Recursive list files from source directory")
+            .arg(Arg::with_name("source")
+                .help("Source directory")
+                .required(true)))
+        .subcommand(SubCommand::with_name("ls")
+            .about("List files in a backup version")
+            .arg(archive_arg()))
+        .subcommand(SubCommand::with_name("restore")
+            .about("Restore files from an archive version to a new destination")
+            .arg(archive_arg())
+            .arg(Arg::with_name("destination")
+                .help("Restore to this new directory")
+                .required(true))
+            .arg(Arg::with_name("force-overwrite")
+                .long("force-overwrite")
+                .help("Overwrite existing destination directory")))
+        .subcommand(SubCommand::with_name("versions")
+            .about("List backup versions in an archive")
+            .arg(archive_arg()))
+        .get_matches();
+
+    let (sub_name, subm) = matches.subcommand();
+    let sub_fn = match sub_name {
+        "backup" => backup,
+        "init" => init,
+        "list-source" => list_source,
+        "ls" => ls,
+        "restore" => restore,
+        "versions" => versions,
+        _ => unimplemented!(),
+    };
+
+    // Always turn off progress for commands that send their output to stdout.
+    // TODO: Make the command request output be off instead.
+    let progress = isatty::stdout_isatty()
+        && !matches.is_present("no-progress")
+        && !["ls", "ls-source", "versions"].contains(&sub_name);
+
+    conserve::logger::establish_a_logger();
+    let ui = if progress { conserve::ui::terminal::TermUI::new() } else { None };
+    let report = Report::with_ui(ui);
+
+    let result = sub_fn(subm.expect("No subcommand matches"), &report);
+
+    if matches.is_present("stats") {
         info!("Stats:\n{}", report);
     }
     if let Err(e) = result {
-        error!("{}", e);
-        for suberr in e.iter().skip(1) { // First was already printed
-            error!("  {}", suberr);
-        }
-        if let Some(bt) = e.backtrace() {
-            println!("{:?}", bt)
-        }
+        show_chained_errors(e);
         std::process::exit(1)
     }
+}
+
+
+fn show_chained_errors(e: Error) {
+    error!("{}", e);
+    for suberr in e.iter().skip(1) { // First was already printed
+        error!("  {}", suberr);
+    }
+    if let Some(bt) = e.backtrace() {
+        println!("{:?}", bt)
+    }
+}
+
+
+fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
+    let archive_path = Path::new(subm.value_of("archive").expect("'archive' arg not found"));
+    Archive::init(archive_path).and(Ok(()))
+}
+
+
+fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
+    conserve::backup(Path::new(subm.value_of("archive").unwrap()),
+        Path::new(subm.value_of("source").unwrap()),
+        report)
+}
+
+
+fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let source_path = Path::new(subm.value_of("source").unwrap());
+    let mut source_iter = try!(conserve::sources::iter(source_path, report));
+    for entry in &mut source_iter {
+        println!("{}", try!(entry).apath);
+    }
+    Ok(())
+}
+
+
+fn versions(subm: &ArgMatches, _report: &Report) -> Result<()> {
+    let archive = try!(Archive::open(Path::new(subm.value_of("archive").unwrap())));
+    for band_id in try!(archive.list_bands()) {
+        println!("{}", band_id.as_string());
+    }
+    Ok(())
+}
+
+
+fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let archive = try!(Archive::open(Path::new(subm.value_of("archive").unwrap())));
+    // TODO: Option to choose version.
+    // TODO: Clean error if empty.
+    let band_id = archive.last_band_id().unwrap().expect("Archive is empty");
+    let band = try!(archive.open_band(&band_id, report));
+    for i in try!(band.index_iter(report)) {
+        let entry = try!(i);
+        println!("{}", entry.apath);
+    }
+    // TODO: Warn if the band is incomplete.
+    Ok(())
+}
+
+
+fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let archive = try!(Archive::open(Path::new(subm.value_of("archive").unwrap())));
+    let destination_path = Path::new(subm.value_of("destination").unwrap());
+    let force_overwrite = subm.is_present("force-overwrite");
+    conserve::Restore::new(&archive,
+        destination_path,
+        report)
+        .force_overwrite(force_overwrite)
+        .run()
 }
