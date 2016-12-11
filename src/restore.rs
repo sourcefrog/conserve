@@ -14,23 +14,17 @@ use super::io::AtomicFile;
 ///
 /// Call `from_archive_path` then `run`.
 pub struct Restore {
-    band: Band,
+    archive: Archive,
     report: Report,
     destination: PathBuf,
-    block_dir: BlockDir,
     force_overwrite: bool,
 }
 
 
 impl Restore {
     pub fn new(archive: &Archive, destination: &Path, report: &Report) -> Restore {
-        // TODO: Open these later and return a clean error.
-        let band_id = archive.last_band_id().unwrap();
-        let band = Band::open(archive.path(), &band_id, report).unwrap();
-        let block_dir = band.block_dir();
         Restore {
-            band: band,
-            block_dir: block_dir,
+            archive: archive.clone(),
             report: report.clone(),
             destination: destination.to_path_buf(),
             force_overwrite: false,
@@ -43,6 +37,10 @@ impl Restore {
     }
 
     pub fn run(mut self) -> Result<()> {
+        let band_id = try!(self.archive.last_band_id());
+        let band = try!(Band::open(self.archive.path(), &band_id, &self.report));
+        let block_dir = band.block_dir();
+
         if !self.force_overwrite {
             if let Ok(mut it) = fs::read_dir(&self.destination) {
                 if it.next().is_some() {
@@ -50,15 +48,16 @@ impl Restore {
                 }
             }
         }
-        for entry in try!(self.band.index_iter(&self.report)) {
+        for entry in try!(band.index_iter(&self.report)) {
             let entry = try!(entry);
             // TODO: Continue even if one fails
-            try!(self.restore_one(&entry));
+            try!(self.restore_one(&block_dir, &entry));
         }
+        // TODO: Warn if band is incomplete
         Ok(())
     }
 
-    fn restore_one(&mut self, entry: &index::Entry) -> Result<()> {
+    fn restore_one(&mut self, block_dir: &BlockDir, entry: &index::Entry) -> Result<()> {
         // Remove initial slash so that the apath is relative to the destination.
         if !apath::valid(&entry.apath) {
             return Err(format!("invalid apath {:?}", &entry.apath).into());
@@ -67,7 +66,7 @@ impl Restore {
         // info!("restore {:?} to {:?}", &entry.apath, &dest_path);
         match entry.kind {
             index::IndexKind::Dir => self.restore_dir(entry, &dest_path),
-            index::IndexKind::File => self.restore_file(entry, &dest_path),
+            index::IndexKind::File => self.restore_file(block_dir, entry, &dest_path),
             index::IndexKind::Symlink => self.restore_symlink(entry, &dest_path),
         }
         // TODO: Restore permissions.
@@ -83,13 +82,13 @@ impl Restore {
         }
     }
 
-    fn restore_file(&mut self, entry: &index::Entry, dest: &Path) -> Result<()> {
+    fn restore_file(&mut self, block_dir: &BlockDir, entry: &index::Entry, dest: &Path) -> Result<()> {
         self.report.increment("file", 1);
         // Here too we write a temporary file and then move it into place: so the file
         // under its real name only appears
         let mut af = try!(AtomicFile::new(dest));
         for addr in &entry.addrs {
-            let block_vec = try!(self.block_dir.get(&addr, &self.report));
+            let block_vec = try!(block_dir.get(&addr, &self.report));
             try!(io::copy(&mut block_vec.as_slice(), &mut af));
         }
         af.close(&self.report)
