@@ -3,6 +3,8 @@
 
 //! Bands are identified by a string like `b0001-0023`.
 
+use super::errors::*;
+
 /// Identifier for a band within an archive, eg 'b0001' or 'b0001-0020'.
 ///
 /// `BandId`s implement a total ordering `std::cmp::Ord`.
@@ -41,22 +43,23 @@ impl BandId {
     }
 
     /// Make a new BandId from a string form.
-    pub fn from_string(s: &str) -> Option<BandId> {
+    pub fn from_string(s: &str) -> Result<BandId> {
+        let nope = Err(ErrorKind::InvalidVersion.into());
         if !s.starts_with('b') {
-            return None;
+            return nope;
         }
         let mut seqs = Vec::<u32>::new();
         for num_part in s[1..].split('-') {
             match num_part.parse::<u32>() {
                 Ok(num) => seqs.push(num),
-                Err(..) => return None,
+                Err(..) => return nope,
             }
         }
         if seqs.is_empty() {
-            None
+            nope
         } else {
             // This rebuilds a new string form to get it into the canonical form.
-            Some(BandId::new(&seqs))
+            Ok(BandId::new(&seqs))
         }
     }
 
@@ -122,18 +125,18 @@ mod tests {
 
     #[test]
     fn from_string_detects_invalid() {
-        assert_eq!(BandId::from_string(""), None);
-        assert_eq!(BandId::from_string("hello"), None);
-        assert_eq!(BandId::from_string("b"), None);
-        assert_eq!(BandId::from_string("b-"), None);
-        assert_eq!(BandId::from_string("b2-"), None);
-        assert_eq!(BandId::from_string("b-2"), None);
-        assert_eq!(BandId::from_string("b2-1-"), None);
-        assert_eq!(BandId::from_string("b2--1"), None);
-        assert_eq!(BandId::from_string("beta"), None);
-        assert_eq!(BandId::from_string("b-eta"), None);
-        assert_eq!(BandId::from_string("b-1eta"), None);
-        assert_eq!(BandId::from_string("b-1-eta"), None);
+        assert!(BandId::from_string("").is_err());
+        assert!(BandId::from_string("hello").is_err());
+        assert!(BandId::from_string("b").is_err());
+        assert!(BandId::from_string("b-").is_err());
+        assert!(BandId::from_string("b2-").is_err());
+        assert!(BandId::from_string("b-2").is_err());
+        assert!(BandId::from_string("b2-1-").is_err());
+        assert!(BandId::from_string("b2--1").is_err());
+        assert!(BandId::from_string("beta").is_err());
+        assert!(BandId::from_string("b-eta").is_err());
+        assert!(BandId::from_string("b-1eta").is_err());
+        assert!(BandId::from_string("b-1-eta").is_err());
     }
 
     #[test]

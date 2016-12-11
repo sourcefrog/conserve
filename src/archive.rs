@@ -178,7 +178,7 @@ impl Iterator for IterBands {
                 continue;
             }
             if let Ok(name_string) = entry.file_name().into_string() {
-                if let Some(band_id) = BandId::from_string(&name_string) {
+                if let Ok(band_id) = BandId::from_string(&name_string) {
                     return Some(Ok(band_id));
                 } else {
                     warn!("unexpected archive subdirectory {:?}", &name_string);

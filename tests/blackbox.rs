@@ -116,6 +116,14 @@ fn blackbox_backup() {
     assert!(!status.success());
     assert_that(&stdout).contains("Destination directory not empty");
 
+    // Restore with specified band id / backup version.
+    {
+        let restore_dir = make_tempdir();
+        let (status, _stdout, _stderr) = run_conserve(
+            &["restore", "-b", "b0000", &arch_dir_str, &restore_dir.path().to_str().unwrap()]);
+            assert!(status.success());
+    }
+
     // TODO: Validate.
     // TODO: Compare vs source tree.
     //

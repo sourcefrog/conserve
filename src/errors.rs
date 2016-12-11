@@ -27,5 +27,8 @@ error_chain! {
         ArchiveEmpty {
             display("Archive is empty")
         }
+        InvalidVersion {
+            display("Invalid version number")
+        }
     }
 }

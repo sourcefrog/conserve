@@ -74,7 +74,7 @@ impl Band {
     }
 
     pub fn open(archive_dir: &Path, id: &BandId, report: &Report) -> Result<Band> {
-        // TODO: Check header file.
+        // TODO: Check header file, error if not present.
         let _ = report;
         Ok(Band::new(archive_dir, id.clone()))
     }
