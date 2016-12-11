@@ -34,7 +34,7 @@ fn blackbox_no_args() {
 #[test]
 fn blackbox_version() {
     assert_success_and_output(&["--version"],
-        "conserve 0.3.0\n", "");
+        "conserve 0.3.1\n", "");
 }
 
 
