@@ -35,9 +35,7 @@ impl AtomicFile {
     }
 
     pub fn close(self: AtomicFile, report: &Report) -> Result<()> {
-        if cfg!(feature = "sync") {
-            try!(report.measure_duration("sync", || self.f.sync_all()));
-        }
+        try!(report.measure_duration("sync", || self.f.sync_all()));
         // We use `persist` rather than `persist_noclobber` here because the latter calls
         // `link` on Unix, and some filesystems don't support it.  That's probably fine
         // because the files being updated by this should never already exist, though

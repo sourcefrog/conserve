@@ -4,6 +4,13 @@
 
 Not released yet.
 
+* `sync` archive files to stable storage after they're written.  In the
+  event of the machine crashing or losing power in the middle of a
+  backup, this should reduce the chance that there are index blocks
+  pointing to data blocks not on the filesystem.  Tests show (at least
+  on Linux and OSX on SSDs) this uses very little time compared to
+  compression.
+
 ## Conserve 0.3.1
 
 Released 2016-12-17

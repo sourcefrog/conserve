@@ -42,5 +42,4 @@ time = "^0"
 
 [features]
 default = []
-sync = []  # Flush changes to disk.
-bench = []  # Build benchmarks (nightly compiler only)
+bench = []  # Build unit benchmarks (nightly compiler only)
