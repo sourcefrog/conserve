@@ -170,4 +170,19 @@ impl UI for TermUI {
         t.carriage_return().unwrap();
         t.get_mut().flush().unwrap();
     }
+
+    fn log(&mut self, record: &log::LogRecord) {
+        let level = record.metadata().level();
+        let mut t = &mut self.t;
+        // TODO: Erase progress bar before logging and restore after.
+        match level {
+            LogLevel::Error | LogLevel::Warn => {
+                t.fg(term::color::RED).unwrap();
+                (write!(t, "{}: ", level)).unwrap();
+                t.reset().unwrap();
+            }
+            _ => (),
+        }
+        writeln!(t, "{}", record.args()).unwrap();
+    }
 }

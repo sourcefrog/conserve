@@ -15,6 +15,8 @@ use std::sync::{Mutex, MutexGuard};
 use std::time;
 use std::time::{Duration};
 
+use log;
+
 use super::ui::UI;
 use super::ui::terminal::TermUI;
 
@@ -181,6 +183,20 @@ impl Display for Report {
             }
         }
         Ok(())
+    }
+}
+
+
+impl log::Log for Report {
+    fn enabled(&self, _metadata: &log::LogMetadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::LogRecord) {
+        let mut ui_guard = self.ui.lock().unwrap();
+        if let Some(ref mut ui) = *ui_guard {
+            ui.log(record);
+        }
     }
 }
 
