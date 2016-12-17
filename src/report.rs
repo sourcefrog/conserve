@@ -86,26 +86,8 @@ impl Report {
     }
 
     pub fn with_ui(ui: Option<TermUI>) -> Report {
-        let mut inner_count = BTreeMap::new();
-        let mut inner_sizes = BTreeMap::new();
-        let mut inner_durations: BTreeMap<&'static str, Duration> = BTreeMap::new();
-        for counter_name in KNOWN_COUNTERS {
-            inner_count.insert(*counter_name, 0);
-        };
-        for counter_name in KNOWN_SIZES {
-            inner_sizes.insert(*counter_name, (0, 0));
-        };
-        for name in KNOWN_DURATIONS {
-            inner_durations.insert(name, Duration::new(0, 0));
-        };
-        let counts = Counts {
-            count: inner_count,
-            sizes: inner_sizes,
-            durations: inner_durations,
-            start: time::Instant::now(),
-        };
         Report {
-            counts: Rc::new(cell::RefCell::new(counts)),
+            counts: Rc::new(cell::RefCell::new(Counts::new())),
             ui: Rc::new(cell::RefCell::new(ui)),
         }
     }
@@ -203,6 +185,27 @@ impl Display for Report {
 
 
 impl Counts {
+    fn new() -> Counts {
+        let mut inner_count = BTreeMap::new();
+        for counter_name in KNOWN_COUNTERS {
+            inner_count.insert(*counter_name, 0);
+        };
+        let mut inner_sizes = BTreeMap::new();
+        for counter_name in KNOWN_SIZES {
+            inner_sizes.insert(*counter_name, (0, 0));
+        };
+        let mut inner_durations: BTreeMap<&'static str, Duration> = BTreeMap::new();
+        for name in KNOWN_DURATIONS {
+            inner_durations.insert(name, Duration::new(0, 0));
+        };
+        Counts {
+            count: inner_count,
+            sizes: inner_sizes,
+            durations: inner_durations,
+            start: time::Instant::now(),
+        }
+    }
+
     pub fn get_duration(&self, name: &str) -> Duration {
         *self.durations.get(name).unwrap_or_else(
             || panic!("unknown duration {:?}", name))
