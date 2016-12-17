@@ -1,5 +1,9 @@
 # Conserve release history
 
+## Conserve 0.3.2
+
+Not released yet.
+
 ## Conserve 0.3.1
 
 Released 2016-12-17
