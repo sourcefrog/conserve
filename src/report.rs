@@ -74,7 +74,7 @@ pub struct Counts {
 /// Cloning a Report makes another reference to the same underlying counters.
 #[derive(Clone)]
 pub struct Report {
-    inner: Rc<cell::RefCell<Counts>>,
+    counts: Rc<cell::RefCell<Counts>>,
     ui: Rc<cell::RefCell<Option<TermUI>>>,
 }
 
@@ -98,24 +98,24 @@ impl Report {
         for name in KNOWN_DURATIONS {
             inner_durations.insert(name, Duration::new(0, 0));
         };
-        let inner = Counts {
+        let counts = Counts {
             count: inner_count,
             sizes: inner_sizes,
             durations: inner_durations,
             start: time::Instant::now(),
         };
         Report {
-            inner: Rc::new(cell::RefCell::new(inner)),
+            counts: Rc::new(cell::RefCell::new(counts)),
             ui: Rc::new(cell::RefCell::new(ui)),
         }
     }
 
-    fn mut_inner(&self) -> cell::RefMut<Counts> {
-        self.inner.borrow_mut()
+    fn mut_counts(&self) -> cell::RefMut<Counts> {
+        self.counts.borrow_mut()
     }
 
     pub fn borrow_counts(&self) -> cell::Ref<Counts> {
-        self.inner.borrow()
+        self.counts.borrow()
     }
 
     /// Increment a counter by a given amount.
@@ -123,40 +123,40 @@ impl Report {
     /// The name must be a static string.  Counters implicitly start at 0.
     pub fn increment(&self, counter_name: &'static str, delta: u64) {
         // Entries are created from the list of known names when this is constructed.
-        if let Some(mut c) = self.mut_inner().count.get_mut(counter_name) {
+        if let Some(mut c) = self.mut_counts().count.get_mut(counter_name) {
             *c += delta;
         } else {
             panic!("unregistered counter {:?}", counter_name);
         }
         if let Some(ref mut ui) = *self.ui.borrow_mut() {
-            // Lock the inner data just once for the whole update
+            // Lock the counts data just once for the whole update
             ui.show_progress(&*self.borrow_counts());
         }
     }
 
     pub fn increment_size(&self, counter_name: &str, uncompressed_bytes: u64, compressed_bytes: u64) {
-        let mut inner = self.mut_inner();
-        let mut e = inner.sizes.get_mut(counter_name).expect("unregistered size counter");
+        let mut counts = self.mut_counts();
+        let mut e = counts.sizes.get_mut(counter_name).expect("unregistered size counter");
         e.0 += uncompressed_bytes;
         e.1 += compressed_bytes;
     }
 
     pub fn increment_duration(&self, name: &str, duration: Duration) {
-        *self.mut_inner().durations
+        *self.mut_counts().durations
             .get_mut(name).expect("undefined duration counter")
             += duration;
     }
 
     /// Merge the contents of `from_report` into `self`.
     pub fn merge_from(&self, from_report: &Report) {
-        let from_inner = from_report.mut_inner();
-        for (name, value) in &from_inner.count {
+        let from_counts = from_report.mut_counts();
+        for (name, value) in &from_counts.count {
             self.increment(name, *value);
         }
-        for (name, &(uncompressed, compressed)) in &from_inner.sizes {
+        for (name, &(uncompressed, compressed)) in &from_counts.sizes {
             self.increment_size(name, uncompressed, compressed);
         }
-        for (name, duration) in &from_inner.durations {
+        for (name, duration) in &from_counts.durations {
             self.increment_duration(name, *duration);
         }
     }
@@ -174,14 +174,14 @@ impl Report {
 impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         try!(write!(f, "Counts:\n"));
-        let inner = self.mut_inner();
-        for (key, value) in &inner.count {
+        let counts = self.mut_counts();
+        for (key, value) in &counts.count {
             if *value > 0 {
                 try!(write!(f, "  {:<40} {:>9}\n", *key, *value));
             }
         }
         try!(write!(f, "Bytes (before and after compression):\n"));
-        for (key, &(uncompressed_bytes, compressed_bytes)) in &inner.sizes {
+        for (key, &(uncompressed_bytes, compressed_bytes)) in &counts.sizes {
             if uncompressed_bytes > 0 {
                 let compression_pct =
                     100 - ((100 * compressed_bytes) / uncompressed_bytes);
@@ -190,7 +190,7 @@ impl Display for Report {
             }
         }
         try!(write!(f, "Durations (seconds):\n"));
-        for (key, &dur) in &inner.durations {
+        for (key, &dur) in &counts.durations {
             let millis = dur.subsec_nanos() / 1000000;
             let secs = dur.as_secs();
             if millis > 0 || secs > 0 {
