@@ -1,5 +1,11 @@
 # Conserve release history
 
+## Conserve 0.3.1
+
+Released 2016-12-17
+
+* Fixed Cargo package metadata.
+
 ## Conserve 0.3.0
 
 Released 2016-12-11
