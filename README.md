@@ -40,8 +40,8 @@ Conserve archives retain all previous versions of backups, stored in
 like `b0000`:
 
     $ conserve versions /backup/home.conserve
-    b0000       2012-12-02T16:24:33   conservetesthost.local
-    b0001       2012-12-02T16:24:45   conservetesthost.local
+    b0000
+    b0001
 
 `ls` shows all the files in a band, including the
 time they were made and the host from which they were made.
