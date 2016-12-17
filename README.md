@@ -58,6 +58,9 @@ Rust.  Then run
 
     cargo build
 
+Binaries for some platforms are available from
+https://github.com/sourcefrog/conserve/releases.
+
 [rust]: https://rust-lang.org/
 [sourcefrog]: http://sourcefrog.net/
 
