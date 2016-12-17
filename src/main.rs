@@ -115,7 +115,7 @@ fn main() {
         && !matches.is_present("no-progress")
         && !["ls", "ls-source", "versions"].contains(&sub_name);
 
-    conserve::logger::establish_a_logger();
+    establish_a_logger();
     let ui = if progress { conserve::ui::terminal::TermUI::new() } else { None };
     let report = Report::with_ui(ui);
 
@@ -128,6 +128,21 @@ fn main() {
         show_chained_errors(e);
         std::process::exit(1)
     }
+}
+
+
+fn establish_a_logger() {
+    use conserve::ui::terminal::ConsoleLogger;
+    use conserve::ui::text::TextLogger;
+
+    let logger_box: Box<log::Log> = match ConsoleLogger::new() {
+        Some(l) => Box::new(l),
+        None => Box::new(TextLogger::new().unwrap())
+    };
+    log::set_logger(|max_log_level| {
+        max_log_level.set(log::LogLevelFilter::Info);
+        logger_box
+    }).ok();
 }
 
 
