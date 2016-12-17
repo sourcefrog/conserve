@@ -11,7 +11,7 @@ use std::cell;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::rc::Rc;
+use std::sync::Arc;
 use std::time;
 use std::time::{Duration};
 use super::ui::UI;
@@ -74,8 +74,8 @@ pub struct Counts {
 /// Cloning a Report makes another reference to the same underlying counters.
 #[derive(Clone)]
 pub struct Report {
-    counts: Rc<cell::RefCell<Counts>>,
-    ui: Rc<cell::RefCell<Option<TermUI>>>,
+    counts: Arc<cell::RefCell<Counts>>,
+    ui: Arc<cell::RefCell<Option<TermUI>>>,
 }
 
 
@@ -87,8 +87,8 @@ impl Report {
 
     pub fn with_ui(ui: Option<TermUI>) -> Report {
         Report {
-            counts: Rc::new(cell::RefCell::new(Counts::new())),
-            ui: Rc::new(cell::RefCell::new(ui)),
+            counts: Arc::new(cell::RefCell::new(Counts::new())),
+            ui: Arc::new(cell::RefCell::new(ui)),
         }
     }
 
