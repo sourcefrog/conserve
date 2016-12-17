@@ -6,6 +6,8 @@
 use super::report::Counts;
 
 pub mod terminal;
+pub mod text;
+
 
 pub trait UI {
     fn show_progress(&mut self, &Counts);
