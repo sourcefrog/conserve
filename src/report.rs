@@ -18,7 +18,6 @@ use std::time::{Duration};
 use log;
 
 use super::ui::UI;
-use super::ui::terminal::TermUI;
 use super::ui::plain::PlainUI;
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[

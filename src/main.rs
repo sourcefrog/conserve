@@ -28,7 +28,7 @@ extern crate conserve;
 use conserve::Archive;
 use conserve::BandId;
 use conserve::Report;
-use conserve::ui::UI;
+use conserve::ui;
 use conserve::errors::*;
 
 
@@ -110,19 +110,11 @@ fn main() {
         _ => unimplemented!(),
     };
 
-    // Always turn off progress for commands that send their output to stdout.
-    // TODO: Make the command request output be off instead.
-    let progress = isatty::stdout_isatty()
-        && !matches.is_present("no-progress")
-        && !["ls", "ls-source", "versions"].contains(&sub_name);
+    let no_progress = matches.is_present("no-progress");
 
     establish_a_logger();
-    let ui_box: Box<UI + Send> = if progress {
-        Box::new(conserve::ui::terminal::TermUI::new().unwrap())
-    } else {
-        Box::new(conserve::ui::plain::PlainUI::new())
-    };
-    let report = Report::with_ui(ui_box);
+    let ui = if no_progress { Box::new(ui::plain::PlainUI::new()) } else { ui::best_ui() };
+    let report = Report::with_ui(ui);
 
     let result = sub_fn(subm.expect("No subcommand matches"), &report);
 

@@ -19,3 +19,15 @@ pub trait UI {
     /// Show a log message.
     fn log(&mut self, record: &log::LogRecord);
 }
+
+
+/// Construct the best available UI for this environment.
+///
+/// This means: colored terminal if isatty etc, otherwise plain text.
+pub fn best_ui() -> Box<UI + Send> {
+    if let Some(ui) = terminal::TermUI::new() {
+        Box::new(ui)
+    } else {
+        Box::new(plain::PlainUI::new())
+    }
+}
