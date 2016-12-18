@@ -12,7 +12,7 @@ use super::Counts;
 /// Log in plain text to stdout.
 pub struct TextLogger;
 
-pub struct TextUI;
+pub struct PlainUI;
 
 
 impl TextLogger {
@@ -37,15 +37,15 @@ impl log::Log for TextLogger {
 
 /// A plain text UI that prints log messages to stdout and does nothing about progress
 /// counters.
-impl TextUI {
-    /// Make a TextUI.
-    pub fn new() -> TextUI {
-        TextUI {}
+impl PlainUI {
+    /// Make a PlainUI.
+    pub fn new() -> PlainUI {
+        PlainUI {}
     }
 }
 
 
-impl super::UI for TextUI {
+impl super::UI for PlainUI {
     fn show_progress(&mut self, counts: &Counts) {}
 
     /// Show a log message.

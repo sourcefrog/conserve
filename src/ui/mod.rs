@@ -8,7 +8,7 @@ pub use super::report::Counts;
 use log;
 
 pub mod terminal;
-pub mod text;
+pub mod plain;
 
 
 /// Display information about backup progress to the user in some way.
