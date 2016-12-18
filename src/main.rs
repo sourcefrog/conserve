@@ -28,6 +28,7 @@ extern crate conserve;
 use conserve::Archive;
 use conserve::BandId;
 use conserve::Report;
+use conserve::ui::UI;
 use conserve::errors::*;
 
 
@@ -116,8 +117,12 @@ fn main() {
         && !["ls", "ls-source", "versions"].contains(&sub_name);
 
     establish_a_logger();
-    let ui = if progress { conserve::ui::terminal::TermUI::new() } else { None };
-    let report = Report::with_ui(ui);
+    let ui_box: Box<UI + Send> = if progress {
+        Box::new(conserve::ui::terminal::TermUI::new().unwrap())
+    } else {
+        Box::new(conserve::ui::plain::PlainUI::new())
+    };
+    let report = Report::with_ui(ui_box);
 
     let result = sub_fn(subm.expect("No subcommand matches"), &report);
 

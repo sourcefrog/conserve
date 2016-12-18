@@ -46,7 +46,7 @@ impl PlainUI {
 
 
 impl super::UI for PlainUI {
-    fn show_progress(&mut self, counts: &Counts) {}
+    fn show_progress(&mut self, _counts: &Counts) {}
 
     /// Show a log message.
     fn log(&mut self, record: &log::LogRecord) {

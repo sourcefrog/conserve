@@ -19,6 +19,7 @@ use log;
 
 use super::ui::UI;
 use super::ui::terminal::TermUI;
+use super::ui::plain::PlainUI;
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "dir",
@@ -78,20 +79,21 @@ pub struct Counts {
 #[derive(Clone)]
 pub struct Report {
     counts: Arc<Mutex<Counts>>,
-    ui: Arc<Mutex<Option<TermUI>>>,
+    ui: Arc<Mutex<Box<UI + Send>>>,
 }
 
 
 impl Report {
-    #[allow(unknown_lints,new_without_default_derive)]
+    /// Default constructor with plain text UI.
     pub fn new() -> Report {
-        Report::with_ui(None)
+        Report::with_ui(Box::new(PlainUI::new()))
     }
 
-    pub fn with_ui(ui: Option<TermUI>) -> Report {
+    /// Make a new report viewed by a given UI.
+    pub fn with_ui(ui_box: Box<UI + Send>) -> Report {
         Report {
             counts: Arc::new(Mutex::new(Counts::new())),
-            ui: Arc::new(Mutex::new(ui)),
+            ui: Arc::new(Mutex::new(ui_box)),
         }
     }
 
@@ -99,6 +101,7 @@ impl Report {
         self.counts.lock().unwrap()
     }
 
+    /// Borrow (read-only) counters inside this report.
     pub fn borrow_counts(&self) -> MutexGuard<Counts> {
         self.counts.lock().unwrap()
     }
@@ -113,10 +116,7 @@ impl Report {
         } else {
             panic!("unregistered counter {:?}", counter_name);
         }
-        if let Some(ref mut ui) = *self.ui.lock().unwrap() {
-            // Lock the counts data just once for the whole update
-            ui.show_progress(&*self.borrow_counts());
-        }
+        self.ui.lock().unwrap().show_progress(&*self.borrow_counts());
     }
 
     pub fn increment_size(&self, counter_name: &str, uncompressed_bytes: u64, compressed_bytes: u64) {
@@ -193,10 +193,7 @@ impl log::Log for Report {
     }
 
     fn log(&self, record: &log::LogRecord) {
-        let mut ui_guard = self.ui.lock().unwrap();
-        if let Some(ref mut ui) = *ui_guard {
-            ui.log(record);
-        }
+        self.ui.lock().unwrap().log(record);
     }
 }
 
