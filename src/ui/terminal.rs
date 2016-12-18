@@ -10,6 +10,7 @@ use std::io::prelude::*;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use isatty;
 use log;
 use log::{LogRecord, LogLevel, LogMetadata};
 use term;
@@ -36,6 +37,9 @@ impl ConsoleLogger {
     ///
     /// Returns None if this process has no console.
     pub fn new() -> Option<ConsoleLogger> {
+        if !isatty::stdout_isatty() {
+            return None;
+        }
         term::stdout().and_then(|t| {
             Some(ConsoleLogger{
                 term_mutex: Mutex::new(t)
@@ -71,7 +75,9 @@ impl log::Log for ConsoleLogger {
 impl TermUI {
     /// Return a new TermUI or None if there isn't a suitable terminal.
     pub fn new() -> Option<TermUI> {
-        if let Some(t) = term::stdout() {
+        if !isatty::stdout_isatty() {
+            None
+        } else if let Some(t) = term::stdout() {
             Some(TermUI{
                 t: t,
                 last_update: None,
