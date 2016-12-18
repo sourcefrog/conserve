@@ -45,10 +45,12 @@ fn main() {
         _ => unimplemented!(),
     };
 
-    let no_progress = matches.is_present("no-progress");
-
     establish_a_logger();
-    let ui = if no_progress { Box::new(ui::plain::PlainUI::new()) } else { ui::best_ui() };
+    let ui = match matches.value_of("ui") {
+        Some(ui) => ui::by_name(ui).expect("Couldn't make UI"),
+        None => ui::best_ui(),
+    };
+    // TODO: Handle --no-progress?
     let report = Report::with_ui(ui);
 
     let result = sub_fn(subm.expect("No subcommand matches"), &report);
@@ -90,6 +92,11 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
        .arg(Arg::with_name("no-progress")
            .long("no-progress")
            .help("Hide progress bars"))
+       .arg(Arg::with_name("ui")
+            .long("ui")
+            .help("UI for progress and messages")
+            .takes_value(true)
+            .possible_values(&["auto", "plain", "color"]))
        .subcommand(SubCommand::with_name("init")
            .display_order(1)
            .about("Create a new archive")

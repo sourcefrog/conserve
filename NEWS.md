@@ -11,6 +11,8 @@ Not released yet.
   on Linux and OSX on SSDs) this uses very little time compared to
   compression.
 
+* New `--ui` option to choose plain text or fancy colored output.
+
 ## Conserve 0.3.1
 
 Released 2016-12-17
