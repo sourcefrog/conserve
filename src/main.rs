@@ -50,7 +50,6 @@ fn main() {
         Some(ui) => ui::by_name(ui).expect("Couldn't make UI"),
         None => ui::best_ui(),
     };
-    // TODO: Handle --no-progress?
     let report = Report::with_ui(ui);
 
     let result = sub_fn(subm.expect("No subcommand matches"), &report);
@@ -89,9 +88,6 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
        .arg(Arg::with_name("stats")
            .long("stats")
            .help("Show number of operations, bytes, seconds elapsed"))
-       .arg(Arg::with_name("no-progress")
-           .long("no-progress")
-           .help("Hide progress bars"))
        .arg(Arg::with_name("ui")
             .long("ui")
             .help("UI for progress and messages")
