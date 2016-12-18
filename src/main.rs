@@ -33,72 +33,7 @@ use conserve::errors::*;
 
 
 fn main() {
-    fn archive_arg<'a, 'b>() -> Arg<'a, 'b> {
-        Arg::with_name("archive")
-            .help("Archive directory")
-            .required(true)
-    };
-
-    fn backup_arg<'a, 'b>() -> Arg<'a, 'b> {
-        Arg::with_name("backup")
-            .help("Backup version number")
-            .short("b")
-            .long("backup")
-            .takes_value(true)
-            .value_name("VERSION")
-    };
-
-    let matches = App::new("conserve")
-        .about("A robust backup tool <http://conserve.fyi/>")
-        .author(crate_authors!())
-        .version(crate_version!())
-        .setting(AppSettings::SubcommandRequiredElseHelp)
-        .arg(Arg::with_name("stats")
-            .long("stats")
-            .help("Show number of operations, bytes, seconds elapsed"))
-        .arg(Arg::with_name("no-progress")
-            .long("no-progress")
-            .help("Hide progress bars"))
-        .subcommand(SubCommand::with_name("init")
-            .display_order(1)
-            .about("Create a new archive")
-            .arg(Arg::with_name("archive")
-                .help("Path for new archive directory")
-                .required(true)))
-        .subcommand(SubCommand::with_name("backup")
-            .display_order(2)
-            .about("Copy source directory into an archive")
-            .arg(archive_arg())
-            .arg(Arg::with_name("source")
-                .help("Backup from this directory")
-                .required(true)))
-        .subcommand(SubCommand::with_name("restore")
-            .display_order(3)
-            .about("Restore files from an archive version to a new destination")
-            .arg(archive_arg())
-            .arg(backup_arg())
-            .arg(Arg::with_name("destination")
-                .help("Restore to this new directory")
-                .required(true))
-            .arg(Arg::with_name("force-overwrite")
-                .long("force-overwrite")
-                .help("Overwrite existing destination directory")))
-        .subcommand(SubCommand::with_name("versions")
-            .display_order(4)
-            .about("List backup versions in an archive")
-            .arg(archive_arg()))
-        .subcommand(SubCommand::with_name("ls")
-            .display_order(5)
-            .about("List files in a backup version")
-            .arg(backup_arg())
-            .arg(archive_arg()))
-        .subcommand(SubCommand::with_name("list-source")
-            .about("Recursive list files from source directory")
-            .arg(Arg::with_name("source")
-                .help("Source directory")
-                .required(true)))
-        .get_matches();
-
+    let matches = make_clap().get_matches();
     let (sub_name, subm) = matches.subcommand();
     let sub_fn = match sub_name {
         "backup" => backup,
@@ -125,6 +60,74 @@ fn main() {
         show_chained_errors(e);
         std::process::exit(1)
     }
+}
+
+
+fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
+    fn archive_arg<'a, 'b>() -> Arg<'a, 'b> {
+        Arg::with_name("archive")
+            .help("Archive directory")
+            .required(true)
+    };
+
+    fn backup_arg<'a, 'b>() -> Arg<'a, 'b> {
+        Arg::with_name("backup")
+            .help("Backup version number")
+            .short("b")
+            .long("backup")
+            .takes_value(true)
+            .value_name("VERSION")
+    };
+
+    App::new("conserve")
+       .about("A robust backup tool <http://conserve.fyi/>")
+       .author(crate_authors!())
+       .version(crate_version!())
+       .setting(AppSettings::SubcommandRequiredElseHelp)
+       .arg(Arg::with_name("stats")
+           .long("stats")
+           .help("Show number of operations, bytes, seconds elapsed"))
+       .arg(Arg::with_name("no-progress")
+           .long("no-progress")
+           .help("Hide progress bars"))
+       .subcommand(SubCommand::with_name("init")
+           .display_order(1)
+           .about("Create a new archive")
+           .arg(Arg::with_name("archive")
+               .help("Path for new archive directory")
+               .required(true)))
+       .subcommand(SubCommand::with_name("backup")
+           .display_order(2)
+           .about("Copy source directory into an archive")
+           .arg(archive_arg())
+           .arg(Arg::with_name("source")
+               .help("Backup from this directory")
+               .required(true)))
+       .subcommand(SubCommand::with_name("restore")
+           .display_order(3)
+           .about("Restore files from an archive version to a new destination")
+           .arg(archive_arg())
+           .arg(backup_arg())
+           .arg(Arg::with_name("destination")
+               .help("Restore to this new directory")
+               .required(true))
+           .arg(Arg::with_name("force-overwrite")
+               .long("force-overwrite")
+               .help("Overwrite existing destination directory")))
+       .subcommand(SubCommand::with_name("versions")
+           .display_order(4)
+           .about("List backup versions in an archive")
+           .arg(archive_arg()))
+       .subcommand(SubCommand::with_name("ls")
+           .display_order(5)
+           .about("List files in a backup version")
+           .arg(backup_arg())
+           .arg(archive_arg()))
+       .subcommand(SubCommand::with_name("list-source")
+           .about("Recursive list files from source directory")
+           .arg(Arg::with_name("source")
+               .help("Source directory")
+               .required(true)))
 }
 
 
