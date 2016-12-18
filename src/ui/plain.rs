@@ -9,30 +9,7 @@ use log;
 
 use super::Counts;
 
-/// Log in plain text to stdout.
-pub struct TextLogger;
-
 pub struct PlainUI;
-
-
-impl TextLogger {
-    pub fn new() -> Option<TextLogger> {
-        Some(TextLogger)
-    }
-}
-
-impl log::Log for TextLogger {
-    fn enabled(&self, _metadata: &log::LogMetadata) -> bool {
-        true
-    }
-
-    fn log(&self, record: &log::LogRecord) {
-        if ! self.enabled(record.metadata()) {
-            return;
-        }
-        println!("{}", record.args());
-    }
-}
 
 
 /// A plain text UI that prints log messages to stdout and does nothing about progress

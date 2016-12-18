@@ -45,12 +45,12 @@ fn main() {
         _ => unimplemented!(),
     };
 
-    establish_a_logger();
     let ui = match matches.value_of("ui") {
         Some(ui) => ui::by_name(ui).expect("Couldn't make UI"),
         None => ui::best_ui(),
     };
     let report = Report::with_ui(ui);
+    report.become_logger();
 
     let result = sub_fn(subm.expect("No subcommand matches"), &report);
 
@@ -131,21 +131,6 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
            .arg(Arg::with_name("source")
                .help("Source directory")
                .required(true)))
-}
-
-
-fn establish_a_logger() {
-    use conserve::ui::color::ConsoleLogger;
-    use conserve::ui::plain::TextLogger;
-
-    let logger_box: Box<log::Log> = match ConsoleLogger::new() {
-        Some(l) => Box::new(l),
-        None => Box::new(TextLogger::new().unwrap())
-    };
-    log::set_logger(|max_log_level| {
-        max_log_level.set(log::LogLevelFilter::Info);
-        logger_box
-    }).ok();
 }
 
 

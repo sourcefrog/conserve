@@ -7,12 +7,11 @@
 //! This acts as a view and the Report is the model.
 
 use std::io::prelude::*;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use isatty;
 use log;
-use log::{LogRecord, LogLevel, LogMetadata};
+use log::LogLevel;
 use term;
 
 use super::super::report::Counts;
@@ -23,52 +22,6 @@ const MB: u64 = 1_000_000;
 pub struct ColorUI {
     t: Box<term::StdoutTerminal>,
     last_update: Option<Instant>,
-}
-
-
-/// Log with colors to a terminal: only works if a real terminal is
-/// available.
-pub struct ConsoleLogger {
-    term_mutex: Mutex<Box<term::StdoutTerminal>>
-}
-
-impl ConsoleLogger {
-    /// Return a new ConsoleLogger if possible.
-    ///
-    /// Returns None if this process has no console.
-    pub fn new() -> Option<ConsoleLogger> {
-        if !isatty::stdout_isatty() {
-            return None;
-        }
-        term::stdout().and_then(|t| {
-            Some(ConsoleLogger{
-                term_mutex: Mutex::new(t)
-            })})
-    }
-}
-
-
-impl log::Log for ConsoleLogger {
-    fn enabled(&self, _metadata: &LogMetadata) -> bool {
-        true
-    }
-
-    fn log(&self, record: &LogRecord) {
-        if ! self.enabled(record.metadata()) {
-            return;
-        }
-        let mut t = self.term_mutex.lock().unwrap();
-        let level = record.metadata().level();
-        match level {
-            LogLevel::Error | LogLevel::Warn => {
-                t.fg(term::color::RED).unwrap();
-                (write!(t, "{}: ", level)).unwrap();
-                t.reset().unwrap();
-            }
-            _ => (),
-        }
-        writeln!(t, "{}", record.args()).unwrap();
-    }
 }
 
 

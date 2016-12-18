@@ -152,6 +152,13 @@ impl Report {
         self.increment_duration(duration_name, start.elapsed());
         result
     }
+
+    pub fn become_logger(&self) {
+        log::set_logger(|max_log_level| {
+            max_log_level.set(log::LogLevelFilter::Info);
+            Box::new(self.clone())
+        }).ok();
+    }
 }
 
 
