@@ -112,14 +112,14 @@ impl Backup {
 mod tests {
     extern crate tempdir;
 
-    use super::backup;
-    use super::super::index;
-    use super::super::report::Report;
-    use super::super::testfixtures::{ScratchArchive, TreeFixture};
-
     #[cfg(unix)]
     #[test]
     pub fn symlink() {
+        use super::backup;
+        use super::super::index;
+        use super::super::report::Report;
+        use super::super::testfixtures::{ScratchArchive, TreeFixture};
+
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
