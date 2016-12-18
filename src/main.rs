@@ -129,7 +129,7 @@ fn main() {
 
 
 fn establish_a_logger() {
-    use conserve::ui::terminal::ConsoleLogger;
+    use conserve::ui::color::ConsoleLogger;
     use conserve::ui::plain::TextLogger;
 
     let logger_box: Box<log::Log> = match ConsoleLogger::new() {

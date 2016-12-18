@@ -7,7 +7,7 @@ pub use super::report::Counts;
 
 use log;
 
-pub mod terminal;
+pub mod color;
 pub mod plain;
 
 
@@ -25,7 +25,7 @@ pub trait UI {
 ///
 /// This means: colored terminal if isatty etc, otherwise plain text.
 pub fn best_ui() -> Box<UI + Send> {
-    if let Some(ui) = terminal::TermUI::new() {
+    if let Some(ui) = color::ColorUI::new() {
         Box::new(ui)
     } else {
         Box::new(plain::PlainUI::new())
@@ -40,7 +40,7 @@ pub fn by_name(ui_name: &str) -> Option<Box<UI + Send>> {
     match ui_name {
         "auto" => Some(best_ui()),
         "plain" => Some(Box::new(plain::PlainUI::new())),
-        "color" => match terminal::TermUI::new() {
+        "color" => match color::ColorUI::new() {
             Some(ui) => Some(Box::new(ui)),
             None => None,
         },

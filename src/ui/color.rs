@@ -20,7 +20,7 @@ use super::UI;
 
 const MB: u64 = 1_000_000;
 
-pub struct TermUI {
+pub struct ColorUI {
     t: Box<term::StdoutTerminal>,
     last_update: Option<Instant>,
 }
@@ -72,13 +72,13 @@ impl log::Log for ConsoleLogger {
 }
 
 
-impl TermUI {
-    /// Return a new TermUI or None if there isn't a suitable terminal.
-    pub fn new() -> Option<TermUI> {
+impl ColorUI {
+    /// Return a new ColorUI or None if there isn't a suitable terminal.
+    pub fn new() -> Option<ColorUI> {
         if !isatty::stdout_isatty() {
             None
         } else if let Some(t) = term::stdout() {
-            Some(TermUI{
+            Some(ColorUI{
                 t: t,
                 last_update: None,
             })
@@ -133,7 +133,7 @@ fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
 }
 
 
-impl UI for TermUI {
+impl UI for ColorUI {
     fn show_progress(&mut self, counts: &Counts) {
         if self.throttle_updates() { return }
         self.last_update = Some(Instant::now());
