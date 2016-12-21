@@ -61,6 +61,10 @@ Rust.  Then run
 Binaries for some platforms are available from
 https://github.com/sourcefrog/conserve/releases.
 
+Windows Defender and Windows Search Indexing can slow the system down severely
+when Conserve is making a backup.  You may want to exclude the backup directory
+from online scans by both systems.
+
 [rust]: https://rust-lang.org/
 [sourcefrog]: http://sourcefrog.net/
 
