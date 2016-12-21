@@ -5,6 +5,7 @@
 
 pub use super::report::Counts;
 
+use isatty;
 use log;
 
 pub mod color;
@@ -25,7 +26,9 @@ pub trait UI {
 ///
 /// This means: colored terminal if isatty etc, otherwise plain text.
 pub fn best_ui() -> Box<UI + Send> {
-    if let Some(ui) = color::ColorUI::new() {
+    if !isatty::stdout_isatty() {
+        Box::new(plain::PlainUI::new())
+    } else if let Some(ui) = color::ColorUI::new() {
         Box::new(ui)
     } else {
         Box::new(plain::PlainUI::new())

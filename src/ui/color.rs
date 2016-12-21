@@ -9,7 +9,6 @@
 use std::io::prelude::*;
 use std::time::{Duration, Instant};
 
-use isatty;
 use log;
 use log::LogLevel;
 use term;
@@ -28,9 +27,7 @@ pub struct ColorUI {
 impl ColorUI {
     /// Return a new ColorUI or None if there isn't a suitable terminal.
     pub fn new() -> Option<ColorUI> {
-        if !isatty::stdout_isatty() {
-            None
-        } else if let Some(t) = term::stdout() {
+        if let Some(t) = term::stdout() {
             Some(ColorUI{
                 t: t,
                 last_update: None,
