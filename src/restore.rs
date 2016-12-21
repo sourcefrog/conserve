@@ -69,7 +69,7 @@ impl Restore {
             return Err(format!("invalid apath {:?}", &entry.apath).into());
         }
         let dest_path = self.destination.join(&entry.apath[1..]);
-        // info!("restore {:?} to {:?}", &entry.apath, &dest_path);
+        info!("Restore {:?} to {:?}", &entry.apath, &dest_path);
         match entry.kind {
             index::IndexKind::Dir => self.restore_dir(entry, &dest_path),
             index::IndexKind::File => self.restore_file(block_dir, entry, &dest_path),

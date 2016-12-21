@@ -7,15 +7,18 @@
 //!
 //! Sizes can be reported in both compressed and uncompressed form.
 
-use std::cell;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::{Mutex, MutexGuard};
 use std::time;
 use std::time::{Duration};
+
+use log;
+
 use super::ui::UI;
-use super::ui::terminal::TermUI;
+use super::ui::plain::PlainUI;
 
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "dir",
@@ -74,30 +77,32 @@ pub struct Counts {
 /// Cloning a Report makes another reference to the same underlying counters.
 #[derive(Clone)]
 pub struct Report {
-    counts: Rc<cell::RefCell<Counts>>,
-    ui: Rc<cell::RefCell<Option<TermUI>>>,
+    counts: Arc<Mutex<Counts>>,
+    ui: Arc<Mutex<Box<UI + Send>>>,
 }
 
 
 impl Report {
-    #[allow(unknown_lints,new_without_default_derive)]
+    /// Default constructor with plain text UI.
     pub fn new() -> Report {
-        Report::with_ui(None)
+        Report::with_ui(Box::new(PlainUI::new()))
     }
 
-    pub fn with_ui(ui: Option<TermUI>) -> Report {
+    /// Make a new report viewed by a given UI.
+    pub fn with_ui(ui_box: Box<UI + Send>) -> Report {
         Report {
-            counts: Rc::new(cell::RefCell::new(Counts::new())),
-            ui: Rc::new(cell::RefCell::new(ui)),
+            counts: Arc::new(Mutex::new(Counts::new())),
+            ui: Arc::new(Mutex::new(ui_box)),
         }
     }
 
-    fn mut_counts(&self) -> cell::RefMut<Counts> {
-        self.counts.borrow_mut()
+    fn mut_counts(&self) -> MutexGuard<Counts> {
+        self.counts.lock().unwrap()
     }
 
-    pub fn borrow_counts(&self) -> cell::Ref<Counts> {
-        self.counts.borrow()
+    /// Borrow (read-only) counters inside this report.
+    pub fn borrow_counts(&self) -> MutexGuard<Counts> {
+        self.counts.lock().unwrap()
     }
 
     /// Increment a counter by a given amount.
@@ -110,10 +115,7 @@ impl Report {
         } else {
             panic!("unregistered counter {:?}", counter_name);
         }
-        if let Some(ref mut ui) = *self.ui.borrow_mut() {
-            // Lock the counts data just once for the whole update
-            ui.show_progress(&*self.borrow_counts());
-        }
+        self.ui.lock().unwrap().show_progress(&*self.borrow_counts());
     }
 
     pub fn increment_size(&self, counter_name: &str, uncompressed_bytes: u64, compressed_bytes: u64) {
@@ -150,6 +152,13 @@ impl Report {
         self.increment_duration(duration_name, start.elapsed());
         result
     }
+
+    pub fn become_logger(&self) {
+        log::set_logger(|max_log_level| {
+            max_log_level.set(log::LogLevelFilter::Info);
+            Box::new(self.clone())
+        }).ok();
+    }
 }
 
 
@@ -180,6 +189,17 @@ impl Display for Report {
             }
         }
         Ok(())
+    }
+}
+
+
+impl log::Log for Report {
+    fn enabled(&self, _metadata: &log::LogMetadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::LogRecord) {
+        self.ui.lock().unwrap().log(record);
     }
 }
 

@@ -11,6 +11,12 @@ Not released yet.
   on Linux and OSX on SSDs) this uses very little time compared to
   compression.
 
+* New `--ui` option to choose plain text or fancy colored output, replacing
+  `--no-progress`.
+
+* Color UI shows progress bars cleanly interleaved with log messages
+  (https://github.com/sourcefrog/conserve/issues/52).
+
 ## Conserve 0.3.1
 
 Released 2016-12-17

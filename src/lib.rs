@@ -38,7 +38,6 @@ mod block;
 pub mod errors;
 pub mod index;
 mod io;
-pub mod logger;
 pub mod report;
 mod restore;
 pub mod sources;
