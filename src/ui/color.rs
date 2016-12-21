@@ -21,6 +21,7 @@ const MB: u64 = 1_000_000;
 pub struct ColorUI {
     t: Box<term::StdoutTerminal>,
     last_update: Option<Instant>,
+    progress_present: bool,
 }
 
 
@@ -31,6 +32,7 @@ impl ColorUI {
             Some(ColorUI{
                 t: t,
                 last_update: None,
+                progress_present: false,
             })
         } else {
             None
@@ -43,6 +45,14 @@ impl ColorUI {
             e.as_secs() < 1 && e.subsec_nanos() < 200_000_000
         } else {
             false
+        }
+    }
+
+    fn clear(&mut self) {
+        if self.progress_present {
+            self.t.carriage_return().unwrap();
+            self.t.delete_line().unwrap();
+            self.progress_present = false;
         }
     }
 }
@@ -85,12 +95,14 @@ fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
 
 impl UI for ColorUI {
     fn show_progress(&mut self, counts: &Counts) {
-        if self.throttle_updates() { return }
+        if self.progress_present && self.throttle_updates() {
+            return
+        }
+        self.clear();
         self.last_update = Some(Instant::now());
+        self.progress_present = true;
 
         let mut t = &mut self.t;
-
-        // t.delete_line().unwrap();
         // TODO: Input size should really be the number of source bytes before
         // block deduplication.
         // Measure compression on body bytes.
@@ -123,14 +135,13 @@ impl UI for ColorUI {
             uncomp_rate,
         ).unwrap();
         t.fg(term::color::WHITE).unwrap();
-        t.carriage_return().unwrap();
-        t.get_mut().flush().unwrap();
+        t.flush().unwrap();
     }
 
     fn log(&mut self, record: &log::LogRecord) {
         let level = record.metadata().level();
+        self.clear();
         let mut t = &mut self.t;
-        // TODO: Erase progress bar before logging and restore after.
         match level {
             LogLevel::Error | LogLevel::Warn => {
                 t.fg(term::color::RED).unwrap();
@@ -140,5 +151,6 @@ impl UI for ColorUI {
             _ => (),
         }
         writeln!(t, "{}", record.args()).unwrap();
+        t.flush().unwrap();
     }
 }
