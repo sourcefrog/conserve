@@ -78,6 +78,8 @@ from online scans by both systems.
 
 * [Archive format](doc/format.md)
 
+* [Release notes](NEWS.md)
+
 ## Limitations
 
 Conserve is still in a pre-1.0 alpha.  It can be used to make and restore
