@@ -34,6 +34,13 @@ use conserve::errors::*;
 
 fn main() {
     let matches = make_clap().get_matches();
+    let ui = match matches.value_of("ui") {
+        Some(ui) => ui::by_name(ui).expect("Couldn't make UI"),
+        None => ui::best_ui(),
+    };
+    let report = Report::with_ui(ui);
+    report.become_logger();
+
     let (sub_name, subm) = matches.subcommand();
     let sub_fn = match sub_name {
         "backup" => backup,
@@ -44,14 +51,6 @@ fn main() {
         "versions" => versions,
         _ => unimplemented!(),
     };
-
-    let ui = match matches.value_of("ui") {
-        Some(ui) => ui::by_name(ui).expect("Couldn't make UI"),
-        None => ui::best_ui(),
-    };
-    let report = Report::with_ui(ui);
-    report.become_logger();
-
     let result = sub_fn(subm.expect("No subcommand matches"), &report);
 
     if matches.is_present("stats") {
