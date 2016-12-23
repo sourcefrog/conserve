@@ -158,9 +158,9 @@ impl Report {
         result
     }
 
-    pub fn become_logger(&self) {
+    pub fn become_logger(&self, log_level: log::LogLevelFilter) {
         log::set_logger(|max_log_level| {
-                max_log_level.set(log::LogLevelFilter::Info);
+                max_log_level.set(log_level);
                 Box::new(self.clone())
             })
             .ok();

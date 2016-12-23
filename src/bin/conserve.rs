@@ -39,7 +39,7 @@ fn main() {
         None => ui::best_ui(),
     };
     let report = Report::with_ui(ui);
-    report.become_logger();
+    report.become_logger(log::LogLevelFilter::Info);
 
     let (sub_name, subm) = matches.subcommand();
     let sub_fn = match sub_name {
