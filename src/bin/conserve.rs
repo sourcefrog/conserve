@@ -38,8 +38,14 @@ fn main() {
         Some(ui) => ui::by_name(ui).expect("Couldn't make UI"),
         None => ui::best_ui(),
     };
+    let log_level = match matches.occurrences_of("v") {
+        0 => log::LogLevelFilter::Warn,
+        1 => log::LogLevelFilter::Info,
+        2 => log::LogLevelFilter::Debug,
+        _ => log::LogLevelFilter::max(),
+    };
     let report = Report::with_ui(ui);
-    report.become_logger(log::LogLevelFilter::Info);
+    report.become_logger(log_level);
 
     let (sub_name, subm) = matches.subcommand();
     let sub_fn = match sub_name {
@@ -94,6 +100,10 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .help("UI for progress and messages")
             .takes_value(true)
             .possible_values(&["auto", "plain", "color"]))
+        .arg(Arg::with_name("v")
+            .short("v")
+            .multiple(true)
+            .help("Be more verbose (log all file names)"))
         .subcommand(SubCommand::with_name("init")
             .display_order(1)
             .about("Create a new archive")

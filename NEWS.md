@@ -17,6 +17,9 @@ Not released yet.
 * Color UI shows progress bars cleanly interleaved with log messages
   (https://github.com/sourcefrog/conserve/issues/52).
 
+* Filenames are now only shown during `backup` and `restore` when the `-v`
+  option is given.
+
 ## Conserve 0.3.1
 
 Released 2016-12-17

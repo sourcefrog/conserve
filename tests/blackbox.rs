@@ -65,7 +65,7 @@ fn blackbox_backup() {
     let arch_dir_str = arch_dir.to_str().unwrap();
 
     // conserve init
-    let (status, stdout, stderr) = run_conserve(&["init", &arch_dir_str]);
+    let (status, stdout, stderr) = run_conserve(&["-v", "init", &arch_dir_str]);
     assert!(status.success());
     assert_that(&stdout.as_str()).starts_with(&"Created new archive");
     assert_eq!(stderr, "");
