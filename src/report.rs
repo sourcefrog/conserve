@@ -116,10 +116,12 @@ impl Report {
         self.ui.lock().unwrap().show_progress(&*self.borrow_counts());
     }
 
-    pub fn increment_size(&self,
-                          counter_name: &str,
-                          uncompressed_bytes: u64,
-                          compressed_bytes: u64) {
+    pub fn increment_size(
+        &self,
+        counter_name: &str,
+        uncompressed_bytes: u64,
+        compressed_bytes: u64
+    ) {
         let mut counts = self.mut_counts();
         let mut e = counts.sizes.get_mut(counter_name).expect("unregistered size counter");
         e.0 += uncompressed_bytes;
@@ -293,6 +295,7 @@ mod tests {
         assert_eq!(cs.get_duration("test"), Duration::new(5, 0));
     }
 
+    #[cfg_attr(rustfmt, rustfmt_skip)]
     #[test]
     pub fn display() {
         let r1 = Report::new();
@@ -302,17 +305,13 @@ mod tests {
         r1.increment_duration("test", Duration::new(42, 479760000));
 
         let formatted = format!("{}", r1);
-        assert_eq!(formatted,
-                   "\
+        assert_eq!(formatted, "\
 Counts:
   block                                           15
-Bytes (before \
-                    and after compression):
-  block                                          300       \
-                    100        67%
+Bytes (before and after compression):
+  block                                          300       100        67%
 Durations (seconds):
-  test                                        \
-                    42.479
+  test                                        42.479
 ");
     }
 }
