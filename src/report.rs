@@ -13,13 +13,14 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use std::sync::{Mutex, MutexGuard};
 use std::time;
-use std::time::{Duration};
+use std::time::Duration;
 
 use log;
 
 use super::ui::UI;
 use super::ui::plain::PlainUI;
 
+#[cfg_attr(rustfmt, rustfmt_skip)]
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "dir",
     "file",
@@ -37,12 +38,9 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
 ];
 
 
-static KNOWN_SIZES: &'static [&'static str] = &[
-    "block",
-    "index",
-];
+static KNOWN_SIZES: &'static [&'static str] = &["block", "index"];
 
-
+#[cfg_attr(rustfmt, rustfmt_skip)]
 static KNOWN_DURATIONS: &'static [&'static str] = &[
     "block.compress",
     "block.hash",
@@ -118,7 +116,10 @@ impl Report {
         self.ui.lock().unwrap().show_progress(&*self.borrow_counts());
     }
 
-    pub fn increment_size(&self, counter_name: &str, uncompressed_bytes: u64, compressed_bytes: u64) {
+    pub fn increment_size(&self,
+                          counter_name: &str,
+                          uncompressed_bytes: u64,
+                          compressed_bytes: u64) {
         let mut counts = self.mut_counts();
         let mut e = counts.sizes.get_mut(counter_name).expect("unregistered size counter");
         e.0 += uncompressed_bytes;
@@ -126,9 +127,10 @@ impl Report {
     }
 
     pub fn increment_duration(&self, name: &str, duration: Duration) {
-        *self.mut_counts().durations
-            .get_mut(name).expect("undefined duration counter")
-            += duration;
+        *self.mut_counts()
+            .durations
+            .get_mut(name)
+            .expect("undefined duration counter") += duration;
     }
 
     /// Merge the contents of `from_report` into `self`.
@@ -146,7 +148,8 @@ impl Report {
     }
 
     pub fn measure_duration<T, F>(&self, duration_name: &str, mut closure: F) -> T
-        where F: FnMut() -> T {
+        where F: FnMut() -> T
+    {
         let start = time::Instant::now();
         let result = closure();
         self.increment_duration(duration_name, start.elapsed());
@@ -155,9 +158,10 @@ impl Report {
 
     pub fn become_logger(&self) {
         log::set_logger(|max_log_level| {
-            max_log_level.set(log::LogLevelFilter::Info);
-            Box::new(self.clone())
-        }).ok();
+                max_log_level.set(log::LogLevelFilter::Info);
+                Box::new(self.clone())
+            })
+            .ok();
     }
 }
 
@@ -174,10 +178,13 @@ impl Display for Report {
         try!(write!(f, "Bytes (before and after compression):\n"));
         for (key, &(uncompressed_bytes, compressed_bytes)) in &counts.sizes {
             if uncompressed_bytes > 0 {
-                let compression_pct =
-                    100 - ((100 * compressed_bytes) / uncompressed_bytes);
-                try!(write!(f, "  {:<40} {:>9} {:>9} {:>9}%\n", *key,
-                    uncompressed_bytes, compressed_bytes, compression_pct));
+                let compression_pct = 100 - ((100 * compressed_bytes) / uncompressed_bytes);
+                try!(write!(f,
+                            "  {:<40} {:>9} {:>9} {:>9}%\n",
+                            *key,
+                            uncompressed_bytes,
+                            compressed_bytes,
+                            compression_pct));
             }
         }
         try!(write!(f, "Durations (seconds):\n"));
@@ -209,15 +216,15 @@ impl Counts {
         let mut inner_count = BTreeMap::new();
         for counter_name in KNOWN_COUNTERS {
             inner_count.insert(*counter_name, 0);
-        };
+        }
         let mut inner_sizes = BTreeMap::new();
         for counter_name in KNOWN_SIZES {
             inner_sizes.insert(*counter_name, (0, 0));
-        };
+        }
         let mut inner_durations: BTreeMap<&'static str, Duration> = BTreeMap::new();
         for name in KNOWN_DURATIONS {
             inner_durations.insert(name, Duration::new(0, 0));
-        };
+        }
         Counts {
             count: inner_count,
             sizes: inner_sizes,
@@ -227,14 +234,14 @@ impl Counts {
     }
 
     pub fn get_duration(&self, name: &str) -> Duration {
-        *self.durations.get(name).unwrap_or_else(
-            || panic!("unknown duration {:?}", name))
+        *self.durations.get(name).unwrap_or_else(|| panic!("unknown duration {:?}", name))
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
     pub fn get_count(&self, counter_name: &str) -> u64 {
-        *self.count.get(counter_name).unwrap_or_else(
-            || panic!("unknown counter {:?}", counter_name))
+        *self.count
+            .get(counter_name)
+            .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
     }
 
     /// Get size of data processed.
@@ -242,8 +249,9 @@ impl Counts {
     /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
     /// in bytes.
     pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
-        *self.sizes.get(counter_name).unwrap_or_else(
-            || panic!("unknown counter {:?}", counter_name))
+        *self.sizes
+            .get(counter_name)
+            .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
     }
 
     pub fn elapsed_time(&self) -> Duration {
@@ -294,13 +302,17 @@ mod tests {
         r1.increment_duration("test", Duration::new(42, 479760000));
 
         let formatted = format!("{}", r1);
-        assert_eq!(formatted, "\
+        assert_eq!(formatted,
+                   "\
 Counts:
   block                                           15
-Bytes (before and after compression):
-  block                                          300       100        67%
+Bytes (before \
+                    and after compression):
+  block                                          300       \
+                    100        67%
 Durations (seconds):
-  test                                        42.479
+  test                                        \
+                    42.479
 ");
     }
 }

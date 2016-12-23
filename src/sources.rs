@@ -32,7 +32,9 @@ pub struct Entry {
 impl Entry {
     /// Return Unix-format mtime if possible.
     pub fn unix_mtime(&self) -> Option<u64> {
-        self.metadata.modified().ok()
+        self.metadata
+            .modified()
+            .ok()
             .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
             .and_then(|dur| Some(dur.as_secs()))
     }
@@ -46,7 +48,6 @@ impl fmt::Debug for Entry {
             .field("path", &self.path)
             .finish()
     }
-
 }
 
 /// Recursive iterator of the contents of a source directory.
@@ -94,7 +95,7 @@ impl Iter {
             let entry = try!(entry);
             let ft = try!(entry.file_type());
             children.push((entry.file_name(), ft.is_dir()));
-        };
+        }
         children.sort();
         let mut directory_insert_point = 0;
         for (child_name, is_dir) in children {
@@ -123,7 +124,7 @@ impl Iter {
                 directory_insert_point += 1;
             }
             self.entry_deque.push_back(new_entry);
-        };
+        }
         Ok(())
     }
 }
@@ -148,14 +149,14 @@ impl Iterator for Iter {
             e @ Some(Err(_)) => e,
             Some(Ok(entry)) => {
                 if let Some(ref last_apath) = self.last_apath {
-                    assert!(
-                        last_apath < &entry.apath,
-                        "sources returned out of order: {:?} >= {:?}",
-                        last_apath, entry.apath);
+                    assert!(last_apath < &entry.apath,
+                            "sources returned out of order: {:?} >= {:?}",
+                            last_apath,
+                            entry.apath);
                 }
                 self.last_apath = Some(entry.apath.clone());
                 Some(Ok(entry))
-            },
+            }
         }
     }
 }
@@ -234,10 +235,12 @@ mod tests {
         assert_eq!(result.len(), 7);
 
         assert_eq!(format!("{:?}", &result[6]),
-            format!("sources::Entry {{ apath: Apath({:?}), path: {:?} }}", "/jam/apricot",
-                    &tf.root.join("jam").join("apricot")));
+                   format!("sources::Entry {{ apath: Apath({:?}), path: {:?} }}",
+                           "/jam/apricot",
+                           &tf.root.join("jam").join("apricot")));
 
-        assert_eq!(report.borrow_counts().get_count("source.visited.directories"), 4);
+        assert_eq!(report.borrow_counts().get_count("source.visited.directories"),
+                   4);
         assert_eq!(report.borrow_counts().get_count("source.selected"), 7);
     }
 
@@ -248,8 +251,10 @@ mod tests {
         tf.create_symlink("from", "to");
         let report = Report::new();
 
-        let result = iter(tf.path(), &report).unwrap()
-            .collect::<io::Result<Vec<_>>>().unwrap();
+        let result = iter(tf.path(), &report)
+            .unwrap()
+            .collect::<io::Result<Vec<_>>>()
+            .unwrap();
 
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[0].path, &tf.root);

@@ -80,11 +80,11 @@ impl Ord for Apath {
                     oa = ac;
                     ob = bc;
                     continue;
-                },
+                }
 
                 // Both paths have children but they differ at this point.
                 (Some(_), Some(_), cmp) => cmp,
-            }
+            };
         }
     }
 }
@@ -102,15 +102,13 @@ impl PartialOrd for Apath {
 /// Rust strings are by contract always valid UTF-8, so to meet that requirement for apaths it's
 /// enough to use a checked conversion from bytes or an `OSString`.
 pub fn valid(a: &str) -> bool {
-    if ! a.starts_with('/') {
+    if !a.starts_with('/') {
         return false;
     } else if a.len() == 1 {
         return true;
     }
     for part in a[1..].split('/') {
-        if part.is_empty()
-            || part == "." || part == ".."
-            || part.contains('\0') {
+        if part.is_empty() || part == "." || part == ".." || part.contains('\0') {
             return false;
         }
     }
@@ -125,21 +123,19 @@ mod tests {
 
     #[test]
     pub fn invalid() {
-        let invalid_cases = [
-            "",
-            "//",
-            "//a",
-            "/a//b",
-            "/a/",
-            "/a//",
-            "./a/b",
-            "/./a/b",
-            "/a/b/.",
-            "/a/./b",
-            "/a/b/../c",
-            "../a",
-            "/hello\0",
-        ];
+        let invalid_cases = ["",
+                             "//",
+                             "//a",
+                             "/a//b",
+                             "/a/",
+                             "/a//",
+                             "./a/b",
+                             "/./a/b",
+                             "/a/b/.",
+                             "/a/./b",
+                             "/a/b/../c",
+                             "../a",
+                             "/hello\0"];
         for v in invalid_cases.into_iter() {
             if valid(v) {
                 panic!("{:?} incorrectly marked valid", v);
@@ -149,35 +145,33 @@ mod tests {
 
     #[test]
     pub fn valid_and_ordered() {
-        let ordered = [
-            "/",
-            "/...a",
-            "/.a",
-            "/a",
-            "/b",
-            "/kleine Katze Fuß",
-            "/~~",
-            "/ñ",
-            "/a/...",
-            "/a/..obscure",
-            "/a/.config",
-            "/a/1",
-            "/a/100",
-            "/a/2",
-            "/a/añejo",
-            "/a/b/c",
-            "/b/((",
-            "/b/,",
-            "/b/A",
-            "/b/AAAA",
-            "/b/a",
-            "/b/b",
-            "/b/c",
-            "/b/a/c",
-            "/b/b/c",
-            "/b/b/b/z",
-            "/b/b/b/{zz}",
-        ];
+        let ordered = ["/",
+                       "/...a",
+                       "/.a",
+                       "/a",
+                       "/b",
+                       "/kleine Katze Fuß",
+                       "/~~",
+                       "/ñ",
+                       "/a/...",
+                       "/a/..obscure",
+                       "/a/.config",
+                       "/a/1",
+                       "/a/100",
+                       "/a/2",
+                       "/a/añejo",
+                       "/a/b/c",
+                       "/b/((",
+                       "/b/,",
+                       "/b/A",
+                       "/b/AAAA",
+                       "/b/a",
+                       "/b/b",
+                       "/b/c",
+                       "/b/a/c",
+                       "/b/b/c",
+                       "/b/b/b/z",
+                       "/b/b/b/{zz}"];
         for (i, a) in ordered.iter().enumerate() {
             if !valid(a) {
                 panic!("{:?} incorrectly marked invalid", a);
@@ -189,9 +183,12 @@ mod tests {
                 let r = ap.cmp(&bp);
                 if r != expected_order {
                     panic!("cmp({:?}, {:?}): returned {:?} expected {:?}",
-                        ap, bp, r, expected_order);
+                           ap,
+                           bp,
+                           r,
+                           expected_order);
                 }
             }
-        };
+        }
     }
 }

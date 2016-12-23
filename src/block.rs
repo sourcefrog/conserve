@@ -17,7 +17,7 @@ use rustc_serialize::hex::ToHex;
 use tempfile;
 
 use super::errors::*;
-use super::io::{read_and_decompress};
+use super::io::read_and_decompress;
 use super::report::Report;
 
 /// Use the maximum 64-byte hash.
@@ -82,9 +82,13 @@ impl BlockDir {
         buf
     }
 
-    pub fn store(&mut self, from_file: &mut Read, report: &Report) -> Result<(Vec<Address>, BlockHash)> {
+    pub fn store(&mut self,
+                 from_file: &mut Read,
+                 report: &Report)
+                 -> Result<(Vec<Address>, BlockHash)> {
         let tempf = try!(tempfile::NamedTempFileOptions::new()
-            .prefix("tmp").create_in(&self.path));
+            .prefix("tmp")
+            .create_in(&self.path));
         let mut encoder = BrotliEncoder::new(tempf, super::BROTLI_COMPRESSION_LEVEL);
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
         let mut uncompressed_length: u64 = 0;
@@ -94,9 +98,12 @@ impl BlockDir {
         }
         loop {
             let buf_slice = self.buf.as_mut_slice();
-            let read_size = try!(report.measure_duration("source.read", || from_file.read(buf_slice)));
-            let input = &buf_slice[.. read_size];
-            if read_size == 0 { break; } // eof
+            let read_size =
+                try!(report.measure_duration("source.read", || from_file.read(buf_slice)));
+            let input = &buf_slice[..read_size];
+            if read_size == 0 {
+                break;
+            } // eof
             uncompressed_length += read_size as u64;
 
             try!(report.measure_duration("block.compress", || encoder.write_all(input)));
@@ -108,10 +115,10 @@ impl BlockDir {
 
         // TODO: Update this when the stored blocks can be different from body hash.
         let refs = vec![Address {
-            hash: hex_hash.clone(),
-            start: 0,
-            len: uncompressed_length,
-        }];
+                            hash: hex_hash.clone(),
+                            start: 0,
+                            len: uncompressed_length,
+                        }];
         if try!(self.contains(&hex_hash)) {
             report.increment("block.already_present", 1);
             return Ok((refs, hex_hash));
@@ -170,7 +177,9 @@ impl BlockDir {
             .to_hex();
         if actual_hash != *hash {
             report.increment("block.misplaced", 1);
-            error!("Block file {:?} has actual decompressed hash {:?}", path, actual_hash);
+            error!("Block file {:?} has actual decompressed hash {:?}",
+                   path,
+                   actual_hash);
             return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
         Ok(decompressed)
@@ -185,13 +194,11 @@ mod tests {
     use std::io::prelude::*;
     use tempdir;
     use tempfile;
-    use super::{BlockDir};
+    use super::BlockDir;
     use super::super::report::Report;
 
     const EXAMPLE_TEXT: &'static [u8] = b"hello!";
-    const EXAMPLE_BLOCK_HASH: &'static str =
-        "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee\
-        31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
+    const EXAMPLE_BLOCK_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
     fn make_example_file() -> tempfile::NamedTempFile {
         let mut tf = tempfile::NamedTempFile::new().unwrap();

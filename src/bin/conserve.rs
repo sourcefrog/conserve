@@ -87,8 +87,8 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         .version(crate_version!())
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .arg(Arg::with_name("stats")
-           .long("stats")
-           .help("Show number of operations, bytes, seconds elapsed"))
+            .long("stats")
+            .help("Show number of operations, bytes, seconds elapsed"))
         .arg(Arg::with_name("ui")
             .long("ui")
             .help("UI for progress and messages")
@@ -137,7 +137,8 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
 
 fn show_chained_errors(e: Error) {
     error!("{}", e);
-    for suberr in e.iter().skip(1) { // First was already printed
+    for suberr in e.iter().skip(1) {
+        // First was already printed
         error!("  {}", suberr);
     }
     if let Some(bt) = e.backtrace() {
@@ -154,8 +155,8 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     conserve::backup(Path::new(subm.value_of("archive").unwrap()),
-        Path::new(subm.value_of("source").unwrap()),
-        report)
+                     Path::new(subm.value_of("source").unwrap()),
+                     report)
 }
 
 

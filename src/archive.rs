@@ -11,7 +11,7 @@ use std;
 use std::fs;
 use std::fs::{File, read_dir};
 use std::io;
-use std::io::{Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use rustc_serialize::json;
@@ -45,12 +45,14 @@ impl Archive {
             if e.kind() == io::ErrorKind::AlreadyExists {
                 // Exists and hopefully empty?
                 if try!(std::fs::read_dir(&archive.path)).next().is_some() {
-                    return Err(e).chain_err(|| format!("Archive directory exists and is not empty {:?}",
-                        archive.path));
+                    return Err(e).chain_err(|| {
+                        format!("Archive directory exists and is not empty {:?}",
+                                archive.path)
+                    });
                 }
             } else {
-                return Err(e).chain_err(|| format!("Failed to create archive directory {:?}",
-                    archive.path));
+                return Err(e)
+                    .chain_err(|| format!("Failed to create archive directory {:?}", archive.path));
             }
         }
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
@@ -81,7 +83,8 @@ impl Archive {
         try!(header_file.read_to_string(&mut header_string));
         let header: ArchiveHeader = try!(json::decode(&header_string));
         if header.conserve_archive_version != ARCHIVE_VERSION {
-            return Err(ErrorKind::UnsupportedArchiveVersion(header.conserve_archive_version).into());
+            return Err(ErrorKind::UnsupportedArchiveVersion(header.conserve_archive_version)
+                .into());
         }
         Ok(archive)
     }
@@ -90,9 +93,7 @@ impl Archive {
     pub fn iter_bands_unsorted(self: &Archive) -> Result<IterBands> {
         let read_dir = try!(read_dir(&self.path)
             .chain_err(|| format!("failed reading directory {:?}", &self.path)));
-        Ok(IterBands {
-            dir_iter: read_dir,
-        })
+        Ok(IterBands { dir_iter: read_dir })
     }
 
     /// Returns a vector of band ids, in sorted order.
@@ -166,7 +167,7 @@ impl Iterator for IterBands {
                 Some(Ok(entry)) => entry,
                 Some(Err(e)) => {
                     return Some(Err(e.into()));
-                },
+                }
             };
             let ft = match entry.file_type() {
                 Ok(ft) => ft,

@@ -5,10 +5,10 @@
 //! into an archive.
 
 use std::fs;
-use std::path::{Path};
+use std::path::Path;
 
 use super::archive::Archive;
-use super::block::{BlockDir};
+use super::block::BlockDir;
 use super::errors::*;
 use super::index;
 use super::index::{IndexBuilder, IndexKind};
@@ -53,7 +53,7 @@ impl Backup {
         } else {
             warn!("Skipping unsupported file kind {}", &source_entry.apath);
             self.report.increment("skipped.unsupported_file_kind", 1);
-            return Ok(())
+            return Ok(());
         };
         let new_index_entry = try!(store_fn(self, source_entry));
         self.index_builder.push(new_index_entry);
@@ -128,7 +128,8 @@ mod tests {
         assert_eq!(0, report.borrow_counts().get_count("block"));
         assert_eq!(0, report.borrow_counts().get_count("file"));
         assert_eq!(1, report.borrow_counts().get_count("symlink"));
-        assert_eq!(0, report.borrow_counts().get_count("skipped.unsupported_file_kind"));
+        assert_eq!(0,
+                   report.borrow_counts().get_count("skipped.unsupported_file_kind"));
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
@@ -137,7 +138,8 @@ mod tests {
         let band = af.open_band(&band_ids[0], &report).unwrap();
         assert!(band.is_closed().unwrap());
 
-        let index_entries = band.index_iter(&report).unwrap()
+        let index_entries = band.index_iter(&report)
+            .unwrap()
             .filter_map(|i| i.ok())
             .collect::<Vec<index::Entry>>();
         assert_eq!(2, index_entries.len());

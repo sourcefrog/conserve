@@ -88,7 +88,11 @@ impl Restore {
         }
     }
 
-    fn restore_file(&mut self, block_dir: &BlockDir, entry: &index::Entry, dest: &Path) -> Result<()> {
+    fn restore_file(&mut self,
+                    block_dir: &BlockDir,
+                    entry: &index::Entry,
+                    dest: &Path)
+                    -> Result<()> {
         self.report.increment("file", 1);
         // Here too we write a temporary file and then move it into place: so the file
         // under its real name only appears
@@ -186,7 +190,8 @@ mod tests {
         let restore_report = Report::new();
         Restore::new(&af, destdir.path(), &restore_report)
             .band_id(Some(BandId::new(&[0])))
-            .run().unwrap();
+            .run()
+            .unwrap();
         // Does not have the 'hello2' file added in the second version.
         assert_eq!(2, restore_report.borrow_counts().get_count("file"));
     }
@@ -208,8 +213,10 @@ mod tests {
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
         let restore_report = Report::new();
-        Restore::new(&af, destdir.path(), &restore_report).force_overwrite(true)
-            .run().unwrap();
+        Restore::new(&af, destdir.path(), &restore_report)
+            .force_overwrite(true)
+            .run()
+            .unwrap();
 
         assert_eq!(3, restore_report.borrow_counts().get_count("file"));
         let dest = &destdir.path();

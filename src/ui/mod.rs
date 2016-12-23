@@ -43,10 +43,12 @@ pub fn by_name(ui_name: &str) -> Option<Box<UI + Send>> {
     match ui_name {
         "auto" => Some(best_ui()),
         "plain" => Some(Box::new(plain::PlainUI::new())),
-        "color" => match color::ColorUI::new() {
-            Some(ui) => Some(Box::new(ui)),
-            None => None,
-        },
+        "color" => {
+            match color::ColorUI::new() {
+                Some(ui) => Some(Box::new(ui)),
+                None => None,
+            }
+        }
         _ => None,
     }
 }

@@ -1,7 +1,7 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
-///! Listing of files in a band in the archive.
+//! Listing of files in a band in the archive.
 
 use std::fmt;
 use std::io;
@@ -119,8 +119,8 @@ impl IndexBuilder {
         try!(ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)));
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
 
-        let json_string = report.measure_duration("index.encode",
-            || json::encode(&self.entries)).unwrap();
+        let json_string = report.measure_duration("index.encode", || json::encode(&self.entries))
+            .unwrap();
         let uncompressed_len = json_string.len() as u64;
 
         let af = try!(AtomicFile::new(hunk_path));
@@ -227,18 +227,18 @@ impl Iter {
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
                 // No (more) index hunk files.
                 return Ok(false);
-            },
+            }
             Err(e) => {
                 return Err(e.into());
-            },
+            }
         };
         self.report.increment_duration("index.read", start_read.elapsed());
         self.report.increment_size("index", index_bytes.len() as u64, comp_len as u64);
         self.report.increment("index.hunk", 1);
 
         let start_parse = time::Instant::now();
-        let index_json = try!(str::from_utf8(&index_bytes).chain_err(
-            || format!("index file {:?} is not UTF-8", hunk_path)));
+        let index_json = try!(str::from_utf8(&index_bytes)
+            .chain_err(|| format!("index file {:?} is not UTF-8", hunk_path)));
         let entries: Vec<Entry> = try!(json::decode(index_json)
             .chain_err(|| format!("couldn't deserialize index hunk {:?}", hunk_path)));
         if entries.is_empty() {
@@ -256,16 +256,14 @@ impl Iter {
 #[cfg(test)]
 mod tests {
     use rustc_serialize::json;
-    use std::path::{Path};
+    use std::path::Path;
     use tempdir;
 
     use super::{IndexBuilder, Entry, IndexKind};
     use super::super::io::read_and_decompress;
     use super::super::report::Report;
 
-    pub const EXAMPLE_HASH: &'static str =
-        "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf21\
-         45b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
+    pub const EXAMPLE_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
     pub fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder, Report) {
         let testdir = tempdir::TempDir::new("index_test").unwrap();
@@ -287,13 +285,13 @@ mod tests {
     #[test]
     fn serialize_index() {
         let entries = [Entry {
-            apath: "/a/b".to_string(),
-            mtime: Some(1461736377),
-            kind: IndexKind::File,
-            blake2b: Some(EXAMPLE_HASH.to_string()),
-            addrs: vec![],
-            target: None,
-        }];
+                           apath: "/a/b".to_string(),
+                           mtime: Some(1461736377),
+                           kind: IndexKind::File,
+                           blake2b: Some(EXAMPLE_HASH.to_string()),
+                           addrs: vec![],
+                           target: None,
+                       }];
         let index_json = json::encode(&entries).unwrap();
         println!("{}", index_json);
         assert_eq!(
@@ -378,7 +376,7 @@ mod tests {
         let entry = it.next().expect("Get second entry").expect("Entry isn't an error");
         assert_eq!(entry.apath, "/banana");
         let opt_entry = it.next();
-        if ! opt_entry.is_none() {
+        if !opt_entry.is_none() {
             panic!("Expected no more entries but got {:?}", opt_entry);
         }
     }
@@ -397,9 +395,8 @@ mod tests {
         ib.finish_hunk(&report).unwrap();
 
         let it = super::read(&ib.dir, &report).unwrap();
-        assert_eq!(
-            format!("{:?}", &it),
-            format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));
+        assert_eq!(format!("{:?}", &it),
+                   format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));
 
         let names: Vec<String> = it.map(|x| x.unwrap().apath).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);

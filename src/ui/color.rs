@@ -29,7 +29,7 @@ impl ColorUI {
     /// Return a new ColorUI or None if there isn't a suitable terminal.
     pub fn new() -> Option<ColorUI> {
         if let Some(t) = term::stdout() {
-            Some(ColorUI{
+            Some(ColorUI {
                 t: t,
                 last_update: None,
                 progress_present: false,
@@ -62,13 +62,11 @@ fn duration_to_hms(d: Duration) -> String {
     let elapsed_secs = d.as_secs();
     if elapsed_secs >= 3600 {
         format!("{:2}:{:02}:{:02}",
-            elapsed_secs / 3600,
-            (elapsed_secs / 60) % 60,
-            elapsed_secs % 60)
+                elapsed_secs / 3600,
+                (elapsed_secs / 60) % 60,
+                elapsed_secs % 60)
     } else {
-        format!("   {:2}:{:02}",
-            (elapsed_secs / 60) % 60,
-            elapsed_secs % 60)
+        format!("   {:2}:{:02}", (elapsed_secs / 60) % 60, elapsed_secs % 60)
     }
 }
 
@@ -83,8 +81,7 @@ fn compression_percent(uncompressed_bytes: u64, compressed_bytes: u64) -> i64 {
 
 
 fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
-    let float_secs = elapsed.as_secs() as f64
-        + (elapsed.subsec_nanos() as f64 / 1e9);
+    let float_secs = elapsed.as_secs() as f64 + (elapsed.subsec_nanos() as f64 / 1e9);
     if float_secs > 0.0 {
         bytes as f64 / float_secs / MB as f64
     } else {
@@ -96,7 +93,7 @@ fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
 impl UI for ColorUI {
     fn show_progress(&mut self, counts: &Counts) {
         if self.progress_present && self.throttle_updates() {
-            return
+            return;
         }
         self.clear();
         self.last_update = Some(Instant::now());
@@ -133,7 +130,8 @@ impl UI for ColorUI {
             comp_mb_str,
             block_comp_pct,
             uncomp_rate,
-        ).unwrap();
+        )
+            .unwrap();
         t.fg(term::color::WHITE).unwrap();
         t.flush().unwrap();
     }

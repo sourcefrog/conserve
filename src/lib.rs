@@ -63,4 +63,4 @@ const ARCHIVE_VERSION: &'static str = "0.3";
 
 const BROTLI_COMPRESSION_LEVEL: u32 = 4;
 
-pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family="unix");
+pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");

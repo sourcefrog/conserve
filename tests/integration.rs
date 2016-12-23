@@ -8,7 +8,7 @@ use conserve::backup;
 use conserve::index;
 use conserve::report::Report;
 use conserve::Restore;
-use conserve::testfixtures::{ScratchArchive};
+use conserve::testfixtures::ScratchArchive;
 use conserve::testfixtures::TreeFixture;
 
 
@@ -39,7 +39,8 @@ pub fn simple_backup() {
     let band = af.open_band(&band_ids[0], &report).unwrap();
     assert!(band.is_closed().unwrap());
 
-    let index_entries = band.index_iter(&report).unwrap()
+    let index_entries = band.index_iter(&report)
+        .unwrap()
         .filter_map(|i| i.ok())
         .collect::<Vec<index::Entry>>();
     assert_eq!(2, index_entries.len());
@@ -55,7 +56,7 @@ pub fn simple_backup() {
     assert!(file_entry.mtime.unwrap() > 0);
     let hash = file_entry.blake2b.as_ref().unwrap();
     assert_eq!("9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
-        hash);
+               hash);
 
     // TODO: Read back contents of that file.
     let restore_dir = TreeFixture::new();

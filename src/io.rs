@@ -77,7 +77,7 @@ impl DerefMut for AtomicFile {
 
 pub fn read_and_decompress(path: &Path) -> io::Result<(usize, Vec<u8>)> {
     // Conserve files are never too large so can always be read entirely in to memory.
-    let mut compressed_buf = Vec::<u8>::with_capacity(10<<20);
+    let mut compressed_buf = Vec::<u8>::with_capacity(10 << 20);
     let read_len = {
         let mut f = try!(fs::File::open(&path));
         try!(f.read_to_end(&mut compressed_buf))
@@ -101,8 +101,10 @@ pub fn read_and_decompress(path: &Path) -> io::Result<(usize, Vec<u8>)> {
 }
 
 
-pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(
-    path: &Path, obj: &T, report: &Report) -> Result<()> {
+pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(path: &Path,
+                                                              obj: &T,
+                                                              report: &Report)
+                                                              -> Result<()> {
     let mut f = try!(AtomicFile::new(path));
     try!(f.write_all(json::encode(&obj).unwrap().as_bytes()));
     try!(f.write_all(b"\n"));
@@ -131,10 +133,12 @@ pub fn directory_exists(path: &Path) -> Result<bool> {
             } else {
                 Err("exists but not a directory".into())
             }
-        },
-        Err(e) => match e.kind() {
-            io::ErrorKind::NotFound => Ok(false),
-            _ => Err(e.into()),
+        }
+        Err(e) => {
+            match e.kind() {
+                io::ErrorKind::NotFound => Ok(false),
+                _ => Err(e.into()),
+            }
         }
     }
 }
@@ -149,10 +153,12 @@ pub fn file_exists(path: &Path) -> Result<bool> {
             } else {
                 Err("exists but not a file".into())
             }
-        },
-        Err(e) => match e.kind() {
-            io::ErrorKind::NotFound => Ok(false),
-            _ => Err(e.into()),
+        }
+        Err(e) => {
+            match e.kind() {
+                io::ErrorKind::NotFound => Ok(false),
+                _ => Err(e.into()),
+            }
         }
     }
 }
@@ -162,8 +168,7 @@ pub fn file_exists(path: &Path) -> Result<bool> {
 ///
 /// Returns a set of filenames and a set of directory names respectively, forced to UTF-8.
 #[cfg(test)] // Only from tests at the moment but could be more general.
-pub fn list_dir(path: &Path) -> Result<(HashSet<String>, HashSet<String>)>
-{
+pub fn list_dir(path: &Path) -> Result<(HashSet<String>, HashSet<String>)> {
     let mut file_names = HashSet::<String>::new();
     let mut dir_names = HashSet::<String>::new();
     for entry in try!(fs::read_dir(path)) {

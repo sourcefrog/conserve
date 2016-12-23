@@ -2,8 +2,6 @@
 // Copyright 2016 Martin Pool.
 
 /// Run conserve CLI as a subprocess and test it.
-
-
 #[macro_use]
 extern crate spectral;
 extern crate tempdir;
@@ -33,8 +31,7 @@ fn blackbox_no_args() {
 
 #[test]
 fn blackbox_version() {
-    assert_success_and_output(&["--version"],
-        "conserve 0.3.2\n", "");
+    assert_success_and_output(&["--version"], "conserve 0.3.2\n", "");
 }
 
 
@@ -83,24 +80,20 @@ fn blackbox_backup() {
     src.create_file("hello");
     src.create_dir("subdir");
 
-    let (status, _stdout, stderr) = run_conserve(
-        &["backup", &arch_dir_str, src.root.to_str().unwrap()]);
+    let (status, _stdout, stderr) =
+        run_conserve(&["backup", &arch_dir_str, src.root.to_str().unwrap()]);
     assert_that(&stderr.as_str()).is_equal_to(&"");
     assert!(status.success());
     // TODO: Inspect the archive
 
-    assert_success_and_output(&["versions", &arch_dir_str],
-        "b0000\n", "");
+    assert_success_and_output(&["versions", &arch_dir_str], "b0000\n", "");
 
-    assert_success_and_output(&["ls", &arch_dir_str],
-        "/\n/hello\n/subdir\n",
-        "");
+    assert_success_and_output(&["ls", &arch_dir_str], "/\n/hello\n/subdir\n", "");
 
     // TODO: Factor out comparison to expected tree.
     let restore_dir = make_tempdir();
     let restore_dir_str = restore_dir.path().to_str().unwrap();
-    let (status, _stdout, _stderr) = run_conserve(
-        &["restore", &arch_dir_str, &restore_dir_str]);
+    let (status, _stdout, _stderr) = run_conserve(&["restore", &arch_dir_str, &restore_dir_str]);
     assert!(status.success());
     assert!(fs::metadata(restore_dir.path().join("subdir")).unwrap().is_dir());
 
@@ -118,9 +111,12 @@ fn blackbox_backup() {
     // Restore with specified band id / backup version.
     {
         let restore_dir = make_tempdir();
-        let (status, _stdout, _stderr) = run_conserve(
-            &["restore", "-b", "b0000", &arch_dir_str, &restore_dir.path().to_str().unwrap()]);
-            assert!(status.success());
+        let (status, _stdout, _stderr) = run_conserve(&["restore",
+                                                        "-b",
+                                                        "b0000",
+                                                        &arch_dir_str,
+                                                        &restore_dir.path().to_str().unwrap()]);
+        assert!(status.success());
     }
 
     // TODO: Validate.
@@ -159,8 +155,8 @@ fn empty_archive() {
 
     let restore_dir = make_tempdir();
     {
-        let (status, stdout, stderr) = run_conserve(&["restore", adir_str,
-            restore_dir.path().to_str().unwrap()]);
+        let (status, stdout, stderr) =
+            run_conserve(&["restore", adir_str, restore_dir.path().to_str().unwrap()]);
         assert!(!status.success());
         assert!(!stderr.contains("panic"));
         assert!(stdout.contains("Archive is empty"));
@@ -219,11 +215,15 @@ fn find_conserve_binary() -> PathBuf {
 fn run_conserve(args: &[&str]) -> (process::ExitStatus, String, String) {
     let conserve_path = find_conserve_binary();
     println!("run conserve: {:?}", args);
-    let output = process::Command::new(&conserve_path).args(args).output()
+    let output = process::Command::new(&conserve_path)
+        .args(args)
+        .output()
         .expect(format!("Failed to run conserve: {:?} {:?}", &conserve_path, &args).as_str());
     println!("status: {:?}", output.status);
     let output_string = String::from_utf8_lossy(&output.stdout).into_owned();
     let error_string = String::from_utf8_lossy(&output.stderr).into_owned();
-    println!(">> stdout:\n{}\n>> stderr:\n{}", &output_string, &error_string);
+    println!(">> stdout:\n{}\n>> stderr:\n{}",
+             &output_string,
+             &error_string);
     (output.status, output_string, error_string)
 }

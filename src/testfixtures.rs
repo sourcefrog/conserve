@@ -94,8 +94,7 @@ impl TreeFixture {
 
     /// Symlinks are just not present on Windows.
     #[cfg(windows)]
-    pub fn create_symlink(self: &TreeFixture, _relative_path: &str, _target: &str) {
-    }
+    pub fn create_symlink(self: &TreeFixture, _relative_path: &str, _target: &str) {}
 }
 
 impl Default for TreeFixture {

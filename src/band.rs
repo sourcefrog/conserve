@@ -162,8 +162,7 @@ mod tests {
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_string("b0001").unwrap();
-        let band2 = Band::open(af.path(), &band_id, report)
-            .expect("failed to open band");
+        let band2 = Band::open(af.path(), &band_id, report).expect("failed to open band");
         assert!(band2.is_closed().unwrap());
     }
 
