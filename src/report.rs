@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::ops::AddAssign;
 use std::sync::Arc;
 use std::sync::{Mutex, MutexGuard};
 use std::time;
@@ -38,6 +39,15 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
 ];
 
 
+/// Describes sizes of data read or written, with both the
+/// compressed and uncompressed size.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Sizes {
+    pub compressed: u64,
+    pub uncompressed: u64,
+}
+
+
 static KNOWN_SIZES: &'static [&'static str] = &["block", "index"];
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -58,7 +68,7 @@ static KNOWN_DURATIONS: &'static [&'static str] = &[
 /// multiple Report values.
 pub struct Counts {
     count: BTreeMap<&'static str, u64>,
-    sizes: BTreeMap<&'static str, (u64, u64)>,
+    sizes: BTreeMap<&'static str, Sizes>,
     durations: BTreeMap<&'static str, Duration>,
     start: time::Instant,
 }
@@ -78,6 +88,22 @@ pub struct Report {
     counts: Arc<Mutex<Counts>>,
     ui: Arc<Mutex<Box<UI + Send>>>,
 }
+
+
+impl AddAssign for Sizes {
+    fn add_assign(&mut self, other: Sizes) {
+        self.compressed += other.compressed;
+        self.uncompressed += other.uncompressed;
+    }
+}
+
+impl<'a> AddAssign<&'a Sizes> for Sizes {
+    fn add_assign(&mut self, other: &'a Sizes) {
+        self.compressed += other.compressed;
+        self.uncompressed += other.uncompressed;
+    }
+}
+
 
 
 impl Report {
@@ -116,16 +142,10 @@ impl Report {
         self.ui.lock().unwrap().show_progress(&*self.borrow_counts());
     }
 
-    pub fn increment_size(
-        &self,
-        counter_name: &str,
-        uncompressed_bytes: u64,
-        compressed_bytes: u64
-    ) {
+    pub fn increment_size(&self, counter_name: &str, sizes: Sizes) {
         let mut counts = self.mut_counts();
         let mut e = counts.sizes.get_mut(counter_name).expect("unregistered size counter");
-        e.0 += uncompressed_bytes;
-        e.1 += compressed_bytes;
+        *e += sizes;
     }
 
     pub fn increment_duration(&self, name: &str, duration: Duration) {
@@ -141,8 +161,8 @@ impl Report {
         for (name, value) in &from_counts.count {
             self.increment(name, *value);
         }
-        for (name, &(uncompressed, compressed)) in &from_counts.sizes {
-            self.increment_size(name, uncompressed, compressed);
+        for (name, s) in &from_counts.sizes {
+            self.increment_size(name, s.clone());
         }
         for (name, duration) in &from_counts.durations {
             self.increment_duration(name, *duration);
@@ -178,14 +198,14 @@ impl Display for Report {
             }
         }
         try!(write!(f, "Bytes (before and after compression):\n"));
-        for (key, &(uncompressed_bytes, compressed_bytes)) in &counts.sizes {
-            if uncompressed_bytes > 0 {
-                let compression_pct = 100 - ((100 * compressed_bytes) / uncompressed_bytes);
+        for (key, s) in &counts.sizes {
+            if s.uncompressed > 0 {
+                let compression_pct = 100 - ((100 * s.compressed) / s.uncompressed);
                 try!(write!(f,
                             "  {:<40} {:>9} {:>9} {:>9}%\n",
                             *key,
-                            uncompressed_bytes,
-                            compressed_bytes,
+                            s.uncompressed,
+                            s.compressed,
                             compression_pct));
             }
         }
@@ -221,7 +241,7 @@ impl Counts {
         }
         let mut inner_sizes = BTreeMap::new();
         for counter_name in KNOWN_SIZES {
-            inner_sizes.insert(*counter_name, (0, 0));
+            inner_sizes.insert(*counter_name, Sizes::default());
         }
         let mut inner_durations: BTreeMap<&'static str, Duration> = BTreeMap::new();
         for name in KNOWN_DURATIONS {
@@ -250,7 +270,7 @@ impl Counts {
     ///
     /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
     /// in bytes.
-    pub fn get_size(&self, counter_name: &str) -> (u64, u64) {
+    pub fn get_size(&self, counter_name: &str) -> Sizes {
         *self.sizes
             .get(counter_name)
             .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
@@ -265,7 +285,7 @@ impl Counts {
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
-    use super::Report;
+    use super::{Report, Sizes};
 
     #[test]
     pub fn count() {
@@ -285,13 +305,21 @@ mod tests {
         r1.increment("block.corrupt", 2);
         r2.increment("block", 1);
         r2.increment("block.corrupt", 10);
-        r2.increment_size("block", 300, 100);
+        r2.increment_size("block",
+                          Sizes {
+                              uncompressed: 300,
+                              compressed: 100,
+                          });
         r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
         let cs = r1.borrow_counts();
         assert_eq!(cs.get_count("block"), 2);
         assert_eq!(cs.get_count("block.corrupt"), 12);
-        assert_eq!(cs.get_size("block"), (300, 100));
+        assert_eq!(cs.get_size("block"),
+                   Sizes {
+                       uncompressed: 300,
+                       compressed: 100,
+                   });
         assert_eq!(cs.get_duration("test"), Duration::new(5, 0));
     }
 
@@ -301,7 +329,8 @@ mod tests {
         let r1 = Report::new();
         r1.increment("block", 10);
         r1.increment("block", 5);
-        r1.increment_size("block", 300, 100);
+        r1.increment_size("block",
+            Sizes { uncompressed: 300, compressed: 100});
         r1.increment_duration("test", Duration::new(42, 479760000));
 
         let formatted = format!("{}", r1);

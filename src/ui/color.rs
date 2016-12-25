@@ -13,7 +13,7 @@ use log;
 use log::LogLevel;
 use term;
 
-use super::super::report::Counts;
+use super::super::report::{Counts, Sizes};
 use super::UI;
 
 const MB: u64 = 1_000_000;
@@ -71,9 +71,9 @@ fn duration_to_hms(d: Duration) -> String {
 }
 
 
-fn compression_percent(uncompressed_bytes: u64, compressed_bytes: u64) -> i64 {
-    if uncompressed_bytes > 0 {
-        100i64 - (100 * compressed_bytes / uncompressed_bytes) as i64
+fn compression_percent(s: &Sizes) -> i64 {
+    if s.uncompressed > 0 {
+        100i64 - (100 * s.compressed / s.uncompressed) as i64
     } else {
         0
     }
@@ -104,7 +104,7 @@ impl UI for ColorUI {
         // block deduplication.
         // Measure compression on body bytes.
         let block_sizes = counts.get_size("block");
-        let block_comp_pct = compression_percent(block_sizes.0, block_sizes.1);
+        let block_comp_pct = compression_percent(&block_sizes);
         let elapsed = counts.elapsed_time();
         // TODO: Truncate to screen width (or draw on multiple lines with cursor-up)?
         // TODO: Rate limit etc.
@@ -112,9 +112,9 @@ impl UI for ColorUI {
         // TODO: Don't special-case for backups.
         t.fg(term::color::GREEN).unwrap();
         write!(t, " {} ", duration_to_hms(elapsed)).unwrap();
-        let uncomp_mb_str = format!("{}MB", block_sizes.0 / MB);
-        let comp_mb_str = format!("{}MB", block_sizes.1 / MB);
-        let uncomp_rate = mbps_rate(block_sizes.0, elapsed);
+        let uncomp_mb_str = format!("{}MB", block_sizes.uncompressed / MB);
+        let comp_mb_str = format!("{}MB", block_sizes.compressed / MB);
+        let uncomp_rate = mbps_rate(block_sizes.uncompressed, elapsed);
 
         t.fg(term::color::GREEN).unwrap();
         write!(t, "{:8}", counts.get_count("file")).unwrap();

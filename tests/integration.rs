@@ -69,10 +69,10 @@ fn check_restore(af: &ScratchArchive) {
     Restore::new(&af, restore_dir.path(), &restore_report).run().unwrap();
     let restore_counts = restore_report.borrow_counts();
     let block_sizes = restore_counts.get_size("block");
-    assert!(block_sizes.0 >= 8 && block_sizes.1 > 10,
-        format!("{:?}", block_sizes));
+    assert!(block_sizes.uncompressed == 8 && block_sizes.compressed == 12,
+            format!("{:?}", block_sizes));
     let index_sizes = restore_counts.get_size("index");
-    assert!(index_sizes.0 > 8 && index_sizes.1 > 100,
-        format!("{:?}", index_sizes));
+    assert!(index_sizes.compressed == 214 && index_sizes.uncompressed == 462,
+            format!("{:?}", index_sizes));
     // TODO: Check what was restored.
 }

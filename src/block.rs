@@ -18,7 +18,7 @@ use tempfile;
 
 use super::errors::*;
 use super::io::read_and_decompress;
-use super::report::Report;
+use super::report::{Report, Sizes};
 
 /// Use the maximum 64-byte hash.
 const BLAKE_HASH_SIZE_BYTES: usize = 64;
@@ -137,7 +137,11 @@ impl BlockDir {
             }
         }
         report.increment("block", 1);
-        report.increment_size("block", uncompressed_length, compressed_length);
+        report.increment_size("block",
+                              Sizes {
+                                  compressed: compressed_length,
+                                  uncompressed: uncompressed_length,
+                              });
         Ok((refs, hex_hash))
     }
 
@@ -170,7 +174,11 @@ impl BlockDir {
         // TODO: Accept addresses referring to only part of a block.
         assert_eq!(decompressed.len(), addr.len as usize);
         report.increment("block", 1);
-        report.increment_size("block", decompressed.len() as u64, compressed_len as u64);
+        report.increment_size("block",
+                              Sizes {
+                                  uncompressed: decompressed.len() as u64,
+                                  compressed: compressed_len as u64,
+                              });
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
             .as_bytes()
@@ -195,7 +203,7 @@ mod tests {
     use tempdir;
     use tempfile;
     use super::BlockDir;
-    use super::super::report::Report;
+    use super::super::report::{Report, Sizes};
 
     const EXAMPLE_TEXT: &'static [u8] = b"hello!";
     const EXAMPLE_BLOCK_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
@@ -240,7 +248,11 @@ mod tests {
 
         assert_eq!(report.borrow_counts().get_count("block.already_present"), 0);
         assert_eq!(report.borrow_counts().get_count("block"), 1);
-        assert_eq!(report.borrow_counts().get_size("block"), (6, 10));
+        assert_eq!(report.borrow_counts().get_size("block"),
+                   Sizes {
+                       uncompressed: 6,
+                       compressed: 10,
+                   });
 
         // Try to read back
         let read_report = Report::new();
@@ -250,7 +262,11 @@ mod tests {
         {
             let counts = read_report.borrow_counts();
             assert_eq!(counts.get_count("block"), 1);
-            assert_eq!(counts.get_size("block"), (EXAMPLE_TEXT.len() as u64, 10u64));
+            assert_eq!(counts.get_size("block"),
+                       Sizes {
+                           uncompressed: EXAMPLE_TEXT.len() as u64,
+                           compressed: 10u64,
+                       });
         }
     }
 

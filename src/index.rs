@@ -19,7 +19,7 @@ use super::apath::Apath;
 use super::block;
 use super::errors::*;
 use super::io::{AtomicFile, ensure_dir_exists, read_and_decompress};
-use super::report::Report;
+use super::report::{Report, Sizes};
 
 
 const MAX_ENTRIES_PER_HUNK: usize = 1000;
@@ -136,7 +136,11 @@ impl IndexBuilder {
         let compressed_len: u64 = try!(af.seek(SeekFrom::Current(0)));
         try!(af.close(report));
 
-        report.increment_size("index", uncompressed_len as u64, compressed_len as u64);
+        report.increment_size("index",
+                              Sizes {
+                                  uncompressed: uncompressed_len as u64,
+                                  compressed: compressed_len as u64,
+                              });
         report.increment("index.hunk", 1);
 
         // Ready for the next hunk.
@@ -233,7 +237,11 @@ impl Iter {
             }
         };
         self.report.increment_duration("index.read", start_read.elapsed());
-        self.report.increment_size("index", index_bytes.len() as u64, comp_len as u64);
+        self.report.increment_size("index",
+                                   Sizes {
+                                       uncompressed: index_bytes.len() as u64,
+                                       compressed: comp_len as u64,
+                                   });
         self.report.increment("index.hunk", 1);
 
         let start_parse = time::Instant::now();
