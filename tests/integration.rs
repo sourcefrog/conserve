@@ -58,9 +58,21 @@ pub fn simple_backup() {
     assert_eq!("9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
                hash);
 
+    check_restore(&af);
+}
+
+
+fn check_restore(af: &ScratchArchive) {
     // TODO: Read back contents of that file.
     let restore_dir = TreeFixture::new();
     let restore_report = Report::new();
     Restore::new(&af, restore_dir.path(), &restore_report).run().unwrap();
+    let restore_counts = restore_report.borrow_counts();
+    let block_sizes = restore_counts.get_size("block");
+    assert!(block_sizes.0 >= 8 && block_sizes.1 > 10,
+        format!("{:?}", block_sizes));
+    let index_sizes = restore_counts.get_size("index");
+    assert!(index_sizes.0 > 8 && index_sizes.1 > 100,
+        format!("{:?}", index_sizes));
     // TODO: Check what was restored.
 }
