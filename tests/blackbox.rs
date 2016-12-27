@@ -30,12 +30,6 @@ fn blackbox_no_args() {
 
 
 #[test]
-fn blackbox_version() {
-    assert_success_and_output(&["--version"], "conserve 0.3.2\n", "");
-}
-
-
-#[test]
 fn blackbox_help() {
     let (status, stdout, stderr) = run_conserve(&["--help"]);
     assert_that(&status).matches(|s| s.success());
