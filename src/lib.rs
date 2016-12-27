@@ -38,6 +38,7 @@ mod block;
 pub mod errors;
 pub mod index;
 mod io;
+mod jsonio;
 pub mod report;
 mod restore;
 pub mod sources;

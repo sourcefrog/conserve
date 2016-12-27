@@ -18,7 +18,7 @@ use rustc_serialize::json;
 
 use super::{ARCHIVE_VERSION, Band, BandId, Report};
 use super::errors::*;
-use super::io::write_json_uncompressed;
+use super::jsonio;
 
 
 const HEADER_FILENAME: &'static str = "CONSERVE";
@@ -57,7 +57,7 @@ impl Archive {
         }
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
         let header_filename = path.join(HEADER_FILENAME);
-        try!(write_json_uncompressed(&header_filename, &header, &report)
+        try!(jsonio::write(&header_filename, &header, &report)
             .chain_err(|| format!("Failed to write archive header: {:?}", header_filename)));
         info!("Created new archive in {:?}", path.display());
         Ok(archive)

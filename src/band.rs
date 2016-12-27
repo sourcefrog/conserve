@@ -21,7 +21,8 @@ use super::block::BlockDir;
 use super::errors::*;
 use super::index;
 use super::index::IndexBuilder;
-use super::io::{file_exists, write_json_uncompressed};
+use super::jsonio;
+use super::io::file_exists;
 
 static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
@@ -63,14 +64,14 @@ impl Band {
         info!("Created band {} in {:?}", new.id.as_string(), &archive_dir);
 
         let head = BandHead { start_time: time::get_time().sec as u64 };
-        try!(write_json_uncompressed(&new.path_buf.join(HEAD_FILENAME), &head, report));
+        try!(jsonio::write(&new.path_buf.join(HEAD_FILENAME), &head, report));
         Ok(new)
     }
 
     /// Mark this band closed: no more blocks should be written after this.
     pub fn close(self: &Band, report: &Report) -> Result<()> {
         let tail = BandTail { end_time: time::get_time().sec as u64 };
-        write_json_uncompressed(&self.tail_path(), &tail, report)
+        jsonio::write(&self.tail_path(), &tail, report)
     }
 
     pub fn open(archive_dir: &Path, id: &BandId, report: &Report) -> Result<Band> {

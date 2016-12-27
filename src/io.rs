@@ -12,8 +12,6 @@ use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
 use brotli2;
-use rustc_serialize::json;
-use rustc_serialize;
 use tempfile;
 
 use super::Report;
@@ -98,18 +96,6 @@ pub fn read_and_decompress(path: &Path) -> io::Result<(usize, Vec<u8>)> {
     }
     decompressed.shrink_to_fit();
     Ok((read_len, decompressed))
-}
-
-
-pub fn write_json_uncompressed<T: rustc_serialize::Encodable>(path: &Path,
-                                                              obj: &T,
-                                                              report: &Report)
-                                                              -> Result<()> {
-    let mut f = try!(AtomicFile::new(path));
-    try!(f.write_all(json::encode(&obj).unwrap().as_bytes()));
-    try!(f.write_all(b"\n"));
-    try!(f.close(report));
-    Ok(())
 }
 
 
