@@ -11,6 +11,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use time;
 
@@ -45,9 +46,23 @@ struct Head {
 }
 
 
+/// Format of the on-disk tail file.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct Tail {
     end_time: u64,
+}
+
+
+/// Readonly summary info about a band, from `Band::get_info`.
+pub struct Info {
+    pub id: BandId,
+    pub is_closed: bool,
+
+    /// Time Conserve started writing this band.
+    pub start_time: SystemTime,
+
+    /// Time this band was completed, if it is complete.
+    pub end_time: Option<SystemTime>,
 }
 
 
@@ -135,6 +150,28 @@ impl Band {
     fn read_tail(&self, report: &Report) -> Result<Tail> {
         jsonio::read(&self.tail_path(), &report)
     }
+
+    /// Return info about the state of this band.
+    pub fn get_info(&self, report: &Report) -> Result<Info> {
+        let head = self.read_head(&report)?;
+        let is_closed = self.is_closed()?;
+        let end_time = if is_closed {
+            Some(time_from_unix(self.read_tail(&report)?.end_time))
+        } else {
+            None
+        };
+        Ok(Info{
+            id: self.id.clone(),
+            is_closed: is_closed,
+            start_time: time_from_unix(head.start_time),
+            end_time: end_time,
+        })
+    }
+}
+
+
+fn time_from_unix(unixtime: u64) -> SystemTime {
+    UNIX_EPOCH + Duration::from_secs(unixtime)
 }
 
 
@@ -176,6 +213,16 @@ mod tests {
         let band_id = BandId::from_string("b0001").unwrap();
         let band2 = Band::open(af.path(), &band_id, report).expect("failed to open band");
         assert!(band2.is_closed().unwrap());
+
+        // Try get_info
+        let info = band2.get_info(&Report::new()).expect("get_info failed");
+        assert_eq!(info.id.as_string(), "b0001");
+        assert_eq!(info.is_closed, true);
+        let dur = info.end_time.expect("info has an end_time")
+            .duration_since(info.start_time).unwrap();
+        // Test should have taken (much) less than 5s between starting and finishing
+        // the band.  (It might fail if you set a breakpoint right there.)
+        assert!(dur.as_secs() < 5);
     }
 
     #[test]
