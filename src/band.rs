@@ -150,7 +150,7 @@ mod tests {
     use super::super::{BandId, Report};
 
     #[test]
-    fn create_band() {
+    fn create_and_reopen_band() {
         use super::super::io::list_dir;
         let af = ScratchArchive::new();
         let report = &Report::new();
