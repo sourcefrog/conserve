@@ -78,14 +78,14 @@ impl Band {
         try!(fs::create_dir(&new.index_dir_path));
         info!("Created band {} in {:?}", new.id.as_string(), &archive_dir);
 
-        let head = Head { start_time: time::get_time().sec as u64 };
+        let head = Head { start_time: unixtime_now() };
         try!(jsonio::write(&new.head_path(), &head, report));
         Ok(new)
     }
 
     /// Mark this band closed: no more blocks should be written after this.
     pub fn close(self: &Band, report: &Report) -> Result<()> {
-        let tail = Tail { end_time: time::get_time().sec as u64 };
+        let tail = Tail { end_time: unixtime_now() };
         jsonio::write(&self.tail_path(), &tail, report)
     }
 
@@ -172,6 +172,11 @@ impl Band {
 
 fn time_from_unix(unixtime: u64) -> SystemTime {
     UNIX_EPOCH + Duration::from_secs(unixtime)
+}
+
+
+fn unixtime_now() -> u64 {
+    time::get_time().sec as u64
 }
 
 
