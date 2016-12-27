@@ -180,10 +180,27 @@ fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
 }
 
 
-fn versions(subm: &ArgMatches, _report: &Report) -> Result<()> {
+fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = try!(Archive::open(Path::new(subm.value_of("archive").unwrap())));
     for band_id in try!(archive.list_bands()) {
-        println!("{}", band_id.as_string());
+        let band = match archive.open_band(&band_id, report) {
+            Ok(band) => band,
+            Err(e) => {
+                warn!("Failed to open band {:?}: {:?}", band_id, e);
+                continue;
+            },
+        };
+        let is_complete_str = match band.is_closed() {
+            Ok(true) => "complete",
+            Ok(false) => "incomplete",
+            Err(e) => {
+                warn!("Failed to read band tail {:?}: {:?}", band_id, e);
+                continue;
+            },
+        };
+        println!("{:-30} {}",
+            band_id.as_string(),
+            is_complete_str);
     }
     Ok(())
 }
