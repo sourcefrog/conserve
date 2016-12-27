@@ -64,7 +64,7 @@ impl Band {
         info!("Created band {} in {:?}", new.id.as_string(), &archive_dir);
 
         let head = BandHead { start_time: time::get_time().sec as u64 };
-        try!(jsonio::write(&new.path_buf.join(HEAD_FILENAME), &head, report));
+        try!(jsonio::write(&new.head_path(), &head, report));
         Ok(new)
     }
 
@@ -75,9 +75,9 @@ impl Band {
     }
 
     pub fn open(archive_dir: &Path, id: &BandId, report: &Report) -> Result<Band> {
-        // TODO: Check header file, error if not present.
-        let _ = report;
-        Ok(Band::new(archive_dir, id.clone()))
+        let new = Band::new(archive_dir, id.clone());
+        new.read_head(&report)?;  // Just check it can be read
+        Ok(new)
     }
 
     /// Create a new in-memory Band object.
@@ -103,13 +103,16 @@ impl Band {
         file_exists(&self.tail_path())
     }
 
-    fn tail_path(self: &Band) -> PathBuf {
-        self.path_buf.join(TAIL_FILENAME)
-    }
-
-    #[allow(unused)]
     pub fn path(self: &Band) -> &Path {
         &self.path_buf
+    }
+
+    fn head_path(&self) -> PathBuf {
+        self.path_buf.join(HEAD_FILENAME)
+    }
+
+    fn tail_path(self: &Band) -> PathBuf {
+        self.path_buf.join(TAIL_FILENAME)
     }
 
     pub fn block_dir(self: &Band) -> BlockDir {
@@ -123,6 +126,14 @@ impl Band {
     /// Make an iterator that will return all entries in this band.
     pub fn index_iter(&self, report: &Report) -> Result<index::Iter> {
         index::read(&self.index_dir_path, report)
+    }
+
+    fn read_head(&self, report: &Report) -> Result<BandHead> {
+        jsonio::read(&self.head_path(), &report)
+    }
+
+    fn read_tail(&self, report: &Report) -> Result<BandTail> {
+        jsonio::read(&self.tail_path(), &report)
     }
 }
 
