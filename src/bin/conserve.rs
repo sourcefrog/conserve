@@ -90,7 +90,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
     App::new("conserve")
         .about("A robust backup tool <http://conserve.fyi/>")
         .author(crate_authors!())
-        .version(crate_version!())
+        .version(conserve::version())
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .arg(Arg::with_name("stats")
             .long("stats")

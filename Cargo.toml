@@ -20,6 +20,7 @@ are:
 readme = "README.md"
 keywords = ["archive", "backup"]
 license = "GPL-2.0"
+build = "build.rs"
 
 [[bin]]
 name = "conserve"
@@ -39,6 +40,10 @@ tempdir = "^0"
 tempfile = "^2"
 term = "^0.4"
 time = "^0"
+vergen = "~0.1.0"
+
+[build-dependencies]
+vergen = "~0.1.0"
 
 [features]
 default = []

@@ -56,8 +56,11 @@ pub use restore::Restore;
 
 /// Conserve version number as a semver string.
 ///
-/// This is populated at compile time from `Cargo.toml`.
-pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+/// This is populated at compile time by `build.rs`.
+include!(concat!(env!("OUT_DIR"), "/version.rs"));
+pub fn version() -> &'static str {
+    semver()
+}
 
 /// Format-compatibility version, normally the first two components of the package version.
 const ARCHIVE_VERSION: &'static str = "0.3";
