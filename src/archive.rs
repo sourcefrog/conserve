@@ -9,15 +9,13 @@
 
 use std;
 use std::fs;
-use std::fs::{File, read_dir};
+use std::fs::read_dir;
 use std::io;
-use std::io::Read;
 use std::path::{Path, PathBuf};
-
-use rustc_serialize::json;
 
 use super::{ARCHIVE_VERSION, Band, BandId, Report};
 use super::errors::*;
+use super::io::file_exists;
 use super::jsonio;
 
 
@@ -66,27 +64,18 @@ impl Archive {
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
-    pub fn open(path: &Path) -> Result<Archive> {
-        let archive = Archive { path: path.to_path_buf() };
+    pub fn open(path: &Path, report: &Report) -> Result<Archive> {
         let header_path = path.join(HEADER_FILENAME);
-        let mut header_file = match File::open(&header_path) {
-            Ok(f) => f,
-            Err(e) => {
-                if e.kind() == io::ErrorKind::NotFound {
-                    return Err(ErrorKind::NotAnArchive(path.into()).into());
-                } else {
-                    return Err(e.into());
-                }
-            }
-        };
-        let mut header_string = String::new();
-        try!(header_file.read_to_string(&mut header_string));
-        let header: ArchiveHeader = try!(json::decode(&header_string));
+        if !file_exists(&header_path)? {
+            return Err(ErrorKind::NotAnArchive(path.into()).into());
+        }
+        let header: ArchiveHeader = jsonio::read(&header_path, &report)
+            .chain_err(|| format!("Failed to read archive header"))?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(ErrorKind::UnsupportedArchiveVersion(header.conserve_archive_version)
                 .into());
         }
-        Ok(archive)
+        Ok(Archive { path: path.to_path_buf() })
     }
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
@@ -216,7 +205,7 @@ mod tests {
         assert!(arch.list_bands().unwrap().is_empty());
 
         // We can re-open it.
-        Archive::open(arch_path).unwrap();
+        Archive::open(arch_path, &Report::new()).unwrap();
         assert!(arch.list_bands().unwrap().is_empty());
     }
 
@@ -229,7 +218,7 @@ mod tests {
         assert_eq!(arch.path(), arch_path);
         assert!(arch.list_bands().unwrap().is_empty());
 
-        Archive::open(arch_path).unwrap();
+        Archive::open(arch_path, &Report::new()).unwrap();
         assert!(arch.list_bands().unwrap().is_empty());
     }
 

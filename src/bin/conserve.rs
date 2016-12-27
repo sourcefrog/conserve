@@ -180,8 +180,9 @@ fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
 }
 
 
-fn versions(subm: &ArgMatches, _report: &Report) -> Result<()> {
-    let archive = try!(Archive::open(Path::new(subm.value_of("archive").unwrap())));
+fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let archive_path = Path::new(subm.value_of("archive").unwrap());
+    let archive = try!(Archive::open(archive_path, &report));
     for band_id in try!(archive.list_bands()) {
         println!("{}", band_id.as_string());
     }
@@ -190,7 +191,8 @@ fn versions(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 
 fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive = try!(Archive::open(Path::new(subm.value_of("archive").unwrap())));
+    let archive_path = Path::new(subm.value_of("archive").unwrap());
+    let archive = try!(Archive::open(archive_path, &report));
     let band_id = try!(band_id_from_match(subm));
     let band = try!(archive.open_band_or_last(&band_id, report));
     for i in try!(band.index_iter(report)) {
@@ -203,7 +205,8 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 
 fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive = try!(Archive::open(Path::new(subm.value_of("archive").unwrap())));
+    let archive_path = Path::new(subm.value_of("archive").unwrap());
+    let archive = try!(Archive::open(archive_path, &report));
     let destination_path = Path::new(subm.value_of("destination").unwrap());
     let force_overwrite = subm.is_present("force-overwrite");
     conserve::Restore::new(&archive, destination_path, report)

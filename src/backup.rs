@@ -24,7 +24,7 @@ struct Backup {
 
 
 pub fn backup(archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
-    let archive = try!(Archive::open(archive_path));
+    let archive = try!(Archive::open(archive_path, &report));
     let band = try!(archive.create_band(&report));
     let mut backup = Backup {
         block_dir: band.block_dir(),
