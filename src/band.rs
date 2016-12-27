@@ -40,13 +40,13 @@ pub struct Band {
 
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-struct BandHead {
+struct Head {
     start_time: u64,
 }
 
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-struct BandTail {
+struct Tail {
     end_time: u64,
 }
 
@@ -63,14 +63,14 @@ impl Band {
         try!(fs::create_dir(&new.index_dir_path));
         info!("Created band {} in {:?}", new.id.as_string(), &archive_dir);
 
-        let head = BandHead { start_time: time::get_time().sec as u64 };
+        let head = Head { start_time: time::get_time().sec as u64 };
         try!(jsonio::write(&new.head_path(), &head, report));
         Ok(new)
     }
 
     /// Mark this band closed: no more blocks should be written after this.
     pub fn close(self: &Band, report: &Report) -> Result<()> {
-        let tail = BandTail { end_time: time::get_time().sec as u64 };
+        let tail = Tail { end_time: time::get_time().sec as u64 };
         jsonio::write(&self.tail_path(), &tail, report)
     }
 
@@ -128,11 +128,11 @@ impl Band {
         index::read(&self.index_dir_path, report)
     }
 
-    fn read_head(&self, report: &Report) -> Result<BandHead> {
+    fn read_head(&self, report: &Report) -> Result<Head> {
         jsonio::read(&self.head_path(), &report)
     }
 
-    fn read_tail(&self, report: &Report) -> Result<BandTail> {
+    fn read_tail(&self, report: &Report) -> Result<Tail> {
         jsonio::read(&self.tail_path(), &report)
     }
 }
