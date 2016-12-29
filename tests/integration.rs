@@ -6,7 +6,7 @@ extern crate conserve;
 
 use conserve::backup;
 use conserve::index;
-use conserve::report::Report;
+use conserve::Report;
 use conserve::Restore;
 use conserve::testfixtures::ScratchArchive;
 use conserve::testfixtures::TreeFixture;

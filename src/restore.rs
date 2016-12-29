@@ -133,11 +133,11 @@ mod tests {
 
     use spectral::prelude::*;
 
-    use SYMLINKS_SUPPORTED;
     use BandId;
-    use super::Restore;
-    use backup::backup;
-    use report::Report;
+    use Report;
+    use Restore;
+    use SYMLINKS_SUPPORTED;
+    use backup;
     use testfixtures::ScratchArchive;
     use testfixtures::TreeFixture;
 
