@@ -116,9 +116,9 @@ mod tests {
     #[test]
     pub fn symlink() {
         use super::backup;
-        use super::super::index;
-        use super::super::report::Report;
-        use super::super::testfixtures::{ScratchArchive, TreeFixture};
+        use index;
+        use report::Report;
+        use testfixtures::{ScratchArchive, TreeFixture};
 
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();

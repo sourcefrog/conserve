@@ -13,8 +13,8 @@ use log;
 use log::LogLevel;
 use term;
 
-use super::super::report::{Counts, Sizes};
-use super::UI;
+use report::{Counts, Sizes};
+use ui::UI;
 
 const MB: u64 = 1_000_000;
 
