@@ -190,10 +190,10 @@ mod tests {
     use std::io::Read;
 
     use super::*;
-    use super::super::errors::ErrorKind;
-    use super::super::{BandId, Report};
-    use super::super::io::list_dir;
-    use super::super::testfixtures::ScratchArchive;
+    use errors::ErrorKind;
+    use {BandId, Report};
+    use io::list_dir;
+    use testfixtures::ScratchArchive;
 
     #[test]
     fn create_then_open_archive() {

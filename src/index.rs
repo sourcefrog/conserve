@@ -268,8 +268,8 @@ mod tests {
     use tempdir;
 
     use super::{IndexBuilder, Entry, IndexKind};
-    use super::super::io::read_and_decompress;
-    use super::super::report::Report;
+    use io::read_and_decompress;
+    use report::Report;
 
     pub const EXAMPLE_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 

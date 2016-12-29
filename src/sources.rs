@@ -202,8 +202,8 @@ mod tests {
     use std::io;
 
     use super::*;
-    use super::super::report::Report;
-    use super::super::testfixtures::TreeFixture;
+    use report::Report;
+    use testfixtures::TreeFixture;
 
     #[test]
     fn simple_directory() {

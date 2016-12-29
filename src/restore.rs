@@ -133,13 +133,13 @@ mod tests {
 
     use spectral::prelude::*;
 
-    use super::super::SYMLINKS_SUPPORTED;
-    use super::super::BandId;
+    use SYMLINKS_SUPPORTED;
+    use BandId;
     use super::Restore;
-    use super::super::backup::backup;
-    use super::super::report::Report;
-    use super::super::testfixtures::ScratchArchive;
-    use super::super::testfixtures::TreeFixture;
+    use backup::backup;
+    use report::Report;
+    use testfixtures::ScratchArchive;
+    use testfixtures::TreeFixture;
 
     fn setup_archive() -> ScratchArchive {
         let af = ScratchArchive::new();

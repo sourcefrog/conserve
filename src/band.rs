@@ -187,9 +187,9 @@ mod tests {
 
     use super::*;
     #[allow(unused_imports)]
-    use super::super::errors::*;
-    use super::super::testfixtures::ScratchArchive;
-    use super::super::{BandId, Report};
+    use errors::*;
+    use testfixtures::ScratchArchive;
+    use {BandId, Report};
 
     #[test]
     fn create_and_reopen_band() {
