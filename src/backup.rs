@@ -7,13 +7,13 @@
 use std::fs;
 use std::path::Path;
 
-use super::archive::Archive;
-use super::block::BlockDir;
-use super::errors::*;
-use super::index;
-use super::index::{IndexBuilder, IndexKind};
-use super::report::Report;
-use super::sources;
+use Archive;
+use Report;
+use block::BlockDir;
+use errors::*;
+use index;
+use index::{IndexBuilder, IndexKind};
+use sources;
 
 
 struct Backup {
@@ -115,9 +115,9 @@ mod tests {
     #[cfg(unix)]
     #[test]
     pub fn symlink() {
-        use super::backup;
+        use backup;
         use index;
-        use report::Report;
+        use Report;
         use testfixtures::{ScratchArchive, TreeFixture};
 
         let af = ScratchArchive::new();
