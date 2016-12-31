@@ -1,9 +1,12 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
-//! Bands are identified by a string like `b0001-0023`.
+//! Bands are identified by a string like `b0001-0023`, represented by a `BandId` object.
 
-use super::errors::*;
+use std::fmt;
+
+use errors::*;
+
 
 /// Identifier for a band within an archive, eg 'b0001' or 'b0001-0020'.
 ///
@@ -88,6 +91,13 @@ impl BandId {
 }
 
 
+impl fmt::Display for BandId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_string())
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,5 +156,11 @@ mod tests {
                    "b123456");
         assert_eq!(BandId::from_string("b0001-0100-0234").unwrap().as_string(),
                    "b0001-0100-0234");
+    }
+
+    #[test]
+    fn format() {
+        assert_eq!(format!("{}", BandId::from_string("b0001-0234").unwrap()),
+            "b0001-0234");
     }
 }

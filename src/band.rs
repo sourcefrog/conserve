@@ -60,7 +60,7 @@ impl Band {
         try!(fs::create_dir(&new.path_buf));
         try!(fs::create_dir(&new.block_dir_path));
         try!(fs::create_dir(&new.index_dir_path));
-        info!("Created band {} in {:?}", new.id.as_string(), &archive_dir);
+        info!("Created band {} in {:?}", new.id, &archive_dir);
 
         let head = BandHead { start_time: time::get_time().sec as u64 };
         try!(write_json_uncompressed(&new.path_buf.join(HEAD_FILENAME), &head, report));

@@ -204,10 +204,10 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
             },
         };
         if short_output {
-            println!("{}", band_id.as_string());
+            println!("{}", band_id);
         } else {
             println!("{:-30} {}",
-                band_id.as_string(),
+                band_id,
                 is_complete_str);
         }
     }
