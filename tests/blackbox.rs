@@ -86,7 +86,8 @@ fn blackbox_backup() {
     assert!(status.success());
     // TODO: Inspect the archive
 
-    assert_success_and_output(&["versions", &arch_dir_str], "b0000\n", "");
+    assert_success_and_output(&["versions", "--short", &arch_dir_str],
+        "b0000\n", "");
 
     assert_success_and_output(&["ls", &arch_dir_str], "/\n/hello\n/subdir\n", "");
 

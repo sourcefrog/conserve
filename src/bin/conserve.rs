@@ -131,7 +131,11 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         .subcommand(SubCommand::with_name("versions")
             .display_order(4)
             .about("List backup versions in an archive")
-            .arg(archive_arg()))
+            .arg(archive_arg())
+            .arg(Arg::with_name("short")
+                .help("List just version name without details")
+                .long("short")
+                .short("s")))
         .subcommand(SubCommand::with_name("ls")
             .display_order(5)
             .about("List files in a backup version")
@@ -181,6 +185,7 @@ fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 
 fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let short_output = subm.is_present("short");
     let archive = try!(Archive::open(Path::new(subm.value_of("archive").unwrap())));
     for band_id in try!(archive.list_bands()) {
         let band = match archive.open_band(&band_id, report) {
@@ -198,9 +203,13 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
                 continue;
             },
         };
-        println!("{:-30} {}",
-            band_id.as_string(),
-            is_complete_str);
+        if short_output {
+            println!("{}", band_id.as_string());
+        } else {
+            println!("{:-30} {}",
+                band_id.as_string(),
+                is_complete_str);
+        }
     }
     Ok(())
 }
