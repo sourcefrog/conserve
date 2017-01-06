@@ -11,9 +11,8 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use time;
+use chrono::{DateTime, TimeZone, UTC};
 
 use super::{BandId, Report};
 use super::block::BlockDir;
@@ -42,14 +41,14 @@ pub struct Band {
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct Head {
-    start_time: u64,
+    start_time: i64,
 }
 
 
 /// Format of the on-disk tail file.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct Tail {
-    end_time: u64,
+    end_time: i64,
 }
 
 
@@ -59,10 +58,10 @@ pub struct Info {
     pub is_closed: bool,
 
     /// Time Conserve started writing this band.
-    pub start_time: SystemTime,
+    pub start_time: DateTime<UTC>,
 
     /// Time this band was completed, if it is complete.
-    pub end_time: Option<SystemTime>,
+    pub end_time: Option<DateTime<UTC>>,
 }
 
 
@@ -78,14 +77,14 @@ impl Band {
         try!(fs::create_dir(&new.index_dir_path));
         info!("Created band {} in {:?}", new.id, &archive_dir);
 
-        let head = Head { start_time: unixtime_now() };
+        let head = Head { start_time: UTC::now().timestamp() };
         try!(jsonio::write(&new.head_path(), &head, report));
         Ok(new)
     }
 
     /// Mark this band closed: no more blocks should be written after this.
     pub fn close(self: &Band, report: &Report) -> Result<()> {
-        let tail = Tail { end_time: unixtime_now() };
+        let tail = Tail { end_time: UTC::now().timestamp() };
         jsonio::write(&self.tail_path(), &tail, report)
     }
 
@@ -156,27 +155,17 @@ impl Band {
         let head = self.read_head(&report)?;
         let is_closed = self.is_closed()?;
         let end_time = if is_closed {
-            Some(time_from_unix(self.read_tail(&report)?.end_time))
+            Some(UTC.timestamp(self.read_tail(&report)?.end_time, 0))
         } else {
             None
         };
         Ok(Info{
             id: self.id.clone(),
             is_closed: is_closed,
-            start_time: time_from_unix(head.start_time),
+            start_time: UTC.timestamp(head.start_time, 0),
             end_time: end_time,
         })
     }
-}
-
-
-fn time_from_unix(unixtime: u64) -> SystemTime {
-    UNIX_EPOCH + Duration::from_secs(unixtime)
-}
-
-
-fn unixtime_now() -> u64 {
-    time::get_time().sec as u64
 }
 
 
@@ -186,8 +175,11 @@ mod tests {
     use std::io;
 
     use super::*;
+
     #[allow(unused_imports)]
     use errors::*;
+
+    use chrono::Duration;
     use testfixtures::ScratchArchive;
     use {BandId, Report};
 
@@ -224,10 +216,10 @@ mod tests {
         assert_eq!(info.id.as_string(), "b0001");
         assert_eq!(info.is_closed, true);
         let dur = info.end_time.expect("info has an end_time")
-            .duration_since(info.start_time).unwrap();
+            - info.start_time;
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)
-        assert!(dur.as_secs() < 5);
+        assert!(dur < Duration::seconds(5));
     }
 
     #[test]

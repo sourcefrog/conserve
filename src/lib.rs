@@ -17,6 +17,7 @@ extern crate log;
 
 extern crate blake2_rfc;
 extern crate brotli2;
+extern crate chrono;
 extern crate isatty;
 extern crate rustc_serialize;
 extern crate spectral;
