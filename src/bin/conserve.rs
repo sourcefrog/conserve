@@ -131,6 +131,9 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         .subcommand(SubCommand::with_name("versions")
             .display_order(4)
             .about("List backup versions in an archive")
+            .after_help("By default `conserve versions` shows one version per \
+                line, the date the backup started, and whether or not it is \
+                complete.")
             .arg(archive_arg())
             .arg(Arg::with_name("short")
                 .help("List just version name without details")
@@ -212,9 +215,9 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
         } else {
             "incomplete"
         };
-        println!("{:<31} {}",
-            band_id,
-            is_complete_str);
+        let start_time_str = info.start_time.to_rfc3339();
+        println!("{:<31} {:<10} {}",
+            band_id, is_complete_str, start_time_str);
     }
     Ok(())
 }

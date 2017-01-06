@@ -95,7 +95,7 @@ fn blackbox_backup() {
         let (status, stdout, stderr) =
             run_conserve(&["versions", &arch_dir_str]);
         assert!(status.success());
-        assert!(Regex::new(r"^b0000 {26} complete\s$").unwrap().is_match(&stdout));
+        assert!(Regex::new(r"^b0000 {26} complete   20[-0-9T:+]+\s*$").unwrap().is_match(&stdout));
         assert!(stderr.is_empty());
     }
 
