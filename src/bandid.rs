@@ -93,7 +93,7 @@ impl BandId {
 
 impl fmt::Display for BandId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.as_string())
+        self.as_string().fmt(f)
     }
 }
 
@@ -160,7 +160,9 @@ mod tests {
 
     #[test]
     fn format() {
-        assert_eq!(format!("{}", BandId::from_string("b0001-0234").unwrap()),
-            "b0001-0234");
+        let a_bandid = BandId::from_string("b0001-0234").unwrap();
+        assert_eq!(format!("{}", a_bandid), "b0001-0234");
+        // Implements padding correctly
+        assert_eq!(format!("{:<15}", a_bandid), "b0001-0234     ");
     }
 }
