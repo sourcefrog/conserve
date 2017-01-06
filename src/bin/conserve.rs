@@ -189,6 +189,10 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
     let short_output = subm.is_present("short");
     let archive = try!(Archive::open(archive_path, &report));
     for band_id in try!(archive.list_bands()) {
+        if short_output {
+            println!("{}", band_id);
+            continue;
+        }
         let band = match archive.open_band(&band_id, report) {
             Ok(band) => band,
             Err(e) => {
@@ -196,21 +200,21 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
                 continue;
             },
         };
-        let is_complete_str = match band.is_closed() {
-            Ok(true) => "complete",
-            Ok(false) => "incomplete",
+        let info = match band.get_info(report) {
+            Ok(info) => info,
             Err(e) => {
                 warn!("Failed to read band tail {:?}: {:?}", band_id, e);
                 continue;
             },
         };
-        if short_output {
-            println!("{}", band_id);
+        let is_complete_str = if info.is_closed {
+            "complete"
         } else {
-            println!("{:<31} {}",
-                band_id,
-                is_complete_str);
-        }
+            "incomplete"
+        };
+        println!("{:<31} {}",
+            band_id,
+            is_complete_str);
     }
     Ok(())
 }
