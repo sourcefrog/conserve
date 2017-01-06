@@ -206,7 +206,7 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
         if short_output {
             println!("{}", band_id);
         } else {
-            println!("{:-30} {}",
+            println!("{:<31} {}",
                 band_id,
                 is_complete_str);
         }

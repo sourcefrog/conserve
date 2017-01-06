@@ -33,6 +33,7 @@ clippy = {version = "0.0.103", optional = true}
 error-chain = "~0.7.1"
 isatty = "0.1"
 log = "^0"
+regex = "0.2"
 rustc-serialize = "^0"
 spectral = "0.6.0"
 tempdir = "^0"

@@ -1,9 +1,12 @@
 // Conserve backup system.
 // Copyright 2016 Martin Pool.
 
-/// Run conserve CLI as a subprocess and test it.
+//! Run conserve CLI as a subprocess and test it.
+
 #[macro_use]
 extern crate spectral;
+
+extern crate regex;
 extern crate tempdir;
 
 use std::env;
@@ -13,6 +16,7 @@ use std::path::PathBuf;
 use std::process;
 use std::str;
 
+use regex::Regex;
 use spectral::prelude::*;
 
 extern crate conserve;
@@ -86,8 +90,20 @@ fn blackbox_backup() {
     assert!(status.success());
     // TODO: Inspect the archive
 
+    // versions --short
     assert_success_and_output(&["versions", "--short", &arch_dir_str],
         "b0000\n", "");
+
+    // versions: includes completion flag.
+    {
+        // TODO: Set a fake date when creating the archive and then we can check
+        // the format of the output?
+        let (status, stdout, stderr) =
+            run_conserve(&["versions", &arch_dir_str]);
+        assert!(status.success());
+        assert!(Regex::new(r"^b0000 {26} complete\s$").unwrap().is_match(&stdout));
+        assert!(stderr.is_empty());
+    }
 
     assert_success_and_output(&["ls", &arch_dir_str], "/\n/hello\n/subdir\n", "");
 
