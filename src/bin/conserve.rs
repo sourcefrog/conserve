@@ -18,9 +18,11 @@ extern crate log;
 #[macro_use]
 extern crate clap;
 
+extern crate chrono;
 extern crate isatty;
 extern crate rustc_serialize;
 
+use chrono::Local;
 use clap::{Arg, App, AppSettings, ArgMatches, SubCommand};
 
 extern crate conserve;
@@ -131,9 +133,10 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         .subcommand(SubCommand::with_name("versions")
             .display_order(4)
             .about("List backup versions in an archive")
-            .after_help("By default `conserve versions` shows one version per \
-                line, the date the backup started, and whether or not it is \
-                complete.")
+            .after_help("`conserve versions` shows one version per \
+                line.  For each version the output shows the version name, \
+                whether it is complete, when it started, and (if complete) \
+                how much time elapsed.")
             .arg(archive_arg())
             .arg(Arg::with_name("short")
                 .help("List just version name without details")
@@ -215,9 +218,13 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
         } else {
             "incomplete"
         };
-        let start_time_str = info.start_time.to_rfc3339();
-        println!("{:<31} {:<10} {}",
-            band_id, is_complete_str, start_time_str);
+        let start_time_str = info.start_time.with_timezone(&Local)
+            .to_rfc3339();
+        let duration_str = info.end_time.map_or_else(
+            String::new,
+            |t| format!("{}s", (t-info.start_time).num_seconds()));
+        println!("{:<26} {:<10} {} {:>7}",
+            band_id, is_complete_str, start_time_str, duration_str);
     }
     Ok(())
 }
@@ -232,7 +239,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
         let entry = try!(i);
         println!("{}", entry.apath);
     }
-    // TODO: Warn if the band is incomplete.
+    // TODO: Fail unless forced if the band is incomplete.
     Ok(())
 }
 
@@ -242,6 +249,7 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = try!(Archive::open(archive_path, &report));
     let destination_path = Path::new(subm.value_of("destination").unwrap());
     let force_overwrite = subm.is_present("force-overwrite");
+    // TODO: Fail unless forced if the band is incomplete.
     conserve::Restore::new(&archive, destination_path, report)
         .force_overwrite(force_overwrite)
         .band_id(try!(band_id_from_match(subm)))
