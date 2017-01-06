@@ -20,6 +20,10 @@ Not released yet.
 * Filenames are now only shown during `backup` and `restore` when the `-v`
   option is given.
 
+* `conserve versions` by default shows whether they're complete or not.
+  `conserve versions --short` gives the same behavior as previously of
+  just listing the version names.
+
 ## Conserve 0.3.1
 
 Released 2016-12-17
