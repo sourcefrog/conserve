@@ -4,14 +4,15 @@
 
 Released 2017-01-08.
 
-* Flush (`sync`) archive files to stable storage after they're written.  In the
+* Flush (sync) archive files to stable storage after they're written.  In the
   event of the machine crashing or losing power in the middle of a
   backup, this should reduce the chance that there are index blocks
-  pointing to data blocks not on the filesystem.  Tests show (at least
-  on Linux and OSX on SSDs) this uses very little time compared to
-  compression.  (Windows 10 performance turns out to be ruined by
-  the Windows Defender antivirus, but if you exclude the archive directory
-  it is fine, even with `sync` on.)
+  pointing to data blocks not on the filesystem.
+
+  Tests show this has little impact on performance and it's consistent with
+  Conserve's value of safety.  (Windows 10 performance turns out to be ruined
+  by the Windows Defender antivirus, but if you exclude the archive directory
+  it is fine, even with this change.)
 
 * New `--ui` option to choose plain text or fancy colored output, replacing
   `--no-progress`.
@@ -25,10 +26,10 @@ Released 2017-01-08.
   `conserve versions --short` gives the same behavior as previously of
   just listing the version names.
 
-* Conserve will by default refuse to read incomplete versions from
-  `conserve ls` and `conserve restore`, to prevent you thinking you
-  restored the whole tree when it may be truncated.  You can override
-  this with `--incomplete`, or select an older version with `--backup`.
+* `conserve ls` and `conserve restore` will by default refuse to read
+  incomplete versions, to prevent you thinking you restored the whole tree when
+  it may be truncated.  You can override this with `--incomplete`, or select an
+  older version with `--backup`.
 
 
 ## Conserve 0.3.1
