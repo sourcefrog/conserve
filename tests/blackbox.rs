@@ -122,12 +122,10 @@ fn blackbox_backup() {
     // Restore with specified band id / backup version.
     {
         let restore_dir = make_tempdir();
-        let (status, _stdout, _stderr) = run_conserve(&["restore",
-                                                        "-b",
-                                                        "b0000",
-                                                        &arch_dir_str,
-                                                        &restore_dir.path().to_str().unwrap()]);
+        let (status, _stdout, _stderr) = run_conserve(
+            &["restore", "-b", "b0000", &arch_dir_str, &restore_dir.path().to_str().unwrap()]);
         assert!(status.success());
+        // TODO: Check contents.
     }
 
     // TODO: Validate.
