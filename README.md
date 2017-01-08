@@ -62,9 +62,11 @@ Each version is identified by a name starting with `b`.
     b0005                      complete   2016-12-18T02:43:59+11:00      4s
 
 `conserve ls` shows all the files in a particular version.  Like all commands
-that read a band from an archive, it operates on the most recent by default.
+that read a band from an archive, it operates on the most recent by default, and
+you can specify a different version using `-b`.  (You can also omit leading zeros
+from the backup version.)
 
-    $ conserve ls /backup/home.cons | less
+    $ conserve ls -b b0 /backup/home.cons | less
 
 `conserve restore` copies a version back out of an archive.
 
