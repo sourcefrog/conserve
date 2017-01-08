@@ -121,6 +121,10 @@ impl Band {
         &self.path_buf
     }
 
+    pub fn id(self: &Band) -> BandId {
+        self.id.clone()
+    }
+
     fn head_path(&self) -> PathBuf {
         self.path_buf.join(HEAD_FILENAME)
     }
