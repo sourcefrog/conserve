@@ -2,20 +2,21 @@
 
 ## Conserve 0.3.2
 
-Not released yet.
+Released 2017-01-08.
 
-* `sync` archive files to stable storage after they're written.  In the
+* Flush (`sync`) archive files to stable storage after they're written.  In the
   event of the machine crashing or losing power in the middle of a
   backup, this should reduce the chance that there are index blocks
   pointing to data blocks not on the filesystem.  Tests show (at least
   on Linux and OSX on SSDs) this uses very little time compared to
-  compression.
+  compression.  (Windows 10 performance turns out to be ruined by
+  the Windows Defender antivirus, but if you exclude the archive directory
+  it is fine, even with `sync` on.)
 
 * New `--ui` option to choose plain text or fancy colored output, replacing
   `--no-progress`.
 
-* Color UI shows progress bars cleanly interleaved with log messages
-  (https://github.com/sourcefrog/conserve/issues/52).
+* Color UI shows progress bars cleanly interleaved with log messages.
 
 * Filenames are now only shown during `backup` and `restore` when the `-v`
   option is given.
@@ -24,11 +25,20 @@ Not released yet.
   `conserve versions --short` gives the same behavior as previously of
   just listing the version names.
 
+* Conserve will by default refuse to read incomplete versions from
+  `conserve ls` and `conserve restore`, to prevent you thinking you
+  restored the whole tree when it may be truncated.  You can override
+  this with `--incomplete`, or select an older version with `--backup`.
+
+
 ## Conserve 0.3.1
 
 Released 2016-12-17
 
 * Fixed Cargo package metadata.
+
+* New `--backup` option to `conserve ls` and `conserve restore` lets you
+  retrieve older versions.
 
 ## Conserve 0.3.0
 
