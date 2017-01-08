@@ -1,7 +1,9 @@
 // Conserve backup system.
 // Copyright 2015, 2016 Martin Pool.
 
-//! File contents are stored in data blocks within an archive band.
+//! File contents are stored in data blocks.
+//!
+//! The structure is: archive > band > blockdir > subdir > file.
 
 use std::fs;
 use std::io;
