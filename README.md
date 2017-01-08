@@ -99,6 +99,8 @@ Binaries for some platforms are available from
 
 * [Release notes](NEWS.md)
 
+* [API docs](https://docs.rs/conserve/)
+
 
 ## Limitations
 
