@@ -47,20 +47,28 @@ source tree), the backup is considered *complete*.
 
     conserve backup /backup/home.cons ~
 
-`conserve versions` lists the versions in an archive, with starting time and
-whether or not the backup is *complete*.
+`conserve versions` lists the versions in an archive,
+whether or not the backup is *complete*,
+the time at which the backup started,
+and the time taken to complete it.
 Each version is identified by a name starting with `b`.
 
-    conserve versions /backup/home.cons
+    $ conserve versions /backup/home.cons
+    b0000                      complete   2016-11-19T07:30:09+11:00     71s
+    b0001                      incomplete 2016-11-20T06:26:46+11:00
+    b0002                      incomplete 2016-11-20T06:30:45+11:00
+    b0003                      complete   2016-11-20T06:42:13+11:00    286s
+    b0004                      complete   2016-12-01T07:08:48+11:00     84s
+    b0005                      complete   2016-12-18T02:43:59+11:00      4s
 
 `conserve ls` shows all the files in a particular version.  Like all commands
 that read a band from an archive, it operates on the most recent by default.
 
-    conserve ls /backup/home.cons | less
+    $ conserve ls /backup/home.cons | less
 
 `conserve restore` copies a version back out of an archive.
 
-    conserve restore /backup/home.cons /tmp/trial-restore
+    $ conserve restore /backup/home.cons /tmp/trial-restore
 
 
 ## Install
