@@ -1,57 +1,69 @@
 # Conserve: a robust backup program
 
+<http://conserve.fyi>
+
 [![Linux build status](https://travis-ci.org/sourcefrog/conserve.svg)](https://travis-ci.org/sourcefrog/conserve)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)
 [![crates.io](https://img.shields.io/crates/v/conserve.svg)](https://crates.io/crates/conserve)
 [![Join the chat at https://gitter.im/sourcefrog/conserve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/sourcefrog/conserve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-Conserve copies files, directories, and (on Unix) symlinks from a local *source*
-tree, to an *archive* directory, and retrieves them on demand.
-
 Conserve's [guiding principles](doc/manifesto.md):
 
 * **Safe**: Conserve is written in [Rust][rust], a fast systems programming
-   language with compile-time guarantees about types, memory safety, and
-   concurrency.
+  language with compile-time guarantees about types, memory safety, and
+  concurrency.
+  Conserve uses a [conservative log-structured format](doc/format.md).
+
 * **Robust**:  If one file is corrupted in storage or due
-   to a bug in Conserve, you can still restore others.
-* **Careful**: Data files already written are never touched or altered,
-   unless you choose to purge them.
+  to a bug in Conserve, or if the backup is interrupted, you can still
+  restore what was written.  (Conserve doesn't need a large transaction to
+  complete for data to be accessible.)
+
+* **Careful**: Backup data files are never touched or altered after they're
+  written, unless you choose to purge them.
+
 * **When you need help now**: Restoring a subset of a large backup is fast.
-* **Always ready**: You can restore recently-written files before the backup
-   job completes.
+
 * **Always making progress**: Even if the backup process or its network
-   connection is repeatedly killed, Conserve can quickly pick up
-   where it left off and make forward progress.
+  connection is repeatedly killed, Conserve can quickly pick up
+  where it left off and make forward progress.
+
 * **Ready for today**: The storage format is fast and reliable on on
-   high-latency, limited-capability, unlimited-capacity, eventually-consistent
-   cloud object storage.
+  high-latency, limited-capability, unlimited-capacity, eventually-consistent
+  cloud object storage.  Conserve is tested on Windows, Linux (x86 and ARM),
+  and OS X.
+
 
 ## Quick start guide
 
-    conserve init /backup/home.conserve
-    conserve backup /backup/home.conserve ~
-    conserve restore /backup/home.conserve /tmp/trial-restore
+Conserve storage is within an *archive* directory created by `conserve init`:
 
-## Inspecting history
+    conserve init /backup/home.cons
 
-Conserve archives retain all previous versions of backups, stored in
-*bands*.  Bands are identified a string of integers starting with `b`,
-like `b0000`:
+`conserve backup` copies a source directory into a new *version* within the archive.
+Conserve copies files, directories, and (on Unix) symlinks.
+If the `conserve backup` command completes successfully (copying the whole
+source tree), the backup is considered *complete*.
 
-    $ conserve versions /backup/home.conserve
-    b0000
-    b0001
+    conserve backup /backup/home.cons ~
 
-`ls` shows all the files in a band, including the
-time they were made and the host from which they were made.
-Like all commands that read a band from an archive, it operates
-on the most recent by default.
+`conserve versions` lists the versions in an archive, with starting time and
+whether or not the backup is *complete*.
+Each version is identified by a name starting with `b`.
+
+    conserve versions /backup/home.cons
+
+`conserve ls` shows all the files in a particular version.  Like all commands
+that read a band from an archive, it operates on the most recent by default.
+
+    conserve ls /backup/home.cons | less
+
+`conserve restore` copies a version back out of an archive.
+
+    conserve restore /backup/home.cons /tmp/trial-restore
+
 
 ## Install
-
-Conserve runs on Linux, OS X, Windows, and probably other systems that
-support Rust.
 
 To build Conserve you need [Rust][rust] and a C compiler that can be used by
 Rust.  Then run
@@ -59,14 +71,11 @@ Rust.  Then run
     cargo build
 
 Binaries for some platforms are available from
-https://github.com/sourcefrog/conserve/releases.
-
-Windows Defender and Windows Search Indexing can slow the system down severely
-when Conserve is making a backup.  You may want to exclude the backup directory
-from online scans by both systems.
+<https://github.com/sourcefrog/conserve/releases>.
 
 [rust]: https://rust-lang.org/
 [sourcefrog]: http://sourcefrog.net/
+
 
 ## More documentation
 
@@ -79,6 +88,7 @@ from online scans by both systems.
 * [Archive format](doc/format.md)
 
 * [Release notes](NEWS.md)
+
 
 ## Limitations
 
@@ -114,9 +124,14 @@ For a longer list see the [issue tracker][issues] and
 [issues]: https://github.com/sourcefrog/conserve/issues
 [milestones]: https://github.com/sourcefrog/conserve/milestones
 
+Windows Defender and Windows Search Indexing can slow the system down severely
+when Conserve is making a backup.  I recommend you exclude the backup directory
+from both systems.
+
+
 ## Licence and non-warranty
 
-Copyright 2012-2016 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
+Copyright 2012-2017 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -127,8 +142,3 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
-## Contact
-
-Conserve's homepage is: <http://conserve.fyi/> and you can talk
-to me in [Gitter](https://gitter.im/sourcefrog/conserve).
