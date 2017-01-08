@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
 //! Bands are identified by a string like `b0001-0023`, represented by a `BandId` object.
 
@@ -13,6 +13,8 @@ use errors::*;
 /// `BandId`s implement a total ordering `std::cmp::Ord`.
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
 pub struct BandId {
+    // TODO: Maybe don't store both the vec and the string?
+
     /// The sequence numbers at each tier.
     seqs: Vec<u32>,
 

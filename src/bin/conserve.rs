@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
 //! Command-line entry point for Conserve backups.
 
@@ -28,6 +28,7 @@ use clap::{Arg, App, AppSettings, ArgMatches, SubCommand};
 extern crate conserve;
 
 use conserve::Archive;
+use conserve::Band;
 use conserve::BandId;
 use conserve::Report;
 use conserve::ui;
@@ -87,6 +88,12 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .value_name("VERSION")
     };
 
+    fn incomplete_arg<'a, 'b>() -> Arg<'a, 'b> {
+        Arg::with_name("incomplete")
+            .help("Read from incomplete (truncated) version")
+            .long("incomplete")
+    };
+
     // TODO: Allow the global options to occur even after the subcommand:
     // at the moment they have to be first.
     App::new("conserve")
@@ -124,6 +131,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .about("Restore files from an archive version to a new destination")
             .arg(archive_arg())
             .arg(backup_arg())
+            .arg(incomplete_arg())
             .arg(Arg::with_name("destination")
                 .help("Restore to this new directory")
                 .required(true))
@@ -145,8 +153,9 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         .subcommand(SubCommand::with_name("ls")
             .display_order(5)
             .about("List files in a backup version")
+            .arg(archive_arg())
             .arg(backup_arg())
-            .arg(archive_arg()))
+            .arg(incomplete_arg()))
         .subcommand(SubCommand::with_name("list-source")
             .about("Recursive list files from source directory")
             .arg(Arg::with_name("source")
@@ -235,11 +244,11 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = try!(Archive::open(archive_path, &report));
     let band_id = try!(band_id_from_match(subm));
     let band = try!(archive.open_band_or_last(&band_id, report));
+    complain_if_incomplete(&band, subm.is_present("incomplete"))?;
     for i in try!(band.index_iter(report)) {
         let entry = try!(i);
         println!("{}", entry.apath);
     }
-    // TODO: Fail unless forced if the band is incomplete.
     Ok(())
 }
 
@@ -249,12 +258,15 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = try!(Archive::open(archive_path, &report));
     let destination_path = Path::new(subm.value_of("destination").unwrap());
     let force_overwrite = subm.is_present("force-overwrite");
-    // TODO: Fail unless forced if the band is incomplete.
+    let band_id = band_id_from_match(subm)?;
+    let band = archive.open_band_or_last(&band_id, report)?;
+    complain_if_incomplete(&band, subm.is_present("incomplete"))?;
     conserve::Restore::new(&archive, destination_path, report)
         .force_overwrite(force_overwrite)
-        .band_id(try!(band_id_from_match(subm)))
+        .band_id(band_id)
         .run()
 }
+
 
 fn band_id_from_match(subm: &ArgMatches) -> Result<Option<BandId>> {
     match subm.value_of("backup") {
@@ -262,3 +274,19 @@ fn band_id_from_match(subm: &ArgMatches) -> Result<Option<BandId>> {
         None => Ok(None),
     }
 }
+
+
+fn complain_if_incomplete(band: &Band, incomplete_ok: bool) -> Result<()> {
+    if !band.is_closed()? {
+        if incomplete_ok {
+            info!("Reading from incomplete version {}", band.id());
+            Ok(())
+        } else {
+            Err(format!("Version {} is incomplete.  \
+                (Use --incomplete to read it anyway.)", band.id()).into())
+        }
+    } else {
+        Ok(())
+    }
+}
+

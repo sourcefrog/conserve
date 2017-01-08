@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016 Martin Pool.
+// Copyright 2016, 2017 Martin Pool.
 
 //! Run conserve CLI as a subprocess and test it.
 
@@ -20,7 +20,7 @@ use regex::Regex;
 use spectral::prelude::*;
 
 extern crate conserve;
-use conserve::testfixtures::TreeFixture;
+use conserve::testfixtures::{ScratchArchive, TreeFixture};
 
 
 #[test]
@@ -183,6 +183,41 @@ fn empty_archive() {
         assert!(status.success());
         assert!(!stderr.contains("panic"));
         assert!(stdout.is_empty());
+    }
+}
+
+
+/// Check behavior on an incomplete version.
+///
+/// Commands that read from the archive should by default decline, unless given
+/// `--incomplete`.
+#[test]
+fn incomplete_version() {
+    let af = ScratchArchive::new();
+    let adir_str = af.path().to_str().unwrap();
+    af.setup_incomplete_empty_band();
+
+   {
+        let (status, stdout, stderr) = run_conserve(&["versions", adir_str]);
+        assert!(status.success());
+        assert!(stderr.is_empty());
+        assert!(stdout.contains("b0000"));
+        assert!(stdout.contains("incomplete"));
+    }
+    {
+        // ls fails on incomplete band
+        let (status, stdout, stderr) = run_conserve(&["ls", adir_str]);
+        assert!(!status.success());
+        assert!(stderr.is_empty());
+        assert!(stdout.contains("Version b0000 is incomplete"));
+    }
+    {
+        // ls --incomplete accurately says it has nothing
+        let (status, stdout, stderr) = run_conserve(
+            &["ls", "--incomplete", adir_str]);
+        assert!(status.success());
+        assert!(stderr.is_empty());
+        assert_eq!(stdout, "");
     }
 }
 

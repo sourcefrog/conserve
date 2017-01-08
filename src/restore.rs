@@ -43,6 +43,10 @@ impl Restore {
         self
     }
 
+    /// Restore a version from the archive, according to parameters previously set on this object.
+    ///
+    /// This will warn, but not fail, if the version is incomplete: this might mean
+    /// only part of the source tree is copied back.
     pub fn run(mut self) -> Result<()> {
         let band = try!(self.archive.open_band_or_last(&self.band_id, &self.report));
         let block_dir = band.block_dir();
@@ -59,7 +63,7 @@ impl Restore {
             // TODO: Continue even if one fails
             try!(self.restore_one(&block_dir, &entry));
         }
-        // TODO: Warn if band is incomplete
+        warn!("Version {} is incomplete: tree may be truncated", band.id());
         Ok(())
     }
 
