@@ -117,7 +117,8 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .display_order(1)
             .about("Create a new archive")
             .arg(Arg::with_name("archive")
-                .help("Path for new archive directory")
+                .help("Path for new archive directory: \
+                should either not exist or be an empty directory")
                 .required(true)))
         .subcommand(SubCommand::with_name("backup")
             .display_order(2)
@@ -128,10 +129,15 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .required(true)))
         .subcommand(SubCommand::with_name("restore")
             .display_order(3)
-            .about("Restore files from an archive version to a new destination")
+            .about("Copy a backup tree out of an archive")
             .arg(archive_arg())
             .arg(backup_arg())
             .arg(incomplete_arg())
+            .after_help("\
+                Conserve will by default refuse to restore incomplete versions, \
+                to prevent you thinking you restored the whole tree when it may \
+                be truncated.  You can override this with --incomplete, or \
+                select an older version with --backup.")
             .arg(Arg::with_name("destination")
                 .help("Restore to this new directory")
                 .required(true))
