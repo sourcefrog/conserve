@@ -88,6 +88,8 @@ impl BlockDir {
                  from_file: &mut Read,
                  report: &Report)
                  -> Result<(Vec<Address>, BlockHash)> {
+        // TODO: Maybe store from an in-memory buffer, not a file - let backup generate blocks from
+        // files.
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp")
             .create_in(&self.path));
@@ -127,6 +129,7 @@ impl BlockDir {
         }
         let compressed_length: u64 = try!(tempf.seek(SeekFrom::Current(0)));
         try!(super::io::ensure_dir_exists(&self.subdir_for(&hex_hash)));
+        report.measure_duration("sync", || tempf.sync_all())?;
         // Also use plain `persist` not `persist_noclobber` to avoid calling `link` on Unix.
         if let Err(e) = tempf.persist(&self.path_for_file(&hex_hash)) {
             if e.error.kind() == io::ErrorKind::AlreadyExists {

@@ -1,5 +1,14 @@
 # Conserve release history
 
+## Conserve 0.3.3
+
+Not released yet.
+
+Bug fixes:
+
+* Conserve was not actually syncing data written to block files, only indexes.
+  This is now fixed.
+
 ## Conserve 0.3.2
 
 Released 2017-01-08.
