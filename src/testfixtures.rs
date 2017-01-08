@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 use tempdir;
 
 use super::Archive;
+use Report;
+
 
 /// A temporary archive.
 pub struct ScratchArchive {
@@ -40,6 +42,10 @@ impl ScratchArchive {
     #[allow(unused)]
     pub fn archive_dir_str(self: &ScratchArchive) -> &str {
         self.archive.path().to_str().unwrap()
+    }
+
+    pub fn setup_incomplete_empty_band(&self) {
+        self.archive.create_band(&Report::new()).unwrap();
     }
 }
 
