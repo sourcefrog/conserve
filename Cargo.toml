@@ -4,19 +4,7 @@ version = "0.3.2"
 authors = ["Martin Pool <mbp@sourcefrog.net>"]
 homepage = "http://conserve.fyi/"
 repository = "https://github.com/sourcefrog/conserve/"
-description = """A robust backup tool.
-
-Conserve copies files, directories, and (on Unix) symlinks from a local source
-tree, to a compressed archive directory, and retrieves them on demand.
-
-The primary interface is the `conserve` command-line tool, and the key commands
-are:
-
-    conserve init /backup/home.conserve
-    conserve backup /backup/home.conserve ~
-    conserve restore /backup/home.conserve /tmp/trial-restore
-
-"""
+description = """A robust backup tool."""
 readme = "README.md"
 keywords = ["archive", "backup"]
 license = "GPL-2.0"
