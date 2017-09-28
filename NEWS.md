@@ -9,6 +9,8 @@ Bug fixes:
 * Conserve was not actually syncing data written to block files, only indexes.
   This is now fixed.
 
+* Updated to work with Rust 1.22 and current library dependencies.
+
 ## Conserve 0.3.2
 
 Released 2017-01-08.
