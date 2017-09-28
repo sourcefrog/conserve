@@ -20,14 +20,16 @@ extern crate brotli2;
 extern crate chrono;
 extern crate isatty;
 extern crate rustc_serialize;
-extern crate spectral;
 extern crate tempdir;
 extern crate tempfile;
 extern crate term;
-extern crate time;
+
+#[cfg(test)]
+extern crate spectral;
 
 #[cfg(feature="bench")]
 extern crate test;
+
 
 // Conserve implementation modules.
 mod apath;
