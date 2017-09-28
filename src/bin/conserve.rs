@@ -12,15 +12,11 @@
 use std::path::Path;
 
 #[macro_use]
-extern crate error_chain;
-#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate clap;
 
 extern crate chrono;
-extern crate isatty;
-extern crate rustc_serialize;
 
 use chrono::Local;
 use clap::{Arg, App, AppSettings, ArgMatches, SubCommand};
@@ -295,4 +291,3 @@ fn complain_if_incomplete(band: &Band, incomplete_ok: bool) -> Result<()> {
         Ok(())
     }
 }
-
