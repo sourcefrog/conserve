@@ -1,7 +1,5 @@
 /// Test Conserve through its public API.
 
-extern crate tempdir;
-
 extern crate conserve;
 
 use conserve::backup;
