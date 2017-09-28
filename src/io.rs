@@ -11,7 +11,7 @@ use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
-use brotli2;
+use libflate::deflate::Decoder;
 use tempfile;
 
 use super::Report;
@@ -82,20 +82,16 @@ pub fn read_and_decompress(path: &Path) -> io::Result<(usize, Vec<u8>)> {
     };
     compressed_buf.truncate(read_len);
     compressed_buf.shrink_to_fit();
-    let mut decomp = brotli2::stream::Decompress::new();
+    let mut decomp = Decoder::new(compressed_buf.as_slice());
     let mut decompressed = Vec::<u8>::with_capacity(read_len * 4);
-    let mut inp = compressed_buf.as_slice();
-    loop {
-        match decomp.decompress_vec(&mut inp, &mut decompressed) {
-            Err(e) => panic!("Brotli decompress error: {:?}", e),
-            Ok(brotli2::stream::Status::Finished) => break,
-            Ok(brotli2::stream::Status::NeedOutput) => (),
-            Ok(x) => panic!("Unexpected Brotli2 status {:?}", x),
-        };
-        decompressed.reserve(read_len * 4);
+    match decomp.read_to_end(&mut decompressed) {
+        Err(e) => panic!("decompress error: {:?}", e),
+        Ok(decompressed_bytes) => {
+            decompressed.truncate(decompressed_bytes);
+            decompressed.shrink_to_fit();
+            return Ok((read_len, decompressed));
+        }
     }
-    decompressed.shrink_to_fit();
-    Ok((read_len, decompressed))
 }
 
 

@@ -12,8 +12,8 @@ use std::str;
 use std::time;
 use std::vec;
 
+use libflate::deflate::Encoder;
 use rustc_serialize::json;
-use brotli2::write::BrotliEncoder;
 
 use super::apath::Apath;
 use super::block;
@@ -124,11 +124,11 @@ impl IndexBuilder {
         let uncompressed_len = json_string.len() as u64;
 
         let af = try!(AtomicFile::new(hunk_path));
-        let mut encoder = BrotliEncoder::new(af, super::BROTLI_COMPRESSION_LEVEL);
+        let mut encoder = Encoder::new(af);
 
         let start_compress = time::Instant::now();
         try!(encoder.write_all(json_string.as_bytes()));
-        let mut af = try!(encoder.finish());
+        let mut af = try!(encoder.finish().into_result());
         report.increment_duration("index.compress", start_compress.elapsed());
 
         // TODO: Don't seek, just count bytes as they're compressed.

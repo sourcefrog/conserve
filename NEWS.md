@@ -1,8 +1,13 @@
 # Conserve release history
 
+## Conserve 0.4.0
+
+* Switch from Brotli2 to deflate compression: probably a better
+  speed/size tradeoff for mixed data. (Breaks format compatibility.)
+
 ## Conserve 0.3.3
 
-Not released yet.
+Never released.
 
 Bug fixes:
 

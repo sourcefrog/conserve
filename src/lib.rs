@@ -16,9 +16,9 @@ extern crate error_chain;
 extern crate log;
 
 extern crate blake2_rfc;
-extern crate brotli2;
 extern crate chrono;
 extern crate isatty;
+extern crate libflate;
 extern crate rustc_serialize;
 extern crate tempdir;
 extern crate tempfile;
@@ -66,8 +66,6 @@ pub fn version() -> &'static str {
 }
 
 /// Format-compatibility version, normally the first two components of the package version.
-const ARCHIVE_VERSION: &'static str = "0.3";
-
-const BROTLI_COMPRESSION_LEVEL: u32 = 4;
+const ARCHIVE_VERSION: &'static str = "0.4";
 
 pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");

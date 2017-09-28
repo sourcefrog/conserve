@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use brotli2::write::BrotliEncoder;
+use libflate::deflate::Encoder;
 use rustc_serialize::hex::ToHex;
 
 use tempfile;
@@ -93,7 +93,7 @@ impl BlockDir {
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp")
             .create_in(&self.path));
-        let mut encoder = BrotliEncoder::new(tempf, super::BROTLI_COMPRESSION_LEVEL);
+        let mut encoder = Encoder::new(tempf);
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
         let mut uncompressed_length: u64 = 0;
         const BUF_SIZE: usize = 1 << 20;
@@ -114,7 +114,7 @@ impl BlockDir {
             report.measure_duration("block.hash", || hasher.update(input));
         }
 
-        let mut tempf = try!(encoder.finish());
+        let mut tempf = try!(encoder.finish().into_result());
         let hex_hash = hasher.finalize().as_bytes().to_hex();
 
         // TODO: Update this when the stored blocks can be different from body hash.
@@ -257,7 +257,7 @@ mod tests {
         assert_eq!(report.borrow_counts().get_size("block"),
                    Sizes {
                        uncompressed: 6,
-                       compressed: 10,
+                       compressed: 19,
                    });
 
         // Try to read back
@@ -271,7 +271,7 @@ mod tests {
             assert_eq!(counts.get_size("block"),
                        Sizes {
                            uncompressed: EXAMPLE_TEXT.len() as u64,
-                           compressed: 10u64,
+                           compressed: 19u64,
                        });
         }
     }
