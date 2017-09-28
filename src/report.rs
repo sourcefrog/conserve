@@ -134,7 +134,7 @@ impl Report {
     /// The name must be a static string.  Counters implicitly start at 0.
     pub fn increment(&self, counter_name: &'static str, delta: u64) {
         // Entries are created from the list of known names when this is constructed.
-        if let Some(mut c) = self.mut_counts().count.get_mut(counter_name) {
+        if let Some(c) = self.mut_counts().count.get_mut(counter_name) {
             *c += delta;
         } else {
             panic!("unregistered counter {:?}", counter_name);
@@ -144,7 +144,7 @@ impl Report {
 
     pub fn increment_size(&self, counter_name: &str, sizes: Sizes) {
         let mut counts = self.mut_counts();
-        let mut e = counts.sizes.get_mut(counter_name).expect("unregistered size counter");
+        let e = counts.sizes.get_mut(counter_name).expect("unregistered size counter");
         *e += sizes;
     }
 

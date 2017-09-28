@@ -99,7 +99,7 @@ impl UI for ColorUI {
         self.last_update = Some(Instant::now());
         self.progress_present = true;
 
-        let mut t = &mut self.t;
+        let t = &mut self.t;
         // TODO: Input size should really be the number of source bytes before
         // block deduplication.
         // Measure compression on body bytes.
@@ -139,7 +139,7 @@ impl UI for ColorUI {
     fn log(&mut self, record: &log::LogRecord) {
         let level = record.metadata().level();
         self.clear();
-        let mut t = &mut self.t;
+        let t = &mut self.t;
         match level {
             LogLevel::Error | LogLevel::Warn => {
                 t.fg(term::color::RED).unwrap();
