@@ -30,7 +30,7 @@ tempdir = "^0"
 tempfile = "^2"
 term = "^0.4"
 time = "^0"
-vergen = "~0.1.0"
+vergen = "0.1.1"
 
 [build-dependencies]
 vergen = "~0.1.0"
