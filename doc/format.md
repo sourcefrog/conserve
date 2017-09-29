@@ -4,6 +4,7 @@
 
 All metadata is stored as json dictionaries.
 
+
 ## Software version
 
 Conserve archives include the version of the software that wrote them, which is
@@ -56,6 +57,14 @@ Then, similarly compare the filenames.
 
 Note that this is not the same as a simple comparison of the strings.
 
+Rationale: This ordering makes several important read operations on the index
+efficient.  Since the index overall is ordered, we can binary search into it.
+Since all the direct children of a directory are grouped together, a
+non-recursive listing of a single directory (e.g. from a web ui or FUSE) is a
+single contiguous read.  And, a recursive listing of a single directory (e.g.,
+to restore that directory) is also a single contiguous read of the directories
+and then all their subtrees.
+
 ## Archive
 
 A backup *archive* is a directory, containing archive files.
@@ -78,9 +87,9 @@ which is contains a json dict:
 ## Tiers
 
 Within an archive there are multiple *tiers* for incremental/hierarchical
-backups.  (For example, for monthly, weekly, daily backups.)  Tiers are not
-directly represented on disk; they're implicitly all the bands whose names
-identify them as being in the same tier.
+backups.  (For example, they might be annual, monthly, weekly, daily, and
+hourly backups.)  Tiers are not directly represented on disk; they're
+implicitly all the bands whose names identify them as being in the same tier.
 
 ## Bands
 
@@ -149,12 +158,17 @@ from the current or any descendent band.
 
 The writer can choose the data block size, except that both the uncompressed
 and compressed blocks must be <1GB, so they can reasonably fit in memory.
+The writer might choose to break the file not at a fixed size but instead at
+some boundary it thinks will be stable as the file changes, for example using
+an rsync-like rolling checksum.
 
 All the data block for a band are stored within a `d/` subdirectory
 of the band, and then within a directory for the first three characters
 of their name.
 
-Data block are compressed in the Brotli format.
+Data block are compressed in the Brotli format.  (Note: This is likely to
+change to a different compression algorithm post 0.3 because Brotli is slow to
+compress.)
 
 The name of the data block file is the BLAKE2 hash of the uncompressed
 contents.
@@ -201,3 +215,15 @@ which is a dict of
 
 So, the length of any file is the sum of the `length` entries for all
 its `blocks`.
+
+Index blocks can reference any section of any data block in the current
+or any ancestor tier band, but not sibling, descendent, or unrelated bands.
+The writer may deduplicate blocks or partial blocks against any of these data
+blocks using any algorithm, including referencing a different length or offset
+into the same block.
+
+Rationale: Constraining which indexes can reference a data block allows
+Conserve to purge a band and its children without needing to consider whether
+its data is used elsewhere.  This means that the purge operation takes time
+proportional only to the data being purged, and does not need to walk the whole
+archive or any other index.
