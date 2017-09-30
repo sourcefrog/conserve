@@ -88,12 +88,13 @@ impl BlockDir {
                  from_file: &mut Read,
                  report: &Report)
                  -> Result<(Vec<Address>, BlockHash)> {
-        // TODO: Maybe store from an in-memory buffer, not a file - let backup generate blocks from
-        // files.
+        // TODO: Maybe store from an in-memory buffer, not a file - let backup
+        // generate blocks from files.
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp")
             .create_in(&self.path));
-        let mut encoder = deflate::Encoder::new(tempf);
+        let bufw = io::BufWriter::new(tempf);
+        let mut encoder = deflate::Encoder::new(bufw);
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
         let mut uncompressed_length: u64 = 0;
         const BUF_SIZE: usize = 1 << 20;
@@ -116,7 +117,7 @@ impl BlockDir {
             report.measure_duration("block.hash", || hasher.update(input));
         }
 
-        let mut tempf = try!(encoder.finish().into_result());
+        let bufw = try!(encoder.finish().into_result());
         let hex_hash = hasher.finalize().as_bytes().to_hex();
 
         // TODO: Update this when the stored blocks can be different from body hash.
@@ -129,9 +130,16 @@ impl BlockDir {
             report.increment("block.already_present", 1);
             return Ok((refs, hex_hash));
         }
-        let compressed_length: u64 = try!(tempf.seek(SeekFrom::Current(0)));
         try!(super::io::ensure_dir_exists(&self.subdir_for(&hex_hash)));
+        let mut tempf = match bufw.into_inner() { // flushes buffer
+            Ok(f) => f,
+            Err(_e) => unimplemented!(), // return Err(e.error().into()),
+        };
         report.measure_duration("sync", || tempf.sync_all())?;
+
+        // TODO: Count bytes as they're written, rather than doing a separate
+        // seek call just to see how many bytes we wrote.
+        let compressed_length: u64 = try!(tempf.seek(SeekFrom::Current(0)));
         // Also use plain `persist` not `persist_noclobber` to avoid calling `link` on Unix.
         if let Err(e) = tempf.persist(&self.path_for_file(&hex_hash)) {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
