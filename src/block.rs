@@ -8,7 +8,6 @@
 use std::fs;
 use std::io;
 use std::io::prelude::*;
-use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
@@ -52,9 +51,6 @@ pub struct Address {
 /// A readable, writable directory within a band holding data blocks.
 pub struct BlockDir {
     pub path: PathBuf,
-
-    /// Internal-use buffer for reading.
-    buf: Vec<u8>,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
@@ -66,7 +62,6 @@ impl BlockDir {
     pub fn new(path: &Path) -> BlockDir {
         BlockDir {
             path: path.to_path_buf(),
-            buf: vec![],
         }
     }
 
@@ -84,63 +79,66 @@ impl BlockDir {
         buf
     }
 
+    // Compress and hash data on block from in-memory buffers,
+    // to in-memory buffers that can later be written to disk.
+    fn compress_and_hash(unco: &[u8], report: &Report)
+        -> Result<(String, Vec<u8>, u64, u64)> {
+        // TODO: Should this handle splitting/joining files, or should
+        // the caller? Maybe the caller.
+        let comp = Vec::<u8>::with_capacity(unco.len());
+        let mut encoder = deflate::Encoder::new(comp);
+        let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
+
+        try!(report.measure_duration("block.compress",
+            || encoder.write_all(unco)));
+        report.measure_duration("block.hash", || hasher.update(unco));
+
+        let comp = try!(encoder.finish().into_result());
+        let comp_len = comp.len() as u64;
+
+        let hex_hash = hasher.finalize().as_bytes().to_hex();
+
+        // TODO: Make a small type for this?
+        return Ok((hex_hash, comp, unco.len() as u64, comp_len));
+    }
+
     pub fn store(&mut self,
                  from_file: &mut Read,
                  report: &Report)
                  -> Result<(Vec<Address>, BlockHash)> {
-        // TODO: Maybe store from an in-memory buffer, not a file - let backup
-        // generate blocks from files.
-        let tempf = try!(tempfile::NamedTempFileOptions::new()
-            .prefix("tmp")
-            .create_in(&self.path));
-        let bufw = io::BufWriter::new(tempf);
-        let mut encoder = deflate::Encoder::new(bufw);
-        let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
-        let mut uncompressed_length: u64 = 0;
-        const BUF_SIZE: usize = 1 << 20;
-        if self.buf.len() < BUF_SIZE {
-            self.buf.resize(BUF_SIZE, 0u8);
-        }
-        loop {
-            let buf_slice = self.buf.as_mut_slice();
-            let read_size =
-                try!(report.measure_duration("source.read",
-                    || from_file.read(buf_slice)));
-            let input = &buf_slice[..read_size];
-            if read_size == 0 {
-                break;
-            } // eof
-            uncompressed_length += read_size as u64;
+        // TODO: Split large files, combine small files.
+        let mut in_buf = Vec::<u8>::new();
+        let read_len = report.measure_duration("source.read",
+            || from_file.read_to_end(&mut in_buf))?;
 
-            try!(report.measure_duration("block.compress",
-                || encoder.write_all(input)));
-            report.measure_duration("block.hash", || hasher.update(input));
-        }
+        let (hex_hash, comp_buf, uncomp_len, comp_len)
+            = BlockDir::compress_and_hash(&in_buf, &report)?;
+        assert_eq!(uncomp_len, read_len as u64);
 
-        let bufw = try!(encoder.finish().into_result());
-        let hex_hash = hasher.finalize().as_bytes().to_hex();
-
-        // TODO: Update this when the stored blocks can be different from body hash.
+        // TODO: Update this when the stored blocks can be different from
+        // body hash.
         let refs = vec![Address {
-                            hash: hex_hash.clone(),
-                            start: 0,
-                            len: uncompressed_length,
-                        }];
-        if try!(self.contains(&hex_hash)) {
+            hash: hex_hash.clone(),
+            start: 0,
+            len: uncomp_len,
+        }];
+
+        // TODO: Hash separately from compressing, so we can avoid compressing
+        // when it's already present.
+        if self.contains(&hex_hash)? {
             report.increment("block.already_present", 1);
             return Ok((refs, hex_hash));
         }
+
         try!(super::io::ensure_dir_exists(&self.subdir_for(&hex_hash)));
-        let mut tempf = match bufw.into_inner() { // flushes buffer
-            Ok(f) => f,
-            Err(_e) => unimplemented!(), // return Err(e.error().into()),
-        };
+        let mut tempf = try!(tempfile::NamedTempFileOptions::new()
+            .prefix("tmp")
+            .create_in(&self.path));
+        report.measure_duration("block.write", || tempf.write_all(&comp_buf))?;
         report.measure_duration("sync", || tempf.sync_all())?;
 
-        // TODO: Count bytes as they're written, rather than doing a separate
-        // seek call just to see how many bytes we wrote.
-        let compressed_length: u64 = try!(tempf.seek(SeekFrom::Current(0)));
-        // Also use plain `persist` not `persist_noclobber` to avoid calling `link` on Unix.
+        // Also use plain `persist` not `persist_noclobber` to avoid
+        // calling `link` on Unix.
         if let Err(e) = tempf.persist(&self.path_for_file(&hex_hash)) {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
@@ -153,10 +151,10 @@ impl BlockDir {
         }
         report.increment("block", 1);
         report.increment_size("block",
-                              Sizes {
-                                  compressed: compressed_length,
-                                  uncompressed: uncompressed_length,
-                              });
+            Sizes {
+                compressed: comp_len,
+                uncompressed: uncomp_len,
+            });
         Ok((refs, hex_hash))
     }
 

@@ -54,6 +54,7 @@ static KNOWN_SIZES: &'static [&'static str] = &["block", "index"];
 static KNOWN_DURATIONS: &'static [&'static str] = &[
     "block.compress",
     "block.hash",
+    "block.write",
     "index.compress",
     "index.encode",
     "index.parse",
