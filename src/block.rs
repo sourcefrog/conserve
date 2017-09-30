@@ -52,9 +52,6 @@ pub struct Address {
 pub struct BlockDir {
     pub path: PathBuf,
 
-    // Reusable buffer for compression, to avoid repeated allocations.
-    comp_buf: Vec<u8>,
-
     // Reusable buffer for reading input.
     in_buf: Vec<u8>,
 }
@@ -68,7 +65,6 @@ impl BlockDir {
     pub fn new(path: &Path) -> BlockDir {
         BlockDir {
             path: path.to_path_buf(),
-            comp_buf: Vec::<u8>::with_capacity(1 << 20),
             in_buf: Vec::<u8>::with_capacity(1 << 20),
         }
     }
@@ -110,17 +106,33 @@ impl BlockDir {
             return Ok((refs, hex_hash));
         }
 
-        // Not already stored: compress it now.
-        report.measure_duration("block.compress",
-            || compress_bytes(&self.in_buf, &mut self.comp_buf))?;
-        let comp_len = self.comp_buf.len() as u64;
-        try!(super::io::ensure_dir_exists(&self.subdir_for(&hex_hash)));
-        let mut tempf = try!(tempfile::NamedTempFileOptions::new()
+        // Not already stored: compress and save it now.
+        let comp_len = self.compress_and_store(&self.in_buf, &hex_hash, &report)?;
+        report.increment("block", 1);
+        report.increment_size("block",
+            Sizes {
+                compressed: comp_len,
+                uncompressed: uncomp_len,
+            });
+        Ok((refs, hex_hash))
+    }
+
+    fn compress_and_store(&self, in_buf: &[u8], hex_hash: &BlockHash, report: &Report) -> Result<u64> {
+        try!(super::io::ensure_dir_exists(&self.subdir_for(hex_hash)));
+        let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp")
             .create_in(&self.path));
-        report.measure_duration("block.write",
-            || tempf.write_all(&self.comp_buf))?;
+        let mut bufw = io::BufWriter::new(tempf);
+        report.measure_duration("block.compress",
+            || compress_bytes(&in_buf, &mut bufw))?;
+        let tempf = match bufw.into_inner() {
+            Ok(w) => w,
+            Err(_e) => unimplemented!(),
+        };
         report.measure_duration("sync", || tempf.sync_all())?;
+
+        // TODO: Count bytes rather than stat-ing.
+        let comp_len = tempf.metadata()?.len();
 
         // Also use plain `persist` not `persist_noclobber` to avoid
         // calling `link` on Unix.
@@ -129,18 +141,11 @@ impl BlockDir {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);
                 report.increment("block.already_present", 1);
-                return Ok((refs, hex_hash));
             } else {
                 return Err(e.error.into());
             }
         }
-        report.increment("block", 1);
-        report.increment_size("block",
-            Sizes {
-                compressed: comp_len,
-                uncompressed: uncomp_len,
-            });
-        Ok((refs, hex_hash))
+        Ok(comp_len)
     }
 
     /// True if the named block is present in this directory.
@@ -193,9 +198,8 @@ impl BlockDir {
 }
 
 
-fn compress_bytes(in_buf: &[u8], out_buf: &mut Vec<u8>) -> Result<()> {
-    out_buf.truncate(0);
-    let mut encoder = deflate::Encoder::new(out_buf);
+fn compress_bytes(in_buf: &[u8], w: &mut io::Write) -> Result<()> {
+    let mut encoder = deflate::Encoder::new(w);
     encoder.write_all(&in_buf)?;
     encoder.finish().into_result()?;
     Ok(())
