@@ -87,56 +87,33 @@ impl BlockDir {
         buf
     }
 
-    // Compress and hash data on block from in-memory buffers,
-    // to in-memory buffers that can later be written to disk.
-    fn compress_and_hash(in_buf: &[u8],
-        comp_buf: &mut Vec<u8>, report: &Report)
-        -> Result<(String)> {
-        // TODO: Should this handle splitting/joining files, or should
-        // the caller? Maybe the caller.
-        comp_buf.truncate(0);
-        let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
-
-        report.measure_duration("block.compress",
-            || compress_bytes(in_buf, comp_buf))?;
-        report.measure_duration("block.hash", || hasher.update(&in_buf));
-
-        let hex_hash = hasher.finalize().as_bytes().to_hex();
-
-        // TODO: Make a small type for this?
-        return Ok((hex_hash));
-    }
-
     pub fn store(&mut self,
                  from_file: &mut Read,
                  report: &Report)
                  -> Result<(Vec<Address>, BlockHash)> {
         // TODO: Split large files, combine small files.
         self.in_buf.truncate(0);
-        let read_len = report.measure_duration("source.read",
-            || from_file.read_to_end(&mut self.in_buf))?;
+        let uncomp_len = report.measure_duration("source.read",
+            || from_file.read_to_end(&mut self.in_buf))? as u64;
+        assert_eq!(self.in_buf.len() as u64, uncomp_len);
 
-        let uncomp_len = self.in_buf.len() as u64;
-        let hex_hash = BlockDir::compress_and_hash(&self.in_buf,
-            &mut self.comp_buf, &report)?;
-        let comp_len = self.comp_buf.len() as u64;
-        assert_eq!(uncomp_len, read_len as u64);
+        let hex_hash = report.measure_duration("block.hash", || hash_bytes(&self.in_buf))?;
 
-        // TODO: Update this when the stored blocks can be different from
-        // body hash.
         let refs = vec![Address {
             hash: hex_hash.clone(),
             start: 0,
-            len: uncomp_len,
+            len: uncomp_len as u64,
         }];
 
-        // TODO: Hash separately from compressing, so we can avoid compressing
-        // when it's already present.
         if self.contains(&hex_hash)? {
             report.increment("block.already_present", 1);
             return Ok((refs, hex_hash));
         }
 
+        // Not already stored: compress it now.
+        report.measure_duration("block.compress",
+            || compress_bytes(&self.in_buf, &mut self.comp_buf))?;
+        let comp_len = self.comp_buf.len() as u64;
         try!(super::io::ensure_dir_exists(&self.subdir_for(&hex_hash)));
         let mut tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp")
@@ -217,12 +194,19 @@ impl BlockDir {
 
 
 fn compress_bytes(in_buf: &[u8], out_buf: &mut Vec<u8>) -> Result<()> {
+    out_buf.truncate(0);
     let mut encoder = deflate::Encoder::new(out_buf);
     encoder.write_all(&in_buf)?;
     encoder.finish().into_result()?;
     Ok(())
 }
 
+
+fn hash_bytes(in_buf: &[u8]) -> Result<BlockHash> {
+    let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
+    hasher.update(in_buf);
+    Ok(hasher.finalize().as_bytes().to_hex())
+}
 
 #[cfg(test)]
 mod tests {
