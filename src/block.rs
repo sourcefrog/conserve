@@ -95,14 +95,12 @@ impl BlockDir {
         // TODO: Should this handle splitting/joining files, or should
         // the caller? Maybe the caller.
         comp_buf.truncate(0);
-        let mut encoder = deflate::Encoder::new(comp_buf);
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
 
-        try!(report.measure_duration("block.compress",
-            || encoder.write_all(&in_buf)));
+        report.measure_duration("block.compress",
+            || compress_bytes(in_buf, comp_buf))?;
         report.measure_duration("block.hash", || hasher.update(&in_buf));
 
-        encoder.finish().into_result()?;
         let hex_hash = hasher.finalize().as_bytes().to_hex();
 
         // TODO: Make a small type for this?
@@ -215,6 +213,14 @@ impl BlockDir {
         }
         Ok(decompressed)
     }
+}
+
+
+fn compress_bytes(in_buf: &[u8], out_buf: &mut Vec<u8>) -> Result<()> {
+    let mut encoder = deflate::Encoder::new(out_buf);
+    encoder.write_all(&in_buf)?;
+    encoder.finish().into_result()?;
+    Ok(())
 }
 
 
