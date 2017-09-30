@@ -170,8 +170,8 @@ impl Report {
         }
     }
 
-    pub fn measure_duration<T, F>(&self, duration_name: &str, mut closure: F) -> T
-        where F: FnMut() -> T
+    pub fn measure_duration<T, F>(&self, duration_name: &str, closure: F) -> T
+        where F: FnOnce() -> T
     {
         let start = time::Instant::now();
         let result = closure();
