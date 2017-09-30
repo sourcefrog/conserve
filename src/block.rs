@@ -51,6 +51,12 @@ pub struct Address {
 /// A readable, writable directory within a band holding data blocks.
 pub struct BlockDir {
     pub path: PathBuf,
+
+    // Reusable buffer for compression, to avoid repeated allocations.
+    comp_buf: Vec<u8>,
+
+    // Reusable buffer for reading input.
+    in_buf: Vec<u8>,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
@@ -62,6 +68,8 @@ impl BlockDir {
     pub fn new(path: &Path) -> BlockDir {
         BlockDir {
             path: path.to_path_buf(),
+            comp_buf: Vec::<u8>::with_capacity(1 << 20),
+            in_buf: Vec::<u8>::with_capacity(1 << 20),
         }
     }
 
@@ -81,25 +89,24 @@ impl BlockDir {
 
     // Compress and hash data on block from in-memory buffers,
     // to in-memory buffers that can later be written to disk.
-    fn compress_and_hash(unco: &[u8], report: &Report)
-        -> Result<(String, Vec<u8>, u64, u64)> {
+    fn compress_and_hash(in_buf: &[u8],
+        comp_buf: &mut Vec<u8>, report: &Report)
+        -> Result<(String)> {
         // TODO: Should this handle splitting/joining files, or should
         // the caller? Maybe the caller.
-        let comp = Vec::<u8>::with_capacity(unco.len());
-        let mut encoder = deflate::Encoder::new(comp);
+        comp_buf.truncate(0);
+        let mut encoder = deflate::Encoder::new(comp_buf);
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
 
         try!(report.measure_duration("block.compress",
-            || encoder.write_all(unco)));
-        report.measure_duration("block.hash", || hasher.update(unco));
+            || encoder.write_all(&in_buf)));
+        report.measure_duration("block.hash", || hasher.update(&in_buf));
 
-        let comp = try!(encoder.finish().into_result());
-        let comp_len = comp.len() as u64;
-
+        encoder.finish().into_result()?;
         let hex_hash = hasher.finalize().as_bytes().to_hex();
 
         // TODO: Make a small type for this?
-        return Ok((hex_hash, comp, unco.len() as u64, comp_len));
+        return Ok((hex_hash));
     }
 
     pub fn store(&mut self,
@@ -107,12 +114,14 @@ impl BlockDir {
                  report: &Report)
                  -> Result<(Vec<Address>, BlockHash)> {
         // TODO: Split large files, combine small files.
-        let mut in_buf = Vec::<u8>::new();
+        self.in_buf.truncate(0);
         let read_len = report.measure_duration("source.read",
-            || from_file.read_to_end(&mut in_buf))?;
+            || from_file.read_to_end(&mut self.in_buf))?;
 
-        let (hex_hash, comp_buf, uncomp_len, comp_len)
-            = BlockDir::compress_and_hash(&in_buf, &report)?;
+        let uncomp_len = self.in_buf.len() as u64;
+        let hex_hash = BlockDir::compress_and_hash(&self.in_buf,
+            &mut self.comp_buf, &report)?;
+        let comp_len = self.comp_buf.len() as u64;
         assert_eq!(uncomp_len, read_len as u64);
 
         // TODO: Update this when the stored blocks can be different from
@@ -134,7 +143,8 @@ impl BlockDir {
         let mut tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp")
             .create_in(&self.path));
-        report.measure_duration("block.write", || tempf.write_all(&comp_buf))?;
+        report.measure_duration("block.write",
+            || tempf.write_all(&self.comp_buf))?;
         report.measure_duration("sync", || tempf.sync_all())?;
 
         // Also use plain `persist` not `persist_noclobber` to avoid
