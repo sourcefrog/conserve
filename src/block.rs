@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use libflate::deflate::Encoder;
+use libflate::deflate;
 use rustc_serialize::hex::ToHex;
 
 use tempfile;
@@ -93,7 +93,7 @@ impl BlockDir {
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp")
             .create_in(&self.path));
-        let mut encoder = Encoder::new(tempf);
+        let mut encoder = deflate::Encoder::new(tempf);
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
         let mut uncompressed_length: u64 = 0;
         const BUF_SIZE: usize = 1 << 20;
@@ -103,14 +103,16 @@ impl BlockDir {
         loop {
             let buf_slice = self.buf.as_mut_slice();
             let read_size =
-                try!(report.measure_duration("source.read", || from_file.read(buf_slice)));
+                try!(report.measure_duration("source.read",
+                    || from_file.read(buf_slice)));
             let input = &buf_slice[..read_size];
             if read_size == 0 {
                 break;
             } // eof
             uncompressed_length += read_size as u64;
 
-            try!(report.measure_duration("block.compress", || encoder.write_all(input)));
+            try!(report.measure_duration("block.compress",
+                || encoder.write_all(input)));
             report.measure_duration("block.hash", || hasher.update(input));
         }
 
