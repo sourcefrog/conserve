@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use libflate::deflate;
+// use libflate::deflate;
 use rustc_serialize::hex::ToHex;
 
 use tempfile;
@@ -118,24 +118,21 @@ impl BlockDir {
     }
 
     fn compress_and_store(&self, in_buf: &[u8], hex_hash: &BlockHash, report: &Report) -> Result<u64> {
-        try!(super::io::ensure_dir_exists(&self.subdir_for(hex_hash)));
+        super::io::ensure_dir_exists(&self.subdir_for(hex_hash))?;
         let tempf = try!(tempfile::NamedTempFileOptions::new()
             .prefix("tmp")
             .create_in(&self.path));
         let mut bufw = io::BufWriter::new(tempf);
         report.measure_duration("block.compress",
             || compress_bytes(&in_buf, &mut bufw))?;
-        let tempf = match bufw.into_inner() {
-            Ok(w) => w,
-            Err(_e) => unimplemented!(),
-        };
+        let tempf = bufw.into_inner().unwrap();
         report.measure_duration("sync", || tempf.sync_all())?;
 
         // TODO: Count bytes rather than stat-ing.
         let comp_len = tempf.metadata()?.len();
 
         // Also use plain `persist` not `persist_noclobber` to avoid
-        // calling `link` on Unix.
+        // calling `link` on Unix, which won't work on all filesystems.
         if let Err(e) = tempf.persist(&self.path_for_file(&hex_hash)) {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
@@ -198,13 +195,21 @@ impl BlockDir {
 }
 
 
+// fn compress_bytes(in_buf: &[u8], w: &mut io::Write) -> Result<()> {
+//     use snap;
+//     let mut encoder = snap::Writer::new(w);
+//     encoder.write_all(&in_buf)?;
+//     encoder.into_inner().unwrap();
+//     Ok(())
+// }
+
 fn compress_bytes(in_buf: &[u8], w: &mut io::Write) -> Result<()> {
-    let mut encoder = deflate::Encoder::new(w);
-    encoder.write_all(&in_buf)?;
-    encoder.finish().into_result()?;
+    use snap;
+    let mut encoder = snap::Encoder::new();
+    let r = encoder.compress_vec(in_buf).unwrap();
+    w.write_all(&r)?;
     Ok(())
 }
-
 
 fn hash_bytes(in_buf: &[u8]) -> Result<BlockHash> {
     let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);

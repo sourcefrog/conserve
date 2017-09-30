@@ -20,6 +20,7 @@ extern crate chrono;
 extern crate isatty;
 extern crate libflate;
 extern crate rustc_serialize;
+extern crate snap;
 extern crate tempdir;
 extern crate tempfile;
 extern crate term;
