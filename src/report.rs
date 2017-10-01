@@ -54,6 +54,7 @@ static KNOWN_SIZES: &'static [&'static str] = &["block", "index"];
 static KNOWN_DURATIONS: &'static [&'static str] = &[
     "block.compress",
     "block.hash",
+    "block.write",
     "index.compress",
     "index.encode",
     "index.parse",
@@ -169,8 +170,8 @@ impl Report {
         }
     }
 
-    pub fn measure_duration<T, F>(&self, duration_name: &str, mut closure: F) -> T
-        where F: FnMut() -> T
+    pub fn measure_duration<T, F>(&self, duration_name: &str, closure: F) -> T
+        where F: FnOnce() -> T
     {
         let start = time::Instant::now();
         let result = closure();

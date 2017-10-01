@@ -3,7 +3,6 @@
 
 //! Run conserve CLI as a subprocess and test it.
 
-#[macro_use]
 extern crate spectral;
 
 extern crate regex;

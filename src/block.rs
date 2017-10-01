@@ -8,18 +8,18 @@
 use std::fs;
 use std::io;
 use std::io::prelude::*;
-use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use brotli2::write::BrotliEncoder;
+// use libflate::deflate;
 use rustc_serialize::hex::ToHex;
 
 use tempfile;
 
+use super::compress::Compression;
+use super::compress::snappy::Snappy;
 use super::errors::*;
-use super::io::read_and_decompress;
 use super::report::{Report, Sizes};
 
 /// Use the maximum 64-byte hash.
@@ -53,8 +53,8 @@ pub struct Address {
 pub struct BlockDir {
     pub path: PathBuf,
 
-    /// Internal-use buffer for reading.
-    buf: Vec<u8>,
+    // Reusable buffer for reading input.
+    in_buf: Vec<u8>,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
@@ -66,7 +66,7 @@ impl BlockDir {
     pub fn new(path: &Path) -> BlockDir {
         BlockDir {
             path: path.to_path_buf(),
-            buf: vec![],
+            in_buf: Vec::<u8>::with_capacity(1 << 20),
         }
     }
 
@@ -88,66 +88,62 @@ impl BlockDir {
                  from_file: &mut Read,
                  report: &Report)
                  -> Result<(Vec<Address>, BlockHash)> {
-        // TODO: Maybe store from an in-memory buffer, not a file - let backup generate blocks from
-        // files.
-        let tempf = try!(tempfile::NamedTempFileOptions::new()
-            .prefix("tmp")
-            .create_in(&self.path));
-        let mut encoder = BrotliEncoder::new(tempf, super::BROTLI_COMPRESSION_LEVEL);
-        let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
-        let mut uncompressed_length: u64 = 0;
-        const BUF_SIZE: usize = 1 << 20;
-        if self.buf.len() < BUF_SIZE {
-            self.buf.resize(BUF_SIZE, 0u8);
-        }
-        loop {
-            let buf_slice = self.buf.as_mut_slice();
-            let read_size =
-                try!(report.measure_duration("source.read", || from_file.read(buf_slice)));
-            let input = &buf_slice[..read_size];
-            if read_size == 0 {
-                break;
-            } // eof
-            uncompressed_length += read_size as u64;
+        // TODO: Split large files, combine small files.
+        self.in_buf.truncate(0);
+        let uncomp_len = report.measure_duration("source.read",
+            || from_file.read_to_end(&mut self.in_buf))? as u64;
+        assert_eq!(self.in_buf.len() as u64, uncomp_len);
 
-            try!(report.measure_duration("block.compress", || encoder.write_all(input)));
-            report.measure_duration("block.hash", || hasher.update(input));
-        }
+        let hex_hash = report.measure_duration("block.hash", || hash_bytes(&self.in_buf))?;
 
-        let mut tempf = try!(encoder.finish());
-        let hex_hash = hasher.finalize().as_bytes().to_hex();
-
-        // TODO: Update this when the stored blocks can be different from body hash.
         let refs = vec![Address {
-                            hash: hex_hash.clone(),
-                            start: 0,
-                            len: uncompressed_length,
-                        }];
-        if try!(self.contains(&hex_hash)) {
+            hash: hex_hash.clone(),
+            start: 0,
+            len: uncomp_len as u64,
+        }];
+
+        if self.contains(&hex_hash)? {
             report.increment("block.already_present", 1);
             return Ok((refs, hex_hash));
         }
-        let compressed_length: u64 = try!(tempf.seek(SeekFrom::Current(0)));
-        try!(super::io::ensure_dir_exists(&self.subdir_for(&hex_hash)));
+
+        // Not already stored: compress and save it now.
+        let comp_len = self.compress_and_store(&self.in_buf, &hex_hash, &report)?;
+        report.increment("block", 1);
+        report.increment_size("block",
+            Sizes {
+                compressed: comp_len,
+                uncompressed: uncomp_len,
+            });
+        Ok((refs, hex_hash))
+    }
+
+    fn compress_and_store(&self, in_buf: &[u8], hex_hash: &BlockHash, report: &Report) -> Result<u64> {
+        super::io::ensure_dir_exists(&self.subdir_for(hex_hash))?;
+        let tempf = try!(tempfile::NamedTempFileOptions::new()
+            .prefix("tmp")
+            .create_in(&self.path));
+        let mut bufw = io::BufWriter::new(tempf);
+        report.measure_duration("block.compress",
+            || Snappy::compress_and_write(&in_buf, &mut bufw))?;
+        let tempf = bufw.into_inner().unwrap();
         report.measure_duration("sync", || tempf.sync_all())?;
-        // Also use plain `persist` not `persist_noclobber` to avoid calling `link` on Unix.
+
+        // TODO: Count bytes rather than stat-ing.
+        let comp_len = tempf.metadata()?.len();
+
+        // Also use plain `persist` not `persist_noclobber` to avoid
+        // calling `link` on Unix, which won't work on all filesystems.
         if let Err(e) = tempf.persist(&self.path_for_file(&hex_hash)) {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 warn!("Unexpected late detection of existing block {:?}", hex_hash);
                 report.increment("block.already_present", 1);
-                return Ok((refs, hex_hash));
             } else {
                 return Err(e.error.into());
             }
         }
-        report.increment("block", 1);
-        report.increment_size("block",
-                              Sizes {
-                                  compressed: compressed_length,
-                                  uncompressed: uncompressed_length,
-                              });
-        Ok((refs, hex_hash))
+        Ok(comp_len)
     }
 
     /// True if the named block is present in this directory.
@@ -167,8 +163,10 @@ impl BlockDir {
         let hash = &addr.hash;
         assert_eq!(0, addr.start);
         let path = self.path_for_file(hash);
+        let mut f = try!(fs::File::open(&path));
+
         // TODO: Specific error for compression failure (corruption?) vs io errors.
-        let (compressed_len, decompressed) = match read_and_decompress(&path) {
+        let (compressed_len, decompressed) = match Snappy::decompress_read(&mut f) {
             Ok(d) => d,
             Err(e) => {
                 report.increment("block.corrupt", 1);
@@ -199,6 +197,11 @@ impl BlockDir {
     }
 }
 
+fn hash_bytes(in_buf: &[u8]) -> Result<BlockHash> {
+    let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
+    hasher.update(in_buf);
+    Ok(hasher.finalize().as_bytes().to_hex())
+}
 
 #[cfg(test)]
 mod tests {
@@ -254,11 +257,11 @@ mod tests {
 
         assert_eq!(report.borrow_counts().get_count("block.already_present"), 0);
         assert_eq!(report.borrow_counts().get_count("block"), 1);
-        assert_eq!(report.borrow_counts().get_size("block"),
-                   Sizes {
-                       uncompressed: 6,
-                       compressed: 10,
-                   });
+        let sizes = report.borrow_counts().get_size("block");
+        assert_eq!(sizes.uncompressed, 6);
+
+        // Will vary depending on compressor and we don't want to be too brittle.
+        assert!(sizes.compressed <= 19, sizes.compressed);
 
         // Try to read back
         let read_report = Report::new();
@@ -271,7 +274,7 @@ mod tests {
             assert_eq!(counts.get_size("block"),
                        Sizes {
                            uncompressed: EXAMPLE_TEXT.len() as u64,
-                           compressed: 10u64,
+                           compressed: 8u64,
                        });
         }
     }

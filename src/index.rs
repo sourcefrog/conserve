@@ -4,21 +4,21 @@
 //! Listing of files in a band in the archive.
 
 use std::fmt;
+use std::fs;
 use std::io;
-use std::io::SeekFrom;
-use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::str;
 use std::time;
 use std::vec;
 
 use rustc_serialize::json;
-use brotli2::write::BrotliEncoder;
 
 use super::apath::Apath;
 use super::block;
+use super::compress::Compression;
+use super::compress::snappy::Snappy;
 use super::errors::*;
-use super::io::{AtomicFile, ensure_dir_exists, read_and_decompress};
+use super::io::{AtomicFile, ensure_dir_exists};
 use super::report::{Report, Sizes};
 
 
@@ -123,17 +123,12 @@ impl IndexBuilder {
             .unwrap();
         let uncompressed_len = json_string.len() as u64;
 
-        let af = try!(AtomicFile::new(hunk_path));
-        let mut encoder = BrotliEncoder::new(af, super::BROTLI_COMPRESSION_LEVEL);
-
-        let start_compress = time::Instant::now();
-        try!(encoder.write_all(json_string.as_bytes()));
-        let mut af = try!(encoder.finish());
-        report.increment_duration("index.compress", start_compress.elapsed());
+        let mut af = try!(AtomicFile::new(hunk_path));
+        let compressed_len = report.measure_duration("index.compress",
+            || Snappy::compress_and_write(json_string.as_bytes(), &mut af))?;
 
         // TODO: Don't seek, just count bytes as they're compressed.
         // TODO: Measure time to compress separately from time to write.
-        let compressed_len: u64 = try!(af.seek(SeekFrom::Current(0)));
         try!(af.close(report));
 
         report.increment_size("index",
@@ -226,8 +221,8 @@ impl Iter {
         let start_read = time::Instant::now();
         // Load the next index hunk into buffered_entries.
         let hunk_path = path_for_hunk(&self.dir, self.next_hunk_number);
-        let (comp_len, index_bytes) = match read_and_decompress(&hunk_path) {
-            Ok(i) => i,
+        let mut f = match fs::File::open(&hunk_path) {
+            Ok(f) => f,
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
                 // No (more) index hunk files.
                 return Ok(false);
@@ -236,12 +231,13 @@ impl Iter {
                 return Err(e.into());
             }
         };
+        let (comp_len, index_bytes) = Snappy::decompress_read(&mut f)?;
         self.report.increment_duration("index.read", start_read.elapsed());
         self.report.increment_size("index",
-                                   Sizes {
-                                       uncompressed: index_bytes.len() as u64,
-                                       compressed: comp_len as u64,
-                                   });
+            Sizes {
+                uncompressed: index_bytes.len() as u64,
+                compressed: comp_len as u64,
+            });
         self.report.increment("index.hunk", 1);
 
         let start_parse = time::Instant::now();
@@ -268,8 +264,9 @@ mod tests {
     use tempdir;
 
     use Report;
+    use super::super::compress::Compression;
+    use super::super::compress::snappy::Snappy;
     use super::{IndexBuilder, Entry, IndexKind};
-    use io::read_and_decompress;
 
     pub const EXAMPLE_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
@@ -361,6 +358,7 @@ mod tests {
 
     #[test]
     fn basic() {
+        use std::fs;
         use std::str;
 
         let (_testdir, mut ib, report) = scratch_indexbuilder();
@@ -374,7 +372,8 @@ mod tests {
         expected_path.push("000000000");
 
         // Check the stored json version
-        let (_comp_len, retrieved_bytes) = read_and_decompress(&expected_path).unwrap();
+        let mut f = fs::File::open(&expected_path).unwrap();
+        let (_comp_len, retrieved_bytes) = Snappy::decompress_read(&mut f).unwrap();
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
         assert_eq!(retrieved,  r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null}]"#);
 
@@ -391,8 +390,6 @@ mod tests {
 
     #[test]
     fn multiple_hunks() {
-        use std::str;
-
         let (_testdir, mut ib, report) = scratch_indexbuilder();
         add_an_entry(&mut ib, "/1.1");
         add_an_entry(&mut ib, "/1.2");

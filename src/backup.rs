@@ -110,8 +110,6 @@ impl Backup {
 
 #[cfg(test)]
 mod tests {
-    extern crate tempdir;
-
     #[cfg(unix)]
     #[test]
     pub fn symlink() {
