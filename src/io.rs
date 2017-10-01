@@ -7,11 +7,10 @@
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::io::{Read, Write};
+use std::io::prelude::*;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
-use libflate::deflate::Decoder;
 use tempfile;
 
 use super::Report;
@@ -69,28 +68,6 @@ impl Deref for AtomicFile {
 impl DerefMut for AtomicFile {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.f
-    }
-}
-
-
-pub fn read_and_decompress(path: &Path) -> io::Result<(usize, Vec<u8>)> {
-    // Conserve files are never too large so can always be read entirely in to memory.
-    let mut compressed_buf = Vec::<u8>::with_capacity(10 << 20);
-    let read_len = {
-        let mut f = try!(fs::File::open(&path));
-        try!(f.read_to_end(&mut compressed_buf))
-    };
-    compressed_buf.truncate(read_len);
-    compressed_buf.shrink_to_fit();
-    let mut decomp = Decoder::new(compressed_buf.as_slice());
-    let mut decompressed = Vec::<u8>::with_capacity(read_len * 4);
-    match decomp.read_to_end(&mut decompressed) {
-        Err(e) => panic!("decompress error: {:?}", e),
-        Ok(decompressed_bytes) => {
-            decompressed.truncate(decompressed_bytes);
-            decompressed.shrink_to_fit();
-            return Ok((read_len, decompressed));
-        }
     }
 }
 

@@ -5,6 +5,7 @@ extern crate conserve;
 use conserve::backup;
 use conserve::index;
 use conserve::Report;
+use conserve::report::Sizes;
 use conserve::Restore;
 use conserve::testfixtures::ScratchArchive;
 use conserve::testfixtures::TreeFixture;
@@ -67,10 +68,13 @@ fn check_restore(af: &ScratchArchive) {
     Restore::new(&af, restore_dir.path(), &restore_report).run().unwrap();
     let restore_counts = restore_report.borrow_counts();
     let block_sizes = restore_counts.get_size("block");
-    assert!(block_sizes.uncompressed == 8 && block_sizes.compressed == 18,
+    assert!(block_sizes.uncompressed == 8 && block_sizes.compressed == 10,
             format!("{:?}", block_sizes));
     let index_sizes = restore_counts.get_size("index");
-    assert!(index_sizes.compressed < 220 && index_sizes.uncompressed == 462,
-            format!("{:?}", index_sizes));
+    assert_eq!(index_sizes,
+        Sizes {
+            compressed: 290,
+            uncompressed: 462,
+        });
     // TODO: Check what was restored.
 }

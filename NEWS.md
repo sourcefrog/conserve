@@ -2,7 +2,7 @@
 
 ## Conserve 0.4.0
 
-* Switch from Brotli2 to deflate compression: probably a better
+* Switch from Brotli2 to Snappy compression: probably a better
   speed/size tradeoff for mixed data. (Breaks format compatibility.)
 
 ## Conserve 0.3.3

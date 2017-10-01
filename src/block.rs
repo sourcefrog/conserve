@@ -17,8 +17,9 @@ use rustc_serialize::hex::ToHex;
 
 use tempfile;
 
+use super::compress::Compression;
+use super::compress::snappy::Snappy;
 use super::errors::*;
-use super::io::read_and_decompress;
 use super::report::{Report, Sizes};
 
 /// Use the maximum 64-byte hash.
@@ -124,7 +125,7 @@ impl BlockDir {
             .create_in(&self.path));
         let mut bufw = io::BufWriter::new(tempf);
         report.measure_duration("block.compress",
-            || compress_bytes(&in_buf, &mut bufw))?;
+            || Snappy::compress_and_write(&in_buf, &mut bufw))?;
         let tempf = bufw.into_inner().unwrap();
         report.measure_duration("sync", || tempf.sync_all())?;
 
@@ -162,8 +163,10 @@ impl BlockDir {
         let hash = &addr.hash;
         assert_eq!(0, addr.start);
         let path = self.path_for_file(hash);
+        let mut f = try!(fs::File::open(&path));
+
         // TODO: Specific error for compression failure (corruption?) vs io errors.
-        let (compressed_len, decompressed) = match read_and_decompress(&path) {
+        let (compressed_len, decompressed) = match Snappy::decompress_read(&mut f) {
             Ok(d) => d,
             Err(e) => {
                 report.increment("block.corrupt", 1);
@@ -192,23 +195,6 @@ impl BlockDir {
         }
         Ok(decompressed)
     }
-}
-
-
-// fn compress_bytes(in_buf: &[u8], w: &mut io::Write) -> Result<()> {
-//     use snap;
-//     let mut encoder = snap::Writer::new(w);
-//     encoder.write_all(&in_buf)?;
-//     encoder.into_inner().unwrap();
-//     Ok(())
-// }
-
-fn compress_bytes(in_buf: &[u8], w: &mut io::Write) -> Result<()> {
-    use snap;
-    let mut encoder = snap::Encoder::new();
-    let r = encoder.compress_vec(in_buf).unwrap();
-    w.write_all(&r)?;
-    Ok(())
 }
 
 fn hash_bytes(in_buf: &[u8]) -> Result<BlockHash> {
@@ -271,11 +257,11 @@ mod tests {
 
         assert_eq!(report.borrow_counts().get_count("block.already_present"), 0);
         assert_eq!(report.borrow_counts().get_count("block"), 1);
-        assert_eq!(report.borrow_counts().get_size("block"),
-                   Sizes {
-                       uncompressed: 6,
-                       compressed: 19,
-                   });
+        let sizes = report.borrow_counts().get_size("block");
+        assert_eq!(sizes.uncompressed, 6);
+
+        // Will vary depending on compressor and we don't want to be too brittle.
+        assert!(sizes.compressed <= 19, sizes.compressed);
 
         // Try to read back
         let read_report = Report::new();
@@ -288,7 +274,7 @@ mod tests {
             assert_eq!(counts.get_size("block"),
                        Sizes {
                            uncompressed: EXAMPLE_TEXT.len() as u64,
-                           compressed: 19u64,
+                           compressed: 8u64,
                        });
         }
     }
