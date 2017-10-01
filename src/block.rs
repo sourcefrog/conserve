@@ -127,7 +127,7 @@ impl BlockDir {
         report.measure_duration("block.compress",
             || Snappy::compress_and_write(&in_buf, &mut bufw))?;
         let tempf = bufw.into_inner().unwrap();
-        report.measure_duration("sync", || tempf.sync_all())?;
+        // report.measure_duration("sync", || tempf.sync_all())?;
 
         // TODO: Count bytes rather than stat-ing.
         let comp_len = tempf.metadata()?.len();
