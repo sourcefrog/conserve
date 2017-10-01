@@ -71,10 +71,7 @@ fn check_restore(af: &ScratchArchive) {
     assert!(block_sizes.uncompressed == 8 && block_sizes.compressed == 10,
             format!("{:?}", block_sizes));
     let index_sizes = restore_counts.get_size("index");
-    assert_eq!(index_sizes,
-        Sizes {
-            compressed: 290,
-            uncompressed: 462,
-        });
+    assert_eq!(index_sizes.uncompressed, 462);
+    assert!(index_sizes.compressed <= 292, index_sizes.compressed);
     // TODO: Check what was restored.
 }
