@@ -13,7 +13,7 @@ use log;
 use log::LogLevel;
 use term;
 
-use report::{Counts, Sizes};
+use report::Counts;
 use ui::UI;
 
 const MB: u64 = 1_000_000;
@@ -71,15 +71,6 @@ fn duration_to_hms(d: Duration) -> String {
 }
 
 
-fn compression_percent(s: &Sizes) -> i64 {
-    if s.uncompressed > 0 {
-        100i64 - (100 * s.compressed / s.uncompressed) as i64
-    } else {
-        0
-    }
-}
-
-
 fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
     let float_secs = elapsed.as_secs() as f64 + (elapsed.subsec_nanos() as f64 / 1e9);
     if float_secs > 0.0 {
@@ -104,7 +95,7 @@ impl UI for ColorUI {
         // block deduplication.
         // Measure compression on body bytes.
         let block_sizes = counts.get_size("block");
-        let block_comp_pct = compression_percent(&block_sizes);
+        let block_comp_ratio = super::compression_ratio(&block_sizes);
         let elapsed = counts.elapsed_time();
         // TODO: Truncate to screen width (or draw on multiple lines with cursor-up)?
         // TODO: Rate limit etc.
@@ -125,10 +116,10 @@ impl UI for ColorUI {
         t.fg(term::color::WHITE).unwrap();
         write!(t, " dirs").unwrap();
         t.fg(term::color::GREEN).unwrap();
-        write!(t, " {:>9} => {:<9} {:3}% {:6.1}MB/s",
+        write!(t, " {:>9} => {:<9} {:2.1}x {:6.1}MB/s",
             uncomp_mb_str,
             comp_mb_str,
-            block_comp_pct,
+            block_comp_ratio,
             uncomp_rate,
         )
             .unwrap();

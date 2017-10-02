@@ -3,7 +3,7 @@
 
 //! Abstract user interface trait.
 
-pub use super::report::Counts;
+pub use super::report::{Counts, Sizes};
 
 use isatty;
 use log;
@@ -53,8 +53,29 @@ pub fn by_name(ui_name: &str) -> Option<Box<UI + Send>> {
     }
 }
 
+
+pub fn compression_percent(s: &Sizes) -> i64 {
+    if s.uncompressed > 0 {
+        100i64 - (100 * s.compressed / s.uncompressed) as i64
+    } else {
+        0
+    }
+}
+
+
+/// Describe the compression ratio: higher is better.
+pub fn compression_ratio(s: &Sizes) -> f64 {
+    if s.compressed > 0 {
+        s.uncompressed as f64 / s.compressed as f64
+    } else {
+        0f64
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use report::Sizes;
+
     #[test]
     pub fn best_ui() {
         // You can at least construct some kind of UI although the type depends on the environment.
@@ -70,5 +91,12 @@ mod tests {
         assert!(super::by_name("giraffe nativity").is_none());
         // Plain UI should always be possible.
         assert!(super::by_name("plain").is_some());
+    }
+
+    #[test]
+    pub fn test_compression_ratio() {
+        let ratio = super::compression_ratio(&Sizes{ compressed: 2000, uncompressed: 4000 });
+        assert_eq!(format!("{:3.1}x", ratio),
+            "2.0x");
     }
 }
