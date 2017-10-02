@@ -37,4 +37,3 @@ vergen = "~0.1.0"
 
 [features]
 default = []
-bench = []  # Build unit benchmarks (nightly compiler only)

@@ -5,7 +5,6 @@
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="bench", feature(test))] // Benchmark support currently only on nightly.
 
 #![recursion_limit = "1024"]  // Needed by error-chain
 
