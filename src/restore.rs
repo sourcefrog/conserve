@@ -63,7 +63,9 @@ impl Restore {
             // TODO: Continue even if one fails
             try!(self.restore_one(&block_dir, &entry));
         }
-        warn!("Version {} is incomplete: tree may be truncated", band.id());
+        if !band.is_closed()? {
+            warn!("Version {} is incomplete: tree may be truncated", band.id());
+        }
         Ok(())
     }
 
