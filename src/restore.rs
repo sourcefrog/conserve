@@ -12,7 +12,7 @@ use super::io::AtomicFile;
 
 /// Restore operation.
 ///
-/// Call `from_archive_path` then `run`.
+/// Call `new` then `run`.
 pub struct Restore {
     archive: Archive,
     report: Report,
