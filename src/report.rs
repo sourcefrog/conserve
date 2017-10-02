@@ -18,6 +18,7 @@ use std::time::Duration;
 
 use log;
 
+use super::ui;
 use super::ui::UI;
 use super::ui::plain::PlainUI;
 
@@ -201,13 +202,13 @@ impl Display for Report {
         try!(write!(f, "Bytes (before and after compression):\n"));
         for (key, s) in &counts.sizes {
             if s.uncompressed > 0 {
-                let compression_pct = 100 - ((100 * s.compressed) / s.uncompressed);
-                try!(write!(f,
-                            "  {:<40} {:>9} {:>9} {:>9}%\n",
-                            *key,
-                            s.uncompressed,
-                            s.compressed,
-                            compression_pct));
+                let ratio = ui::compression_ratio(s);
+                write!(f,
+                    "  {:<40} {:>9} {:>9} {:>9.1}x\n",
+                    *key,
+                    s.uncompressed,
+                    s.compressed,
+                    ratio)?;
             }
         }
         try!(write!(f, "Durations (seconds):\n"));
@@ -339,7 +340,7 @@ mod tests {
 Counts:
   block                                           15
 Bytes (before and after compression):
-  block                                          300       100        67%
+  block                                          300       100       3.0x
 Durations (seconds):
   test                                        42.479
 ");
