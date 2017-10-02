@@ -32,18 +32,6 @@ use conserve::errors::*;
 
 fn main() {
     let matches = make_clap().get_matches();
-    let ui = match matches.value_of("ui") {
-        Some(ui) => ui::by_name(ui).expect("Couldn't make UI"),
-        None => ui::best_ui(),
-    };
-    let log_level = match matches.occurrences_of("v") {
-        0 => log::LogLevelFilter::Warn,
-        1 => log::LogLevelFilter::Info,
-        2 => log::LogLevelFilter::Debug,
-        _ => log::LogLevelFilter::max(),
-    };
-    let report = Report::with_ui(ui);
-    report.become_logger(log_level);
 
     let (sub_name, subm) = matches.subcommand();
     let sub_fn = match sub_name {
@@ -55,11 +43,27 @@ fn main() {
         "versions" => versions,
         _ => unimplemented!(),
     };
-    let result = sub_fn(subm.expect("No subcommand matches"), &report);
+    let subm = subm.unwrap();
 
-    if matches.is_present("stats") {
+    let ui = match matches.value_of("ui").or(subm.value_of("ui")) {
+        Some(ui) => ui::by_name(ui).expect("Couldn't make UI"),
+        None => ui::best_ui(),
+    };
+    let log_level = match (matches.occurrences_of("v") + subm.occurrences_of("v")) {
+        0 => log::LogLevelFilter::Warn,
+        1 => log::LogLevelFilter::Info,
+        2 => log::LogLevelFilter::Debug,
+        _ => log::LogLevelFilter::max(),
+    };
+    let report = Report::with_ui(ui);
+    report.become_logger(log_level);
+
+    let result = sub_fn(subm, &report);
+
+    if matches.is_present("stats") || subm.is_present("stats") {
         info!("Stats:\n{}", report);
     }
+
     if let Err(e) = result {
         show_chained_errors(e);
         std::process::exit(1)
@@ -107,6 +111,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         .arg(Arg::with_name("v")
             .short("v")
             .multiple(true)
+            .global(true)
             .help("Be more verbose (log all file names)"))
         .subcommand(SubCommand::with_name("init")
             .display_order(1)
