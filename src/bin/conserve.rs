@@ -49,7 +49,7 @@ fn main() {
         Some(ui) => ui::by_name(ui).expect("Couldn't make UI"),
         None => ui::best_ui(),
     };
-    let log_level = match (matches.occurrences_of("v") + subm.occurrences_of("v")) {
+    let log_level = match matches.occurrences_of("v") + subm.occurrences_of("v") {
         0 => log::LogLevelFilter::Warn,
         1 => log::LogLevelFilter::Info,
         2 => log::LogLevelFilter::Debug,
@@ -60,9 +60,7 @@ fn main() {
 
     let result = sub_fn(subm, &report);
 
-    if matches.is_present("stats") || subm.is_present("stats") {
-        info!("Stats:\n{}", report);
-    }
+    info!("{}", report);
 
     if let Err(e) = result {
         show_chained_errors(e);
@@ -100,9 +98,6 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         .author(crate_authors!())
         .version(conserve::version())
         .setting(AppSettings::SubcommandRequiredElseHelp)
-        .arg(Arg::with_name("stats")
-            .long("stats")
-            .help("Show number of operations, bytes, seconds elapsed"))
         .arg(Arg::with_name("ui")
             .long("ui")
             .help("UI for progress and messages")
