@@ -47,7 +47,7 @@ pub mod ui;
 
 pub use archive::Archive;
 pub use apath::Apath;
-pub use backup::backup;
+pub use backup::BackupOptions;
 pub use band::Band;
 pub use bandid::BandId;
 pub use block::BlockDir;

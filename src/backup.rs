@@ -12,6 +12,12 @@ use index;
 use sources;
 
 
+#[derive(Debug, Default)]
+pub struct BackupOptions {
+}
+
+
+// TODO: #[derive(Debug)]
 struct Backup {
     block_dir: BlockDir,
     index_builder: IndexBuilder,
@@ -19,21 +25,23 @@ struct Backup {
 }
 
 
-pub fn backup(archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
-    let archive = try!(Archive::open(archive_path, &report));
-    let band = try!(archive.create_band(&report));
-    let mut backup = Backup {
-        block_dir: band.block_dir(),
-        index_builder: band.index_builder(),
-        report: report.clone(),
-    };
-    let source_iter = try!(sources::iter(source, report));
-    for entry in source_iter {
-        try!(backup.store_one_source_entry(&try!(entry)));
+impl BackupOptions {
+    pub fn backup(&self, archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
+        let archive = try!(Archive::open(archive_path, &report));
+        let band = try!(archive.create_band(&report));
+        let mut backup = Backup {
+            block_dir: band.block_dir(),
+            index_builder: band.index_builder(),
+            report: report.clone(),
+        };
+        let source_iter = try!(sources::iter(source, report));
+        for entry in source_iter {
+            try!(backup.store_one_source_entry(&try!(entry)));
+        }
+        try!(backup.index_builder.finish_hunk(report));
+        try!(band.close(&backup.report));
+        Ok(())
     }
-    try!(backup.index_builder.finish_hunk(report));
-    try!(band.close(&backup.report));
-    Ok(())
 }
 
 
@@ -106,19 +114,17 @@ impl Backup {
 
 #[cfg(test)]
 mod tests {
+    use super::super::*;
+    use testfixtures::{ScratchArchive, TreeFixture};
+
     #[cfg(unix)]
     #[test]
     pub fn symlink() {
-        use backup;
-        use index;
-        use Report;
-        use testfixtures::{ScratchArchive, TreeFixture};
-
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
         let report = Report::new();
-        backup(af.path(), srcdir.path(), &report).unwrap();
+        BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
         assert_eq!(0, report.borrow_counts().get_count("block"));
         assert_eq!(0, report.borrow_counts().get_count("file"));
         assert_eq!(1, report.borrow_counts().get_count("symlink"));

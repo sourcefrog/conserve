@@ -180,9 +180,10 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
-    backup(Path::new(subm.value_of("archive").unwrap()),
-                     Path::new(subm.value_of("source").unwrap()),
-                     report)
+    BackupOptions::default()
+        .backup(Path::new(subm.value_of("archive").unwrap()),
+                Path::new(subm.value_of("source").unwrap()),
+                report)
 }
 
 
