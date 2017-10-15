@@ -50,6 +50,7 @@ impl fmt::Debug for Entry {
 }
 
 /// Recursive iterator of the contents of a source directory.
+#[derive(Debug)]
 pub struct Iter {
     /// Directories yet to be visited.
     dir_deque: VecDeque<Entry>,
@@ -63,8 +64,6 @@ pub struct Iter {
     /// Copy of the last-emitted apath, for the purposes of checking they're in apath order.
     last_apath: Option<Apath>,
 }
-
-// TODO: Implement Debug on Iter.
 
 
 impl Iter {
