@@ -1,3 +1,5 @@
+// Copyright 2015, 2016, 2017 Martin Pool.
+
 //! Restore from the archive to the filesystem.
 
 use std::fs;
@@ -5,7 +7,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use super::*;
-use super::apath;
 use super::index;
 
 /// Restore operation.
@@ -69,7 +70,7 @@ impl Restore {
 
     fn restore_one(&mut self, block_dir: &BlockDir, entry: &index::Entry) -> Result<()> {
         // Remove initial slash so that the apath is relative to the destination.
-        if !apath::valid(&entry.apath) {
+        if !Apath::is_valid(&entry.apath) {
             return Err(format!("invalid apath {:?}", &entry.apath).into());
         }
         let dest_path = self.destination.join(&entry.apath[1..]);

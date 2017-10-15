@@ -26,12 +26,30 @@ pub struct Apath(String);
 
 impl Apath {
     pub fn from_string(s: &str) -> Apath {
-        assert!(valid(s));
+        assert!(Apath::is_valid(s));
         Apath(s.to_string())
     }
 
     pub fn to_string(&self) -> &String {
         &self.0
+    }
+
+    /// True if this string is a well-formed apath.
+    ///
+    /// Rust strings are by contract always valid UTF-8, so to meet that requirement 
+    /// for apaths it's enough to use a checked conversion from bytes or an `OSString`.
+    pub fn is_valid(a: &str) -> bool {
+        if !a.starts_with('/') {
+            return false;
+        } else if a.len() == 1 {
+            return true;
+        }
+        for part in a[1..].split('/') {
+            if part.is_empty() || part == "." || part == ".." || part.contains('\0') {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -97,29 +115,8 @@ impl PartialOrd for Apath {
 }
 
 
-/// True if this apath is well-formed.
-///
-/// Rust strings are by contract always valid UTF-8, so to meet that requirement for apaths it's
-/// enough to use a checked conversion from bytes or an `OSString`.
-// TODO: Migrate onto a method of Apath?
-pub fn valid(a: &str) -> bool {
-    if !a.starts_with('/') {
-        return false;
-    } else if a.len() == 1 {
-        return true;
-    }
-    for part in a[1..].split('/') {
-        if part.is_empty() || part == "." || part == ".." || part.contains('\0') {
-            return false;
-        }
-    }
-    true
-}
-
-
 #[cfg(test)]
 mod tests {
-    use super::valid;
     use super::Apath;
 
     #[test]
@@ -138,7 +135,7 @@ mod tests {
                              "../a",
                              "/hello\0"];
         for v in invalid_cases.into_iter() {
-            if valid(v) {
+            if Apath::is_valid(v) {
                 panic!("{:?} incorrectly marked valid", v);
             }
         }
@@ -174,7 +171,7 @@ mod tests {
                        "/b/b/b/z",
                        "/b/b/b/{zz}"];
         for (i, a) in ordered.iter().enumerate() {
-            if !valid(a) {
+            if !Apath::is_valid(a) {
                 panic!("{:?} incorrectly marked invalid", a);
             }
             let ap = Apath::from_string(a);
