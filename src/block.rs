@@ -197,7 +197,9 @@ impl BlockDir {
 
 impl fmt::Debug for BlockDir {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "BlockDir {{ path: {:?} }}", self.path)
+        f.debug_struct("BlockDir")
+            .field("path", &self.path)
+            .finish()
     }
 }
 
