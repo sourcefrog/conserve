@@ -5,6 +5,7 @@
 //!
 //! The structure is: archive > band > blockdir > subdir > file.
 
+use std::fmt;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
@@ -191,6 +192,12 @@ impl BlockDir {
             return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
         Ok(decompressed)
+    }
+}
+
+impl fmt::Debug for BlockDir {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "BlockDir {{ path: {:?} }}", self.path)
     }
 }
 
