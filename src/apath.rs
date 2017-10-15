@@ -1,8 +1,8 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
-//! "Apaths" (for archive paths) are platform-independent relative file paths used inside archive
-//! snapshots.
+//! "Apaths" (for archive paths) are platform-independent relative file paths used
+//! inside archive snapshots.
 //!
 //! The format and semantics of apaths are defined in ../doc/format.md.
 //!
@@ -101,6 +101,7 @@ impl PartialOrd for Apath {
 ///
 /// Rust strings are by contract always valid UTF-8, so to meet that requirement for apaths it's
 /// enough to use a checked conversion from bytes or an `OSString`.
+// TODO: Migrate onto a method of Apath?
 pub fn valid(a: &str) -> bool {
     if !a.starts_with('/') {
         return false;

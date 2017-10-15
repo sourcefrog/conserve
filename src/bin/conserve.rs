@@ -22,12 +22,8 @@ use clap::{Arg, App, AppSettings, ArgMatches, SubCommand};
 
 extern crate conserve;
 
-use conserve::Archive;
-use conserve::Band;
-use conserve::BandId;
-use conserve::Report;
+use conserve::*;
 use conserve::ui;
-use conserve::errors::*;
 
 
 fn main() {
@@ -35,7 +31,7 @@ fn main() {
 
     let (sub_name, subm) = matches.subcommand();
     let sub_fn = match sub_name {
-        "backup" => backup,
+        "backup" => cmd_backup,
         "init" => init,
         "list-source" => list_source,
         "ls" => ls,
@@ -183,8 +179,8 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 }
 
 
-fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
-    conserve::backup(Path::new(subm.value_of("archive").unwrap()),
+fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
+    backup(Path::new(subm.value_of("archive").unwrap()),
                      Path::new(subm.value_of("source").unwrap()),
                      report)
 }

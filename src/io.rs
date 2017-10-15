@@ -13,8 +13,7 @@ use std::path::{Path, PathBuf};
 
 use tempfile;
 
-use super::Report;
-use super::errors::*;
+use super::*;
 
 
 pub struct AtomicFile {

@@ -11,8 +11,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time;
 
-use Report;
-use apath::Apath;
+use super::*;
 
 
 /// An entry found in the source directory.
@@ -201,8 +200,8 @@ pub fn iter(source_dir: &Path, report: &Report) -> io::Result<Iter> {
 mod tests {
     use std::io;
 
-    use Report;
-    use super::*;
+    use super::iter;
+    use super::super::*;
     use testfixtures::TreeFixture;
 
     #[test]

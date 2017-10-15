@@ -7,12 +7,8 @@
 use std::fs;
 use std::path::Path;
 
-use Archive;
-use Report;
-use block::BlockDir;
-use errors::*;
+use super::*;
 use index;
-use index::{IndexBuilder, IndexKind};
 use sources;
 
 

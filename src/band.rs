@@ -14,13 +14,8 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, TimeZone, UTC};
 
-use super::{BandId, Report};
-use super::block::BlockDir;
-
-#[allow(unused_imports)]  // Needed for Result
-use super::errors::*;
+use super::*;
 use super::index;
-use super::index::IndexBuilder;
 use super::jsonio;
 use super::io::file_exists;
 
@@ -178,14 +173,10 @@ mod tests {
     use std::fs;
     use std::io;
 
-    use super::*;
-
-    #[allow(unused_imports)]
-    use errors::*;
-
     use chrono::Duration;
+
+    use super::super::*;
     use testfixtures::ScratchArchive;
-    use {BandId, Report};
 
     #[test]
     fn create_and_reopen_band() {

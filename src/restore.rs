@@ -4,11 +4,9 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use super::{Archive, BandId, BlockDir, Report};
+use super::*;
 use super::apath;
-use super::errors::*;
 use super::index;
-use super::io::AtomicFile;
 
 /// Restore operation.
 ///
@@ -139,13 +137,8 @@ mod tests {
 
     use spectral::prelude::*;
 
-    use BandId;
-    use Report;
-    use Restore;
-    use SYMLINKS_SUPPORTED;
-    use backup;
-    use testfixtures::ScratchArchive;
-    use testfixtures::TreeFixture;
+    use super::super::*;
+    use testfixtures::{ScratchArchive, TreeFixture};
 
     fn setup_archive() -> ScratchArchive {
         let af = ScratchArchive::new();

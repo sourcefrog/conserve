@@ -14,8 +14,7 @@ use std::path::{Path, PathBuf};
 
 use tempdir;
 
-use super::Archive;
-use Report;
+use super::*;
 
 
 /// A temporary archive.

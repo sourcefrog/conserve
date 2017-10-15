@@ -17,10 +17,7 @@ use rustc_serialize::hex::ToHex;
 
 use tempfile;
 
-use super::compress::Compression;
-use super::compress::snappy::Snappy;
-use super::errors::*;
-use super::report::{Report, Sizes};
+use super::*;
 
 /// Use the maximum 64-byte hash.
 const BLAKE_HASH_SIZE_BYTES: usize = 64;
@@ -211,8 +208,7 @@ mod tests {
     use tempdir;
     use tempfile;
 
-    use super::BlockDir;
-    use report::{Report, Sizes};
+    use super::super::*;
 
     const EXAMPLE_TEXT: &'static [u8] = b"hello!";
     const EXAMPLE_BLOCK_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";

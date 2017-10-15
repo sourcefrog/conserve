@@ -1,4 +1,4 @@
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
 //! Conserve backup system.
 //!
@@ -45,14 +45,21 @@ pub mod sources;
 pub mod testfixtures;
 pub mod ui;
 
-// Re-export important classes.
 pub use archive::Archive;
+pub use apath::Apath;
 pub use backup::backup;
 pub use band::Band;
 pub use bandid::BandId;
 pub use block::BlockDir;
-pub use report::Report;
+pub use compress::Compression;
+pub use compress::snappy::Snappy;
+pub use errors::*;
+pub use io::{AtomicFile, ensure_dir_exists};
+pub use index::{IndexBuilder, Entry, IndexKind};
+pub use report::{Report, Sizes};
 pub use restore::Restore;
+pub use ui::UI;
+
 
 /// Conserve version number as a semver string.
 ///
@@ -63,6 +70,6 @@ pub fn version() -> &'static str {
 }
 
 /// Format-compatibility version, normally the first two components of the package version.
-const ARCHIVE_VERSION: &'static str = "0.4";
+pub const ARCHIVE_VERSION: &'static str = "0.4";
 
 pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");

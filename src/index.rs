@@ -13,13 +13,8 @@ use std::vec;
 
 use rustc_serialize::json;
 
-use super::apath::Apath;
+use super::*;
 use super::block;
-use super::compress::Compression;
-use super::compress::snappy::Snappy;
-use super::errors::*;
-use super::io::{AtomicFile, ensure_dir_exists};
-use super::report::{Report, Sizes};
 
 
 const MAX_ENTRIES_PER_HUNK: usize = 1000;
@@ -263,10 +258,7 @@ mod tests {
     use std::path::Path;
     use tempdir;
 
-    use Report;
-    use super::super::compress::Compression;
-    use super::super::compress::snappy::Snappy;
-    use super::{IndexBuilder, Entry, IndexKind};
+    use super::super::*;
 
     pub const EXAMPLE_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
