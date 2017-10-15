@@ -9,6 +9,7 @@ use log;
 
 use super::Counts;
 
+#[derive(Debug)]
 pub struct PlainUI;
 
 

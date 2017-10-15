@@ -17,7 +17,7 @@ pub struct BackupOptions {
 }
 
 
-// TODO: #[derive(Debug)]
+#[derive(Debug)]
 struct Backup {
     block_dir: BlockDir,
     index_builder: IndexBuilder,

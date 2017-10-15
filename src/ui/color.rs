@@ -6,6 +6,7 @@
 //!
 //! This acts as a view and the Report is the model.
 
+use std::fmt;
 use std::io::prelude::*;
 use std::time::{Duration, Instant};
 
@@ -141,5 +142,15 @@ impl UI for ColorUI {
         }
         writeln!(t, "{}", record.args()).unwrap();
         t.flush().unwrap();
+    }
+}
+
+
+impl fmt::Debug for ColorUI {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("ColorUI")
+            .field("last_update", &self.last_update)
+            .field("progress_present", &self.progress_present)
+            .finish()
     }
 }

@@ -3,6 +3,8 @@
 
 //! Abstract user interface trait.
 
+use std::fmt;
+
 pub use super::report::{Counts, Sizes};
 
 use isatty;
@@ -13,7 +15,7 @@ pub mod plain;
 
 
 /// Display information about backup progress to the user in some way.
-pub trait UI {
+pub trait UI : fmt::Debug {
     /// Show counters, eg as a progress bar.
     fn show_progress(&mut self, counts: &Counts);
 

@@ -68,6 +68,7 @@ static KNOWN_DURATIONS: &'static [&'static str] = &[
 
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
+#[derive(Debug)]
 pub struct Counts {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, Sizes>,
@@ -85,7 +86,7 @@ pub struct Counts {
 /// or scopes (on the same thread) who all append to it.
 ///
 /// Cloning a Report makes another reference to the same underlying counters.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Report {
     counts: Arc<Mutex<Counts>>,
     ui: Arc<Mutex<Box<UI + Send>>>,
