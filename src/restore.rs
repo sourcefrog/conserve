@@ -4,131 +4,159 @@
 
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::*;
 use super::index;
 
-/// Restore operation.
-///
-/// Call `new` then `run`.
-pub struct Restore {
-    archive: Archive,
-    report: Report,
-    destination: PathBuf,
+
+/// Options for Restore operation.
+#[derive(Default, Debug)]
+pub struct RestoreOptions {
     force_overwrite: bool,
     band_id: Option<BandId>,
 }
 
 
-impl Restore {
-    pub fn new(archive: &Archive, destination: &Path, report: &Report) -> Restore {
-        Restore {
-            archive: archive.clone(),
-            report: report.clone(),
-            destination: destination.to_path_buf(),
-            force_overwrite: false,
-            band_id: None,
+impl RestoreOptions {
+    pub fn force_overwrite(self, f: bool) -> RestoreOptions {
+        RestoreOptions {
+            force_overwrite: f,
+            ..self
         }
     }
 
-    pub fn force_overwrite(mut self, force: bool) -> Restore {
-        self.force_overwrite = force;
-        self
+    pub fn band_id(self, b: Option<BandId>) -> RestoreOptions {
+        RestoreOptions { band_id: b, ..self }
     }
 
-    pub fn band_id(mut self, band_id: Option<BandId>) -> Restore {
-        self.band_id = band_id;
-        self
-    }
-
-    /// Restore a version from the archive, according to parameters previously set on this object.
+    /// Restore a version from the archive.
     ///
-    /// This will warn, but not fail, if the version is incomplete: this might mean
-    /// only part of the source tree is copied back.
-    pub fn run(mut self) -> Result<()> {
-        let band = try!(self.archive.open_band_or_last(&self.band_id, &self.report));
+    /// This will warn, but not fail, if the version is incomplete: this might
+    /// mean only part of the source tree is copied back.
+    pub fn restore(
+        &self,
+        archive: &Archive,
+        destination: &Path,
+        report: &Report,
+    ) -> Result<()> {
+        let options = &self;
+        let band = try!(archive.open_band_or_last(&options.band_id, &report));
         let block_dir = band.block_dir();
 
-        if !self.force_overwrite {
-            if let Ok(mut it) = fs::read_dir(&self.destination) {
+        if !options.force_overwrite {
+            if let Ok(mut it) = fs::read_dir(&destination) {
                 if it.next().is_some() {
-                    return Err(ErrorKind::DestinationNotEmpty(self.destination).into());
+                    return Err(
+                        ErrorKind::DestinationNotEmpty(
+                            destination.to_path_buf(),
+                        ).into(),
+                    );
                 }
             }
         }
-        for entry in try!(band.index_iter(&self.report)) {
+        for entry in try!(band.index_iter(&report)) {
             let entry = try!(entry);
             // TODO: Continue even if one fails
-            try!(self.restore_one(&block_dir, &entry));
+            try!(restore_one(
+                &block_dir,
+                &entry,
+                destination,
+                report,
+                options,
+            ));
         }
         if !band.is_closed()? {
             warn!("Version {} is incomplete: tree may be truncated", band.id());
         }
         Ok(())
     }
+}
 
-    fn restore_one(&mut self, block_dir: &BlockDir, entry: &index::Entry) -> Result<()> {
-        // Remove initial slash so that the apath is relative to the destination.
-        if !Apath::is_valid(&entry.apath) {
-            return Err(format!("invalid apath {:?}", &entry.apath).into());
-        }
-        let dest_path = self.destination.join(&entry.apath[1..]);
-        info!("Restore {:?} to {:?}", &entry.apath, &dest_path);
-        match entry.kind {
-            index::IndexKind::Dir => self.restore_dir(entry, &dest_path),
-            index::IndexKind::File => self.restore_file(block_dir, entry, &dest_path),
-            index::IndexKind::Symlink => self.restore_symlink(entry, &dest_path),
-        }
-        // TODO: Restore permissions.
-        // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
-    }
 
-    fn restore_dir(&mut self, _entry: &index::Entry, dest: &Path) -> Result<()> {
-        self.report.increment("dir", 1);
-        match fs::create_dir(dest) {
-            Ok(_) => Ok(()),
-            Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-            Err(e) => Err(e.into()),
+fn restore_one(
+    block_dir: &BlockDir,
+    entry: &index::Entry,
+    destination: &Path,
+    report: &Report,
+    _options: &RestoreOptions,
+) -> Result<()> {
+    // Remove initial slash so that the apath is relative to the destination.
+    if !Apath::is_valid(&entry.apath) {
+        return Err(format!("invalid apath {:?}", &entry.apath).into());
+    }
+    let dest_path = destination.join(&entry.apath[1..]);
+    info!("Restore {:?} to {:?}", &entry.apath, &dest_path);
+    match entry.kind {
+        index::IndexKind::Dir => restore_dir(entry, &dest_path, &report),
+        index::IndexKind::File => {
+            restore_file(block_dir, entry, &dest_path, &report)
+        }
+        index::IndexKind::Symlink => {
+            restore_symlink(entry, &dest_path, &report)
         }
     }
+    // TODO: Restore permissions.
+    // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
+}
 
-    fn restore_file(&mut self,
-                    block_dir: &BlockDir,
-                    entry: &index::Entry,
-                    dest: &Path)
-                    -> Result<()> {
-        self.report.increment("file", 1);
-        // Here too we write a temporary file and then move it into place: so the file
-        // under its real name only appears
-        let mut af = try!(AtomicFile::new(dest));
-        for addr in &entry.addrs {
-            let block_vec = try!(block_dir.get(&addr, &self.report));
-            try!(io::copy(&mut block_vec.as_slice(), &mut af));
-        }
-        af.close(&self.report)
+fn restore_dir(
+    _entry: &index::Entry,
+    dest: &Path,
+    report: &Report,
+) -> Result<()> {
+    report.increment("dir", 1);
+    match fs::create_dir(dest) {
+        Ok(_) => Ok(()),
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+        Err(e) => Err(e.into()),
     }
+}
 
-    #[cfg(unix)]
-    fn restore_symlink(&mut self, entry: &index::Entry, dest: &Path) -> Result<()> {
-        use std::os::unix::fs as unix_fs;
-        self.report.increment("symlink", 1);
-        if let Some(ref target) = entry.target {
-            unix_fs::symlink(target, dest).unwrap();
-        } else {
-            warn!("No target in symlink entry {}", entry.apath);
-        }
-        Ok(())
+fn restore_file(
+    block_dir: &BlockDir,
+    entry: &index::Entry,
+    dest: &Path,
+    report: &Report,
+) -> Result<()> {
+    report.increment("file", 1);
+    // Here too we write a temporary file and then move it into place: so the
+    // file under its real name only appears
+    let mut af = try!(AtomicFile::new(dest));
+    for addr in &entry.addrs {
+        let block_vec = try!(block_dir.get(&addr, &report));
+        try!(io::copy(&mut block_vec.as_slice(), &mut af));
     }
+    af.close(&report)
+}
 
-    #[cfg(not(unix))]
-    fn restore_symlink(&mut self, entry: &index::Entry, _dest: &Path) -> Result<()> {
-        // TODO: Add a test with a canned index containing a symlink, and expect
-        // it cannot be restored on Windows and can be on Unix.
-        warn!("Can't restore symlinks on Windows: {}", entry.apath);
-        self.report.increment("skipped.unsupported_file_kind", 1);
-        Ok(())
+#[cfg(unix)]
+fn restore_symlink(
+    entry: &index::Entry,
+    dest: &Path,
+    report: &Report,
+) -> Result<()> {
+    use std::os::unix::fs as unix_fs;
+    report.increment("symlink", 1);
+    if let Some(ref target) = entry.target {
+        unix_fs::symlink(target, dest).unwrap();
+    } else {
+        warn!("No target in symlink entry {}", entry.apath);
     }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn restore_symlink(
+    entry: &index::Entry,
+    _dest: &Path,
+    report: &Report,
+) -> Result<()> {
+    // TODO: Add a test with a canned index containing a symlink, and expect
+    // it cannot be restored on Windows and can be on Unix.
+    warn!("Can't restore symlinks on Windows: {}", entry.apath);
+    report.increment("skipped.unsupported_file_kind", 1);
+    Ok(())
 }
 
 
@@ -165,7 +193,9 @@ mod tests {
         let af = setup_archive();
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
-        Restore::new(&af, destdir.path(), &restore_report).run().unwrap();
+        RestoreOptions::default()
+            .restore(&af, destdir.path(), &restore_report)
+            .unwrap();
 
         assert_eq!(3, restore_report.borrow_counts().get_count("file"));
         let dest = &destdir.path();
@@ -188,9 +218,10 @@ mod tests {
         let af = setup_archive();
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
-        Restore::new(&af, destdir.path(), &restore_report)
-            .band_id(Some(BandId::new(&[0])))
-            .run()
+        let options =
+            RestoreOptions::default().band_id(Some(BandId::new(&[0])));
+        options
+            .restore(&af, destdir.path(), &restore_report)
             .unwrap();
         // Does not have the 'hello2' file added in the second version.
         assert_eq!(2, restore_report.borrow_counts().get_count("file"));
@@ -202,9 +233,14 @@ mod tests {
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
         let restore_report = Report::new();
-        let restore_err = Restore::new(&af, destdir.path(), &restore_report).run().unwrap_err();
+        let options = RestoreOptions::default();
+        let restore_err = options
+            .restore(&af, destdir.path(), &restore_report)
+            .unwrap_err();
         let restore_err_str = restore_err.to_string();
-        assert_that(&restore_err_str).contains(&"Destination directory not empty");
+        assert_that(&restore_err_str).contains(
+            &"Destination directory not empty",
+        );
     }
 
     #[test]
@@ -213,9 +249,9 @@ mod tests {
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
         let restore_report = Report::new();
-        Restore::new(&af, destdir.path(), &restore_report)
-            .force_overwrite(true)
-            .run()
+        let options = RestoreOptions::default().force_overwrite(true);
+        options
+            .restore(&af, destdir.path(), &restore_report)
             .unwrap();
 
         assert_eq!(3, restore_report.borrow_counts().get_count("file"));

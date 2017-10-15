@@ -62,7 +62,8 @@ fn check_restore(af: &ScratchArchive) {
     // TODO: Read back contents of that file.
     let restore_dir = TreeFixture::new();
     let restore_report = Report::new();
-    Restore::new(&af, restore_dir.path(), &restore_report).run().unwrap();
+    let options = RestoreOptions::default();
+    options.restore(&af, restore_dir.path(), &restore_report).unwrap();
     let restore_counts = restore_report.borrow_counts();
     let block_sizes = restore_counts.get_size("block");
     assert!(block_sizes.uncompressed == 8 && block_sizes.compressed == 10,

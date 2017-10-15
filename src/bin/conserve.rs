@@ -258,10 +258,10 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let band_id = band_id_from_match(subm)?;
     let band = archive.open_band_or_last(&band_id, report)?;
     complain_if_incomplete(&band, subm.is_present("incomplete"))?;
-    conserve::Restore::new(&archive, destination_path, report)
+    let options = conserve::RestoreOptions::default()
         .force_overwrite(force_overwrite)
-        .band_id(band_id)
-        .run()
+        .band_id(band_id);
+    options.restore(&archive, destination_path, report)
 }
 
 
