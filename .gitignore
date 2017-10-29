@@ -3,3 +3,5 @@ target
 *.bk
 .*.sw[po]
 Cargo.lock
+.idea/
+conserve.iml
