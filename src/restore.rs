@@ -180,10 +180,10 @@ mod tests {
         }
 
         let backup_report = Report::new();
-        BackupOptions::default().backup(af.path(), srcdir.path(), &backup_report).unwrap();
+        BackupOptions::default().backup(af.path(), srcdir.path(), &backup_report, None).unwrap();
 
         srcdir.create_file("hello2");
-        BackupOptions::default().backup(af.path(), srcdir.path(), &Report::new()).unwrap();
+        BackupOptions::default().backup(af.path(), srcdir.path(), &Report::new(), None).unwrap();
 
         af
     }

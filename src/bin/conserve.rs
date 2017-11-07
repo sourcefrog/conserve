@@ -3,8 +3,8 @@
 
 //! Command-line entry point for Conserve backups.
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(feature = "clippy", feature(plugin))]
+#![cfg_attr(feature = "clippy", plugin(clippy))]
 
 #![recursion_limit = "1024"]  // Needed by error-chain
 
@@ -45,6 +45,7 @@ fn main() {
         Some(ui) => ui::by_name(ui).expect("Couldn't make UI"),
         None => ui::best_ui(),
     };
+
     let log_level = match matches.occurrences_of("v") + subm.occurrences_of("v") {
         0 => log::LogLevelFilter::Warn,
         1 => log::LogLevelFilter::Info,
@@ -117,7 +118,9 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .arg(archive_arg())
             .arg(Arg::with_name("source")
                 .help("Backup from this directory")
-                .required(true)))
+                .required(true))
+            .arg(Arg::with_name("exclude")
+                .help("Exclude Files that matches the provided pattern [glob1,glob2,..]")))
         .subcommand(SubCommand::with_name("restore")
             .display_order(3)
             .about("Copy a backup tree out of an archive")
@@ -180,10 +183,16 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let excludes: Option<Vec<&str>> = match subm.value_of("exclude") {
+        Some(exclude) => Some(exclude.split(',').collect()),
+        None => None
+    };
+
     BackupOptions::default()
         .backup(Path::new(subm.value_of("archive").unwrap()),
                 Path::new(subm.value_of("source").unwrap()),
-                report)
+                report,
+                excludes)
 }
 
 
@@ -211,14 +220,14 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
             Err(e) => {
                 warn!("Failed to open band {:?}: {:?}", band_id, e);
                 continue;
-            },
+            }
         };
         let info = match band.get_info(report) {
             Ok(info) => info,
             Err(e) => {
                 warn!("Failed to read band tail {:?}: {:?}", band_id, e);
                 continue;
-            },
+            }
         };
         let is_complete_str = if info.is_closed {
             "complete"
@@ -229,9 +238,9 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
             .to_rfc3339();
         let duration_str = info.end_time.map_or_else(
             String::new,
-            |t| format!("{}s", (t-info.start_time).num_seconds()));
+            |t| format!("{}s", (t - info.start_time).num_seconds()));
         println!("{:<26} {:<10} {} {:>7}",
-            band_id, is_complete_str, start_time_str, duration_str);
+                 band_id, is_complete_str, start_time_str, duration_str);
     }
     Ok(())
 }
@@ -264,7 +273,6 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
         .band_id(band_id);
     options.restore(&archive, destination_path, report)
 }
-
 
 fn band_id_from_match(subm: &ArgMatches) -> Result<Option<BandId>> {
     match subm.value_of("backup") {
