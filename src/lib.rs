@@ -26,6 +26,8 @@ extern crate term;
 #[cfg(test)]
 extern crate spectral;
 
+extern crate globset;
+
 
 // Conserve implementation modules.
 mod apath;

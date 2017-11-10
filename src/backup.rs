@@ -11,9 +11,7 @@ use super::*;
 use index;
 use sources;
 
-extern crate globset;
-
-use self::globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 
 
 #[derive(Debug, Default)]
