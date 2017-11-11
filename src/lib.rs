@@ -4,8 +4,8 @@
 //!
 //! For user documentation and an overview see http://conserve.fyi/.
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(feature = "clippy", feature(plugin))]
+#![cfg_attr(feature = "clippy", plugin(clippy))]
 
 #![recursion_limit = "1024"]  // Needed by error-chain
 
@@ -36,6 +36,7 @@ mod backup;
 mod band;
 mod bandid;
 mod block;
+mod excludes;
 pub mod compress;
 pub mod errors;
 pub mod index;
@@ -56,6 +57,7 @@ pub use block::BlockDir;
 pub use compress::Compression;
 pub use compress::snappy::Snappy;
 pub use errors::*;
+pub use excludes::Excludes;
 pub use io::{AtomicFile, ensure_dir_exists};
 pub use index::{IndexBuilder, Entry, IndexKind};
 pub use report::{Report, Sizes};

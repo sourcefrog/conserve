@@ -11,11 +11,13 @@ use super::*;
 use index;
 use sources;
 
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::GlobSet;
 
 
 #[derive(Debug, Default)]
-pub struct BackupOptions {}
+pub struct BackupOptions {
+    excludes: Option<GlobSet>
+}
 
 
 #[derive(Debug)]
@@ -27,10 +29,15 @@ struct Backup {
 
 
 impl BackupOptions {
-    pub fn backup(&self, archive_path: &Path, source: &Path, report: &Report, excludes: Option<Vec<&str>>) -> Result<()> {
+    pub fn with_excludes(excludes: Option<Vec<&str>>) -> Result<Self> {
+        let mut backup_options = BackupOptions::default();
+        backup_options.excludes = Excludes::default().parse_excludes(excludes)?;
+        Ok(backup_options)
+    }
+
+    pub fn backup(&self, archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
         let archive = try!(Archive::open(archive_path, &report));
         let band = try!(archive.create_band(&report));
-        let excludes = BackupOptions::get_excludes(excludes)?;
 
         let mut backup = Backup {
             block_dir: band.block_dir(),
@@ -41,15 +48,9 @@ impl BackupOptions {
         let source_iter = try!(sources::iter(source, report));
         for entry in source_iter {
             let entry = entry?.clone();
-            let path = entry
-                .apath
-                .to_string()
-                .clone()
-                .chars()
-                .skip(1)
-                .collect::<String>();  // remove leading '/‘ from path
+            let path = entry.apath.to_string();
 
-            if excludes.is_some() && excludes.clone().unwrap().matches(&path).len() > 0 {
+            if self.excludes.is_some() && self.excludes.clone().unwrap().matches(&path).len() > 0 {
                 info!("Skipping {}", path);
                 continue;
             }
@@ -58,20 +59,6 @@ impl BackupOptions {
         try!(backup.index_builder.finish_hunk(report));
         try!(band.close(&backup.report));
         Ok(())
-    }
-
-
-    fn get_excludes(excludes: Option<Vec<&str>>) -> Result<Option<GlobSet>> {
-        match excludes {
-            Some(excludes) => {
-                let mut builder = GlobSetBuilder::new();
-                for exclude in excludes {
-                    builder.add(Glob::new(exclude).chain_err(|| "Failed to parse exclude value")?);
-                }
-                Ok(Some(builder.build().chain_err(|| "Failed to build exclude patterns")?))
-            }
-            None => Ok(None)
-        }
     }
 }
 
@@ -155,7 +142,7 @@ mod tests {
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
         let report = Report::new();
-        BackupOptions::default().backup(af.path(), srcdir.path(), &report, None).unwrap();
+        BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
         assert_eq!(0, report.borrow_counts().get_count("block"));
         assert_eq!(0, report.borrow_counts().get_count("file"));
         assert_eq!(1, report.borrow_counts().get_count("symlink"));
@@ -195,7 +182,7 @@ mod tests {
         srcdir.create_file("test/baz");
 
         let report = Report::new();
-        BackupOptions::default().backup(af.path(), srcdir.path(), &report, Some(vec!["f*", "baz"])).unwrap();
+        BackupOptions::with_excludes(Some(vec!["/f*", "/baz"])).unwrap().backup(af.path(), srcdir.path(), &report).unwrap();
         assert_eq!(1, report.borrow_counts().get_count("block"));
         assert_eq!(2, report.borrow_counts().get_count("file"));
         assert_eq!(0, report.borrow_counts().get_count("symlink"));

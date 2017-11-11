@@ -15,7 +15,7 @@ pub fn simple_backup() {
     srcdir.create_file("hello");
     // TODO: Include a symlink only on Unix.
     let report = Report::new();
-    BackupOptions::default().backup(af.path(), srcdir.path(), &report, None).unwrap();
+    BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
     {
         let cs = report.borrow_counts();
         assert_eq!(1, cs.get_count("block"));

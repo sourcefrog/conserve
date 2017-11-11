@@ -188,16 +188,20 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let excludes: Option<Vec<&str>> = match subm.value_of("exclude") {
-        Some(exclude) => Some(exclude.split(',').collect()),
-        None => None
-    };
-
-    BackupOptions::default()
-        .backup(Path::new(subm.value_of("archive").unwrap()),
-                Path::new(subm.value_of("source").unwrap()),
-                report,
-                excludes)
+    match subm.value_of("exclude") {
+        Some(exclude) => {
+            BackupOptions::with_excludes(Some(exclude.split(',').collect()))?
+                .backup(Path::new(subm.value_of("archive").unwrap()),
+                        Path::new(subm.value_of("source").unwrap()),
+                        report)
+        }
+        None => {
+            BackupOptions::default()
+                .backup(Path::new(subm.value_of("archive").unwrap()),
+                        Path::new(subm.value_of("source").unwrap()),
+                        report)
+        }
+    }
 }
 
 
