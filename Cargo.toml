@@ -1,6 +1,6 @@
 [package]
 name = "conserve"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Martin Pool <mbp@sourcefrog.net>"]
 homepage = "http://conserve.fyi/"
 repository = "https://github.com/sourcefrog/conserve/"
