@@ -13,6 +13,7 @@ use std::time;
 
 use super::*;
 
+use globset::GlobSet;
 
 /// An entry found in the source directory.
 #[derive(Clone)]
@@ -62,6 +63,9 @@ pub struct Iter {
 
     /// Copy of the last-emitted apath, for the purposes of checking they're in apath order.
     last_apath: Option<Apath>,
+
+    /// glob pattern to skip in iterator
+    excludes: Option<GlobSet>
 }
 
 // TODO: Implement Debug on Iter.
@@ -92,8 +96,21 @@ impl Iter {
         let mut children = Vec::<(OsString, bool)>::new();
         for entry in readdir {
             let entry = try!(entry);
+            let entry_name = entry.file_name();
             let ft = try!(entry.file_type());
-            children.push((entry.file_name(), ft.is_dir()));
+
+            if self.excludes.is_some() &&
+                self.excludes.clone().unwrap().matches(&entry_name).len() > 0 {
+                info!("Skipping {:?}", &entry_name);
+                if ft.is_dir() {
+                    self.report.increment("skipped.excluded.directories", 1);
+                } else {
+                    self.report.increment("skipped.excluded.files", 1);
+                }
+                continue;
+            }
+
+            children.push((entry_name, ft.is_dir()));
         }
         children.sort();
         let mut directory_insert_point = 0;
@@ -168,7 +185,7 @@ impl Iterator for Iter {
 /// name.
 ///
 /// The `Iter` has its own `Report` of how many directories and files were visited.
-pub fn iter(source_dir: &Path, report: &Report) -> io::Result<Iter> {
+pub fn iter(source_dir: &Path, report: &Report, excludes: &Option<GlobSet>) -> io::Result<Iter> {
     let root_metadata = match fs::symlink_metadata(&source_dir) {
         Ok(metadata) => metadata,
         Err(e) => {
@@ -193,6 +210,7 @@ pub fn iter(source_dir: &Path, report: &Report) -> io::Result<Iter> {
         dir_deque: dir_deque,
         report: report.clone(),
         last_apath: None,
+        excludes: excludes.clone()
     })
 }
 
@@ -214,7 +232,7 @@ mod tests {
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
         let report = Report::new();
-        let mut source_iter = iter(tf.path(), &report).unwrap();
+        let mut source_iter = iter(tf.path(), &report, &None).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -243,6 +261,47 @@ mod tests {
         assert_eq!(report.borrow_counts().get_count("source.selected"), 7);
     }
 
+
+    #[test]
+    fn exclude_entries_directory() {
+        let tf = TreeFixture::new();
+        tf.create_file("foo");
+        tf.create_file("bar");
+        tf.create_dir("baz");
+        tf.create_dir("fooBar");
+        tf.create_file("baz/bar");
+        tf.create_file("baz/bas");
+        tf.create_file("baz/test");
+        let report = Report::new();
+
+        let vec = vec!["fo*", "ba[pqr]", "*bas"];
+        let excludes = Excludes::default()
+            .parse_excludes(Some(vec))
+            .unwrap();
+
+        let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
+        let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
+
+        // First one is the root
+        assert_eq!(&result[0].apath, "/");
+        assert_eq!(&result[0].path, &tf.root);
+        assert_eq!(&result[1].apath, "/baz");
+        assert_eq!(&result[1].path, &tf.root.join("baz"));
+        assert_eq!(&result[2].apath, "/baz/test");
+        assert_eq!(&result[2].path, &tf.root.join("baz").join("test"));
+        assert_eq!(result.len(), 3);
+
+        assert_eq!(format!("{:?}", &result[2]),
+                   format!("sources::Entry {{ apath: Apath({:?}), path: {:?} }}",
+                           "/baz/test",
+                           &tf.root.join("baz").join("test")));
+
+        assert_eq!(2, report.borrow_counts().get_count("source.visited.directories"));
+        assert_eq!(3, report.borrow_counts().get_count("source.selected"));
+        assert_eq!(4, report.borrow_counts().get_count("skipped.excluded.files"));
+        assert_eq!(1, report.borrow_counts().get_count("skipped.excluded.directories"));
+    }
+
     #[cfg(unix)]
     #[test]
     fn symlinks() {
@@ -250,7 +309,7 @@ mod tests {
         tf.create_symlink("from", "to");
         let report = Report::new();
 
-        let result = iter(tf.path(), &report)
+        let result = iter(tf.path(), &report, &None)
             .unwrap()
             .collect::<io::Result<Vec<_>>>()
             .unwrap();

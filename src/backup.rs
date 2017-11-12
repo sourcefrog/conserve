@@ -45,16 +45,10 @@ impl BackupOptions {
             report: report.clone(),
         };
 
-        let source_iter = try!(sources::iter(source, report));
-        for entry in source_iter {
-            let entry = entry?.clone();
-            let path = entry.apath.to_string();
+        let source_iter = sources::iter(source, report, &self.excludes)?;
 
-            if self.excludes.is_some() && self.excludes.clone().unwrap().matches(&path).len() > 0 {
-                info!("Skipping {}", path);
-                continue;
-            }
-            try!(backup.store_one_source_entry(&entry));
+        for entry in source_iter {
+            try!(backup.store_one_source_entry(&entry?.clone()));
         }
         try!(backup.index_builder.finish_hunk(report));
         try!(band.close(&backup.report));
@@ -174,18 +168,26 @@ mod tests {
         let srcdir = TreeFixture::new();
 
         srcdir.create_dir("test");
-
+        srcdir.create_dir("foooooo");
         srcdir.create_file("foo");
-        srcdir.create_file("bar");
         srcdir.create_file("fooBar");
-        srcdir.create_file("baz");
+        srcdir.create_file("foooooo/test");
         srcdir.create_file("test/baz");
+        srcdir.create_file("baz");
+        srcdir.create_file("bar");
 
         let report = Report::new();
-        BackupOptions::with_excludes(Some(vec!["/f*", "/baz"])).unwrap().backup(af.path(), srcdir.path(), &report).unwrap();
+        BackupOptions::with_excludes(Some(vec!["f*", "baz"]))
+            .unwrap()
+            .backup(af.path(), srcdir.path(), &report)
+            .unwrap();
+
         assert_eq!(1, report.borrow_counts().get_count("block"));
-        assert_eq!(2, report.borrow_counts().get_count("file"));
+        assert_eq!(1, report.borrow_counts().get_count("file"));
+        assert_eq!(2, report.borrow_counts().get_count("dir"));
         assert_eq!(0, report.borrow_counts().get_count("symlink"));
         assert_eq!(0, report.borrow_counts().get_count("skipped.unsupported_file_kind"));
+        assert_eq!(4, report.borrow_counts().get_count("skipped.excluded.files"));
+        assert_eq!(1, report.borrow_counts().get_count("skipped.excluded.directories"));
     }
 }

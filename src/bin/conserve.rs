@@ -207,7 +207,7 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source_path = Path::new(subm.value_of("source").unwrap());
-    let mut source_iter = try!(conserve::sources::iter(source_path, report));
+    let mut source_iter = try!(conserve::sources::iter(source_path, report, &None));
     for entry in &mut source_iter {
         println!("{}", try!(entry).apath);
     }
