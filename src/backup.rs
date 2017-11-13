@@ -48,7 +48,7 @@ impl BackupOptions {
         let source_iter = sources::iter(source, report, &self.excludes)?;
 
         for entry in source_iter {
-            try!(backup.store_one_source_entry(&entry?.clone()));
+            try!(backup.store_one_source_entry(&entry?));
         }
         try!(backup.index_builder.finish_hunk(report));
         try!(band.close(&backup.report));
