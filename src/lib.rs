@@ -57,7 +57,6 @@ pub use block::BlockDir;
 pub use compress::Compression;
 pub use compress::snappy::Snappy;
 pub use errors::*;
-pub use excludes::Excludes;
 pub use io::{AtomicFile, ensure_dir_exists};
 pub use index::{IndexBuilder, Entry, IndexKind};
 pub use report::{Report, Sizes};

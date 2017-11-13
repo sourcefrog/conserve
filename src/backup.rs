@@ -31,7 +31,7 @@ struct Backup {
 impl BackupOptions {
     pub fn with_excludes(excludes: Option<Vec<&str>>) -> Result<Self> {
         let mut backup_options = BackupOptions::default();
-        backup_options.excludes = Excludes::default().parse_excludes(excludes)?;
+        backup_options.excludes = excludes::parse_excludes(excludes)?;
         Ok(backup_options)
     }
 

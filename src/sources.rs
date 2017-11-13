@@ -275,9 +275,7 @@ mod tests {
         let report = Report::new();
 
         let vec = vec!["fo*", "ba[pqr]", "*bas"];
-        let excludes = Excludes::default()
-            .parse_excludes(Some(vec))
-            .unwrap();
+        let excludes = excludes::parse_excludes(Some(vec)).unwrap();
 
         let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
