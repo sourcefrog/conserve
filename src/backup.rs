@@ -29,10 +29,10 @@ struct Backup {
 
 
 impl BackupOptions {
-    pub fn with_excludes(excludes: Option<Vec<&str>>) -> Result<Self> {
-        let mut backup_options = BackupOptions::default();
-        backup_options.excludes = excludes::parse_excludes(excludes)?;
-        Ok(backup_options)
+    pub fn with_excludes(&self, excludes: Option<Vec<&str>>) -> Result<Self> {
+        Ok(BackupOptions {
+            excludes: excludes::parse_excludes(excludes)?
+        })
     }
 
     pub fn backup(&self, archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
@@ -177,7 +177,7 @@ mod tests {
         srcdir.create_file("bar");
 
         let report = Report::new();
-        BackupOptions::with_excludes(Some(vec!["f*", "baz"]))
+        BackupOptions::default().with_excludes(Some(vec!["f*", "baz"]))
             .unwrap()
             .backup(af.path(), srcdir.path(), &report)
             .unwrap();

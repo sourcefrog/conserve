@@ -190,7 +190,7 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     match subm.value_of("exclude") {
         Some(exclude) => {
-            BackupOptions::with_excludes(Some(exclude.split(',').collect()))?
+            BackupOptions::default().with_excludes(Some(exclude.split(',').collect()))?
                 .backup(Path::new(subm.value_of("archive").unwrap()),
                         Path::new(subm.value_of("source").unwrap()),
                         report)
