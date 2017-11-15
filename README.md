@@ -47,7 +47,7 @@ source tree), the backup is considered *complete*.
 
     conserve backup /backup/home.cons ~
 
-Provide as option `--exclude` a list of [glob patterns](https://en.wikipedia.org/wiki/Glob_(programming) to exclude files or folders from backup.
+Provide as option `--exclude` a list of [glob patterns](http://man7.org/linux/man-pages/man7/glob.7.html) to exclude files or folders from backup.
 
 `conserve versions` lists the versions in an archive,
 whether or not the backup is *complete*,
