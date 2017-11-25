@@ -100,7 +100,7 @@ impl Iter {
             let ft = try!(entry.file_type());
 
             if self.excludes.is_some() &&
-                self.excludes.clone().unwrap().matches(&entry_name).len() > 0 {
+                self.excludes.clone().unwrap().is_match(&entry_name) {
                 info!("Skipping {:?}", &entry_name);
                 if ft.is_dir() {
                     self.report.increment("skipped.excluded.directories", 1);
