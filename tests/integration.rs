@@ -16,6 +16,29 @@ pub fn simple_backup() {
     // TODO: Include a symlink only on Unix.
     let report = Report::new();
     BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
+    check_backup(&af, &report);
+    check_restore(&af);
+}
+
+
+#[test]
+pub fn simple_backup_with_excludes() {
+    let af = ScratchArchive::new();
+    let srcdir = TreeFixture::new();
+    srcdir.create_file("hello");
+    srcdir.create_file("foo");
+    srcdir.create_file("bar");
+    srcdir.create_file("baz");
+    // TODO: Include a symlink only on Unix.
+    let report = Report::new();
+    BackupOptions::default()
+        .with_excludes(vec!["baz", "bar", "f*"]).unwrap()
+        .backup(af.path(), srcdir.path(), &report).unwrap();
+    check_backup(&af, &report);
+    check_restore(&af);
+}
+
+fn check_backup(af: &ScratchArchive, report: &Report) {
     {
         let cs = report.borrow_counts();
         assert_eq!(1, cs.get_count("block"));
@@ -53,10 +76,7 @@ pub fn simple_backup() {
     let hash = file_entry.blake2b.as_ref().unwrap();
     assert_eq!("9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
                hash);
-
-    check_restore(&af);
 }
-
 
 fn check_restore(af: &ScratchArchive) {
     // TODO: Read back contents of that file.
