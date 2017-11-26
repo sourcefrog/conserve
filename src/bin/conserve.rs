@@ -106,12 +106,6 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .multiple(true)
             .global(true)
             .help("Be more verbose (log all file names)"))
-        .arg(Arg::with_name("exclude")
-            .long("exclude")
-            .short("e")
-            .global(true)
-            .takes_value(true)
-            .help("Exclude Files that matches the provided pattern [glob1,glob2,..]"))
         .subcommand(SubCommand::with_name("init")
             .display_order(1)
             .about("Create a new archive")
@@ -125,7 +119,13 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .arg(archive_arg())
             .arg(Arg::with_name("source")
                 .help("Backup from this directory")
-                .required(true)))
+                .required(true))
+            .arg(Arg::with_name("exclude")
+                .long("exclude")
+                .short("e")
+                .takes_value(true)
+                .multiple(true)
+                .help("Exclude files that matches the provided GLOB pattern")))
         .subcommand(SubCommand::with_name("restore")
             .display_order(3)
             .about("Copy a backup tree out of an archive")
@@ -188,10 +188,10 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let backup_options = match subm.value_of("exclude") {
-        Some(exclude) => {
+    let backup_options = match subm.values_of("exclude") {
+        Some(excludes) => {
             BackupOptions::default()
-                .with_excludes(Some(exclude.split(',').collect()))?
+                .with_excludes(Some(excludes.collect()))?
         }
         None => BackupOptions::default()
     };
