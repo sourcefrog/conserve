@@ -58,7 +58,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     let band = af.open_band(&band_ids[0], &report).unwrap();
     assert!(band.is_closed().unwrap());
 
-    let index_entries = band.index_iter(&report)
+    let index_entries = band.index_iter(&report, &excludes::produce_no_excludes())
         .unwrap()
         .filter_map(|i| i.ok())
         .collect::<Vec<index::Entry>>();

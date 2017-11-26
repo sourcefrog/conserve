@@ -99,7 +99,7 @@ impl Iter {
             let entry_name = entry.file_name();
             let ft = try!(entry.file_type());
 
-            if self.excludes.is_match(&entry_name) {
+            if self.excludes.is_match(&entry_name) { //FIXME @SailReal use path instead of filename
                 info!("Skipping {:?}", &entry_name);
                 if ft.is_dir() {
                     self.report.increment("skipped.excluded.directories", 1);

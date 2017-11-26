@@ -81,6 +81,15 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .value_name("VERSION")
     };
 
+    fn exclude_arg<'a, 'b>() -> Arg<'a, 'b> {
+        Arg::with_name("exclude")
+            .long("exclude")
+            .short("e")
+            .takes_value(true)
+            .multiple(true)
+            .help("Exclude files that matches the provided GLOB pattern")
+    };
+
     fn incomplete_arg<'a, 'b>() -> Arg<'a, 'b> {
         Arg::with_name("incomplete")
             .help("Read from incomplete (truncated) version")
@@ -119,12 +128,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .arg(Arg::with_name("source")
                 .help("Backup from this directory")
                 .required(true))
-            .arg(Arg::with_name("exclude")
-                .long("exclude")
-                .short("e")
-                .takes_value(true)
-                .multiple(true)
-                .help("Exclude files that matches the provided GLOB pattern")))
+            .arg(exclude_arg()))
         .subcommand(SubCommand::with_name("restore")
             .display_order(3)
             .about("Copy a backup tree out of an archive")
@@ -141,7 +145,8 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .required(true))
             .arg(Arg::with_name("force-overwrite")
                 .long("force-overwrite")
-                .help("Overwrite existing destination directory")))
+                .help("Overwrite existing destination directory"))
+            .arg(exclude_arg()))
         .subcommand(SubCommand::with_name("versions")
             .display_order(4)
             .about("List backup versions in an archive")
@@ -159,12 +164,14 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .about("List files in a backup version")
             .arg(archive_arg())
             .arg(backup_arg())
+            .arg(exclude_arg())
             .arg(incomplete_arg()))
         .subcommand(SubCommand::with_name("list-source")
             .about("Recursive list files from source directory")
             .arg(Arg::with_name("source")
                 .help("Source directory")
-                .required(true)))
+                .required(true))
+            .arg(exclude_arg()))
 }
 
 
@@ -203,10 +210,16 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source_path = Path::new(subm.value_of("source").unwrap());
+    let excludes = match subm.values_of("exclude") {
+        Some(excludes) => {
+            excludes::produce_excludes(excludes.collect())?
+        }
+        None => excludes::produce_no_excludes()
+    };
     let mut source_iter = conserve::sources::iter(
         source_path,
         report,
-        &excludes::produce_no_excludes())?;
+        &excludes)?;
     for entry in &mut source_iter {
         println!("{}", try!(entry).apath);
     }
@@ -260,7 +273,13 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let band_id = try!(band_id_from_match(subm));
     let band = try!(archive.open_band_or_last(&band_id, report));
     complain_if_incomplete(&band, subm.is_present("incomplete"))?;
-    for i in try!(band.index_iter(report)) {
+    let excludes = match subm.values_of("exclude") {
+        Some(excludes) => {
+            excludes::produce_excludes(excludes.collect())?
+        }
+        None => excludes::produce_no_excludes()
+    };
+    for i in try!(band.index_iter(report, &excludes)) {
         let entry = try!(i);
         println!("{}", entry.apath);
     }
@@ -276,9 +295,12 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let band_id = band_id_from_match(subm)?;
     let band = archive.open_band_or_last(&band_id, report)?;
     complain_if_incomplete(&band, subm.is_present("incomplete"))?;
-    let options = conserve::RestoreOptions::default()
+    let mut options = conserve::RestoreOptions::default()
         .force_overwrite(force_overwrite)
         .band_id(band_id);
+    if let Some(excludes) = subm.values_of("exclude") {
+        options = options.with_excludes(excludes.collect())?;
+    };
     options.restore(&archive, destination_path, report)
 }
 

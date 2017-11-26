@@ -9,16 +9,34 @@ use std::path::Path;
 use super::*;
 use super::index;
 
+use globset::GlobSet;
 
 /// Options for Restore operation.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct RestoreOptions {
     force_overwrite: bool,
     band_id: Option<BandId>,
+    excludes: GlobSet,
 }
 
 
 impl RestoreOptions {
+    pub fn default() -> Self {
+        RestoreOptions {
+            force_overwrite: false,
+            band_id: None,
+            excludes: excludes::produce_no_excludes()
+        }
+    }
+
+    pub fn with_excludes(&self, exclude: Vec<&str>) -> Result<Self> {
+        Ok(RestoreOptions {
+            force_overwrite: self.force_overwrite,
+            band_id: self.band_id.clone(),
+            excludes: excludes::produce_excludes(exclude)?
+        })
+    }
+
     pub fn force_overwrite(self, f: bool) -> RestoreOptions {
         RestoreOptions {
             force_overwrite: f,
@@ -55,7 +73,7 @@ impl RestoreOptions {
                 }
             }
         }
-        for entry in try!(band.index_iter(&report)) {
+        for entry in try!(band.index_iter(&report, &self.excludes)) {
             let entry = try!(entry);
             // TODO: Continue even if one fails
             try!(restore_one(
@@ -258,5 +276,22 @@ mod tests {
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("existing").as_path()).is_a_file();
+    }
+
+    #[test]
+    pub fn exclude_files() {
+        let af = setup_archive();
+        let destdir = TreeFixture::new();
+        let restore_report = Report::new();
+        RestoreOptions::default()
+            .with_excludes(vec!["/**/subfile"]).unwrap()
+            .restore(&af, destdir.path(), &restore_report)
+            .unwrap();
+
+        assert_eq!(2, restore_report.borrow_counts().get_count("file"));
+        let dest = &destdir.path();
+        assert_that(&dest.join("hello").as_path()).is_a_file();
+        assert_that(&dest.join("hello2")).is_a_file();
+        assert_that(&dest.join("subdir").as_path()).is_a_directory();
     }
 }

@@ -16,6 +16,7 @@ use rustc_serialize::json;
 use super::*;
 use super::block;
 
+use globset::GlobSet;
 
 const MAX_ENTRIES_PER_HUNK: usize = 1000;
 
@@ -120,7 +121,7 @@ impl IndexBuilder {
 
         let mut af = try!(AtomicFile::new(hunk_path));
         let compressed_len = report.measure_duration("index.compress",
-            || Snappy::compress_and_write(json_string.as_bytes(), &mut af))?;
+                                                     || Snappy::compress_and_write(json_string.as_bytes(), &mut af))?;
 
         // TODO: Don't seek, just count bytes as they're compressed.
         // TODO: Measure time to compress separately from time to write.
@@ -163,6 +164,7 @@ pub struct Iter {
     buffered_entries: vec::IntoIter<Entry>,
     next_hunk_number: u32,
     pub report: Report,
+    excludes: GlobSet,
 }
 
 
@@ -181,12 +183,13 @@ impl fmt::Debug for Iter {
 /// Create an iterator that will read all entires from an existing index.
 ///
 /// Prefer to use `Band::index_iter` instead.
-pub fn read(index_dir: &Path, report: &Report) -> Result<Iter> {
+pub fn read(index_dir: &Path, report: &Report, excludes: &GlobSet) -> Result<Iter> {
     Ok(Iter {
         dir: index_dir.to_path_buf(),
         buffered_entries: Vec::<Entry>::new().into_iter(),
         next_hunk_number: 0,
         report: report.clone(),
+        excludes: excludes.clone(),
     })
 }
 
@@ -229,10 +232,10 @@ impl Iter {
         let (comp_len, index_bytes) = Snappy::decompress_read(&mut f)?;
         self.report.increment_duration("index.read", start_read.elapsed());
         self.report.increment_size("index",
-            Sizes {
-                uncompressed: index_bytes.len() as u64,
-                compressed: comp_len as u64,
-            });
+                                   Sizes {
+                                       uncompressed: index_bytes.len() as u64,
+                                       compressed: comp_len as u64,
+                                   });
         self.report.increment("index.hunk", 1);
 
         let start_parse = time::Instant::now();
@@ -245,7 +248,10 @@ impl Iter {
         }
         self.report.increment_duration("index.parse", start_parse.elapsed());
 
-        self.buffered_entries = entries.into_iter();
+        self.buffered_entries = entries.into_iter()
+            .filter(|entry| !self.excludes.is_match(&entry.apath))
+            .collect::<Vec<Entry>>().into_iter();
+
         self.next_hunk_number += 1;
         Ok(true)
     }
@@ -282,13 +288,13 @@ mod tests {
     #[test]
     fn serialize_index() {
         let entries = [Entry {
-                           apath: "/a/b".to_string(),
-                           mtime: Some(1461736377),
-                           kind: IndexKind::File,
-                           blake2b: Some(EXAMPLE_HASH.to_string()),
-                           addrs: vec![],
-                           target: None,
-                       }];
+            apath: "/a/b".to_string(),
+            mtime: Some(1461736377),
+            kind: IndexKind::File,
+            blake2b: Some(EXAMPLE_HASH.to_string()),
+            addrs: vec![],
+            target: None,
+        }];
         let index_json = json::encode(&entries).unwrap();
         println!("{}", index_json);
         assert_eq!(
@@ -367,9 +373,9 @@ mod tests {
         let mut f = fs::File::open(&expected_path).unwrap();
         let (_comp_len, retrieved_bytes) = Snappy::decompress_read(&mut f).unwrap();
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
-        assert_eq!(retrieved,  r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null}]"#);
+        assert_eq!(retrieved, r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null}]"#);
 
-        let mut it = super::read(&ib.dir, &report).unwrap();
+        let mut it = super::read(&ib.dir, &report, &excludes::produce_no_excludes()).unwrap();
         let entry = it.next().expect("Get first entry").expect("First entry isn't an error");
         assert_eq!(entry.apath, "/apple");
         let entry = it.next().expect("Get second entry").expect("Entry isn't an error");
@@ -391,7 +397,7 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk(&report).unwrap();
 
-        let it = super::read(&ib.dir, &report).unwrap();
+        let it = super::read(&ib.dir, &report, &excludes::produce_no_excludes()).unwrap();
         assert_eq!(format!("{:?}", &it),
                    format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));
 
@@ -417,5 +423,22 @@ mod tests {
         // Try to add an identically-named file within the next hunk and it should error,
         // because the IndexBuilder remembers the last file name written.
         add_an_entry(&mut ib, "hello");
+    }
+
+    #[test]
+    fn excluded_entries() {
+        let (_testdir, mut ib, report) = scratch_indexbuilder();
+        add_an_entry(&mut ib, "/bar");
+        add_an_entry(&mut ib, "/foo");
+        add_an_entry(&mut ib, "/foobar");
+        ib.finish_hunk(&report).unwrap();
+
+        let excludes = excludes::produce_excludes(vec!["/fo*"]).unwrap();
+        let it = super::read(&ib.dir, &report, &excludes).unwrap();
+        assert_eq!(format!("{:?}", &it),
+                   format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));
+
+        let names: Vec<String> = it.map(|x| x.unwrap().apath).collect();
+        assert_eq!(names, &["/bar"]);
     }
 }

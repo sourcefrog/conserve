@@ -19,6 +19,8 @@ use super::index;
 use super::jsonio;
 use super::io::file_exists;
 
+use globset::GlobSet;
+
 static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
 static HEAD_FILENAME: &'static str = "BANDHEAD";
@@ -137,8 +139,8 @@ impl Band {
     }
 
     /// Make an iterator that will return all entries in this band.
-    pub fn index_iter(&self, report: &Report) -> Result<index::Iter> {
-        index::read(&self.index_dir_path, report)
+    pub fn index_iter(&self, report: &Report, excludes: &GlobSet) -> Result<index::Iter> {
+        index::read(&self.index_dir_path, report, excludes)
     }
 
     fn read_head(&self, report: &Report) -> Result<Head> {
@@ -158,7 +160,7 @@ impl Band {
         } else {
             None
         };
-        Ok(Info{
+        Ok(Info {
             id: self.id.clone(),
             is_closed: is_closed,
             start_time: UTC.timestamp(head.start_time, 0),
