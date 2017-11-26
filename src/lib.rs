@@ -36,7 +36,7 @@ mod backup;
 mod band;
 mod bandid;
 mod block;
-mod excludes;
+pub mod excludes;
 pub mod compress;
 pub mod errors;
 pub mod index;

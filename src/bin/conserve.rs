@@ -25,7 +25,6 @@ extern crate conserve;
 use conserve::*;
 use conserve::ui;
 
-
 fn main() {
     let matches = make_clap().get_matches();
 
@@ -191,7 +190,7 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     let backup_options = match subm.values_of("exclude") {
         Some(excludes) => {
             BackupOptions::default()
-                .with_excludes(Some(excludes.collect()))?
+                .with_excludes(excludes.collect())?
         }
         None => BackupOptions::default()
     };
@@ -204,7 +203,10 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source_path = Path::new(subm.value_of("source").unwrap());
-    let mut source_iter = try!(conserve::sources::iter(source_path, report, &None));
+    let mut source_iter = conserve::sources::iter(
+        source_path,
+        report,
+        &excludes::produce_no_excludes())?;
     for entry in &mut source_iter {
         println!("{}", try!(entry).apath);
     }

@@ -65,7 +65,7 @@ pub struct Iter {
     last_apath: Option<Apath>,
 
     /// glob pattern to skip in iterator
-    excludes: Option<GlobSet>
+    excludes: GlobSet
 }
 
 // TODO: Implement Debug on Iter.
@@ -99,8 +99,7 @@ impl Iter {
             let entry_name = entry.file_name();
             let ft = try!(entry.file_type());
 
-            if self.excludes.is_some() &&
-                self.excludes.clone().unwrap().is_match(&entry_name) {
+            if self.excludes.is_match(&entry_name) {
                 info!("Skipping {:?}", &entry_name);
                 if ft.is_dir() {
                     self.report.increment("skipped.excluded.directories", 1);
@@ -185,7 +184,7 @@ impl Iterator for Iter {
 /// name.
 ///
 /// The `Iter` has its own `Report` of how many directories and files were visited.
-pub fn iter(source_dir: &Path, report: &Report, excludes: &Option<GlobSet>) -> io::Result<Iter> {
+pub fn iter(source_dir: &Path, report: &Report, excludes: &GlobSet) -> io::Result<Iter> {
     let root_metadata = match fs::symlink_metadata(&source_dir) {
         Ok(metadata) => metadata,
         Err(e) => {
@@ -232,7 +231,7 @@ mod tests {
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
         let report = Report::new();
-        let mut source_iter = iter(tf.path(), &report, &None).unwrap();
+        let mut source_iter = iter(tf.path(), &report, &excludes::produce_no_excludes()).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -275,7 +274,7 @@ mod tests {
         let report = Report::new();
 
         let vec = vec!["fo*", "ba[pqr]", "*bas"];
-        let excludes = excludes::parse_excludes(Some(vec)).unwrap();
+        let excludes = excludes::produce_excludes(vec).unwrap();
 
         let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
@@ -307,7 +306,7 @@ mod tests {
         tf.create_symlink("from", "to");
         let report = Report::new();
 
-        let result = iter(tf.path(), &report, &None)
+        let result = iter(tf.path(), &report, &excludes::produce_no_excludes())
             .unwrap()
             .collect::<io::Result<Vec<_>>>()
             .unwrap();

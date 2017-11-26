@@ -6,21 +6,25 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use super::*;
 
-pub fn parse_excludes(excludes: Option<Vec<&str>>) -> Result<Option<GlobSet>> {
-    match excludes {
-        Some(excludes) => {
-            let mut builder = GlobSetBuilder::new();
-            for exclude in excludes {
-                builder.add(Glob::new(exclude)
-                    .chain_err(|| format!("Failed to parse exclude value: {}", exclude))?);
-            }
-            Ok(Some(builder.build()
-                .chain_err(|| "Failed to build exclude patterns")?))
-        }
-        None => Ok(None)
-    }
+pub fn produce_excludes(excludes: Vec<&str>) -> Result<GlobSet> {
+    produce_globset(excludes)
 }
 
+pub fn produce_no_excludes() -> GlobSet {
+    produce_globset(vec!["![*]"]).unwrap()
+}
+
+fn produce_globset(excludes: Vec<&str>) -> Result<GlobSet> {
+    let mut builder = GlobSetBuilder::new();
+
+    for exclude in excludes {
+        builder.add(Glob::new(exclude)
+            .chain_err(|| format!("Failed to parse exclude value: {}", exclude))?);
+    }
+
+    Ok(builder.build()
+        .chain_err(|| "Failed to build exclude patterns")?)
+}
 
 #[cfg(test)]
 mod tests {
@@ -31,34 +35,34 @@ mod tests {
     #[test]
     pub fn simple_parse() {
         let vec = vec!["fo*", "foo", "bar*"];
-        let excludes = excludes::parse_excludes(Some(vec)).unwrap();
-        assert_that(&excludes.clone().unwrap().matches("foo").len()).is_equal_to(2);
-        assert_that(&excludes.clone().unwrap().matches("foobar").len()).is_equal_to(1);
-        assert_that(&excludes.clone().unwrap().matches("barBaz").len()).is_equal_to(1);
-        assert_that(&excludes.clone().unwrap().matches("bazBar").len()).is_equal_to(0);
+        let excludes = excludes::produce_excludes(vec).unwrap();
+        assert_that(&excludes.matches("foo").len()).is_equal_to(2);
+        assert_that(&excludes.matches("foobar").len()).is_equal_to(1);
+        assert_that(&excludes.matches("barBaz").len()).is_equal_to(1);
+        assert_that(&excludes.matches("bazBar").len()).is_equal_to(0);
     }
 
     #[test]
     pub fn path_parse() {
         let vec = vec!["fo*/bar/baz*"];
-        let excludes = excludes::parse_excludes(Some(vec)).unwrap();
-        assert_that(&excludes.clone().unwrap().matches("foo/bar/baz.rs").len()).is_equal_to(1);
+        let excludes = excludes::produce_excludes(vec).unwrap();
+        assert_that(&excludes.matches("foo/bar/baz.rs").len()).is_equal_to(1);
     }
 
     #[test]
     pub fn extendend_pattern_parse() {
         let vec = vec!["fo?", "ba[abc]", "[!a-z]"];
-        let excludes = excludes::parse_excludes(Some(vec)).unwrap();
-        assert_that(&excludes.clone().unwrap().matches("foo").len()).is_equal_to(1);
-        assert_that(&excludes.clone().unwrap().matches("fo").len()).is_equal_to(0);
-        assert_that(&excludes.clone().unwrap().matches("baa").len()).is_equal_to(1);
-        assert_that(&excludes.clone().unwrap().matches("1").len()).is_equal_to(1);
-        assert_that(&excludes.clone().unwrap().matches("a").len()).is_equal_to(0);
+        let excludes = excludes::produce_excludes(vec).unwrap();
+        assert_that(&excludes.matches("foo").len()).is_equal_to(1);
+        assert_that(&excludes.matches("fo").len()).is_equal_to(0);
+        assert_that(&excludes.matches("baa").len()).is_equal_to(1);
+        assert_that(&excludes.matches("1").len()).is_equal_to(1);
+        assert_that(&excludes.matches("a").len()).is_equal_to(0);
     }
 
     #[test]
     pub fn nothing_parse() {
-        let excludes = excludes::parse_excludes(None).unwrap();
-        assert_that(&excludes).is_none()
+        let excludes = excludes::produce_no_excludes();
+        assert_that(&excludes.matches("a").len()).is_equal_to(0)
     }
 }

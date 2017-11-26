@@ -13,10 +13,9 @@ use sources;
 
 use globset::GlobSet;
 
-
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct BackupOptions {
-    excludes: Option<GlobSet>
+    excludes: GlobSet
 }
 
 
@@ -29,9 +28,15 @@ struct Backup {
 
 
 impl BackupOptions {
-    pub fn with_excludes(&self, excludes: Option<Vec<&str>>) -> Result<Self> {
+    pub fn default() -> Self {
+        BackupOptions {
+            excludes: excludes::produce_no_excludes()
+        }
+    }
+
+    pub fn with_excludes(&self, exclude: Vec<&str>) -> Result<Self> {
         Ok(BackupOptions {
-            excludes: excludes::parse_excludes(excludes)?
+            excludes: excludes::produce_excludes(exclude)?
         })
     }
 
@@ -177,7 +182,7 @@ mod tests {
         srcdir.create_file("bar");
 
         let report = Report::new();
-        BackupOptions::default().with_excludes(Some(vec!["f*", "baz"]))
+        BackupOptions::default().with_excludes(vec!["f*", "baz"])
             .unwrap()
             .backup(af.path(), srcdir.path(), &report)
             .unwrap();
