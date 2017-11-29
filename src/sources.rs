@@ -105,7 +105,6 @@ impl Iter {
             path.push_str(&entry.file_name().to_string_lossy());
 
             if self.excludes.is_match(&path) {
-                info!("Skipping {:?}", &path);
                 if ft.is_dir() {
                     self.report.increment("skipped.excluded.directories", 1);
                 } else {
