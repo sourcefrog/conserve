@@ -26,13 +26,13 @@ pub fn simple_backup_with_excludes() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
-    srcdir.create_file("foo");
+    srcdir.create_file("foooo");
     srcdir.create_file("bar");
     srcdir.create_file("baz");
     // TODO: Include a symlink only on Unix.
     let report = Report::new();
     BackupOptions::default()
-        .with_excludes(vec!["baz", "bar", "f*"]).unwrap()
+        .with_excludes(vec!["/**/baz", "/**/bar", "/**/fooo*"]).unwrap()
         .backup(af.path(), srcdir.path(), &report).unwrap();
     check_backup(&af, &report);
     check_restore(&af);

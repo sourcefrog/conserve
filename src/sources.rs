@@ -96,20 +96,21 @@ impl Iter {
         let mut children = Vec::<(OsString, bool)>::new();
         for entry in readdir {
             let entry = try!(entry);
-            let entry_name = entry.file_name();
             let ft = try!(entry.file_type());
-
-            if self.excludes.is_match(&entry_name) { //FIXME @SailReal use path instead of filename
-                info!("Skipping {:?}", &entry_name);
-                if ft.is_dir() {
-                    self.report.increment("skipped.excluded.directories", 1);
-                } else {
-                    self.report.increment("skipped.excluded.files", 1);
+            if let Ok(entry_path) = entry.path().into_os_string().into_string() {
+                if self.excludes.is_match(&entry_path) {
+                    info!("Skipping {:?}", &entry_path);
+                    if ft.is_dir() {
+                        self.report.increment("skipped.excluded.directories", 1);
+                    } else {
+                        self.report.increment("skipped.excluded.files", 1);
+                    }
+                    continue;
                 }
-                continue;
+            } else {
+                warn!("Failed to parse entry path to exclude from backup: {:?}", entry);
             }
-
-            children.push((entry_name, ft.is_dir()));
+            children.push((entry.file_name(), ft.is_dir()));
         }
         children.sort();
         let mut directory_insert_point = 0;
@@ -264,20 +265,22 @@ mod tests {
     #[test]
     fn exclude_entries_directory() {
         let tf = TreeFixture::new();
-        tf.create_file("foo");
+        tf.create_file("foooo");
         tf.create_file("bar");
+        tf.create_dir("fooooBar");
         tf.create_dir("baz");
-        tf.create_dir("fooBar");
         tf.create_file("baz/bar");
         tf.create_file("baz/bas");
         tf.create_file("baz/test");
         let report = Report::new();
 
-        let vec = vec!["fo*", "ba[pqr]", "*bas"];
+        let vec = vec!["/**/fooo*", "/**/ba[pqr]", "/**/*bas"];
         let excludes = excludes::produce_excludes(vec).unwrap();
 
         let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
+
+        println!("Result is {:?}", result);
 
         // First one is the root
         assert_eq!(&result[0].apath, "/");

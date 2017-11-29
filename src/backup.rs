@@ -182,7 +182,7 @@ mod tests {
         srcdir.create_file("bar");
 
         let report = Report::new();
-        BackupOptions::default().with_excludes(vec!["f*", "baz"])
+        BackupOptions::default().with_excludes(vec!["/**/foo*", "/**/baz"])
             .unwrap()
             .backup(af.path(), srcdir.path(), &report)
             .unwrap();
