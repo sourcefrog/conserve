@@ -93,32 +93,31 @@ impl Iter {
     fn visit_next_directory(&mut self, dir_entry: Entry) -> io::Result<()> {
         let readdir = try!(fs::read_dir(&dir_entry.path));
         self.report.increment("source.visited.directories", 1);
-        let mut children = Vec::<(OsString, bool)>::new();
+        let mut children = Vec::<(OsString, bool, Apath)>::new();
         for entry in readdir {
             let entry = try!(entry);
             let ft = try!(entry.file_type());
-            if let Ok(entry_path) = entry.path().into_os_string().into_string() {
-                if self.excludes.is_match(&entry_path) {
-                    info!("Skipping {:?}", &entry_path);
-                    if ft.is_dir() {
-                        self.report.increment("skipped.excluded.directories", 1);
-                    } else {
-                        self.report.increment("skipped.excluded.files", 1);
-                    }
-                    continue;
-                }
-            } else {
-                warn!("Failed to parse entry path to exclude from backup: {:?}", entry);
+            let mut path = dir_entry.apath.to_string().clone();
+            if path != "/" {
+                path.push('/');
             }
-            children.push((entry.file_name(), ft.is_dir()));
+            // TODO: Don't be lossy, error if not convertible.
+            path.push_str(&entry.file_name().to_string_lossy());
+
+            if self.excludes.is_match(&path) {
+                info!("Skipping {:?}", &path);
+                if ft.is_dir() {
+                    self.report.increment("skipped.excluded.directories", 1);
+                } else {
+                    self.report.increment("skipped.excluded.files", 1);
+                }
+                continue;
+            }
+            children.push((entry.file_name(), ft.is_dir(), Apath::from_string(&path)));
         }
         children.sort();
         let mut directory_insert_point = 0;
-        for (child_name, is_dir) in children {
-            let mut new_apath = dir_entry.apath.to_string().clone();
-            if new_apath != "/" {
-                new_apath.push('/');
-            }
+        for (child_name, is_dir, apath) in children {
             let child_path = dir_entry.path.join(&child_name).to_path_buf();
             let metadata = match fs::symlink_metadata(&child_path) {
                 Ok(metadata) => metadata,
@@ -128,10 +127,8 @@ impl Iter {
                     continue;
                 }
             };
-            // TODO: Don't be lossy, error if not convertible.
-            new_apath.push_str(&child_name.to_string_lossy());
             let new_entry = Entry {
-                apath: Apath::from_string(&new_apath),
+                apath: apath,
                 path: child_path,
                 metadata: metadata,
             };
@@ -279,8 +276,6 @@ mod tests {
 
         let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
-
-        println!("Result is {:?}", result);
 
         // First one is the root
         assert_eq!(&result[0].apath, "/");
