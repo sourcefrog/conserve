@@ -249,7 +249,17 @@ impl Iter {
         self.report.increment_duration("index.parse", start_parse.elapsed());
 
         self.buffered_entries = entries.into_iter()
-            .filter(|entry| !self.excludes.is_match(&entry.apath))
+            .filter(|entry| {
+                if self.excludes.is_match(&entry.apath) {
+                    match entry.kind {
+                        IndexKind::Dir => self.report.increment("skipped.excluded.directories", 1),
+                        IndexKind::Symlink => self.report.increment("skipped.excluded.directories", 1),
+                        IndexKind::File => self.report.increment("skipped.excluded.files", 1)
+                    }
+                    return false;
+                }
+                return true;
+            })
             .collect::<Vec<Entry>>().into_iter();
 
         self.next_hunk_number += 1;
