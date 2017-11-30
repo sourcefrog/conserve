@@ -47,7 +47,7 @@ source tree), the backup is considered *complete*.
 
     conserve backup /backup/home.cons ~
 
-Use `--exclude GLOB` to exclude files or directories from the backup using[GLOB patterns](http://man7.org/linux/man-pages/man7/glob.7.html).
+Use `--exclude GLOB` to exclude files or directories from the backup using[GLOB patterns](http://man7.org/linux/man-pages/man7/glob.7.html). The `--exclude`-option is also available for `restore`, `ls` and the `list-source`.
 
 `conserve versions` lists the versions in an archive,
 whether or not the backup is *complete*,
@@ -69,6 +69,7 @@ you can specify a different version using `-b`.  (You can also omit leading zero
 from the backup version.)
 
     $ conserve ls -b b0 /backup/home.cons | less
+    
 
 `conserve restore` copies a version back out of an archive.
 
