@@ -228,7 +228,7 @@ mod tests {
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
         let report = Report::new();
-        let mut source_iter = iter(tf.path(), &report, &excludes::produce_no_excludes()).unwrap();
+        let mut source_iter = iter(tf.path(), &report, &excludes::excludes_nothing()).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -271,7 +271,7 @@ mod tests {
         let report = Report::new();
 
         let vec = vec!["/**/fooo*", "/**/ba[pqr]", "/**/*bas"];
-        let excludes = excludes::produce_excludes(vec).unwrap();
+        let excludes = excludes::from_strings(vec).unwrap();
 
         let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
@@ -303,7 +303,7 @@ mod tests {
         tf.create_symlink("from", "to");
         let report = Report::new();
 
-        let result = iter(tf.path(), &report, &excludes::produce_no_excludes())
+        let result = iter(tf.path(), &report, &excludes::excludes_nothing())
             .unwrap()
             .collect::<io::Result<Vec<_>>>()
             .unwrap();

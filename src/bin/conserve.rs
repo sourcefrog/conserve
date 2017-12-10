@@ -212,9 +212,9 @@ fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source_path = Path::new(subm.value_of("source").unwrap());
     let excludes = match subm.values_of("exclude") {
         Some(excludes) => {
-            excludes::produce_excludes(excludes.collect())?
+            excludes::from_strings(excludes.collect())?
         }
-        None => excludes::produce_no_excludes()
+        None => excludes::excludes_nothing()
     };
     let mut source_iter = conserve::sources::iter(
         source_path,
@@ -275,9 +275,9 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     complain_if_incomplete(&band, subm.is_present("incomplete"))?;
     let excludes = match subm.values_of("exclude") {
         Some(excludes) => {
-            excludes::produce_excludes(excludes.collect())?
+            excludes::from_strings(excludes.collect())?
         }
-        None => excludes::produce_no_excludes()
+        None => excludes::excludes_nothing()
     };
     for i in try!(band.index_iter(report, &excludes)) {
         let entry = try!(i);

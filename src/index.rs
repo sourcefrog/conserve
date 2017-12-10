@@ -385,7 +385,7 @@ mod tests {
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
         assert_eq!(retrieved, r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null}]"#);
 
-        let mut it = super::read(&ib.dir, &report, &excludes::produce_no_excludes()).unwrap();
+        let mut it = super::read(&ib.dir, &report, &excludes::excludes_nothing()).unwrap();
         let entry = it.next().expect("Get first entry").expect("First entry isn't an error");
         assert_eq!(entry.apath, "/apple");
         let entry = it.next().expect("Get second entry").expect("Entry isn't an error");
@@ -407,7 +407,7 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk(&report).unwrap();
 
-        let it = super::read(&ib.dir, &report, &excludes::produce_no_excludes()).unwrap();
+        let it = super::read(&ib.dir, &report, &excludes::excludes_nothing()).unwrap();
         assert_eq!(format!("{:?}", &it),
                    format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));
 
@@ -443,7 +443,7 @@ mod tests {
         add_an_entry(&mut ib, "/foobar");
         ib.finish_hunk(&report).unwrap();
 
-        let excludes = excludes::produce_excludes(vec!["/fo*"]).unwrap();
+        let excludes = excludes::from_strings(vec!["/fo*"]).unwrap();
         let it = super::read(&ib.dir, &report, &excludes).unwrap();
         assert_eq!(format!("{:?}", &it),
                    format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));

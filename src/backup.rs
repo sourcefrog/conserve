@@ -30,13 +30,13 @@ struct Backup {
 impl BackupOptions {
     pub fn default() -> Self {
         BackupOptions {
-            excludes: excludes::produce_no_excludes()
+            excludes: excludes::excludes_nothing()
         }
     }
 
     pub fn with_excludes(&self, exclude: Vec<&str>) -> Result<Self> {
         Ok(BackupOptions {
-            excludes: excludes::produce_excludes(exclude)?
+            excludes: excludes::from_strings(exclude)?
         })
     }
 
@@ -155,7 +155,7 @@ mod tests {
         let band = af.open_band(&band_ids[0], &report).unwrap();
         assert!(band.is_closed().unwrap());
 
-        let index_entries = band.index_iter(&report, &excludes::produce_no_excludes())
+        let index_entries = band.index_iter(&report, &excludes::excludes_nothing())
             .unwrap()
             .filter_map(|i| i.ok())
             .collect::<Vec<index::Entry>>();

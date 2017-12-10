@@ -25,7 +25,7 @@ impl RestoreOptions {
         RestoreOptions {
             force_overwrite: false,
             band_id: None,
-            excludes: excludes::produce_no_excludes()
+            excludes: excludes::excludes_nothing()
         }
     }
 
@@ -33,7 +33,7 @@ impl RestoreOptions {
         Ok(RestoreOptions {
             force_overwrite: self.force_overwrite,
             band_id: self.band_id.clone(),
-            excludes: excludes::produce_excludes(exclude)?
+            excludes: excludes::from_strings(exclude)?
         })
     }
 
