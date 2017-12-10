@@ -72,24 +72,6 @@ pub struct Iter {
 
 
 impl Iter {
-    fn unchecked_next(&mut self) -> Option<io::Result<Entry>> {
-        loop {
-            if let Some(entry) = self.entry_deque.pop_front() {
-                // Have already found some entries and just need to return them.
-                self.report.increment("source.selected", 1);
-                return Some(Ok(entry));
-            } else if let Some(entry) = self.dir_deque.pop_front() {
-                if let Err(e) = self.visit_next_directory(entry) {
-                    return Some(Err(e));
-                }
-                // Queues have been refilled.
-            } else {
-                // No entries queued and no more directories to visit.
-                return None;
-            }
-        }
-    }
-
     fn visit_next_directory(&mut self, dir_entry: Entry) -> io::Result<()> {
         let readdir = try!(fs::read_dir(&dir_entry.path));
         self.report.increment("source.visited.directories", 1);
@@ -105,15 +87,20 @@ impl Iter {
             path.push_str(&entry.file_name().to_string_lossy());
 
             if self.excludes.is_match(&path) {
-                if ft.is_dir() {
-                    self.report.increment("skipped.excluded.directories", 1);
-                } else {
+                if ft.is_file() {
                     self.report.increment("skipped.excluded.files", 1);
+                } else if ft.is_dir() {
+                    self.report.increment("skipped.excluded.directories", 1);
+                } else if ft.is_symlink() {
+                    self.report.increment("skipped.excluded.symlinks", 1);
                 }
+
                 continue;
             }
+
             children.push((entry.file_name(), ft.is_dir(), Apath::from_string(&path)));
         }
+
         children.sort();
         let mut directory_insert_point = 0;
         for (child_name, is_dir, apath) in children {
@@ -139,6 +126,24 @@ impl Iter {
         }
         Ok(())
     }
+
+    fn unchecked_next(&mut self) -> Option<io::Result<Entry>> {
+        loop {
+            if let Some(entry) = self.entry_deque.pop_front() {
+                // Have already found some entries and just need to return them.
+                self.report.increment("source.selected", 1);
+                return Some(Ok(entry));
+            } else if let Some(entry) = self.dir_deque.pop_front() {
+                if let Err(e) = self.visit_next_directory(entry) {
+                    return Some(Err(e));
+                }
+                // Queues have been refilled.
+            } else {
+                // No entries queued and no more directories to visit.
+                return None;
+            }
+        }
+    }
 }
 
 
@@ -154,8 +159,8 @@ impl Iterator for Iter {
     type Item = io::Result<Entry>;
 
     fn next(&mut self) -> Option<io::Result<Entry>> {
-        // Check that all the returned paths are in correct order.
-        // TODO: Maybe this can be skipped in non-debug builds?
+// Check that all the returned paths are in correct order.
+// TODO: Maybe this can be skipped in non-debug builds?
         match self.unchecked_next() {
             None => None,
             e @ Some(Err(_)) => e,
@@ -194,11 +199,11 @@ pub fn iter(source_dir: &Path, report: &Report, excludes: &GlobSet) -> io::Resul
         path: source_dir.to_path_buf(),
         metadata: root_metadata,
     };
-    // Preload iter to return the root and then recurse into it.
+// Preload iter to return the root and then recurse into it.
     let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();
     entry_deque.push_back(root_entry.clone());
-    // TODO: Consider the case where the root is not actually a directory?
-    // Should that be supported?
+// TODO: Consider the case where the root is not actually a directory?
+// Should that be supported?
     let mut dir_deque = VecDeque::<Entry>::new();
     dir_deque.push_back(root_entry);
     Ok(Iter {
@@ -230,7 +235,7 @@ mod tests {
         let report = Report::new();
         let mut source_iter = iter(tf.path(), &report, &excludes::excludes_nothing()).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
-        // First one is the root
+// First one is the root
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[0].path, &tf.root);
         assert_eq!(&result[1].apath, "/aaa");
@@ -276,7 +281,7 @@ mod tests {
         let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
 
-        // First one is the root
+// First one is the root
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[0].path, &tf.root);
         assert_eq!(&result[1].apath, "/baz");

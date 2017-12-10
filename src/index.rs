@@ -253,7 +253,7 @@ impl Iter {
                 if self.excludes.is_match(&entry.apath) {
                     match entry.kind {
                         IndexKind::Dir => self.report.increment("skipped.excluded.directories", 1),
-                        IndexKind::Symlink => self.report.increment("skipped.excluded.directories", 1),
+                        IndexKind::Symlink => self.report.increment("skipped.excluded.symlinks", 1),
                         IndexKind::File => self.report.increment("skipped.excluded.files", 1)
                     }
                     return false;
