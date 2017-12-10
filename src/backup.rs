@@ -34,9 +34,10 @@ impl BackupOptions {
         }
     }
 
-    pub fn with_excludes(&self, exclude: Vec<&str>) -> Result<Self> {
+    pub fn with_excludes(self, exclude: Vec<&str>) -> Result<Self> {
         Ok(BackupOptions {
-            excludes: excludes::from_strings(exclude)?
+            excludes: excludes::from_strings(exclude)?,
+            ..self
         })
     }
 

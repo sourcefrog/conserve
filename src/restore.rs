@@ -29,11 +29,10 @@ impl RestoreOptions {
         }
     }
 
-    pub fn with_excludes(&self, exclude: Vec<&str>) -> Result<Self> {
+    pub fn with_excludes(self, exclude: Vec<&str>) -> Result<Self> {
         Ok(RestoreOptions {
-            force_overwrite: self.force_overwrite,
-            band_id: self.band_id.clone(),
-            excludes: excludes::from_strings(exclude)?
+            excludes: excludes::from_strings(exclude)?,
+            ..self
         })
     }
 
