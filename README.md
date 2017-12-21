@@ -47,7 +47,11 @@ source tree), the backup is considered *complete*.
 
     conserve backup /backup/home.cons ~
 
-Use `--exclude GLOB` to exclude files or directories from the backup using[GLOB patterns](http://man7.org/linux/man-pages/man7/glob.7.html). The `--exclude`-option is also available for `restore`, `ls` and the `list-source`.
+Use `--exclude GLOB` to exclude files or directories from the backup using 
+[GLOB patterns](https://docs.rs/globset/0.2.1/globset/#syntax). 
+The `--exclude` option is also available for `restore`, `ls` and `list-source`. 
+Please note that the pattern provided in the exclude has to be relative to the 
+top-level directory.
 
 `conserve versions` lists the versions in an archive,
 whether or not the backup is *complete*,
@@ -112,7 +116,6 @@ backups, but there are some important performance and functional limitations,
 which will be fixed before 1.0.
 
 * [There are no incremental backups][41]: all backups store all files.
-* [There is no way to exclude files/subdirectories from backup or restore][8].
 * The planned `validate` command is [not implemented][5],
   however a trial restore from the archive will test everything can be read.
 * The planned feature of resuming an interrupted backup is not implemented:
