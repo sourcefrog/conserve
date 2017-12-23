@@ -115,7 +115,7 @@ impl Backup {
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use testfixtures::{ScratchArchive, TreeFixture};
+    use test_fixtures::{ScratchArchive, TreeFixture};
 
     #[cfg(unix)]
     #[test]

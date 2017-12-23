@@ -37,7 +37,7 @@ pub fn read<T: Decodable>(path: &Path, _report: &Report) -> Result<T> {
 
 #[cfg(test)]
 mod tests {
-    use testfixtures::TreeFixture;
+    use test_fixtures::TreeFixture;
     use Report;
 
     #[derive(Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]

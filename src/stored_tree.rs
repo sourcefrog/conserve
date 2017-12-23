@@ -37,7 +37,7 @@ impl StoredTree {
 #[cfg(test)]
 mod test {
     use super::super::*;
-    use super::super::testfixtures::*;
+    use super::super::test_fixtures::*;
 
     #[test]
     pub fn open_stored_tree() {

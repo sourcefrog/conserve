@@ -43,7 +43,7 @@ pub mod report;
 mod restore;
 pub mod sources;
 mod stored_tree;
-pub mod testfixtures;
+pub mod test_fixtures;
 pub mod ui;
 
 pub use archive::Archive;

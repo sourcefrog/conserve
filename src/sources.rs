@@ -201,7 +201,7 @@ mod tests {
 
     use super::iter;
     use super::super::*;
-    use testfixtures::TreeFixture;
+    use test_fixtures::TreeFixture;
 
     #[test]
     fn simple_directory() {

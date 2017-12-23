@@ -176,7 +176,7 @@ mod tests {
     use chrono::Duration;
 
     use super::super::*;
-    use testfixtures::ScratchArchive;
+    use test_fixtures::ScratchArchive;
 
     #[test]
     fn create_and_reopen_band() {

@@ -192,7 +192,7 @@ mod tests {
     use errors::ErrorKind;
     use {BandId, Report};
     use io::list_dir;
-    use testfixtures::ScratchArchive;
+    use test_fixtures::ScratchArchive;
 
     #[test]
     fn create_then_open_archive() {

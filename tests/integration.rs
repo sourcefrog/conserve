@@ -4,8 +4,8 @@ extern crate conserve;
 
 use conserve::index;
 use conserve::*;
-use conserve::testfixtures::ScratchArchive;
-use conserve::testfixtures::TreeFixture;
+use conserve::test_fixtures::ScratchArchive;
+use conserve::test_fixtures::TreeFixture;
 
 
 #[test]
