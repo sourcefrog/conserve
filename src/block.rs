@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-// use libflate::deflate;
 use rustc_serialize::hex::ToHex;
 
 use tempfile;
