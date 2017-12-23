@@ -31,6 +31,11 @@ impl StoredTree {
     pub fn band(&self) -> &Band {
         &self.band
     }
+
+    /// Return an iter of index entries in this stored tree.
+    pub fn index_iter(&self, report: &Report) -> Result<index::Iter> {
+        self.band.index_iter(report)
+    }
 }
 
 
@@ -50,6 +55,14 @@ mod test {
         let st = StoredTree::open(a, None, &report).unwrap();
 
         assert_eq!(st.band().id(), last_band_id);
+
+        let names: Vec<String> = st.index_iter(&report).unwrap().map(|e| {e.unwrap().apath}).collect();
+        let expected = if SYMLINKS_SUPPORTED {
+            vec!["/", "/hello", "/hello2", "/link", "/subdir", "/subdir/subfile"]
+        } else {
+            vec!["/", "/hello", "/hello2", "/subdir", "/subdir/subfile"]
+        };
+        assert_eq!(expected, names);
     }
 
     #[test]
