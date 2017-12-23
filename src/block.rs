@@ -1,11 +1,16 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
 //! File contents are stored in data blocks.
 //!
+//! Data blocks are stored compressed, and identified by the hash of their uncompressed
+//! contents.
+//!
+//! The contents of a file is identified by an Address, which says which block holds the data,
+//! and which range of uncompressed bytes.
+//!
 //! The structure is: archive > band > blockdir > subdir > file.
 
-use std::fmt;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
@@ -47,11 +52,9 @@ pub struct Address {
 
 
 /// A readable, writable directory within a band holding data blocks.
+#[derive(Debug)]
 pub struct BlockDir {
     pub path: PathBuf,
-
-    // Reusable buffer for reading input.
-    in_buf: Vec<u8>,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
@@ -61,10 +64,7 @@ fn block_name_to_subdirectory(block_hash: &str) -> &str {
 impl BlockDir {
     /// Create a BlockDir accessing `path`, which must exist as a directory.
     pub fn new(path: &Path) -> BlockDir {
-        BlockDir {
-            path: path.to_path_buf(),
-            in_buf: Vec::<u8>::with_capacity(1 << 20),
-        }
+        BlockDir { path: path.to_path_buf() }
     }
 
     /// Return the subdirectory in which we'd put a file called `hash_hex`.
@@ -86,12 +86,12 @@ impl BlockDir {
                  report: &Report)
                  -> Result<(Vec<Address>, BlockHash)> {
         // TODO: Split large files, combine small files.
-        self.in_buf.truncate(0);
+        let mut in_buf = Vec::with_capacity(1 << 20);
         let uncomp_len = report.measure_duration("source.read",
-            || from_file.read_to_end(&mut self.in_buf))? as u64;
-        assert_eq!(self.in_buf.len() as u64, uncomp_len);
+            || from_file.read_to_end(&mut in_buf))? as u64;
+        assert_eq!(in_buf.len() as u64, uncomp_len);
 
-        let hex_hash = report.measure_duration("block.hash", || hash_bytes(&self.in_buf))?;
+        let hex_hash = report.measure_duration("block.hash", || hash_bytes(&in_buf))?;
 
         let refs = vec![Address {
             hash: hex_hash.clone(),
@@ -105,7 +105,7 @@ impl BlockDir {
         }
 
         // Not already stored: compress and save it now.
-        let comp_len = self.compress_and_store(&self.in_buf, &hex_hash, &report)?;
+        let comp_len = self.compress_and_store(&in_buf, &hex_hash, &report)?;
         report.increment("block", 1);
         report.increment_size("block",
             Sizes {
@@ -191,14 +191,6 @@ impl BlockDir {
             return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
         Ok(decompressed)
-    }
-}
-
-impl fmt::Debug for BlockDir {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("BlockDir")
-            .field("path", &self.path)
-            .finish()
     }
 }
 
