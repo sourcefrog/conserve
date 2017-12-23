@@ -64,7 +64,7 @@ fn blackbox_backup() {
     // conserve init
     let (status, stdout, stderr) = run_conserve(&["-v", "init", &arch_dir_str]);
     assert!(status.success());
-    assert_that(&stdout.as_str()).starts_with(&"Created new archive");
+    assert_that(&stdout.as_str()).starts_with(&"Creating archive directory");
     assert_eq!(stderr, "");
 
     // New archive contains no versions.
