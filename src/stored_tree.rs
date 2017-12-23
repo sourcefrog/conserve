@@ -3,6 +3,10 @@
 //! Access a versioned tree stored in the archive.
 //!
 //! Through this interface you can iterate the contents and retrieve file contents.
+//!
+//! This is the preferred higher-level interface for reading stored versions. It'll abstract
+//! across incremental backups, hiding from the caller that data may be distributed across
+//! multiple index files, bands, and blocks.
 
 use super::*;
 
@@ -26,6 +30,10 @@ impl StoredTree {
 
     pub fn band(&self) -> &Band {
         &self.band
+    }
+
+    pub fn is_closed(&self) -> Result<bool> {
+        self.band.is_closed()
     }
 
     /// Return an iter of index entries in this stored tree.

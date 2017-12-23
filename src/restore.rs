@@ -41,8 +41,7 @@ impl RestoreOptions {
         report: &Report,
     ) -> Result<()> {
         let options = &self;
-        let band = try!(archive.open_band_or_last(&options.band_id, &report));
-        let block_dir = band.block_dir();
+        let stored_tree = StoredTree::open(archive.clone(), options.band_id.clone(), &report)?;
 
         if !options.force_overwrite {
             if let Ok(mut it) = fs::read_dir(&destination) {
@@ -55,19 +54,19 @@ impl RestoreOptions {
                 }
             }
         }
-        for entry in try!(band.index_iter(&report)) {
+        for entry in try!(stored_tree.index_iter(&report)) {
             let entry = try!(entry);
             // TODO: Continue even if one fails
             try!(restore_one(
-                &block_dir,
+                &stored_tree,
                 &entry,
                 destination,
                 report,
                 options,
             ));
         }
-        if !band.is_closed()? {
-            warn!("Version {} is incomplete: tree may be truncated", band.id());
+        if !stored_tree.is_closed()? {
+            warn!("Version {} is incomplete: tree may be truncated", stored_tree.band().id());
         }
         Ok(())
     }
@@ -75,7 +74,7 @@ impl RestoreOptions {
 
 
 fn restore_one(
-    block_dir: &BlockDir,
+    stored_tree: &StoredTree,
     entry: &index::Entry,
     destination: &Path,
     report: &Report,
@@ -90,7 +89,7 @@ fn restore_one(
     match entry.kind {
         index::IndexKind::Dir => restore_dir(entry, &dest_path, &report),
         index::IndexKind::File => {
-            restore_file(block_dir, entry, &dest_path, &report)
+            restore_file(stored_tree, entry, &dest_path, &report)
         }
         index::IndexKind::Symlink => {
             restore_symlink(entry, &dest_path, &report)
@@ -114,11 +113,12 @@ fn restore_dir(
 }
 
 fn restore_file(
-    block_dir: &BlockDir,
+    stored_tree: &StoredTree,
     entry: &index::Entry,
     dest: &Path,
     report: &Report,
 ) -> Result<()> {
+    let block_dir = stored_tree.band().block_dir();
     report.increment("file", 1);
     // Here too we write a temporary file and then move it into place: so the
     // file under its real name only appears
