@@ -39,29 +39,10 @@ mod test {
     use super::super::*;
     use super::super::testfixtures::*;
 
-    // TODO: Maybe move to testfixtures.
-    fn setup_archive() -> ScratchArchive {
-        let af = ScratchArchive::new();
-        let srcdir = TreeFixture::new();
-        srcdir.create_file("hello");
-        srcdir.create_dir("subdir");
-        srcdir.create_file("subdir/subfile");
-        if SYMLINKS_SUPPORTED {
-            srcdir.create_symlink("link", "target");
-        }
-
-        let backup_report = Report::new();
-        BackupOptions::default().backup(af.path(), srcdir.path(), &backup_report).unwrap();
-
-        srcdir.create_file("hello2");
-        BackupOptions::default().backup(af.path(), srcdir.path(), &Report::new()).unwrap();
-
-        af
-    }
-
     #[test]
     pub fn open_stored_tree() {
-        let af = setup_archive();
+        let af = ScratchArchive::new();
+        af.store_two_versions();
 
         let report = Report::new();
         let a = Archive::open(af.path(), &report).unwrap();

@@ -46,6 +46,22 @@ impl ScratchArchive {
     pub fn setup_incomplete_empty_band(&self) {
         self.archive.create_band(&Report::new()).unwrap();
     }
+
+    pub fn store_two_versions(&self) {
+        let srcdir = TreeFixture::new();
+        srcdir.create_file("hello");
+        srcdir.create_dir("subdir");
+        srcdir.create_file("subdir/subfile");
+        if SYMLINKS_SUPPORTED {
+            srcdir.create_symlink("link", "target");
+        }
+
+        let backup_report = Report::new();
+        BackupOptions::default().backup(self.path(), srcdir.path(), &backup_report).unwrap();
+
+        srcdir.create_file("hello2");
+        BackupOptions::default().backup(self.path(), srcdir.path(), &Report::new()).unwrap();
+    }
 }
 
 impl Deref for ScratchArchive {
