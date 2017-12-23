@@ -103,10 +103,12 @@ impl BlockDir {
         //   compress and store
         let mut addresses = Vec::<Address>::with_capacity(1);
         let mut file_hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
+        let mut in_buf = Vec::<u8>::with_capacity(MAX_BLOCK_SIZE);
         loop {
-            // TODO: Could do an unsafe set_len here to avoid initializing memory that is
-            // immediately and only going to be overwritten by `read`.
-            let mut in_buf = vec![0u8; MAX_BLOCK_SIZE];
+            unsafe {
+                // Increase size to capacity without initializing data that will be overwritten.
+                in_buf.set_len(MAX_BLOCK_SIZE);
+            };
             // TODO: Possibly read repeatedly in case we get a short read and have room for more,
             // so that short reads don't lead to short blocks being stored.
             let read_len = report.measure_duration(
@@ -116,7 +118,7 @@ impl BlockDir {
             if read_len == 0 {
                 break;
             }
-            let in_buf = &in_buf[..read_len];
+            in_buf.truncate(read_len);
             // TODO: In the common case where this is the first and only block, the block hash
             // can just be the same as the file hash. However Blake2b is not currently copyable.
             report.measure_duration("file.hash", || file_hasher.update(&in_buf));
