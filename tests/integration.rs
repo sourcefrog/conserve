@@ -18,7 +18,7 @@ pub fn simple_backup() {
     BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
     {
         let cs = report.borrow_counts();
-        assert_eq!(1, cs.get_count("block"));
+        assert_eq!(1, cs.get_count("block.write"));
         assert_eq!(1, cs.get_count("file"));
         assert_eq!(1, cs.get_count("dir"));
         assert_eq!(0, cs.get_count("skipped.unsupported_file_kind"));

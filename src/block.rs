@@ -223,7 +223,7 @@ impl BlockDir {
         if decompressed.len() != addr.len as usize {
             unimplemented!();
         }
-        report.increment("block", 1);
+        report.increment("block.read", 1);
         report.increment_size(
             "block",
             Sizes {
@@ -307,7 +307,7 @@ mod tests {
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
 
         assert_eq!(report.borrow_counts().get_count("block.already_present"), 0);
-        assert_eq!(report.borrow_counts().get_count("block"), 1);
+        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
         let sizes = report.borrow_counts().get_size("block");
         assert_eq!(sizes.uncompressed, 6);
 
@@ -316,12 +316,12 @@ mod tests {
 
         // Try to read back
         let read_report = Report::new();
-        assert_eq!(read_report.borrow_counts().get_count("block"), 0);
+        assert_eq!(read_report.borrow_counts().get_count("block.read"), 0);
         let back = block_dir.get(&refs[0], &read_report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
         {
             let counts = read_report.borrow_counts();
-            assert_eq!(counts.get_count("block"), 1);
+            assert_eq!(counts.get_count("block.read"), 1);
             assert_eq!(
                 counts.get_size("block"),
                 Sizes {
@@ -340,12 +340,12 @@ mod tests {
         let mut example_file = make_example_file();
         let (refs1, hash1) = block_dir.store(&mut example_file, &report).unwrap();
         assert_eq!(report.borrow_counts().get_count("block.already_present"), 0);
-        assert_eq!(report.borrow_counts().get_count("block"), 1);
+        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
 
         let mut example_file = make_example_file();
         let (refs2, hash2) = block_dir.store(&mut example_file, &report).unwrap();
         assert_eq!(report.borrow_counts().get_count("block.already_present"), 1);
-        assert_eq!(report.borrow_counts().get_count("block"), 1);
+        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
 
         assert_eq!(hash1, hash2);
         assert_eq!(refs1, refs2);
@@ -379,7 +379,7 @@ mod tests {
         assert_eq!(report.get_size("block").uncompressed, MAX_BLOCK_SIZE as u64);
         // Should be very compressible
         assert!(report.get_size("block").compressed < (MAX_BLOCK_SIZE as u64 / 10));
-        assert_eq!(report.get_count("block"), 1);
+        assert_eq!(report.get_count("block.write"), 1);
         assert_eq!(
             report.get_count("block.already_present"),
             TOTAL_SIZE / (MAX_BLOCK_SIZE as u64) - 1

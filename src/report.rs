@@ -31,7 +31,7 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "file.large",
     "symlink",
     "backup.error.stat",
-    "block",
+    "block.read",
     "block.write",
     "block.corrupt",
     "block.misplaced",
@@ -306,20 +306,20 @@ mod tests {
     #[test]
     pub fn count() {
         let r = Report::new();
-        assert_eq!(r.borrow_counts().get_count("block"), 0);
-        r.increment("block", 1);
-        assert_eq!(r.borrow_counts().get_count("block"), 1);
-        r.increment("block", 10);
-        assert_eq!(r.borrow_counts().get_count("block"), 11);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 0);
+        r.increment("block.read", 1);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 1);
+        r.increment("block.read", 10);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 11);
     }
 
     #[test]
     pub fn merge_reports() {
         let r1 = Report::new();
         let r2 = Report::new();
-        r1.increment("block", 1);
+        r1.increment("block.write", 1);
         r1.increment("block.corrupt", 2);
-        r2.increment("block", 1);
+        r2.increment("block.write", 1);
         r2.increment("block.corrupt", 10);
         r2.increment_size("block",
                           Sizes {
@@ -329,7 +329,7 @@ mod tests {
         r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
         let cs = r1.borrow_counts();
-        assert_eq!(cs.get_count("block"), 2);
+        assert_eq!(cs.get_count("block.write"), 2);
         assert_eq!(cs.get_count("block.corrupt"), 12);
         assert_eq!(cs.get_size("block"),
                    Sizes {
@@ -343,8 +343,8 @@ mod tests {
     #[test]
     pub fn display() {
         let r1 = Report::new();
-        r1.increment("block", 10);
-        r1.increment("block", 5);
+        r1.increment("block.write", 10);
+        r1.increment("block.write", 5);
         r1.increment_size("block",
             Sizes { uncompressed: 300, compressed: 100});
         r1.increment_duration("test", Duration::new(42, 479760000));
@@ -352,7 +352,7 @@ mod tests {
         let formatted = format!("{}", r1);
         assert_eq!(formatted, "\
 Counts:
-  block                                           15
+  block.write                                     15
 Bytes (before and after compression):
   block                                          300       100       3.0x
 Durations (seconds):
