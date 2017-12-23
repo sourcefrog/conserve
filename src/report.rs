@@ -192,6 +192,10 @@ impl Report {
     pub fn get_size(&self, counter_name: &str) -> Sizes {
         self.borrow_counts().get_size(counter_name)
     }
+
+    pub fn get_count(&self, counter_name: &str) -> u64 {
+        self.borrow_counts().get_count(counter_name)
+    }
 }
 
 
