@@ -31,6 +31,7 @@ impl StoredFile {
 impl Iterator for StoredFile {
     type Item = Result<Vec<u8>>;
 
+    /// Yield a series of uncompressed vecs of byte contents.
     fn next(&mut self) -> Option<Result<Vec<u8>>> {
         if let Some(addr) = self.addrs.next() {
             Some(self.block_dir.get(&addr, &self.report))

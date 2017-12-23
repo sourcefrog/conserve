@@ -30,6 +30,9 @@ const BLAKE_HASH_SIZE_BYTES: usize = 64;
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
 
+/// Break blocks at this many uncompressed bytes.
+const MAX_BLOCK_SIZE: usize = 1 << 20;
+
 /// The unique identifier for a block: its hexadecimal `BLAKE2b` hash.
 pub type BlockHash = String;
 
@@ -92,47 +95,61 @@ impl BlockDir {
         // TODO: Split large files, combine small files. Don't read them all into a single buffer.
 
         // loop
-        //   read block_size bytes
+        //   read up to block_size bytes
         //   accumulate into the overall hasher
         //   hash those bytes - as a special case if this is the first block, it's the same as
         //     the overall hash.
         //   if already stored: don't store again
         //   compress and store
         let mut addresses = Vec::<Address>::with_capacity(1);
-
-        let mut in_buf = Vec::<u8>::with_capacity(1 << 20);
-        let uncomp_len = report.measure_duration(
-            "source.read",
-            || from_file.read_to_end(&mut in_buf),
-        )? as u64;
-        assert_eq!(in_buf.len() as u64, uncomp_len);
-
-        let hex_hash = report.measure_duration(
-            "block.hash",
-            || hash_bytes(&in_buf),
-        )?;
-
-        addresses.push(Address {
-            hash: hex_hash.clone(),
-            start: 0,
-            len: uncomp_len as u64,
-        });
-
-        if self.contains(&hex_hash)? {
-            report.increment("block.already_present", 1);
-        } else {
-            let comp_len = self.compress_and_store(&in_buf, &hex_hash, &report)?;
-            // Maybe rename counter to 'block.write'?
-            report.increment("block", 1);
-            report.increment_size(
-                "block",
-                Sizes {
-                    compressed: comp_len,
-                    uncompressed: uncomp_len,
-                },
-            );
+        let mut file_hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
+        loop {
+            // TODO: Could do an unsafe set_len here to avoid initializing memory that is
+            // immediately and only going to be overwritten by `read`.
+            let mut in_buf = vec![0u8; MAX_BLOCK_SIZE];
+            // TODO: Possibly read repeatedly in case we get a short read and have room for more,
+            // so that short reads don't lead to short blocks being stored.
+            let read_len = report.measure_duration(
+                "source.read",
+                || from_file.read(&mut in_buf),
+            )?;
+            if read_len == 0 {
+                break;
+            }
+            let in_buf = &in_buf[..read_len];
+            // TODO: In the common case where this is the first and only block, the block hash
+            // can just be the same as the file hash. However Blake2b is not currently copyable.
+            report.measure_duration("file.hash", || file_hasher.update(&in_buf));
+            let block_hash = report.measure_duration(
+                "block.hash",
+                || hash_bytes(&in_buf),
+            )?;
+            addresses.push(Address {
+                hash: block_hash.clone(),
+                start: 0,
+                len: read_len as u64,
+            });
+            if self.contains(&block_hash)? {
+                report.increment("block.already_present", 1);
+            } else {
+                let comp_len = self.compress_and_store(&in_buf, &block_hash, &report)?;
+                // Maybe rename counter to 'block.write'?
+                report.increment("block.write", 1);
+                report.increment_size(
+                    "block",
+                    Sizes {
+                        compressed: comp_len,
+                        uncompressed: read_len as u64,
+                    },
+                );
+            }
         }
-        Ok((addresses, hex_hash))
+        match addresses.len() {
+            0 => report.increment("file.empty", 1),
+            1 => report.increment("file.medium", 1),
+            _ => report.increment("file.large", 1),
+        }
+        Ok((addresses, file_hasher.finalize().as_bytes().to_hex()))
     }
 
     fn compress_and_store(
@@ -337,11 +354,12 @@ mod tests {
     #[test]
     // Large enough that it should break across blocks.
     pub fn large_file() {
+        use super::MAX_BLOCK_SIZE;
         let report = Report::new();
         let (_testdir, mut block_dir) = setup();
         let mut tf = tempfile::NamedTempFile::new().unwrap();
         const N_CHUNKS: u64 = 10;
-        const CHUNK_SIZE: u64 = 1 << 20;
+        const CHUNK_SIZE: u64 = 1 << 21;
         const TOTAL_SIZE: u64 = N_CHUNKS * CHUNK_SIZE;
         for _i in 0..N_CHUNKS {
             tf.write_all(&[64; CHUNK_SIZE as usize]).unwrap();
@@ -355,16 +373,24 @@ mod tests {
         let (addrs, _overall_hash) = block_dir.store(&mut tf, &report).unwrap();
         // TODO: Assertions about report counters.
         println!("Report after store: {}", report);
-        assert_eq!(report.get_size("block").uncompressed, TOTAL_SIZE);
-        // Should be very compressible
-        assert!(report.get_size("block").compressed < (TOTAL_SIZE / 10));
 
-        // 10x 1MB should be ten blocks
-        assert_eq!(addrs.len(), 1);
+        // Since the blocks are identical we should see them only stored once, and several
+        // blocks repeated.
+        assert_eq!(report.get_size("block").uncompressed, MAX_BLOCK_SIZE as u64);
+        // Should be very compressible
+        assert!(report.get_size("block").compressed < (MAX_BLOCK_SIZE as u64 / 10));
+        assert_eq!(report.get_count("block"), 1);
+        assert_eq!(
+            report.get_count("block.already_present"),
+            TOTAL_SIZE / (MAX_BLOCK_SIZE as u64) - 1
+        );
+
+        // 10x 2MB should be twenty blocks
+        assert_eq!(addrs.len(), 20);
         for a in addrs {
             let retr = block_dir.get(&a, &report).unwrap();
-            // TODO: They should actually be MAX_BLOCK_SIZE each...
-            assert_eq!(retr.len(), TOTAL_SIZE as usize)
+            assert_eq!(retr.len(), MAX_BLOCK_SIZE as usize);
+            assert!(retr.iter().all(|b| *b == 64u8));
         }
     }
 }
