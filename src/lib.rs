@@ -42,6 +42,7 @@ mod jsonio;
 pub mod report;
 mod restore;
 pub mod sources;
+mod stored_file;
 mod stored_tree;
 pub mod test_fixtures;
 pub mod ui;

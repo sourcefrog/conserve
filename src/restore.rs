@@ -4,6 +4,7 @@
 
 use std::fs;
 use std::io;
+use std::io::Write;
 use std::path::Path;
 
 use super::*;
@@ -112,20 +113,13 @@ fn restore_dir(
     }
 }
 
-fn restore_file(
-    stored_tree: &StoredTree,
-    entry: &index::Entry,
-    dest: &Path,
-    report: &Report,
-) -> Result<()> {
-    let block_dir = stored_tree.band().block_dir();
+fn restore_file(stored_tree: &StoredTree, entry: &index::Entry, dest: &Path, report: &Report) -> Result<()> {
     report.increment("file", 1);
     // Here too we write a temporary file and then move it into place: so the
     // file under its real name only appears
     let mut af = try!(AtomicFile::new(dest));
-    for addr in &entry.addrs {
-        let block_vec = try!(block_dir.get(&addr, &report));
-        try!(io::copy(&mut block_vec.as_slice(), &mut af));
+    for bytes in stored_tree.file_contents(entry, report)? {
+        af.write(bytes?.as_slice())?;
     }
     af.close(&report)
 }
