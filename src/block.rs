@@ -81,48 +81,76 @@ impl BlockDir {
         buf
     }
 
-    pub fn store(&mut self,
-                 from_file: &mut Read,
-                 report: &Report)
-                 -> Result<(Vec<Address>, BlockHash)> {
-        // TODO: Split large files, combine small files.
-        let mut in_buf = Vec::with_capacity(1 << 20);
-        let uncomp_len = report.measure_duration("source.read",
-            || from_file.read_to_end(&mut in_buf))? as u64;
+    /// Store the contents of a readable file into the BlockDir.
+    ///
+    /// Returns the addresses at which it was stored, plus the hash of the overall original file.
+    pub fn store(
+        &mut self,
+        from_file: &mut Read,
+        report: &Report,
+    ) -> Result<(Vec<Address>, BlockHash)> {
+        // TODO: Split large files, combine small files. Don't read them all into a single buffer.
+
+        // loop
+        //   read block_size bytes
+        //   accumulate into the overall hasher
+        //   hash those bytes - as a special case if this is the first block, it's the same as
+        //     the overall hash.
+        //   if already stored: don't store again
+        //   compress and store
+        let mut addresses = Vec::<Address>::with_capacity(1);
+
+        let mut in_buf = Vec::<u8>::with_capacity(1 << 20);
+        let uncomp_len = report.measure_duration(
+            "source.read",
+            || from_file.read_to_end(&mut in_buf),
+        )? as u64;
         assert_eq!(in_buf.len() as u64, uncomp_len);
 
-        let hex_hash = report.measure_duration("block.hash", || hash_bytes(&in_buf))?;
+        let hex_hash = report.measure_duration(
+            "block.hash",
+            || hash_bytes(&in_buf),
+        )?;
 
-        let refs = vec![Address {
+        addresses.push(Address {
             hash: hex_hash.clone(),
             start: 0,
             len: uncomp_len as u64,
-        }];
+        });
 
         if self.contains(&hex_hash)? {
             report.increment("block.already_present", 1);
-            return Ok((refs, hex_hash));
+        } else {
+            let comp_len = self.compress_and_store(&in_buf, &hex_hash, &report)?;
+            // Maybe rename counter to 'block.write'?
+            report.increment("block", 1);
+            report.increment_size(
+                "block",
+                Sizes {
+                    compressed: comp_len,
+                    uncompressed: uncomp_len,
+                },
+            );
         }
-
-        // Not already stored: compress and save it now.
-        let comp_len = self.compress_and_store(&in_buf, &hex_hash, &report)?;
-        report.increment("block", 1);
-        report.increment_size("block",
-            Sizes {
-                compressed: comp_len,
-                uncompressed: uncomp_len,
-            });
-        Ok((refs, hex_hash))
+        Ok((addresses, hex_hash))
     }
 
-    fn compress_and_store(&self, in_buf: &[u8], hex_hash: &BlockHash, report: &Report) -> Result<u64> {
+    fn compress_and_store(
+        &self,
+        in_buf: &[u8],
+        hex_hash: &BlockHash,
+        report: &Report,
+    ) -> Result<u64> {
         super::io::ensure_dir_exists(&self.subdir_for(hex_hash))?;
-        let tempf = try!(tempfile::NamedTempFileOptions::new()
-            .prefix("tmp")
-            .create_in(&self.path));
+        let tempf = try!(
+            tempfile::NamedTempFileOptions::new()
+                .prefix("tmp")
+                .create_in(&self.path)
+        );
         let mut bufw = io::BufWriter::new(tempf);
-        report.measure_duration("block.compress",
-            || Snappy::compress_and_write(&in_buf, &mut bufw))?;
+        report.measure_duration("block.compress", || {
+            Snappy::compress_and_write(&in_buf, &mut bufw)
+        })?;
         let tempf = bufw.into_inner().unwrap();
         // report.measure_duration("sync", || tempf.sync_all())?;
 
@@ -154,11 +182,14 @@ impl BlockDir {
 
     /// Read back the contents of a block, as a byte array.
     ///
-    /// TODO: Return a Read rather than a Vec.
+    /// To read a whole file, use StoredFile instead.
     pub fn get(self: &BlockDir, addr: &Address, report: &Report) -> Result<Vec<u8>> {
+        // TODO: Return a Read rather than a Vec?
         // TODO: Accept vectors of multiple addresess, maybe in another function.
         let hash = &addr.hash;
-        assert_eq!(0, addr.start);
+        if addr.start != 0 {
+            unimplemented!();
+        }
         let path = self.path_for_file(hash);
         let mut f = try!(fs::File::open(&path));
 
@@ -172,22 +203,28 @@ impl BlockDir {
             }
         };
         // TODO: Accept addresses referring to only part of a block.
-        assert_eq!(decompressed.len(), addr.len as usize);
+        if decompressed.len() != addr.len as usize {
+            unimplemented!();
+        }
         report.increment("block", 1);
-        report.increment_size("block",
-                              Sizes {
-                                  uncompressed: decompressed.len() as u64,
-                                  compressed: compressed_len as u64,
-                              });
+        report.increment_size(
+            "block",
+            Sizes {
+                uncompressed: decompressed.len() as u64,
+                compressed: compressed_len as u64,
+            },
+        );
 
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
             .as_bytes()
             .to_hex();
         if actual_hash != *hash {
             report.increment("block.misplaced", 1);
-            error!("Block file {:?} has actual decompressed hash {:?}",
-                   path,
-                   actual_hash);
+            error!(
+                "Block file {:?} has actual decompressed hash {:?}",
+                path,
+                actual_hash
+            );
             return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
         Ok(decompressed)
@@ -211,7 +248,8 @@ mod tests {
     use super::super::*;
 
     const EXAMPLE_TEXT: &'static [u8] = b"hello!";
-    const EXAMPLE_BLOCK_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
+    const EXAMPLE_BLOCK_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd\
+    3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
     fn make_example_file() -> tempfile::NamedTempFile {
         let mut tf = tempfile::NamedTempFile::new().unwrap();
@@ -267,11 +305,13 @@ mod tests {
         {
             let counts = read_report.borrow_counts();
             assert_eq!(counts.get_count("block"), 1);
-            assert_eq!(counts.get_size("block"),
-                       Sizes {
-                           uncompressed: EXAMPLE_TEXT.len() as u64,
-                           compressed: 8u64,
-                       });
+            assert_eq!(
+                counts.get_size("block"),
+                Sizes {
+                    uncompressed: EXAMPLE_TEXT.len() as u64,
+                    compressed: 8u64,
+                }
+            );
         }
     }
 
@@ -292,5 +332,39 @@ mod tests {
 
         assert_eq!(hash1, hash2);
         assert_eq!(refs1, refs2);
+    }
+
+    #[test]
+    // Large enough that it should break across blocks.
+    pub fn large_file() {
+        let report = Report::new();
+        let (_testdir, mut block_dir) = setup();
+        let mut tf = tempfile::NamedTempFile::new().unwrap();
+        const N_CHUNKS: u64 = 10;
+        const CHUNK_SIZE: u64 = 1 << 20;
+        const TOTAL_SIZE: u64 = N_CHUNKS * CHUNK_SIZE;
+        for _i in 0..N_CHUNKS {
+            tf.write_all(&[64; CHUNK_SIZE as usize]).unwrap();
+        }
+        tf.flush().unwrap();
+        let tf_len = tf.seek(SeekFrom::Current(0)).unwrap();
+        println!("tf len={}", tf_len);
+        assert_eq!(tf_len, TOTAL_SIZE);
+        tf.seek(SeekFrom::Start(0)).unwrap();
+
+        let (addrs, _overall_hash) = block_dir.store(&mut tf, &report).unwrap();
+        // TODO: Assertions about report counters.
+        println!("Report after store: {}", report);
+        assert_eq!(report.get_size("block").uncompressed, TOTAL_SIZE);
+        // Should be very compressible
+        assert!(report.get_size("block").compressed < (TOTAL_SIZE / 10));
+
+        // 10x 1MB should be ten blocks
+        assert_eq!(addrs.len(), 1);
+        for a in addrs {
+            let retr = block_dir.get(&a, &report).unwrap();
+            // TODO: They should actually be MAX_BLOCK_SIZE each...
+            assert_eq!(retr.len(), TOTAL_SIZE as usize)
+        }
     }
 }
