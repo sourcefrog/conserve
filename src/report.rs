@@ -188,6 +188,10 @@ impl Report {
             })
             .ok();
     }
+
+    pub fn get_size(&self, counter_name: &str) -> Sizes {
+        self.borrow_counts().get_size(counter_name)
+    }
 }
 
 
