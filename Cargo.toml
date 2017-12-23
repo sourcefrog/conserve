@@ -15,7 +15,7 @@ name = "conserve"
 doc = false  # Conflicts with library docs which are more useful.
 
 [dependencies]
-blake2-rfc = "^0"
+blake2-rfc = "0.2.18"
 chrono = "0.2"
 clap = "~2.19"
 clippy = {version = "0.0.103", optional = true}
