@@ -17,11 +17,7 @@ pub struct StoredTree {
 impl StoredTree {
     pub fn open(archive: Archive, band_id: Option<BandId>, report: &Report) -> Result<StoredTree> {
         let band = try!(archive.open_band_or_last(&band_id, report));
-        // TODO: Maybe warn if the band's incomplete, or fail unless opening is forced.
-        for i in try!(band.index_iter(report)) {
-            let entry = try!(i);
-            println!("{}", entry.apath);
-        }
+        // TODO: Maybe warn if the band's incomplete, or fail unless opening is forced?
         Ok(StoredTree {
             archive: archive,
             band: band,
