@@ -20,7 +20,7 @@ pub struct StoredFile {
 impl StoredFile {
     /// Open a stored file.
     pub fn open(block_dir: BlockDir, addrs: Vec<block::Address>, report: &Report) -> StoredFile {
-        StoredFile{
+        StoredFile {
             block_dir: block_dir,
             addrs: addrs.into_iter(),
             report: report.clone(),

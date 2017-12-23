@@ -44,9 +44,16 @@ impl StoredTree {
     /// Return an iter of contents of file contents for the given file entry.
     ///
     /// Contents are yielded as blocks of bytes, of arbitrary length as stored in the archive.
-    pub fn file_contents(&self, entry: &index::Entry, report: &Report)
-        -> Result<stored_file::StoredFile> {
-            Ok(stored_file::StoredFile::open(self.band.block_dir(), entry.addrs.clone(), &report))
+    pub fn file_contents(
+        &self,
+        entry: &index::Entry,
+        report: &Report,
+    ) -> Result<stored_file::StoredFile> {
+        Ok(stored_file::StoredFile::open(
+            self.band.block_dir(),
+            entry.addrs.clone(),
+            &report,
+        ))
     }
 }
 
@@ -68,9 +75,19 @@ mod test {
 
         assert_eq!(st.band().id(), last_band_id);
 
-        let names: Vec<String> = st.index_iter(&report).unwrap().map(|e| {e.unwrap().apath}).collect();
+        let names: Vec<String> = st.index_iter(&report)
+            .unwrap()
+            .map(|e| e.unwrap().apath)
+            .collect();
         let expected = if SYMLINKS_SUPPORTED {
-            vec!["/", "/hello", "/hello2", "/link", "/subdir", "/subdir/subfile"]
+            vec![
+                "/",
+                "/hello",
+                "/hello2",
+                "/link",
+                "/subdir",
+                "/subdir/subfile",
+            ]
         } else {
             vec!["/", "/hello", "/hello2", "/subdir", "/subdir/subfile"]
         };
