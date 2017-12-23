@@ -241,11 +241,10 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive_path = Path::new(subm.value_of("archive").unwrap());
     let archive = try!(Archive::open(archive_path, &report));
     let band_id = try!(band_id_from_match(subm));
-    let band = try!(archive.open_band_or_last(&band_id, report));
-    complain_if_incomplete(&band, subm.is_present("incomplete"))?;
-    for i in try!(band.index_iter(report)) {
-        let entry = try!(i);
-        println!("{}", entry.apath);
+    let st = StoredTree::open(archive, band_id, report)?;
+    complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
+    for i in st.index_iter(report)? {
+        println!("{}", i?.apath);
     }
     Ok(())
 }
