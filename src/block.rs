@@ -33,7 +33,7 @@ pub type BlockHash = String;
 ///
 /// Identifiers are: which file contains it, at what (pre-compression) offset,
 /// and what (pre-compression) length.
-#[derive(Debug, PartialEq, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct Address {
     /// ID of the block storing this info (in future, salted.)
     pub hash: String,
