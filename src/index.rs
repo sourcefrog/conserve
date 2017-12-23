@@ -121,17 +121,17 @@ impl IndexBuilder {
 
         let mut af = try!(AtomicFile::new(hunk_path));
         let compressed_len = report.measure_duration("index.compress",
-                                                     || Snappy::compress_and_write(json_string.as_bytes(), &mut af))?;
+            || Snappy::compress_and_write(json_string.as_bytes(), &mut af))?;
 
         // TODO: Don't seek, just count bytes as they're compressed.
         // TODO: Measure time to compress separately from time to write.
         try!(af.close(report));
 
         report.increment_size("index",
-                              Sizes {
-                                  uncompressed: uncompressed_len as u64,
-                                  compressed: compressed_len as u64,
-                              });
+            Sizes {
+                uncompressed: uncompressed_len as u64,
+                compressed: compressed_len as u64,
+            });
         report.increment("index.hunk", 1);
 
         // Ready for the next hunk.
@@ -298,13 +298,13 @@ mod tests {
     #[test]
     fn serialize_index() {
         let entries = [Entry {
-            apath: "/a/b".to_string(),
-            mtime: Some(1461736377),
-            kind: IndexKind::File,
-            blake2b: Some(EXAMPLE_HASH.to_string()),
-            addrs: vec![],
-            target: None,
-        }];
+                           apath: "/a/b".to_string(),
+                           mtime: Some(1461736377),
+                           kind: IndexKind::File,
+                           blake2b: Some(EXAMPLE_HASH.to_string()),
+                           addrs: vec![],
+                           target: None,
+                       }];
         let index_json = json::encode(&entries).unwrap();
         println!("{}", index_json);
         assert_eq!(

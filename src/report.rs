@@ -185,9 +185,9 @@ impl Report {
 
     pub fn become_logger(&self, log_level: log::LogLevelFilter) {
         log::set_logger(|max_log_level| {
-            max_log_level.set(log_level);
-            Box::new(self.clone())
-        })
+                max_log_level.set(log_level);
+                Box::new(self.clone())
+            })
             .ok();
     }
 }
@@ -207,11 +207,11 @@ impl Display for Report {
             if s.uncompressed > 0 {
                 let ratio = ui::compression_ratio(s);
                 write!(f,
-                       "  {:<40} {:>9} {:>9} {:>9.1}x\n",
-                       *key,
-                       s.uncompressed,
-                       s.compressed,
-                       ratio)?;
+                    "  {:<40} {:>9} {:>9} {:>9.1}x\n",
+                    *key,
+                    s.uncompressed,
+                    s.compressed,
+                    ratio)?;
             }
         }
         try!(write!(f, "Durations (seconds):\n"));
@@ -335,7 +335,7 @@ mod tests {
         r1.increment("block", 10);
         r1.increment("block", 5);
         r1.increment_size("block",
-                          Sizes { uncompressed: 300, compressed: 100 });
+            Sizes { uncompressed: 300, compressed: 100 });
         r1.increment_duration("test", Duration::new(42, 479760000));
 
         let formatted = format!("{}", r1);

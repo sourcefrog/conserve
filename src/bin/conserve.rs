@@ -3,8 +3,8 @@
 
 //! Command-line entry point for Conserve backups.
 
-#![cfg_attr(feature = "clippy", feature(plugin))]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
 
 #![recursion_limit = "1024"]  // Needed by error-chain
 
@@ -259,9 +259,9 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
             .to_rfc3339();
         let duration_str = info.end_time.map_or_else(
             String::new,
-            |t| format!("{}s", (t - info.start_time).num_seconds()));
+            |t| format!("{}s", (t-info.start_time).num_seconds()));
         println!("{:<26} {:<10} {} {:>7}",
-                 band_id, is_complete_str, start_time_str, duration_str);
+            band_id, is_complete_str, start_time_str, duration_str);
     }
     Ok(())
 }

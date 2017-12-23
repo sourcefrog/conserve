@@ -4,8 +4,8 @@
 //!
 //! For user documentation and an overview see http://conserve.fyi/.
 
-#![cfg_attr(feature = "clippy", feature(plugin))]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
 
 #![recursion_limit = "1024"]  // Needed by error-chain
 

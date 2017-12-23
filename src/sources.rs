@@ -159,8 +159,8 @@ impl Iterator for Iter {
     type Item = io::Result<Entry>;
 
     fn next(&mut self) -> Option<io::Result<Entry>> {
-// Check that all the returned paths are in correct order.
-// TODO: Maybe this can be skipped in non-debug builds?
+        // Check that all the returned paths are in correct order.
+        // TODO: Maybe this can be skipped in non-debug builds?
         match self.unchecked_next() {
             None => None,
             e @ Some(Err(_)) => e,
@@ -199,11 +199,11 @@ pub fn iter(source_dir: &Path, report: &Report, excludes: &GlobSet) -> io::Resul
         path: source_dir.to_path_buf(),
         metadata: root_metadata,
     };
-// Preload iter to return the root and then recurse into it.
+    // Preload iter to return the root and then recurse into it.
     let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();
     entry_deque.push_back(root_entry.clone());
-// TODO: Consider the case where the root is not actually a directory?
-// Should that be supported?
+    // TODO: Consider the case where the root is not actually a directory?
+    // Should that be supported?
     let mut dir_deque = VecDeque::<Entry>::new();
     dir_deque.push_back(root_entry);
     Ok(Iter {
@@ -235,7 +235,7 @@ mod tests {
         let report = Report::new();
         let mut source_iter = iter(tf.path(), &report, &excludes::excludes_nothing()).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
-// First one is the root
+        // First one is the root
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[0].path, &tf.root);
         assert_eq!(&result[1].apath, "/aaa");
@@ -281,7 +281,7 @@ mod tests {
         let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
         let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
 
-// First one is the root
+        // First one is the root
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[0].path, &tf.root);
         assert_eq!(&result[1].apath, "/baz");
