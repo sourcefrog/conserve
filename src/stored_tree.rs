@@ -55,6 +55,9 @@ impl StoredTree {
             &report,
         ))
     }
+
+    // TODO: Perhaps add a way to open a file by name, bearing in mind this might be slow to
+    // call repeatedly if it reads the whole index.
 }
 
 

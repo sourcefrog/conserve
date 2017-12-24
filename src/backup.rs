@@ -149,4 +149,25 @@ mod tests {
         assert_eq!(e2.apath, "/symlink");
         assert_eq!(e2.target.as_ref().unwrap(), "/a/broken/destination");
     }
+
+    #[test]
+    pub fn empty_file_uses_zero_blocks() {
+        let af = ScratchArchive::new();
+        let srcdir = TreeFixture::new();
+        srcdir.create_file_with_contents("empty", &[]);
+        let report = Report::new();
+        BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
+
+        assert_eq!(0, report.get_count("block.write"));
+        assert_eq!(1, report.get_count("file"), "file count");
+
+        // Read back the empty file
+        let st = StoredTree::open(Archive::open(af.path(), &report).unwrap(), None, &report).unwrap();
+        let empty_entry = st.index_iter(&report).unwrap()
+            .map(|i| i.unwrap())
+            .find(|ref i| {i.apath == "/empty"})
+            .expect("found one entry");
+        let sf = st.file_contents(&empty_entry, &report).unwrap();
+        assert_eq!(0, sf.count(), "reading empty file has zero chunks");
+    }
 }
