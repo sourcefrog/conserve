@@ -1,5 +1,11 @@
 # Conserve release history
 
+## Conserve 0.4.1
+
+* Large files are broken into multiple blocks of 1MB uncompressed content,
+  so that memory use is capped and so that common blocks can potentially be
+  shared.
+
 ## Conserve 0.4.0
 
 * Switch from Brotli2 to Snappy compression: probably a better
