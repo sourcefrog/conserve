@@ -210,14 +210,14 @@ impl Report {
 
 impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        try!(write!(f, "Counts:\n"));
+        write!(f, "Counts:\n")?;
         let counts = self.mut_counts();
         for (key, value) in &counts.count {
             if *value > 0 {
-                try!(write!(f, "  {:<40} {:>9}\n", *key, *value));
+                write!(f, "  {:<40} {:>9}\n", *key, *value)?;
             }
         }
-        try!(write!(f, "Bytes (before and after compression):\n"));
+        write!(f, "Bytes (before and after compression):\n")?;
         for (key, s) in &counts.sizes {
             if s.uncompressed > 0 {
                 let ratio = ui::compression_ratio(s);
@@ -229,12 +229,12 @@ impl Display for Report {
                     ratio)?;
             }
         }
-        try!(write!(f, "Durations (seconds):\n"));
+        write!(f, "Durations (seconds):\n")?;
         for (key, &dur) in &counts.durations {
             let millis = dur.subsec_nanos() / 1000000;
             let secs = dur.as_secs();
             if millis > 0 || secs > 0 {
-                try!(write!(f, "  {:<40} {:>5}.{:>03}\n", key, secs, millis));
+                write!(f, "  {:<40} {:>5}.{:>03}\n", key, secs, millis)?;
             }
         }
         Ok(())

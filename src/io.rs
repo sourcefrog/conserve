@@ -26,7 +26,7 @@ impl AtomicFile {
         let dir = path.parent().unwrap();
         Ok(AtomicFile {
             path: path.to_path_buf(),
-            f: try!(tempfile::NamedTempFileOptions::new().prefix("tmp").create_in(dir)),
+            f: tempfile::NamedTempFileOptions::new().prefix("tmp").create_in(dir)?,
         })
     }
 
@@ -129,10 +129,10 @@ pub fn file_exists(path: &Path) -> Result<bool> {
 pub fn list_dir(path: &Path) -> Result<(HashSet<String>, HashSet<String>)> {
     let mut file_names = HashSet::<String>::new();
     let mut dir_names = HashSet::<String>::new();
-    for entry in try!(fs::read_dir(path)) {
+    for entry in fs::read_dir(path)? {
         let entry = entry.unwrap();
         let entry_filename = entry.file_name().into_string().unwrap();
-        let entry_type = try!(entry.file_type());
+        let entry_type = entry.file_type()?;
         if entry_type.is_file() {
             file_names.insert(entry_filename);
         } else if entry_type.is_dir() {

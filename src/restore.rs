@@ -55,16 +55,15 @@ impl RestoreOptions {
                 }
             }
         }
-        for entry in try!(stored_tree.index_iter(&report)) {
-            let entry = try!(entry);
+        for entry in stored_tree.index_iter(&report)? {
             // TODO: Continue even if one fails
-            try!(restore_one(
+            restore_one(
                 &stored_tree,
-                &entry,
+                &entry?,
                 destination,
                 report,
                 options,
-            ));
+            )?;
         }
         if !stored_tree.is_closed()? {
             warn!("Version {} is incomplete: tree may be truncated", stored_tree.band().id());
@@ -117,7 +116,7 @@ fn restore_file(stored_tree: &StoredTree, entry: &index::Entry, dest: &Path, rep
     report.increment("file", 1);
     // Here too we write a temporary file and then move it into place: so the
     // file under its real name only appears
-    let mut af = try!(AtomicFile::new(dest));
+    let mut af = AtomicFile::new(dest)?;
     for bytes in stored_tree.file_contents(entry, report)? {
         af.write(bytes?.as_slice())?;
     }

@@ -27,19 +27,18 @@ struct Backup {
 
 impl BackupOptions {
     pub fn backup(&self, archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
-        let archive = try!(Archive::open(archive_path, &report));
-        let band = try!(archive.create_band(&report));
+        let archive = Archive::open(archive_path, &report)?;
+        let band = archive.create_band(&report)?;
         let mut backup = Backup {
             block_dir: band.block_dir(),
             index_builder: band.index_builder(),
             report: report.clone(),
         };
-        let source_iter = try!(sources::iter(source, report));
-        for entry in source_iter {
-            try!(backup.store_one_source_entry(&try!(entry)));
+        for entry in sources::iter(source, report)? {
+            backup.store_one_source_entry(&entry?)?;
         }
-        try!(backup.index_builder.finish_hunk(report));
-        try!(band.close(&backup.report));
+        backup.index_builder.finish_hunk(report)?;
+        band.close(&backup.report)?;
         Ok(())
     }
 }
@@ -59,9 +58,9 @@ impl Backup {
             self.report.increment("skipped.unsupported_file_kind", 1);
             return Ok(());
         };
-        let new_index_entry = try!(store_fn(self, source_entry));
+        let new_index_entry = store_fn(self, source_entry)?;
         self.index_builder.push(new_index_entry);
-        try!(self.index_builder.maybe_flush(&self.report));
+        self.index_builder.maybe_flush(&self.report)?;
         Ok(())
     }
 
@@ -82,8 +81,8 @@ impl Backup {
     fn store_file(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
-        let mut f = try!(fs::File::open(&source_entry.path));
-        let (addrs, body_hash) = try!(self.block_dir.store(&mut f, &self.report));
+        let mut f = fs::File::open(&source_entry.path)?;
+        let (addrs, body_hash) = self.block_dir.store(&mut f, &self.report)?;
         Ok(index::Entry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
@@ -97,9 +96,9 @@ impl Backup {
 
     fn store_symlink(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
         self.report.increment("symlink", 1);
-        // TODO: Maybe log a warning if the target is not decodable rather than silently
-        // losing.
-        let target = try!(fs::read_link(&source_entry.path)).to_string_lossy().to_string();
+        // TODO: Record a problem and log a message if the target is not decodable, rather than
+        //  silently losing.
+        let target = fs::read_link(&source_entry.path)?.to_string_lossy().to_string();
         Ok(index::Entry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),

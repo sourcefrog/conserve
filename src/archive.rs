@@ -43,7 +43,7 @@ impl Archive {
         if let Err(e) = std::fs::create_dir(&archive.path) {
             if e.kind() == io::ErrorKind::AlreadyExists {
                 // Exists and hopefully empty?
-                if try!(std::fs::read_dir(&archive.path)).next().is_some() {
+                if std::fs::read_dir(&archive.path)?.next().is_some() {
                     return Err(e).chain_err(|| {
                         format!("Archive directory exists and is not empty {:?}",
                                 archive.path)
@@ -56,8 +56,8 @@ impl Archive {
         }
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
         let header_filename = path.join(HEADER_FILENAME);
-        try!(jsonio::write(&header_filename, &header, &report)
-            .chain_err(|| format!("Failed to write archive header: {:?}", header_filename)));
+        jsonio::write(&header_filename, &header, &report)
+            .chain_err(|| format!("Failed to write archive header: {:?}", header_filename))?;
         info!("Created new archive in {:?}", path.display());
         Ok(archive)
     }
@@ -81,14 +81,15 @@ impl Archive {
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
     pub fn iter_bands_unsorted(self: &Archive) -> Result<IterBands> {
-        let read_dir = try!(read_dir(&self.path)
-            .chain_err(|| format!("failed reading directory {:?}", &self.path)));
+        let read_dir = read_dir(&self.path)
+            .chain_err(|| format!("failed reading directory {:?}", &self.path))?;
         Ok(IterBands { dir_iter: read_dir })
     }
 
     /// Returns a vector of band ids, in sorted order.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
-        let mut band_ids: Vec<BandId> = try!(try!(self.iter_bands_unsorted()).collect());
+        // Note: For some reason `?` doesn't work here only `try!`.
+        let mut band_ids: Vec<BandId> = try!(self.iter_bands_unsorted()?.collect());
         band_ids.sort();
         Ok(band_ids)
     }
@@ -106,7 +107,7 @@ impl Archive {
     pub fn last_band_id(self: &Archive) -> Result<BandId> {
         // Walk through list of bands; if any error return that, otherwise return the greatest.
         let mut accum: Option<BandId> = None;
-        for next in try!(self.iter_bands_unsorted()) {
+        for next in self.iter_bands_unsorted()? {
             accum = Some(match (next, accum) {
                 (Err(e), _) => return Err(e),
                 (Ok(b), None) => b,
@@ -135,7 +136,7 @@ impl Archive {
     pub fn open_band_or_last(&self, band_id: &Option<BandId>, report: &Report) -> Result<Band> {
         let band_id = match band_id {
             &Some(ref b) => b.clone(),
-            &None => try!(self.last_band_id()),
+            &None => self.last_band_id()?,
         };
         self.open_band(&band_id, report)
     }

@@ -86,13 +86,11 @@ impl Iter {
     }
 
     fn visit_next_directory(&mut self, dir_entry: Entry) -> io::Result<()> {
-        let readdir = try!(fs::read_dir(&dir_entry.path));
         self.report.increment("source.visited.directories", 1);
         let mut children = Vec::<(OsString, bool)>::new();
-        for entry in readdir {
-            let entry = try!(entry);
-            let ft = try!(entry.file_type());
-            children.push((entry.file_name(), ft.is_dir()));
+        for entry in fs::read_dir(&dir_entry.path)? {
+            let entry = entry?;
+            children.push((entry.file_name(), entry.file_type()?.is_dir()));
         }
         children.sort();
         let mut directory_insert_point = 0;

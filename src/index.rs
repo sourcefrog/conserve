@@ -111,20 +111,20 @@ impl IndexBuilder {
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
     pub fn finish_hunk(&mut self, report: &Report) -> Result<()> {
-        try!(ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)));
+        ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))?;
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
 
         let json_string = report.measure_duration("index.encode", || json::encode(&self.entries))
             .unwrap();
         let uncompressed_len = json_string.len() as u64;
 
-        let mut af = try!(AtomicFile::new(hunk_path));
+        let mut af = AtomicFile::new(hunk_path)?;
         let compressed_len = report.measure_duration("index.compress",
             || Snappy::compress_and_write(json_string.as_bytes(), &mut af))?;
 
         // TODO: Don't seek, just count bytes as they're compressed.
         // TODO: Measure time to compress separately from time to write.
-        try!(af.close(report));
+        af.close(report)?;
 
         report.increment_size("index",
                               Sizes {
@@ -236,10 +236,10 @@ impl Iter {
         self.report.increment("index.hunk", 1);
 
         let start_parse = time::Instant::now();
-        let index_json = try!(str::from_utf8(&index_bytes)
-            .chain_err(|| format!("index file {:?} is not UTF-8", hunk_path)));
-        let entries: Vec<Entry> = try!(json::decode(index_json)
-            .chain_err(|| format!("couldn't deserialize index hunk {:?}", hunk_path)));
+        let index_json = str::from_utf8(&index_bytes)
+            .chain_err(|| format!("index file {:?} is not UTF-8", hunk_path))?;
+        let entries: Vec<Entry> = json::decode(index_json)
+            .chain_err(|| format!("couldn't deserialize index hunk {:?}", hunk_path))?;
         if entries.is_empty() {
             warn!("Index hunk {} is empty", hunk_path.display());
         }

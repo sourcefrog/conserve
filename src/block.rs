@@ -163,11 +163,9 @@ impl BlockDir {
         report: &Report,
     ) -> Result<u64> {
         super::io::ensure_dir_exists(&self.subdir_for(hex_hash))?;
-        let tempf = try!(
-            tempfile::NamedTempFileOptions::new()
-                .prefix("tmp")
-                .create_in(&self.path)
-        );
+        let tempf = tempfile::NamedTempFileOptions::new()
+            .prefix("tmp")
+            .create_in(&self.path)?;
         let mut bufw = io::BufWriter::new(tempf);
         report.measure_duration("block.compress", || {
             Snappy::compress_and_write(&in_buf, &mut bufw)
@@ -212,7 +210,7 @@ impl BlockDir {
             unimplemented!();
         }
         let path = self.path_for_file(hash);
-        let mut f = try!(fs::File::open(&path));
+        let mut f = fs::File::open(&path)?;
 
         // TODO: Specific error for compression failure (corruption?) vs io errors.
         let (compressed_len, decompressed) = match Snappy::decompress_read(&mut f) {

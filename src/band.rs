@@ -67,13 +67,13 @@ impl Band {
     pub fn create(archive_dir: &Path, id: BandId, report: &Report) -> Result<Band> {
         let new = Band::new(archive_dir, id);
 
-        try!(fs::create_dir(&new.path_buf));
-        try!(fs::create_dir(&new.block_dir_path));
-        try!(fs::create_dir(&new.index_dir_path));
+        fs::create_dir(&new.path_buf)?;
+        fs::create_dir(&new.block_dir_path)?;
+        fs::create_dir(&new.index_dir_path)?;
         info!("Created band {} in {:?}", new.id, &archive_dir);
 
         let head = Head { start_time: UTC::now().timestamp() };
-        try!(jsonio::write(&new.head_path(), &head, report));
+        jsonio::write(&new.head_path(), &head, report)?;
         Ok(new)
     }
 
