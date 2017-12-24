@@ -1,9 +1,16 @@
+// Copyright 2015, 2016, 2017 Martin Pool.
+
 /// Test Conserve through its public API.
 
 extern crate conserve;
 
-use conserve::index;
+extern crate tempdir;
+
+use std::fs::File;
+use std::io::prelude::*;
+
 use conserve::*;
+use conserve::index;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 
@@ -51,11 +58,6 @@ pub fn simple_backup() {
     assert_eq!("9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
                hash);
 
-    check_restore(&af);
-}
-
-
-fn check_restore(af: &ScratchArchive) {
     // TODO: Read back contents of that file.
     let restore_dir = TreeFixture::new();
     let restore_report = Report::new();
@@ -63,9 +65,38 @@ fn check_restore(af: &ScratchArchive) {
     options.restore(&af, restore_dir.path(), &restore_report).unwrap();
     let block_sizes = restore_report.get_size("block");
     assert!(block_sizes.uncompressed == 8 && block_sizes.compressed == 10,
-            format!("{:?}", block_sizes));
+           format!("{:?}", block_sizes));
     let index_sizes = restore_report.get_size("index");
     assert_eq!(index_sizes.uncompressed, 462, "index_sizes.uncompressed on restore");
     assert!(index_sizes.compressed <= 292, index_sizes.compressed);
     // TODO: Check what was restored.
+}
+
+
+
+/// Store and retrieve large files.
+#[test]
+fn large_file() {
+    let af = ScratchArchive::new();
+
+    let tf = TreeFixture::new();
+    let large_content = String::from("a sample large file\n").repeat(1000000);
+    tf.create_file_with_contents("large", &large_content.as_bytes());
+
+    let report = Report::new();
+
+    BackupOptions::default().backup(af.path(), tf.path(), &report).unwrap();
+    assert_eq!(report.get_count("file"), 1);
+    assert_eq!(report.get_count("file.large"), 1);
+
+    // Try to restore it
+    let rd = tempdir::TempDir::new("conserve_test_restore").unwrap();
+    let restore_report = Report::new();
+    RestoreOptions::default().restore(&af, rd.path(), &restore_report).unwrap();
+    assert_eq!(report.get_count("file"), 1);
+
+    // TODO: Restore should also set file.large etc.
+    let mut content = String::new();
+    File::open(rd.path().join("large")).unwrap().read_to_string(&mut content).unwrap();
+    assert_eq!(large_content, content);
 }
