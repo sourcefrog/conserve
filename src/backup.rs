@@ -162,7 +162,7 @@ mod tests {
         assert_eq!(1, report.get_count("file"), "file count");
 
         // Read back the empty file
-        let st = StoredTree::open(Archive::open(af.path(), &report).unwrap(), None, &report).unwrap();
+        let st = StoredTree::open(&af, None, &report).unwrap();
         let empty_entry = st.index_iter(&report).unwrap()
             .map(|i| i.unwrap())
             .find(|ref i| {i.apath == "/empty"})

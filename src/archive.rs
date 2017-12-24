@@ -20,6 +20,8 @@ use super::jsonio;
 
 const HEADER_FILENAME: &'static str = "CONSERVE";
 
+
+/// An archive holding backup material.
 #[derive(Clone, Debug)]
 pub struct Archive {
     /// Top-level directory for the archive.

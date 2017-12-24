@@ -17,7 +17,9 @@ use tempdir;
 use super::*;
 
 
-/// A temporary archive.
+/// A temporary archive, deleted when it goes out of scope.
+///
+/// The ScratchArchive can be treated as an Archive.
 pub struct ScratchArchive {
     _tempdir: tempdir::TempDir, // held only for cleanup
     archive: Archive,
