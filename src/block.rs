@@ -312,7 +312,7 @@ mod tests {
 
         assert_eq!(report.get_count("block.already_present"), 0);
         assert_eq!(report.get_count("block.write"), 1);
-        let sizes = report.borrow_counts().get_size("block");
+        let sizes = report.get_size("block");
         assert_eq!(sizes.uncompressed, 6);
 
         // Will vary depending on compressor and we don't want to be too brittle.
