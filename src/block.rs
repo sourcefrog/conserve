@@ -119,18 +119,15 @@ impl BlockDir {
                 break;
             }
             in_buf.truncate(read_len);
-            // TODO: In the common case where this is the first and only block, the block hash
-            // can just be the same as the file hash. However Blake2b is not currently copyable.
             report.measure_duration("file.hash", || file_hasher.update(&in_buf));
-            let block_hash = report.measure_duration(
-                "block.hash",
-                || hash_bytes(&in_buf),
-            )?;
-            addresses.push(Address {
-                hash: block_hash.clone(),
-                start: 0,
-                len: read_len as u64,
-            });
+            let block_hash = if addresses.len() == 0 {
+                file_hasher.clone().finalize().as_bytes().to_hex()
+            } else {
+                report.measure_duration(
+                    "block.hash",
+                    || hash_bytes(&in_buf),
+                )?
+            };
             if self.contains(&block_hash)? {
                 report.increment("block.already_present", 1);
             } else {
@@ -145,6 +142,11 @@ impl BlockDir {
                     },
                 );
             }
+            addresses.push(Address {
+                hash: block_hash.clone(),
+                start: 0,
+                len: read_len as u64,
+            });
         }
         match addresses.len() {
             0 => report.increment("file.empty", 1),
