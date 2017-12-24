@@ -16,13 +16,10 @@ pub fn simple_backup() {
     // TODO: Include a symlink only on Unix.
     let report = Report::new();
     BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
-    {
-        let cs = report.borrow_counts();
-        assert_eq!(1, cs.get_count("block.write"));
-        assert_eq!(1, cs.get_count("file"));
-        assert_eq!(1, cs.get_count("dir"));
-        assert_eq!(0, cs.get_count("skipped.unsupported_file_kind"));
-    }
+    assert_eq!(1, report.get_count("block.write"));
+    assert_eq!(1, report.get_count("file"));
+    assert_eq!(1, report.get_count("dir"));
+    assert_eq!(0, report.get_count("skipped.unsupported_file_kind"));
 
     let band_ids = af.list_bands().unwrap();
     assert_eq!(1, band_ids.len());
@@ -64,11 +61,10 @@ fn check_restore(af: &ScratchArchive) {
     let restore_report = Report::new();
     let options = RestoreOptions::default();
     options.restore(&af, restore_dir.path(), &restore_report).unwrap();
-    let restore_counts = restore_report.borrow_counts();
-    let block_sizes = restore_counts.get_size("block");
+    let block_sizes = restore_report.get_size("block");
     assert!(block_sizes.uncompressed == 8 && block_sizes.compressed == 10,
             format!("{:?}", block_sizes));
-    let index_sizes = restore_counts.get_size("index");
+    let index_sizes = restore_report.get_size("index");
     assert_eq!(index_sizes.uncompressed, 462, "index_sizes.uncompressed on restore");
     assert!(index_sizes.compressed <= 292, index_sizes.compressed);
     // TODO: Check what was restored.

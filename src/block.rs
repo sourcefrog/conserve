@@ -323,17 +323,14 @@ mod tests {
         assert_eq!(read_report.get_count("block.read"), 0);
         let back = block_dir.get(&refs[0], &read_report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
-        {
-            let counts = read_report.borrow_counts();
-            assert_eq!(counts.get_count("block.read"), 1);
-            assert_eq!(
-                counts.get_size("block"),
-                Sizes {
-                    uncompressed: EXAMPLE_TEXT.len() as u64,
-                    compressed: 8u64,
-                }
-            );
-        }
+        assert_eq!(read_report.get_count("block.read"), 1);
+        assert_eq!(
+            read_report.get_size("block"),
+            Sizes {
+                uncompressed: EXAMPLE_TEXT.len() as u64,
+                compressed: 8u64,
+            }
+        );
     }
 
     #[test]
