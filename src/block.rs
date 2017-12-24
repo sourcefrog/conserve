@@ -310,8 +310,8 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
 
-        assert_eq!(report.borrow_counts().get_count("block.already_present"), 0);
-        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
+        assert_eq!(report.get_count("block.already_present"), 0);
+        assert_eq!(report.get_count("block.write"), 1);
         let sizes = report.borrow_counts().get_size("block");
         assert_eq!(sizes.uncompressed, 6);
 
@@ -320,7 +320,7 @@ mod tests {
 
         // Try to read back
         let read_report = Report::new();
-        assert_eq!(read_report.borrow_counts().get_count("block.read"), 0);
+        assert_eq!(read_report.get_count("block.read"), 0);
         let back = block_dir.get(&refs[0], &read_report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
         {
@@ -343,13 +343,13 @@ mod tests {
 
         let mut example_file = make_example_file();
         let (refs1, hash1) = block_dir.store(&mut example_file, &report).unwrap();
-        assert_eq!(report.borrow_counts().get_count("block.already_present"), 0);
-        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
+        assert_eq!(report.get_count("block.already_present"), 0);
+        assert_eq!(report.get_count("block.write"), 1);
 
         let mut example_file = make_example_file();
         let (refs2, hash2) = block_dir.store(&mut example_file, &report).unwrap();
-        assert_eq!(report.borrow_counts().get_count("block.already_present"), 1);
-        assert_eq!(report.borrow_counts().get_count("block.write"), 1);
+        assert_eq!(report.get_count("block.already_present"), 1);
+        assert_eq!(report.get_count("block.write"), 1);
 
         assert_eq!(hash1, hash2);
         assert_eq!(refs1, refs2);

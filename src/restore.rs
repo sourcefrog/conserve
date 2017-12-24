@@ -173,7 +173,7 @@ mod tests {
             .restore(&af, destdir.path(), &restore_report)
             .unwrap();
 
-        assert_eq!(3, restore_report.borrow_counts().get_count("file"));
+        assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("hello2")).is_a_file();
@@ -201,7 +201,7 @@ mod tests {
             .restore(&af, destdir.path(), &restore_report)
             .unwrap();
         // Does not have the 'hello2' file added in the second version.
-        assert_eq!(2, restore_report.borrow_counts().get_count("file"));
+        assert_eq!(2, restore_report.get_count("file"));
     }
 
     #[test]
@@ -233,7 +233,7 @@ mod tests {
             .restore(&af, destdir.path(), &restore_report)
             .unwrap();
 
-        assert_eq!(3, restore_report.borrow_counts().get_count("file"));
+        assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("existing").as_path()).is_a_file();
