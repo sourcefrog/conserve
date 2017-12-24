@@ -145,6 +145,28 @@ pub fn list_dir(path: &Path) -> Result<(HashSet<String>, HashSet<String>)> {
 }
 
 
+/// Create a directory if it doesn't exist; if it does then assert it must be empty.
+pub fn require_empty_directory(path: &Path) -> Result<()> {
+    if let Err(e) = std::fs::create_dir(&path) {
+        if e.kind() == io::ErrorKind::AlreadyExists {
+            // Exists and hopefully empty?
+            if std::fs::read_dir(&path)?.next().is_some() {
+                Err(e).chain_err(|| {
+                    format!("Directory exists and is not empty {:?}", path)
+                })
+            } else {
+                Ok(()) // Exists and empty
+            }
+        } else {
+            Err(e)
+                .chain_err(|| format!("Failed to create directory {:?}", path))
+        }
+    } else {
+        Ok(()) // Created
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     // TODO: Somehow test the error cases.

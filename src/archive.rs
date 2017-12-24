@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
 //! Archives holding backup material.
 //!
@@ -10,11 +10,10 @@
 use std;
 use std::fs;
 use std::fs::read_dir;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use super::*;
-use super::io::file_exists;
+use super::io::{file_exists, require_empty_directory};
 use super::jsonio;
 
 
@@ -40,20 +39,7 @@ impl Archive {
         let archive = Archive { path: path.to_path_buf() };
         // Report is not consumed because the results for init aren't so interesting.
         let report = Report::new();
-        if let Err(e) = std::fs::create_dir(&archive.path) {
-            if e.kind() == io::ErrorKind::AlreadyExists {
-                // Exists and hopefully empty?
-                if std::fs::read_dir(&archive.path)?.next().is_some() {
-                    return Err(e).chain_err(|| {
-                        format!("Archive directory exists and is not empty {:?}",
-                                archive.path)
-                    });
-                }
-            } else {
-                return Err(e)
-                    .chain_err(|| format!("Failed to create archive directory {:?}", archive.path));
-            }
-        }
+        require_empty_directory(&archive.path)?;
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
         let header_filename = path.join(HEADER_FILENAME);
         jsonio::write(&header_filename, &header, &report)
@@ -172,6 +158,7 @@ impl Iterator for IterBands {
                 }
             };
             if !ft.is_dir() {
+                // TODO: Complain about non-directory children other than the expected header?
                 continue;
             }
             if let Ok(name_string) = entry.file_name().into_string() {
