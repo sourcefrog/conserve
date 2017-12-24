@@ -360,8 +360,9 @@ mod tests {
         const N_CHUNKS: u64 = 10;
         const CHUNK_SIZE: u64 = 1 << 21;
         const TOTAL_SIZE: u64 = N_CHUNKS * CHUNK_SIZE;
+        let a_chunk = vec![b'@'; CHUNK_SIZE as usize];
         for _i in 0..N_CHUNKS {
-            tf.write_all(&[64; CHUNK_SIZE as usize]).unwrap();
+            tf.write_all(&a_chunk).unwrap();
         }
         tf.flush().unwrap();
         let tf_len = tf.seek(SeekFrom::Current(0)).unwrap();
@@ -370,7 +371,6 @@ mod tests {
         tf.seek(SeekFrom::Start(0)).unwrap();
 
         let (addrs, _overall_hash) = block_dir.store(&mut tf, &report).unwrap();
-        // TODO: Assertions about report counters.
         println!("Report after store: {}", report);
 
         // Since the blocks are identical we should see them only stored once, and several
