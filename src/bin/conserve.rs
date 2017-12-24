@@ -87,7 +87,9 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .short("e")
             .takes_value(true)
             .multiple(true)
-            .help("Exclude files that matches the provided GLOB pattern")
+            .number_of_values(1)
+            .value_name("GLOB")
+            .help("Exclude files that match the provided glob pattern")
     };
 
     fn incomplete_arg<'a, 'b>() -> Arg<'a, 'b> {
