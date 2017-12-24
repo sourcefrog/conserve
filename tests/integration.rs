@@ -25,7 +25,7 @@ pub fn simple_backup() {
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].as_string());
 
-    let dur = report.borrow_counts().get_duration("source.read");
+    let dur = report.get_duration("source.read");
     let read_us = (dur.subsec_nanos() as u64) / 1000u64 + dur.as_secs() * 1000000u64;
     assert!(read_us > 0);
 

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
 //! Accumulate statistics about a Conserve operation.
 //!
@@ -200,6 +200,10 @@ impl Report {
 
     pub fn get_count(&self, counter_name: &str) -> u64 {
         self.borrow_counts().get_count(counter_name)
+    }
+
+    pub fn get_duration(&self, name: &str) -> Duration {
+        self.borrow_counts().get_duration(name)
     }
 }
 
