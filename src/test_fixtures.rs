@@ -97,9 +97,13 @@ impl TreeFixture {
     }
 
     pub fn create_file(self: &TreeFixture, relative_path: &str) {
+        self.create_file_with_contents(relative_path, b"contents");
+    }
+
+    pub fn create_file_with_contents(self: &TreeFixture, relative_path: &str, contents: &[u8]) {
         let full_path = self.root.join(relative_path);
         let mut f = fs::File::create(&full_path).unwrap();
-        f.write_all(b"contents").unwrap();
+        f.write_all(contents).unwrap();
     }
 
     pub fn create_dir(self: &TreeFixture, relative_path: &str) {
