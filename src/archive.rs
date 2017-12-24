@@ -34,7 +34,6 @@ struct ArchiveHeader {
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
     pub fn init(path: &Path) -> Result<Archive> {
-        debug!("Creating archive directory {:?}", path.display());
         let archive = Archive { path: path.to_path_buf() };
         // Report is not consumed because the results for init aren't so interesting.
         let report = Report::new();
