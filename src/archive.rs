@@ -139,6 +139,11 @@ impl Archive {
         };
         self.open_band(&band_id, report)
     }
+
+    /// Open access to a tree (including index and file contents) stored in the archive.
+    pub fn stored_tree(&self, band_id: &Option<BandId>, report: &Report) -> Result<StoredTree> {
+        StoredTree::open(self, band_id, report)
+    }
 }
 
 
