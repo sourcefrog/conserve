@@ -6,6 +6,10 @@
 //! A report includes counters of events, and also sizes for files.
 //!
 //! Sizes can be reported in both compressed and uncompressed form.
+//!
+//! By convention in this library when a Report is explicitly provided, it's the last parameter.
+//!
+//! When possible a Report is inherited from an `Archive` into the objects created from it.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -93,7 +97,7 @@ pub struct Counts {
 /// A Report is internally mutable, so a single instance can be shared by multiple objects
 /// or scopes (on the same thread) who all append to it.
 ///
-/// Cloning a Report makes another reference to the same underlying counters.
+/// Cloning a Report makes a shared reference to the same underlying counters.
 #[derive(Clone, Debug)]
 pub struct Report {
     counts: Arc<Mutex<Counts>>,

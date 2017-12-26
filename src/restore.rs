@@ -59,7 +59,7 @@ impl RestoreOptions {
         report: &Report,
     ) -> Result<()> {
         let options = &self;
-        let stored_tree = archive.stored_tree(&options.band_id, &report)?;
+        let stored_tree = archive.stored_tree(&options.band_id)?;
 
         if !options.force_overwrite {
             if let Ok(mut it) = fs::read_dir(&destination) {

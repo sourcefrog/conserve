@@ -24,8 +24,8 @@ pub struct StoredTree {
 
 
 impl StoredTree {
-    pub(super) fn open(archive: &Archive, band_id: &Option<BandId>, report: &Report) -> Result<StoredTree> {
-        let band = archive.open_band(&band_id, report)?;
+    pub(super) fn open(archive: &Archive, band_id: &Option<BandId>) -> Result<StoredTree> {
+        let band = archive.open_band(band_id)?;
         // TODO: Maybe warn if the band's incomplete, or fail unless opening is forced?
         Ok(StoredTree {
             archive: archive.clone(),
@@ -78,7 +78,7 @@ mod test {
 
         let report = Report::new();
         let last_band_id = af.last_band_id().unwrap();
-        let st = af.stored_tree(&None, &report).unwrap();
+        let st = af.stored_tree(&None).unwrap();
 
         assert_eq!(st.band().id(), last_band_id);
 
@@ -104,7 +104,6 @@ mod test {
     #[test]
     pub fn cant_open_no_versions() {
         let af = ScratchArchive::new();
-        let report = Report::new();
-        assert!(af.stored_tree(&None, &report).is_err());
+        assert!(af.stored_tree(&None).is_err());
     }
 }

@@ -238,7 +238,7 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
             println!("{}", band_id);
             continue;
         }
-        let band = match archive.open_band(&Some(band_id.clone()), report) {
+        let band = match archive.open_band(&Some(band_id.clone())) {
             Ok(band) => band,
             Err(e) => {
                 warn!("Failed to open band {:?}: {:?}", band_id, e);
@@ -273,7 +273,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive_path = Path::new(subm.value_of("archive").unwrap());
     let archive = Archive::open(archive_path, &report)?;
     let band_id = band_id_from_match(subm)?;
-    let st = archive.stored_tree(&band_id, report)?;
+    let st = archive.stored_tree(&band_id)?;
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
     let excludes = match subm.values_of("exclude") {
         Some(excludes) => {
@@ -293,8 +293,9 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(archive_path, &report)?;
     let destination_path = Path::new(subm.value_of("destination").unwrap());
     let force_overwrite = subm.is_present("force-overwrite");
+    // TODO: Restore core code should complain if the band is incomplete.
     let band_id = band_id_from_match(subm)?;
-    let band = archive.open_band(&band_id, report)?;
+    let band = archive.open_band(&band_id)?;
     complain_if_incomplete(&band, subm.is_present("incomplete"))?;
     let mut options = conserve::RestoreOptions::default()
         .force_overwrite(force_overwrite)

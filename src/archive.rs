@@ -25,6 +25,9 @@ const HEADER_FILENAME: &'static str = "CONSERVE";
 pub struct Archive {
     /// Top-level directory for the archive.
     path: PathBuf,
+
+    /// Report for operations on this archive.
+    report: Report,
 }
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
@@ -35,13 +38,14 @@ struct ArchiveHeader {
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
     pub fn init(path: &Path) -> Result<Archive> {
-        let archive = Archive { path: path.to_path_buf() };
-        // Report is not consumed because the results for init aren't so interesting.
-        let report = Report::new();
+        let archive = Archive {
+            path: path.to_path_buf(),
+            report: Report::new(),
+        };
         require_empty_directory(&archive.path)?;
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
         let header_filename = path.join(HEADER_FILENAME);
-        jsonio::write(&header_filename, &header, &report)
+        jsonio::write(&header_filename, &header, &archive.report)
             .chain_err(|| format!("Failed to write archive header: {:?}", header_filename))?;
         info!("Created new archive in {:?}", path.display());
         Ok(archive)
@@ -61,7 +65,10 @@ impl Archive {
             return Err(ErrorKind::UnsupportedArchiveVersion(header.conserve_archive_version)
                 .into());
         }
-        Ok(Archive { path: path.to_path_buf() })
+        Ok(Archive {
+            path: path.to_path_buf(),
+            report: report.clone(),
+     })
     }
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
@@ -103,27 +110,27 @@ impl Archive {
     }
 
     /// Make a new band. Bands are numbered sequentially.
-    pub fn create_band(self: &Archive, report: &Report) -> Result<Band> {
+    pub fn create_band(self: &Archive) -> Result<Band> {
         let new_band_id = match self.last_band_id() {
             Err(Error(ErrorKind::ArchiveEmpty, _)) => BandId::zero(),
             Ok(b) => b.next_sibling(),
             Err(e) => return Err(e),
         };
-        Band::create(self.path(), new_band_id, report)
+        Band::create(self.path(), new_band_id, &self.report)
     }
 
-    /// Open a band if specified, or the last.
-    pub fn open_band(&self, band_id: &Option<BandId>, report: &Report) -> Result<Band> {
+    /// Open a band if specified, or otherwise the last band.
+    pub fn open_band(&self, band_id: &Option<BandId>) -> Result<Band> {
         let band_id = match band_id {
             &Some(ref b) => b.clone(),
             &None => self.last_band_id()?,
         };
-        Band::open(self.path(), &band_id, report)
+        Band::open(self.path(), &band_id, &self.report)
     }
 
     /// Open access to a tree (including index and file contents) stored in the archive.
-    pub fn stored_tree(&self, band_id: &Option<BandId>, report: &Report) -> Result<StoredTree> {
-        StoredTree::open(self, band_id, report)
+    pub fn stored_tree(&self, band_id: &Option<BandId>) -> Result<StoredTree> {
+        StoredTree::open(self, band_id)
     }
 }
 
@@ -240,7 +247,7 @@ mod tests {
         }
 
         // Make one band
-        let _band1 = af.create_band(&Report::new()).unwrap();
+        let _band1 = af.create_band().unwrap();
         assert!(directory_exists(af.path()).unwrap());
         let (_file_names, dir_names) = list_dir(af.path()).unwrap();
         println!("dirs: {:?}", dir_names);
@@ -250,7 +257,7 @@ mod tests {
         assert_eq!(af.last_band_id().unwrap(), BandId::new(&[0]));
 
         // Try creating a second band.
-        let _band2 = &af.create_band(&Report::new()).unwrap();
+        let _band2 = &af.create_band().unwrap();
         assert_eq!(af.list_bands().unwrap(),
                    vec![BandId::new(&[0]), BandId::new(&[1])]);
         assert_eq!(af.last_band_id().unwrap(), BandId::new(&[1]));

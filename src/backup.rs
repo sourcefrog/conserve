@@ -43,7 +43,7 @@ impl BackupOptions {
 
     pub fn backup(&self, archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
         let archive = Archive::open(archive_path, &report)?;
-        let band = archive.create_band(&report)?;
+        let band = archive.create_band()?;
         let mut backup = Backup {
             block_dir: band.block_dir(),
             index_builder: band.index_builder(),
@@ -149,7 +149,7 @@ mod tests {
         assert_eq!(1, band_ids.len());
         assert_eq!("b0000", band_ids[0].as_string());
 
-        let band = af.open_band(&Some(band_ids[0].clone()), &report).unwrap();
+        let band = af.open_band(&Some(band_ids[0].clone())).unwrap();
         assert!(band.is_closed().unwrap());
 
         let index_entries = band.index_iter(&excludes::excludes_nothing(), &report)
@@ -205,7 +205,7 @@ mod tests {
         assert_eq!(1, report.get_count("file"), "file count");
 
         // Read back the empty file
-        let st = af.stored_tree(&None, &report).unwrap();
+        let st = af.stored_tree(&None).unwrap();
         let empty_entry = st.index_iter(&excludes::excludes_nothing(), &report).unwrap()
             .map(|i| i.unwrap())
             .find(|ref i| {i.apath == "/empty"})
