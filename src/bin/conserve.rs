@@ -238,7 +238,7 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
             println!("{}", band_id);
             continue;
         }
-        let band = match archive.open_band(&band_id, report) {
+        let band = match archive.open_band(&Some(band_id.clone()), report) {
             Ok(band) => band,
             Err(e) => {
                 warn!("Failed to open band {:?}: {:?}", band_id, e);
@@ -294,7 +294,7 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let destination_path = Path::new(subm.value_of("destination").unwrap());
     let force_overwrite = subm.is_present("force-overwrite");
     let band_id = band_id_from_match(subm)?;
-    let band = archive.open_band_or_last(&band_id, report)?;
+    let band = archive.open_band(&band_id, report)?;
     complain_if_incomplete(&band, subm.is_present("incomplete"))?;
     let mut options = conserve::RestoreOptions::default()
         .force_overwrite(force_overwrite)

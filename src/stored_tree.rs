@@ -25,7 +25,7 @@ pub struct StoredTree {
 
 impl StoredTree {
     pub(super) fn open(archive: &Archive, band_id: &Option<BandId>, report: &Report) -> Result<StoredTree> {
-        let band = archive.open_band_or_last(&band_id, report)?;
+        let band = archive.open_band(&band_id, report)?;
         // TODO: Maybe warn if the band's incomplete, or fail unless opening is forced?
         Ok(StoredTree {
             archive: archive.clone(),

@@ -59,7 +59,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     let read_us = (dur.subsec_nanos() as u64) / 1000u64 + dur.as_secs() * 1000000u64;
     assert!(read_us > 0);
 
-    let band = af.open_band(&band_ids[0], &report).unwrap();
+    let band = af.open_band(&Some(band_ids[0].clone()), &report).unwrap();
     assert!(band.is_closed().unwrap());
 
     let index_entries = band.index_iter(&excludes::excludes_nothing(), &report)

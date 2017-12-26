@@ -112,18 +112,13 @@ impl Archive {
         Band::create(self.path(), new_band_id, report)
     }
 
-    /// Open a specific named band.
-    pub fn open_band(&self, band_id: &BandId, report: &Report) -> Result<Band> {
-        Band::open(self.path(), band_id, report)
-    }
-
     /// Open a band if specified, or the last.
-    pub fn open_band_or_last(&self, band_id: &Option<BandId>, report: &Report) -> Result<Band> {
+    pub fn open_band(&self, band_id: &Option<BandId>, report: &Report) -> Result<Band> {
         let band_id = match band_id {
             &Some(ref b) => b.clone(),
             &None => self.last_band_id()?,
         };
-        self.open_band(&band_id, report)
+        Band::open(self.path(), &band_id, report)
     }
 
     /// Open access to a tree (including index and file contents) stored in the archive.
