@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
 //! Bands are the top-level structure inside an archive.
 //!
@@ -7,6 +7,9 @@
 //! band.
 //!
 //! Bands can stack on top of each other to create a tree of incremental backups.
+//!
+//! To read a consistent tree possibly composed from several incremental backups, use
+//! StoredTree rather than the Band itself.
 
 
 use std::fs;
