@@ -16,10 +16,10 @@ use super::io::AtomicFile;
 
 
 pub fn write<T: Encodable>(path: &Path, obj: &T, report: &Report) -> Result<()> {
-    let mut f = try!(AtomicFile::new(path));
-    try!(f.write_all(json::encode(&obj).unwrap().as_bytes()));
-    try!(f.write_all(b"\n"));
-    try!(f.close(report));
+    let mut f = AtomicFile::new(path)?;
+    f.write_all(json::encode(&obj).unwrap().as_bytes())?;
+    f.write_all(b"\n")?;
+    f.close(report)?;
     Ok(())
 }
 
@@ -37,7 +37,7 @@ pub fn read<T: Decodable>(path: &Path, _report: &Report) -> Result<T> {
 
 #[cfg(test)]
 mod tests {
-    use testfixtures::TreeFixture;
+    use test_fixtures::TreeFixture;
     use Report;
 
     #[derive(Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]

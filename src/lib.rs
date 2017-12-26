@@ -45,7 +45,9 @@ mod jsonio;
 pub mod report;
 mod restore;
 pub mod sources;
-pub mod testfixtures;
+mod stored_file;
+mod stored_tree;
+pub mod test_fixtures;
 pub mod ui;
 
 pub use archive::Archive;
@@ -61,6 +63,7 @@ pub use io::{AtomicFile, ensure_dir_exists};
 pub use index::{IndexBuilder, Entry, IndexKind};
 pub use report::{Report, Sizes};
 pub use restore::RestoreOptions;
+pub use stored_tree::StoredTree;
 pub use ui::UI;
 
 

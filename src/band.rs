@@ -69,13 +69,13 @@ impl Band {
     pub fn create(archive_dir: &Path, id: BandId, report: &Report) -> Result<Band> {
         let new = Band::new(archive_dir, id);
 
-        try!(fs::create_dir(&new.path_buf));
-        try!(fs::create_dir(&new.block_dir_path));
-        try!(fs::create_dir(&new.index_dir_path));
+        fs::create_dir(&new.path_buf)?;
+        fs::create_dir(&new.block_dir_path)?;
+        fs::create_dir(&new.index_dir_path)?;
         info!("Created band {} in {:?}", new.id, &archive_dir);
 
         let head = Head { start_time: UTC::now().timestamp() };
-        try!(jsonio::write(&new.head_path(), &head, report));
+        jsonio::write(&new.head_path(), &head, report)?;
         Ok(new)
     }
 
@@ -139,8 +139,8 @@ impl Band {
     }
 
     /// Make an iterator that will return all entries in this band.
-    pub fn index_iter(&self, report: &Report, excludes: &GlobSet) -> Result<index::Iter> {
-        index::read(&self.index_dir_path, report, excludes)
+    pub fn index_iter(&self, excludes: &GlobSet, report: &Report) -> Result<index::Iter> {
+        index::read(&self.index_dir_path, excludes, report)
     }
 
     fn read_head(&self, report: &Report) -> Result<Head> {
@@ -178,7 +178,7 @@ mod tests {
     use chrono::Duration;
 
     use super::super::*;
-    use testfixtures::ScratchArchive;
+    use test_fixtures::ScratchArchive;
 
     #[test]
     fn create_and_reopen_band() {

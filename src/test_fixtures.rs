@@ -17,7 +17,9 @@ use tempdir;
 use super::*;
 
 
-/// A temporary archive.
+/// A temporary archive, deleted when it goes out of scope.
+///
+/// The ScratchArchive can be treated as an Archive.
 pub struct ScratchArchive {
     _tempdir: tempdir::TempDir, // held only for cleanup
     archive: Archive,
@@ -45,6 +47,22 @@ impl ScratchArchive {
 
     pub fn setup_incomplete_empty_band(&self) {
         self.archive.create_band(&Report::new()).unwrap();
+    }
+
+    pub fn store_two_versions(&self) {
+        let srcdir = TreeFixture::new();
+        srcdir.create_file("hello");
+        srcdir.create_dir("subdir");
+        srcdir.create_file("subdir/subfile");
+        if SYMLINKS_SUPPORTED {
+            srcdir.create_symlink("link", "target");
+        }
+
+        let backup_report = Report::new();
+        BackupOptions::default().backup(self.path(), srcdir.path(), &backup_report).unwrap();
+
+        srcdir.create_file("hello2");
+        BackupOptions::default().backup(self.path(), srcdir.path(), &Report::new()).unwrap();
     }
 }
 
@@ -81,9 +99,13 @@ impl TreeFixture {
     }
 
     pub fn create_file(self: &TreeFixture, relative_path: &str) {
+        self.create_file_with_contents(relative_path, b"contents");
+    }
+
+    pub fn create_file_with_contents(self: &TreeFixture, relative_path: &str, contents: &[u8]) {
         let full_path = self.root.join(relative_path);
         let mut f = fs::File::create(&full_path).unwrap();
-        f.write_all(b"contents").unwrap();
+        f.write_all(contents).unwrap();
     }
 
     pub fn create_dir(self: &TreeFixture, relative_path: &str) {

@@ -47,11 +47,8 @@ source tree), the backup is considered *complete*.
 
     conserve backup /backup/home.cons ~
 
-Use `--exclude GLOB` to exclude files or directories from the backup using 
-[GLOB patterns](https://docs.rs/globset/0.2.1/globset/#syntax). 
-The `--exclude` option is also available for `restore`, `ls` and `list-source`. 
-Please note that the pattern provided in the exclude has to be relative to the 
-top-level directory.
+Use `--exclude GLOB` to exclude files or directories from the backup using
+[glob patterns](https://docs.rs/globset/0.2.1/globset/#syntax).
 
 `conserve versions` lists the versions in an archive,
 whether or not the backup is *complete*,
@@ -73,12 +70,20 @@ you can specify a different version using `-b`.  (You can also omit leading zero
 from the backup version.)
 
     $ conserve ls -b b0 /backup/home.cons | less
-    
+
 
 `conserve restore` copies a version back out of an archive.
 
     $ conserve restore /backup/home.cons /tmp/trial-restore
 
+## Exclusions
+
+The `--exclude GLOB` option can be given to commands that operate on files,
+including `backup`, `restore`, `ls` and `list-source`.
+
+A `/` at the start of the exclusion pattern anchors it to the top of the backup
+tree (not the root of the filesystem.)  `**` recursively matches any number
+of directories.
 
 ## Install
 

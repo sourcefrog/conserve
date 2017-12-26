@@ -42,22 +42,18 @@ impl BackupOptions {
     }
 
     pub fn backup(&self, archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
-        let archive = try!(Archive::open(archive_path, &report));
-        let band = try!(archive.create_band(&report));
-
+        let archive = Archive::open(archive_path, &report)?;
+        let band = archive.create_band(&report)?;
         let mut backup = Backup {
             block_dir: band.block_dir(),
             index_builder: band.index_builder(),
             report: report.clone(),
         };
-
-        let source_iter = sources::iter(source, report, &self.excludes)?;
-
-        for entry in source_iter {
-            try!(backup.store_one_source_entry(&entry?));
+        for entry in sources::iter(source, report, &self.excludes)? {
+            backup.store_one_source_entry(&entry?)?;
         }
-        try!(backup.index_builder.finish_hunk(report));
-        try!(band.close(&backup.report));
+        backup.index_builder.finish_hunk(report)?;
+        band.close(&backup.report)?;
         Ok(())
     }
 }
@@ -77,9 +73,9 @@ impl Backup {
             self.report.increment("skipped.unsupported_file_kind", 1);
             return Ok(());
         };
-        let new_index_entry = try!(store_fn(self, source_entry));
+        let new_index_entry = store_fn(self, source_entry)?;
         self.index_builder.push(new_index_entry);
-        try!(self.index_builder.maybe_flush(&self.report));
+        self.index_builder.maybe_flush(&self.report)?;
         Ok(())
     }
 
@@ -100,8 +96,8 @@ impl Backup {
     fn store_file(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
-        let mut f = try!(fs::File::open(&source_entry.path));
-        let (addrs, body_hash) = try!(self.block_dir.store(&mut f, &self.report));
+        let mut f = fs::File::open(&source_entry.path)?;
+        let (addrs, body_hash) = self.block_dir.store(&mut f, &self.report)?;
         Ok(index::Entry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
@@ -115,9 +111,9 @@ impl Backup {
 
     fn store_symlink(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
         self.report.increment("symlink", 1);
-        // TODO: Maybe log a warning if the target is not decodable rather than silently
-        // losing.
-        let target = try!(fs::read_link(&source_entry.path)).to_string_lossy().to_string();
+        // TODO: Record a problem and log a message if the target is not decodable, rather than
+        //  silently losing.
+        let target = fs::read_link(&source_entry.path)?.to_string_lossy().to_string();
         Ok(index::Entry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
@@ -133,7 +129,7 @@ impl Backup {
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use testfixtures::{ScratchArchive, TreeFixture};
+    use test_fixtures::{ScratchArchive, TreeFixture};
 
     #[cfg(unix)]
     #[test]
@@ -143,11 +139,11 @@ mod tests {
         srcdir.create_symlink("symlink", "/a/broken/destination");
         let report = Report::new();
         BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
-        assert_eq!(0, report.borrow_counts().get_count("block"));
-        assert_eq!(0, report.borrow_counts().get_count("file"));
-        assert_eq!(1, report.borrow_counts().get_count("symlink"));
+        assert_eq!(0, report.get_count("block.write"));
+        assert_eq!(0, report.get_count("file"));
+        assert_eq!(1, report.get_count("symlink"));
         assert_eq!(0,
-                   report.borrow_counts().get_count("skipped.unsupported_file_kind"));
+                   report.get_count("skipped.unsupported_file_kind"));
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
@@ -156,7 +152,7 @@ mod tests {
         let band = af.open_band(&band_ids[0], &report).unwrap();
         assert!(band.is_closed().unwrap());
 
-        let index_entries = band.index_iter(&report, &excludes::excludes_nothing())
+        let index_entries = band.index_iter(&excludes::excludes_nothing(), &report)
             .unwrap()
             .filter_map(|i| i.ok())
             .collect::<Vec<index::Entry>>();
@@ -188,12 +184,33 @@ mod tests {
             .backup(af.path(), srcdir.path(), &report)
             .unwrap();
 
-        assert_eq!(1, report.borrow_counts().get_count("block"));
-        assert_eq!(1, report.borrow_counts().get_count("file"));
-        assert_eq!(2, report.borrow_counts().get_count("dir"));
-        assert_eq!(0, report.borrow_counts().get_count("symlink"));
-        assert_eq!(0, report.borrow_counts().get_count("skipped.unsupported_file_kind"));
-        assert_eq!(4, report.borrow_counts().get_count("skipped.excluded.files"));
-        assert_eq!(1, report.borrow_counts().get_count("skipped.excluded.directories"));
+        assert_eq!(1, report.get_count("block.write"));
+        assert_eq!(1, report.get_count("file"));
+        assert_eq!(2, report.get_count("dir"));
+        assert_eq!(0, report.get_count("symlink"));
+        assert_eq!(0, report.get_count("skipped.unsupported_file_kind"));
+        assert_eq!(4, report.get_count("skipped.excluded.files"));
+        assert_eq!(1, report.get_count("skipped.excluded.directories"));
+    }
+
+    #[test]
+    pub fn empty_file_uses_zero_blocks() {
+        let af = ScratchArchive::new();
+        let srcdir = TreeFixture::new();
+        srcdir.create_file_with_contents("empty", &[]);
+        let report = Report::new();
+        BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
+
+        assert_eq!(0, report.get_count("block.write"));
+        assert_eq!(1, report.get_count("file"), "file count");
+
+        // Read back the empty file
+        let st = af.stored_tree(&None, &report).unwrap();
+        let empty_entry = st.index_iter(&excludes::excludes_nothing(), &report).unwrap()
+            .map(|i| i.unwrap())
+            .find(|ref i| {i.apath == "/empty"})
+            .expect("found one entry");
+        let sf = st.file_contents(&empty_entry, &report).unwrap();
+        assert_eq!(0, sf.count(), "reading empty file has zero chunks");
     }
 }

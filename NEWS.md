@@ -1,18 +1,15 @@
 # Conserve release history
 
+## Conserve 0.4.1
+
+* Large files are broken into multiple blocks of 1MB uncompressed content,
+  so that memory use is capped and so that common blocks can potentially be
+  shared.
+
 ## Conserve 0.4.0
 
 * Switch from Brotli2 to Snappy compression: probably a better
   speed/size tradeoff for mixed data. (Breaks format compatibility.)
-
-## Conserve 0.3.3
-
-Never released.
-
-Bug fixes:
-
-* Conserve was not actually syncing data written to block files, only indexes.
-  This is now fixed.
 
 * Updated to work with Rust 1.22 and current library dependencies.
 

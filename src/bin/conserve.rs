@@ -223,7 +223,7 @@ fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
         report,
         &excludes)?;
     for entry in &mut source_iter {
-        println!("{}", try!(entry).apath);
+        println!("{}", entry?.apath);
     }
     Ok(())
 }
@@ -232,8 +232,8 @@ fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive_path = Path::new(subm.value_of("archive").unwrap());
     let short_output = subm.is_present("short");
-    let archive = try!(Archive::open(archive_path, &report));
-    for band_id in try!(archive.list_bands()) {
+    let archive = Archive::open(archive_path, &report)?;
+    for band_id in archive.list_bands()? {
         if short_output {
             println!("{}", band_id);
             continue;
@@ -271,19 +271,18 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive_path = Path::new(subm.value_of("archive").unwrap());
-    let archive = try!(Archive::open(archive_path, &report));
-    let band_id = try!(band_id_from_match(subm));
-    let band = try!(archive.open_band_or_last(&band_id, report));
-    complain_if_incomplete(&band, subm.is_present("incomplete"))?;
+    let archive = Archive::open(archive_path, &report)?;
+    let band_id = band_id_from_match(subm)?;
+    let st = archive.stored_tree(&band_id, report)?;
+    complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
     let excludes = match subm.values_of("exclude") {
         Some(excludes) => {
             excludes::from_strings(excludes.collect())?
         }
         None => excludes::excludes_nothing()
     };
-    for i in try!(band.index_iter(report, &excludes)) {
-        let entry = try!(i);
-        println!("{}", entry.apath);
+    for i in st.index_iter(&excludes, &report)? {
+        println!("{}", i?.apath);
     }
     Ok(())
 }
@@ -291,7 +290,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive_path = Path::new(subm.value_of("archive").unwrap());
-    let archive = try!(Archive::open(archive_path, &report));
+    let archive = Archive::open(archive_path, &report)?;
     let destination_path = Path::new(subm.value_of("destination").unwrap());
     let force_overwrite = subm.is_present("force-overwrite");
     let band_id = band_id_from_match(subm)?;
@@ -308,7 +307,7 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn band_id_from_match(subm: &ArgMatches) -> Result<Option<BandId>> {
     match subm.value_of("backup") {
-        Some(b) => Ok(Some(try!(BandId::from_string(b)))),
+        Some(b) => Ok(Some(BandId::from_string(b)?)),
         None => Ok(None),
     }
 }

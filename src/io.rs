@@ -26,7 +26,7 @@ impl AtomicFile {
         let dir = path.parent().unwrap();
         Ok(AtomicFile {
             path: path.to_path_buf(),
-            f: try!(tempfile::NamedTempFileOptions::new().prefix("tmp").create_in(dir)),
+            f: tempfile::NamedTempFileOptions::new().prefix("tmp").create_in(dir)?,
         })
     }
 
@@ -129,10 +129,10 @@ pub fn file_exists(path: &Path) -> Result<bool> {
 pub fn list_dir(path: &Path) -> Result<(HashSet<String>, HashSet<String>)> {
     let mut file_names = HashSet::<String>::new();
     let mut dir_names = HashSet::<String>::new();
-    for entry in try!(fs::read_dir(path)) {
+    for entry in fs::read_dir(path)? {
         let entry = entry.unwrap();
         let entry_filename = entry.file_name().into_string().unwrap();
-        let entry_type = try!(entry.file_type());
+        let entry_type = entry.file_type()?;
         if entry_type.is_file() {
             file_names.insert(entry_filename);
         } else if entry_type.is_dir() {
@@ -142,6 +142,28 @@ pub fn list_dir(path: &Path) -> Result<(HashSet<String>, HashSet<String>)> {
         }
     }
     Ok((file_names, dir_names))
+}
+
+
+/// Create a directory if it doesn't exist; if it does then assert it must be empty.
+pub fn require_empty_directory(path: &Path) -> Result<()> {
+    if let Err(e) = std::fs::create_dir(&path) {
+        if e.kind() == io::ErrorKind::AlreadyExists {
+            // Exists and hopefully empty?
+            if std::fs::read_dir(&path)?.next().is_some() {
+                Err(e).chain_err(|| {
+                    format!("Directory exists and is not empty {:?}", path)
+                })
+            } else {
+                Ok(()) // Exists and empty
+            }
+        } else {
+            Err(e)
+                .chain_err(|| format!("Failed to create directory {:?}", path))
+        }
+    } else {
+        Ok(()) // Created
+    }
 }
 
 

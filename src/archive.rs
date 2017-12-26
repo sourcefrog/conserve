@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
 //! Archives holding backup material.
 //!
@@ -10,16 +10,17 @@
 use std;
 use std::fs;
 use std::fs::read_dir;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use super::*;
-use super::io::file_exists;
+use super::io::{file_exists, require_empty_directory};
 use super::jsonio;
 
 
 const HEADER_FILENAME: &'static str = "CONSERVE";
 
+
+/// An archive holding backup material.
 #[derive(Clone, Debug)]
 pub struct Archive {
     /// Top-level directory for the archive.
@@ -37,24 +38,11 @@ impl Archive {
         let archive = Archive { path: path.to_path_buf() };
         // Report is not consumed because the results for init aren't so interesting.
         let report = Report::new();
-        if let Err(e) = std::fs::create_dir(&archive.path) {
-            if e.kind() == io::ErrorKind::AlreadyExists {
-                // Exists and hopefully empty?
-                if try!(std::fs::read_dir(&archive.path)).next().is_some() {
-                    return Err(e).chain_err(|| {
-                        format!("Archive directory exists and is not empty {:?}",
-                                archive.path)
-                    });
-                }
-            } else {
-                return Err(e)
-                    .chain_err(|| format!("Failed to create archive directory {:?}", archive.path));
-            }
-        }
+        require_empty_directory(&archive.path)?;
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
         let header_filename = path.join(HEADER_FILENAME);
-        try!(jsonio::write(&header_filename, &header, &report)
-            .chain_err(|| format!("Failed to write archive header: {:?}", header_filename)));
+        jsonio::write(&header_filename, &header, &report)
+            .chain_err(|| format!("Failed to write archive header: {:?}", header_filename))?;
         info!("Created new archive in {:?}", path.display());
         Ok(archive)
     }
@@ -78,14 +66,15 @@ impl Archive {
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
     pub fn iter_bands_unsorted(self: &Archive) -> Result<IterBands> {
-        let read_dir = try!(read_dir(&self.path)
-            .chain_err(|| format!("failed reading directory {:?}", &self.path)));
+        let read_dir = read_dir(&self.path)
+            .chain_err(|| format!("failed reading directory {:?}", &self.path))?;
         Ok(IterBands { dir_iter: read_dir })
     }
 
     /// Returns a vector of band ids, in sorted order.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
-        let mut band_ids: Vec<BandId> = try!(try!(self.iter_bands_unsorted()).collect());
+        // Note: For some reason `?` doesn't work here only `try!`.
+        let mut band_ids: Vec<BandId> = try!(self.iter_bands_unsorted()?.collect());
         band_ids.sort();
         Ok(band_ids)
     }
@@ -103,7 +92,7 @@ impl Archive {
     pub fn last_band_id(self: &Archive) -> Result<BandId> {
         // Walk through list of bands; if any error return that, otherwise return the greatest.
         let mut accum: Option<BandId> = None;
-        for next in try!(self.iter_bands_unsorted()) {
+        for next in self.iter_bands_unsorted()? {
             accum = Some(match (next, accum) {
                 (Err(e), _) => return Err(e),
                 (Ok(b), None) => b,
@@ -132,9 +121,14 @@ impl Archive {
     pub fn open_band_or_last(&self, band_id: &Option<BandId>, report: &Report) -> Result<Band> {
         let band_id = match band_id {
             &Some(ref b) => b.clone(),
-            &None => try!(self.last_band_id()),
+            &None => self.last_band_id()?,
         };
         self.open_band(&band_id, report)
+    }
+
+    /// Open access to a tree (including index and file contents) stored in the archive.
+    pub fn stored_tree(&self, band_id: &Option<BandId>, report: &Report) -> Result<StoredTree> {
+        StoredTree::open(self, band_id, report)
     }
 }
 
@@ -163,6 +157,7 @@ impl Iterator for IterBands {
                 }
             };
             if !ft.is_dir() {
+                // TODO: Complain about non-directory children other than the expected header?
                 continue;
             }
             if let Ok(name_string) = entry.file_name().into_string() {
@@ -191,7 +186,7 @@ mod tests {
     use errors::ErrorKind;
     use {BandId, Report};
     use io::list_dir;
-    use testfixtures::ScratchArchive;
+    use test_fixtures::ScratchArchive;
 
     #[test]
     fn create_then_open_archive() {

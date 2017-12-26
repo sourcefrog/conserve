@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
 //! Accumulate statistics about a Conserve operation.
 //!
@@ -26,9 +26,13 @@ use super::ui::plain::PlainUI;
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "dir",
     "file",
+    "file.empty",
+    "file.medium",
+    "file.large",
     "symlink",
     "backup.error.stat",
-    "block",
+    "block.read",
+    "block.write",
     "block.corrupt",
     "block.misplaced",
     "block.already_present",
@@ -59,6 +63,7 @@ static KNOWN_DURATIONS: &'static [&'static str] = &[
     "block.compress",
     "block.hash",
     "block.write",
+    "file.hash",
     "index.compress",
     "index.encode",
     "index.parse",
@@ -190,19 +195,31 @@ impl Report {
             })
             .ok();
     }
+
+    pub fn get_size(&self, counter_name: &str) -> Sizes {
+        self.borrow_counts().get_size(counter_name)
+    }
+
+    pub fn get_count(&self, counter_name: &str) -> u64 {
+        self.borrow_counts().get_count(counter_name)
+    }
+
+    pub fn get_duration(&self, name: &str) -> Duration {
+        self.borrow_counts().get_duration(name)
+    }
 }
 
 
 impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        try!(write!(f, "Counts:\n"));
+        write!(f, "Counts:\n")?;
         let counts = self.mut_counts();
         for (key, value) in &counts.count {
             if *value > 0 {
-                try!(write!(f, "  {:<40} {:>9}\n", *key, *value));
+                write!(f, "  {:<40} {:>9}\n", *key, *value)?;
             }
         }
-        try!(write!(f, "Bytes (before and after compression):\n"));
+        write!(f, "Bytes (before and after compression):\n")?;
         for (key, s) in &counts.sizes {
             if s.uncompressed > 0 {
                 let ratio = ui::compression_ratio(s);
@@ -214,12 +231,12 @@ impl Display for Report {
                     ratio)?;
             }
         }
-        try!(write!(f, "Durations (seconds):\n"));
+        write!(f, "Durations (seconds):\n")?;
         for (key, &dur) in &counts.durations {
             let millis = dur.subsec_nanos() / 1000000;
             let secs = dur.as_secs();
             if millis > 0 || secs > 0 {
-                try!(write!(f, "  {:<40} {:>5}.{:>03}\n", key, secs, millis));
+                write!(f, "  {:<40} {:>5}.{:>03}\n", key, secs, millis)?;
             }
         }
         Ok(())
@@ -295,20 +312,20 @@ mod tests {
     #[test]
     pub fn count() {
         let r = Report::new();
-        assert_eq!(r.borrow_counts().get_count("block"), 0);
-        r.increment("block", 1);
-        assert_eq!(r.borrow_counts().get_count("block"), 1);
-        r.increment("block", 10);
-        assert_eq!(r.borrow_counts().get_count("block"), 11);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 0);
+        r.increment("block.read", 1);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 1);
+        r.increment("block.read", 10);
+        assert_eq!(r.borrow_counts().get_count("block.read"), 11);
     }
 
     #[test]
     pub fn merge_reports() {
         let r1 = Report::new();
         let r2 = Report::new();
-        r1.increment("block", 1);
+        r1.increment("block.write", 1);
         r1.increment("block.corrupt", 2);
-        r2.increment("block", 1);
+        r2.increment("block.write", 1);
         r2.increment("block.corrupt", 10);
         r2.increment_size("block",
                           Sizes {
@@ -318,7 +335,7 @@ mod tests {
         r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
         let cs = r1.borrow_counts();
-        assert_eq!(cs.get_count("block"), 2);
+        assert_eq!(cs.get_count("block.write"), 2);
         assert_eq!(cs.get_count("block.corrupt"), 12);
         assert_eq!(cs.get_size("block"),
                    Sizes {
@@ -332,8 +349,8 @@ mod tests {
     #[test]
     pub fn display() {
         let r1 = Report::new();
-        r1.increment("block", 10);
-        r1.increment("block", 5);
+        r1.increment("block.write", 10);
+        r1.increment("block.write", 5);
         r1.increment_size("block",
             Sizes { uncompressed: 300, compressed: 100 });
         r1.increment_duration("test", Duration::new(42, 479760000));
@@ -341,7 +358,7 @@ mod tests {
         let formatted = format!("{}", r1);
         assert_eq!(formatted, "\
 Counts:
-  block                                           15
+  block.write                                     15
 Bytes (before and after compression):
   block                                          300       100       3.0x
 Durations (seconds):

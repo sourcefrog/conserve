@@ -19,7 +19,7 @@ use regex::Regex;
 use spectral::prelude::*;
 
 extern crate conserve;
-use conserve::testfixtures::{ScratchArchive, TreeFixture};
+use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
 
 #[test]

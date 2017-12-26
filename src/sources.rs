@@ -51,6 +51,7 @@ impl fmt::Debug for Entry {
 }
 
 /// Recursive iterator of the contents of a source directory.
+#[derive(Debug)]
 pub struct Iter {
     /// Directories yet to be visited.
     dir_deque: VecDeque<Entry>,
@@ -68,17 +69,32 @@ pub struct Iter {
     excludes: GlobSet
 }
 
-// TODO: Implement Debug on Iter.
-
 
 impl Iter {
+    fn unchecked_next(&mut self) -> Option<io::Result<Entry>> {
+        loop {
+            if let Some(entry) = self.entry_deque.pop_front() {
+                // Have already found some entries and just need to return them.
+                self.report.increment("source.selected", 1);
+                return Some(Ok(entry));
+            } else if let Some(entry) = self.dir_deque.pop_front() {
+                if let Err(e) = self.visit_next_directory(entry) {
+                    return Some(Err(e));
+                }
+                // Queues have been refilled.
+            } else {
+                // No entries queued and no more directories to visit.
+                return None;
+            }
+        }
+    }
+
     fn visit_next_directory(&mut self, dir_entry: Entry) -> io::Result<()> {
-        let readdir = try!(fs::read_dir(&dir_entry.path));
         self.report.increment("source.visited.directories", 1);
         let mut children = Vec::<(OsString, bool, Apath)>::new();
-        for entry in readdir {
-            let entry = try!(entry);
-            let ft = try!(entry.file_type());
+        for entry in fs::read_dir(&dir_entry.path)? {
+            let entry = entry?;
+            let ft = entry.file_type()?;
             let mut path = dir_entry.apath.to_string().clone();
             if path != "/" {
                 path.push('/');
@@ -94,10 +110,8 @@ impl Iter {
                 } else if ft.is_symlink() {
                     self.report.increment("skipped.excluded.symlinks", 1);
                 }
-
                 continue;
             }
-
             children.push((entry.file_name(), ft.is_dir(), Apath::from_string(&path)));
         }
 
@@ -125,24 +139,6 @@ impl Iter {
             self.entry_deque.push_back(new_entry);
         }
         Ok(())
-    }
-
-    fn unchecked_next(&mut self) -> Option<io::Result<Entry>> {
-        loop {
-            if let Some(entry) = self.entry_deque.pop_front() {
-                // Have already found some entries and just need to return them.
-                self.report.increment("source.selected", 1);
-                return Some(Ok(entry));
-            } else if let Some(entry) = self.dir_deque.pop_front() {
-                if let Err(e) = self.visit_next_directory(entry) {
-                    return Some(Err(e));
-                }
-                // Queues have been refilled.
-            } else {
-                // No entries queued and no more directories to visit.
-                return None;
-            }
-        }
     }
 }
 
@@ -221,7 +217,7 @@ mod tests {
 
     use super::iter;
     use super::super::*;
-    use testfixtures::TreeFixture;
+    use test_fixtures::TreeFixture;
 
     #[test]
     fn simple_directory() {
@@ -257,9 +253,9 @@ mod tests {
                            "/jam/apricot",
                            &tf.root.join("jam").join("apricot")));
 
-        assert_eq!(report.borrow_counts().get_count("source.visited.directories"),
+        assert_eq!(report.get_count("source.visited.directories"),
                    4);
-        assert_eq!(report.borrow_counts().get_count("source.selected"), 7);
+        assert_eq!(report.get_count("source.selected"), 7);
     }
 
 

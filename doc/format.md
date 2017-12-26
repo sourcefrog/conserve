@@ -166,9 +166,8 @@ All the data block for a band are stored within a `d/` subdirectory
 of the band, and then within a directory for the first three characters
 of their name.
 
-Data block are compressed in the Brotli format.  (Note: This is likely to
-change to a different compression algorithm post 0.3 because Brotli is slow to
-compress.)
+Data block are compressed in the Snappy format
+<https://github.com/google/snappy>.
 
 The name of the data block file is the BLAKE2 hash of the uncompressed
 contents.
@@ -185,7 +184,7 @@ Index hunks are stored in an `i/` subdirectory of the band, and then
 in a subdirectory for the sequence number divided by 10000 and
 padded to five digits.  So, the first block is `i/00000/000000000`.
 
-Index hunks are stored in json and gzip compressed.
+Index hunks are stored in json and also Snappy compressed.
 
 Stored files are in order by filename across all of the index hunks
 within a band.

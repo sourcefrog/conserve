@@ -112,20 +112,20 @@ impl IndexBuilder {
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
     pub fn finish_hunk(&mut self, report: &Report) -> Result<()> {
-        try!(ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)));
+        ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))?;
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
 
         let json_string = report.measure_duration("index.encode", || json::encode(&self.entries))
             .unwrap();
         let uncompressed_len = json_string.len() as u64;
 
-        let mut af = try!(AtomicFile::new(hunk_path));
+        let mut af = AtomicFile::new(hunk_path)?;
         let compressed_len = report.measure_duration("index.compress",
             || Snappy::compress_and_write(json_string.as_bytes(), &mut af))?;
 
         // TODO: Don't seek, just count bytes as they're compressed.
         // TODO: Measure time to compress separately from time to write.
-        try!(af.close(report));
+        af.close(report)?;
 
         report.increment_size("index",
             Sizes {
@@ -183,7 +183,7 @@ impl fmt::Debug for Iter {
 /// Create an iterator that will read all entires from an existing index.
 ///
 /// Prefer to use `Band::index_iter` instead.
-pub fn read(index_dir: &Path, report: &Report, excludes: &GlobSet) -> Result<Iter> {
+pub fn read(index_dir: &Path, excludes: &GlobSet, report: &Report) -> Result<Iter> {
     Ok(Iter {
         dir: index_dir.to_path_buf(),
         buffered_entries: Vec::<Entry>::new().into_iter(),
@@ -239,10 +239,10 @@ impl Iter {
         self.report.increment("index.hunk", 1);
 
         let start_parse = time::Instant::now();
-        let index_json = try!(str::from_utf8(&index_bytes)
-            .chain_err(|| format!("index file {:?} is not UTF-8", hunk_path)));
-        let entries: Vec<Entry> = try!(json::decode(index_json)
-            .chain_err(|| format!("couldn't deserialize index hunk {:?}", hunk_path)));
+        let index_json = str::from_utf8(&index_bytes)
+            .chain_err(|| format!("index file {:?} is not UTF-8", hunk_path))?;
+        let entries: Vec<Entry> = json::decode(index_json)
+            .chain_err(|| format!("couldn't deserialize index hunk {:?}", hunk_path))?;
         if entries.is_empty() {
             warn!("Index hunk {} is empty", hunk_path.display());
         }
@@ -385,7 +385,7 @@ mod tests {
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
         assert_eq!(retrieved, r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null}]"#);
 
-        let mut it = super::read(&ib.dir, &report, &excludes::excludes_nothing()).unwrap();
+        let mut it = super::read(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
         let entry = it.next().expect("Get first entry").expect("First entry isn't an error");
         assert_eq!(entry.apath, "/apple");
         let entry = it.next().expect("Get second entry").expect("Entry isn't an error");
@@ -407,7 +407,7 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk(&report).unwrap();
 
-        let it = super::read(&ib.dir, &report, &excludes::excludes_nothing()).unwrap();
+        let it = super::read(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
         assert_eq!(format!("{:?}", &it),
                    format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));
 
@@ -444,7 +444,7 @@ mod tests {
         ib.finish_hunk(&report).unwrap();
 
         let excludes = excludes::from_strings(vec!["/fo*"]).unwrap();
-        let it = super::read(&ib.dir, &report, &excludes).unwrap();
+        let it = super::read(&ib.dir, &excludes, &report).unwrap();
         assert_eq!(format!("{:?}", &it),
                    format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));
 

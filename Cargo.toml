@@ -1,6 +1,6 @@
 [package]
 name = "conserve"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Martin Pool <mbp@sourcefrog.net>"]
 homepage = "http://conserve.fyi/"
 repository = "https://github.com/sourcefrog/conserve/"
@@ -15,13 +15,13 @@ name = "conserve"
 doc = false  # Conflicts with library docs which are more useful.
 
 [dependencies]
-blake2-rfc = "^0"
+blake2-rfc = "0.2.18"
 chrono = "0.2"
 clap = "~2.29"
 clippy = {version = "0.0.103", optional = true}
 error-chain = "0.11"
 isatty = "0.1"
-log = "^0"
+log = "^0.3"
 regex = "0.2"
 rustc-serialize = "^0"
 snap = "0.2"

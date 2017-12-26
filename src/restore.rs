@@ -4,6 +4,7 @@
 
 use std::fs;
 use std::io;
+use std::io::Write;
 use std::path::Path;
 
 use super::*;
@@ -58,8 +59,7 @@ impl RestoreOptions {
         report: &Report,
     ) -> Result<()> {
         let options = &self;
-        let band = try!(archive.open_band_or_last(&options.band_id, &report));
-        let block_dir = band.block_dir();
+        let stored_tree = archive.stored_tree(&options.band_id, &report)?;
 
         if !options.force_overwrite {
             if let Ok(mut it) = fs::read_dir(&destination) {
@@ -69,22 +69,22 @@ impl RestoreOptions {
                             destination.to_path_buf(),
                         ).into(),
                     );
-                }
+                };
             }
-        }
-        for entry in try!(band.index_iter(&report, &self.excludes)) {
-            let entry = try!(entry);
+            // TODO: Propagate error from readdir?
+        };
+        for entry in stored_tree.band().index_iter(&self.excludes, &report)? {
             // TODO: Continue even if one fails
-            try!(restore_one(
-                &block_dir,
-                &entry,
+            restore_one(
+                &stored_tree,
+                &entry?,
                 destination,
                 report,
                 options,
-            ));
+            )?;
         }
-        if !band.is_closed()? {
-            warn!("Version {} is incomplete: tree may be truncated", band.id());
+        if !stored_tree.is_closed()? {
+            warn!("Version {} is incomplete: tree may be truncated", stored_tree.band().id());
         }
         Ok(())
     }
@@ -92,7 +92,7 @@ impl RestoreOptions {
 
 
 fn restore_one(
-    block_dir: &BlockDir,
+    stored_tree: &StoredTree,
     entry: &index::Entry,
     destination: &Path,
     report: &Report,
@@ -107,7 +107,7 @@ fn restore_one(
     match entry.kind {
         index::IndexKind::Dir => restore_dir(entry, &dest_path, &report),
         index::IndexKind::File => {
-            restore_file(block_dir, entry, &dest_path, &report)
+            restore_file(stored_tree, entry, &dest_path, &report)
         }
         index::IndexKind::Symlink => {
             restore_symlink(entry, &dest_path, &report)
@@ -130,19 +130,13 @@ fn restore_dir(
     }
 }
 
-fn restore_file(
-    block_dir: &BlockDir,
-    entry: &index::Entry,
-    dest: &Path,
-    report: &Report,
-) -> Result<()> {
+fn restore_file(stored_tree: &StoredTree, entry: &index::Entry, dest: &Path, report: &Report) -> Result<()> {
     report.increment("file", 1);
     // Here too we write a temporary file and then move it into place: so the
     // file under its real name only appears
-    let mut af = try!(AtomicFile::new(dest));
-    for addr in &entry.addrs {
-        let block_vec = try!(block_dir.get(&addr, &report));
-        try!(io::copy(&mut block_vec.as_slice(), &mut af));
+    let mut af = AtomicFile::new(dest)?;
+    for bytes in stored_tree.file_contents(entry, report)? {
+        af.write(bytes?.as_slice())?;
     }
     af.close(&report)
 }
@@ -184,37 +178,19 @@ mod tests {
     use spectral::prelude::*;
 
     use super::super::*;
-    use testfixtures::{ScratchArchive, TreeFixture};
-
-    fn setup_archive() -> ScratchArchive {
-        let af = ScratchArchive::new();
-        let srcdir = TreeFixture::new();
-        srcdir.create_file("hello");
-        srcdir.create_dir("subdir");
-        srcdir.create_file("subdir/subfile");
-        if SYMLINKS_SUPPORTED {
-            srcdir.create_symlink("link", "target");
-        }
-
-        let backup_report = Report::new();
-        BackupOptions::default().backup(af.path(), srcdir.path(), &backup_report).unwrap();
-
-        srcdir.create_file("hello2");
-        BackupOptions::default().backup(af.path(), srcdir.path(), &Report::new()).unwrap();
-
-        af
-    }
+    use test_fixtures::{ScratchArchive, TreeFixture};
 
     #[test]
     pub fn simple_restore() {
-        let af = setup_archive();
+        let af = ScratchArchive::new();
+        af.store_two_versions();
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         RestoreOptions::default()
             .restore(&af, destdir.path(), &restore_report)
             .unwrap();
 
-        assert_eq!(3, restore_report.borrow_counts().get_count("file"));
+        assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("hello2")).is_a_file();
@@ -232,7 +208,8 @@ mod tests {
 
     #[test]
     fn restore_named_band() {
-        let af = setup_archive();
+        let af = ScratchArchive::new();
+        af.store_two_versions();
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         let options =
@@ -241,12 +218,13 @@ mod tests {
             .restore(&af, destdir.path(), &restore_report)
             .unwrap();
         // Does not have the 'hello2' file added in the second version.
-        assert_eq!(2, restore_report.borrow_counts().get_count("file"));
+        assert_eq!(2, restore_report.get_count("file"));
     }
 
     #[test]
     pub fn decline_to_overwrite() {
-        let af = setup_archive();
+        let af = ScratchArchive::new();
+        af.store_two_versions();
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
         let restore_report = Report::new();
@@ -262,7 +240,8 @@ mod tests {
 
     #[test]
     pub fn forced_overwrite() {
-        let af = setup_archive();
+        let af = ScratchArchive::new();
+        af.store_two_versions();
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
         let restore_report = Report::new();
@@ -271,7 +250,7 @@ mod tests {
             .restore(&af, destdir.path(), &restore_report)
             .unwrap();
 
-        assert_eq!(3, restore_report.borrow_counts().get_count("file"));
+        assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("existing").as_path()).is_a_file();
@@ -279,7 +258,8 @@ mod tests {
 
     #[test]
     pub fn exclude_files() {
-        let af = setup_archive();
+        let af = ScratchArchive::new();
+        af.store_two_versions();
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         RestoreOptions::default()
