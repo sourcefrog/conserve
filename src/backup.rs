@@ -19,14 +19,6 @@ pub struct BackupOptions {
 }
 
 
-#[derive(Debug)]
-struct Backup {
-    block_dir: BlockDir,
-    index_builder: IndexBuilder,
-    report: Report,
-}
-
-
 impl BackupOptions {
     pub fn default() -> Self {
         BackupOptions { excludes: excludes::excludes_nothing() }
@@ -41,39 +33,53 @@ impl BackupOptions {
 }
 
 
-/// Make a new backup from a source tree into a band in this archive.
-pub fn make_backup(source: &Path, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
-    let band = archive.create_band()?;
-    let block_dir = band.block_dir();
-    let index_builder = band.index_builder();
-    let report = archive.report();
-    backup::Backup {
-        block_dir: block_dir,
-        index_builder: index_builder,
-        report: report.clone(),
-    }.run(source, backup_options)?;
-    band.close(report)?;
-    Ok(())
+/// Accepts files to write in the archive (in apath order.)
+#[derive(Debug)]
+struct BackupWriter {
+    band: Band,
+    block_dir: BlockDir,
+    index_builder: IndexBuilder,
+    report: Report,
 }
 
 
-impl Backup {
-    pub fn run(&mut self, source: &Path, backup_options: &BackupOptions) -> Result<()> {
-        for entry in sources::iter(source, &self.report, &backup_options.excludes)? {
-            self.store_one_source_entry(&entry?)?;
-        }
+/// Make a new backup from a source tree into a band in this archive.
+pub fn make_backup(source: &Path, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
+    let mut backup_writer = BackupWriter::begin_band(archive)?;
+    for entry in sources::iter(source, &backup_writer.report, &backup_options.excludes)? {
+        backup_writer.store(&entry?)?;
+    }
+    backup_writer.finish()
+}
+
+
+impl BackupWriter {
+    fn begin_band(archive: &Archive) -> Result<BackupWriter> {
+        let band = archive.create_band()?;
+        let block_dir = band.block_dir();
+        let index_builder = band.index_builder();
+        Ok(BackupWriter {
+            band: band,
+            block_dir: block_dir,
+            index_builder: index_builder,
+            report: archive.report().clone(),
+        })
+    }
+
+    fn finish(mut self) -> Result<()> {
         self.index_builder.finish_hunk(&self.report)?;
+        self.band.close(&self.report)?;
         Ok(())
     }
 
-    fn store_one_source_entry(&mut self, source_entry: &sources::Entry) -> Result<()> {
+    fn store(&mut self, source_entry: &sources::Entry) -> Result<()> {
         info!("Backup {}", source_entry.path.display());
         let store_fn = if source_entry.metadata.is_file() {
-            Backup::store_file
+            BackupWriter::store_file
         } else if source_entry.metadata.is_dir() {
-            Backup::store_dir
+            BackupWriter::store_dir
         } else if source_entry.metadata.file_type().is_symlink() {
-            Backup::store_symlink
+            BackupWriter::store_symlink
         } else {
             warn!("Skipping unsupported file kind {}", &source_entry.apath);
             self.report.increment("skipped.unsupported_file_kind", 1);
