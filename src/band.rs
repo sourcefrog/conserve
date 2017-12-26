@@ -65,8 +65,8 @@ pub struct Info {
 impl Band {
     /// Make a new band (and its on-disk directory).
     ///
-    /// Publicly, prefer Archive::create_band.
-    pub fn create(archive_dir: &Path, id: BandId, report: &Report) -> Result<Band> {
+    /// Prefer Archive::create_band.
+    pub(crate) fn create(archive_dir: &Path, id: BandId, report: &Report) -> Result<Band> {
         let new = Band::new(archive_dir, id);
 
         fs::create_dir(&new.path_buf)?;
@@ -85,7 +85,8 @@ impl Band {
         jsonio::write(&self.tail_path(), &tail, report)
     }
 
-    pub fn open(archive_dir: &Path, id: &BandId, report: &Report) -> Result<Band> {
+    /// Open a given band. Prefer `Archive.open_band`.
+    pub(crate) fn open(archive_dir: &Path, id: &BandId, report: &Report) -> Result<Band> {
         let new = Band::new(archive_dir, id.clone());
         new.read_head(&report)?;  // Just check it can be read
         Ok(new)
@@ -93,8 +94,8 @@ impl Band {
 
     /// Create a new in-memory Band object.
     ///
-    /// Use `create` or `open` to create or open the on-disk directory.
-    fn new(archive_dir: &Path, id: BandId) -> Band {
+    /// Prefer `Archive.create_band`.
+    pub(crate) fn new(archive_dir: &Path, id: BandId) -> Band {
         let mut path_buf = archive_dir.to_path_buf();
         path_buf.push(id.as_string());
         let mut block_dir_path = path_buf.clone();
