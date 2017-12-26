@@ -6,6 +6,8 @@
   so that memory use is capped and so that common blocks can potentially be
   shared.
 
+* New `--exclude GLOB` option.
+
 ## Conserve 0.4.0
 
 * Switch from Brotli2 to Snappy compression: probably a better
