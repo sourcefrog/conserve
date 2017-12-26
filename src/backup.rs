@@ -38,26 +38,34 @@ impl BackupOptions {
             ..self
         })
     }
+}
 
-    pub fn backup(&self, archive_path: &Path, source: &Path, report: &Report) -> Result<()> {
-        let archive = Archive::open(archive_path, &report)?;
-        let band = archive.create_band()?;
-        let mut backup = Backup {
-            block_dir: band.block_dir(),
-            index_builder: band.index_builder(),
-            report: report.clone(),
-        };
-        for entry in sources::iter(source, report, &self.excludes)? {
-            backup.store_one_source_entry(&entry?)?;
-        }
-        backup.index_builder.finish_hunk(report)?;
-        band.close(&backup.report)?;
-        Ok(())
-    }
+
+/// Make a new backup from a source tree into a band in this archive.
+pub fn make_backup(source: &Path, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
+    let band = archive.create_band()?;
+    let block_dir = band.block_dir();
+    let index_builder = band.index_builder();
+    let report = archive.report();
+    backup::Backup {
+        block_dir: block_dir,
+        index_builder: index_builder,
+        report: report.clone(),
+    }.run(source, backup_options)?;
+    band.close(report)?;
+    Ok(())
 }
 
 
 impl Backup {
+    pub fn run(&mut self, source: &Path, backup_options: &BackupOptions) -> Result<()> {
+        for entry in sources::iter(source, &self.report, &backup_options.excludes)? {
+            self.store_one_source_entry(&entry?)?;
+        }
+        self.index_builder.finish_hunk(&self.report)?;
+        Ok(())
+    }
+
     fn store_one_source_entry(&mut self, source_entry: &sources::Entry) -> Result<()> {
         info!("Backup {}", source_entry.path.display());
         let store_fn = if source_entry.metadata.is_file() {
@@ -137,10 +145,9 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
-        let report = Report::new();
-        BackupOptions::default()
-            .backup(af.path(), srcdir.path(), &report)
+        make_backup(srcdir.path(), &af, &BackupOptions::default())
             .unwrap();
+        let report = af.report();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("file"));
         assert_eq!(1, report.get_count("symlink"));
@@ -179,12 +186,10 @@ mod tests {
         srcdir.create_file("baz");
         srcdir.create_file("bar");
 
-        let report = Report::new();
-        BackupOptions::default()
-            .with_excludes(vec!["/**/foo*", "/**/baz"])
-            .unwrap()
-            .backup(af.path(), srcdir.path(), &report)
-            .unwrap();
+        let backup_options = BackupOptions::default()
+            .with_excludes(vec!["/**/foo*", "/**/baz"]).unwrap();
+        make_backup(srcdir.path(), &af, &backup_options).unwrap();
+        let report = af.report();
 
         assert_eq!(1, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"));
@@ -200,10 +205,8 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_file_with_contents("empty", &[]);
-        let report = Report::new();
-        BackupOptions::default()
-            .backup(af.path(), srcdir.path(), &report)
-            .unwrap();
+        make_backup(srcdir.path(), &af, &BackupOptions::default()).unwrap();
+        let report = af.report();
 
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"), "file count");

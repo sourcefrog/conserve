@@ -58,15 +58,10 @@ impl ScratchArchive {
             srcdir.create_symlink("link", "target");
         }
 
-        let backup_report = Report::new();
-        BackupOptions::default()
-            .backup(self.path(), srcdir.path(), &backup_report)
-            .unwrap();
+        make_backup(srcdir.path(), self, &BackupOptions::default()).unwrap();
 
         srcdir.create_file("hello2");
-        BackupOptions::default()
-            .backup(self.path(), srcdir.path(), &Report::new())
-            .unwrap();
+        make_backup(srcdir.path(), self, &BackupOptions::default()).unwrap();
     }
 }
 

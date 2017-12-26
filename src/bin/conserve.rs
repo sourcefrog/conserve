@@ -232,12 +232,11 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
         Some(excludes) => BackupOptions::default().with_excludes(excludes.collect())?,
         None => BackupOptions::default(),
     };
+    let archive = Archive::open(
+        Path::new(subm.value_of("archive").unwrap()), &report)?;
 
-    backup_options.backup(
-        Path::new(subm.value_of("archive").unwrap()),
-        Path::new(subm.value_of("source").unwrap()),
-        report,
-    )
+    make_backup(Path::new(&subm.value_of("source").unwrap()),
+        &archive, &backup_options)
 }
 
 
