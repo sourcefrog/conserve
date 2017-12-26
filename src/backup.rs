@@ -15,7 +15,7 @@ use globset::GlobSet;
 
 #[derive(Debug)]
 pub struct BackupOptions {
-    excludes: GlobSet
+    excludes: GlobSet,
 }
 
 
@@ -29,9 +29,7 @@ struct Backup {
 
 impl BackupOptions {
     pub fn default() -> Self {
-        BackupOptions {
-            excludes: excludes::excludes_nothing()
-        }
+        BackupOptions { excludes: excludes::excludes_nothing() }
     }
 
     pub fn with_excludes(self, exclude: Vec<&str>) -> Result<Self> {
@@ -113,7 +111,9 @@ impl Backup {
         self.report.increment("symlink", 1);
         // TODO: Record a problem and log a message if the target is not decodable, rather than
         //  silently losing.
-        let target = fs::read_link(&source_entry.path)?.to_string_lossy().to_string();
+        let target = fs::read_link(&source_entry.path)?
+            .to_string_lossy()
+            .to_string();
         Ok(index::Entry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
@@ -138,12 +138,13 @@ mod tests {
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
         let report = Report::new();
-        BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
+        BackupOptions::default()
+            .backup(af.path(), srcdir.path(), &report)
+            .unwrap();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("file"));
         assert_eq!(1, report.get_count("symlink"));
-        assert_eq!(0,
-                   report.get_count("skipped.unsupported_file_kind"));
+        assert_eq!(0, report.get_count("skipped.unsupported_file_kind"));
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
@@ -179,7 +180,8 @@ mod tests {
         srcdir.create_file("bar");
 
         let report = Report::new();
-        BackupOptions::default().with_excludes(vec!["/**/foo*", "/**/baz"])
+        BackupOptions::default()
+            .with_excludes(vec!["/**/foo*", "/**/baz"])
             .unwrap()
             .backup(af.path(), srcdir.path(), &report)
             .unwrap();
@@ -199,16 +201,19 @@ mod tests {
         let srcdir = TreeFixture::new();
         srcdir.create_file_with_contents("empty", &[]);
         let report = Report::new();
-        BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
+        BackupOptions::default()
+            .backup(af.path(), srcdir.path(), &report)
+            .unwrap();
 
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"), "file count");
 
         // Read back the empty file
         let st = af.stored_tree(&None).unwrap();
-        let empty_entry = st.index_iter(&excludes::excludes_nothing()).unwrap()
+        let empty_entry = st.index_iter(&excludes::excludes_nothing())
+            .unwrap()
             .map(|i| i.unwrap())
-            .find(|ref i| {i.apath == "/empty"})
+            .find(|ref i| i.apath == "/empty")
             .expect("found one entry");
         let sf = st.file_contents(&empty_entry).unwrap();
         assert_eq!(0, sf.count(), "reading empty file has zero chunks");

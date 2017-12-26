@@ -91,7 +91,7 @@ impl Band {
     /// Open a given band. Prefer `Archive.open_band`.
     pub(crate) fn open(archive_dir: &Path, id: &BandId, report: &Report) -> Result<Band> {
         let new = Band::new(archive_dir, id.clone());
-        new.read_head(&report)?;  // Just check it can be read
+        new.read_head(&report)?; // Just check it can be read
         Ok(new)
     }
 
@@ -216,8 +216,7 @@ mod tests {
         let info = band2.get_info(&Report::new()).expect("get_info failed");
         assert_eq!(info.id.as_string(), "b0001");
         assert_eq!(info.is_closed, true);
-        let dur = info.end_time.expect("info has an end_time")
-            - info.start_time;
+        let dur = info.end_time.expect("info has an end_time") - info.start_time;
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)
         assert!(dur < Duration::seconds(5));

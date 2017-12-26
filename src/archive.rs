@@ -46,7 +46,9 @@ impl Archive {
         let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
         let header_filename = path.join(HEADER_FILENAME);
         jsonio::write(&header_filename, &header, &archive.report)
-            .chain_err(|| format!("Failed to write archive header: {:?}", header_filename))?;
+            .chain_err(|| {
+                format!("Failed to write archive header: {:?}", header_filename)
+            })?;
         info!("Created new archive in {:?}", path.display());
         Ok(archive)
     }
@@ -59,22 +61,25 @@ impl Archive {
         if !file_exists(&header_path)? {
             return Err(ErrorKind::NotAnArchive(path.into()).into());
         }
-        let header: ArchiveHeader = jsonio::read(&header_path, &report)
-            .chain_err(|| format!("Failed to read archive header"))?;
+        let header: ArchiveHeader = jsonio::read(&header_path, &report).chain_err(|| {
+            format!("Failed to read archive header")
+        })?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
-            return Err(ErrorKind::UnsupportedArchiveVersion(header.conserve_archive_version)
-                .into());
+            return Err(
+                ErrorKind::UnsupportedArchiveVersion(header.conserve_archive_version).into(),
+            );
         }
         Ok(Archive {
             path: path.to_path_buf(),
             report: report.clone(),
-     })
+        })
     }
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
     pub fn iter_bands_unsorted(self: &Archive) -> Result<IterBands> {
-        let read_dir = read_dir(&self.path)
-            .chain_err(|| format!("failed reading directory {:?}", &self.path))?;
+        let read_dir = read_dir(&self.path).chain_err(|| {
+            format!("failed reading directory {:?}", &self.path)
+        })?;
         Ok(IterBands { dir_iter: read_dir })
     }
 
@@ -173,8 +178,10 @@ impl Iterator for IterBands {
                     warn!("unexpected archive subdirectory {:?}", &name_string);
                 }
             } else {
-                warn!("unexpected archive subdirectory with un-decodable name {:?}",
-                      entry.file_name())
+                warn!(
+                    "unexpected archive subdirectory with un-decodable name {:?}",
+                    entry.file_name()
+                )
             }
         }
     }
@@ -262,8 +269,10 @@ mod tests {
 
         // Try creating a second band.
         let _band2 = &af.create_band().unwrap();
-        assert_eq!(af.list_bands().unwrap(),
-                   vec![BandId::new(&[0]), BandId::new(&[1])]);
+        assert_eq!(
+            af.list_bands().unwrap(),
+            vec![BandId::new(&[0]), BandId::new(&[1])]
+        );
         assert_eq!(af.last_band_id().unwrap(), BandId::new(&[1]));
     }
 }

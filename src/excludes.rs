@@ -10,12 +10,14 @@ pub fn from_strings(excludes: Vec<&str>) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
 
     for exclude in excludes {
-        builder.add(Glob::new(exclude)
-            .chain_err(|| format!("Failed to parse exclude value: {}", exclude))?);
+        builder.add(Glob::new(exclude).chain_err(|| {
+            format!("Failed to parse exclude value: {}", exclude)
+        })?);
     }
 
-    Ok(builder.build()
-        .chain_err(|| "Failed to build exclude patterns")?)
+    Ok(builder.build().chain_err(
+        || "Failed to build exclude patterns",
+    )?)
 }
 
 pub fn excludes_nothing() -> GlobSet {

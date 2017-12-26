@@ -20,7 +20,7 @@ use std::fmt::{Display, Formatter};
 ///
 /// Equal strings are equivalent to equal apaths, but the ordering is not the same as
 /// string ordering.
-#[derive(Clone,Debug,Eq,PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Apath(String);
 
 
@@ -36,7 +36,7 @@ impl Apath {
 
     /// True if this string is a well-formed apath.
     ///
-    /// Rust strings are by contract always valid UTF-8, so to meet that requirement 
+    /// Rust strings are by contract always valid UTF-8, so to meet that requirement
     /// for apaths it's enough to use a checked conversion from bytes or an `OSString`.
     pub fn is_valid(a: &str) -> bool {
         if !a.starts_with('/') {
@@ -121,19 +121,21 @@ mod tests {
 
     #[test]
     pub fn invalid() {
-        let invalid_cases = ["",
-                             "//",
-                             "//a",
-                             "/a//b",
-                             "/a/",
-                             "/a//",
-                             "./a/b",
-                             "/./a/b",
-                             "/a/b/.",
-                             "/a/./b",
-                             "/a/b/../c",
-                             "../a",
-                             "/hello\0"];
+        let invalid_cases = [
+            "",
+            "//",
+            "//a",
+            "/a//b",
+            "/a/",
+            "/a//",
+            "./a/b",
+            "/./a/b",
+            "/a/b/.",
+            "/a/./b",
+            "/a/b/../c",
+            "../a",
+            "/hello\0",
+        ];
         for v in invalid_cases.into_iter() {
             if Apath::is_valid(v) {
                 panic!("{:?} incorrectly marked valid", v);
@@ -143,33 +145,35 @@ mod tests {
 
     #[test]
     pub fn valid_and_ordered() {
-        let ordered = ["/",
-                       "/...a",
-                       "/.a",
-                       "/a",
-                       "/b",
-                       "/kleine Katze Fuß",
-                       "/~~",
-                       "/ñ",
-                       "/a/...",
-                       "/a/..obscure",
-                       "/a/.config",
-                       "/a/1",
-                       "/a/100",
-                       "/a/2",
-                       "/a/añejo",
-                       "/a/b/c",
-                       "/b/((",
-                       "/b/,",
-                       "/b/A",
-                       "/b/AAAA",
-                       "/b/a",
-                       "/b/b",
-                       "/b/c",
-                       "/b/a/c",
-                       "/b/b/c",
-                       "/b/b/b/z",
-                       "/b/b/b/{zz}"];
+        let ordered = [
+            "/",
+            "/...a",
+            "/.a",
+            "/a",
+            "/b",
+            "/kleine Katze Fuß",
+            "/~~",
+            "/ñ",
+            "/a/...",
+            "/a/..obscure",
+            "/a/.config",
+            "/a/1",
+            "/a/100",
+            "/a/2",
+            "/a/añejo",
+            "/a/b/c",
+            "/b/((",
+            "/b/,",
+            "/b/A",
+            "/b/AAAA",
+            "/b/a",
+            "/b/b",
+            "/b/c",
+            "/b/a/c",
+            "/b/b/c",
+            "/b/b/b/z",
+            "/b/b/b/{zz}",
+        ];
         for (i, a) in ordered.iter().enumerate() {
             if !Apath::is_valid(a) {
                 panic!("{:?} incorrectly marked invalid", a);
@@ -180,11 +184,13 @@ mod tests {
                 let bp = Apath::from_string(b);
                 let r = ap.cmp(&bp);
                 if r != expected_order {
-                    panic!("cmp({:?}, {:?}): returned {:?} expected {:?}",
-                           ap,
-                           bp,
-                           r,
-                           expected_order);
+                    panic!(
+                        "cmp({:?}, {:?}): returned {:?} expected {:?}",
+                        ap,
+                        bp,
+                        r,
+                        expected_order
+                    );
                 }
             }
         }

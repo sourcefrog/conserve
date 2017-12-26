@@ -84,17 +84,19 @@ fn blackbox_backup() {
     // TODO: Inspect the archive
 
     // versions --short
-    assert_success_and_output(&["versions", "--short", &arch_dir_str],
-        "b0000\n", "");
+    assert_success_and_output(&["versions", "--short", &arch_dir_str], "b0000\n", "");
 
     // versions: includes completion flag.
     {
         // TODO: Set a fake date when creating the archive and then we can check
         // the format of the output?
-        let (status, stdout, stderr) =
-            run_conserve(&["versions", &arch_dir_str]);
+        let (status, stdout, stderr) = run_conserve(&["versions", &arch_dir_str]);
         assert!(status.success());
-        assert!(Regex::new(r"^b0000 {21} complete   20[-0-9T:+]+\s +\d+s\n$").unwrap().is_match(&stdout));
+        assert!(
+            Regex::new(r"^b0000 {21} complete   20[-0-9T:+]+\s +\d+s\n$")
+                .unwrap()
+                .is_match(&stdout)
+        );
         assert!(stderr.is_empty());
     }
 
@@ -105,12 +107,19 @@ fn blackbox_backup() {
     let restore_dir_str = restore_dir.path().to_str().unwrap();
     let (status, _stdout, _stderr) = run_conserve(&["restore", &arch_dir_str, &restore_dir_str]);
     assert!(status.success());
-    assert!(fs::metadata(restore_dir.path().join("subdir")).unwrap().is_dir());
+    assert!(
+        fs::metadata(restore_dir.path().join("subdir"))
+            .unwrap()
+            .is_dir()
+    );
 
     let restore_hello = restore_dir.path().join("hello");
     assert!(fs::metadata(&restore_hello).unwrap().is_file());
     let mut file_contents = String::new();
-    fs::File::open(&restore_hello).unwrap().read_to_string(&mut file_contents).unwrap();
+    fs::File::open(&restore_hello)
+        .unwrap()
+        .read_to_string(&mut file_contents)
+        .unwrap();
     assert_eq!(file_contents, "contents");
 
     // Try to restore again over the same directory: should decline.
@@ -122,7 +131,14 @@ fn blackbox_backup() {
     {
         let restore_dir = make_tempdir();
         let (status, _stdout, _stderr) = run_conserve(
-            &["restore", "-b", "b0000", &arch_dir_str, &restore_dir.path().to_str().unwrap()]);
+            &[
+                "restore",
+                "-b",
+                "b0000",
+                &arch_dir_str,
+                &restore_dir.path().to_str().unwrap(),
+            ],
+        );
         assert!(status.success());
         // TODO: Check contents.
     }
@@ -194,7 +210,7 @@ fn incomplete_version() {
     let adir_str = af.path().to_str().unwrap();
     af.setup_incomplete_empty_band();
 
-   {
+    {
         let (status, stdout, stderr) = run_conserve(&["versions", adir_str]);
         assert!(status.success());
         assert!(stderr.is_empty());
@@ -210,8 +226,7 @@ fn incomplete_version() {
     }
     {
         // ls --incomplete accurately says it has nothing
-        let (status, stdout, stderr) = run_conserve(
-            &["ls", "--incomplete", adir_str]);
+        let (status, stdout, stderr) = run_conserve(&["ls", "--incomplete", adir_str]);
         assert!(status.success());
         assert!(stderr.is_empty());
         assert_eq!(stdout, "");
@@ -261,12 +276,16 @@ fn run_conserve(args: &[&str]) -> (process::ExitStatus, String, String) {
     let output = process::Command::new(&conserve_path)
         .args(args)
         .output()
-        .expect(format!("Failed to run conserve: {:?} {:?}", &conserve_path, &args).as_str());
+        .expect(
+            format!("Failed to run conserve: {:?} {:?}", &conserve_path, &args).as_str(),
+        );
     println!("status: {:?}", output.status);
     let output_string = String::from_utf8_lossy(&output.stdout).into_owned();
     let error_string = String::from_utf8_lossy(&output.stderr).into_owned();
-    println!(">> stdout:\n{}\n>> stderr:\n{}",
-             &output_string,
-             &error_string);
+    println!(
+        ">> stdout:\n{}\n>> stderr:\n{}",
+        &output_string,
+        &error_string
+    );
     (output.status, output_string, error_string)
 }

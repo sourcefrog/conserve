@@ -22,7 +22,9 @@ pub fn simple_backup() {
     srcdir.create_file("hello");
     // TODO: Include a symlink only on Unix.
     let report = Report::new();
-    BackupOptions::default().backup(af.path(), srcdir.path(), &report).unwrap();
+    BackupOptions::default()
+        .backup(af.path(), srcdir.path(), &report)
+        .unwrap();
     check_backup(&af, &report);
     check_restore(&af);
 }
@@ -39,8 +41,10 @@ pub fn simple_backup_with_excludes() {
     // TODO: Include a symlink only on Unix.
     let report = Report::new();
     BackupOptions::default()
-        .with_excludes(vec!["/**/baz", "/**/bar", "/**/fooo*"]).unwrap()
-        .backup(af.path(), srcdir.path(), &report).unwrap();
+        .with_excludes(vec!["/**/baz", "/**/bar", "/**/fooo*"])
+        .unwrap()
+        .backup(af.path(), srcdir.path(), &report)
+        .unwrap();
     check_backup(&af, &report);
     check_restore(&af);
 }
@@ -78,8 +82,10 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     assert_eq!(index::IndexKind::File, file_entry.kind);
     assert!(file_entry.mtime.unwrap() > 0);
     let hash = file_entry.blake2b.as_ref().unwrap();
-    assert_eq!("9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
-               hash);
+    assert_eq!(
+        "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
+        hash
+    );
 }
 
 fn check_restore(af: &ScratchArchive) {
@@ -91,10 +97,16 @@ fn check_restore(af: &ScratchArchive) {
     let restore_a = Archive::open(af.path(), &restore_report).unwrap();
     options.restore(&restore_a, restore_dir.path()).unwrap();
     let block_sizes = restore_report.get_size("block");
-    assert!(block_sizes.uncompressed == 8 && block_sizes.compressed == 10,
-           format!("{:?}", block_sizes));
+    assert!(
+        block_sizes.uncompressed == 8 && block_sizes.compressed == 10,
+        format!("{:?}", block_sizes)
+    );
     let index_sizes = restore_report.get_size("index");
-    assert_eq!(index_sizes.uncompressed, 462, "index_sizes.uncompressed on restore");
+    assert_eq!(
+        index_sizes.uncompressed,
+        462,
+        "index_sizes.uncompressed on restore"
+    );
     assert!(index_sizes.compressed <= 292, index_sizes.compressed);
     // TODO: Check what was restored.
 }
@@ -111,7 +123,9 @@ fn large_file() {
 
     let report = Report::new();
 
-    BackupOptions::default().backup(af.path(), tf.path(), &report).unwrap();
+    BackupOptions::default()
+        .backup(af.path(), tf.path(), &report)
+        .unwrap();
     assert_eq!(report.get_count("file"), 1);
     assert_eq!(report.get_count("file.large"), 1);
 
@@ -119,11 +133,16 @@ fn large_file() {
     let rd = tempdir::TempDir::new("conserve_test_restore").unwrap();
     let restore_report = Report::new();
     let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
-    RestoreOptions::default().restore(&restore_archive, rd.path()).unwrap();
+    RestoreOptions::default()
+        .restore(&restore_archive, rd.path())
+        .unwrap();
     assert_eq!(report.get_count("file"), 1);
 
     // TODO: Restore should also set file.large etc.
     let mut content = String::new();
-    File::open(rd.path().join("large")).unwrap().read_to_string(&mut content).unwrap();
+    File::open(rd.path().join("large"))
+        .unwrap()
+        .read_to_string(&mut content)
+        .unwrap();
     assert_eq!(large_content, content);
 }

@@ -6,7 +6,7 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 
-#![recursion_limit = "1024"]  // Needed by error-chain
+#![recursion_limit = "1024"] // Needed by error-chain
 
 use std::path::Path;
 
@@ -105,75 +105,107 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         .author(crate_authors!())
         .version(conserve::version())
         .setting(AppSettings::SubcommandRequiredElseHelp)
-        .arg(Arg::with_name("ui")
-            .long("ui")
-            .short("u")
-            .help("UI for progress and messages")
-            .takes_value(true)
-            .possible_values(&["auto", "plain", "color"]))
-        .arg(Arg::with_name("v")
-            .short("v")
-            .multiple(true)
-            .global(true)
-            .help("Be more verbose (log all file names)"))
-        .subcommand(SubCommand::with_name("init")
-            .display_order(1)
-            .about("Create a new archive")
-            .arg(Arg::with_name("archive")
-                .help("Path for new archive directory: \
-                should either not exist or be an empty directory")
-                .required(true)))
-        .subcommand(SubCommand::with_name("backup")
-            .display_order(2)
-            .about("Copy source directory into an archive")
-            .arg(archive_arg())
-            .arg(Arg::with_name("source")
-                .help("Backup from this directory")
-                .required(true))
-            .arg(exclude_arg()))
-        .subcommand(SubCommand::with_name("restore")
-            .display_order(3)
-            .about("Copy a backup tree out of an archive")
-            .arg(archive_arg())
-            .arg(backup_arg())
-            .arg(incomplete_arg())
-            .after_help("\
+        .arg(
+            Arg::with_name("ui")
+                .long("ui")
+                .short("u")
+                .help("UI for progress and messages")
+                .takes_value(true)
+                .possible_values(&["auto", "plain", "color"]),
+        )
+        .arg(
+            Arg::with_name("v")
+                .short("v")
+                .multiple(true)
+                .global(true)
+                .help("Be more verbose (log all file names)"),
+        )
+        .subcommand(
+            SubCommand::with_name("init")
+                .display_order(1)
+                .about("Create a new archive")
+                .arg(
+                    Arg::with_name("archive")
+                        .help(
+                            "Path for new archive directory: \
+                should either not exist or be an empty directory",
+                        )
+                        .required(true),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("backup")
+                .display_order(2)
+                .about("Copy source directory into an archive")
+                .arg(archive_arg())
+                .arg(
+                    Arg::with_name("source")
+                        .help("Backup from this directory")
+                        .required(true),
+                )
+                .arg(exclude_arg()),
+        )
+        .subcommand(
+            SubCommand::with_name("restore")
+                .display_order(3)
+                .about("Copy a backup tree out of an archive")
+                .arg(archive_arg())
+                .arg(backup_arg())
+                .arg(incomplete_arg())
+                .after_help(
+                    "\
                 Conserve will by default refuse to restore incomplete versions, \
                 to prevent you thinking you restored the whole tree when it may \
                 be truncated.  You can override this with --incomplete, or \
-                select an older version with --backup.")
-            .arg(Arg::with_name("destination")
-                .help("Restore to this new directory")
-                .required(true))
-            .arg(Arg::with_name("force-overwrite")
-                .long("force-overwrite")
-                .help("Overwrite existing destination directory"))
-            .arg(exclude_arg()))
-        .subcommand(SubCommand::with_name("versions")
-            .display_order(4)
-            .about("List backup versions in an archive")
-            .after_help("`conserve versions` shows one version per \
+                select an older version with --backup.",
+                )
+                .arg(
+                    Arg::with_name("destination")
+                        .help("Restore to this new directory")
+                        .required(true),
+                )
+                .arg(
+                    Arg::with_name("force-overwrite")
+                        .long("force-overwrite")
+                        .help("Overwrite existing destination directory"),
+                )
+                .arg(exclude_arg()),
+        )
+        .subcommand(
+            SubCommand::with_name("versions")
+                .display_order(4)
+                .about("List backup versions in an archive")
+                .after_help(
+                    "`conserve versions` shows one version per \
                 line.  For each version the output shows the version name, \
                 whether it is complete, when it started, and (if complete) \
-                how much time elapsed.")
-            .arg(archive_arg())
-            .arg(Arg::with_name("short")
-                .help("List just version name without details")
-                .long("short")
-                .short("s")))
-        .subcommand(SubCommand::with_name("ls")
-            .display_order(5)
-            .about("List files in a backup version")
-            .arg(archive_arg())
-            .arg(backup_arg())
-            .arg(exclude_arg())
-            .arg(incomplete_arg()))
-        .subcommand(SubCommand::with_name("list-source")
-            .about("Recursive list files from source directory")
-            .arg(Arg::with_name("source")
-                .help("Source directory")
-                .required(true))
-            .arg(exclude_arg()))
+                how much time elapsed.",
+                )
+                .arg(archive_arg())
+                .arg(
+                    Arg::with_name("short")
+                        .help("List just version name without details")
+                        .long("short")
+                        .short("s"),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("ls")
+                .display_order(5)
+                .about("List files in a backup version")
+                .arg(archive_arg())
+                .arg(backup_arg())
+                .arg(exclude_arg())
+                .arg(incomplete_arg()),
+        )
+        .subcommand(
+            SubCommand::with_name("list-source")
+                .about("Recursive list files from source directory")
+                .arg(Arg::with_name("source").help("Source directory").required(
+                    true,
+                ))
+                .arg(exclude_arg()),
+        )
 }
 
 
@@ -197,31 +229,25 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     let backup_options = match subm.values_of("exclude") {
-        Some(excludes) => {
-            BackupOptions::default()
-                .with_excludes(excludes.collect())?
-        }
-        None => BackupOptions::default()
+        Some(excludes) => BackupOptions::default().with_excludes(excludes.collect())?,
+        None => BackupOptions::default(),
     };
 
-    backup_options.backup(Path::new(subm.value_of("archive").unwrap()),
-                          Path::new(subm.value_of("source").unwrap()),
-                          report)
+    backup_options.backup(
+        Path::new(subm.value_of("archive").unwrap()),
+        Path::new(subm.value_of("source").unwrap()),
+        report,
+    )
 }
 
 
 fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source_path = Path::new(subm.value_of("source").unwrap());
     let excludes = match subm.values_of("exclude") {
-        Some(excludes) => {
-            excludes::from_strings(excludes.collect())?
-        }
-        None => excludes::excludes_nothing()
+        Some(excludes) => excludes::from_strings(excludes.collect())?,
+        None => excludes::excludes_nothing(),
     };
-    let mut source_iter = conserve::sources::iter(
-        source_path,
-        report,
-        &excludes)?;
+    let mut source_iter = conserve::sources::iter(source_path, report, &excludes)?;
     for entry in &mut source_iter {
         println!("{}", entry?.apath);
     }
@@ -257,13 +283,17 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
         } else {
             "incomplete"
         };
-        let start_time_str = info.start_time.with_timezone(&Local)
-            .to_rfc3339();
-        let duration_str = info.end_time.map_or_else(
-            String::new,
-            |t| format!("{}s", (t-info.start_time).num_seconds()));
-        println!("{:<26} {:<10} {} {:>7}",
-            band_id, is_complete_str, start_time_str, duration_str);
+        let start_time_str = info.start_time.with_timezone(&Local).to_rfc3339();
+        let duration_str = info.end_time.map_or_else(String::new, |t| {
+            format!("{}s", (t - info.start_time).num_seconds())
+        });
+        println!(
+            "{:<26} {:<10} {} {:>7}",
+            band_id,
+            is_complete_str,
+            start_time_str,
+            duration_str
+        );
     }
     Ok(())
 }
@@ -276,10 +306,8 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = archive.stored_tree(&band_id)?;
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
     let excludes = match subm.values_of("exclude") {
-        Some(excludes) => {
-            excludes::from_strings(excludes.collect())?
-        }
-        None => excludes::excludes_nothing()
+        Some(excludes) => excludes::from_strings(excludes.collect())?,
+        None => excludes::excludes_nothing(),
     };
     for i in st.index_iter(&excludes)? {
         println!("{}", i?.apath);
@@ -320,8 +348,13 @@ fn complain_if_incomplete(band: &Band, incomplete_ok: bool) -> Result<()> {
             info!("Reading from incomplete version {}", band.id());
             Ok(())
         } else {
-            Err(format!("Version {} is incomplete.  \
-                (Use --incomplete to read it anyway.)", band.id()).into())
+            Err(
+                format!(
+                    "Version {} is incomplete.  \
+                (Use --incomplete to read it anyway.)",
+                    band.id()
+                ).into(),
+            )
         }
     } else {
         Ok(())

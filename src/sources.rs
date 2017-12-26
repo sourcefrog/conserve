@@ -66,7 +66,7 @@ pub struct Iter {
     last_apath: Option<Apath>,
 
     /// glob pattern to skip in iterator
-    excludes: GlobSet
+    excludes: GlobSet,
 }
 
 
@@ -81,7 +81,7 @@ impl Iter {
                 if let Err(e) = self.visit_next_directory(entry) {
                     return Some(Err(e));
                 }
-                // Queues have been refilled.
+            // Queues have been refilled.
             } else {
                 // No entries queued and no more directories to visit.
                 return None;
@@ -133,7 +133,10 @@ impl Iter {
                 metadata: metadata,
             };
             if is_dir {
-                self.dir_deque.insert(directory_insert_point, new_entry.clone());
+                self.dir_deque.insert(
+                    directory_insert_point,
+                    new_entry.clone(),
+                );
                 directory_insert_point += 1;
             }
             self.entry_deque.push_back(new_entry);
@@ -162,10 +165,12 @@ impl Iterator for Iter {
             e @ Some(Err(_)) => e,
             Some(Ok(entry)) => {
                 if let Some(ref last_apath) = self.last_apath {
-                    assert!(last_apath < &entry.apath,
-                            "sources returned out of order: {:?} >= {:?}",
-                            last_apath,
-                            entry.apath);
+                    assert!(
+                        last_apath < &entry.apath,
+                        "sources returned out of order: {:?} >= {:?}",
+                        last_apath,
+                        entry.apath
+                    );
                 }
                 self.last_apath = Some(entry.apath.clone());
                 Some(Ok(entry))
@@ -207,7 +212,7 @@ pub fn iter(source_dir: &Path, report: &Report, excludes: &GlobSet) -> io::Resul
         dir_deque: dir_deque,
         report: report.clone(),
         last_apath: None,
-        excludes: excludes.clone()
+        excludes: excludes.clone(),
     })
 }
 
@@ -230,7 +235,10 @@ mod tests {
         tf.create_dir("jam/.etc");
         let report = Report::new();
         let mut source_iter = iter(tf.path(), &report, &excludes::excludes_nothing()).unwrap();
-        let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
+        let result = source_iter
+            .by_ref()
+            .collect::<io::Result<Vec<_>>>()
+            .unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[0].path, &tf.root);
@@ -248,13 +256,16 @@ mod tests {
         assert_eq!(&result[6].path, &tf.root.join("jam").join("apricot"));
         assert_eq!(result.len(), 7);
 
-        assert_eq!(format!("{:?}", &result[6]),
-                   format!("sources::Entry {{ apath: Apath({:?}), path: {:?} }}",
-                           "/jam/apricot",
-                           &tf.root.join("jam").join("apricot")));
+        assert_eq!(
+            format!("{:?}", &result[6]),
+            format!(
+                "sources::Entry {{ apath: Apath({:?}), path: {:?} }}",
+                "/jam/apricot",
+                &tf.root.join("jam").join("apricot")
+            )
+        );
 
-        assert_eq!(report.get_count("source.visited.directories"),
-                   4);
+        assert_eq!(report.get_count("source.visited.directories"), 4);
         assert_eq!(report.get_count("source.selected"), 7);
     }
 
@@ -275,7 +286,10 @@ mod tests {
         let excludes = excludes::from_strings(vec).unwrap();
 
         let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
-        let result = source_iter.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
+        let result = source_iter
+            .by_ref()
+            .collect::<io::Result<Vec<_>>>()
+            .unwrap();
 
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -286,15 +300,32 @@ mod tests {
         assert_eq!(&result[2].path, &tf.root.join("baz").join("test"));
         assert_eq!(result.len(), 3);
 
-        assert_eq!(format!("{:?}", &result[2]),
-                   format!("sources::Entry {{ apath: Apath({:?}), path: {:?} }}",
-                           "/baz/test",
-                           &tf.root.join("baz").join("test")));
+        assert_eq!(
+            format!("{:?}", &result[2]),
+            format!(
+                "sources::Entry {{ apath: Apath({:?}), path: {:?} }}",
+                "/baz/test",
+                &tf.root.join("baz").join("test")
+            )
+        );
 
-        assert_eq!(2, report.borrow_counts().get_count("source.visited.directories"));
+        assert_eq!(
+            2,
+            report.borrow_counts().get_count(
+                "source.visited.directories",
+            )
+        );
         assert_eq!(3, report.borrow_counts().get_count("source.selected"));
-        assert_eq!(4, report.borrow_counts().get_count("skipped.excluded.files"));
-        assert_eq!(1, report.borrow_counts().get_count("skipped.excluded.directories"));
+        assert_eq!(
+            4,
+            report.borrow_counts().get_count("skipped.excluded.files")
+        );
+        assert_eq!(
+            1,
+            report.borrow_counts().get_count(
+                "skipped.excluded.directories",
+            )
+        );
     }
 
     #[cfg(unix)]

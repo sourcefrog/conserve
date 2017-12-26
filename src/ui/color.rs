@@ -62,10 +62,12 @@ impl ColorUI {
 fn duration_to_hms(d: Duration) -> String {
     let elapsed_secs = d.as_secs();
     if elapsed_secs >= 3600 {
-        format!("{:2}:{:02}:{:02}",
-                elapsed_secs / 3600,
-                (elapsed_secs / 60) % 60,
-                elapsed_secs % 60)
+        format!(
+            "{:2}:{:02}:{:02}",
+            elapsed_secs / 3600,
+            (elapsed_secs / 60) % 60,
+            elapsed_secs % 60
+        )
     } else {
         format!("   {:2}:{:02}", (elapsed_secs / 60) % 60, elapsed_secs % 60)
     }
@@ -122,8 +124,7 @@ impl UI for ColorUI {
             comp_mb_str,
             block_comp_ratio,
             uncomp_rate,
-        )
-            .unwrap();
+        ).unwrap();
         t.fg(term::color::WHITE).unwrap();
         t.flush().unwrap();
     }

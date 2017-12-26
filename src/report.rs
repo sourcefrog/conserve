@@ -153,20 +153,23 @@ impl Report {
         } else {
             panic!("unregistered counter {:?}", counter_name);
         }
-        self.ui.lock().unwrap().show_progress(&*self.borrow_counts());
+        self.ui.lock().unwrap().show_progress(
+            &*self.borrow_counts(),
+        );
     }
 
     pub fn increment_size(&self, counter_name: &str, sizes: Sizes) {
         let mut counts = self.mut_counts();
-        let e = counts.sizes.get_mut(counter_name).expect("unregistered size counter");
+        let e = counts.sizes.get_mut(counter_name).expect(
+            "unregistered size counter",
+        );
         *e += sizes;
     }
 
     pub fn increment_duration(&self, name: &str, duration: Duration) {
-        *self.mut_counts()
-            .durations
-            .get_mut(name)
-            .expect("undefined duration counter") += duration;
+        *self.mut_counts().durations.get_mut(name).expect(
+            "undefined duration counter",
+        ) += duration;
     }
 
     /// Merge the contents of `from_report` into `self`.
@@ -184,7 +187,8 @@ impl Report {
     }
 
     pub fn measure_duration<T, F>(&self, duration_name: &str, closure: F) -> T
-        where F: FnOnce() -> T
+    where
+        F: FnOnce() -> T,
     {
         let start = time::Instant::now();
         let result = closure();
@@ -194,10 +198,9 @@ impl Report {
 
     pub fn become_logger(&self, log_level: log::LogLevelFilter) {
         log::set_logger(|max_log_level| {
-                max_log_level.set(log_level);
-                Box::new(self.clone())
-            })
-            .ok();
+            max_log_level.set(log_level);
+            Box::new(self.clone())
+        }).ok();
     }
 
     pub fn get_size(&self, counter_name: &str) -> Sizes {
@@ -227,12 +230,14 @@ impl Display for Report {
         for (key, s) in &counts.sizes {
             if s.uncompressed > 0 {
                 let ratio = ui::compression_ratio(s);
-                write!(f,
+                write!(
+                    f,
                     "  {:<40} {:>9} {:>9} {:>9.1}x\n",
                     *key,
                     s.uncompressed,
                     s.compressed,
-                    ratio)?;
+                    ratio
+                )?;
             }
         }
         write!(f, "Durations (seconds):\n")?;
@@ -282,14 +287,16 @@ impl Counts {
     }
 
     pub fn get_duration(&self, name: &str) -> Duration {
-        *self.durations.get(name).unwrap_or_else(|| panic!("unknown duration {:?}", name))
+        *self.durations.get(name).unwrap_or_else(|| {
+            panic!("unknown duration {:?}", name)
+        })
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
     pub fn get_count(&self, counter_name: &str) -> u64 {
-        *self.count
-            .get(counter_name)
-            .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
+        *self.count.get(counter_name).unwrap_or_else(|| {
+            panic!("unknown counter {:?}", counter_name)
+        })
     }
 
     /// Get size of data processed.
@@ -297,9 +304,9 @@ impl Counts {
     /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
     /// in bytes.
     pub fn get_size(&self, counter_name: &str) -> Sizes {
-        *self.sizes
-            .get(counter_name)
-            .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
+        *self.sizes.get(counter_name).unwrap_or_else(|| {
+            panic!("unknown counter {:?}", counter_name)
+        })
     }
 
     pub fn elapsed_time(&self) -> Duration {
@@ -331,21 +338,25 @@ mod tests {
         r1.increment("block.corrupt", 2);
         r2.increment("block.write", 1);
         r2.increment("block.corrupt", 10);
-        r2.increment_size("block",
-                          Sizes {
-                              uncompressed: 300,
-                              compressed: 100,
-                          });
+        r2.increment_size(
+            "block",
+            Sizes {
+                uncompressed: 300,
+                compressed: 100,
+            },
+        );
         r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
         let cs = r1.borrow_counts();
         assert_eq!(cs.get_count("block.write"), 2);
         assert_eq!(cs.get_count("block.corrupt"), 12);
-        assert_eq!(cs.get_size("block"),
-                   Sizes {
-                       uncompressed: 300,
-                       compressed: 100,
-                   });
+        assert_eq!(
+            cs.get_size("block"),
+            Sizes {
+                uncompressed: 300,
+                compressed: 100,
+            }
+        );
         assert_eq!(cs.get_duration("test"), Duration::new(5, 0));
     }
 

@@ -15,7 +15,7 @@ pub mod plain;
 
 
 /// Display information about backup progress to the user in some way.
-pub trait UI : fmt::Debug {
+pub trait UI: fmt::Debug {
     /// Show counters, eg as a progress bar.
     fn show_progress(&mut self, counts: &Counts);
 
@@ -97,8 +97,10 @@ mod tests {
 
     #[test]
     pub fn test_compression_ratio() {
-        let ratio = super::compression_ratio(&Sizes{ compressed: 2000, uncompressed: 4000 });
-        assert_eq!(format!("{:3.1}x", ratio),
-            "2.0x");
+        let ratio = super::compression_ratio(&Sizes {
+            compressed: 2000,
+            uncompressed: 4000,
+        });
+        assert_eq!(format!("{:3.1}x", ratio), "2.0x");
     }
 }

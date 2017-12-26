@@ -26,7 +26,9 @@ impl AtomicFile {
         let dir = path.parent().unwrap();
         Ok(AtomicFile {
             path: path.to_path_buf(),
-            f: tempfile::NamedTempFileOptions::new().prefix("tmp").create_in(dir)?,
+            f: tempfile::NamedTempFileOptions::new()
+                .prefix("tmp")
+                .create_in(dir)?,
         })
     }
 
@@ -151,15 +153,12 @@ pub fn require_empty_directory(path: &Path) -> Result<()> {
         if e.kind() == io::ErrorKind::AlreadyExists {
             // Exists and hopefully empty?
             if std::fs::read_dir(&path)?.next().is_some() {
-                Err(e).chain_err(|| {
-                    format!("Directory exists and is not empty {:?}", path)
-                })
+                Err(e).chain_err(|| format!("Directory exists and is not empty {:?}", path))
             } else {
                 Ok(()) // Exists and empty
             }
         } else {
-            Err(e)
-                .chain_err(|| format!("Failed to create directory {:?}", path))
+            Err(e).chain_err(|| format!("Failed to create directory {:?}", path))
         }
     } else {
         Ok(()) // Created

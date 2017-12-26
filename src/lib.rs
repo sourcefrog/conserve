@@ -7,7 +7,7 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 
-#![recursion_limit = "1024"]  // Needed by error-chain
+#![recursion_limit = "1024"] // Needed by error-chain
 
 #[macro_use]
 extern crate error_chain;

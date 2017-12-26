@@ -115,23 +115,27 @@ impl IndexBuilder {
         ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))?;
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
 
-        let json_string = report.measure_duration("index.encode", || json::encode(&self.entries))
+        let json_string = report
+            .measure_duration("index.encode", || json::encode(&self.entries))
             .unwrap();
         let uncompressed_len = json_string.len() as u64;
 
         let mut af = AtomicFile::new(hunk_path)?;
-        let compressed_len = report.measure_duration("index.compress",
-            || Snappy::compress_and_write(json_string.as_bytes(), &mut af))?;
+        let compressed_len = report.measure_duration("index.compress", || {
+            Snappy::compress_and_write(json_string.as_bytes(), &mut af)
+        })?;
 
         // TODO: Don't seek, just count bytes as they're compressed.
         // TODO: Measure time to compress separately from time to write.
         af.close(report)?;
 
-        report.increment_size("index",
+        report.increment_size(
+            "index",
             Sizes {
                 uncompressed: uncompressed_len as u64,
                 compressed: compressed_len as u64,
-            });
+            },
+        );
         report.increment("index.hunk", 1);
 
         // Ready for the next hunk.
@@ -230,37 +234,49 @@ impl Iter {
             }
         };
         let (comp_len, index_bytes) = Snappy::decompress_read(&mut f)?;
-        self.report.increment_duration("index.read", start_read.elapsed());
-        self.report.increment_size("index",
-                                   Sizes {
-                                       uncompressed: index_bytes.len() as u64,
-                                       compressed: comp_len as u64,
-                                   });
+        self.report.increment_duration(
+            "index.read",
+            start_read.elapsed(),
+        );
+        self.report.increment_size(
+            "index",
+            Sizes {
+                uncompressed: index_bytes.len() as u64,
+                compressed: comp_len as u64,
+            },
+        );
         self.report.increment("index.hunk", 1);
 
         let start_parse = time::Instant::now();
-        let index_json = str::from_utf8(&index_bytes)
-            .chain_err(|| format!("index file {:?} is not UTF-8", hunk_path))?;
-        let entries: Vec<Entry> = json::decode(index_json)
-            .chain_err(|| format!("couldn't deserialize index hunk {:?}", hunk_path))?;
+        let index_json = str::from_utf8(&index_bytes).chain_err(|| {
+            format!("index file {:?} is not UTF-8", hunk_path)
+        })?;
+        let entries: Vec<Entry> = json::decode(index_json).chain_err(|| {
+            format!("couldn't deserialize index hunk {:?}", hunk_path)
+        })?;
         if entries.is_empty() {
             warn!("Index hunk {} is empty", hunk_path.display());
         }
-        self.report.increment_duration("index.parse", start_parse.elapsed());
+        self.report.increment_duration(
+            "index.parse",
+            start_parse.elapsed(),
+        );
 
-        self.buffered_entries = entries.into_iter()
+        self.buffered_entries = entries
+            .into_iter()
             .filter(|entry| {
                 if self.excludes.is_match(&entry.apath) {
                     match entry.kind {
                         IndexKind::Dir => self.report.increment("skipped.excluded.directories", 1),
                         IndexKind::Symlink => self.report.increment("skipped.excluded.symlinks", 1),
-                        IndexKind::File => self.report.increment("skipped.excluded.files", 1)
+                        IndexKind::File => self.report.increment("skipped.excluded.files", 1),
                     }
                     return false;
                 }
                 return true;
             })
-            .collect::<Vec<Entry>>().into_iter();
+            .collect::<Vec<Entry>>()
+            .into_iter();
 
         self.next_hunk_number += 1;
         Ok(true)
@@ -297,14 +313,16 @@ mod tests {
 
     #[test]
     fn serialize_index() {
-        let entries = [Entry {
-                           apath: "/a/b".to_string(),
-                           mtime: Some(1461736377),
-                           kind: IndexKind::File,
-                           blake2b: Some(EXAMPLE_HASH.to_string()),
-                           addrs: vec![],
-                           target: None,
-                       }];
+        let entries = [
+            Entry {
+                apath: "/a/b".to_string(),
+                mtime: Some(1461736377),
+                kind: IndexKind::File,
+                blake2b: Some(EXAMPLE_HASH.to_string()),
+                addrs: vec![],
+                target: None,
+            },
+        ];
         let index_json = json::encode(&entries).unwrap();
         println!("{}", index_json);
         assert_eq!(
@@ -386,9 +404,13 @@ mod tests {
         assert_eq!(retrieved, r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null}]"#);
 
         let mut it = super::read(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
-        let entry = it.next().expect("Get first entry").expect("First entry isn't an error");
+        let entry = it.next().expect("Get first entry").expect(
+            "First entry isn't an error",
+        );
         assert_eq!(entry.apath, "/apple");
-        let entry = it.next().expect("Get second entry").expect("Entry isn't an error");
+        let entry = it.next().expect("Get second entry").expect(
+            "Entry isn't an error",
+        );
         assert_eq!(entry.apath, "/banana");
         let opt_entry = it.next();
         if !opt_entry.is_none() {
@@ -408,8 +430,10 @@ mod tests {
         ib.finish_hunk(&report).unwrap();
 
         let it = super::read(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
-        assert_eq!(format!("{:?}", &it),
-                   format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));
+        assert_eq!(
+            format!("{:?}", &it),
+            format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir)
+        );
 
         let names: Vec<String> = it.map(|x| x.unwrap().apath).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
@@ -445,8 +469,10 @@ mod tests {
 
         let excludes = excludes::from_strings(vec!["/fo*"]).unwrap();
         let it = super::read(&ib.dir, &excludes, &report).unwrap();
-        assert_eq!(format!("{:?}", &it),
-                   format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir));
+        assert_eq!(
+            format!("{:?}", &it),
+            format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir)
+        );
 
         let names: Vec<String> = it.map(|x| x.unwrap().apath).collect();
         assert_eq!(names, &["/bar"]);

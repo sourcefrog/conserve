@@ -26,7 +26,7 @@ impl RestoreOptions {
         RestoreOptions {
             force_overwrite: false,
             band_id: None,
-            excludes: excludes::excludes_nothing()
+            excludes: excludes::excludes_nothing(),
         }
     }
 
@@ -52,11 +52,7 @@ impl RestoreOptions {
     ///
     /// This will warn, but not fail, if the version is incomplete: this might
     /// mean only part of the source tree is copied back.
-    pub fn restore(
-        &self,
-        archive: &Archive,
-        destination: &Path
-    ) -> Result<()> {
+    pub fn restore(&self, archive: &Archive, destination: &Path) -> Result<()> {
         let options = &self;
         let stored_tree = archive.stored_tree(&options.band_id)?;
 
@@ -64,9 +60,7 @@ impl RestoreOptions {
             if let Ok(mut it) = fs::read_dir(&destination) {
                 if it.next().is_some() {
                     return Err(
-                        ErrorKind::DestinationNotEmpty(
-                            destination.to_path_buf(),
-                        ).into(),
+                        ErrorKind::DestinationNotEmpty(destination.to_path_buf()).into(),
                     );
                 };
             }
@@ -83,7 +77,10 @@ impl RestoreOptions {
             )?;
         }
         if !stored_tree.is_closed()? {
-            warn!("Version {} is incomplete: tree may be truncated", stored_tree.band().id());
+            warn!(
+                "Version {} is incomplete: tree may be truncated",
+                stored_tree.band().id()
+            );
         }
         Ok(())
     }
@@ -105,22 +102,14 @@ fn restore_one(
     info!("Restore {:?} to {:?}", &entry.apath, &dest_path);
     match entry.kind {
         index::IndexKind::Dir => restore_dir(entry, &dest_path, &report),
-        index::IndexKind::File => {
-            restore_file(stored_tree, entry, &dest_path, &report)
-        }
-        index::IndexKind::Symlink => {
-            restore_symlink(entry, &dest_path, &report)
-        }
+        index::IndexKind::File => restore_file(stored_tree, entry, &dest_path, &report),
+        index::IndexKind::Symlink => restore_symlink(entry, &dest_path, &report),
     }
     // TODO: Restore permissions.
     // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
 }
 
-fn restore_dir(
-    _entry: &index::Entry,
-    dest: &Path,
-    report: &Report,
-) -> Result<()> {
+fn restore_dir(_entry: &index::Entry, dest: &Path, report: &Report) -> Result<()> {
     report.increment("dir", 1);
     match fs::create_dir(dest) {
         Ok(_) => Ok(()),
@@ -129,7 +118,12 @@ fn restore_dir(
     }
 }
 
-fn restore_file(stored_tree: &StoredTree, entry: &index::Entry, dest: &Path, report: &Report) -> Result<()> {
+fn restore_file(
+    stored_tree: &StoredTree,
+    entry: &index::Entry,
+    dest: &Path,
+    report: &Report,
+) -> Result<()> {
     report.increment("file", 1);
     // Here too we write a temporary file and then move it into place: so the
     // file under its real name only appears
@@ -141,11 +135,7 @@ fn restore_file(stored_tree: &StoredTree, entry: &index::Entry, dest: &Path, rep
 }
 
 #[cfg(unix)]
-fn restore_symlink(
-    entry: &index::Entry,
-    dest: &Path,
-    report: &Report,
-) -> Result<()> {
+fn restore_symlink(entry: &index::Entry, dest: &Path, report: &Report) -> Result<()> {
     use std::os::unix::fs as unix_fs;
     report.increment("symlink", 1);
     if let Some(ref target) = entry.target {
@@ -157,11 +147,7 @@ fn restore_symlink(
 }
 
 #[cfg(not(unix))]
-fn restore_symlink(
-    entry: &index::Entry,
-    _dest: &Path,
-    report: &Report,
-) -> Result<()> {
+fn restore_symlink(entry: &index::Entry, _dest: &Path, report: &Report) -> Result<()> {
     // TODO: Add a test with a canned index containing a symlink, and expect
     // it cannot be restored on Windows and can be on Unix.
     warn!("Can't restore symlinks on Windows: {}", entry.apath);
@@ -186,7 +172,10 @@ mod tests {
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         RestoreOptions::default()
-            .restore(&Archive::open(af.path(), &restore_report).unwrap(), destdir.path())
+            .restore(
+                &Archive::open(af.path(), &restore_report).unwrap(),
+                destdir.path(),
+            )
             .unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
@@ -212,8 +201,7 @@ mod tests {
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         let a = Archive::open(af.path(), &restore_report).unwrap();
-        let options =
-            RestoreOptions::default().band_id(Some(BandId::new(&[0])));
+        let options = RestoreOptions::default().band_id(Some(BandId::new(&[0])));
         options.restore(&a, destdir.path()).unwrap();
         // Does not have the 'hello2' file added in the second version.
         assert_eq!(2, restore_report.get_count("file"));
@@ -226,13 +214,9 @@ mod tests {
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
         let options = RestoreOptions::default();
-        let restore_err = options
-            .restore(&af, destdir.path())
-            .unwrap_err();
+        let restore_err = options.restore(&af, destdir.path()).unwrap_err();
         let restore_err_str = restore_err.to_string();
-        assert_that(&restore_err_str).contains(
-            &"Destination directory not empty",
-        );
+        assert_that(&restore_err_str).contains(&"Destination directory not empty");
     }
 
     #[test]
@@ -243,7 +227,12 @@ mod tests {
         destdir.create_file("existing");
         let restore_report = Report::new();
         let options = RestoreOptions::default().force_overwrite(true);
-        options.restore(&Archive::open(af.path(), &restore_report).unwrap(), destdir.path()).unwrap();
+        options
+            .restore(
+                &Archive::open(af.path(), &restore_report).unwrap(),
+                destdir.path(),
+            )
+            .unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
@@ -259,7 +248,8 @@ mod tests {
         let restore_report = Report::new();
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
         RestoreOptions::default()
-            .with_excludes(vec!["/**/subfile"]).unwrap()
+            .with_excludes(vec!["/**/subfile"])
+            .unwrap()
             .restore(&restore_archive, destdir.path())
             .unwrap();
 

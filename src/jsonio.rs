@@ -5,7 +5,7 @@
 
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::{Path};
+use std::path::Path;
 
 use rustc_serialize::json;
 use rustc_serialize::{Decodable, Encodable};
@@ -28,7 +28,9 @@ pub fn read<T: Decodable>(path: &Path, _report: &Report) -> Result<T> {
     // TODO: Send something to the Report.
     // At present this is used only for small metadata files so measurement is not
     // critical.
-    let mut f = File::open(path).chain_err(|| format!("Failed to open {:?}", path))?;
+    let mut f = File::open(path).chain_err(
+        || format!("Failed to open {:?}", path),
+    )?;
     let mut buf = String::new();
     let _bytes_read = f.read_to_string(&mut buf)?;
     json::decode(&buf).chain_err(|| format!("Couldn't deserialize {:?}", path))

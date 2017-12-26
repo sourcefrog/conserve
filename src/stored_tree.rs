@@ -49,10 +49,7 @@ impl StoredTree {
     /// Return an iter of contents of file contents for the given file entry.
     ///
     /// Contents are yielded as blocks of bytes, of arbitrary length as stored in the archive.
-    pub fn file_contents(
-        &self,
-        entry: &index::Entry,
-    ) -> Result<stored_file::StoredFile> {
+    pub fn file_contents(&self, entry: &index::Entry) -> Result<stored_file::StoredFile> {
         Ok(stored_file::StoredFile::open(
             self.band.block_dir(),
             entry.addrs.clone(),

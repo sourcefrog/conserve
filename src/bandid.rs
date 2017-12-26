@@ -14,7 +14,6 @@ use errors::*;
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
 pub struct BandId {
     // TODO: Maybe don't store both the vec and the string?
-
     /// The sequence numbers at each tier.
     seqs: Vec<u32>,
 
@@ -123,16 +122,20 @@ mod tests {
     #[test]
     fn next() {
         assert_eq!(BandId::zero().next_sibling().as_string(), "b0001");
-        assert_eq!(BandId::new(&[2, 3]).next_sibling().as_string(),
-                   "b0002-0004");
+        assert_eq!(
+            BandId::new(&[2, 3]).next_sibling().as_string(),
+            "b0002-0004"
+        );
     }
 
     #[test]
     fn as_string() {
         let band_id = BandId::new(&[1, 10, 20]);
         assert_eq!(band_id.as_string(), "b0001-0010-0020");
-        assert_eq!(BandId::new(&[1000000, 2000000]).as_string(),
-                   "b1000000-2000000")
+        assert_eq!(
+            BandId::new(&[1000000, 2000000]).as_string(),
+            "b1000000-2000000"
+        )
     }
 
     #[test]
@@ -154,10 +157,14 @@ mod tests {
     #[test]
     fn from_string_valid() {
         assert_eq!(BandId::from_string("b0001").unwrap().as_string(), "b0001");
-        assert_eq!(BandId::from_string("b123456").unwrap().as_string(),
-                   "b123456");
-        assert_eq!(BandId::from_string("b0001-0100-0234").unwrap().as_string(),
-                   "b0001-0100-0234");
+        assert_eq!(
+            BandId::from_string("b123456").unwrap().as_string(),
+            "b123456"
+        );
+        assert_eq!(
+            BandId::from_string("b0001-0100-0234").unwrap().as_string(),
+            "b0001-0100-0234"
+        );
     }
 
     #[test]
