@@ -206,11 +206,11 @@ mod tests {
 
         // Read back the empty file
         let st = af.stored_tree(&None).unwrap();
-        let empty_entry = st.index_iter(&excludes::excludes_nothing(), &report).unwrap()
+        let empty_entry = st.index_iter(&excludes::excludes_nothing()).unwrap()
             .map(|i| i.unwrap())
             .find(|ref i| {i.apath == "/empty"})
             .expect("found one entry");
-        let sf = st.file_contents(&empty_entry, &report).unwrap();
+        let sf = st.file_contents(&empty_entry).unwrap();
         assert_eq!(0, sf.count(), "reading empty file has zero chunks");
     }
 }

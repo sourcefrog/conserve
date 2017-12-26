@@ -55,8 +55,7 @@ impl RestoreOptions {
     pub fn restore(
         &self,
         archive: &Archive,
-        destination: &Path,
-        report: &Report,
+        destination: &Path
     ) -> Result<()> {
         let options = &self;
         let stored_tree = archive.stored_tree(&options.band_id)?;
@@ -73,13 +72,13 @@ impl RestoreOptions {
             }
             // TODO: Propagate error from readdir?
         };
-        for entry in stored_tree.band().index_iter(&self.excludes, &report)? {
+        for entry in stored_tree.index_iter(&self.excludes)? {
             // TODO: Continue even if one fails
             restore_one(
                 &stored_tree,
                 &entry?,
                 destination,
-                report,
+                archive.report(),
                 options,
             )?;
         }
@@ -135,7 +134,7 @@ fn restore_file(stored_tree: &StoredTree, entry: &index::Entry, dest: &Path, rep
     // Here too we write a temporary file and then move it into place: so the
     // file under its real name only appears
     let mut af = AtomicFile::new(dest)?;
-    for bytes in stored_tree.file_contents(entry, report)? {
+    for bytes in stored_tree.file_contents(entry)? {
         af.write(bytes?.as_slice())?;
     }
     af.close(&report)
@@ -187,7 +186,7 @@ mod tests {
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         RestoreOptions::default()
-            .restore(&af, destdir.path(), &restore_report)
+            .restore(&Archive::open(af.path(), &restore_report).unwrap(), destdir.path())
             .unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
@@ -212,11 +211,10 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
+        let a = Archive::open(af.path(), &restore_report).unwrap();
         let options =
             RestoreOptions::default().band_id(Some(BandId::new(&[0])));
-        options
-            .restore(&af, destdir.path(), &restore_report)
-            .unwrap();
+        options.restore(&a, destdir.path()).unwrap();
         // Does not have the 'hello2' file added in the second version.
         assert_eq!(2, restore_report.get_count("file"));
     }
@@ -227,10 +225,9 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
-        let restore_report = Report::new();
         let options = RestoreOptions::default();
         let restore_err = options
-            .restore(&af, destdir.path(), &restore_report)
+            .restore(&af, destdir.path())
             .unwrap_err();
         let restore_err_str = restore_err.to_string();
         assert_that(&restore_err_str).contains(
@@ -246,9 +243,7 @@ mod tests {
         destdir.create_file("existing");
         let restore_report = Report::new();
         let options = RestoreOptions::default().force_overwrite(true);
-        options
-            .restore(&af, destdir.path(), &restore_report)
-            .unwrap();
+        options.restore(&Archive::open(af.path(), &restore_report).unwrap(), destdir.path()).unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
@@ -262,9 +257,10 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
+        let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
         RestoreOptions::default()
             .with_excludes(vec!["/**/subfile"]).unwrap()
-            .restore(&af, destdir.path(), &restore_report)
+            .restore(&restore_archive, destdir.path())
             .unwrap();
 
         assert_eq!(2, restore_report.borrow_counts().get_count("file"));

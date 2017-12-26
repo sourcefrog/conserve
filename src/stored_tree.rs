@@ -42,8 +42,8 @@ impl StoredTree {
     }
 
     /// Return an iter of index entries in this stored tree.
-    pub fn index_iter(&self, excludes: &GlobSet, report: &Report) -> Result<index::Iter> {
-        self.band.index_iter(excludes, report)
+    pub fn index_iter(&self, excludes: &GlobSet) -> Result<index::Iter> {
+        self.band.index_iter(excludes, self.archive.report())
     }
 
     /// Return an iter of contents of file contents for the given file entry.
@@ -52,12 +52,11 @@ impl StoredTree {
     pub fn file_contents(
         &self,
         entry: &index::Entry,
-        report: &Report,
     ) -> Result<stored_file::StoredFile> {
         Ok(stored_file::StoredFile::open(
             self.band.block_dir(),
             entry.addrs.clone(),
-            &report,
+            self.archive.report(),
         ))
     }
 
@@ -76,13 +75,12 @@ mod test {
         let af = ScratchArchive::new();
         af.store_two_versions();
 
-        let report = Report::new();
         let last_band_id = af.last_band_id().unwrap();
         let st = af.stored_tree(&None).unwrap();
 
         assert_eq!(st.band().id(), last_band_id);
 
-        let names: Vec<String> = st.index_iter(&excludes::excludes_nothing(), &report)
+        let names: Vec<String> = st.index_iter(&excludes::excludes_nothing())
             .unwrap()
             .map(|e| e.unwrap().apath)
             .collect();

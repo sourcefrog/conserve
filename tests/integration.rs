@@ -85,9 +85,11 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
 fn check_restore(af: &ScratchArchive) {
     // TODO: Read back contents of that file.
     let restore_dir = TreeFixture::new();
-    let restore_report = Report::new();
     let options = RestoreOptions::default();
-    options.restore(&af, restore_dir.path(), &restore_report).unwrap();
+
+    let restore_report = Report::new();
+    let restore_a = Archive::open(af.path(), &restore_report).unwrap();
+    options.restore(&restore_a, restore_dir.path()).unwrap();
     let block_sizes = restore_report.get_size("block");
     assert!(block_sizes.uncompressed == 8 && block_sizes.compressed == 10,
            format!("{:?}", block_sizes));
@@ -116,7 +118,8 @@ fn large_file() {
     // Try to restore it
     let rd = tempdir::TempDir::new("conserve_test_restore").unwrap();
     let restore_report = Report::new();
-    RestoreOptions::default().restore(&af, rd.path(), &restore_report).unwrap();
+    let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
+    RestoreOptions::default().restore(&restore_archive, rd.path()).unwrap();
     assert_eq!(report.get_count("file"), 1);
 
     // TODO: Restore should also set file.large etc.

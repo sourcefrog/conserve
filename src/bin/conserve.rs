@@ -281,7 +281,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
         }
         None => excludes::excludes_nothing()
     };
-    for i in st.index_iter(&excludes, &report)? {
+    for i in st.index_iter(&excludes)? {
         println!("{}", i?.apath);
     }
     Ok(())
@@ -303,7 +303,7 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     if let Some(excludes) = subm.values_of("exclude") {
         options = options.with_excludes(excludes.collect())?;
     };
-    options.restore(&archive, destination_path, report)
+    options.restore(&archive, destination_path)
 }
 
 fn band_id_from_match(subm: &ArgMatches) -> Result<Option<BandId>> {

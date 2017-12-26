@@ -132,6 +132,10 @@ impl Archive {
     pub fn stored_tree(&self, band_id: &Option<BandId>) -> Result<StoredTree> {
         StoredTree::open(self, band_id)
     }
+
+    pub fn report(&self) -> &Report {
+        &self.report
+    }
 }
 
 
