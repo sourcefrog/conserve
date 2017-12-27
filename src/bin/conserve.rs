@@ -324,15 +324,14 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let force_overwrite = subm.is_present("force-overwrite");
     // TODO: Restore core code should complain if the band is incomplete.
     let band_id = band_id_from_match(subm)?;
-    let band = archive.open_band(&band_id)?;
-    complain_if_incomplete(&band, subm.is_present("incomplete"))?;
+    let st = archive.stored_tree(&band_id)?;
+    complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
     let mut options = conserve::RestoreOptions::default()
-        .force_overwrite(force_overwrite)
-        .band_id(band_id);
+        .force_overwrite(force_overwrite);
     if let Some(excludes) = subm.values_of("exclude") {
         options = options.with_excludes(excludes.collect())?;
     };
-    options.restore(&archive, destination_path)
+    restore_tree(&st, destination_path, &options)
 }
 
 fn band_id_from_match(subm: &ArgMatches) -> Result<Option<BandId>> {

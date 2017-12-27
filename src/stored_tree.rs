@@ -37,6 +37,10 @@ impl StoredTree {
         &self.band
     }
 
+    pub fn archive(&self) -> &Archive {
+        &self.archive
+    }
+
     pub fn is_closed(&self) -> Result<bool> {
         self.band.is_closed()
     }

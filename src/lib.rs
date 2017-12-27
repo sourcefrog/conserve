@@ -62,7 +62,7 @@ pub use errors::*;
 pub use io::{AtomicFile, ensure_dir_exists};
 pub use index::{IndexBuilder, Entry, IndexKind};
 pub use report::{Report, Sizes};
-pub use restore::RestoreOptions;
+pub use restore::{RestoreOptions, restore_tree};
 pub use stored_tree::StoredTree;
 pub use ui::UI;
 

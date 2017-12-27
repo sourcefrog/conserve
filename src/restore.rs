@@ -43,47 +43,41 @@ impl RestoreOptions {
             ..self
         }
     }
+}
 
-    pub fn band_id(self, b: Option<BandId>) -> RestoreOptions {
-        RestoreOptions { band_id: b, ..self }
-    }
 
-    /// Restore a version from the archive.
-    ///
-    /// This will warn, but not fail, if the version is incomplete: this might
-    /// mean only part of the source tree is copied back.
-    pub fn restore(&self, archive: &Archive, destination: &Path) -> Result<()> {
-        let options = &self;
-        let stored_tree = archive.stored_tree(&options.band_id)?;
-
-        if !options.force_overwrite {
-            if let Ok(mut it) = fs::read_dir(&destination) {
-                if it.next().is_some() {
-                    return Err(
-                        ErrorKind::DestinationNotEmpty(destination.to_path_buf()).into(),
-                    );
-                };
-            }
-            // TODO: Propagate error from readdir?
-        };
-        for entry in stored_tree.index_iter(&self.excludes)? {
-            // TODO: Continue even if one fails
-            restore_one(
-                &stored_tree,
-                &entry?,
-                destination,
-                archive.report(),
-                options,
-            )?;
+pub fn restore_tree(
+    stored_tree: &StoredTree,
+    destination: &Path,
+    options: &RestoreOptions,
+) -> Result<()> {
+    if !options.force_overwrite {
+        if let Ok(mut it) = fs::read_dir(&destination) {
+            if it.next().is_some() {
+                return Err(
+                    ErrorKind::DestinationNotEmpty(destination.to_path_buf()).into(),
+                );
+            };
         }
-        if !stored_tree.is_closed()? {
-            warn!(
-                "Version {} is incomplete: tree may be truncated",
-                stored_tree.band().id()
-            );
-        }
-        Ok(())
+        // TODO: Propagate error from readdir?
+    };
+    for entry in stored_tree.index_iter(&options.excludes)? {
+        // TODO: Continue even if one fails
+        restore_one(
+            &stored_tree,
+            &entry?,
+            destination,
+            stored_tree.archive().report(),
+            options,
+        )?;
     }
+    if !stored_tree.is_closed()? {
+        warn!(
+            "Version {} is incomplete: tree may be truncated",
+            stored_tree.band().id()
+        );
+    }
+    Ok(())
 }
 
 
@@ -170,13 +164,11 @@ mod tests {
         let af = ScratchArchive::new();
         af.store_two_versions();
         let destdir = TreeFixture::new();
+
         let restore_report = Report::new();
-        RestoreOptions::default()
-            .restore(
-                &Archive::open(af.path(), &restore_report).unwrap(),
-                destdir.path(),
-            )
-            .unwrap();
+        let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
+        let st = restore_archive.stored_tree(&None).unwrap();
+        restore_tree(&st, destdir.path(), &RestoreOptions::default()).unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
@@ -201,8 +193,9 @@ mod tests {
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         let a = Archive::open(af.path(), &restore_report).unwrap();
-        let options = RestoreOptions::default().band_id(Some(BandId::new(&[0])));
-        options.restore(&a, destdir.path()).unwrap();
+        let st = a.stored_tree(&Some(BandId::new(&[0]))).unwrap();
+        let options = RestoreOptions::default();
+        restore_tree(&st, destdir.path(), &options).unwrap();
         // Does not have the 'hello2' file added in the second version.
         assert_eq!(2, restore_report.get_count("file"));
     }
@@ -213,9 +206,11 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
-        let options = RestoreOptions::default();
-        let restore_err = options.restore(&af, destdir.path()).unwrap_err();
-        let restore_err_str = restore_err.to_string();
+        let restore_err_str = restore_tree(
+            &af.stored_tree(&None).unwrap(),
+            destdir.path(),
+            &RestoreOptions::default(),
+        ).unwrap_err().to_string();
         assert_that(&restore_err_str).contains(&"Destination directory not empty");
     }
 
@@ -225,14 +220,12 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
+
         let restore_report = Report::new();
+        let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
         let options = RestoreOptions::default().force_overwrite(true);
-        options
-            .restore(
-                &Archive::open(af.path(), &restore_report).unwrap(),
-                destdir.path(),
-            )
-            .unwrap();
+        let st = restore_archive.stored_tree(&None).unwrap();
+        restore_tree(&st, destdir.path(), &options).unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
@@ -247,11 +240,11 @@ mod tests {
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
-        RestoreOptions::default()
+        let st = restore_archive.stored_tree(&None).unwrap();
+        let options = RestoreOptions::default()
             .with_excludes(vec!["/**/subfile"])
-            .unwrap()
-            .restore(&restore_archive, destdir.path())
             .unwrap();
+        restore_tree(&st, destdir.path(), &options).unwrap();
 
         assert_eq!(2, restore_report.borrow_counts().get_count("file"));
         let dest = &destdir.path();
