@@ -52,14 +52,7 @@ pub fn restore_tree(
     options: &RestoreOptions,
 ) -> Result<()> {
     if !options.force_overwrite {
-        if let Ok(mut it) = fs::read_dir(&destination) {
-            if it.next().is_some() {
-                return Err(
-                    ErrorKind::DestinationNotEmpty(destination.to_path_buf()).into(),
-                );
-            };
-        }
-        // TODO: Propagate error from readdir?
+        require_empty_destination(destination)?;
     };
     for entry in stored_tree.index_iter(&options.excludes)? {
         // TODO: Continue even if one fails
@@ -76,6 +69,24 @@ pub fn restore_tree(
             "Version {} is incomplete: tree may be truncated",
             stored_tree.band().id()
         );
+    }
+    Ok(())
+}
+
+
+/// The destination must either not exist, or be an empty directory.
+fn require_empty_destination(destination: &Path) -> Result<()> {
+    match fs::read_dir(&destination) {
+        Ok(mut it) => {
+            if it.next().is_some() {
+                return Err(
+                    ErrorKind::DestinationNotEmpty(destination.to_path_buf()).into(),
+                );
+            };
+        },
+        Err(e) => {
+            return Err(e.into());
+        }
     }
     Ok(())
 }
