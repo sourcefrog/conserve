@@ -55,7 +55,7 @@ pub fn make_backup(source: &Path, archive: &Archive, backup_options: &BackupOpti
 
 impl BackupWriter {
     fn begin_band(archive: &Archive) -> Result<BackupWriter> {
-        let band = archive.create_band()?;
+        let band = Band::create(archive)?;
         let block_dir = band.block_dir();
         let index_builder = band.index_builder();
         Ok(BackupWriter {

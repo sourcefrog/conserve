@@ -68,8 +68,18 @@ pub struct Info {
 impl Band {
     /// Make a new band (and its on-disk directory).
     ///
-    /// Prefer Archive::create_band.
-    pub(crate) fn create(archive: &Archive, id: BandId) -> Result<Band> {
+    /// The Band gets the next relevant id.
+    pub fn create(archive: &Archive) -> Result<Band> {
+        let new_band_id = match archive.last_band_id() {
+            Err(Error(ErrorKind::ArchiveEmpty, _)) => BandId::zero(),
+            Ok(b) => b.next_sibling(),
+            Err(e) => return Err(e),
+        };
+        Band::create_specific_id(archive, new_band_id)
+    }
+
+    /// Create a Band with a given id.
+    fn create_specific_id(archive: &Archive, id: BandId) -> Result<Band> {
         let archive_dir = archive.path();
         let new = Band::new(archive_dir, id);
 
@@ -195,7 +205,7 @@ mod tests {
         use super::super::io::list_dir;
         let af = ScratchArchive::new();
         let report = &Report::new();
-        let band = Band::create(&af, BandId::from_string("b0001").unwrap()).unwrap();
+        let band = Band::create_specific_id(&af, BandId::from_string("b0001").unwrap()).unwrap();
         assert!(band.path().to_str().unwrap().ends_with("b0001"));
         assert!(fs::metadata(band.path()).unwrap().is_dir());
 
@@ -232,8 +242,8 @@ mod tests {
     fn create_existing_band() {
         let af = ScratchArchive::new();
         let band_id = BandId::from_string("b0001").unwrap();
-        Band::create(&af, band_id.clone()).unwrap();
-        let e = Band::create(&af, band_id).unwrap_err();
+        Band::create_specific_id(&af, band_id.clone()).unwrap();
+        let e = Band::create_specific_id(&af, band_id).unwrap_err();
         if let ErrorKind::Io(ref ioerror) = *e.kind() {
             assert_eq!(ioerror.kind(), io::ErrorKind::AlreadyExists);
         } else {

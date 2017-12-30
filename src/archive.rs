@@ -99,8 +99,8 @@ impl Archive {
         self.path.as_path()
     }
 
-    // Return the `BandId` of the highest-numbered band, or ArchiveEmpty,
-    // or an Err if any occurred reading the directory.
+    /// Return the `BandId` of the highest-numbered band, or ArchiveEmpty,
+    /// or an Err if any occurred reading the directory.
     pub fn last_band_id(self: &Archive) -> Result<BandId> {
         // Walk through list of bands; if any error return that, otherwise return the greatest.
         let mut accum: Option<BandId> = None;
@@ -114,16 +114,7 @@ impl Archive {
         accum.ok_or(ErrorKind::ArchiveEmpty.into())
     }
 
-    /// Make a new band. Bands are numbered sequentially.
-    pub fn create_band(self: &Archive) -> Result<Band> {
-        let new_band_id = match self.last_band_id() {
-            Err(Error(ErrorKind::ArchiveEmpty, _)) => BandId::zero(),
-            Ok(b) => b.next_sibling(),
-            Err(e) => return Err(e),
-        };
-        Band::create(&self, new_band_id)
-    }
-
+    /// Return the Report that counts operations on this Archive and objects descended from it.
     pub fn report(&self) -> &Report {
         &self.report
     }
@@ -244,7 +235,7 @@ mod tests {
         }
 
         // Make one band
-        let _band1 = af.create_band().unwrap();
+        let _band1 = Band::create(&af).unwrap();
         assert!(directory_exists(af.path()).unwrap());
         let (_file_names, dir_names) = list_dir(af.path()).unwrap();
         println!("dirs: {:?}", dir_names);
@@ -254,7 +245,7 @@ mod tests {
         assert_eq!(af.last_band_id().unwrap(), BandId::new(&[0]));
 
         // Try creating a second band.
-        let _band2 = &af.create_band().unwrap();
+        let _band2 = Band::create(&af).unwrap();
         assert_eq!(
             af.list_bands().unwrap(),
             vec![BandId::new(&[0]), BandId::new(&[1])]

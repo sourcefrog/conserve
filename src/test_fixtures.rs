@@ -46,7 +46,7 @@ impl ScratchArchive {
     }
 
     pub fn setup_incomplete_empty_band(&self) {
-        self.archive.create_band().unwrap();
+        Band::create(&self.archive).unwrap();
     }
 
     pub fn store_two_versions(&self) {
