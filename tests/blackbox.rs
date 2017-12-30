@@ -250,8 +250,7 @@ fn assert_success_and_output(args: &[&str], expected_stdout: &str, expected_stde
 ///
 /// It might be in the same directory as the test (if run from tests/debug) or
 /// in the parent, if the test happens to be run from tests/debug/deps.
-///
-/// See https://users.rust-lang.org/t/test-dependency-binary-no-longer-found-under-unqualified-name/8077.
+// https://users.rust-lang.org/t/test-dependency-binary-no-longer-found-under-unqualified-name/8077
 fn find_conserve_binary() -> PathBuf {
     let mut search_dir = env::current_exe().unwrap().to_path_buf();
     for _ in 0..2 {

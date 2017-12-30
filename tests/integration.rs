@@ -78,7 +78,8 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     assert!(file_entry.mtime.unwrap() > 0);
     let hash = file_entry.blake2b.as_ref().unwrap();
     assert_eq!(
-        "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
+        "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee\
+        42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
         hash
     );
 }
