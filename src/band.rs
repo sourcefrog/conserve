@@ -69,7 +69,8 @@ impl Band {
     /// Make a new band (and its on-disk directory).
     ///
     /// Prefer Archive::create_band.
-    pub(crate) fn create(archive_dir: &Path, id: BandId, report: &Report) -> Result<Band> {
+    pub(crate) fn create(archive: &Archive, id: BandId) -> Result<Band> {
+        let archive_dir = archive.path();
         let new = Band::new(archive_dir, id);
 
         fs::create_dir(&new.path_buf)?;
@@ -78,7 +79,7 @@ impl Band {
         info!("Created band {} in {:?}", new.id, &archive_dir);
 
         let head = Head { start_time: UTC::now().timestamp() };
-        jsonio::write(&new.head_path(), &head, report)?;
+        jsonio::write(&new.head_path(), &head, archive.report())?;
         Ok(new)
     }
 
@@ -194,7 +195,7 @@ mod tests {
         use super::super::io::list_dir;
         let af = ScratchArchive::new();
         let report = &Report::new();
-        let band = Band::create(af.path(), BandId::from_string("b0001").unwrap(), report).unwrap();
+        let band = Band::create(&af, BandId::from_string("b0001").unwrap()).unwrap();
         assert!(band.path().to_str().unwrap().ends_with("b0001"));
         assert!(fs::metadata(band.path()).unwrap().is_dir());
 
@@ -231,8 +232,8 @@ mod tests {
     fn create_existing_band() {
         let af = ScratchArchive::new();
         let band_id = BandId::from_string("b0001").unwrap();
-        Band::create(af.path(), band_id.clone(), &Report::new()).unwrap();
-        let e = Band::create(af.path(), band_id, &Report::new()).unwrap_err();
+        Band::create(&af, band_id.clone()).unwrap();
+        let e = Band::create(&af, band_id).unwrap_err();
         if let ErrorKind::Io(ref ioerror) = *e.kind() {
             assert_eq!(ioerror.kind(), io::ErrorKind::AlreadyExists);
         } else {

@@ -121,7 +121,7 @@ impl Archive {
             Ok(b) => b.next_sibling(),
             Err(e) => return Err(e),
         };
-        Band::create(self.path(), new_band_id, &self.report)
+        Band::create(&self, new_band_id)
     }
 
     pub fn report(&self) -> &Report {
