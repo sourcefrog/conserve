@@ -88,10 +88,14 @@ impl Band {
         jsonio::write(&self.tail_path(), &tail, report)
     }
 
-    /// Open a given band. Prefer `Archive.open_band`.
-    pub(crate) fn open(archive_dir: &Path, id: &BandId, report: &Report) -> Result<Band> {
-        let new = Band::new(archive_dir, id.clone());
-        new.read_head(&report)?; // Just check it can be read
+    /// Open a given band, or by default the latest in the archive.
+    pub fn open(archive: &Archive, band_id: &Option<BandId>) -> Result<Band> {
+        let band_id = match band_id {
+            &Some(ref b) => b.clone(),
+            &None => archive.last_band_id()?,
+        };
+        let new = Band::new(archive.path(), band_id);
+        new.read_head(&archive.report())?; // Just check it can be read
         Ok(new)
     }
 
@@ -209,7 +213,7 @@ mod tests {
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_string("b0001").unwrap();
-        let band2 = Band::open(af.path(), &band_id, report).expect("failed to open band");
+        let band2 = Band::open(&af, &Some(band_id)).expect("failed to open band");
         assert!(band2.is_closed().unwrap());
 
         // Try get_info

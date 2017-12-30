@@ -126,11 +126,7 @@ impl Archive {
 
     /// Open a band if specified, or otherwise the last band.
     pub fn open_band(&self, band_id: &Option<BandId>) -> Result<Band> {
-        let band_id = match band_id {
-            &Some(ref b) => b.clone(),
-            &None => self.last_band_id()?,
-        };
-        Band::open(self.path(), &band_id, &self.report)
+        Band::open(self, &band_id)
     }
 
     pub fn report(&self) -> &Report {
