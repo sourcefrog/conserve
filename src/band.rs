@@ -101,8 +101,9 @@ impl Band {
 
     /// Create a new in-memory Band object.
     ///
-    /// Prefer `Archive.create_band`.
-    pub(crate) fn new(archive_dir: &Path, id: BandId) -> Band {
+    /// Instead of creating the in-memory object you typically should either `create` or `open` the
+    /// band corresponding to in-archive directory.
+    fn new(archive_dir: &Path, id: BandId) -> Band {
         let mut path_buf = archive_dir.to_path_buf();
         path_buf.push(id.as_string());
         let mut block_dir_path = path_buf.clone();
