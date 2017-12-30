@@ -14,8 +14,6 @@ use super::*;
 
 
 /// Read index and file contents for a version stored in the archive.
-///
-/// These are obtained from `Archive.stored_tree`.
 #[derive(Debug)]
 pub struct StoredTree {
     archive: Archive,
@@ -24,7 +22,8 @@ pub struct StoredTree {
 
 
 impl StoredTree {
-    pub(super) fn open(archive: &Archive, band_id: &Option<BandId>) -> Result<StoredTree> {
+    /// Open a tree stored in the archive, identified by BandId or by default the last.
+    pub fn open(archive: &Archive, band_id: &Option<BandId>) -> Result<StoredTree> {
         let band = archive.open_band(band_id)?;
         // TODO: Maybe warn if the band's incomplete, or fail unless opening is forced?
         Ok(StoredTree {
@@ -77,7 +76,7 @@ mod test {
         af.store_two_versions();
 
         let last_band_id = af.last_band_id().unwrap();
-        let st = af.stored_tree(&None).unwrap();
+        let st = StoredTree::open(&af, &None).unwrap();
 
         assert_eq!(st.band().id(), last_band_id);
 
@@ -103,6 +102,6 @@ mod test {
     #[test]
     pub fn cant_open_no_versions() {
         let af = ScratchArchive::new();
-        assert!(af.stored_tree(&None).is_err());
+        assert!(StoredTree::open(&af, &None).is_err());
     }
 }

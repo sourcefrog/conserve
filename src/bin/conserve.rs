@@ -304,7 +304,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive_path = Path::new(subm.value_of("archive").unwrap());
     let archive = Archive::open(archive_path, &report)?;
     let band_id = band_id_from_match(subm)?;
-    let st = archive.stored_tree(&band_id)?;
+    let st = StoredTree::open(&archive, &band_id)?;
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
     let excludes = match subm.values_of("exclude") {
         Some(excludes) => excludes::from_strings(excludes.collect())?,
@@ -324,7 +324,7 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let force_overwrite = subm.is_present("force-overwrite");
     // TODO: Restore core code should complain if the band is incomplete.
     let band_id = band_id_from_match(subm)?;
-    let st = archive.stored_tree(&band_id)?;
+    let st = StoredTree::open(&archive, &band_id)?;
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
     let mut options = conserve::RestoreOptions::default()
         .force_overwrite(force_overwrite);
