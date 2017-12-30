@@ -29,7 +29,7 @@ impl ScratchArchive {
     pub fn new() -> ScratchArchive {
         let tempdir = tempdir::TempDir::new("conserve_ScratchArchive").unwrap();
         let arch_dir = tempdir.path().join("archive");
-        let archive = Archive::init(&arch_dir).unwrap();
+        let archive = Archive::create(&arch_dir).unwrap();
         ScratchArchive {
             _tempdir: tempdir,
             archive: archive,

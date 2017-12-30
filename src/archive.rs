@@ -37,7 +37,7 @@ struct ArchiveHeader {
 
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
-    pub fn init(path: &Path) -> Result<Archive> {
+    pub fn create(path: &Path) -> Result<Archive> {
         let archive = Archive {
             path: path.to_path_buf(),
             report: Report::new(),
@@ -191,7 +191,7 @@ mod tests {
     fn create_then_open_archive() {
         let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
         let arch_path = &testdir.path().join("arch");
-        let arch = Archive::init(arch_path).unwrap();
+        let arch = Archive::create(arch_path).unwrap();
 
         assert_eq!(arch.path(), arch_path.as_path());
         assert!(arch.list_bands().unwrap().is_empty());
@@ -205,7 +205,7 @@ mod tests {
     fn init_empty_dir() {
         let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
         let arch_path = testdir.path();
-        let arch = Archive::init(arch_path).unwrap();
+        let arch = Archive::create(arch_path).unwrap();
 
         assert_eq!(arch.path(), arch_path);
         assert!(arch.list_bands().unwrap().is_empty());

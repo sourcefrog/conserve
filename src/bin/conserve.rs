@@ -223,7 +223,7 @@ fn show_chained_errors(e: Error) {
 
 fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
     let archive_path = Path::new(subm.value_of("archive").expect("'archive' arg not found"));
-    Archive::init(archive_path).and(Ok(()))
+    Archive::create(archive_path).and(Ok(()))
 }
 
 
