@@ -24,7 +24,7 @@ pub struct StoredTree {
 impl StoredTree {
     /// Open a tree stored in the archive, identified by BandId or by default the last.
     pub fn open(archive: &Archive, band_id: &Option<BandId>) -> Result<StoredTree> {
-        let band = archive.open_band(band_id)?;
+        let band = Band::open(&archive, band_id)?;
         // TODO: Maybe warn if the band's incomplete, or fail unless opening is forced?
         Ok(StoredTree {
             archive: archive.clone(),

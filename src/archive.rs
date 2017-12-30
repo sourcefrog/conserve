@@ -124,11 +124,6 @@ impl Archive {
         Band::create(self.path(), new_band_id, &self.report)
     }
 
-    /// Open a band if specified, or otherwise the last band.
-    pub fn open_band(&self, band_id: &Option<BandId>) -> Result<Band> {
-        Band::open(self, &band_id)
-    }
-
     pub fn report(&self) -> &Report {
         &self.report
     }
