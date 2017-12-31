@@ -6,7 +6,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use super::*;
 
-pub fn from_strings<I: IntoIterator<Item=S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
+pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
     for e in excludes {
         let exclude = e.as_ref();

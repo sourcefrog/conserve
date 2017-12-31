@@ -151,8 +151,7 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
-        make_backup(srcdir.path(), &af, &BackupOptions::default())
-            .unwrap();
+        make_backup(srcdir.path(), &af, &BackupOptions::default()).unwrap();
         let report = af.report();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("file"));
@@ -192,8 +191,11 @@ mod tests {
         srcdir.create_file("baz");
         srcdir.create_file("bar");
 
-        let backup_options = BackupOptions::default()
-            .with_excludes(excludes::from_strings(&["/**/foo*", "/**/baz"]).unwrap());
+        let backup_options = BackupOptions::default().with_excludes(
+            excludes::from_strings(
+                &["/**/foo*", "/**/baz"],
+            ).unwrap(),
+        );
         make_backup(srcdir.path(), &af, &backup_options).unwrap();
         let report = af.report();
 

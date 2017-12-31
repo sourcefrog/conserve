@@ -30,11 +30,11 @@ impl RestoreOptions {
         }
     }
 
-    pub fn with_excludes(self, exclude: Vec<&str>) -> Result<Self> {
-        Ok(RestoreOptions {
-            excludes: excludes::from_strings(&exclude)?,
+    pub fn with_excludes(self, excludes: GlobSet) -> Self {
+        RestoreOptions {
+            excludes: excludes,
             ..self
-        })
+        }
     }
 
     pub fn force_overwrite(self, f: bool) -> RestoreOptions {
@@ -83,7 +83,7 @@ fn require_empty_destination(destination: &Path) -> Result<()> {
                     ErrorKind::DestinationNotEmpty(destination.to_path_buf()).into(),
                 );
             };
-        },
+        }
         Err(e) => {
             return Err(e.into());
         }
@@ -221,7 +221,8 @@ mod tests {
             &StoredTree::open(&af, &None).unwrap(),
             destdir.path(),
             &RestoreOptions::default(),
-        ).unwrap_err().to_string();
+        ).unwrap_err()
+            .to_string();
         assert_that(&restore_err_str).contains(&"Destination directory not empty");
     }
 
@@ -252,9 +253,11 @@ mod tests {
         let restore_report = Report::new();
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
         let st = StoredTree::open(&restore_archive, &None).unwrap();
-        let options = RestoreOptions::default()
-            .with_excludes(vec!["/**/subfile"])
-            .unwrap();
+        let options = RestoreOptions::default().with_excludes(
+            excludes::from_strings(
+                &["/**/subfile"],
+            ).unwrap(),
+        );
         restore_tree(&st, destdir.path(), &options).unwrap();
 
         assert_eq!(2, restore_report.borrow_counts().get_count("file"));

@@ -229,8 +229,7 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let backup_options = BackupOptions::default()
-        .with_excludes(excludes_from_option(subm)?);
+    let backup_options = BackupOptions::default().with_excludes(excludes_from_option(subm)?);
     let archive = Archive::open(Path::new(subm.value_of("archive").unwrap()), &report)?;
     make_backup(
         Path::new(&subm.value_of("source").unwrap()),
@@ -313,15 +312,13 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive_path = Path::new(subm.value_of("archive").unwrap());
     let archive = Archive::open(archive_path, &report)?;
     let destination_path = Path::new(subm.value_of("destination").unwrap());
-    let force_overwrite = subm.is_present("force-overwrite");
     // TODO: Restore core code should complain if the band is incomplete.
     let band_id = band_id_from_match(subm)?;
     let st = StoredTree::open(&archive, &band_id)?;
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
-    let mut options = conserve::RestoreOptions::default().force_overwrite(force_overwrite);
-    if let Some(excludes) = subm.values_of("exclude") {
-        options = options.with_excludes(excludes.collect())?;
-    };
+    let options = conserve::RestoreOptions::default()
+        .force_overwrite(subm.is_present("force-overwrite"))
+        .with_excludes(excludes_from_option(subm)?);
     restore_tree(&st, destination_path, &options)
 }
 
