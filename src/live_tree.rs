@@ -64,7 +64,7 @@ impl entry::Entry for Entry {
 
 impl fmt::Debug for Entry {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("sources::Entry")
+        fmt.debug_struct("live_tree::Entry")
             .field("apath", &self.apath)
             .field("path", &self.path)
             .finish()
@@ -188,7 +188,7 @@ impl Iterator for Iter {
                 if let Some(ref last_apath) = self.last_apath {
                     assert!(
                         last_apath < &entry.apath,
-                        "sources returned out of order: {:?} >= {:?}",
+                        "entries returned out of order: {:?} >= {:?}",
                         last_apath,
                         entry.apath
                     );
@@ -280,7 +280,7 @@ mod tests {
         assert_eq!(
             format!("{:?}", &result[6]),
             format!(
-                "sources::Entry {{ apath: Apath({:?}), path: {:?} }}",
+                "live_tree::Entry {{ apath: Apath({:?}), path: {:?} }}",
                 "/jam/apricot",
                 &tf.root.join("jam").join("apricot")
             )
@@ -323,7 +323,7 @@ mod tests {
         assert_eq!(
             format!("{:?}", &result[2]),
             format!(
-                "sources::Entry {{ apath: Apath({:?}), path: {:?} }}",
+                "live_tree::Entry {{ apath: Apath({:?}), path: {:?} }}",
                 "/baz/test",
                 &tf.root.join("baz").join("test")
             )

@@ -8,7 +8,6 @@ use std::fs;
 use std::path::Path;
 
 use super::*;
-use sources;
 use entry::Entry;
 
 use globset::GlobSet;
@@ -46,7 +45,7 @@ struct BackupWriter {
 /// Make a new backup from a source tree into a band in this archive.
 pub fn make_backup(source: &Path, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
     let mut backup_writer = BackupWriter::begin_band(archive)?;
-    for entry in sources::iter(source, &backup_writer.report, &backup_options.excludes)? {
+    for entry in live_tree::iter(source, &backup_writer.report, &backup_options.excludes)? {
         backup_writer.store(&entry?)?;
     }
     backup_writer.finish()
@@ -72,7 +71,7 @@ impl BackupWriter {
         Ok(())
     }
 
-    fn store(&mut self, source_entry: &sources::Entry) -> Result<()> {
+    fn store(&mut self, source_entry: &live_tree::Entry) -> Result<()> {
         info!("Backup {}", source_entry.path.display());
         let store_fn = match source_entry.kind() {
             Kind::File => BackupWriter::store_file,
@@ -91,7 +90,7 @@ impl BackupWriter {
     }
 
 
-    fn store_dir(&mut self, source_entry: &sources::Entry) -> Result<IndexEntry> {
+    fn store_dir(&mut self, source_entry: &live_tree::Entry) -> Result<IndexEntry> {
         self.report.increment("dir", 1);
         Ok(IndexEntry {
             apath: source_entry.apath.to_string().clone(),
@@ -104,7 +103,7 @@ impl BackupWriter {
     }
 
 
-    fn store_file(&mut self, source_entry: &sources::Entry) -> Result<IndexEntry> {
+    fn store_file(&mut self, source_entry: &live_tree::Entry) -> Result<IndexEntry> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
         let mut f = fs::File::open(&source_entry.path)?;
@@ -120,7 +119,7 @@ impl BackupWriter {
     }
 
 
-    fn store_symlink(&mut self, source_entry: &sources::Entry) -> Result<IndexEntry> {
+    fn store_symlink(&mut self, source_entry: &live_tree::Entry) -> Result<IndexEntry> {
         self.report.increment("symlink", 1);
         // TODO: Record a problem and log a message if the target is not decodable, rather than
         //  silently losing.
