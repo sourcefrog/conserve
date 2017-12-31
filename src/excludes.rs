@@ -8,17 +8,15 @@ use super::*;
 
 pub fn from_strings<I: IntoIterator<Item=S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
-
     for e in excludes {
         let exclude = e.as_ref();
         builder.add(Glob::new(exclude).chain_err(|| {
             format!("Failed to parse exclude value: {}", exclude)
         })?);
     }
-
-    Ok(builder.build().chain_err(
+    builder.build().chain_err(
         || "Failed to build exclude patterns",
-    )?)
+    )
 }
 
 pub fn excludes_nothing() -> GlobSet {
