@@ -68,14 +68,14 @@ impl BackupWriter {
         Ok(())
     }
 
-    fn store(&mut self, source_entry: &live_tree::Entry) -> Result<()> {
-        info!("Backup {}", source_entry.path.display());
+    fn store(&mut self, source_entry: &Entry) -> Result<()> {
+        info!("Backup {}", source_entry.apath());
         let new_index_entry = match source_entry.kind() {
             Kind::File => BackupWriter::store_file(self, source_entry),
             Kind::Dir => BackupWriter::store_dir(self, source_entry),
             Kind::Symlink => BackupWriter::store_symlink(self, source_entry),
             Kind::Unknown => {
-                warn!("Skipping unsupported file kind of {}", &source_entry.apath);
+                warn!("Skipping unsupported file kind of {}", &source_entry.apath());
                 self.report.increment("skipped.unsupported_file_kind", 1);
                 return Ok(());
             }
