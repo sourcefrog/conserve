@@ -45,9 +45,10 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "source.selected",
     "skipped.unsupported_file_kind",
     "source.visited.directories",
-    "skipped.excluded.files",
     "skipped.excluded.directories",
-    "skipped.excluded.symlinks"
+    "skipped.excluded.files",
+    "skipped.excluded.symlinks",
+    "skipped.excluded.unknown",
 ];
 
 

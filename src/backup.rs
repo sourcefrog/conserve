@@ -10,6 +10,7 @@ use std::path::Path;
 use super::*;
 use index;
 use sources;
+use entry::Entry;
 
 use globset::GlobSet;
 
@@ -74,16 +75,15 @@ impl BackupWriter {
 
     fn store(&mut self, source_entry: &sources::Entry) -> Result<()> {
         info!("Backup {}", source_entry.path.display());
-        let store_fn = if source_entry.metadata.is_file() {
-            BackupWriter::store_file
-        } else if source_entry.metadata.is_dir() {
-            BackupWriter::store_dir
-        } else if source_entry.metadata.file_type().is_symlink() {
-            BackupWriter::store_symlink
-        } else {
-            warn!("Skipping unsupported file kind {}", &source_entry.apath);
-            self.report.increment("skipped.unsupported_file_kind", 1);
-            return Ok(());
+        let store_fn = match source_entry.kind() {
+            Kind::File => BackupWriter::store_file,
+            Kind::Dir => BackupWriter::store_dir,
+            Kind::Symlink => BackupWriter::store_symlink,
+            Kind::Unknown => {
+                warn!("Skipping unsupported file kind {}", &source_entry.apath);
+                self.report.increment("skipped.unsupported_file_kind", 1);
+                return Ok(());
+            }
         };
         let new_index_entry = store_fn(self, source_entry)?;
         self.index_builder.push(new_index_entry);

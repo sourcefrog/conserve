@@ -41,6 +41,21 @@ impl Entry {
 }
 
 
+impl entry::Entry for Entry {
+    fn kind(&self) -> Kind {
+        if self.metadata.is_file() {
+            Kind::File
+        } else if self.metadata.is_dir() {
+            Kind::Dir
+        } else if self.metadata.file_type().is_symlink() {
+            Kind::Symlink
+        } else {
+            Kind::Unknown
+        }
+    }
+}
+
+
 impl fmt::Debug for Entry {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("sources::Entry")

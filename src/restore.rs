@@ -107,6 +107,12 @@ fn restore_one(
         Kind::Dir => restore_dir(entry, &dest_path, &report),
         Kind::File => restore_file(stored_tree, entry, &dest_path, &report),
         Kind::Symlink => restore_symlink(entry, &dest_path, &report),
+        Kind::Unknown => {
+            return Err(format!(
+                    "file type Unknown shouldn't occur in archive: {:?}",
+                    &entry.apath).into());
+        }
+
     }
     // TODO: Restore permissions.
     // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.

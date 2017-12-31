@@ -44,6 +44,13 @@ pub struct Entry {
 }
 
 
+impl entry::Entry for Entry {
+    fn kind(&self) -> Kind {
+        self.kind
+    }
+}
+
+
 /// Accumulates ordered changes to the index and streams them out to index files.
 #[derive(Debug)]
 pub struct IndexBuilder {
@@ -261,6 +268,7 @@ impl Iter {
                         Kind::Dir => self.report.increment("skipped.excluded.directories", 1),
                         Kind::Symlink => self.report.increment("skipped.excluded.symlinks", 1),
                         Kind::File => self.report.increment("skipped.excluded.files", 1),
+                        Kind::Unknown => self.report.increment("skipped.excluded.unknown", 1),
                     }
                     return false;
                 }
