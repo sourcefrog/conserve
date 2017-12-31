@@ -292,7 +292,9 @@ mod tests {
 
     use super::super::*;
 
-    pub const EXAMPLE_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
+    pub const EXAMPLE_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee69429\
+        3c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b\
+        2fb1d67e28262168013ba63c";
 
     pub fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder, Report) {
         let testdir = tempdir::TempDir::new("index_test").unwrap();
@@ -327,7 +329,15 @@ mod tests {
         println!("{}", index_json);
         assert_eq!(
             index_json,
-            r#"[{"apath":"/a/b","mtime":1461736377,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null}]"#);
+            "[{\"apath\":\"/a/b\",\
+            \"mtime\":1461736377,\
+            \"kind\":\"File\",\
+            \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3\
+            f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262\
+            168013ba63c\",\
+            \"addrs\":[],\
+            \"target\":null}]"
+        );
     }
 
     #[test]
@@ -401,7 +411,25 @@ mod tests {
         let mut f = fs::File::open(&expected_path).unwrap();
         let (_comp_len, retrieved_bytes) = Snappy::decompress_read(&mut f).unwrap();
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
-        assert_eq!(retrieved, r#"[{"apath":"/apple","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null},{"apath":"/banana","mtime":null,"kind":"File","blake2b":"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c","addrs":[],"target":null}]"#);
+        assert_eq!(
+            retrieved,
+            "[{\"apath\":\"/apple\",\
+            \"mtime\":null,\
+            \"kind\":\"File\",\
+            \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb\
+            5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c\
+            2b2fb1d67e28262168013ba63c\",\
+            \"addrs\":[],\
+            \"target\":null},\
+            {\"apath\":\"/banana\",\
+            \"mtime\":null,\
+            \"kind\":\"File\",\
+            \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb\
+            5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c\
+            2b2fb1d67e28262168013ba63c\",\
+            \"addrs\":[],\
+            \"target\":null}]"
+        );
 
         let mut it = super::read(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
         let entry = it.next().expect("Get first entry").expect(
