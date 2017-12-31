@@ -49,7 +49,7 @@ impl StoredTree {
     }
 
     /// Return an iter of index entries in this stored tree.
-    pub fn index_iter(&self, excludes: &GlobSet) -> Result<index::Iter> {
+    pub fn iter_entries(&self, excludes: &GlobSet) -> Result<index::Iter> {
         self.band.index_iter(excludes, self.archive.report())
     }
 
@@ -84,7 +84,7 @@ mod test {
 
         assert_eq!(st.band().id(), last_band_id);
 
-        let names: Vec<String> = st.index_iter(&excludes::excludes_nothing())
+        let names: Vec<String> = st.iter_entries(&excludes::excludes_nothing())
             .unwrap()
             .map(|e| e.unwrap().apath)
             .collect();

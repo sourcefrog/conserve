@@ -52,7 +52,7 @@ pub fn restore_tree(
     if !options.force_overwrite {
         require_empty_destination(destination)?;
     };
-    for entry in stored_tree.index_iter(&options.excludes)? {
+    for entry in stored_tree.iter_entries(&options.excludes)? {
         // TODO: Continue even if one fails
         restore_one(
             &stored_tree,

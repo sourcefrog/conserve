@@ -223,7 +223,7 @@ mod tests {
 
         // Read back the empty file
         let st = StoredTree::open(&af, &None).unwrap();
-        let empty_entry = st.index_iter(&excludes::excludes_nothing())
+        let empty_entry = st.iter_entries(&excludes::excludes_nothing())
             .unwrap()
             .map(|i| i.unwrap())
             .find(|ref i| i.apath == "/empty")

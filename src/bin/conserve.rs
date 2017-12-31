@@ -298,7 +298,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = StoredTree::open(&archive, &band_id)?;
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
     let excludes = excludes_from_option(subm)?;
-    for i in st.index_iter(&excludes)? {
+    for i in st.iter_entries(&excludes)? {
         println!("{}", i?.apath);
     }
     Ok(())
