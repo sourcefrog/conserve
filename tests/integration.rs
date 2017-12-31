@@ -10,7 +10,6 @@ use std::fs::File;
 use std::io::prelude::*;
 
 use conserve::*;
-use conserve::index;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 
