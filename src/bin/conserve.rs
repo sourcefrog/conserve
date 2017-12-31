@@ -16,6 +16,7 @@ extern crate log;
 extern crate clap;
 
 extern crate chrono;
+extern crate globset;
 
 use chrono::Local;
 use clap::{Arg, App, AppSettings, ArgMatches, SubCommand};
@@ -244,10 +245,7 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source_path = Path::new(subm.value_of("source").unwrap());
-    let excludes = match subm.values_of("exclude") {
-        Some(excludes) => excludes::from_strings(excludes.collect())?,
-        None => excludes::excludes_nothing(),
-    };
+    let excludes = excludes_from_option(subm)?;
     let mut source_iter = conserve::sources::iter(source_path, report, &excludes)?;
     for entry in &mut source_iter {
         println!("{}", entry?.apath);
@@ -306,10 +304,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let band_id = band_id_from_match(subm)?;
     let st = StoredTree::open(&archive, &band_id)?;
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
-    let excludes = match subm.values_of("exclude") {
-        Some(excludes) => excludes::from_strings(excludes.collect())?,
-        None => excludes::excludes_nothing(),
-    };
+    let excludes = excludes_from_option(subm)?;
     for i in st.index_iter(&excludes)? {
         println!("{}", i?.apath);
     }
@@ -337,6 +332,14 @@ fn band_id_from_match(subm: &ArgMatches) -> Result<Option<BandId>> {
     match subm.value_of("backup") {
         Some(b) => Ok(Some(BandId::from_string(b)?)),
         None => Ok(None),
+    }
+}
+
+/// Make an exclusion globset from the `--excludes` option.
+fn excludes_from_option(subm: &ArgMatches) -> Result<globset::GlobSet> {
+    match subm.values_of("exclude") {
+        Some(excludes) => excludes::from_strings(excludes.collect()),
+        None => Ok(excludes::excludes_nothing()),
     }
 }
 
