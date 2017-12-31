@@ -8,7 +8,6 @@ use std::fs;
 use std::path::Path;
 
 use super::*;
-use index;
 use sources;
 use entry::Entry;
 
@@ -92,9 +91,9 @@ impl BackupWriter {
     }
 
 
-    fn store_dir(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
+    fn store_dir(&mut self, source_entry: &sources::Entry) -> Result<IndexEntry> {
         self.report.increment("dir", 1);
-        Ok(index::Entry {
+        Ok(IndexEntry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Dir,
@@ -105,12 +104,12 @@ impl BackupWriter {
     }
 
 
-    fn store_file(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
+    fn store_file(&mut self, source_entry: &sources::Entry) -> Result<IndexEntry> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
         let mut f = fs::File::open(&source_entry.path)?;
         let (addrs, body_hash) = self.block_dir.store(&mut f, &self.report)?;
-        Ok(index::Entry {
+        Ok(IndexEntry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::File,
@@ -121,14 +120,14 @@ impl BackupWriter {
     }
 
 
-    fn store_symlink(&mut self, source_entry: &sources::Entry) -> Result<index::Entry> {
+    fn store_symlink(&mut self, source_entry: &sources::Entry) -> Result<IndexEntry> {
         self.report.increment("symlink", 1);
         // TODO: Record a problem and log a message if the target is not decodable, rather than
         //  silently losing.
         let target = fs::read_link(&source_entry.path)?
             .to_string_lossy()
             .to_string();
-        Ok(index::Entry {
+        Ok(IndexEntry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Symlink,
@@ -168,7 +167,7 @@ mod tests {
         let index_entries = band.index_iter(&excludes::excludes_nothing(), &report)
             .unwrap()
             .filter_map(|i| i.ok())
-            .collect::<Vec<index::Entry>>();
+            .collect::<Vec<IndexEntry>>();
         assert_eq!(2, index_entries.len());
 
         let e2 = &index_entries[1];

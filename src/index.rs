@@ -23,7 +23,7 @@ const MAX_ENTRIES_PER_HUNK: usize = 1000;
 
 /// Description of one archived file.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-pub struct Entry {
+pub struct IndexEntry {
     /// Path of this entry relative to the base of the backup, in `apath` form.
     pub apath: String,
 
@@ -44,7 +44,7 @@ pub struct Entry {
 }
 
 
-impl entry::Entry for Entry {
+impl entry::Entry for IndexEntry {
     fn kind(&self) -> Kind {
         self.kind
     }
@@ -58,7 +58,7 @@ pub struct IndexBuilder {
     dir: PathBuf,
 
     /// Currently queued entries to be written out.
-    entries: Vec<Entry>,
+    entries: Vec<IndexEntry>,
 
     /// Index hunk number, starting at 0.
     sequence: u32,
@@ -76,7 +76,7 @@ impl IndexBuilder {
     pub fn new(dir: &Path) -> IndexBuilder {
         IndexBuilder {
             dir: dir.to_path_buf(),
-            entries: Vec::<Entry>::new(),
+            entries: Vec::<IndexEntry>::new(),
             sequence: 0,
             last_apath: None,
         }
@@ -85,7 +85,7 @@ impl IndexBuilder {
     /// Append an entry to the index.
     ///
     /// The new entry must sort after everything already written to the index.
-    pub fn push(&mut self, entry: Entry) {
+    pub fn push(&mut self, entry: IndexEntry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
         let entry_apath = Apath::from_string(&entry.apath);
@@ -163,7 +163,7 @@ fn path_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
 pub struct Iter {
     /// The `i` directory within the band where all files for this index are written.
     dir: PathBuf,
-    buffered_entries: vec::IntoIter<Entry>,
+    buffered_entries: vec::IntoIter<IndexEntry>,
     next_hunk_number: u32,
     pub report: Report,
     excludes: GlobSet,
@@ -188,7 +188,7 @@ impl fmt::Debug for Iter {
 pub fn read(index_dir: &Path, excludes: &GlobSet, report: &Report) -> Result<Iter> {
     Ok(Iter {
         dir: index_dir.to_path_buf(),
-        buffered_entries: Vec::<Entry>::new().into_iter(),
+        buffered_entries: Vec::<IndexEntry>::new().into_iter(),
         next_hunk_number: 0,
         report: report.clone(),
         excludes: excludes.clone(),
@@ -197,9 +197,9 @@ pub fn read(index_dir: &Path, excludes: &GlobSet, report: &Report) -> Result<Ite
 
 
 impl Iterator for Iter {
-    type Item = Result<Entry>;
+    type Item = Result<IndexEntry>;
 
-    fn next(&mut self) -> Option<Result<Entry>> {
+    fn next(&mut self) -> Option<Result<IndexEntry>> {
         loop {
             if let Some(entry) = self.buffered_entries.next() {
                 return Some(Ok(entry));
@@ -249,7 +249,7 @@ impl Iter {
         let index_json = str::from_utf8(&index_bytes).chain_err(|| {
             format!("index file {:?} is not UTF-8", hunk_path)
         })?;
-        let entries: Vec<Entry> = json::decode(index_json).chain_err(|| {
+        let entries: Vec<IndexEntry> = json::decode(index_json).chain_err(|| {
             format!("couldn't deserialize index hunk {:?}", hunk_path)
         })?;
         if entries.is_empty() {
@@ -264,7 +264,7 @@ impl Iter {
             .into_iter()
             .filter(|entry| {
                 if self.excludes.is_match(&entry.apath) {
-                    match entry.kind {
+                    match entry.kind() {
                         Kind::Dir => self.report.increment("skipped.excluded.directories", 1),
                         Kind::Symlink => self.report.increment("skipped.excluded.symlinks", 1),
                         Kind::File => self.report.increment("skipped.excluded.files", 1),
@@ -274,7 +274,7 @@ impl Iter {
                 }
                 return true;
             })
-            .collect::<Vec<Entry>>()
+            .collect::<Vec<IndexEntry>>()
             .into_iter();
 
         self.next_hunk_number += 1;
@@ -302,7 +302,7 @@ mod tests {
     }
 
     pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
-        ib.push(Entry {
+        ib.push(IndexEntry {
             apath: apath.to_string(),
             mtime: None,
             kind: Kind::File,
@@ -315,7 +315,7 @@ mod tests {
     #[test]
     fn serialize_index() {
         let entries = [
-            Entry {
+            IndexEntry {
                 apath: "/a/b".to_string(),
                 mtime: Some(1461736377),
                 kind: Kind::File,
@@ -343,7 +343,7 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_order() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
-        ib.push(Entry {
+        ib.push(IndexEntry {
             apath: "/zzz".to_string(),
             mtime: None,
             kind: Kind::File,
@@ -351,7 +351,7 @@ mod tests {
             addrs: vec![],
             target: None,
         });
-        ib.push(Entry {
+        ib.push(IndexEntry {
             apath: "aaa".to_string(),
             mtime: None,
             kind: Kind::File,
@@ -365,7 +365,7 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_names() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
-        ib.push(Entry {
+        ib.push(IndexEntry {
             apath: "../escapecat".to_string(),
             mtime: None,
             kind: Kind::File,
@@ -436,7 +436,7 @@ mod tests {
         );
         assert_eq!(entry.apath, "/apple");
         let entry = it.next().expect("Get second entry").expect(
-            "Entry isn't an error",
+            "IndexEntry isn't an error",
         );
         assert_eq!(entry.apath, "/banana");
         let opt_entry = it.next();

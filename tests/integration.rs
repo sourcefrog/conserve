@@ -67,7 +67,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     let index_entries = band.index_iter(&excludes::excludes_nothing(), &report)
         .unwrap()
         .filter_map(|i| i.ok())
-        .collect::<Vec<index::Entry>>();
+        .collect::<Vec<IndexEntry>>();
     assert_eq!(2, index_entries.len());
 
     let root_entry = &index_entries[0];

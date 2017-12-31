@@ -8,7 +8,7 @@ use std::io::Write;
 use std::path::Path;
 
 use super::*;
-use super::index;
+use super::entry::Entry;
 
 use globset::GlobSet;
 
@@ -92,7 +92,7 @@ fn require_empty_destination(destination: &Path) -> Result<()> {
 
 fn restore_one(
     stored_tree: &StoredTree,
-    entry: &index::Entry,
+    entry: &IndexEntry,
     destination: &Path,
     report: &Report,
     _options: &RestoreOptions,
@@ -103,7 +103,7 @@ fn restore_one(
     }
     let dest_path = destination.join(&entry.apath[1..]);
     info!("Restore {:?} to {:?}", &entry.apath, &dest_path);
-    match entry.kind {
+    match entry.kind() {
         Kind::Dir => restore_dir(entry, &dest_path, &report),
         Kind::File => restore_file(stored_tree, entry, &dest_path, &report),
         Kind::Symlink => restore_symlink(entry, &dest_path, &report),
@@ -118,7 +118,7 @@ fn restore_one(
     // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
 }
 
-fn restore_dir(_entry: &index::Entry, dest: &Path, report: &Report) -> Result<()> {
+fn restore_dir(_entry: &IndexEntry, dest: &Path, report: &Report) -> Result<()> {
     report.increment("dir", 1);
     match fs::create_dir(dest) {
         Ok(_) => Ok(()),
@@ -129,7 +129,7 @@ fn restore_dir(_entry: &index::Entry, dest: &Path, report: &Report) -> Result<()
 
 fn restore_file(
     stored_tree: &StoredTree,
-    entry: &index::Entry,
+    entry: &IndexEntry,
     dest: &Path,
     report: &Report,
 ) -> Result<()> {
@@ -144,7 +144,7 @@ fn restore_file(
 }
 
 #[cfg(unix)]
-fn restore_symlink(entry: &index::Entry, dest: &Path, report: &Report) -> Result<()> {
+fn restore_symlink(entry: &IndexEntry, dest: &Path, report: &Report) -> Result<()> {
     use std::os::unix::fs as unix_fs;
     report.increment("symlink", 1);
     if let Some(ref target) = entry.target {
@@ -156,7 +156,7 @@ fn restore_symlink(entry: &index::Entry, dest: &Path, report: &Report) -> Result
 }
 
 #[cfg(not(unix))]
-fn restore_symlink(entry: &index::Entry, _dest: &Path, report: &Report) -> Result<()> {
+fn restore_symlink(entry: &IndexEntry, _dest: &Path, report: &Report) -> Result<()> {
     // TODO: Add a test with a canned index containing a symlink, and expect
     // it cannot be restored on Windows and can be on Unix.
     warn!("Can't restore symlinks on Windows: {}", entry.apath);
