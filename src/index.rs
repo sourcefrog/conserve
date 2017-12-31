@@ -14,6 +14,7 @@ use std::vec;
 use rustc_serialize::json;
 
 use super::*;
+use super::apath::Apath;
 use super::block;
 
 use globset::GlobSet;
@@ -22,6 +23,8 @@ const MAX_ENTRIES_PER_HUNK: usize = 1000;
 
 
 /// Description of one archived file.
+///
+/// This struct is directly encoded/decoded to the json index file.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub struct IndexEntry {
     /// Path of this entry relative to the base of the backup, in `apath` form.
@@ -45,6 +48,10 @@ pub struct IndexEntry {
 
 
 impl entry::Entry for IndexEntry {
+    fn apath(&self) -> Apath {
+        Apath::from_string(&self.apath)
+    }
+
     fn kind(&self) -> Kind {
         self.kind
     }

@@ -79,7 +79,7 @@ impl BackupWriter {
             Kind::Dir => BackupWriter::store_dir,
             Kind::Symlink => BackupWriter::store_symlink,
             Kind::Unknown => {
-                warn!("Skipping unsupported file kind {}", &source_entry.apath);
+                warn!("Skipping unsupported file kind of {}", &source_entry.apath);
                 self.report.increment("skipped.unsupported_file_kind", 1);
                 return Ok(());
             }

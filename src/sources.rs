@@ -42,6 +42,12 @@ impl Entry {
 
 
 impl entry::Entry for Entry {
+    fn apath(&self) -> Apath {
+        // TODO: Better to just return a reference with the same lifetime, once index entries can
+        // support that.
+        self.apath.clone()
+    }
+
     fn kind(&self) -> Kind {
         if self.metadata.is_file() {
             Kind::File
