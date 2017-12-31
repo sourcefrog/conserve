@@ -15,6 +15,23 @@ use super::*;
 
 use globset::GlobSet;
 
+
+/// A real tree on the filesystem, for use as a backup source or restore destination.
+#[derive(Clone, Debug)]
+pub struct LiveTree {
+    path: PathBuf,
+}
+
+
+impl LiveTree {
+    pub fn open(path: &Path) -> Result<LiveTree> {
+        Ok(LiveTree {
+            path: path.to_path_buf(),
+        })
+    }
+}
+
+
 /// An entry found in the source directory.
 #[derive(Clone)]
 pub struct Entry {
@@ -244,6 +261,15 @@ mod tests {
     use super::iter;
     use super::super::*;
     use test_fixtures::TreeFixture;
+
+    #[test]
+    fn open_tree() {
+        let tf = TreeFixture::new();
+        let lt = LiveTree::open(tf.path()).unwrap();
+        assert_eq!(
+            format!("{:?}", &lt),
+            format!("LiveTree {{ path: {:?} }}", tf.path()));
+    }
 
     #[test]
     fn simple_directory() {

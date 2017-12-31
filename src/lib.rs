@@ -63,6 +63,7 @@ pub use entry::{Entry, Kind};
 pub use errors::*;
 pub use io::{AtomicFile, ensure_dir_exists};
 pub use index::{IndexBuilder, IndexEntry};
+pub use live_tree::LiveTree;
 pub use report::{Report, Sizes};
 pub use restore::{RestoreOptions, restore_tree};
 pub use stored_tree::StoredTree;
