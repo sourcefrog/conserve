@@ -68,7 +68,7 @@ pub struct Info {
 impl Band {
     /// Make a new band (and its on-disk directory).
     ///
-    /// The Band gets the next relevant id.
+    /// The Band gets the next id after those that already exist.
     pub fn create(archive: &Archive) -> Result<Band> {
         let new_band_id = match archive.last_band_id() {
             Err(Error(ErrorKind::ArchiveEmpty, _)) => BandId::zero(),
