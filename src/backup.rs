@@ -24,11 +24,11 @@ impl BackupOptions {
         BackupOptions { excludes: excludes::excludes_nothing() }
     }
 
-    pub fn with_excludes(self, exclude: Vec<&str>) -> Result<Self> {
-        Ok(BackupOptions {
-            excludes: excludes::from_strings(exclude)?,
+    pub fn with_excludes(self, excludes: GlobSet) -> Self {
+        BackupOptions {
+            excludes: excludes,
             ..self
-        })
+        }
     }
 }
 
@@ -193,7 +193,7 @@ mod tests {
         srcdir.create_file("bar");
 
         let backup_options = BackupOptions::default()
-            .with_excludes(vec!["/**/foo*", "/**/baz"]).unwrap();
+            .with_excludes(excludes::from_strings(vec!["/**/foo*", "/**/baz"]).unwrap());
         make_backup(srcdir.path(), &af, &backup_options).unwrap();
         let report = af.report();
 

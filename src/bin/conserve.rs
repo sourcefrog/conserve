@@ -229,12 +229,9 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let backup_options = match subm.values_of("exclude") {
-        Some(excludes) => BackupOptions::default().with_excludes(excludes.collect())?,
-        None => BackupOptions::default(),
-    };
+    let backup_options = BackupOptions::default()
+        .with_excludes(excludes_from_option(subm)?);
     let archive = Archive::open(Path::new(subm.value_of("archive").unwrap()), &report)?;
-
     make_backup(
         Path::new(&subm.value_of("source").unwrap()),
         &archive,
