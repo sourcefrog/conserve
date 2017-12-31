@@ -72,27 +72,26 @@ impl BackupWriter {
 
     fn store(&mut self, source_entry: &live_tree::Entry) -> Result<()> {
         info!("Backup {}", source_entry.path.display());
-        let store_fn = match source_entry.kind() {
-            Kind::File => BackupWriter::store_file,
-            Kind::Dir => BackupWriter::store_dir,
-            Kind::Symlink => BackupWriter::store_symlink,
+        let new_index_entry = match source_entry.kind() {
+            Kind::File => BackupWriter::store_file(self, source_entry),
+            Kind::Dir => BackupWriter::store_dir(self, source_entry),
+            Kind::Symlink => BackupWriter::store_symlink(self, source_entry),
             Kind::Unknown => {
                 warn!("Skipping unsupported file kind of {}", &source_entry.apath);
                 self.report.increment("skipped.unsupported_file_kind", 1);
                 return Ok(());
             }
-        };
-        let new_index_entry = store_fn(self, source_entry)?;
+        }?;
         self.index_builder.push(new_index_entry);
         self.index_builder.maybe_flush(&self.report)?;
         Ok(())
     }
 
 
-    fn store_dir(&mut self, source_entry: &live_tree::Entry) -> Result<IndexEntry> {
+    fn store_dir(&mut self, source_entry: &Entry) -> Result<IndexEntry> {
         self.report.increment("dir", 1);
         Ok(IndexEntry {
-            apath: source_entry.apath.to_string().clone(),
+            apath: source_entry.apath().to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Dir,
             addrs: vec![],
@@ -108,7 +107,7 @@ impl BackupWriter {
         let mut f = fs::File::open(&source_entry.path)?;
         let (addrs, body_hash) = self.block_dir.store(&mut f, &self.report)?;
         Ok(IndexEntry {
-            apath: source_entry.apath.to_string().clone(),
+            apath: source_entry.apath().to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::File,
             addrs: addrs,
@@ -126,7 +125,7 @@ impl BackupWriter {
             .to_string_lossy()
             .to_string();
         Ok(IndexEntry {
-            apath: source_entry.apath.to_string().clone(),
+            apath: source_entry.apath().to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Symlink,
             addrs: vec![],
