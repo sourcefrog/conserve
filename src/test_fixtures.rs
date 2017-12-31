@@ -58,12 +58,14 @@ impl ScratchArchive {
             srcdir.create_symlink("link", "target");
         }
 
-        make_backup(srcdir.path(), self, &BackupOptions::default()).unwrap();
+        let lt = LiveTree::open(srcdir.path()).unwrap();
+        make_backup(&lt, self, &BackupOptions::default()).unwrap();
 
         srcdir.create_file("hello2");
-        make_backup(srcdir.path(), self, &BackupOptions::default()).unwrap();
+        make_backup(&lt, self, &BackupOptions::default()).unwrap();
     }
 }
+
 
 impl Deref for ScratchArchive {
     type Target = Archive;
@@ -82,6 +84,7 @@ pub struct TreeFixture {
     pub root: PathBuf,
     _tempdir: tempdir::TempDir, // held only for cleanup
 }
+
 
 impl TreeFixture {
     pub fn new() -> TreeFixture {
@@ -121,6 +124,11 @@ impl TreeFixture {
     /// Symlinks are just not present on Windows.
     #[cfg(windows)]
     pub fn create_symlink(self: &TreeFixture, _relative_path: &str, _target: &str) {}
+
+    pub fn live_tree(&self) -> LiveTree {
+        // TODO: Maybe allow deref TreeFixture to LiveTree.
+        LiveTree::open(self.path()).unwrap()
+    }
 }
 
 impl Default for TreeFixture {

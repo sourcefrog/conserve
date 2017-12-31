@@ -5,7 +5,6 @@
 //! into an archive.
 
 use std::fs;
-use std::path::Path;
 
 use super::*;
 use entry::Entry;
@@ -43,10 +42,9 @@ struct BackupWriter {
 
 
 /// Make a new backup from a source tree into a band in this archive.
-pub fn make_backup(source: &Path, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
+pub fn make_backup(source: &LiveTree, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
     let mut backup_writer = BackupWriter::begin_band(archive)?;
-    let lt = LiveTree::open(source)?;
-    for entry in lt.iter_entries(&backup_writer.report, &backup_options.excludes)? {
+    for entry in source.iter_entries(&backup_writer.report, &backup_options.excludes)? {
         backup_writer.store(&entry?)?;
     }
     backup_writer.finish()
@@ -150,7 +148,10 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
-        make_backup(srcdir.path(), &af, &BackupOptions::default()).unwrap();
+        make_backup(
+            &LiveTree::open(srcdir.path()).unwrap(),
+            &af,
+            &BackupOptions::default()).unwrap();
         let report = af.report();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("file"));
@@ -195,7 +196,10 @@ mod tests {
                 &["/**/foo*", "/**/baz"],
             ).unwrap(),
         );
-        make_backup(srcdir.path(), &af, &backup_options).unwrap();
+        make_backup(
+            &LiveTree::open(srcdir.path()).unwrap(),
+            &af,
+            &backup_options).unwrap();
         let report = af.report();
 
         assert_eq!(1, report.get_count("block.write"));
@@ -212,7 +216,10 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_file_with_contents("empty", &[]);
-        make_backup(srcdir.path(), &af, &BackupOptions::default()).unwrap();
+        make_backup(
+            srcdir.live_tree(),
+            &af,
+            &BackupOptions::default()).unwrap();
         let report = af.report();
 
         assert_eq!(0, report.get_count("block.write"));
