@@ -16,7 +16,6 @@ use globset::GlobSet;
 #[derive(Debug)]
 pub struct RestoreOptions {
     force_overwrite: bool,
-    band_id: Option<BandId>,
     excludes: GlobSet,
 }
 
@@ -25,7 +24,6 @@ impl RestoreOptions {
     pub fn default() -> Self {
         RestoreOptions {
             force_overwrite: false,
-            band_id: None,
             excludes: excludes::excludes_nothing(),
         }
     }
