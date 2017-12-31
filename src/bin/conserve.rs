@@ -242,8 +242,8 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source_path = Path::new(subm.value_of("source").unwrap());
     let excludes = excludes_from_option(subm)?;
-    let mut source_iter = conserve::live_tree::iter(source_path, report, &excludes)?;
-    for entry in &mut source_iter {
+    let lt = LiveTree::open(source_path)?;
+    for entry in lt.iter_entries(report, &excludes)? {
         println!("{}", entry?.apath);
     }
     Ok(())

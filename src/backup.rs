@@ -45,7 +45,8 @@ struct BackupWriter {
 /// Make a new backup from a source tree into a band in this archive.
 pub fn make_backup(source: &Path, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
     let mut backup_writer = BackupWriter::begin_band(archive)?;
-    for entry in live_tree::iter(source, &backup_writer.report, &backup_options.excludes)? {
+    let lt = LiveTree::open(source)?;
+    for entry in lt.iter_entries(&backup_writer.report, &backup_options.excludes)? {
         backup_writer.store(&entry?)?;
     }
     backup_writer.finish()

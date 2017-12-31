@@ -25,14 +25,52 @@ pub struct LiveTree {
 
 impl LiveTree {
     pub fn open(path: &Path) -> Result<LiveTree> {
+        // TODO: Maybe fail here if the root doesn't exist or isn't a directory?
         Ok(LiveTree {
             path: path.to_path_buf(),
+        })
+    }
+
+    /// Iterate source files descending through a source directory.
+    ///
+    /// Visit the files in a directory before descending into its children, as
+    /// is the defined order for files stored in an archive.  Within those files and
+    /// child directories, visit them according to a sorted comparison by their UTF-8
+    /// name.
+    ///
+    /// The `Iter` has its own `Report` of how many directories and files were visited.
+    pub fn iter_entries(&self, report: &Report, excludes: &GlobSet) -> Result<Iter> {
+        let root_metadata = match fs::symlink_metadata(&self.path) {
+            Ok(metadata) => metadata,
+            Err(e) => {
+                warn!("{}", e);
+                return Err(e.into());
+            }
+        };
+        let root_entry = Entry {
+            apath: Apath::from_string("/"),
+            path: self.path.clone(),
+            metadata: root_metadata,
+        };
+        // Preload iter to return the root and then recurse into it.
+        let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();
+        entry_deque.push_back(root_entry.clone());
+        // TODO: Consider the case where the root is not actually a directory?
+        // Should that be supported?
+        let mut dir_deque = VecDeque::<Entry>::new();
+        dir_deque.push_back(root_entry);
+        Ok(Iter {
+            entry_deque: entry_deque,
+            dir_deque: dir_deque,
+            report: report.clone(),
+            last_apath: None,
+            excludes: excludes.clone(),
         })
     }
 }
 
 
-/// An entry found in the source directory.
+/// An entry in a live tree, describing a real file etc on disk.
 #[derive(Clone)]
 pub struct Entry {
     /// Conserve apath, relative to the top-level directory.
@@ -217,48 +255,11 @@ impl Iterator for Iter {
     }
 }
 
-/// Iterate source files descending through a source directory.
-///
-/// Visit the files in a directory before descending into its children, as
-/// is the defined order for files stored in an archive.  Within those files and
-/// child directories, visit them according to a sorted comparison by their UTF-8
-/// name.
-///
-/// The `Iter` has its own `Report` of how many directories and files were visited.
-pub fn iter(source_dir: &Path, report: &Report, excludes: &GlobSet) -> Result<Iter> {
-    let root_metadata = match fs::symlink_metadata(&source_dir) {
-        Ok(metadata) => metadata,
-        Err(e) => {
-            warn!("{}", e);
-            return Err(e.into());
-        }
-    };
-    let root_entry = Entry {
-        apath: Apath::from_string("/"),
-        path: source_dir.to_path_buf(),
-        metadata: root_metadata,
-    };
-    // Preload iter to return the root and then recurse into it.
-    let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();
-    entry_deque.push_back(root_entry.clone());
-    // TODO: Consider the case where the root is not actually a directory?
-    // Should that be supported?
-    let mut dir_deque = VecDeque::<Entry>::new();
-    dir_deque.push_back(root_entry);
-    Ok(Iter {
-        entry_deque: entry_deque,
-        dir_deque: dir_deque,
-        report: report.clone(),
-        last_apath: None,
-        excludes: excludes.clone(),
-    })
-}
 
 #[cfg(test)]
 mod tests {
     use std::io;
 
-    use super::iter;
     use super::super::*;
     use test_fixtures::TreeFixture;
 
@@ -281,7 +282,8 @@ mod tests {
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
         let report = Report::new();
-        let mut source_iter = iter(tf.path(), &report, &excludes::excludes_nothing()).unwrap();
+        let lt = LiveTree::open(tf.path()).unwrap();
+        let mut source_iter = lt.iter_entries(&report, &excludes::excludes_nothing()).unwrap();
         let result = source_iter
             .by_ref()
             .collect::<io::Result<Vec<_>>>()
@@ -331,7 +333,8 @@ mod tests {
 
         let excludes = excludes::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
-        let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
+        let lt = LiveTree::open(tf.path()).unwrap();
+        let mut source_iter = lt.iter_entries(&report, &excludes).unwrap();
         let result = source_iter
             .by_ref()
             .collect::<io::Result<Vec<_>>>()
@@ -381,7 +384,8 @@ mod tests {
         tf.create_symlink("from", "to");
         let report = Report::new();
 
-        let result = iter(tf.path(), &report, &excludes::excludes_nothing())
+        let lt = LiveTree::open(tf.path()).unwrap();
+        let result = lt.iter_entries(&report, &excludes::excludes_nothing())
             .unwrap()
             .collect::<io::Result<Vec<_>>>()
             .unwrap();
