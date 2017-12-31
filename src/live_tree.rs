@@ -84,18 +84,6 @@ pub struct Entry {
 }
 
 
-impl Entry {
-    /// Return Unix-format mtime if possible.
-    pub fn unix_mtime(&self) -> Option<u64> {
-        self.metadata
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
-            .and_then(|dur| Some(dur.as_secs()))
-    }
-}
-
-
 impl entry::Entry for Entry {
     fn apath(&self) -> Apath {
         // TODO: Better to just return a reference with the same lifetime, once index entries can
@@ -113,6 +101,14 @@ impl entry::Entry for Entry {
         } else {
             Kind::Unknown
         }
+    }
+
+    fn unix_mtime(&self) -> Option<u64> {
+        self.metadata
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
+            .and_then(|dur| Some(dur.as_secs()))
     }
 }
 

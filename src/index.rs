@@ -55,6 +55,10 @@ impl entry::Entry for IndexEntry {
     fn kind(&self) -> Kind {
         self.kind
     }
+
+    fn unix_mtime(&self) -> Option<u64> {
+        self.mtime
+    }
 }
 
 

@@ -24,5 +24,9 @@ pub trait Entry {
 
     // TODO: Would be better to return a reference, but it's difficult because IndexEntry doesn't
     // directly store an Apath due to serialization.
+    /// Return apath relative to the top of the tree.
     fn apath(&self) -> Apath;
+
+    /// Return Unix-format mtime if known.
+    fn unix_mtime(&self) -> Option<u64>;
 }
