@@ -171,7 +171,7 @@ mod tests {
         assert_eq!(2, index_entries.len());
 
         let e2 = &index_entries[1];
-        assert_eq!(e2.kind, Kind::Symlink);
+        assert_eq!(e2.kind(), Kind::Symlink);
         assert_eq!(e2.apath, "/symlink");
         assert_eq!(e2.target.as_ref().unwrap(), "/a/broken/destination");
     }
