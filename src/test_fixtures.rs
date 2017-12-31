@@ -41,7 +41,7 @@ impl ScratchArchive {
     }
 
     #[allow(unused)]
-    pub fn archive_dir_str(self: &ScratchArchive) -> &str {
+    pub fn archive_dir_str(&self) -> &str {
         self.archive.path().to_str().unwrap()
     }
 
@@ -96,26 +96,26 @@ impl TreeFixture {
         }
     }
 
-    pub fn path(self: &TreeFixture) -> &Path {
+    pub fn path(&self) -> &Path {
         &self.root
     }
 
-    pub fn create_file(self: &TreeFixture, relative_path: &str) {
+    pub fn create_file(&self, relative_path: &str) {
         self.create_file_with_contents(relative_path, b"contents");
     }
 
-    pub fn create_file_with_contents(self: &TreeFixture, relative_path: &str, contents: &[u8]) {
+    pub fn create_file_with_contents(&self, relative_path: &str, contents: &[u8]) {
         let full_path = self.root.join(relative_path);
         let mut f = fs::File::create(&full_path).unwrap();
         f.write_all(contents).unwrap();
     }
 
-    pub fn create_dir(self: &TreeFixture, relative_path: &str) {
+    pub fn create_dir(&self, relative_path: &str) {
         fs::create_dir(self.root.join(relative_path)).unwrap();
     }
 
     #[cfg(unix)]
-    pub fn create_symlink(self: &TreeFixture, relative_path: &str, target: &str) {
+    pub fn create_symlink(&self, relative_path: &str, target: &str) {
         use std::os::unix::fs as unix_fs;
 
         unix_fs::symlink(target, self.root.join(relative_path)).unwrap();
@@ -123,7 +123,7 @@ impl TreeFixture {
 
     /// Symlinks are just not present on Windows.
     #[cfg(windows)]
-    pub fn create_symlink(self: &TreeFixture, _relative_path: &str, _target: &str) {}
+    pub fn create_symlink(&self, _relative_path: &str, _target: &str) {}
 
     pub fn live_tree(&self) -> LiveTree {
         // TODO: Maybe allow deref TreeFixture to LiveTree.
