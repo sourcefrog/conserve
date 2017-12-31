@@ -159,24 +159,6 @@ pub struct Iter {
 
 
 impl Iter {
-    fn unchecked_next(&mut self) -> Option<Result<Entry>> {
-        loop {
-            if let Some(entry) = self.entry_deque.pop_front() {
-                // Have already found some entries and just need to return them.
-                self.report.increment("source.selected", 1);
-                return Some(Ok(entry));
-            } else if let Some(entry) = self.dir_deque.pop_front() {
-                if let Err(e) = self.visit_next_directory(entry) {
-                    return Some(Err(e.into()));
-                }
-            // Queues have been refilled.
-            } else {
-                // No entries queued and no more directories to visit.
-                return None;
-            }
-        }
-    }
-
     fn visit_next_directory(&mut self, dir_entry: Entry) -> Result<()> {
         self.report.increment("source.visited.directories", 1);
         let mut children = Vec::<(OsString, bool, Apath)>::new();
@@ -246,12 +228,11 @@ impl Iterator for Iter {
     type Item = Result<Entry>;
 
     fn next(&mut self) -> Option<Result<Entry>> {
-        // Check that all the returned paths are in correct order.
-        // TODO: Maybe this can be skipped in non-debug builds?
-        match self.unchecked_next() {
-            None => None,
-            e @ Some(Err(_)) => e,
-            Some(Ok(entry)) => {
+        loop {
+            if let Some(entry) = self.entry_deque.pop_front() {
+                // Have already found some entries, so just return the first.
+                self.report.increment("source.selected", 1);
+                // Sanity check that all the returned paths are in correct order.
                 if let Some(ref last_apath) = self.last_apath {
                     assert!(
                         last_apath < &entry.apath,
@@ -261,7 +242,17 @@ impl Iterator for Iter {
                     );
                 }
                 self.last_apath = Some(entry.apath.clone());
-                Some(Ok(entry))
+                return Some(Ok(entry));
+            }
+
+            // No entries already queued, visit a new directory to try to refill the queue.
+            if let Some(entry) = self.dir_deque.pop_front() {
+                if let Err(e) = self.visit_next_directory(entry) {
+                    return Some(Err(e.into()));
+                }
+            } else {
+                // No entries queued and no more directories to visit.
+                return None;
             }
         }
     }
