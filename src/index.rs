@@ -189,20 +189,6 @@ impl fmt::Debug for Iter {
 }
 
 
-/// Create an iterator that will read all entires from an existing index.
-///
-/// Prefer to use `Band::index_iter` instead.
-pub fn read(index_dir: &Path, excludes: &GlobSet, report: &Report) -> Result<Iter> {
-    Ok(Iter {
-        dir: index_dir.to_path_buf(),
-        buffered_entries: Vec::<IndexEntry>::new().into_iter(),
-        next_hunk_number: 0,
-        report: report.clone(),
-        excludes: excludes.clone(),
-    })
-}
-
-
 impl Iterator for Iter {
     type Item = Result<IndexEntry>;
 
@@ -221,6 +207,19 @@ impl Iterator for Iter {
 }
 
 impl Iter {
+    /// Create an iterator that will read all entires from an existing index.
+    ///
+    /// Prefer to use `Band::index_iter` instead.
+    pub fn open(index_dir: &Path, excludes: &GlobSet, report: &Report) -> Result<Iter> {
+        Ok(Iter {
+            dir: index_dir.to_path_buf(),
+            buffered_entries: Vec::<IndexEntry>::new().into_iter(),
+            next_hunk_number: 0,
+            report: report.clone(),
+            excludes: excludes.clone(),
+        })
+    }
+
     /// Read another hunk file and put it into buffered_entries.
     /// Returns true if another hunk could be found, otherwise false.
     /// (It's possible though unlikely the hunks can be empty.)
@@ -437,7 +436,7 @@ mod tests {
             \"target\":null}]"
         );
 
-        let mut it = super::read(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        let mut it = super::Iter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
         let entry = it.next().expect("Get first entry").expect(
             "First entry isn't an error",
         );
@@ -463,7 +462,7 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk(&report).unwrap();
 
-        let it = super::read(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        let it = super::Iter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
         assert_eq!(
             format!("{:?}", &it),
             format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir)
@@ -502,7 +501,7 @@ mod tests {
         ib.finish_hunk(&report).unwrap();
 
         let excludes = excludes::from_strings(&["/fo*"]).unwrap();
-        let it = super::read(&ib.dir, &excludes, &report).unwrap();
+        let it = super::Iter::open(&ib.dir, &excludes, &report).unwrap();
         assert_eq!(
             format!("{:?}", &it),
             format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir)

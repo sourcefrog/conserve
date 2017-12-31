@@ -156,7 +156,7 @@ impl Band {
 
     /// Make an iterator that will return all entries in this band.
     pub fn index_iter(&self, excludes: &GlobSet, report: &Report) -> Result<index::Iter> {
-        index::read(&self.index_dir_path, excludes, report)
+        index::Iter::open(&self.index_dir_path, excludes, report)
     }
 
     fn read_head(&self, report: &Report) -> Result<Head> {
