@@ -72,12 +72,12 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
 
     let root_entry = &index_entries[0];
     assert_eq!("/", root_entry.apath);
-    assert_eq!(index::IndexKind::Dir, root_entry.kind);
+    assert_eq!(Kind::Dir, root_entry.kind);
     assert!(root_entry.mtime.unwrap() > 0);
 
     let file_entry = &index_entries[1];
     assert_eq!("/hello", file_entry.apath);
-    assert_eq!(index::IndexKind::File, file_entry.kind);
+    assert_eq!(Kind::File, file_entry.kind);
     assert!(file_entry.mtime.unwrap() > 0);
     let hash = file_entry.blake2b.as_ref().unwrap();
     assert_eq!(

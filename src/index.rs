@@ -21,15 +21,6 @@ use globset::GlobSet;
 const MAX_ENTRIES_PER_HUNK: usize = 1000;
 
 
-/// Kind of file that can be stored in the archive.
-#[derive(Debug, PartialEq, RustcDecodable, RustcEncodable)]
-pub enum IndexKind {
-    File,
-    Dir,
-    Symlink,
-}
-
-
 /// Description of one archived file.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub struct Entry {
@@ -40,7 +31,7 @@ pub struct Entry {
     pub mtime: Option<u64>,
 
     /// Type of file.
-    pub kind: IndexKind,
+    pub kind: Kind,
 
     /// BLAKE2b hash of the entire original file, without salt.
     pub blake2b: Option<String>,
@@ -267,9 +258,9 @@ impl Iter {
             .filter(|entry| {
                 if self.excludes.is_match(&entry.apath) {
                     match entry.kind {
-                        IndexKind::Dir => self.report.increment("skipped.excluded.directories", 1),
-                        IndexKind::Symlink => self.report.increment("skipped.excluded.symlinks", 1),
-                        IndexKind::File => self.report.increment("skipped.excluded.files", 1),
+                        Kind::Dir => self.report.increment("skipped.excluded.directories", 1),
+                        Kind::Symlink => self.report.increment("skipped.excluded.symlinks", 1),
+                        Kind::File => self.report.increment("skipped.excluded.files", 1),
                     }
                     return false;
                 }
@@ -306,7 +297,7 @@ mod tests {
         ib.push(Entry {
             apath: apath.to_string(),
             mtime: None,
-            kind: IndexKind::File,
+            kind: Kind::File,
             blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
             target: None,
@@ -319,7 +310,7 @@ mod tests {
             Entry {
                 apath: "/a/b".to_string(),
                 mtime: Some(1461736377),
-                kind: IndexKind::File,
+                kind: Kind::File,
                 blake2b: Some(EXAMPLE_HASH.to_string()),
                 addrs: vec![],
                 target: None,
@@ -347,7 +338,7 @@ mod tests {
         ib.push(Entry {
             apath: "/zzz".to_string(),
             mtime: None,
-            kind: IndexKind::File,
+            kind: Kind::File,
             blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
             target: None,
@@ -355,7 +346,7 @@ mod tests {
         ib.push(Entry {
             apath: "aaa".to_string(),
             mtime: None,
-            kind: IndexKind::File,
+            kind: Kind::File,
             blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
             target: None,
@@ -369,7 +360,7 @@ mod tests {
         ib.push(Entry {
             apath: "../escapecat".to_string(),
             mtime: None,
-            kind: IndexKind::File,
+            kind: Kind::File,
             blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
             target: None,

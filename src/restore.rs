@@ -104,9 +104,9 @@ fn restore_one(
     let dest_path = destination.join(&entry.apath[1..]);
     info!("Restore {:?} to {:?}", &entry.apath, &dest_path);
     match entry.kind {
-        index::IndexKind::Dir => restore_dir(entry, &dest_path, &report),
-        index::IndexKind::File => restore_file(stored_tree, entry, &dest_path, &report),
-        index::IndexKind::Symlink => restore_symlink(entry, &dest_path, &report),
+        Kind::Dir => restore_dir(entry, &dest_path, &report),
+        Kind::File => restore_file(stored_tree, entry, &dest_path, &report),
+        Kind::Symlink => restore_symlink(entry, &dest_path, &report),
     }
     // TODO: Restore permissions.
     // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.

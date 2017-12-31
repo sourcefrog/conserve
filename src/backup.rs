@@ -97,7 +97,7 @@ impl BackupWriter {
         Ok(index::Entry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
-            kind: IndexKind::Dir,
+            kind: Kind::Dir,
             addrs: vec![],
             blake2b: None,
             target: None,
@@ -113,7 +113,7 @@ impl BackupWriter {
         Ok(index::Entry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
-            kind: IndexKind::File,
+            kind: Kind::File,
             addrs: addrs,
             blake2b: Some(body_hash),
             target: None,
@@ -131,7 +131,7 @@ impl BackupWriter {
         Ok(index::Entry {
             apath: source_entry.apath.to_string().clone(),
             mtime: source_entry.unix_mtime(),
-            kind: IndexKind::Symlink,
+            kind: Kind::Symlink,
             addrs: vec![],
             blake2b: None,
             target: Some(target),
@@ -172,7 +172,7 @@ mod tests {
         assert_eq!(2, index_entries.len());
 
         let e2 = &index_entries[1];
-        assert_eq!(e2.kind, index::IndexKind::Symlink);
+        assert_eq!(e2.kind, Kind::Symlink);
         assert_eq!(e2.apath, "/symlink");
         assert_eq!(e2.target.as_ref().unwrap(), "/a/broken/destination");
     }
