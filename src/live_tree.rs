@@ -7,7 +7,6 @@ use std::collections::vec_deque::VecDeque;
 use std::fmt;
 use std::ffi::OsString;
 use std::fs;
-use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time;
@@ -160,7 +159,7 @@ pub struct Iter {
 
 
 impl Iter {
-    fn unchecked_next(&mut self) -> Option<io::Result<Entry>> {
+    fn unchecked_next(&mut self) -> Option<Result<Entry>> {
         loop {
             if let Some(entry) = self.entry_deque.pop_front() {
                 // Have already found some entries and just need to return them.
@@ -168,7 +167,7 @@ impl Iter {
                 return Some(Ok(entry));
             } else if let Some(entry) = self.dir_deque.pop_front() {
                 if let Err(e) = self.visit_next_directory(entry) {
-                    return Some(Err(e));
+                    return Some(Err(e.into()));
                 }
             // Queues have been refilled.
             } else {
@@ -178,7 +177,7 @@ impl Iter {
         }
     }
 
-    fn visit_next_directory(&mut self, dir_entry: Entry) -> io::Result<()> {
+    fn visit_next_directory(&mut self, dir_entry: Entry) -> Result<()> {
         self.report.increment("source.visited.directories", 1);
         let mut children = Vec::<(OsString, bool, Apath)>::new();
         for entry in fs::read_dir(&dir_entry.path)? {
@@ -244,9 +243,9 @@ impl Iter {
 // subdirectories are then visited, also in sorted order, before returning to
 // any higher-level directories.
 impl Iterator for Iter {
-    type Item = io::Result<Entry>;
+    type Item = Result<Entry>;
 
-    fn next(&mut self) -> Option<io::Result<Entry>> {
+    fn next(&mut self) -> Option<Result<Entry>> {
         // Check that all the returned paths are in correct order.
         // TODO: Maybe this can be skipped in non-debug builds?
         match self.unchecked_next() {
@@ -271,8 +270,6 @@ impl Iterator for Iter {
 
 #[cfg(test)]
 mod tests {
-    use std::io;
-
     use super::super::*;
     use test_fixtures::TreeFixture;
 
@@ -299,7 +296,7 @@ mod tests {
         let mut source_iter = lt.iter_entries(&report, &excludes::excludes_nothing()).unwrap();
         let result = source_iter
             .by_ref()
-            .collect::<io::Result<Vec<_>>>()
+            .collect::<Result<Vec<_>>>()
             .unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -350,7 +347,7 @@ mod tests {
         let mut source_iter = lt.iter_entries(&report, &excludes).unwrap();
         let result = source_iter
             .by_ref()
-            .collect::<io::Result<Vec<_>>>()
+            .collect::<Result<Vec<_>>>()
             .unwrap();
 
         // First one is the root
@@ -400,7 +397,7 @@ mod tests {
         let lt = LiveTree::open(tf.path()).unwrap();
         let result = lt.iter_entries(&report, &excludes::excludes_nothing())
             .unwrap()
-            .collect::<io::Result<Vec<_>>>()
+            .collect::<Result<Vec<_>>>()
             .unwrap();
 
         assert_eq!(&result[0].apath, "/");
