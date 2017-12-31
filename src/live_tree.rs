@@ -110,6 +110,17 @@ impl entry::Entry for Entry {
             .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
             .and_then(|dur| Some(dur.as_secs()))
     }
+
+    fn symlink_target(&self) -> Option<String> {
+        // TODO: Record a problem and log a message if the target is not decodable, rather than
+        // panicing.
+        // TODO: Also return a Result if the link can't be read?
+        match self.kind() {
+            Kind::Symlink => Some(
+                fs::read_link(&self.path).unwrap().into_os_string().into_string().unwrap()),
+            _ => None,
+        }
+    }
 }
 
 

@@ -29,4 +29,7 @@ pub trait Entry {
 
     /// Return Unix-format mtime if known.
     fn unix_mtime(&self) -> Option<u64>;
+
+    /// Target of the symlink, if this is a symlink.
+    fn symlink_target(&self) -> Option<String>;
 }

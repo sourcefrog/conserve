@@ -117,20 +117,17 @@ impl BackupWriter {
     }
 
 
-    fn store_symlink(&mut self, source_entry: &live_tree::Entry) -> Result<IndexEntry> {
+    fn store_symlink(&mut self, source_entry: &Entry) -> Result<IndexEntry> {
         self.report.increment("symlink", 1);
-        // TODO: Record a problem and log a message if the target is not decodable, rather than
-        //  silently losing.
-        let target = fs::read_link(&source_entry.path)?
-            .to_string_lossy()
-            .to_string();
+        let target = source_entry.symlink_target();
+        assert!(target.is_some());
         Ok(IndexEntry {
             apath: source_entry.apath().to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Symlink,
             addrs: vec![],
             blake2b: None,
-            target: Some(target),
+            target: target,
         })
     }
 }

@@ -59,6 +59,13 @@ impl entry::Entry for IndexEntry {
     fn unix_mtime(&self) -> Option<u64> {
         self.mtime
     }
+
+    fn symlink_target(&self) -> Option<String> {
+        assert_eq!(
+            self.kind() == Kind::Symlink,
+            self.target.is_some());
+        self.target.clone()
+    }
 }
 
 
