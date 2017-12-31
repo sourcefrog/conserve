@@ -205,8 +205,8 @@ mod tests {
         use super::super::io::list_dir;
         let af = ScratchArchive::new();
         let report = &Report::new();
-        let band = Band::create_specific_id(&af, BandId::from_string("b0001").unwrap()).unwrap();
-        assert!(band.path().to_str().unwrap().ends_with("b0001"));
+        let band = Band::create(&af).unwrap();
+        assert!(band.path().to_str().unwrap().ends_with("b0000"));
         assert!(fs::metadata(band.path()).unwrap().is_dir());
 
         let (file_names, dir_names) = list_dir(band.path()).unwrap();
@@ -224,13 +224,13 @@ mod tests {
 
         assert!(band.is_closed().unwrap());
 
-        let band_id = BandId::from_string("b0001").unwrap();
+        let band_id = BandId::from_string("b0000").unwrap();
         let band2 = Band::open(&af, &Some(band_id)).expect("failed to open band");
         assert!(band2.is_closed().unwrap());
 
         // Try get_info
         let info = band2.get_info(&Report::new()).expect("get_info failed");
-        assert_eq!(info.id.as_string(), "b0001");
+        assert_eq!(info.id.as_string(), "b0000");
         assert_eq!(info.is_closed, true);
         let dur = info.end_time.expect("info has an end_time") - info.start_time;
         // Test should have taken (much) less than 5s between starting and finishing
