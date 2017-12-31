@@ -8,6 +8,7 @@ use std::fmt;
 use std::ffi::OsString;
 use std::fs;
 use std::io;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time;
 
@@ -120,6 +121,11 @@ impl entry::Entry for Entry {
                 fs::read_link(&self.path).unwrap().into_os_string().into_string().unwrap()),
             _ => None,
         }
+    }
+
+    fn file_contents(&self) -> Result<Box<Read>> {
+        assert_eq!(self.kind(), Kind::File);
+        Ok(Box::new(fs::File::open(&self.path)?))
     }
 }
 

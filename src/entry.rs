@@ -4,6 +4,8 @@
 //! An entry representing a file, directory, etc, in either a
 //! stored tree or local tree.
 
+use std::io::Read;
+
 use super::*;
 
 
@@ -32,4 +34,11 @@ pub trait Entry {
 
     /// Target of the symlink, if this is a symlink.
     fn symlink_target(&self) -> Option<String>;
+
+    /// Read the contents of a file.
+    ///
+    /// Only valid on Kind::File.
+    fn file_contents(&self) -> Result<Box<Read>> {
+        unimplemented!();
+    }
 }

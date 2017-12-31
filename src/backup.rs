@@ -4,12 +4,10 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
-use std::fs;
-
 use super::*;
-use entry::Entry;
 
 use globset::GlobSet;
+
 
 #[derive(Debug)]
 pub struct BackupOptions {
@@ -101,10 +99,10 @@ impl BackupWriter {
     }
 
 
-    fn store_file(&mut self, source_entry: &live_tree::Entry) -> Result<IndexEntry> {
+    fn store_file(&mut self, source_entry: &Entry) -> Result<IndexEntry> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
-        let mut f = fs::File::open(&source_entry.path)?;
+        let mut f = source_entry.file_contents()?;
         let (addrs, body_hash) = self.block_dir.store(&mut f, &self.report)?;
         Ok(IndexEntry {
             apath: source_entry.apath().to_string().clone(),
