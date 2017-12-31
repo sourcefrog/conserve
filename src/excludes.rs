@@ -6,10 +6,11 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use super::*;
 
-pub fn from_strings(excludes: &[&str]) -> Result<GlobSet> {
+pub fn from_strings<I: IntoIterator<Item=S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
 
-    for exclude in excludes {
+    for e in excludes {
+        let exclude = e.as_ref();
         builder.add(Glob::new(exclude).chain_err(|| {
             format!("Failed to parse exclude value: {}", exclude)
         })?);
