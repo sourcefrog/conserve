@@ -193,7 +193,7 @@ mod tests {
         srcdir.create_file("bar");
 
         let backup_options = BackupOptions::default()
-            .with_excludes(excludes::from_strings(vec!["/**/foo*", "/**/baz"]).unwrap());
+            .with_excludes(excludes::from_strings(&["/**/foo*", "/**/baz"]).unwrap());
         make_backup(srcdir.path(), &af, &backup_options).unwrap();
         let report = af.report();
 

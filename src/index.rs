@@ -495,7 +495,7 @@ mod tests {
         add_an_entry(&mut ib, "/foobar");
         ib.finish_hunk(&report).unwrap();
 
-        let excludes = excludes::from_strings(vec!["/fo*"]).unwrap();
+        let excludes = excludes::from_strings(&["/fo*"]).unwrap();
         let it = super::read(&ib.dir, &excludes, &report).unwrap();
         assert_eq!(
             format!("{:?}", &it),

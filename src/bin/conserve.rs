@@ -335,7 +335,10 @@ fn band_id_from_match(subm: &ArgMatches) -> Result<Option<BandId>> {
 /// Make an exclusion globset from the `--excludes` option.
 fn excludes_from_option(subm: &ArgMatches) -> Result<globset::GlobSet> {
     match subm.values_of("exclude") {
-        Some(excludes) => excludes::from_strings(excludes.collect()),
+        Some(excludes) => {
+            let exclude_strs: Vec<&str> = excludes.collect();
+            excludes::from_strings(&exclude_strs)
+        },
         None => Ok(excludes::excludes_nothing()),
     }
 }

@@ -282,8 +282,7 @@ mod tests {
         tf.create_file("baz/test");
         let report = Report::new();
 
-        let vec = vec!["/**/fooo*", "/**/ba[pqr]", "/**/*bas"];
-        let excludes = excludes::from_strings(vec).unwrap();
+        let excludes = excludes::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
         let mut source_iter = iter(tf.path(), &report, &excludes).unwrap();
         let result = source_iter

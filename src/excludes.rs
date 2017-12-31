@@ -6,7 +6,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use super::*;
 
-pub fn from_strings(excludes: Vec<&str>) -> Result<GlobSet> {
+pub fn from_strings(excludes: &[&str]) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
 
     for exclude in excludes {
@@ -33,7 +33,7 @@ mod tests {
     #[test]
     pub fn simple_parse() {
         let vec = vec!["fo*", "foo", "bar*"];
-        let excludes = excludes::from_strings(vec).unwrap();
+        let excludes = excludes::from_strings(&vec).unwrap();
         assert_that(&excludes.matches("foo").len()).is_equal_to(2);
         assert_that(&excludes.matches("foobar").len()).is_equal_to(1);
         assert_that(&excludes.matches("barBaz").len()).is_equal_to(1);
@@ -42,15 +42,13 @@ mod tests {
 
     #[test]
     pub fn path_parse() {
-        let vec = vec!["fo*/bar/baz*"];
-        let excludes = excludes::from_strings(vec).unwrap();
+        let excludes = excludes::from_strings(&["fo*/bar/baz*"]).unwrap();
         assert_that(&excludes.matches("foo/bar/baz.rs").len()).is_equal_to(1);
     }
 
     #[test]
     pub fn extendend_pattern_parse() {
-        let vec = vec!["fo?", "ba[abc]", "[!a-z]"];
-        let excludes = excludes::from_strings(vec).unwrap();
+        let excludes = excludes::from_strings(&["fo?", "ba[abc]", "[!a-z]"]).unwrap();
         assert_that(&excludes.matches("foo").len()).is_equal_to(1);
         assert_that(&excludes.matches("fo").len()).is_equal_to(0);
         assert_that(&excludes.matches("baa").len()).is_equal_to(1);

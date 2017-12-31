@@ -32,7 +32,7 @@ impl RestoreOptions {
 
     pub fn with_excludes(self, exclude: Vec<&str>) -> Result<Self> {
         Ok(RestoreOptions {
-            excludes: excludes::from_strings(exclude)?,
+            excludes: excludes::from_strings(&exclude)?,
             ..self
         })
     }
