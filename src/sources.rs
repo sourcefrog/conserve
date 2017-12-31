@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2017 Martin Pool.
 
 //! Find source files within a source directory, in apath order.
 
