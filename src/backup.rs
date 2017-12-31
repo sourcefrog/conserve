@@ -217,7 +217,7 @@ mod tests {
         let srcdir = TreeFixture::new();
         srcdir.create_file_with_contents("empty", &[]);
         make_backup(
-            srcdir.live_tree(),
+            &srcdir.live_tree(),
             &af,
             &BackupOptions::default()).unwrap();
         let report = af.report();
