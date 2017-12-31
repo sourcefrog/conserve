@@ -225,12 +225,12 @@ impl Iterator for Iter {
 /// name.
 ///
 /// The `Iter` has its own `Report` of how many directories and files were visited.
-pub fn iter(source_dir: &Path, report: &Report, excludes: &GlobSet) -> io::Result<Iter> {
+pub fn iter(source_dir: &Path, report: &Report, excludes: &GlobSet) -> Result<Iter> {
     let root_metadata = match fs::symlink_metadata(&source_dir) {
         Ok(metadata) => metadata,
         Err(e) => {
             warn!("{}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
     let root_entry = Entry {
