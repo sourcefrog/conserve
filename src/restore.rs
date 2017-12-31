@@ -159,7 +159,7 @@ fn restore_symlink(entry: &Entry, dest: &Path, report: &Report) -> Result<()> {
 fn restore_symlink(entry: &Entry, _dest: &Path, report: &Report) -> Result<()> {
     // TODO: Add a test with a canned index containing a symlink, and expect
     // it cannot be restored on Windows and can be on Unix.
-    warn!("Can't restore symlinks on Windows: {}", entry.apath);
+    warn!("Can't restore symlinks on Windows: {}", entry.apath());
     report.increment("skipped.unsupported_file_kind", 1);
     Ok(())
 }
