@@ -118,7 +118,7 @@ fn restore_one(
     // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
 }
 
-fn restore_dir(_entry: &IndexEntry, dest: &Path, report: &Report) -> Result<()> {
+fn restore_dir(_entry: &Entry, dest: &Path, report: &Report) -> Result<()> {
     report.increment("dir", 1);
     match fs::create_dir(dest) {
         Ok(_) => Ok(()),
@@ -144,19 +144,19 @@ fn restore_file(
 }
 
 #[cfg(unix)]
-fn restore_symlink(entry: &IndexEntry, dest: &Path, report: &Report) -> Result<()> {
+fn restore_symlink(entry: &Entry, dest: &Path, report: &Report) -> Result<()> {
     use std::os::unix::fs as unix_fs;
     report.increment("symlink", 1);
-    if let Some(ref target) = entry.target {
+    if let Some(ref target) = entry.symlink_target() {
         unix_fs::symlink(target, dest).unwrap();
     } else {
-        warn!("No target in symlink entry {}", entry.apath);
+        warn!("No target in symlink entry {}", entry.apath());
     }
     Ok(())
 }
 
 #[cfg(not(unix))]
-fn restore_symlink(entry: &IndexEntry, _dest: &Path, report: &Report) -> Result<()> {
+fn restore_symlink(entry: &Entry, _dest: &Path, report: &Report) -> Result<()> {
     // TODO: Add a test with a canned index containing a symlink, and expect
     // it cannot be restored on Windows and can be on Unix.
     warn!("Can't restore symlinks on Windows: {}", entry.apath);
