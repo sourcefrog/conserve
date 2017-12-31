@@ -162,7 +162,7 @@ mod tests {
         assert_eq!(1, band_ids.len());
         assert_eq!("b0000", band_ids[0].as_string());
 
-        let band = Band::open(&af, &Some(band_ids[0].clone())).unwrap();
+        let band = Band::open(&af, &band_ids[0]).unwrap();
         assert!(band.is_closed().unwrap());
 
         let index_entries = band.index_iter(&excludes::excludes_nothing(), &report)

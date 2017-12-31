@@ -35,6 +35,9 @@ error_chain! {
         ArchiveEmpty {
             display("Archive is empty")
         }
+        NoCompleteBands {
+            display("Archive has no complete bands")
+        }
         InvalidVersion {
             display("Invalid version number")
         }

@@ -83,7 +83,7 @@ impl Archive {
         Ok(IterBands { dir_iter: read_dir })
     }
 
-    /// Returns a vector of band ids, in sorted order.
+    /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
         // Note: For some reason `?` doesn't work here only `try!`.
         let mut band_ids: Vec<BandId> = try!(self.iter_bands_unsorted()?.collect());
@@ -112,6 +112,17 @@ impl Archive {
             })
         }
         accum.ok_or(ErrorKind::ArchiveEmpty.into())
+    }
+
+    /// Return the last completely-written band id.
+    pub fn last_complete_band(self: &Archive) -> Result<Band> {
+        for id in self.list_bands()?.iter().rev() {
+            let b = Band::open(self, &id)?;
+            if b.is_closed()? {
+                return Ok(b);
+            }
+        }
+        Err(ErrorKind::NoCompleteBands.into())
     }
 
     /// Return the Report that counts operations on this Archive and objects descended from it.
@@ -190,6 +201,7 @@ mod tests {
         // We can re-open it.
         Archive::open(arch_path, &Report::new()).unwrap();
         assert!(arch.list_bands().unwrap().is_empty());
+        assert!(arch.last_complete_band().is_err());
     }
 
     #[test]
@@ -209,7 +221,7 @@ mod tests {
     /// A new archive contains just one header file.
     /// The header is readable json containing only a version number.
     #[test]
-    fn new_archive_header_contents() {
+    fn empty_archive() {
         let af = ScratchArchive::new();
         let (file_names, dir_names) = list_dir(af.path()).unwrap();
         assert_eq!(file_names.len(), 1);
@@ -221,6 +233,16 @@ mod tests {
         let mut contents = String::new();
         header_file.read_to_string(&mut contents).unwrap();
         assert_eq!(contents, "{\"conserve_archive_version\":\"0.4\"}\n");
+
+        match *af.last_band_id().unwrap_err().kind() {
+            ErrorKind::ArchiveEmpty => (),
+            ref x => panic!("Unexpected error {:?}", x),
+        }
+
+        match *af.last_complete_band().unwrap_err().kind() {
+            ErrorKind::NoCompleteBands => (),
+            ref x => panic!("Unexpected error {:?}", x),
+        }
     }
 
     /// Can create bands in an archive.
@@ -228,11 +250,6 @@ mod tests {
     fn create_bands() {
         use super::super::io::directory_exists;
         let af = ScratchArchive::new();
-
-        match *af.last_band_id().unwrap_err().kind() {
-            ErrorKind::ArchiveEmpty => (),
-            ref x => panic!("Unexpected error {:?}", x),
-        }
 
         // Make one band
         let _band1 = Band::create(&af).unwrap();

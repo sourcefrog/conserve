@@ -259,7 +259,7 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
             println!("{}", band_id);
             continue;
         }
-        let band = match Band::open(&archive, &Some(band_id.clone())) {
+        let band = match Band::open(&archive, &band_id) {
             Ok(band) => band,
             Err(e) => {
                 warn!("Failed to open band {:?}: {:?}", band_id, e);

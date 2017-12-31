@@ -183,13 +183,13 @@ fn empty_archive() {
             run_conserve(&["restore", adir_str, restore_dir.path().to_str().unwrap()]);
         assert!(!status.success());
         assert!(!stderr.contains("panic"));
-        assert!(stdout.contains("Archive is empty"));
+        assert!(stdout.contains("Archive has no complete bands"));
     }
     {
         let (status, stdout, stderr) = run_conserve(&["ls", adir_str]);
         assert!(!status.success());
         assert!(!stderr.contains("panic"));
-        assert!(stdout.contains("Archive is empty"));
+        assert!(stdout.contains("Archive has no complete bands"));
     }
     {
         let (status, stdout, stderr) = run_conserve(&["versions", adir_str]);
@@ -222,11 +222,12 @@ fn incomplete_version() {
         let (status, stdout, stderr) = run_conserve(&["ls", adir_str]);
         assert!(!status.success());
         assert!(stderr.is_empty());
-        assert!(stdout.contains("Version b0000 is incomplete"));
+        assert!(stdout.contains("Archive has no complete bands"));
     }
     {
         // ls --incomplete accurately says it has nothing
-        let (status, stdout, stderr) = run_conserve(&["ls", "--incomplete", adir_str]);
+        let (status, stdout, stderr) = run_conserve(
+            &["ls", "-b", "b0", "--incomplete", adir_str]);
         assert!(status.success());
         assert!(stderr.is_empty());
         assert_eq!(stdout, "");

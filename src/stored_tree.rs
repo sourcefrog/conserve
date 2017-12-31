@@ -22,10 +22,14 @@ pub struct StoredTree {
 
 
 impl StoredTree {
-    /// Open a tree stored in the archive, identified by BandId or by default the last.
+    /// Open a tree stored in the archive, identified by BandId or by default the last complete
+    /// backup.
     pub fn open(archive: &Archive, band_id: &Option<BandId>) -> Result<StoredTree> {
-        let band = Band::open(&archive, band_id)?;
         // TODO: Maybe warn if the band's incomplete, or fail unless opening is forced?
+        let band = match band_id {
+            &Some(ref b) => Band::open(archive, b)?,
+            &None => archive.last_complete_band()?,
+        };
         Ok(StoredTree {
             archive: archive.clone(),
             band: band,

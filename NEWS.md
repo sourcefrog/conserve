@@ -1,5 +1,13 @@
 # Conserve release history
 
+## Conserve 0.4.2
+
+* Commands such as `restore` and `ls` that operate on a version, will by
+  default operate on the last complete version, rather than defaulting to the
+  last version altogether and then potentially complaining it's incomplete.
+  Similarly for the `SourceTree::open` API when given no `BandId`
+  argument.
+
 ## Conserve 0.4.1
 
 * Large files are broken into multiple blocks of 1MB uncompressed content,
