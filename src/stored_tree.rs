@@ -8,8 +8,6 @@
 //! across incremental backups, hiding from the caller that data may be distributed across
 //! multiple index files, bands, and blocks.
 
-use globset::GlobSet;
-
 use super::*;
 
 
@@ -48,11 +46,6 @@ impl StoredTree {
         self.band.is_closed()
     }
 
-    /// Return an iter of index entries in this stored tree.
-    pub fn iter_entries(&self, excludes: &GlobSet) -> Result<index::Iter> {
-        self.band.index_iter(excludes, self.archive.report())
-    }
-
     /// Return an iter of contents of file contents for the given file entry.
     ///
     /// Contents are yielded as blocks of bytes, of arbitrary length as stored in the archive.
@@ -66,6 +59,17 @@ impl StoredTree {
 
     // TODO: Perhaps add a way to open a file by name, bearing in mind this might be slow to
     // call repeatedly if it reads the whole index.
+}
+
+
+impl Tree for StoredTree {
+    type E = index::IndexEntry;
+    type I = index::Iter;
+
+    /// Return an iter of index entries in this stored tree.
+    fn iter_entries(&self, excludes: &GlobSet) -> Result<index::Iter> {
+        self.band.index_iter(excludes, self.archive.report())
+    }
 }
 
 
