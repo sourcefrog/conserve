@@ -30,6 +30,11 @@ impl LiveTree {
             path: path.to_path_buf(),
         })
     }
+}
+
+impl tree::Tree for LiveTree {
+    type E = Entry;
+    type I = Iter;
 
     /// Iterate source files descending through a source directory.
     ///
@@ -39,7 +44,7 @@ impl LiveTree {
     /// name.
     ///
     /// The `Iter` has its own `Report` of how many directories and files were visited.
-    pub fn iter_entries(&self, report: &Report, excludes: &GlobSet) -> Result<Iter> {
+    fn iter_entries(&self, report: &Report, excludes: &GlobSet) -> Result<Self::I> {
         let root_metadata = match fs::symlink_metadata(&self.path) {
             Ok(metadata) => metadata,
             Err(e) => {

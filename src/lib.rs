@@ -49,6 +49,7 @@ mod restore;
 mod stored_file;
 mod stored_tree;
 pub mod test_fixtures;
+mod tree;
 pub mod ui;
 
 pub use archive::Archive;
@@ -67,7 +68,11 @@ pub use live_tree::LiveTree;
 pub use report::{Report, Sizes};
 pub use restore::{RestoreOptions, restore_tree};
 pub use stored_tree::StoredTree;
+pub use tree::Tree;
 pub use ui::UI;
+
+// Commonly-used external types.
+pub use globset::GlobSet;
 
 
 /// Conserve version number as a semver string.
