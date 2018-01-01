@@ -238,24 +238,6 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 }
 
 
-fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let excludes = excludes_from_option(subm)?;
-    let lt = LiveTree::open(
-        &subm.value_of("source").unwrap(),
-        &report)?;
-    list_tree_contents(&lt, &excludes)?;
-    Ok(())
-}
-
-
-fn list_tree_contents<T: Tree>(tree: &T, excludes: &GlobSet) -> Result<()> {
-    for entry in tree.iter_entries(excludes)? {
-        println!("{}", entry?.apath());
-    }
-    Ok(())
-}
-
-
 fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
     let short_output = subm.is_present("short");
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
@@ -299,11 +281,28 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
 }
 
 
+fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let lt = LiveTree::open(
+        &subm.value_of("source").unwrap(),
+        &report)?;
+    list_tree_contents(&lt, &excludes_from_option(subm)?)?;
+    Ok(())
+}
+
+
 fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let st = StoredTree::open(&archive, &band_id_from_option(subm)?)?;
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
     list_tree_contents(&st, &excludes_from_option(subm)?)?;
+    Ok(())
+}
+
+
+fn list_tree_contents<T: Tree>(tree: &T, excludes: &GlobSet) -> Result<()> {
+    for entry in tree.iter_entries(excludes)? {
+        println!("{}", entry?.apath());
+    }
     Ok(())
 }
 
