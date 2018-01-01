@@ -37,7 +37,8 @@ struct ArchiveHeader {
 
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
-    pub fn create(path: &Path) -> Result<Archive> {
+    pub fn create<P: AsRef<Path>>(path: P) -> Result<Archive> {
+        let path = path.as_ref();
         let archive = Archive {
             path: path.to_path_buf(),
             report: Report::new(),
@@ -56,7 +57,8 @@ impl Archive {
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
-    pub fn open(path: &Path, report: &Report) -> Result<Archive> {
+    pub fn open<P: AsRef<Path>>(path: P, report: &Report) -> Result<Archive> {
+        let path = path.as_ref();
         let header_path = path.join(HEADER_FILENAME);
         if !file_exists(&header_path)? {
             return Err(ErrorKind::NotAnArchive(path.into()).into());

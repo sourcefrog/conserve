@@ -223,16 +223,16 @@ fn show_chained_errors(e: Error) {
 
 
 fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
-    let archive_path = Path::new(subm.value_of("archive").expect("'archive' arg not found"));
+    let archive_path = subm.value_of("archive").expect("'archive' arg not found");
     Archive::create(archive_path).and(Ok(()))
 }
 
 
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     let backup_options = BackupOptions::default().with_excludes(excludes_from_option(subm)?);
-    let archive = Archive::open(Path::new(subm.value_of("archive").unwrap()), &report)?;
+    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let lt = LiveTree::open(
-        Path::new(&subm.value_of("source").unwrap()),
+        &subm.value_of("source").unwrap(),
         &report)?;
     make_backup(&lt, &archive, &backup_options)
 }
@@ -241,7 +241,7 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
     let excludes = excludes_from_option(subm)?;
     let lt = LiveTree::open(
-        Path::new(&subm.value_of("source").unwrap()),
+        &subm.value_of("source").unwrap(),
         &report)?;
     for entry in lt.iter_entries(&excludes)? {
         println!("{}", entry?.apath);
@@ -251,9 +251,8 @@ fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 
 fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive_path = Path::new(subm.value_of("archive").unwrap());
     let short_output = subm.is_present("short");
-    let archive = Archive::open(archive_path, &report)?;
+    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     for band_id in archive.list_bands()? {
         if short_output {
             println!("{}", band_id);
@@ -295,8 +294,7 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 
 fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive_path = Path::new(subm.value_of("archive").unwrap());
-    let archive = Archive::open(archive_path, &report)?;
+    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let band_id = band_id_from_match(subm)?;
     let st = StoredTree::open(&archive, &band_id)?;
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
@@ -309,8 +307,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 
 fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive_path = Path::new(subm.value_of("archive").unwrap());
-    let archive = Archive::open(archive_path, &report)?;
+    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let destination_path = Path::new(subm.value_of("destination").unwrap());
     // TODO: Restore core code should complain if the band is incomplete.
     let band_id = band_id_from_match(subm)?;

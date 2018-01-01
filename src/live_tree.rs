@@ -25,10 +25,10 @@ pub struct LiveTree {
 
 
 impl LiveTree {
-    pub fn open(path: &Path, report: &Report) -> Result<LiveTree> {
+    pub fn open<P: AsRef<Path>>(path: P, report: &Report) -> Result<LiveTree> {
         // TODO: Maybe fail here if the root doesn't exist or isn't a directory?
         Ok(LiveTree {
-            path: path.to_path_buf(),
+            path: path.as_ref().to_path_buf(),
             report: report.clone(),
         })
     }
