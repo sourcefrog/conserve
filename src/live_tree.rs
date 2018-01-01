@@ -17,17 +17,19 @@ use globset::GlobSet;
 
 
 /// A real tree on the filesystem, for use as a backup source or restore destination.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct LiveTree {
     path: PathBuf,
+    report: Report,
 }
 
 
 impl LiveTree {
-    pub fn open(path: &Path) -> Result<LiveTree> {
+    pub fn open(path: &Path, report: &Report) -> Result<LiveTree> {
         // TODO: Maybe fail here if the root doesn't exist or isn't a directory?
         Ok(LiveTree {
             path: path.to_path_buf(),
+            report: report.clone(),
         })
     }
 }
@@ -44,7 +46,7 @@ impl tree::Tree for LiveTree {
     /// name.
     ///
     /// The `Iter` has its own `Report` of how many directories and files were visited.
-    fn iter_entries(&self, report: &Report, excludes: &GlobSet) -> Result<Self::I> {
+    fn iter_entries(&self, excludes: &GlobSet) -> Result<Self::I> {
         let root_metadata = match fs::symlink_metadata(&self.path) {
             Ok(metadata) => metadata,
             Err(e) => {
@@ -67,10 +69,19 @@ impl tree::Tree for LiveTree {
         Ok(Iter {
             entry_deque: entry_deque,
             dir_deque: dir_deque,
-            report: report.clone(),
+            report: self.report.clone(),
             last_apath: None,
             excludes: excludes.clone(),
         })
+    }
+}
+
+
+impl fmt::Debug for LiveTree {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("LiveTree")
+            .field("path", &self.path)
+            .finish()
     }
 }
 
@@ -272,7 +283,7 @@ mod tests {
     #[test]
     fn open_tree() {
         let tf = TreeFixture::new();
-        let lt = LiveTree::open(tf.path()).unwrap();
+        let lt = LiveTree::open(tf.path(), &Report::new()).unwrap();
         assert_eq!(
             format!("{:?}", &lt),
             format!("LiveTree {{ path: {:?} }}", tf.path()));
@@ -288,8 +299,8 @@ mod tests {
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
         let report = Report::new();
-        let lt = LiveTree::open(tf.path()).unwrap();
-        let mut source_iter = lt.iter_entries(&report, &excludes::excludes_nothing()).unwrap();
+        let lt = LiveTree::open(tf.path(), &report).unwrap();
+        let mut source_iter = lt.iter_entries(&excludes::excludes_nothing()).unwrap();
         let result = source_iter
             .by_ref()
             .collect::<Result<Vec<_>>>()
@@ -339,8 +350,8 @@ mod tests {
 
         let excludes = excludes::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
-        let lt = LiveTree::open(tf.path()).unwrap();
-        let mut source_iter = lt.iter_entries(&report, &excludes).unwrap();
+        let lt = LiveTree::open(tf.path(), &report).unwrap();
+        let mut source_iter = lt.iter_entries(&excludes).unwrap();
         let result = source_iter
             .by_ref()
             .collect::<Result<Vec<_>>>()
@@ -390,8 +401,8 @@ mod tests {
         tf.create_symlink("from", "to");
         let report = Report::new();
 
-        let lt = LiveTree::open(tf.path()).unwrap();
-        let result = lt.iter_entries(&report, &excludes::excludes_nothing())
+        let lt = LiveTree::open(tf.path(), &report).unwrap();
+        let result = lt.iter_entries(&excludes::excludes_nothing())
             .unwrap()
             .collect::<Result<Vec<_>>>()
             .unwrap();

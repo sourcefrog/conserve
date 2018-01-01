@@ -10,6 +10,5 @@ pub trait Tree {
     type E: Entry;
     type I: Iterator<Item = Result<Self::E>>;
 
-    // TODO: Maybe hold the report inside self?
-    fn iter_entries(&self, report: &Report, excludes: &GlobSet) -> Result<Self::I>;
+    fn iter_entries(&self, excludes: &GlobSet) -> Result<Self::I>;
 }

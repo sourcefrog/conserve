@@ -231,16 +231,19 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     let backup_options = BackupOptions::default().with_excludes(excludes_from_option(subm)?);
     let archive = Archive::open(Path::new(subm.value_of("archive").unwrap()), &report)?;
-    let lt = LiveTree::open(Path::new(&subm.value_of("source").unwrap()))?;
+    let lt = LiveTree::open(
+        Path::new(&subm.value_of("source").unwrap()),
+        &report)?;
     make_backup(&lt, &archive, &backup_options)
 }
 
 
 fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let source_path = Path::new(subm.value_of("source").unwrap());
     let excludes = excludes_from_option(subm)?;
-    let lt = LiveTree::open(source_path)?;
-    for entry in lt.iter_entries(report, &excludes)? {
+    let lt = LiveTree::open(
+        Path::new(&subm.value_of("source").unwrap()),
+        &report)?;
+    for entry in lt.iter_entries(&excludes)? {
         println!("{}", entry?.apath);
     }
     Ok(())

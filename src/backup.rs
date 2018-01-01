@@ -42,7 +42,7 @@ struct BackupWriter {
 /// Make a new backup from a source tree into a band in this archive.
 pub fn make_backup(source: &LiveTree, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
     let mut backup_writer = BackupWriter::begin_band(archive)?;
-    for entry in source.iter_entries(&backup_writer.report, &backup_options.excludes)? {
+    for entry in source.iter_entries(&backup_options.excludes)? {
         backup_writer.store(&entry?)?;
     }
     backup_writer.finish()
@@ -143,7 +143,7 @@ mod tests {
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
         make_backup(
-            &LiveTree::open(srcdir.path()).unwrap(),
+            &LiveTree::open(srcdir.path(), &Report::new()).unwrap(),
             &af,
             &BackupOptions::default()).unwrap();
         let report = af.report();
@@ -190,11 +190,11 @@ mod tests {
                 &["/**/foo*", "/**/baz"],
             ).unwrap(),
         );
+        let report = af.report();
         make_backup(
-            &LiveTree::open(srcdir.path()).unwrap(),
+            &LiveTree::open(srcdir.path(), &report).unwrap(),
             &af,
             &backup_options).unwrap();
-        let report = af.report();
 
         assert_eq!(1, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"));

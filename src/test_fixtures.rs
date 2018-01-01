@@ -58,7 +58,7 @@ impl ScratchArchive {
             srcdir.create_symlink("link", "target");
         }
 
-        let lt = LiveTree::open(srcdir.path()).unwrap();
+        let lt = LiveTree::open(srcdir.path(), &Report::new()).unwrap();
         make_backup(&lt, self, &BackupOptions::default()).unwrap();
 
         srcdir.create_file("hello2");
@@ -127,7 +127,7 @@ impl TreeFixture {
 
     pub fn live_tree(&self) -> LiveTree {
         // TODO: Maybe allow deref TreeFixture to LiveTree.
-        LiveTree::open(self.path()).unwrap()
+        LiveTree::open(self.path(), &Report::new()).unwrap()
     }
 }
 
