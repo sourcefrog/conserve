@@ -243,8 +243,14 @@ fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
     let lt = LiveTree::open(
         &subm.value_of("source").unwrap(),
         &report)?;
-    for entry in lt.iter_entries(&excludes)? {
-        println!("{}", entry?.apath);
+    list_tree_contents(&lt, &excludes)?;
+    Ok(())
+}
+
+
+fn list_tree_contents<T: Tree>(tree: &T, excludes: &GlobSet) -> Result<()> {
+    for entry in tree.iter_entries(excludes)? {
+        println!("{}", entry?.apath());
     }
     Ok(())
 }
@@ -298,10 +304,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let band_id = band_id_from_match(subm)?;
     let st = StoredTree::open(&archive, &band_id)?;
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
-    let excludes = excludes_from_option(subm)?;
-    for i in st.iter_entries(&excludes)? {
-        println!("{}", i?.apath);
-    }
+    list_tree_contents(&st, &excludes_from_option(subm)?)?;
     Ok(())
 }
 
