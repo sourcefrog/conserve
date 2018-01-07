@@ -6,7 +6,7 @@
 use super::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
-pub trait Tree {
+pub trait ReadTree {
     type E: Entry;
     type I: Iterator<Item = Result<Self::E>>;
     type R: std::io::Read;
@@ -18,7 +18,7 @@ pub trait Tree {
 
 /// A tree open for writing, either local or an an archive.
 ///
-/// This isn't a sub-trait of Tree since a backup band can't be read while writing is
+/// This isn't a sub-trait of ReadTree since a backup band can't be read while writing is
 /// still underway.
 ///
 /// Entries must be written in Apath order, since that's a requirement of the index.
@@ -31,7 +31,7 @@ pub trait WriteTree {
 }
 
 
-pub fn copy_tree<ST: Tree, DT: WriteTree>(
+pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     source: &ST, dest: &mut DT, excludes: &GlobSet) -> Result<()> {
     for entry in source.iter_entries(excludes)? {
         let entry = entry?;

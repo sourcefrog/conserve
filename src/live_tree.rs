@@ -33,7 +33,7 @@ impl LiveTree {
     }
 }
 
-impl tree::Tree for LiveTree {
+impl tree::ReadTree for LiveTree {
     type E = Entry;
     type I = Iter;
     type R = std::fs::File;

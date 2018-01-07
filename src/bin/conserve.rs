@@ -297,7 +297,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 }
 
 
-fn list_tree_contents<T: Tree>(tree: &T, excludes: &GlobSet) -> Result<()> {
+fn list_tree_contents<T: ReadTree>(tree: &T, excludes: &GlobSet) -> Result<()> {
     for entry in tree.iter_entries(excludes)? {
         println!("{}", entry?.apath());
     }

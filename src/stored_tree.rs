@@ -72,7 +72,7 @@ impl StoredTree {
 }
 
 
-impl Tree for StoredTree {
+impl ReadTree for StoredTree {
     type E = index::IndexEntry;
     type I = index::Iter;
     type R = stored_file::StoredFile;

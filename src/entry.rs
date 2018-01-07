@@ -20,7 +20,7 @@ pub enum Kind {
 
 /// A file, directory, or symlink stored in any tree.
 /// 
-/// To get the contents of a plain file, use `Tree::file_contents`.
+/// To get the contents of a plain file, use `ReadTree::file_contents`.
 pub trait Entry {
     fn kind(&self) -> Kind;
 
