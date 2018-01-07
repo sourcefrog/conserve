@@ -127,7 +127,7 @@ pub fn restore_tree(stored_tree: &StoredTree, dest: &Path, options: &RestoreOpti
     } else {
         RestoreTree::create(dest, report)
     }?;
-    tree::copy_tree(stored_tree, &mut rt, &options.excludes, &report)
+    tree::copy_tree(stored_tree, &mut rt, &options.excludes)
 }
 
 
