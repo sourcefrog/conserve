@@ -4,7 +4,7 @@
 
 use std::fs;
 use std::io;
-use std::io::Write;
+use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 use super::*;
@@ -74,7 +74,7 @@ impl RestoreTree {
         info!("Restore {:?}", &entry.apath);
         match entry.kind() {
             Kind::Dir => self.write_dir(entry),
-            Kind::File => self.restore_file(stored_tree, entry),
+            Kind::File => self.write_file(stored_tree, entry),
             Kind::Symlink => self.write_symlink(entry),
             Kind::Unknown => {
                 return Err(format!(
@@ -91,8 +91,7 @@ impl RestoreTree {
         self.path.join(&entry.apath().to_string()[1..])
     }
 
-    // TODO: Let the Entry know how to read itself rather than passing the tree to read from.
-    fn restore_file(&self, stored_tree: &StoredTree, entry: &IndexEntry) -> Result<()> {
+    fn write_file(&self, stored_tree: &StoredTree, entry: &IndexEntry) -> Result<()> {
         self.report.increment("file", 1);
         // Here too we write a temporary file and then move it into place: so the
         // file under its real name only appears
@@ -102,6 +101,7 @@ impl RestoreTree {
         }
         af.close(&self.report)
     }
+
 }
 
 
