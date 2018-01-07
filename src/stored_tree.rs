@@ -67,19 +67,8 @@ impl StoredTree {
         self.band.is_closed()
     }
 
-    /// Return an iter of contents of file contents for the given file entry.
-    ///
-    /// Contents are yielded as blocks of bytes, of arbitrary length as stored in the archive.
-    pub fn file_contents(&self, entry: &IndexEntry) -> Result<stored_file::StoredFile> {
-        Ok(stored_file::StoredFile::open(
-            self.band.block_dir(),
-            entry.addrs.clone(),
-            self.archive.report(),
-        ))
-    }
-
     // TODO: Perhaps add a way to open a file by name, bearing in mind this might be slow to
-    // call repeatedly if it reads the whole index.
+    // call if it reads the whole index.
 }
 
 
