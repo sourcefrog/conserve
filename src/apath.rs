@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! "Apaths" (for archive paths) are platform-independent relative file paths used
 //! inside archive snapshots.
@@ -111,6 +111,32 @@ impl Ord for Apath {
 impl PartialOrd for Apath {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+
+/// Observe Apaths and assert that they're visited in the correct order.
+#[derive(Debug)]
+pub struct CheckOrder {
+    /// The last-seen filename, to enforce ordering.
+    last_apath: Option<Apath>,
+}
+
+impl CheckOrder {
+    pub fn new() -> CheckOrder {
+        CheckOrder {
+            last_apath: None,
+        }
+    }
+
+    pub fn check(&mut self, a: &Apath) {
+        if let Some(ref last_apath) = self.last_apath {
+            assert!(
+                last_apath < &a,
+                "apaths out of order: {:?} should be before {:?}",
+                last_apath, a);
+        }
+        self.last_apath = Some(a.clone());
     }
 }
 

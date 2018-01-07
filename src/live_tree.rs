@@ -70,7 +70,7 @@ impl tree::Tree for LiveTree {
             entry_deque: entry_deque,
             dir_deque: dir_deque,
             report: self.report.clone(),
-            last_apath: None,
+            check_order: apath::CheckOrder::new(),
             excludes: excludes.clone(),
         })
     }
@@ -166,8 +166,8 @@ pub struct Iter {
     /// Count of directories and files visited by this iterator.
     report: Report,
 
-    /// Copy of the last-emitted apath, for the purposes of checking they're in apath order.
-    last_apath: Option<Apath>,
+    /// Check that emitted paths are in the right order.
+    check_order: apath::CheckOrder,
 
     /// glob pattern to skip in iterator
     excludes: GlobSet,
@@ -249,15 +249,7 @@ impl Iterator for Iter {
                 // Have already found some entries, so just return the first.
                 self.report.increment("source.selected", 1);
                 // Sanity check that all the returned paths are in correct order.
-                if let Some(ref last_apath) = self.last_apath {
-                    assert!(
-                        last_apath < &entry.apath,
-                        "entries returned out of order: {:?} >= {:?}",
-                        last_apath,
-                        entry.apath
-                    );
-                }
-                self.last_apath = Some(entry.apath.clone());
+                self.check_order.check(&entry.apath);
                 return Some(Ok(entry));
             }
 

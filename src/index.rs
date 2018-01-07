@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Listing of files in a band in the archive.
 
@@ -84,7 +84,7 @@ pub struct IndexBuilder {
     /// The last-added filename, to enforce ordering.  At the start of the first hunk
     /// this is empty; at the start of a later hunk it's the last path from the previous
     /// hunk, and otherwise it's the last path from `entries`.
-    last_apath: Option<Apath>,
+    check_order: apath::CheckOrder,
 }
 
 
@@ -96,7 +96,7 @@ impl IndexBuilder {
             dir: dir.to_path_buf(),
             entries: Vec::<IndexEntry>::new(),
             sequence: 0,
-            last_apath: None,
+            check_order: apath::CheckOrder::new(),
         }
     }
 
@@ -106,11 +106,7 @@ impl IndexBuilder {
     pub fn push(&mut self, entry: IndexEntry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
-        let entry_apath = Apath::from_string(&entry.apath);
-        if let Some(ref last_apath) = self.last_apath {
-            assert!(last_apath < &entry_apath);
-        }
-        self.last_apath = Some(entry_apath.clone());
+        self.check_order.check(&Apath::from_string(&entry.apath));
         self.entries.push(entry);
     }
 
