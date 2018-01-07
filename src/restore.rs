@@ -1,14 +1,15 @@
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Restore from the archive to the filesystem.
 
 use std::fs;
 use std::io;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::*;
 use super::entry::Entry;
+use super::tree::WriteTree;
 
 use globset::GlobSet;
 
@@ -44,25 +45,118 @@ impl RestoreOptions {
 }
 
 
-pub fn restore_tree(
-    stored_tree: &StoredTree,
-    destination: &Path,
-    options: &RestoreOptions,
-) -> Result<()> {
-    if !options.force_overwrite {
-        require_empty_destination(destination)?;
-    };
+/// A write-only tree on the filesystem, as a restore destination.
+#[derive(Debug)]
+struct RestoreTree {
+    path: PathBuf,
+    report: Report,
+}
+
+
+impl RestoreTree {
+    pub fn create(path: &Path, report: &Report) -> Result<RestoreTree> {
+        require_empty_destination(path)?;
+        Self::create_overwrite(path, report)
+    }
+
+    pub fn create_overwrite(path: &Path, report: &Report) -> Result<RestoreTree> {
+        Ok(RestoreTree {
+            path: path.to_path_buf(),
+            report: report.clone(),
+        })
+    }
+
+    fn restore_one(&mut self, stored_tree: &StoredTree, entry: &IndexEntry) -> Result<()> {
+        // TODO: Unify this with make_backup into a generic tree-copier.
+        if !Apath::is_valid(&entry.apath) {
+            return Err(format!("invalid apath {:?}", &entry.apath).into());
+        }
+        info!("Restore {:?}", &entry.apath);
+        match entry.kind() {
+            Kind::Dir => self.write_dir(entry),
+            Kind::File => self.restore_file(stored_tree, entry),
+            Kind::Symlink => self.write_symlink(entry),
+            Kind::Unknown => {
+                return Err(format!(
+                        "file type Unknown shouldn't occur in archive: {:?}",
+                        &entry.apath).into());
+            }
+        }
+        // TODO: Restore permissions.
+        // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
+    }
+
+    fn entry_path(&self, entry: &Entry) -> PathBuf {
+        // Remove initial slash so that the apath is relative to the destination.
+        self.path.join(&entry.apath().to_string()[1..])
+    }
+
+    // TODO: Let the Entry know how to read itself rather than passing the tree to read from.
+    fn restore_file(&self, stored_tree: &StoredTree, entry: &IndexEntry) -> Result<()> {
+        self.report.increment("file", 1);
+        // Here too we write a temporary file and then move it into place: so the
+        // file under its real name only appears
+        let mut af = AtomicFile::new(&self.entry_path(entry))?;
+        for bytes in stored_tree.file_contents(entry)? {
+            af.write(bytes?.as_slice())?;
+        }
+        af.close(&self.report)
+    }
+}
+
+
+impl tree::WriteTree for RestoreTree {
+    fn finish(&mut self) -> Result<()> {
+        // Live tree doesn't need to be finished.
+        Ok(())
+    }
+
+    fn write_dir(&mut self, entry: &Entry) -> Result<()> {
+        self.report.increment("dir", 1);
+        match fs::create_dir(self.entry_path(entry)) {
+            Ok(_) => Ok(()),
+            Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    #[cfg(unix)]
+    fn write_symlink(&mut self, entry: &Entry) -> Result<()> {
+        use std::os::unix::fs as unix_fs;
+        self.report.increment("symlink", 1);
+        if let Some(ref target) = entry.symlink_target() {
+            unix_fs::symlink(target, self.entry_path(entry))?;
+        } else {
+            // TODO: Treat as an error.
+            warn!("No target in symlink entry {}", entry.apath());
+        }
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    fn write_symlink(&mut self, entry: &Entry) -> Result<()> {
+        // TODO: Add a test with a canned index containing a symlink, and expect
+        // it cannot be restored on Windows and can be on Unix.
+        warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
+        self.report.increment("skipped.unsupported_file_kind", 1);
+        Ok(())
+    }
+}
+
+
+pub fn restore_tree(stored_tree: &StoredTree, destination: &Path, options: &RestoreOptions)
+    -> Result<()> {
+    let report = stored_tree.archive().report();
+    let mut rt = if options.force_overwrite {
+        RestoreTree::create_overwrite(destination, report)
+    } else {
+        RestoreTree::create(destination, report)
+    }?;
     for entry in stored_tree.iter_entries(&options.excludes)? {
         // TODO: Continue even if one fails
-        restore_one(
-            &stored_tree,
-            &entry?,
-            destination,
-            stored_tree.archive().report(),
-            options,
-        )?;
+        rt.restore_one(&stored_tree, &entry?)?;
     }
-    Ok(())
+    rt.finish()
 }
 
 
@@ -80,81 +174,6 @@ fn require_empty_destination(destination: &Path) -> Result<()> {
             return Err(e.into());
         }
     }
-    Ok(())
-}
-
-
-fn restore_one(
-    stored_tree: &StoredTree,
-    entry: &IndexEntry,
-    destination: &Path,
-    report: &Report,
-    _options: &RestoreOptions,
-) -> Result<()> {
-    // Remove initial slash so that the apath is relative to the destination.
-    if !Apath::is_valid(&entry.apath) {
-        return Err(format!("invalid apath {:?}", &entry.apath).into());
-    }
-    let dest_path = destination.join(&entry.apath[1..]);
-    info!("Restore {:?} to {:?}", &entry.apath, &dest_path);
-    match entry.kind() {
-        Kind::Dir => restore_dir(entry, &dest_path, &report),
-        Kind::File => restore_file(stored_tree, entry, &dest_path, &report),
-        Kind::Symlink => restore_symlink(entry, &dest_path, &report),
-        Kind::Unknown => {
-            return Err(format!(
-                    "file type Unknown shouldn't occur in archive: {:?}",
-                    &entry.apath).into());
-        }
-
-    }
-    // TODO: Restore permissions.
-    // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
-}
-
-fn restore_dir(_entry: &Entry, dest: &Path, report: &Report) -> Result<()> {
-    report.increment("dir", 1);
-    match fs::create_dir(dest) {
-        Ok(_) => Ok(()),
-        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-        Err(e) => Err(e.into()),
-    }
-}
-
-fn restore_file(
-    stored_tree: &StoredTree,
-    entry: &IndexEntry,
-    dest: &Path,
-    report: &Report,
-) -> Result<()> {
-    report.increment("file", 1);
-    // Here too we write a temporary file and then move it into place: so the
-    // file under its real name only appears
-    let mut af = AtomicFile::new(dest)?;
-    for bytes in stored_tree.file_contents(entry)? {
-        af.write(bytes?.as_slice())?;
-    }
-    af.close(&report)
-}
-
-#[cfg(unix)]
-fn restore_symlink(entry: &Entry, dest: &Path, report: &Report) -> Result<()> {
-    use std::os::unix::fs as unix_fs;
-    report.increment("symlink", 1);
-    if let Some(ref target) = entry.symlink_target() {
-        unix_fs::symlink(target, dest).unwrap();
-    } else {
-        warn!("No target in symlink entry {}", entry.apath());
-    }
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn restore_symlink(entry: &Entry, _dest: &Path, report: &Report) -> Result<()> {
-    // TODO: Add a test with a canned index containing a symlink, and expect
-    // it cannot be restored on Windows and can be on Unix.
-    warn!("Can't restore symlinks on Windows: {}", entry.apath());
-    report.increment("skipped.unsupported_file_kind", 1);
     Ok(())
 }
 
