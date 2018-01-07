@@ -62,12 +62,6 @@ pub fn restore_tree(
             options,
         )?;
     }
-    if !stored_tree.is_closed()? {
-        warn!(
-            "Version {} is incomplete: tree may be truncated",
-            stored_tree.band().id()
-        );
-    }
     Ok(())
 }
 
