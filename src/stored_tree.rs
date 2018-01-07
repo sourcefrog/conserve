@@ -32,10 +32,8 @@ impl StoredTree {
     ///
     /// It's an error if it's not complete.
     pub fn open_version(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
-        // TODO: Error if incomplete, use open_incomplete_version.
-        let allow_incomplete = true;
         let band = Band::open(archive, band_id)?;
-        if !allow_incomplete && !band.is_closed()? {
+        if !band.is_closed()? {
             return Err(ErrorKind::BandIncomplete(band_id.clone()).into());
         }
         Ok(StoredTree {
@@ -44,7 +42,17 @@ impl StoredTree {
         })
     }
 
-    // TODO: open_incomplete_version
+    /// Open a specified version.
+    ///
+    /// This function allows opening incomplete versions, which might contain only a partial copy
+    /// of the source tree, or maybe nothing at all.
+    pub fn open_incomplete_version(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
+        let band = Band::open(archive, band_id)?;
+        Ok(StoredTree {
+            archive: archive.clone(),
+            band: band,
+        })
+    }
 
     pub fn band(&self) -> &Band {
         &self.band

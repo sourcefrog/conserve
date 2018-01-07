@@ -291,12 +291,7 @@ fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 
 fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    let st = match band_id_from_option(subm)? {
-        None => StoredTree::open_last(&archive)?,
-        Some(ref b) => StoredTree::open_version(&archive, b)?,
-    };
-    complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
+    let st = stored_tree_from_options(subm, report)?;
     list_tree_contents(&st, &excludes_from_option(subm)?)?;
     Ok(())
 }
@@ -311,18 +306,25 @@ fn list_tree_contents<T: Tree>(tree: &T, excludes: &GlobSet) -> Result<()> {
 
 
 fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let destination_path = Path::new(subm.value_of("destination").unwrap());
-    // TODO: Restore core code should complain if the band is incomplete.
-    let st = match band_id_from_option(subm)? {
-        None => StoredTree::open_last(&archive)?,
-        Some(ref b) => StoredTree::open_version(&archive, b)?,
-    };
-    complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
+    let st = stored_tree_from_options(subm, report)?;
     let options = conserve::RestoreOptions::default()
         .force_overwrite(subm.is_present("force-overwrite"))
         .with_excludes(excludes_from_option(subm)?);
     restore_tree(&st, destination_path, &options)
+}
+
+
+fn stored_tree_from_options(subm: &ArgMatches, report: &Report) -> Result<StoredTree> {
+    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
+    match band_id_from_option(subm)? {
+        None => StoredTree::open_last(&archive),
+        Some(ref b) => if subm.is_present("incomplete") {
+            StoredTree::open_incomplete_version(&archive, b)
+        } else {
+            StoredTree::open_version(&archive, b)
+        },
+    }
 }
 
 fn band_id_from_option(subm: &ArgMatches) -> Result<Option<BandId>> {
@@ -340,22 +342,3 @@ fn excludes_from_option(subm: &ArgMatches) -> Result<globset::GlobSet> {
     }
 }
 
-
-fn complain_if_incomplete(band: &Band, incomplete_ok: bool) -> Result<()> {
-    if !band.is_closed()? {
-        if incomplete_ok {
-            info!("Reading from incomplete version {}", band.id());
-            Ok(())
-        } else {
-            Err(
-                format!(
-                    "Version {} is incomplete.  \
-                (Use --incomplete to read it anyway.)",
-                    band.id()
-                ).into(),
-            )
-        }
-    } else {
-        Ok(())
-    }
-}
