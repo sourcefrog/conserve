@@ -1,4 +1,4 @@
-// Copyright 2017 Martin Pool.
+// Copyright 2017, 2018 Martin Pool.
 
 //! Access a versioned tree stored in the archive.
 //!
@@ -20,19 +20,31 @@ pub struct StoredTree {
 
 
 impl StoredTree {
-    /// Open a tree stored in the archive, identified by BandId or by default the last complete
-    /// backup.
-    pub fn open(archive: &Archive, band_id: &Option<BandId>) -> Result<StoredTree> {
-        // TODO: Maybe warn if the band's incomplete, or fail unless opening is forced?
-        let band = match band_id {
-            &Some(ref b) => Band::open(archive, b)?,
-            &None => archive.last_complete_band()?,
-        };
+    /// Open the last complete version in the archive.
+    pub fn open_last(archive: &Archive) -> Result<StoredTree> {
+        Ok(StoredTree {
+            archive: archive.clone(),
+            band: archive.last_complete_band()?,
+        })
+    }
+
+    /// Open a specified version.
+    ///
+    /// It's an error if it's not complete.
+    pub fn open_version(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
+        // TODO: Error if incomplete, use open_incomplete_version.
+        let allow_incomplete = true;
+        let band = Band::open(archive, band_id)?;
+        if !allow_incomplete && !band.is_closed()? {
+            return Err(ErrorKind::BandIncomplete(band_id.clone()).into());
+        }
         Ok(StoredTree {
             archive: archive.clone(),
             band: band,
         })
     }
+
+    // TODO: open_incomplete_version
 
     pub fn band(&self) -> &Band {
         &self.band
@@ -84,7 +96,7 @@ mod test {
         af.store_two_versions();
 
         let last_band_id = af.last_band_id().unwrap();
-        let st = StoredTree::open(&af, &None).unwrap();
+        let st = StoredTree::open_last(&af).unwrap();
 
         assert_eq!(st.band().id(), last_band_id);
 
@@ -110,6 +122,6 @@ mod test {
     #[test]
     pub fn cant_open_no_versions() {
         let af = ScratchArchive::new();
-        assert!(StoredTree::open(&af, &None).is_err());
+        assert!(StoredTree::open_last(&af).is_err());
     }
 }

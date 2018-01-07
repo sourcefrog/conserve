@@ -93,7 +93,7 @@ fn check_restore(af: &ScratchArchive) {
     let restore_report = Report::new();
     let restore_a = Archive::open(af.path(), &restore_report).unwrap();
     restore_tree(
-        &StoredTree::open(&restore_a, &None).unwrap(),
+        &StoredTree::open_last(&restore_a).unwrap(),
         restore_dir.path(),
         &RestoreOptions::default(),
     ).unwrap();
@@ -133,7 +133,7 @@ fn large_file() {
     let restore_report = Report::new();
     let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
     restore_tree(
-        &StoredTree::open(&restore_archive, &None).unwrap(),
+        &StoredTree::open_last(&restore_archive).unwrap(),
         rd.path(),
         &RestoreOptions::default(),
     ).unwrap();

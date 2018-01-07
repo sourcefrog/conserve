@@ -292,7 +292,10 @@ fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    let st = StoredTree::open(&archive, &band_id_from_option(subm)?)?;
+    let st = match band_id_from_option(subm)? {
+        None => StoredTree::open_last(&archive)?,
+        Some(ref b) => StoredTree::open_version(&archive, b)?,
+    };
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
     list_tree_contents(&st, &excludes_from_option(subm)?)?;
     Ok(())
@@ -311,7 +314,10 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let destination_path = Path::new(subm.value_of("destination").unwrap());
     // TODO: Restore core code should complain if the band is incomplete.
-    let st = StoredTree::open(&archive, &band_id_from_option(subm)?)?;
+    let st = match band_id_from_option(subm)? {
+        None => StoredTree::open_last(&archive)?,
+        Some(ref b) => StoredTree::open_version(&archive, b)?,
+    };
     complain_if_incomplete(&st.band(), subm.is_present("incomplete"))?;
     let options = conserve::RestoreOptions::default()
         .force_overwrite(subm.is_present("force-overwrite"))

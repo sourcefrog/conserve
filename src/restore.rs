@@ -182,7 +182,7 @@ mod tests {
 
         let restore_report = Report::new();
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
-        let st = StoredTree::open(&restore_archive, &None).unwrap();
+        let st = StoredTree::open_last(&restore_archive).unwrap();
         restore_tree(&st, destdir.path(), &RestoreOptions::default()).unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
@@ -208,7 +208,7 @@ mod tests {
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         let a = Archive::open(af.path(), &restore_report).unwrap();
-        let st = StoredTree::open(&a, &Some(BandId::new(&[0]))).unwrap();
+        let st = StoredTree::open_version(&a, &BandId::new(&[0])).unwrap();
         let options = RestoreOptions::default();
         restore_tree(&st, destdir.path(), &options).unwrap();
         // Does not have the 'hello2' file added in the second version.
@@ -222,7 +222,7 @@ mod tests {
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
         let restore_err_str = restore_tree(
-            &StoredTree::open(&af, &None).unwrap(),
+            &StoredTree::open_last(&af).unwrap(),
             destdir.path(),
             &RestoreOptions::default(),
         ).unwrap_err()
@@ -240,7 +240,7 @@ mod tests {
         let restore_report = Report::new();
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
         let options = RestoreOptions::default().force_overwrite(true);
-        let st = StoredTree::open(&restore_archive, &None).unwrap();
+        let st = StoredTree::open_last(&restore_archive).unwrap();
         restore_tree(&st, destdir.path(), &options).unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
@@ -256,7 +256,7 @@ mod tests {
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
-        let st = StoredTree::open(&restore_archive, &None).unwrap();
+        let st = StoredTree::open_last(&restore_archive).unwrap();
         let options = RestoreOptions::default().with_excludes(
             excludes::from_strings(
                 &["/**/subfile"],

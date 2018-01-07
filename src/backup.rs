@@ -220,7 +220,7 @@ mod tests {
         assert_eq!(1, report.get_count("file"), "file count");
 
         // Read back the empty file
-        let st = StoredTree::open(&af, &None).unwrap();
+        let st = StoredTree::open_last(&af).unwrap();
         let empty_entry = st.iter_entries(&excludes::excludes_nothing())
             .unwrap()
             .map(|i| i.unwrap())
