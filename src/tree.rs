@@ -29,3 +29,23 @@ pub trait WriteTree {
     fn write_symlink(&mut self, entry: &Entry) -> Result<()>;
     fn write_file(&mut self, entry: &Entry, content: &mut std::io::Read) -> Result<()>;
 }
+
+
+pub fn copy_tree<ST: Tree, DT: WriteTree>(
+    source: &ST, dest: &mut DT, excludes: &GlobSet) -> Result<()> {
+    for entry in source.iter_entries(excludes)? {
+        let entry = entry?;
+        match entry.kind() {
+            Kind::Dir => dest.write_dir(&entry),
+            Kind::File => dest.write_file(&entry, &mut source.file_contents(&entry)?),
+            Kind::Symlink => dest.write_symlink(&entry),
+            Kind::Unknown => {
+                warn!("Skipping unsupported file kind of {}", &entry.apath());
+                // TODO: Count them - make the report visible somewhere? Or rather, make this the
+                // job of the ST to skip them.
+                continue;
+            }
+        }?;
+    }
+    dest.finish()
+}

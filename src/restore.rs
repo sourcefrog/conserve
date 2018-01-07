@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 use super::entry::Entry;
-use super::tree::WriteTree;
 
 use globset::GlobSet;
 
@@ -65,26 +64,6 @@ impl RestoreTree {
         })
     }
 
-    fn restore_one(&mut self, stored_tree: &StoredTree, entry: &IndexEntry) -> Result<()> {
-        // TODO: Unify this with make_backup into a generic tree-copier.
-        if !Apath::is_valid(&entry.apath) {
-            return Err(format!("invalid apath {:?}", &entry.apath).into());
-        }
-        info!("Restore {:?}", &entry.apath);
-        match entry.kind() {
-            Kind::Dir => self.write_dir(entry),
-            Kind::File => self.write_file(entry, &mut stored_tree.file_contents(entry)?),
-            Kind::Symlink => self.write_symlink(entry),
-            Kind::Unknown => {
-                return Err(format!(
-                        "file type Unknown shouldn't occur in archive: {:?}",
-                        &entry.apath).into());
-            }
-        }
-        // TODO: Restore permissions.
-        // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
-    }
-
     fn entry_path(&self, entry: &Entry) -> PathBuf {
         // Remove initial slash so that the apath is relative to the destination.
         self.path.join(&entry.apath().to_string()[1..])
@@ -108,6 +87,8 @@ impl tree::WriteTree for RestoreTree {
     }
 
     fn write_file(&mut self, entry: &Entry, content: &mut std::io::Read) -> Result<()> {
+        // TODO: Restore permissions.
+        // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
         self.report.increment("file", 1);
         let mut af = AtomicFile::new(&self.entry_path(entry))?;
         std::io::copy(content, &mut af)?;
@@ -138,29 +119,25 @@ impl tree::WriteTree for RestoreTree {
 }
 
 
-pub fn restore_tree(stored_tree: &StoredTree, destination: &Path, options: &RestoreOptions)
+pub fn restore_tree(stored_tree: &StoredTree, dest: &Path, options: &RestoreOptions)
     -> Result<()> {
     let report = stored_tree.archive().report();
     let mut rt = if options.force_overwrite {
-        RestoreTree::create_overwrite(destination, report)
+        RestoreTree::create_overwrite(dest, report)
     } else {
-        RestoreTree::create(destination, report)
+        RestoreTree::create(dest, report)
     }?;
-    for entry in stored_tree.iter_entries(&options.excludes)? {
-        // TODO: Continue even if one fails
-        rt.restore_one(&stored_tree, &entry?)?;
-    }
-    rt.finish()
+    tree::copy_tree(stored_tree, &mut rt, &options.excludes, &report)
 }
 
 
 /// The destination must either not exist, or be an empty directory.
-fn require_empty_destination(destination: &Path) -> Result<()> {
-    match fs::read_dir(&destination) {
+fn require_empty_destination(dest: &Path) -> Result<()> {
+    match fs::read_dir(&dest) {
         Ok(mut it) => {
             if it.next().is_some() {
                 Err(
-                    ErrorKind::DestinationNotEmpty(destination.to_path_buf()).into(),
+                    ErrorKind::DestinationNotEmpty(dest.to_path_buf()).into(),
                 )
             } else {
                 Ok(())

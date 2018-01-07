@@ -41,11 +41,7 @@ struct BackupWriter {
 
 /// Make a new backup from a source tree into a band in this archive.
 pub fn make_backup(source: &LiveTree, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
-    let mut backup_writer = BackupWriter::begin(archive)?;
-    for entry in source.iter_entries(&backup_options.excludes)? {
-        backup_writer.store(source, &entry?)?;
-    }
-    backup_writer.finish()
+    tree::copy_tree(source, &mut BackupWriter::begin(archive)?, &backup_options.excludes)
 }
 
 
@@ -64,23 +60,6 @@ impl BackupWriter {
             report: archive.report().clone(),
         })
     }
-
-    fn store<ST: Tree>(&mut self, source_tree: &ST, source_entry: &ST::E) -> Result<()> {
-        info!("Backup {}", source_entry.apath());
-        match source_entry.kind() {
-            Kind::Dir => self.write_dir(source_entry),
-            Kind::File => self.write_file(
-                source_entry, &mut source_tree.file_contents(source_entry)?),
-            Kind::Symlink => self.write_symlink(source_entry),
-            Kind::Unknown => {
-                warn!("Skipping unsupported file kind of {}", &source_entry.apath());
-                self.report.increment("skipped.unsupported_file_kind", 1);
-                return Ok(());
-            }
-        }?;
-        Ok(())
-    }
-
 
     fn push_entry(&mut self, index_entry: IndexEntry) -> Result<()> {
         self.index_builder.push(index_entry);
