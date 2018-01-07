@@ -43,7 +43,7 @@ struct BackupWriter {
 pub fn make_backup(source: &LiveTree, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
     let mut backup_writer = BackupWriter::begin(archive)?;
     for entry in source.iter_entries(&backup_options.excludes)? {
-        backup_writer.store(&entry?)?;
+        backup_writer.store(source, &entry?)?;
     }
     backup_writer.finish()
 }
@@ -65,11 +65,11 @@ impl BackupWriter {
         })
     }
 
-    fn store(&mut self, source_entry: &Entry) -> Result<()> {
+    fn store<ST: Tree>(&mut self, source_tree: &ST, source_entry: &ST::E) -> Result<()> {
         info!("Backup {}", source_entry.apath());
         match source_entry.kind() {
             Kind::Dir => self.write_dir(source_entry),
-            Kind::File => self.store_file(source_entry),
+            Kind::File => self.store_file(source_tree, source_entry),
             Kind::Symlink => self.write_symlink(source_entry),
             Kind::Unknown => {
                 warn!("Skipping unsupported file kind of {}", &source_entry.apath());
@@ -88,10 +88,10 @@ impl BackupWriter {
     }
 
 
-    fn store_file(&mut self, source_entry: &Entry) -> Result<()> {
+    fn store_file<ST: Tree>(&mut self, source_tree: &ST, source_entry: &ST::E) -> Result<()> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
-        let mut f = source_entry.file_contents()?;
+        let mut f = source_tree.file_contents(source_entry)?;
         let (addrs, body_hash) = self.block_dir.store(&mut f, &self.report)?;
         self.push_entry(IndexEntry {
             apath: source_entry.apath().to_string().clone(),
@@ -219,6 +219,8 @@ mod tests {
 
     #[test]
     pub fn empty_file_uses_zero_blocks() {
+        use std::io::Read;
+
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_file_with_contents("empty", &[]);
@@ -238,7 +240,9 @@ mod tests {
             .map(|i| i.unwrap())
             .find(|ref i| i.apath == "/empty")
             .expect("found one entry");
-        let sf = st.file_contents(&empty_entry).unwrap();
-        assert_eq!(0, sf.count(), "reading empty file has zero chunks");
+        let mut sf = st.file_contents(&empty_entry).unwrap();
+        let mut s = String::new();
+        assert_eq!(sf.read_to_string(&mut s).unwrap(), 0);
+        assert_eq!(s.len(), 0);
     }
 }

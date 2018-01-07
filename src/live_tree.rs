@@ -7,7 +7,6 @@ use std::collections::vec_deque::VecDeque;
 use std::fmt;
 use std::ffi::OsString;
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time;
 
@@ -37,6 +36,7 @@ impl LiveTree {
 impl tree::Tree for LiveTree {
     type E = Entry;
     type I = Iter;
+    type R = std::fs::File;
 
     /// Iterate source files descending through a source directory.
     ///
@@ -73,6 +73,14 @@ impl tree::Tree for LiveTree {
             check_order: apath::CheckOrder::new(),
             excludes: excludes.clone(),
         })
+    }
+
+    fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
+        use entry::Entry;
+        assert_eq!(entry.kind(), Kind::File);
+        let mut path = self.path.clone();
+        path.push(&entry.apath.to_string()[1..]);
+        Ok(fs::File::open(&path)?)
     }
 }
 
@@ -136,11 +144,6 @@ impl entry::Entry for Entry {
                 fs::read_link(&self.path).unwrap().into_os_string().into_string().unwrap()),
             _ => None,
         }
-    }
-
-    fn file_contents(&self) -> Result<Box<Read>> {
-        assert_eq!(self.kind(), Kind::File);
-        Ok(Box::new(fs::File::open(&self.path)?))
     }
 }
 

@@ -1,7 +1,7 @@
 // Conserve backup system.
 // Copyright 2017 Martin Pool.
 
-/// Abstract Tree trait.
+//! Abstract Tree trait.
 
 use super::*;
 
@@ -9,8 +9,10 @@ use super::*;
 pub trait Tree {
     type E: Entry;
     type I: Iterator<Item = Result<Self::E>>;
+    type R: std::io::Read;
 
     fn iter_entries(&self, excludes: &GlobSet) -> Result<Self::I>;
+    fn file_contents(&self, entry: &Self::E) -> Result<Self::R>;
 }
 
 

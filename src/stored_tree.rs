@@ -9,6 +9,7 @@
 //! multiple index files, bands, and blocks.
 
 use super::*;
+use super::stored_file::StoredFile;
 
 
 /// Read index and file contents for a version stored in the archive.
@@ -85,10 +86,15 @@ impl StoredTree {
 impl Tree for StoredTree {
     type E = index::IndexEntry;
     type I = index::Iter;
+    type R = stored_file::StoredFile;
 
     /// Return an iter of index entries in this stored tree.
     fn iter_entries(&self, excludes: &GlobSet) -> Result<index::Iter> {
         self.band.index_iter(excludes, self.archive.report())
+    }
+
+    fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
+        Ok(StoredFile::open(self.band.block_dir(), entry.addrs.clone(), self.archive.report()))
     }
 }
 

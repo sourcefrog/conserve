@@ -4,7 +4,6 @@
 
 use std::fs;
 use std::io;
-use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 use super::*;
@@ -96,9 +95,7 @@ impl RestoreTree {
         // Here too we write a temporary file and then move it into place: so the
         // file under its real name only appears
         let mut af = AtomicFile::new(&self.entry_path(entry))?;
-        for bytes in stored_tree.file_contents(entry)? {
-            af.write(bytes?.as_slice())?;
-        }
+        std::io::copy(&mut stored_tree.file_contents(entry)?, &mut af)?;
         af.close(&self.report)
     }
 
@@ -165,16 +162,20 @@ fn require_empty_destination(destination: &Path) -> Result<()> {
     match fs::read_dir(&destination) {
         Ok(mut it) => {
             if it.next().is_some() {
-                return Err(
+                Err(
                     ErrorKind::DestinationNotEmpty(destination.to_path_buf()).into(),
-                );
-            };
+                )
+            } else {
+                Ok(())
+            }
         }
         Err(e) => {
-            return Err(e.into());
+            match e.kind() {
+                io::ErrorKind::NotFound => Ok(()),
+                _ => Err(e.into()),
+            }
         }
     }
-    Ok(())
 }
 
 

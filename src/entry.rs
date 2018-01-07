@@ -4,8 +4,6 @@
 //! An entry representing a file, directory, etc, in either a
 //! stored tree or local tree.
 
-use std::io::Read;
-
 use super::*;
 
 
@@ -21,6 +19,8 @@ pub enum Kind {
 
 
 /// A file, directory, or symlink stored in any tree.
+/// 
+/// To get the contents of a plain file, use `Tree::file_contents`.
 pub trait Entry {
     fn kind(&self) -> Kind;
 
@@ -34,11 +34,4 @@ pub trait Entry {
 
     /// Target of the symlink, if this is a symlink.
     fn symlink_target(&self) -> Option<String>;
-
-    /// Read the contents of a file.
-    ///
-    /// Only valid on Kind::File.
-    fn file_contents(&self) -> Result<Box<Read>> {
-        unimplemented!();
-    }
 }
