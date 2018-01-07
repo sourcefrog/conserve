@@ -73,7 +73,7 @@ impl RestoreTree {
         info!("Restore {:?}", &entry.apath);
         match entry.kind() {
             Kind::Dir => self.write_dir(entry),
-            Kind::File => self.write_file(stored_tree, entry),
+            Kind::File => self.write_file(entry, &mut stored_tree.file_contents(entry)?),
             Kind::Symlink => self.write_symlink(entry),
             Kind::Unknown => {
                 return Err(format!(
@@ -89,16 +89,6 @@ impl RestoreTree {
         // Remove initial slash so that the apath is relative to the destination.
         self.path.join(&entry.apath().to_string()[1..])
     }
-
-    fn write_file(&self, stored_tree: &StoredTree, entry: &IndexEntry) -> Result<()> {
-        self.report.increment("file", 1);
-        // Here too we write a temporary file and then move it into place: so the
-        // file under its real name only appears
-        let mut af = AtomicFile::new(&self.entry_path(entry))?;
-        std::io::copy(&mut stored_tree.file_contents(entry)?, &mut af)?;
-        af.close(&self.report)
-    }
-
 }
 
 
@@ -115,6 +105,13 @@ impl tree::WriteTree for RestoreTree {
             Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
             Err(e) => Err(e.into()),
         }
+    }
+
+    fn write_file(&mut self, entry: &Entry, content: &mut std::io::Read) -> Result<()> {
+        self.report.increment("file", 1);
+        let mut af = AtomicFile::new(&self.entry_path(entry))?;
+        std::io::copy(content, &mut af)?;
+        af.close(&self.report)
     }
 
     #[cfg(unix)]

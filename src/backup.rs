@@ -69,7 +69,8 @@ impl BackupWriter {
         info!("Backup {}", source_entry.apath());
         match source_entry.kind() {
             Kind::Dir => self.write_dir(source_entry),
-            Kind::File => self.store_file(source_tree, source_entry),
+            Kind::File => self.write_file(
+                source_entry, &mut source_tree.file_contents(source_entry)?),
             Kind::Symlink => self.write_symlink(source_entry),
             Kind::Unknown => {
                 warn!("Skipping unsupported file kind of {}", &source_entry.apath());
@@ -86,24 +87,6 @@ impl BackupWriter {
         self.index_builder.maybe_flush(&self.report)?;
         Ok(())
     }
-
-
-    fn store_file<ST: Tree>(&mut self, source_tree: &ST, source_entry: &ST::E) -> Result<()> {
-        self.report.increment("file", 1);
-        // TODO: Cope graciously if the file disappeared after readdir.
-        let mut f = source_tree.file_contents(source_entry)?;
-        let (addrs, body_hash) = self.block_dir.store(&mut f, &self.report)?;
-        self.push_entry(IndexEntry {
-            apath: source_entry.apath().to_string().clone(),
-            mtime: source_entry.unix_mtime(),
-            kind: Kind::File,
-            addrs: addrs,
-            blake2b: Some(body_hash),
-            target: None,
-        })
-    }
-
-
 }
 
 
@@ -123,6 +106,20 @@ impl tree::WriteTree for BackupWriter {
             kind: Kind::Dir,
             addrs: vec![],
             blake2b: None,
+            target: None,
+        })
+    }
+
+    fn write_file(&mut self, source_entry: &Entry, content: &mut std::io::Read) -> Result<()> {
+        self.report.increment("file", 1);
+        // TODO: Cope graciously if the file disappeared after readdir.
+        let (addrs, body_hash) = self.block_dir.store(content, &self.report)?;
+        self.push_entry(IndexEntry {
+            apath: source_entry.apath().to_string().clone(),
+            mtime: source_entry.unix_mtime(),
+            kind: Kind::File,
+            addrs: addrs,
+            blake2b: Some(body_hash),
             target: None,
         })
     }

@@ -27,4 +27,5 @@ pub trait WriteTree {
 
     fn write_dir(&mut self, entry: &Entry) -> Result<()>;
     fn write_symlink(&mut self, entry: &Entry) -> Result<()>;
+    fn write_file(&mut self, entry: &Entry, content: &mut std::io::Read) -> Result<()>;
 }
