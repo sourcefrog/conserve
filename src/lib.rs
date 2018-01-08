@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Conserve backup system.
 //!
@@ -17,6 +17,7 @@ extern crate log;
 extern crate blake2_rfc;
 extern crate chrono;
 extern crate isatty;
+extern crate rayon;
 extern crate rustc_serialize;
 extern crate snap;
 extern crate tempdir;

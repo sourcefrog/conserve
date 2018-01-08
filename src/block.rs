@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! File contents are stored in data blocks.
 //!
@@ -119,15 +119,24 @@ impl BlockDir {
                 break;
             }
             in_buf.truncate(read_len);
-            report.measure_duration("file.hash", || file_hasher.update(&in_buf));
-            let block_hash = if addresses.len() == 0 {
-                file_hasher.clone().finalize().as_bytes().to_hex()
+
+            let block_hash: String;
+            if addresses.len() == 0 {
+                report.measure_duration("file.hash", || file_hasher.update(&in_buf));
+                block_hash = file_hasher.clone().finalize().as_bytes().to_hex()
             } else {
-                report.measure_duration(
-                    "block.hash",
-                    || hash_bytes(&in_buf),
-                )?
-            };
+                // Not the first block, must update file and block hash separately, but we can do
+                // them in parallel.
+                if true {
+                    block_hash = rayon::join(
+                        || report.measure_duration("file.hash", || file_hasher.update(&in_buf)),
+                        || report.measure_duration("block.hash", || hash_bytes(&in_buf).unwrap())).1;
+                } else {
+                    report.measure_duration("file.hash", || file_hasher.update(&in_buf));
+                    block_hash = report.measure_duration("block.hash", || hash_bytes(&in_buf))?
+                }
+            }
+
             if self.contains(&block_hash)? {
                 report.increment("block.already_present", 1);
             } else {
