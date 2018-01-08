@@ -35,12 +35,13 @@ pub fn simple_backup_with_excludes() {
     srcdir.create_file("bar");
     srcdir.create_file("baz");
     // TODO: Include a symlink only on Unix.
-    let backup_options = BackupOptions::default().with_excludes(
-        excludes::from_strings(
-            &["/**/baz", "/**/bar", "/**/fooo*"],
-        ).unwrap(),
-    );
-    make_backup(&srcdir.live_tree(), &af, &backup_options).unwrap();
+    let backup_options = BackupOptions::default();
+    let lt = srcdir.live_tree()
+        .with_excludes(
+            excludes::from_strings(
+                &["/**/baz", "/**/bar", "/**/fooo*"],
+            ).unwrap());
+    make_backup(&lt, &af, &backup_options).unwrap();
     check_backup(&af, &af.report());
     check_restore(&af);
 }

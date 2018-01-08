@@ -229,11 +229,9 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let backup_options = BackupOptions::default().with_excludes(excludes_from_option(subm)?);
+    let backup_options = BackupOptions::default();
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    let lt = LiveTree::open(
-        &subm.value_of("source").unwrap(),
-        &report)?;
+    let lt = live_tree_from_options(subm, report)?;
     make_backup(&lt, &archive, &backup_options)
 }
 
@@ -282,23 +280,21 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 
 fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let lt = LiveTree::open(
-        &subm.value_of("source").unwrap(),
-        &report)?;
-    list_tree_contents(&lt, &excludes_from_option(subm)?)?;
+    let lt = live_tree_from_options(subm, report)?;
+    list_tree_contents(&lt)?;
     Ok(())
 }
 
 
 fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = stored_tree_from_options(subm, report)?;
-    list_tree_contents(&st, &excludes_from_option(subm)?)?;
+    list_tree_contents(&st)?;
     Ok(())
 }
 
 
-fn list_tree_contents<T: ReadTree>(tree: &T, excludes: &GlobSet) -> Result<()> {
-    for entry in tree.iter_entries(excludes)? {
+fn list_tree_contents<T: ReadTree>(tree: &T) -> Result<()> {
+    for entry in tree.iter_entries()? {
         println!("{}", entry?.apath());
     }
     Ok(())
@@ -309,22 +305,29 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let destination_path = Path::new(subm.value_of("destination").unwrap());
     let st = stored_tree_from_options(subm, report)?;
     let options = conserve::RestoreOptions::default()
-        .force_overwrite(subm.is_present("force-overwrite"))
-        .with_excludes(excludes_from_option(subm)?);
+        .force_overwrite(subm.is_present("force-overwrite"));
     restore_tree(&st, destination_path, &options)
 }
 
 
 fn stored_tree_from_options(subm: &ArgMatches, report: &Report) -> Result<StoredTree> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    match band_id_from_option(subm)? {
+    let st = match band_id_from_option(subm)? {
         None => StoredTree::open_last(&archive),
         Some(ref b) => if subm.is_present("incomplete") {
             StoredTree::open_incomplete_version(&archive, b)
         } else {
             StoredTree::open_version(&archive, b)
         },
-    }
+    }?;
+    Ok(st.with_excludes(excludes_from_option(subm)?))
+}
+
+fn live_tree_from_options(subm: &ArgMatches, report: &Report) -> Result<LiveTree> {
+    Ok(LiveTree::open(
+        &subm.value_of("source").unwrap(),
+        &report)?
+        .with_excludes(excludes_from_option(subm)?))
 }
 
 fn band_id_from_option(subm: &ArgMatches) -> Result<Option<BandId>> {
@@ -334,7 +337,7 @@ fn band_id_from_option(subm: &ArgMatches) -> Result<Option<BandId>> {
     }
 }
 
-/// Make an exclusion globset from the `--excludes` option.
+/// Make an exclusion globset from the `--exclude` option.
 fn excludes_from_option(subm: &ArgMatches) -> Result<globset::GlobSet> {
     match subm.values_of("exclude") {
         Some(excludes) => excludes::from_strings(excludes),

@@ -6,25 +6,15 @@
 
 use super::*;
 
-use globset::GlobSet;
-
 
 #[derive(Debug)]
 pub struct BackupOptions {
-    excludes: GlobSet,
 }
 
 
 impl BackupOptions {
     pub fn default() -> Self {
-        BackupOptions { excludes: excludes::excludes_nothing() }
-    }
-
-    pub fn with_excludes(self, excludes: GlobSet) -> Self {
-        BackupOptions {
-            excludes: excludes,
-            ..self
-        }
+        BackupOptions { }
     }
 }
 
@@ -40,8 +30,8 @@ struct BackupWriter {
 
 
 /// Make a new backup from a source tree into a band in this archive.
-pub fn make_backup(source: &LiveTree, archive: &Archive, backup_options: &BackupOptions) -> Result<()> {
-    tree::copy_tree(source, &mut BackupWriter::begin(archive)?, &backup_options.excludes)
+pub fn make_backup(source: &LiveTree, archive: &Archive, _: &BackupOptions) -> Result<()> {
+    tree::copy_tree(source, &mut BackupWriter::begin(archive)?)
 }
 
 
@@ -173,16 +163,17 @@ mod tests {
         srcdir.create_file("baz");
         srcdir.create_file("bar");
 
-        let backup_options = BackupOptions::default().with_excludes(
-            excludes::from_strings(
-                &["/**/foo*", "/**/baz"],
-            ).unwrap(),
-        );
         let report = af.report();
+        let lt = &LiveTree::open(srcdir.path(), &report).unwrap()
+            .with_excludes(
+                excludes::from_strings(
+                    &["/**/foo*", "/**/baz"],
+                ).unwrap(),
+            );
         make_backup(
-            &LiveTree::open(srcdir.path(), &report).unwrap(),
+            &lt,
             &af,
-            &backup_options).unwrap();
+            &BackupOptions::default()).unwrap();
 
         assert_eq!(1, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"));
@@ -211,7 +202,7 @@ mod tests {
 
         // Read back the empty file
         let st = StoredTree::open_last(&af).unwrap();
-        let empty_entry = st.iter_entries(&excludes::excludes_nothing())
+        let empty_entry = st.iter_entries()
             .unwrap()
             .map(|i| i.unwrap())
             .find(|ref i| i.apath == "/empty")

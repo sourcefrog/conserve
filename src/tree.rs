@@ -11,7 +11,7 @@ pub trait ReadTree {
     type I: Iterator<Item = Result<Self::E>>;
     type R: std::io::Read;
 
-    fn iter_entries(&self, excludes: &GlobSet) -> Result<Self::I>;
+    fn iter_entries(&self) -> Result<Self::I>;
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R>;
 }
 
@@ -32,8 +32,8 @@ pub trait WriteTree {
 
 
 pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
-    source: &ST, dest: &mut DT, excludes: &GlobSet) -> Result<()> {
-    for entry in source.iter_entries(excludes)? {
+    source: &ST, dest: &mut DT) -> Result<()> {
+    for entry in source.iter_entries()? {
         let entry = entry?;
         match entry.kind() {
             Kind::Dir => dest.write_dir(&entry),

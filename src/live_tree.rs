@@ -20,6 +20,7 @@ use globset::GlobSet;
 pub struct LiveTree {
     path: PathBuf,
     report: Report,
+    excludes: GlobSet,
 }
 
 
@@ -29,9 +30,21 @@ impl LiveTree {
         Ok(LiveTree {
             path: path.as_ref().to_path_buf(),
             report: report.clone(),
+            excludes: excludes::excludes_nothing(),
         })
     }
+
+    /// Return a new LiveTree which when listed will ignore certain files.
+    ///
+    /// This replaces any previous exclusions.
+    pub fn with_excludes(self, excludes: GlobSet) -> LiveTree {
+        LiveTree {
+            excludes: excludes,
+            .. self
+        }
+    }
 }
+
 
 impl tree::ReadTree for LiveTree {
     type E = Entry;
@@ -46,7 +59,7 @@ impl tree::ReadTree for LiveTree {
     /// name.
     ///
     /// The `Iter` has its own `Report` of how many directories and files were visited.
-    fn iter_entries(&self, excludes: &GlobSet) -> Result<Self::I> {
+    fn iter_entries(&self) -> Result<Self::I> {
         let root_metadata = match fs::symlink_metadata(&self.path) {
             Ok(metadata) => metadata,
             Err(e) => {
@@ -71,7 +84,7 @@ impl tree::ReadTree for LiveTree {
             dir_deque: dir_deque,
             report: self.report.clone(),
             check_order: apath::CheckOrder::new(),
-            excludes: excludes.clone(),
+            excludes: self.excludes.clone(),
         })
     }
 
@@ -295,7 +308,7 @@ mod tests {
         tf.create_dir("jam/.etc");
         let report = Report::new();
         let lt = LiveTree::open(tf.path(), &report).unwrap();
-        let mut source_iter = lt.iter_entries(&excludes::excludes_nothing()).unwrap();
+        let mut source_iter = lt.iter_entries().unwrap();
         let result = source_iter
             .by_ref()
             .collect::<Result<Vec<_>>>()
@@ -345,8 +358,9 @@ mod tests {
 
         let excludes = excludes::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
-        let lt = LiveTree::open(tf.path(), &report).unwrap();
-        let mut source_iter = lt.iter_entries(&excludes).unwrap();
+        let lt = LiveTree::open(tf.path(), &report).unwrap()
+            .with_excludes(excludes);
+        let mut source_iter = lt.iter_entries().unwrap();
         let result = source_iter
             .by_ref()
             .collect::<Result<Vec<_>>>()
@@ -397,7 +411,7 @@ mod tests {
         let report = Report::new();
 
         let lt = LiveTree::open(tf.path(), &report).unwrap();
-        let result = lt.iter_entries(&excludes::excludes_nothing())
+        let result = lt.iter_entries()
             .unwrap()
             .collect::<Result<Vec<_>>>()
             .unwrap();

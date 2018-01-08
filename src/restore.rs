@@ -9,13 +9,11 @@ use std::path::{Path, PathBuf};
 use super::*;
 use super::entry::Entry;
 
-use globset::GlobSet;
 
 /// Options for Restore operation.
 #[derive(Debug)]
 pub struct RestoreOptions {
     force_overwrite: bool,
-    excludes: GlobSet,
 }
 
 
@@ -23,14 +21,6 @@ impl RestoreOptions {
     pub fn default() -> Self {
         RestoreOptions {
             force_overwrite: false,
-            excludes: excludes::excludes_nothing(),
-        }
-    }
-
-    pub fn with_excludes(self, excludes: GlobSet) -> Self {
-        RestoreOptions {
-            excludes: excludes,
-            ..self
         }
     }
 
@@ -127,7 +117,7 @@ pub fn restore_tree(stored_tree: &StoredTree, dest: &Path, options: &RestoreOpti
     } else {
         RestoreTree::create(dest, report)
     }?;
-    tree::copy_tree(stored_tree, &mut rt, &options.excludes)
+    tree::copy_tree(stored_tree, &mut rt)
 }
 
 
@@ -244,18 +234,16 @@ mod tests {
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
-        let st = StoredTree::open_last(&restore_archive).unwrap();
-        let options = RestoreOptions::default().with_excludes(
-            excludes::from_strings(
-                &["/**/subfile"],
-            ).unwrap(),
-        );
+        let st = StoredTree::open_last(&restore_archive).unwrap()
+            .with_excludes(
+                excludes::from_strings(&["/**/subfile"]).unwrap());
+        let options = RestoreOptions::default();
         restore_tree(&st, destdir.path(), &options).unwrap();
 
-        assert_eq!(2, restore_report.borrow_counts().get_count("file"));
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
         assert_that(&dest.join("hello2")).is_a_file();
         assert_that(&dest.join("subdir").as_path()).is_a_directory();
+        assert_eq!(2, restore_report.borrow_counts().get_count("file"));
     }
 }

@@ -17,6 +17,7 @@ use super::stored_file::StoredFile;
 pub struct StoredTree {
     archive: Archive,
     band: Band,
+    excludes: GlobSet,
 }
 
 
@@ -26,6 +27,7 @@ impl StoredTree {
         Ok(StoredTree {
             archive: archive.clone(),
             band: archive.last_complete_band()?,
+            excludes: excludes::excludes_nothing(),
         })
     }
 
@@ -40,6 +42,7 @@ impl StoredTree {
         Ok(StoredTree {
             archive: archive.clone(),
             band: band,
+            excludes: excludes::excludes_nothing(),
         })
     }
 
@@ -52,7 +55,15 @@ impl StoredTree {
         Ok(StoredTree {
             archive: archive.clone(),
             band: band,
+            excludes: excludes::excludes_nothing(),
         })
+    }
+
+    pub fn with_excludes(self, excludes: GlobSet) -> StoredTree {
+        StoredTree {
+            excludes: excludes,
+            .. self
+        }
     }
 
     pub fn band(&self) -> &Band {
@@ -78,8 +89,8 @@ impl ReadTree for StoredTree {
     type R = stored_file::StoredFile;
 
     /// Return an iter of index entries in this stored tree.
-    fn iter_entries(&self, excludes: &GlobSet) -> Result<index::Iter> {
-        self.band.index_iter(excludes, self.archive.report())
+    fn iter_entries(&self) -> Result<index::Iter> {
+        self.band.index_iter(&self.excludes, self.archive.report())
     }
 
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
@@ -103,7 +114,7 @@ mod test {
 
         assert_eq!(st.band().id(), last_band_id);
 
-        let names: Vec<String> = st.iter_entries(&excludes::excludes_nothing())
+        let names: Vec<String> = st.iter_entries()
             .unwrap()
             .map(|e| e.unwrap().apath)
             .collect();
