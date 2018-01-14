@@ -17,6 +17,7 @@ doc = false  # Conflicts with library docs which are more useful.
 [dependencies]
 chrono = "0.2"
 clap = "2.32"
+cpuprofiler = "0.0.3"
 error-chain = "0.11"
 isatty = "0.1"
 rayon = "1.0.2"
@@ -36,10 +37,6 @@ globset = "0.4"
 
 [dependencies.blake2-rfc]
 version = "0.2.18"
-
-[dependencies.blake2-rfc]
-version = "0.2.18"
-## features = ["simd_asm"]
 
 [build-dependencies]
 vergen = "~0.1.0"
