@@ -98,6 +98,9 @@ Binaries for some platforms are available from
 [rust]: https://rust-lang.org/
 [sourcefrog]: http://sourcefrog.net/
 
+On nightly Rust only, you can enable a potential speed-up to the blake2 hashes with
+
+    rustup run nightly cargo build --release --features blake2-rfc/simd_asm
 
 ## More documentation
 
