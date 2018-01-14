@@ -37,6 +37,10 @@ globset = "0.4"
 [dependencies.blake2-rfc]
 version = "0.2.18"
 
+[dependencies.blake2-rfc]
+version = "0.2.18"
+## features = ["simd_asm"]
+
 [build-dependencies]
 vergen = "~0.1.0"
 
