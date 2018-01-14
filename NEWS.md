@@ -8,6 +8,14 @@
   Similarly for the `SourceTree::open` API when given no `BandId`
   argument.
 
+* Some backup work is parallelized using Rayon, giving a mild speedup
+  for large files. There is potential to much more work here, because backups
+  are generally CPU-bound in Snap compression and BLAKE2 hashing, and Conserve
+  should try to use every available core.
+
+* Various internal rearrangements including treating stored and live trees
+  as instances of a common trait, to enable future features.
+
 ## Conserve 0.4.1
 
 * Large files are broken into multiple blocks of 1MB uncompressed content,
