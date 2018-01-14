@@ -17,7 +17,7 @@ doc = false  # Conflicts with library docs which are more useful.
 [dependencies]
 chrono = "0.2"
 clap = "2.32"
-cpuprofiler = "0.0.3"
+cpuprofiler = { version = "0.0.3", optional = true }
 error-chain = "0.11"
 isatty = "0.1"
 rayon = "1.0.2"
@@ -46,3 +46,8 @@ default = []
 
 # Use SIMD assembly, on nightly only.
 blake2_simd_asm = ["blake2-rfc/simd_asm"]
+
+# This needs `sudo apt-get install libgoogle-perftools-dev` or similar, and
+# only works on Linux.
+profile = ["cpuprofiler"]
+

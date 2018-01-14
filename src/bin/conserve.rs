@@ -11,6 +11,8 @@ use std::path::Path;
 extern crate clap;
 
 extern crate chrono;
+
+#[cfg(feature = "profile")]
 extern crate cpuprofiler;
 extern crate globset;
 
@@ -19,9 +21,23 @@ use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 extern crate conserve;
 use conserve::*;
 
+
+#[cfg(not(feature = "profile"))]
+fn main() {
+    real_main()
+}
+
+#[cfg(feature = "profile")]
 fn main() {
     use cpuprofiler::PROFILER;
     PROFILER.lock().unwrap().start("./my-prof.profile").unwrap();
+    real_main();
+    // Note: real_main might terminate directly, and then no profile will be written.
+    PROFILER.lock().unwrap().stop().unwrap();
+}
+
+
+fn real_main() {
     let matches = make_clap().get_matches();
     let ui_name = matches.value_of("ui").unwrap_or("auto");
     let no_progress = matches.is_present("no-progress");
@@ -44,7 +60,6 @@ fn main() {
     report.set_print_filenames(sm.is_present("v"));
     let result = c(sm, &report);
     report.finish();
-    PROFILER.lock().unwrap().stop().unwrap();
     if matches.is_present("stats") {
         report.print(&format!("{}", report));
     }
