@@ -40,6 +40,7 @@ impl StoredFile {
 
 impl std::io::Read for StoredFile {
     fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        // TODO: Readahead n_cpus blocks into memory, using futures-cpupool or similar.
         loop {
             // If there's already buffered data, return as much of that as will fit.
             let avail = self.buf.len() - self.buf_cursor;
