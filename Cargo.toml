@@ -15,7 +15,6 @@ name = "conserve"
 doc = false  # Conflicts with library docs which are more useful.
 
 [dependencies]
-blake2-rfc = "0.2.18"
 chrono = "0.2"
 clap = "~2.29"
 clippy = {version = "0.0.103", optional = true}
@@ -34,8 +33,14 @@ time = "^0"
 vergen = "0.1.1"
 globset = "0.2"
 
+[dependencies.blake2-rfc]
+version = "0.2.18"
+
 [build-dependencies]
 vergen = "~0.1.0"
 
 [features]
 default = []
+
+# Use SIMD assembly, on nightly only.
+blake2_simd_asm = ["blake2-rfc/simd_asm"]
