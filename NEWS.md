@@ -1,5 +1,10 @@
 # Conserve release history
 
+## Unreleased
+
+* `conserve versions` has a new `--sizes` option, to show disk usage by each
+  version.
+
 ## Conserve 0.4.2
 
 * Commands such as `restore` and `ls` that operate on a version, will by
