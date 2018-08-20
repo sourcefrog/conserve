@@ -46,6 +46,7 @@ pub mod index;
 mod io;
 mod jsonio;
 pub mod live_tree;
+pub mod output;
 pub mod report;
 mod restore;
 mod stored_file;

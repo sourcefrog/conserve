@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Command-line entry point for Conserve backups.
 
@@ -18,7 +18,6 @@ extern crate clap;
 extern crate chrono;
 extern crate globset;
 
-use chrono::Local;
 use clap::{Arg, App, AppSettings, ArgMatches, SubCommand};
 
 extern crate conserve;
@@ -237,45 +236,13 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 
 fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let short_output = subm.is_present("short");
+    use conserve::output::ShowArchive;
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    for band_id in archive.list_bands()? {
-        if short_output {
-            println!("{}", band_id);
-            continue;
-        }
-        let band = match Band::open(&archive, &band_id) {
-            Ok(band) => band,
-            Err(e) => {
-                warn!("Failed to open band {:?}: {:?}", band_id, e);
-                continue;
-            }
-        };
-        let info = match band.get_info(report) {
-            Ok(info) => info,
-            Err(e) => {
-                warn!("Failed to read band tail {:?}: {:?}", band_id, e);
-                continue;
-            }
-        };
-        let is_complete_str = if info.is_closed {
-            "complete"
-        } else {
-            "incomplete"
-        };
-        let start_time_str = info.start_time.with_timezone(&Local).to_rfc3339();
-        let duration_str = info.end_time.map_or_else(String::new, |t| {
-            format!("{}s", (t - info.start_time).num_seconds())
-        });
-        println!(
-            "{:<26} {:<10} {} {:>7}",
-            band_id,
-            is_complete_str,
-            start_time_str,
-            duration_str
-        );
+    if subm.is_present("short") { 
+        output::ShortVersionList::default().show_archive(&archive)
+    } else { 
+        output::VerboseVersionList::default().show_archive(&archive)
     }
-    Ok(())
 }
 
 
