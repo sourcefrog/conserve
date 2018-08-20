@@ -23,6 +23,7 @@ extern crate snap;
 extern crate tempdir;
 extern crate tempfile;
 extern crate term;
+extern crate walkdir;
 
 #[cfg(test)]
 extern crate spectral;

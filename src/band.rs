@@ -183,6 +183,25 @@ impl Band {
             end_time: end_time,
         })
     }
+
+    /// Get the total size in bytes of files stored for this band.
+    pub fn get_disk_size(&self) -> Result<u64> {
+        // TODO: Better handling than panic of unexpected errors.
+        let mut total = 0u64;
+        for entry in walkdir::WalkDir::new(self.path()) {
+            match entry {
+                Ok(entry) => {
+                    if entry.file_type().is_file() {
+                        total += entry.metadata().unwrap().len();
+                    }
+                },
+                Err(e) => {
+                    return Err(e.into_io_error().unwrap().into())
+                }
+            }
+        }
+        Ok(total)
+    }
 }
 
 
@@ -232,6 +251,10 @@ mod tests {
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)
         assert!(dur < Duration::seconds(5));
+
+        // It takes some amount of space
+        let bytes = band2.get_disk_size().unwrap();
+        assert!(bytes > 10 && bytes < 8000, bytes);
     }
 
     #[test]
