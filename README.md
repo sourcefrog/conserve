@@ -89,9 +89,15 @@ of directories.
 ## Install
 
 To build Conserve you need [Rust][rust] and a C compiler that can be used by
-Rust.  Then run
+Rust.
 
-    cargo build
+To install the most recent release from crates.io, run
+
+    cargo install conserve
+
+To install from a git checkout, run
+
+    cargo install -f --path .
 
 Binaries for some platforms are available from
 <https://github.com/sourcefrog/conserve/releases>.
@@ -158,7 +164,7 @@ from both systems.
 
 ## Licence and non-warranty
 
-Copyright 2012-2017 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
+Copyright 2012-2018 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
