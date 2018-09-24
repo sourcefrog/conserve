@@ -1,7 +1,5 @@
 # Conserve TODO
 
-<https://github.com/sourcefrog/conserve/wiki/TODO>
-
 ## Short-term UI snags
 
 * `conserve backup -v` and `conserve restore -v`
