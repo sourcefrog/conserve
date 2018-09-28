@@ -69,9 +69,9 @@ pub use io::{AtomicFile, ensure_dir_exists};
 pub use index::{IndexBuilder, IndexEntry};
 pub use live_tree::LiveTree;
 pub use report::{Report, Sizes};
-pub use restore::{RestoreOptions, restore_tree};
+pub use restore::RestoreTree;
 pub use stored_tree::StoredTree;
-pub use tree::{ReadTree, WriteTree};
+pub use tree::{ReadTree, WriteTree, copy_tree};
 pub use ui::UI;
 
 // Commonly-used external types.

@@ -22,6 +22,7 @@ use std::time::Duration;
 
 use log;
 
+use super::*;
 use super::ui;
 use super::ui::UI;
 use super::ui::plain::PlainUI;
@@ -215,11 +216,17 @@ impl Report {
     pub fn get_duration(&self, name: &str) -> Duration {
         self.borrow_counts().get_duration(name)
     }
+
+    /// Report that processing started for a given entry.
+    pub fn start_entry(&self, entry: &Entry) {
+        // TODO: Leave cursor pending at the end of the line until it's finished?
+        info!("{}", entry.apath());
+    }
 }
 
 
 impl Display for Report {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), fmt::Error> {
         write!(f, "Counts:\n")?;
         let counts = self.mut_counts();
         for (key, value) in &counts.count {

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2017 Martin Pool.
+// Copyright 2017, 2018 Martin Pool.
 
 //! Abstract Tree trait.
 
@@ -31,10 +31,11 @@ pub trait WriteTree {
 }
 
 
-pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
-    source: &ST, dest: &mut DT) -> Result<()> {
+/// Copy files and other entries from one tree to another.
+pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT, report: &Report) -> Result<()> {
     for entry in source.iter_entries()? {
         let entry = entry?;
+        report.start_entry(&entry);
         match entry.kind() {
             Kind::Dir => dest.write_dir(&entry),
             Kind::File => dest.write_file(&entry, &mut source.file_contents(&entry)?),

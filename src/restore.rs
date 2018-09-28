@@ -10,38 +10,16 @@ use super::*;
 use super::entry::Entry;
 
 
-/// Options for Restore operation.
-#[derive(Debug)]
-pub struct RestoreOptions {
-    force_overwrite: bool,
-}
-
-
-impl RestoreOptions {
-    pub fn default() -> Self {
-        RestoreOptions {
-            force_overwrite: false,
-        }
-    }
-
-    pub fn force_overwrite(self, f: bool) -> RestoreOptions {
-        RestoreOptions {
-            force_overwrite: f,
-            ..self
-        }
-    }
-}
-
-
 /// A write-only tree on the filesystem, as a restore destination.
 #[derive(Debug)]
-struct RestoreTree {
+pub struct RestoreTree {
     path: PathBuf,
     report: Report,
 }
 
 
 impl RestoreTree {
+    /// Create a RestoreTree that writes to a new empty directory.
     pub fn create(path: &Path, report: &Report) -> Result<RestoreTree> {
         require_empty_destination(path)?;
         Self::create_overwrite(path, report)
@@ -109,18 +87,6 @@ impl tree::WriteTree for RestoreTree {
 }
 
 
-pub fn restore_tree(stored_tree: &StoredTree, dest: &Path, options: &RestoreOptions)
-    -> Result<()> {
-    let report = stored_tree.archive().report();
-    let mut rt = if options.force_overwrite {
-        RestoreTree::create_overwrite(dest, report)
-    } else {
-        RestoreTree::create(dest, report)
-    }?;
-    tree::copy_tree(stored_tree, &mut rt)
-}
-
-
 /// The destination must either not exist, or be an empty directory.
 fn require_empty_destination(dest: &Path) -> Result<()> {
     match fs::read_dir(&dest) {
@@ -161,7 +127,8 @@ mod tests {
         let restore_report = Report::new();
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
-        restore_tree(&st, destdir.path(), &RestoreOptions::default()).unwrap();
+        let mut rt = RestoreTree::create(destdir.path(), &restore_report).unwrap();
+        copy_tree(&st, &mut rt, &restore_report).unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
@@ -187,8 +154,8 @@ mod tests {
         let restore_report = Report::new();
         let a = Archive::open(af.path(), &restore_report).unwrap();
         let st = StoredTree::open_version(&a, &BandId::new(&[0])).unwrap();
-        let options = RestoreOptions::default();
-        restore_tree(&st, destdir.path(), &options).unwrap();
+        let mut rt = RestoreTree::create(&destdir.path(), &restore_report).unwrap();
+        copy_tree(&st, &mut rt, &restore_report).unwrap();
         // Does not have the 'hello2' file added in the second version.
         assert_eq!(2, restore_report.get_count("file"));
     }
@@ -199,12 +166,7 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
-        let restore_err_str = restore_tree(
-            &StoredTree::open_last(&af).unwrap(),
-            destdir.path(),
-            &RestoreOptions::default(),
-        ).unwrap_err()
-            .to_string();
+        let restore_err_str = RestoreTree::create(&destdir.path(), &Report::new()).unwrap_err().to_string();
         assert_that(&restore_err_str).contains(&"Destination directory not empty");
     }
 
@@ -217,9 +179,9 @@ mod tests {
 
         let restore_report = Report::new();
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
-        let options = RestoreOptions::default().force_overwrite(true);
+        let mut rt = RestoreTree::create_overwrite(&destdir.path(), &restore_report).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
-        restore_tree(&st, destdir.path(), &options).unwrap();
+        copy_tree(&st, &mut rt, &restore_report).unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
@@ -237,8 +199,8 @@ mod tests {
         let st = StoredTree::open_last(&restore_archive).unwrap()
             .with_excludes(
                 excludes::from_strings(&["/**/subfile"]).unwrap());
-        let options = RestoreOptions::default();
-        restore_tree(&st, destdir.path(), &options).unwrap();
+        let mut rt = RestoreTree::create_overwrite(&destdir.path(), &restore_report).unwrap();
+        copy_tree(&st, &mut rt, &restore_report).unwrap();
 
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();

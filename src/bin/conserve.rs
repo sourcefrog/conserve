@@ -241,9 +241,9 @@ fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
     use conserve::output::ShowArchive;
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    if subm.is_present("short") { 
+    if subm.is_present("short") {
         output::ShortVersionList::default().show_archive(&archive)
-    } else { 
+    } else {
         output::VerboseVersionList::default()
             .show_sizes(subm.is_present("sizes"))
             .show_archive(&archive)
@@ -274,11 +274,14 @@ fn list_tree_contents<T: ReadTree>(tree: &T) -> Result<()> {
 
 
 fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let destination_path = Path::new(subm.value_of("destination").unwrap());
+    let dest = Path::new(subm.value_of("destination").unwrap());
     let st = stored_tree_from_options(subm, report)?;
-    let options = conserve::RestoreOptions::default()
-        .force_overwrite(subm.is_present("force-overwrite"));
-    restore_tree(&st, destination_path, &options)
+    let mut rt = if subm.is_present("force-overwrite") {
+        RestoreTree::create_overwrite(dest, report)
+    } else {
+        RestoreTree::create(dest, report)
+    }?;
+    copy_tree(&st, &mut rt, &report)
 }
 
 

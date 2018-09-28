@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
@@ -31,7 +31,7 @@ struct BackupWriter {
 
 /// Make a new backup from a source tree into a band in this archive.
 pub fn make_backup(source: &LiveTree, archive: &Archive, _: &BackupOptions) -> Result<()> {
-    tree::copy_tree(source, &mut BackupWriter::begin(archive)?)
+    tree::copy_tree(source, &mut BackupWriter::begin(archive)?, &archive.report())
 }
 
 

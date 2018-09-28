@@ -93,11 +93,9 @@ fn check_restore(af: &ScratchArchive) {
 
     let restore_report = Report::new();
     let restore_a = Archive::open(af.path(), &restore_report).unwrap();
-    restore_tree(
-        &StoredTree::open_last(&restore_a).unwrap(),
-        restore_dir.path(),
-        &RestoreOptions::default(),
-    ).unwrap();
+    let mut restore_tree = RestoreTree::create(&restore_dir.path(), &restore_report).unwrap();
+    let st = StoredTree::open_last(&restore_a).unwrap();
+    copy_tree(&st, &mut restore_tree, &restore_report).unwrap();
 
     let block_sizes = restore_report.get_size("block");
     assert!(
@@ -133,11 +131,9 @@ fn large_file() {
     let rd = tempdir::TempDir::new("conserve_test_restore").unwrap();
     let restore_report = Report::new();
     let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
-    restore_tree(
-        &StoredTree::open_last(&restore_archive).unwrap(),
-        rd.path(),
-        &RestoreOptions::default(),
-    ).unwrap();
+    let st = StoredTree::open_last(&restore_archive).unwrap();
+    let mut rt = RestoreTree::create(rd.path(), &restore_report).unwrap();
+    copy_tree(&st, &mut rt, &restore_report).unwrap();
 
     assert_eq!(report.get_count("file"), 1);
 
