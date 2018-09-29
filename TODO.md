@@ -10,8 +10,12 @@
   `-v` ought to control listing filenames, not showing stats.
 
 * `--ignore .git` should probably ignore that anywhere in the tree. At present
-  it'll try and fail to match the whole path. Perhaps this should be the same
-  as gitignore <https://git-scm.com/docs/gitignore>.
+  it'll try and fail to match the whole path.
+
+  Perhaps this should be the same as gitignore <https://git-scm.com/docs/gitignore>.
+
+  This might require a change from <https://docs.rs/globset/0.4.2/globset/> that
+  we use at present.
 
 ## Next major feature: Incremental backups
 
