@@ -58,11 +58,12 @@ impl ScratchArchive {
             srcdir.create_symlink("link", "target");
         }
 
-        let lt = LiveTree::open(srcdir.path(), &Report::new()).unwrap();
-        make_backup(&lt, self, &BackupOptions::default()).unwrap();
+        let report = Report::new();
+        let lt = LiveTree::open(srcdir.path(), &report).unwrap();
+        copy_tree(&lt, &mut BackupWriter::begin(&self).unwrap(), &report).unwrap();
 
         srcdir.create_file("hello2");
-        make_backup(&lt, self, &BackupOptions::default()).unwrap();
+        copy_tree(&lt, &mut BackupWriter::begin(&self).unwrap(), &report).unwrap();
     }
 }
 

@@ -19,12 +19,15 @@ pub struct RestoreTree {
 
 
 impl RestoreTree {
-    /// Create a RestoreTree that writes to a new empty directory.
+    /// Create a RestoreTree.
+    ///
+    /// The destination must either not yet exist, or be an empty directory.
     pub fn create(path: &Path, report: &Report) -> Result<RestoreTree> {
         require_empty_destination(path)?;
         Self::create_overwrite(path, report)
     }
 
+    /// Create a RestoreTree, even if the destination directory is not empty.
     pub fn create_overwrite(path: &Path, report: &Report) -> Result<RestoreTree> {
         Ok(RestoreTree {
             path: path.to_path_buf(),

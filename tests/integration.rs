@@ -20,7 +20,7 @@ pub fn simple_backup() {
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
     // TODO: Include a symlink only on Unix.
-    make_backup(&srcdir.live_tree(), &af, &BackupOptions::default()).unwrap();
+    copy_tree(&srcdir.live_tree(), &mut BackupWriter::begin(&af).unwrap(), &af.report()).unwrap();
     check_backup(&af, &af.report());
     check_restore(&af);
 }
@@ -35,13 +35,10 @@ pub fn simple_backup_with_excludes() {
     srcdir.create_file("bar");
     srcdir.create_file("baz");
     // TODO: Include a symlink only on Unix.
-    let backup_options = BackupOptions::default();
-    let lt = srcdir.live_tree()
-        .with_excludes(
-            excludes::from_strings(
-                &["/**/baz", "/**/bar", "/**/fooo*"],
-            ).unwrap());
-    make_backup(&lt, &af, &backup_options).unwrap();
+    let excludes = excludes::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
+    let lt = srcdir.live_tree().with_excludes(excludes);
+    let mut bw = BackupWriter::begin(&af).unwrap();
+    copy_tree(&lt, &mut bw, &af.report()).unwrap();
     check_backup(&af, &af.report());
     check_restore(&af);
 }
@@ -121,9 +118,9 @@ fn large_file() {
     let tf = TreeFixture::new();
     let large_content = String::from("a sample large file\n").repeat(1000000);
     tf.create_file_with_contents("large", &large_content.as_bytes());
-
-    make_backup(&tf.live_tree(), &af, &BackupOptions::default()).unwrap();
     let report = af.report();
+    let mut bw = BackupWriter::begin(&af).unwrap();
+    copy_tree(&tf.live_tree(), &mut bw, &report).unwrap();
     assert_eq!(report.get_count("file"), 1);
     assert_eq!(report.get_count("file.large"), 1);
 

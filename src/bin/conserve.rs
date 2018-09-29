@@ -231,10 +231,10 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 
 fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let backup_options = BackupOptions::default();
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let lt = live_tree_from_options(subm, report)?;
-    make_backup(&lt, &archive, &backup_options)
+    let mut bw = BackupWriter::begin(&archive)?;
+    copy_tree(&lt, &mut bw, &report)
 }
 
 

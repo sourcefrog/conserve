@@ -7,21 +7,9 @@
 use super::*;
 
 
-#[derive(Debug)]
-pub struct BackupOptions {
-}
-
-
-impl BackupOptions {
-    pub fn default() -> Self {
-        BackupOptions { }
-    }
-}
-
-
 /// Accepts files to write in the archive (in apath order.)
 #[derive(Debug)]
-struct BackupWriter {
+pub struct BackupWriter {
     band: Band,
     block_dir: BlockDir,
     index_builder: IndexBuilder,
@@ -29,17 +17,11 @@ struct BackupWriter {
 }
 
 
-/// Make a new backup from a source tree into a band in this archive.
-pub fn make_backup(source: &LiveTree, archive: &Archive, _: &BackupOptions) -> Result<()> {
-    tree::copy_tree(source, &mut BackupWriter::begin(archive)?, &archive.report())
-}
-
-
 impl BackupWriter {
     /// Create a new BackupWriter.
     ///
     /// This currently makes a new top-level band.
-    fn begin(archive: &Archive) -> Result<BackupWriter> {
+    pub fn begin(archive: &Archive) -> Result<BackupWriter> {
         let band = Band::create(archive)?;
         let block_dir = band.block_dir();
         let index_builder = band.index_builder();
@@ -121,11 +103,10 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
-        make_backup(
-            &LiveTree::open(srcdir.path(), &Report::new()).unwrap(),
-            &af,
-            &BackupOptions::default()).unwrap();
+        let lt = LiveTree::open(srcdir.path(), &Report::new()).unwrap();
+        let mut bw = BackupWriter::begin(&af).unwrap();
         let report = af.report();
+        tree::copy_tree(&lt, &mut bw, &report).unwrap();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("file"));
         assert_eq!(1, report.get_count("symlink"));
@@ -165,16 +146,11 @@ mod tests {
         srcdir.create_file("bar");
 
         let report = af.report();
-        let lt = &LiveTree::open(srcdir.path(), &report).unwrap()
-            .with_excludes(
-                excludes::from_strings(
-                    &["/**/foo*", "/**/baz"],
-                ).unwrap(),
-            );
-        make_backup(
-            &lt,
-            &af,
-            &BackupOptions::default()).unwrap();
+        let excludes = excludes::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
+        let lt = LiveTree::open(srcdir.path(), &report).unwrap()
+            .with_excludes(excludes);
+        let mut bw = BackupWriter::begin(&af).unwrap();
+        copy_tree(&lt, &mut bw, &report).unwrap();
 
         assert_eq!(1, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"));
@@ -192,11 +168,9 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_file_with_contents("empty", &[]);
-        make_backup(
-            &srcdir.live_tree(),
-            &af,
-            &BackupOptions::default()).unwrap();
+        let mut bw = BackupWriter::begin(&af).unwrap();
         let report = af.report();
+        copy_tree(&srcdir.live_tree(), &mut bw, &report).unwrap();
 
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"), "file count");
