@@ -32,7 +32,7 @@ term = "^0.4"
 time = "^0"
 vergen = "0.1.1"
 walkdir = "2"
-globset = "0.2"
+globset = "0.4"
 
 [dependencies.blake2-rfc]
 version = "0.2.18"
