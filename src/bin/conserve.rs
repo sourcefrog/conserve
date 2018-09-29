@@ -45,11 +45,12 @@ fn main() {
         None => ui::best_ui(),
     };
 
-    let log_level = match matches.occurrences_of("v") + subm.occurrences_of("v") {
-        0 => log::LogLevelFilter::Warn,
-        1 => log::LogLevelFilter::Info,
-        2 => log::LogLevelFilter::Debug,
-        _ => log::LogLevelFilter::max(),
+    let log_level = match matches.value_of("log-level").or(subm.value_of("log-level")) {
+        None => log::LogLevelFilter::Warn,
+        Some("warn") => log::LogLevelFilter::Warn,
+        Some("info") => log::LogLevelFilter::Info,
+        Some("debug") => log::LogLevelFilter::Debug,
+        Some(_level) => unimplemented!(),
     };
     let report = Report::with_ui(ui);
     report.become_logger(log_level);
@@ -98,6 +99,12 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .long("incomplete")
     };
 
+    fn verbose_arg<'a, 'b>() -> Arg<'a, 'b> {
+        Arg::with_name("v")
+            .short("v")
+            .help("Print filenames")
+    };
+
     // TODO: Allow the global options to occur even after the subcommand:
     // at the moment they have to be first.
     App::new("conserve")
@@ -113,13 +120,12 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .takes_value(true)
                 .possible_values(&["auto", "plain", "color"]),
         )
-        .arg(
-            Arg::with_name("v")
-                .short("v")
-                .multiple(true)
-                .global(true)
-                .help("Be more verbose (log all file names)"),
-        )
+        .arg(Arg::with_name("log-level")
+            .takes_value(true)
+            .long("log-level")
+            .global(true)
+            .possible_values(&["warn", "info", "debug"])
+            .help("Increased amount of debug logging"))
         .subcommand(
             SubCommand::with_name("init")
                 .display_order(1)
@@ -143,8 +149,9 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                         .help("Backup from this directory")
                         .required(true),
                 )
-                .arg(exclude_arg()),
-        )
+                .arg(exclude_arg())
+                .arg(verbose_arg())
+      )
         .subcommand(
             SubCommand::with_name("restore")
                 .display_order(3)
@@ -169,7 +176,8 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                         .long("force-overwrite")
                         .help("Overwrite existing destination directory"),
                 )
-                .arg(exclude_arg()),
+                .arg(exclude_arg())
+                .arg(verbose_arg())
         )
         .subcommand(
             SubCommand::with_name("versions")
