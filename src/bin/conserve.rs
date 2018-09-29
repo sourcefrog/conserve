@@ -30,7 +30,7 @@ fn main() {
 
     let (sub_name, subm) = matches.subcommand();
     let sub_fn = match sub_name {
-        "backup" => cmd_backup,
+        "backup" => backup,
         "init" => init,
         "list-source" => list_source,
         "ls" => ls,
@@ -230,7 +230,7 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 }
 
 
-fn cmd_backup(subm: &ArgMatches, report: &Report) -> Result<()> {
+fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let lt = live_tree_from_options(subm, report)?;
     let mut bw = BackupWriter::begin(&archive)?;
