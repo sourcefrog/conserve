@@ -107,6 +107,12 @@ pub struct Report {
 }
 
 
+/// Trees and Archives have a Report as general context for operations on them.
+pub trait HasReport {
+    fn report(&self) -> &Report;
+}
+
+
 impl AddAssign for Sizes {
     fn add_assign(&mut self, other: Sizes) {
         self.compressed += other.compressed;

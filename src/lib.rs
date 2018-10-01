@@ -68,7 +68,7 @@ pub use errors::*;
 pub use io::{AtomicFile, ensure_dir_exists};
 pub use index::{IndexBuilder, IndexEntry};
 pub use live_tree::LiveTree;
-pub use report::{Report, Sizes};
+pub use report::{HasReport, Report, Sizes};
 pub use restore::RestoreTree;
 pub use stored_tree::StoredTree;
 pub use tree::{ReadTree, WriteTree, copy_tree};

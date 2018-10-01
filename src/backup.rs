@@ -92,6 +92,13 @@ impl tree::WriteTree for BackupWriter {
 }
 
 
+impl HasReport for BackupWriter {
+    fn report(&self) -> &Report {
+        &self.report
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::super::*;

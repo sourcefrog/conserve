@@ -90,13 +90,22 @@ impl ReadTree for StoredTree {
 
     /// Return an iter of index entries in this stored tree.
     fn iter_entries(&self) -> Result<index::Iter> {
-        self.band.index_iter(&self.excludes, self.archive.report())
+        self.band.index_iter(&self.excludes, self.report())
     }
 
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
-        Ok(StoredFile::open(self.band.block_dir(), entry.addrs.clone(), self.archive.report()))
+        Ok(StoredFile::open(self.band.block_dir(), entry.addrs.clone(), self.report()))
     }
 }
+
+
+impl HasReport for StoredTree {
+    fn report(&self) -> &Report {
+        self.archive.report()
+    }
+}
+
+
 
 
 #[cfg(test)]

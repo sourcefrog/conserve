@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Find source files within a source directory, in apath order.
 
@@ -98,6 +98,13 @@ impl tree::ReadTree for LiveTree {
 }
 
 
+impl HasReport for LiveTree {
+    fn report(&self) -> &Report {
+        &self.report
+    }
+}
+
+
 impl fmt::Debug for LiveTree {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("LiveTree")
@@ -169,6 +176,7 @@ impl fmt::Debug for Entry {
             .finish()
     }
 }
+
 
 /// Recursive iterator of the contents of a source directory.
 #[derive(Debug)]

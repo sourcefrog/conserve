@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Archives holding backup material.
 //!
@@ -126,9 +126,12 @@ impl Archive {
         }
         Err(ErrorKind::NoCompleteBands.into())
     }
+}
 
+
+impl HasReport for Archive {
     /// Return the Report that counts operations on this Archive and objects descended from it.
-    pub fn report(&self) -> &Report {
+    fn report(&self) -> &Report {
         &self.report
     }
 }

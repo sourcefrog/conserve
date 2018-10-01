@@ -6,7 +6,7 @@
 use super::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
-pub trait ReadTree {
+pub trait ReadTree : HasReport {
     type E: Entry;
     type I: Iterator<Item = Result<Self::E>>;
     type R: std::io::Read;
