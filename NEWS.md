@@ -1,9 +1,13 @@
 # Conserve release history
 
-## Unreleased
+## Unreleased 0.4.3
 
 * `conserve versions` has a new `--sizes` option, to show disk usage by each
   version.
+
+* New option `--log-level` replaces repeated `-v`. `-v` now controls
+  command-specific behavior, specifically printing file names for
+  `conserve backup` and `conserve restore`.
 
 ## Conserve 0.4.2
 
