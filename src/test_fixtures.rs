@@ -32,7 +32,7 @@ impl ScratchArchive {
         let archive = Archive::create(&arch_dir).unwrap();
         ScratchArchive {
             _tempdir: tempdir,
-            archive: archive,
+            archive,
         }
     }
 
@@ -78,6 +78,13 @@ impl Deref for ScratchArchive {
 }
 
 
+impl Default for ScratchArchive {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 /// A temporary tree for running a test.
 ///
 /// Created in a temporary directory and automatically disposed when done.
@@ -93,7 +100,7 @@ impl TreeFixture {
         let root = tempdir.path().to_path_buf();
         TreeFixture {
             _tempdir: tempdir,
-            root: root,
+            root,
         }
     }
 

@@ -132,7 +132,7 @@ impl CheckOrder {
     pub fn check(&mut self, a: &Apath) {
         if let Some(ref last_apath) = self.last_apath {
             assert!(
-                last_apath < &a,
+                last_apath < a,
                 "apaths out of order: {:?} should be before {:?}",
                 last_apath, a);
         }

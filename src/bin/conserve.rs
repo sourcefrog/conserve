@@ -60,7 +60,7 @@ fn main() {
     info!("{}", report);
 
     if let Err(e) = result {
-        show_chained_errors(e);
+        show_chained_errors(&e);
         std::process::exit(1)
     }
 }
@@ -220,7 +220,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
 }
 
 
-fn show_chained_errors(e: Error) {
+fn show_chained_errors(e: &Error) {
     error!("{}", e);
     for suberr in e.iter().skip(1) {
         // First was already printed

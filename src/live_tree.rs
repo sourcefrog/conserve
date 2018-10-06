@@ -39,7 +39,7 @@ impl LiveTree {
     /// This replaces any previous exclusions.
     pub fn with_excludes(self, excludes: GlobSet) -> LiveTree {
         LiveTree {
-            excludes: excludes,
+            excludes,
             .. self
         }
     }
@@ -80,8 +80,8 @@ impl tree::ReadTree for LiveTree {
         let mut dir_deque = VecDeque::<Entry>::new();
         dir_deque.push_back(root_entry);
         Ok(Iter {
-            entry_deque: entry_deque,
-            dir_deque: dir_deque,
+            entry_deque,
+            dir_deque,
             report: self.report.clone(),
             check_order: apath::CheckOrder::new(),
             excludes: self.excludes.clone(),
@@ -199,7 +199,7 @@ pub struct Iter {
 
 
 impl Iter {
-    fn visit_next_directory(&mut self, dir_entry: Entry) -> Result<()> {
+    fn visit_next_directory(&mut self, dir_entry: &Entry) -> Result<()> {
         self.report.increment("source.visited.directories", 1);
         let mut children = Vec::<(OsString, bool, Apath)>::new();
         for entry in fs::read_dir(&dir_entry.path)? {
@@ -238,9 +238,9 @@ impl Iter {
                 }
             };
             let new_entry = Entry {
-                apath: apath,
+                apath,
                 path: child_path,
-                metadata: metadata,
+                metadata,
             };
             if is_dir {
                 self.dir_deque.insert(
@@ -279,8 +279,8 @@ impl Iterator for Iter {
 
             // No entries already queued, visit a new directory to try to refill the queue.
             if let Some(entry) = self.dir_deque.pop_front() {
-                if let Err(e) = self.visit_next_directory(entry) {
-                    return Some(Err(e.into()));
+                if let Err(e) = self.visit_next_directory(&entry) {
+                    return Some(Err(e));
                 }
             } else {
                 // No entries queued and no more directories to visit.

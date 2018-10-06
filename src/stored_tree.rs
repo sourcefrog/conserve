@@ -41,7 +41,7 @@ impl StoredTree {
         }
         Ok(StoredTree {
             archive: archive.clone(),
-            band: band,
+            band,
             excludes: excludes::excludes_nothing(),
         })
     }
@@ -54,14 +54,14 @@ impl StoredTree {
         let band = Band::open(archive, band_id)?;
         Ok(StoredTree {
             archive: archive.clone(),
-            band: band,
+            band,
             excludes: excludes::excludes_nothing(),
         })
     }
 
     pub fn with_excludes(self, excludes: GlobSet) -> StoredTree {
         StoredTree {
-            excludes: excludes,
+            excludes,
             .. self
         }
     }

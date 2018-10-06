@@ -40,7 +40,7 @@ impl VerboseVersionList {
     // Setting this requires walking the band directories which takes some extra time.
     pub fn show_sizes(self, show_sizes: bool) -> VerboseVersionList {
         VerboseVersionList {
-            show_sizes: show_sizes,
+            show_sizes,
             .. self
         }
     }
@@ -80,7 +80,7 @@ impl ShowArchive for VerboseVersionList {
                     is_complete_str,
                     start_time_str,
                     duration_str,
-                    disk_bytes / 1000000,
+                    disk_bytes / 1_000_000,
                 );
             } else {
                 println!(

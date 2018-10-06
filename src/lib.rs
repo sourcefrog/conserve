@@ -87,6 +87,6 @@ pub fn version() -> &'static str {
 }
 
 /// Format-compatibility version, normally the first two components of the package version.
-pub const ARCHIVE_VERSION: &'static str = "0.4";
+pub const ARCHIVE_VERSION: &str = "0.4";
 
 pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Accumulate statistics about a Conserve operation.
 //!
@@ -231,22 +231,29 @@ impl Report {
 }
 
 
+impl Default for Report {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), fmt::Error> {
-        write!(f, "Counts:\n")?;
+        writeln!(f, "Counts:")?;
         let counts = self.mut_counts();
         for (key, value) in &counts.count {
             if *value > 0 {
-                write!(f, "  {:<40} {:>9}\n", *key, *value)?;
+                writeln!(f, "  {:<40} {:>9}", *key, *value)?;
             }
         }
-        write!(f, "Bytes (before and after compression):\n")?;
+        writeln!(f, "Bytes (before and after compression):")?;
         for (key, s) in &counts.sizes {
             if s.uncompressed > 0 {
                 let ratio = ui::compression_ratio(s);
-                write!(
+                writeln!(
                     f,
-                    "  {:<40} {:>9} {:>9} {:>9.1}x\n",
+                    "  {:<40} {:>9} {:>9} {:>9.1}x",
                     *key,
                     s.uncompressed,
                     s.compressed,
@@ -254,12 +261,12 @@ impl Display for Report {
                 )?;
             }
         }
-        write!(f, "Durations (seconds):\n")?;
+        writeln!(f, "Durations (seconds):")?;
         for (key, &dur) in &counts.durations {
-            let millis = dur.subsec_nanos() / 1000000;
+            let millis = dur.subsec_millis();
             let secs = dur.as_secs();
             if millis > 0 || secs > 0 {
-                write!(f, "  {:<40} {:>5}.{:>03}\n", key, secs, millis)?;
+                writeln!(f, "  {:<40} {:>5}.{:>03}", key, secs, millis)?;
             }
         }
         Ok(())

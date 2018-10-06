@@ -17,7 +17,7 @@ use super::io::{file_exists, require_empty_directory};
 use super::jsonio;
 
 
-const HEADER_FILENAME: &'static str = "CONSERVE";
+const HEADER_FILENAME: &str = "CONSERVE";
 
 
 /// An archive holding backup material.
@@ -64,7 +64,7 @@ impl Archive {
             return Err(ErrorKind::NotAnArchive(path.into()).into());
         }
         let header: ArchiveHeader = jsonio::read(&header_path, &report).chain_err(|| {
-            format!("Failed to read archive header")
+            "Failed to read archive header"
         })?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(
@@ -113,7 +113,7 @@ impl Archive {
                 (Ok(b), Some(a)) => std::cmp::max(b, a),
             })
         }
-        accum.ok_or(ErrorKind::ArchiveEmpty.into())
+        accum.ok_or_else(|| ErrorKind::ArchiveEmpty.into())
     }
 
     /// Return the last completely-written band id.

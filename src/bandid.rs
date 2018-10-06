@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Bands are identified by a string like `b0001-0023`, represented by a `BandId` object.
 
@@ -27,7 +27,7 @@ pub struct BandId {
 impl BandId {
     /// Makes a new BandId from a sequence of integers.
     pub fn new(seqs: &[u32]) -> BandId {
-        assert!(seqs.len() > 0);
+        assert!(!seqs.is_empty());
         BandId {
             seqs: seqs.to_vec(),
             string_form: BandId::make_string_form(seqs),

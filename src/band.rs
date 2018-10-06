@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Bands are the top-level structure inside an archive.
 //!
@@ -119,10 +119,10 @@ impl Band {
         index_dir_path.push(INDEX_DIR);
 
         Band {
-            id: id,
-            path_buf: path_buf,
-            block_dir_path: block_dir_path,
-            index_dir_path: index_dir_path,
+            id,
+            path_buf,
+            block_dir_path,
+            index_dir_path,
         }
     }
 
@@ -178,9 +178,9 @@ impl Band {
         };
         Ok(Info {
             id: self.id.clone(),
-            is_closed: is_closed,
+            is_closed,
             start_time: UTC.timestamp(head.start_time, 0),
-            end_time: end_time,
+            end_time,
         })
     }
 

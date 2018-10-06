@@ -283,9 +283,10 @@ impl Iter {
                         Kind::File => self.report.increment("skipped.excluded.files", 1),
                         Kind::Unknown => self.report.increment("skipped.excluded.unknown", 1),
                     }
-                    return false;
+                    false
+                } else {
+                    true
                 }
-                return true;
             })
             .collect::<Vec<IndexEntry>>()
             .into_iter();

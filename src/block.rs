@@ -121,20 +121,15 @@ impl BlockDir {
             in_buf.truncate(read_len);
 
             let block_hash: String;
-            if addresses.len() == 0 {
+            if addresses.is_empty() {
                 report.measure_duration("file.hash", || file_hasher.update(&in_buf));
                 block_hash = file_hasher.clone().finalize().as_bytes().to_hex()
             } else {
                 // Not the first block, must update file and block hash separately, but we can do
                 // them in parallel.
-                if true {
-                    block_hash = rayon::join(
-                        || report.measure_duration("file.hash", || file_hasher.update(&in_buf)),
-                        || report.measure_duration("block.hash", || hash_bytes(&in_buf).unwrap())).1;
-                } else {
-                    report.measure_duration("file.hash", || file_hasher.update(&in_buf));
-                    block_hash = report.measure_duration("block.hash", || hash_bytes(&in_buf))?
-                }
+                block_hash = rayon::join(
+                    || report.measure_duration("file.hash", || file_hasher.update(&in_buf)),
+                    || report.measure_duration("block.hash", || hash_bytes(&in_buf).unwrap())).1;
             }
 
             if self.contains(&block_hash)? {
@@ -168,7 +163,7 @@ impl BlockDir {
     fn compress_and_store(
         &self,
         in_buf: &[u8],
-        hex_hash: &BlockHash,
+        hex_hash: &str,
         report: &Report,
     ) -> Result<u64> {
         super::io::ensure_dir_exists(&self.subdir_for(hex_hash))?;
