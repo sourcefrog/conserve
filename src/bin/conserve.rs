@@ -54,8 +54,9 @@ fn main() {
 
     let result = sub_fn(subm, &report);
 
-    info!("{}", report);
-
+    if matches.is_present("stats") {
+        report.print(&format!("{}", report));
+    }
     if let Err(e) = result {
         show_chained_errors(&e);
         std::process::exit(1)
