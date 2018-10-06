@@ -3,8 +3,6 @@
 
 //! Command-line entry point for Conserve backups.
 
-#![cfg_attr(feature = "clippy", feature(plugin))]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
 #![recursion_limit = "1024"] // Needed by error-chain
 
 use std::path::Path;
