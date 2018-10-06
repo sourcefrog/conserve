@@ -1,7 +1,6 @@
 // Copyright 2017 Martin Pool.
 
 /// Snappy compression.
-
 use std::io;
 
 use snap;

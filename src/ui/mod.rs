@@ -13,7 +13,6 @@ use log;
 pub mod color;
 pub mod plain;
 
-
 /// Display information about backup progress to the user in some way.
 pub trait UI: fmt::Debug {
     /// Show counters, eg as a progress bar.
@@ -22,7 +21,6 @@ pub trait UI: fmt::Debug {
     /// Show a log message.
     fn log(&mut self, record: &log::LogRecord);
 }
-
 
 /// Construct the best available UI for this environment.
 ///
@@ -37,7 +35,6 @@ pub fn best_ui() -> Box<UI + Send> {
     }
 }
 
-
 /// Construct a UI by name.
 ///
 /// `ui_name` may be `"auto"`, `"plain"`, or `"color"`.
@@ -45,16 +42,13 @@ pub fn by_name(ui_name: &str) -> Option<Box<UI + Send>> {
     match ui_name {
         "auto" => Some(best_ui()),
         "plain" => Some(Box::new(plain::PlainUI::new())),
-        "color" => {
-            match color::ColorUI::new() {
-                Some(ui) => Some(Box::new(ui)),
-                None => None,
-            }
-        }
+        "color" => match color::ColorUI::new() {
+            Some(ui) => Some(Box::new(ui)),
+            None => None,
+        },
         _ => None,
     }
 }
-
 
 pub fn compression_percent(s: &Sizes) -> i64 {
     if s.uncompressed > 0 {
@@ -63,7 +57,6 @@ pub fn compression_percent(s: &Sizes) -> i64 {
         0
     }
 }
-
 
 /// Describe the compression ratio: higher is better.
 pub fn compression_ratio(s: &Sizes) -> f64 {

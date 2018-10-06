@@ -36,7 +36,6 @@ const MAX_BLOCK_SIZE: usize = 1 << 20;
 /// The unique identifier for a block: its hexadecimal `BLAKE2b` hash.
 pub type BlockHash = String;
 
-
 /// Points to some compressed data inside the block dir.
 ///
 /// Identifiers are: which file contains it, at what (pre-compression) offset,
@@ -53,7 +52,6 @@ pub struct Address {
     pub len: u64,
 }
 
-
 /// A readable, writable directory within a band holding data blocks.
 #[derive(Debug)]
 pub struct BlockDir {
@@ -67,7 +65,9 @@ fn block_name_to_subdirectory(block_hash: &str) -> &str {
 impl BlockDir {
     /// Create a BlockDir accessing `path`, which must exist as a directory.
     pub fn new(path: &Path) -> BlockDir {
-        BlockDir { path: path.to_path_buf() }
+        BlockDir {
+            path: path.to_path_buf(),
+        }
     }
 
     /// Return the subdirectory in which we'd put a file called `hash_hex`.
@@ -111,10 +111,8 @@ impl BlockDir {
             };
             // TODO: Possibly read repeatedly in case we get a short read and have room for more,
             // so that short reads don't lead to short blocks being stored.
-            let read_len = report.measure_duration(
-                "source.read",
-                || from_file.read(&mut in_buf),
-            )?;
+            let read_len =
+                report.measure_duration("source.read", || from_file.read(&mut in_buf))?;
             if read_len == 0 {
                 break;
             }
@@ -129,7 +127,8 @@ impl BlockDir {
                 // them in parallel.
                 block_hash = rayon::join(
                     || report.measure_duration("file.hash", || file_hasher.update(&in_buf)),
-                    || report.measure_duration("block.hash", || hash_bytes(&in_buf).unwrap())).1;
+                    || report.measure_duration("block.hash", || hash_bytes(&in_buf).unwrap()),
+                ).1;
             }
 
             if self.contains(&block_hash)? {
@@ -160,12 +159,7 @@ impl BlockDir {
         Ok((addresses, file_hasher.finalize().as_bytes().to_hex()))
     }
 
-    fn compress_and_store(
-        &self,
-        in_buf: &[u8],
-        hex_hash: &str,
-        report: &Report,
-    ) -> Result<u64> {
+    fn compress_and_store(&self, in_buf: &[u8], hex_hash: &str, report: &Report) -> Result<u64> {
         super::io::ensure_dir_exists(&self.subdir_for(hex_hash))?;
         let tempf = tempfile::NamedTempFileOptions::new()
             .prefix("tmp")
@@ -245,8 +239,7 @@ impl BlockDir {
             report.increment("block.misplaced", 1);
             error!(
                 "Block file {:?} has actual decompressed hash {:?}",
-                path,
-                actual_hash
+                path, actual_hash
             );
             return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
@@ -263,16 +256,17 @@ fn hash_bytes(in_buf: &[u8]) -> Result<BlockHash> {
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::io::SeekFrom;
     use std::io::prelude::*;
+    use std::io::SeekFrom;
     use tempdir;
     use tempfile;
 
     use super::super::*;
 
     const EXAMPLE_TEXT: &'static [u8] = b"hello!";
-    const EXAMPLE_BLOCK_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd\
-    3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
+    const EXAMPLE_BLOCK_HASH: &'static str =
+        "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd\
+         3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
     fn make_example_file() -> tempfile::NamedTempFile {
         let mut tf = tempfile::NamedTempFile::new().unwrap();

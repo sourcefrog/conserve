@@ -7,12 +7,11 @@
 // and not useful to flag here.
 #![allow(unknown_lints,redundant_closure)]
 
+use rustc_serialize;
 use std::io;
 use std::path::PathBuf;
-use rustc_serialize;
 
 use BandId;
-
 
 error_chain! {
     foreign_links {

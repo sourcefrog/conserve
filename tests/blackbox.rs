@@ -9,8 +9,8 @@ extern crate regex;
 extern crate tempdir;
 
 use std::env;
-use std::io::prelude::*;
 use std::fs;
+use std::io::prelude::*;
 use std::path::PathBuf;
 use std::process;
 use std::str;
@@ -21,7 +21,6 @@ use spectral::prelude::*;
 extern crate conserve;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
-
 #[test]
 fn blackbox_no_args() {
     // Run with no arguments, should fail with a usage message to stderr.
@@ -31,7 +30,6 @@ fn blackbox_no_args() {
     assert_that(&stdout).matches(String::is_empty);
 }
 
-
 #[test]
 fn blackbox_help() {
     let (status, stdout, stderr) = run_conserve(&["--help"]);
@@ -40,7 +38,6 @@ fn blackbox_help() {
     assert_that(&stdout).contains("Copy source directory into an archive");
     assert_that(&stderr).matches(String::is_empty);
 }
-
 
 #[test]
 fn clean_error_on_non_archive() {
@@ -53,7 +50,6 @@ fn clean_error_on_non_archive() {
     assert_that(&status).matches(|s| !s.success());
     assert_that(&error_string.as_str()).contains(&"Not a Conserve archive");
 }
-
 
 #[test]
 fn blackbox_backup() {
@@ -130,15 +126,13 @@ fn blackbox_backup() {
     // Restore with specified band id / backup version.
     {
         let restore_dir = make_tempdir();
-        let (status, _stdout, _stderr) = run_conserve(
-            &[
-                "restore",
-                "-b",
-                "b0000",
-                &arch_dir_str,
-                &restore_dir.path().to_str().unwrap(),
-            ],
-        );
+        let (status, _stdout, _stderr) = run_conserve(&[
+            "restore",
+            "-b",
+            "b0000",
+            &arch_dir_str,
+            &restore_dir.path().to_str().unwrap(),
+        ]);
         assert!(status.success());
         // TODO: Check contents.
     }
@@ -169,7 +163,6 @@ fn blackbox_backup() {
     //
 }
 
-
 #[test]
 fn empty_archive() {
     let adir = make_tempdir();
@@ -199,7 +192,6 @@ fn empty_archive() {
     }
 }
 
-
 /// Check behavior on an incomplete version.
 ///
 /// Commands that read from the archive should by default decline, unless given
@@ -226,19 +218,16 @@ fn incomplete_version() {
     }
     {
         // ls --incomplete accurately says it has nothing
-        let (status, stdout, stderr) = run_conserve(
-            &["ls", "-b", "b0", "--incomplete", adir_str]);
+        let (status, stdout, stderr) = run_conserve(&["ls", "-b", "b0", "--incomplete", adir_str]);
         assert!(status.success());
         assert!(stderr.is_empty());
         assert_eq!(stdout, "");
     }
 }
 
-
 fn make_tempdir() -> tempdir::TempDir {
     tempdir::TempDir::new("conserve_blackbox").unwrap()
 }
-
 
 fn assert_success_and_output(args: &[&str], expected_stdout: &str, expected_stderr: &str) {
     let (status, stdout, stderr) = run_conserve(args);
@@ -276,16 +265,13 @@ fn run_conserve(args: &[&str]) -> (process::ExitStatus, String, String) {
     let output = process::Command::new(&conserve_path)
         .args(args)
         .output()
-        .expect(
-            format!("Failed to run conserve: {:?} {:?}", &conserve_path, &args).as_str(),
-        );
+        .expect(format!("Failed to run conserve: {:?} {:?}", &conserve_path, &args).as_str());
     println!("status: {:?}", output.status);
     let output_string = String::from_utf8_lossy(&output.stdout).into_owned();
     let error_string = String::from_utf8_lossy(&output.stderr).into_owned();
     println!(
         ">> stdout:\n{}\n>> stderr:\n{}",
-        &output_string,
-        &error_string
+        &output_string, &error_string
     );
     (output.status, output_string, error_string)
 }

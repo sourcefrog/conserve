@@ -11,16 +11,15 @@
 //! To read a consistent tree possibly composed from several incremental backups, use
 //! StoredTree rather than the Band itself.
 
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, TimeZone, UTC};
 
-use super::*;
 use super::index;
-use super::jsonio;
 use super::io::file_exists;
+use super::jsonio;
+use super::*;
 
 use globset::GlobSet;
 
@@ -38,19 +37,16 @@ pub struct Band {
     index_dir_path: PathBuf,
 }
 
-
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct Head {
     start_time: i64,
 }
-
 
 /// Format of the on-disk tail file.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct Tail {
     end_time: i64,
 }
-
 
 /// Readonly summary info about a band, from `Band::get_info`.
 pub struct Info {
@@ -63,7 +59,6 @@ pub struct Info {
     /// Time this band was completed, if it is complete.
     pub end_time: Option<DateTime<UTC>>,
 }
-
 
 impl Band {
     /// Make a new band (and its on-disk directory).
@@ -88,14 +83,18 @@ impl Band {
         fs::create_dir(&new.index_dir_path)?;
         info!("Created band {} in {:?}", new.id, &archive_dir);
 
-        let head = Head { start_time: UTC::now().timestamp() };
+        let head = Head {
+            start_time: UTC::now().timestamp(),
+        };
         jsonio::write(&new.head_path(), &head, archive.report())?;
         Ok(new)
     }
 
     /// Mark this band closed: no more blocks should be written after this.
     pub fn close(self: &Band, report: &Report) -> Result<()> {
-        let tail = Tail { end_time: UTC::now().timestamp() };
+        let tail = Tail {
+            end_time: UTC::now().timestamp(),
+        };
         jsonio::write(&self.tail_path(), &tail, report)
     }
 
@@ -194,16 +193,13 @@ impl Band {
                     if entry.file_type().is_file() {
                         total += entry.metadata().unwrap().len();
                     }
-                },
-                Err(e) => {
-                    return Err(e.into_io_error().unwrap().into())
                 }
+                Err(e) => return Err(e.into_io_error().unwrap().into()),
             }
         }
         Ok(total)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

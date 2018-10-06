@@ -6,9 +6,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use super::*;
 use super::entry::Entry;
-
+use super::*;
 
 /// A write-only tree on the filesystem, as a restore destination.
 #[derive(Debug)]
@@ -16,7 +15,6 @@ pub struct RestoreTree {
     path: PathBuf,
     report: Report,
 }
-
 
 impl RestoreTree {
     /// Create a RestoreTree.
@@ -40,7 +38,6 @@ impl RestoreTree {
         self.path.join(&entry.apath().to_string()[1..])
     }
 }
-
 
 impl tree::WriteTree for RestoreTree {
     fn finish(&mut self) -> Result<()> {
@@ -89,28 +86,22 @@ impl tree::WriteTree for RestoreTree {
     }
 }
 
-
 /// The destination must either not exist, or be an empty directory.
 fn require_empty_destination(dest: &Path) -> Result<()> {
     match fs::read_dir(&dest) {
         Ok(mut it) => {
             if it.next().is_some() {
-                Err(
-                    ErrorKind::DestinationNotEmpty(dest.to_path_buf()).into(),
-                )
+                Err(ErrorKind::DestinationNotEmpty(dest.to_path_buf()).into())
             } else {
                 Ok(())
             }
         }
-        Err(e) => {
-            match e.kind() {
-                io::ErrorKind::NotFound => Ok(()),
-                _ => Err(e.into()),
-            }
-        }
+        Err(e) => match e.kind() {
+            io::ErrorKind::NotFound => Ok(()),
+            _ => Err(e.into()),
+        },
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -169,7 +160,9 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
-        let restore_err_str = RestoreTree::create(&destdir.path(), &Report::new()).unwrap_err().to_string();
+        let restore_err_str = RestoreTree::create(&destdir.path(), &Report::new())
+            .unwrap_err()
+            .to_string();
         assert_that(&restore_err_str).contains(&"Destination directory not empty");
     }
 
@@ -199,9 +192,9 @@ mod tests {
         let destdir = TreeFixture::new();
         let restore_report = Report::new();
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
-        let st = StoredTree::open_last(&restore_archive).unwrap()
-            .with_excludes(
-                excludes::from_strings(&["/**/subfile"]).unwrap());
+        let st = StoredTree::open_last(&restore_archive)
+            .unwrap()
+            .with_excludes(excludes::from_strings(&["/**/subfile"]).unwrap());
         let mut rt = RestoreTree::create_overwrite(&destdir.path(), &restore_report).unwrap();
         copy_tree(&st, &mut rt).unwrap();
 

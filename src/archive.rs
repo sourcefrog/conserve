@@ -12,13 +12,11 @@ use std::fs;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 
-use super::*;
 use super::io::{file_exists, require_empty_directory};
 use super::jsonio;
-
+use super::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
-
 
 /// An archive holding backup material.
 #[derive(Clone, Debug)]
@@ -44,12 +42,12 @@ impl Archive {
             report: Report::new(),
         };
         require_empty_directory(&archive.path)?;
-        let header = ArchiveHeader { conserve_archive_version: String::from(ARCHIVE_VERSION) };
+        let header = ArchiveHeader {
+            conserve_archive_version: String::from(ARCHIVE_VERSION),
+        };
         let header_filename = path.join(HEADER_FILENAME);
         jsonio::write(&header_filename, &header, &archive.report)
-            .chain_err(|| {
-                format!("Failed to write archive header: {:?}", header_filename)
-            })?;
+            .chain_err(|| format!("Failed to write archive header: {:?}", header_filename))?;
         info!("Created new archive in {:?}", path.display());
         Ok(archive)
     }
@@ -63,9 +61,8 @@ impl Archive {
         if !file_exists(&header_path)? {
             return Err(ErrorKind::NotAnArchive(path.into()).into());
         }
-        let header: ArchiveHeader = jsonio::read(&header_path, &report).chain_err(|| {
-            "Failed to read archive header"
-        })?;
+        let header: ArchiveHeader =
+            jsonio::read(&header_path, &report).chain_err(|| "Failed to read archive header")?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(
                 ErrorKind::UnsupportedArchiveVersion(header.conserve_archive_version).into(),
@@ -79,9 +76,8 @@ impl Archive {
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
     pub fn iter_bands_unsorted(self: &Archive) -> Result<IterBands> {
-        let read_dir = read_dir(&self.path).chain_err(|| {
-            format!("failed reading directory {:?}", &self.path)
-        })?;
+        let read_dir = read_dir(&self.path)
+            .chain_err(|| format!("failed reading directory {:?}", &self.path))?;
         Ok(IterBands { dir_iter: read_dir })
     }
 
@@ -128,7 +124,6 @@ impl Archive {
     }
 }
 
-
 impl HasReport for Archive {
     /// Return the Report that counts operations on this Archive and objects descended from it.
     fn report(&self) -> &Report {
@@ -136,11 +131,9 @@ impl HasReport for Archive {
     }
 }
 
-
 pub struct IterBands {
     dir_iter: fs::ReadDir,
 }
-
 
 impl Iterator for IterBands {
     type Item = Result<BandId>;
@@ -180,7 +173,6 @@ impl Iterator for IterBands {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
@@ -190,9 +182,9 @@ mod tests {
 
     use super::*;
     use errors::ErrorKind;
-    use {BandId, Report};
     use io::list_dir;
     use test_fixtures::ScratchArchive;
+    use {BandId, Report};
 
     #[test]
     fn create_then_open_archive() {
@@ -221,7 +213,6 @@ mod tests {
         Archive::open(arch_path, &Report::new()).unwrap();
         assert!(arch.list_bands().unwrap().is_empty());
     }
-
 
     /// A new archive contains just one header file.
     /// The header is readable json containing only a version number.

@@ -6,7 +6,6 @@
 
 use super::*;
 
-
 /// Kind of file that can be stored in the archive.
 #[derive(Clone, Copy, Debug, PartialEq, RustcDecodable, RustcEncodable)]
 pub enum Kind {
@@ -17,9 +16,8 @@ pub enum Kind {
     Unknown,
 }
 
-
 /// A file, directory, or symlink stored in any tree.
-/// 
+///
 /// To get the contents of a plain file, use `ReadTree::file_contents`.
 pub trait Entry {
     fn kind(&self) -> Kind;

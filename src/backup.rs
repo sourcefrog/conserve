@@ -6,7 +6,6 @@
 
 use super::*;
 
-
 /// Accepts files to write in the archive (in apath order.)
 #[derive(Debug)]
 pub struct BackupWriter {
@@ -15,7 +14,6 @@ pub struct BackupWriter {
     index_builder: IndexBuilder,
     report: Report,
 }
-
 
 impl BackupWriter {
     /// Create a new BackupWriter.
@@ -40,14 +38,12 @@ impl BackupWriter {
     }
 }
 
-
 impl tree::WriteTree for BackupWriter {
     fn finish(&mut self) -> Result<()> {
         self.index_builder.finish_hunk(&self.report)?;
         self.band.close(&self.report)?;
         Ok(())
     }
-
 
     fn write_dir(&mut self, source_entry: &Entry) -> Result<()> {
         self.report.increment("dir", 1);
@@ -91,13 +87,11 @@ impl tree::WriteTree for BackupWriter {
     }
 }
 
-
 impl HasReport for BackupWriter {
     fn report(&self) -> &Report {
         &self.report
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -126,7 +120,8 @@ mod tests {
         let band = Band::open(&af, &band_ids[0]).unwrap();
         assert!(band.is_closed().unwrap());
 
-        let index_entries = band.index_iter(&excludes::excludes_nothing(), &report)
+        let index_entries = band
+            .index_iter(&excludes::excludes_nothing(), &report)
             .unwrap()
             .filter_map(|i| i.ok())
             .collect::<Vec<IndexEntry>>();
@@ -154,7 +149,8 @@ mod tests {
 
         let report = af.report();
         let excludes = excludes::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
-        let lt = LiveTree::open(srcdir.path(), &report).unwrap()
+        let lt = LiveTree::open(srcdir.path(), &report)
+            .unwrap()
             .with_excludes(excludes);
         let mut bw = BackupWriter::begin(&af).unwrap();
         copy_tree(&lt, &mut bw).unwrap();
@@ -184,7 +180,8 @@ mod tests {
 
         // Read back the empty file
         let st = StoredTree::open_last(&af).unwrap();
-        let empty_entry = st.iter_entries()
+        let empty_entry = st
+            .iter_entries()
             .unwrap()
             .map(|i| i.unwrap())
             .find(|ref i| i.apath == "/empty")

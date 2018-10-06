@@ -12,7 +12,6 @@ use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-
 /// An ordered archive path.
 ///
 /// The ordering groups all the direct parents of a directory together, followed
@@ -22,7 +21,6 @@ use std::fmt::{Display, Formatter};
 /// string ordering.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Apath(String);
-
 
 impl Apath {
     pub fn from_string(s: &str) -> Apath {
@@ -53,13 +51,11 @@ impl Apath {
     }
 }
 
-
 impl Display for Apath {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
         write!(fmt, "{}", self.to_string())
     }
 }
-
 
 /// Compare for equality an Apath to a str.
 impl PartialEq<str> for Apath {
@@ -67,7 +63,6 @@ impl PartialEq<str> for Apath {
         self.0 == other
     }
 }
-
 
 /// Compare two apaths.
 ///
@@ -107,13 +102,11 @@ impl Ord for Apath {
     }
 }
 
-
 impl PartialOrd for Apath {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
-
 
 /// Observe Apaths and assert that they're visited in the correct order.
 #[derive(Debug)]
@@ -124,9 +117,7 @@ pub struct CheckOrder {
 
 impl CheckOrder {
     pub fn new() -> CheckOrder {
-        CheckOrder {
-            last_apath: None,
-        }
+        CheckOrder { last_apath: None }
     }
 
     pub fn check(&mut self, a: &Apath) {
@@ -134,12 +125,13 @@ impl CheckOrder {
             assert!(
                 last_apath < a,
                 "apaths out of order: {:?} should be before {:?}",
-                last_apath, a);
+                last_apath,
+                a
+            );
         }
         self.last_apath = Some(a.clone());
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -212,10 +204,7 @@ mod tests {
                 if r != expected_order {
                     panic!(
                         "cmp({:?}, {:?}): returned {:?} expected {:?}",
-                        ap,
-                        bp,
-                        r,
-                        expected_order
+                        ap, bp, r, expected_order
                     );
                 }
             }

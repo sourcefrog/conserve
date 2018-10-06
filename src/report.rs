@@ -22,10 +22,10 @@ use std::time::Duration;
 
 use log;
 
-use super::*;
 use super::ui;
-use super::ui::UI;
 use super::ui::plain::PlainUI;
+use super::ui::UI;
+use super::*;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 static KNOWN_COUNTERS: &'static [&'static str] = &[
@@ -52,7 +52,6 @@ static KNOWN_COUNTERS: &'static [&'static str] = &[
     "skipped.excluded.unknown",
 ];
 
-
 /// Describes sizes of data read or written, with both the
 /// compressed and uncompressed size.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -60,7 +59,6 @@ pub struct Sizes {
     pub compressed: u64,
     pub uncompressed: u64,
 }
-
 
 static KNOWN_SIZES: &'static [&'static str] = &["block", "index"];
 
@@ -79,7 +77,6 @@ static KNOWN_DURATIONS: &'static [&'static str] = &[
     "test",
 ];
 
-
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
 #[derive(Debug)]
@@ -89,7 +86,6 @@ pub struct Counts {
     durations: BTreeMap<&'static str, Duration>,
     start: time::Instant,
 }
-
 
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
 /// running.
@@ -106,12 +102,10 @@ pub struct Report {
     ui: Arc<Mutex<Box<UI + Send>>>,
 }
 
-
 /// Trees and Archives have a Report as general context for operations on them.
 pub trait HasReport {
     fn report(&self) -> &Report;
 }
-
 
 impl AddAssign for Sizes {
     fn add_assign(&mut self, other: Sizes) {
@@ -126,7 +120,6 @@ impl<'a> AddAssign<&'a Sizes> for Sizes {
         self.uncompressed += other.uncompressed;
     }
 }
-
 
 impl Report {
     /// Default constructor with plain text UI.
@@ -161,23 +154,27 @@ impl Report {
         } else {
             panic!("unregistered counter {:?}", counter_name);
         }
-        self.ui.lock().unwrap().show_progress(
-            &*self.borrow_counts(),
-        );
+        self.ui
+            .lock()
+            .unwrap()
+            .show_progress(&*self.borrow_counts());
     }
 
     pub fn increment_size(&self, counter_name: &str, sizes: Sizes) {
         let mut counts = self.mut_counts();
-        let e = counts.sizes.get_mut(counter_name).expect(
-            "unregistered size counter",
-        );
+        let e = counts
+            .sizes
+            .get_mut(counter_name)
+            .expect("unregistered size counter");
         *e += sizes;
     }
 
     pub fn increment_duration(&self, name: &str, duration: Duration) {
-        *self.mut_counts().durations.get_mut(name).expect(
-            "undefined duration counter",
-        ) += duration;
+        *self
+            .mut_counts()
+            .durations
+            .get_mut(name)
+            .expect("undefined duration counter") += duration;
     }
 
     /// Merge the contents of `from_report` into `self`.
@@ -230,13 +227,11 @@ impl Report {
     }
 }
 
-
 impl Default for Report {
     fn default() -> Self {
         Self::new()
     }
 }
-
 
 impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), fmt::Error> {
@@ -254,10 +249,7 @@ impl Display for Report {
                 writeln!(
                     f,
                     "  {:<40} {:>9} {:>9} {:>9.1}x",
-                    *key,
-                    s.uncompressed,
-                    s.compressed,
-                    ratio
+                    *key, s.uncompressed, s.compressed, ratio
                 )?;
             }
         }
@@ -273,7 +265,6 @@ impl Display for Report {
     }
 }
 
-
 impl log::Log for Report {
     fn enabled(&self, _metadata: &log::LogMetadata) -> bool {
         true
@@ -283,7 +274,6 @@ impl log::Log for Report {
         self.ui.lock().unwrap().log(record);
     }
 }
-
 
 impl Counts {
     fn new() -> Counts {
@@ -308,16 +298,18 @@ impl Counts {
     }
 
     pub fn get_duration(&self, name: &str) -> Duration {
-        *self.durations.get(name).unwrap_or_else(|| {
-            panic!("unknown duration {:?}", name)
-        })
+        *self
+            .durations
+            .get(name)
+            .unwrap_or_else(|| panic!("unknown duration {:?}", name))
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
     pub fn get_count(&self, counter_name: &str) -> u64 {
-        *self.count.get(counter_name).unwrap_or_else(|| {
-            panic!("unknown counter {:?}", counter_name)
-        })
+        *self
+            .count
+            .get(counter_name)
+            .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
     }
 
     /// Get size of data processed.
@@ -325,9 +317,10 @@ impl Counts {
     /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
     /// in bytes.
     pub fn get_size(&self, counter_name: &str) -> Sizes {
-        *self.sizes.get(counter_name).unwrap_or_else(|| {
-            panic!("unknown counter {:?}", counter_name)
-        })
+        *self
+            .sizes
+            .get(counter_name)
+            .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
     }
 
     pub fn elapsed_time(&self) -> Duration {
@@ -335,11 +328,10 @@ impl Counts {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use super::{Report, Sizes};
+    use std::time::Duration;
 
     #[test]
     pub fn count() {

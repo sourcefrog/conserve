@@ -1,7 +1,6 @@
 // Copyright 2015, 2016, 2017 Martin Pool.
 
 /// Test Conserve through its public API.
-
 extern crate conserve;
 
 extern crate tempdir;
@@ -9,10 +8,9 @@ extern crate tempdir;
 use std::fs::File;
 use std::io::prelude::*;
 
-use conserve::*;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
-
+use conserve::*;
 
 #[test]
 pub fn simple_backup() {
@@ -24,7 +22,6 @@ pub fn simple_backup() {
     check_backup(&af, &af.report());
     check_restore(&af);
 }
-
 
 #[test]
 pub fn simple_backup_with_excludes() {
@@ -61,7 +58,8 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     let band = Band::open(&af, &band_ids[0]).unwrap();
     assert!(band.is_closed().unwrap());
 
-    let index_entries = band.index_iter(&excludes::excludes_nothing(), &report)
+    let index_entries = band
+        .index_iter(&excludes::excludes_nothing(), &report)
         .unwrap()
         .filter_map(|i| i.ok())
         .collect::<Vec<IndexEntry>>();
@@ -79,7 +77,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     let hash = file_entry.blake2b.as_ref().unwrap();
     assert_eq!(
         "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee\
-        42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
+         42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
         hash
     );
 }
@@ -101,14 +99,12 @@ fn check_restore(af: &ScratchArchive) {
     );
     let index_sizes = restore_report.get_size("index");
     assert_eq!(
-        index_sizes.uncompressed,
-        462,
+        index_sizes.uncompressed, 462,
         "index_sizes.uncompressed on restore"
     );
     assert!(index_sizes.compressed <= 292, index_sizes.compressed);
     // TODO: Check what was restored.
 }
-
 
 /// Store and retrieve large files.
 #[test]

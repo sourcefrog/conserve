@@ -1,12 +1,10 @@
 // Conserve backup system.
 // Copyright 2016, 2017 Martin Pool.
 
-
 /// Utilities to set up test environments.
 ///
 /// Fixtures that create directories will be automatically deleted when the object
 /// is deleted.
-
 use std::fs;
 use std::io::Write;
 use std::ops::Deref;
@@ -15,7 +13,6 @@ use std::path::{Path, PathBuf};
 use tempdir;
 
 use super::*;
-
 
 /// A temporary archive, deleted when it goes out of scope.
 ///
@@ -67,7 +64,6 @@ impl ScratchArchive {
     }
 }
 
-
 impl Deref for ScratchArchive {
     type Target = Archive;
 
@@ -77,13 +73,11 @@ impl Deref for ScratchArchive {
     }
 }
 
-
 impl Default for ScratchArchive {
     fn default() -> Self {
         Self::new()
     }
 }
-
 
 /// A temporary tree for running a test.
 ///
@@ -92,7 +86,6 @@ pub struct TreeFixture {
     pub root: PathBuf,
     _tempdir: tempdir::TempDir, // held only for cleanup
 }
-
 
 impl TreeFixture {
     pub fn new() -> TreeFixture {

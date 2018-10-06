@@ -1,7 +1,6 @@
 // Copyright 2017 Martin Pool.
 
 ///! Access a file stored in the archive.
-
 use super::*;
 
 /// Returns the contents of a file stored in the archive, as an iter of byte blocks.
@@ -25,8 +24,7 @@ pub struct StoredFile {
 
 impl StoredFile {
     /// Open a stored file.
-    pub fn open(block_dir: BlockDir, addrs: Vec<block::Address>, report: &Report)
-        -> StoredFile {
+    pub fn open(block_dir: BlockDir, addrs: Vec<block::Address>, report: &Report) -> StoredFile {
         StoredFile {
             block_dir,
             addrs: addrs.into_iter(),
@@ -37,7 +35,6 @@ impl StoredFile {
     }
 }
 
-
 impl std::io::Read for StoredFile {
     fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
         // TODO: Readahead n_cpus blocks into memory, using futures-cpupool or similar.
@@ -46,7 +43,7 @@ impl std::io::Read for StoredFile {
             let avail = self.buf.len() - self.buf_cursor;
             if avail > 0 {
                 let s = std::cmp::min(out.len(), avail);
-                let r = &self.buf[self.buf_cursor..self.buf_cursor+s];
+                let r = &self.buf[self.buf_cursor..self.buf_cursor + s];
                 out[..s].copy_from_slice(r);
                 self.buf_cursor += s;
                 return Ok(s);
@@ -54,8 +51,8 @@ impl std::io::Read for StoredFile {
                 // TODO: Handle errors nicely, but they need to convert to std::io::Error.
                 self.buf = self.block_dir.get(&addr, &self.report).unwrap();
                 self.buf_cursor = 0;
-                // TODO: Read directly into the caller's buffer, if it will fit. Requires changing
-                // BlockDir::get to take a caller-provided buffer.
+            // TODO: Read directly into the caller's buffer, if it will fit. Requires changing
+            // BlockDir::get to take a caller-provided buffer.
             } else {
                 // No data buffered and no more to read, end of file.
                 return Ok(0);

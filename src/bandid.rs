@@ -7,7 +7,6 @@ use std::fmt;
 
 use errors::*;
 
-
 /// Identifier for a band within an archive, eg 'b0001' or 'b0001-0020'.
 ///
 /// `BandId`s implement a total ordering `std::cmp::Ord`.
@@ -22,7 +21,6 @@ pub struct BandId {
 }
 
 // TODO: Maybe a more concise debug form?
-
 
 impl BandId {
     /// Makes a new BandId from a sequence of integers.
@@ -91,13 +89,11 @@ impl BandId {
     }
 }
 
-
 impl fmt::Display for BandId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.as_string().fmt(f)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

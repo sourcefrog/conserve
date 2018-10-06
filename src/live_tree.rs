@@ -4,8 +4,8 @@
 //! Find source files within a source directory, in apath order.
 
 use std::collections::vec_deque::VecDeque;
-use std::fmt;
 use std::ffi::OsString;
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time;
@@ -14,7 +14,6 @@ use super::*;
 
 use globset::GlobSet;
 
-
 /// A real tree on the filesystem, for use as a backup source or restore destination.
 #[derive(Clone)]
 pub struct LiveTree {
@@ -22,7 +21,6 @@ pub struct LiveTree {
     report: Report,
     excludes: GlobSet,
 }
-
 
 impl LiveTree {
     pub fn open<P: AsRef<Path>>(path: P, report: &Report) -> Result<LiveTree> {
@@ -38,13 +36,9 @@ impl LiveTree {
     ///
     /// This replaces any previous exclusions.
     pub fn with_excludes(self, excludes: GlobSet) -> LiveTree {
-        LiveTree {
-            excludes,
-            .. self
-        }
+        LiveTree { excludes, ..self }
     }
 }
-
 
 impl tree::ReadTree for LiveTree {
     type E = Entry;
@@ -97,13 +91,11 @@ impl tree::ReadTree for LiveTree {
     }
 }
 
-
 impl HasReport for LiveTree {
     fn report(&self) -> &Report {
         &self.report
     }
 }
-
 
 impl fmt::Debug for LiveTree {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -112,7 +104,6 @@ impl fmt::Debug for LiveTree {
             .finish()
     }
 }
-
 
 /// An entry in a live tree, describing a real file etc on disk.
 #[derive(Clone)]
@@ -126,7 +117,6 @@ pub struct Entry {
     /// stat-like structure including kind, mtime, etc.
     pub metadata: fs::Metadata,
 }
-
 
 impl entry::Entry for Entry {
     fn apath(&self) -> Apath {
@@ -161,12 +151,16 @@ impl entry::Entry for Entry {
         // TODO: Also return a Result if the link can't be read?
         match self.kind() {
             Kind::Symlink => Some(
-                fs::read_link(&self.path).unwrap().into_os_string().into_string().unwrap()),
+                fs::read_link(&self.path)
+                    .unwrap()
+                    .into_os_string()
+                    .into_string()
+                    .unwrap(),
+            ),
             _ => None,
         }
     }
 }
-
 
 impl fmt::Debug for Entry {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
@@ -176,7 +170,6 @@ impl fmt::Debug for Entry {
             .finish()
     }
 }
-
 
 /// Recursive iterator of the contents of a source directory.
 #[derive(Debug)]
@@ -196,7 +189,6 @@ pub struct Iter {
     /// glob pattern to skip in iterator
     excludes: GlobSet,
 }
-
 
 impl Iter {
     fn visit_next_directory(&mut self, dir_entry: &Entry) -> Result<()> {
@@ -243,10 +235,8 @@ impl Iter {
                 metadata,
             };
             if is_dir {
-                self.dir_deque.insert(
-                    directory_insert_point,
-                    new_entry.clone(),
-                );
+                self.dir_deque
+                    .insert(directory_insert_point, new_entry.clone());
                 directory_insert_point += 1;
             }
             self.entry_deque.push_back(new_entry);
@@ -254,7 +244,6 @@ impl Iter {
         Ok(())
     }
 }
-
 
 // The source iterator yields one path at a time as it walks through the source directories.
 //
@@ -290,7 +279,6 @@ impl Iterator for Iter {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::super::*;
@@ -302,7 +290,8 @@ mod tests {
         let lt = LiveTree::open(tf.path(), &Report::new()).unwrap();
         assert_eq!(
             format!("{:?}", &lt),
-            format!("LiveTree {{ path: {:?} }}", tf.path()));
+            format!("LiveTree {{ path: {:?} }}", tf.path())
+        );
     }
 
     #[test]
@@ -317,10 +306,7 @@ mod tests {
         let report = Report::new();
         let lt = LiveTree::open(tf.path(), &report).unwrap();
         let mut source_iter = lt.iter_entries().unwrap();
-        let result = source_iter
-            .by_ref()
-            .collect::<Result<Vec<_>>>()
-            .unwrap();
+        let result = source_iter.by_ref().collect::<Result<Vec<_>>>().unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[0].path, &tf.root);
@@ -351,7 +337,6 @@ mod tests {
         assert_eq!(report.get_count("source.selected"), 7);
     }
 
-
     #[test]
     fn exclude_entries_directory() {
         let tf = TreeFixture::new();
@@ -366,13 +351,11 @@ mod tests {
 
         let excludes = excludes::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
-        let lt = LiveTree::open(tf.path(), &report).unwrap()
+        let lt = LiveTree::open(tf.path(), &report)
+            .unwrap()
             .with_excludes(excludes);
         let mut source_iter = lt.iter_entries().unwrap();
-        let result = source_iter
-            .by_ref()
-            .collect::<Result<Vec<_>>>()
-            .unwrap();
+        let result = source_iter.by_ref().collect::<Result<Vec<_>>>().unwrap();
 
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -394,9 +377,9 @@ mod tests {
 
         assert_eq!(
             2,
-            report.borrow_counts().get_count(
-                "source.visited.directories",
-            )
+            report
+                .borrow_counts()
+                .get_count("source.visited.directories",)
         );
         assert_eq!(3, report.borrow_counts().get_count("source.selected"));
         assert_eq!(
@@ -405,9 +388,9 @@ mod tests {
         );
         assert_eq!(
             1,
-            report.borrow_counts().get_count(
-                "skipped.excluded.directories",
-            )
+            report
+                .borrow_counts()
+                .get_count("skipped.excluded.directories",)
         );
     }
 
@@ -419,7 +402,8 @@ mod tests {
         let report = Report::new();
 
         let lt = LiveTree::open(tf.path(), &report).unwrap();
-        let result = lt.iter_entries()
+        let result = lt
+            .iter_entries()
             .unwrap()
             .collect::<Result<Vec<_>>>()
             .unwrap();

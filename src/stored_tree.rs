@@ -8,9 +8,8 @@
 //! across incremental backups, hiding from the caller that data may be distributed across
 //! multiple index files, bands, and blocks.
 
-use super::*;
 use super::stored_file::StoredFile;
-
+use super::*;
 
 /// Read index and file contents for a version stored in the archive.
 #[derive(Debug)]
@@ -19,7 +18,6 @@ pub struct StoredTree {
     band: Band,
     excludes: GlobSet,
 }
-
 
 impl StoredTree {
     /// Open the last complete version in the archive.
@@ -60,10 +58,7 @@ impl StoredTree {
     }
 
     pub fn with_excludes(self, excludes: GlobSet) -> StoredTree {
-        StoredTree {
-            excludes,
-            .. self
-        }
+        StoredTree { excludes, ..self }
     }
 
     pub fn band(&self) -> &Band {
@@ -82,7 +77,6 @@ impl StoredTree {
     // call if it reads the whole index.
 }
 
-
 impl ReadTree for StoredTree {
     type E = index::IndexEntry;
     type I = index::Iter;
@@ -94,10 +88,13 @@ impl ReadTree for StoredTree {
     }
 
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
-        Ok(StoredFile::open(self.band.block_dir(), entry.addrs.clone(), self.report()))
+        Ok(StoredFile::open(
+            self.band.block_dir(),
+            entry.addrs.clone(),
+            self.report(),
+        ))
     }
 }
-
 
 impl HasReport for StoredTree {
     fn report(&self) -> &Report {
@@ -105,13 +102,10 @@ impl HasReport for StoredTree {
     }
 }
 
-
-
-
 #[cfg(test)]
 mod test {
-    use super::super::*;
     use super::super::test_fixtures::*;
+    use super::super::*;
 
     #[test]
     pub fn open_stored_tree() {
@@ -123,7 +117,8 @@ mod test {
 
         assert_eq!(st.band().id(), last_band_id);
 
-        let names: Vec<String> = st.iter_entries()
+        let names: Vec<String> = st
+            .iter_entries()
             .unwrap()
             .map(|e| e.unwrap().apath)
             .collect();

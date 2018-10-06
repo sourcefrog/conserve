@@ -10,13 +10,14 @@ pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Re
     let mut builder = GlobSetBuilder::new();
     for e in excludes {
         let exclude = e.as_ref();
-        builder.add(Glob::new(exclude).chain_err(|| {
-            format!("Failed to parse exclude value: {}", exclude)
-        })?);
+        builder.add(
+            Glob::new(exclude)
+                .chain_err(|| format!("Failed to parse exclude value: {}", exclude))?,
+        );
     }
-    builder.build().chain_err(
-        || "Failed to build exclude patterns",
-    )
+    builder
+        .build()
+        .chain_err(|| "Failed to build exclude patterns")
 }
 
 pub fn excludes_nothing() -> GlobSet {
@@ -25,9 +26,8 @@ pub fn excludes_nothing() -> GlobSet {
 
 #[cfg(test)]
 mod tests {
-    use spectral::prelude::*;
     use super::super::*;
-
+    use spectral::prelude::*;
 
     #[test]
     pub fn simple_parse() {

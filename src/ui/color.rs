@@ -25,7 +25,6 @@ pub struct ColorUI {
     progress_present: bool,
 }
 
-
 impl ColorUI {
     /// Return a new ColorUI or None if there isn't a suitable terminal.
     pub fn new() -> Option<ColorUI> {
@@ -58,7 +57,6 @@ impl ColorUI {
     }
 }
 
-
 fn duration_to_hms(d: Duration) -> String {
     let elapsed_secs = d.as_secs();
     if elapsed_secs >= 3600 {
@@ -73,7 +71,6 @@ fn duration_to_hms(d: Duration) -> String {
     }
 }
 
-
 fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
     let float_secs = elapsed.as_secs() as f64;
     if float_secs > 0.0 {
@@ -82,7 +79,6 @@ fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
         0f64
     }
 }
-
 
 impl UI for ColorUI {
     fn show_progress(&mut self, counts: &Counts) {
@@ -119,11 +115,10 @@ impl UI for ColorUI {
         t.fg(term::color::WHITE).unwrap();
         write!(t, " dirs").unwrap();
         t.fg(term::color::GREEN).unwrap();
-        write!(t, " {:>9} => {:<9} {:2.1}x {:6.1}MB/s",
-            uncomp_mb_str,
-            comp_mb_str,
-            block_comp_ratio,
-            uncomp_rate,
+        write!(
+            t,
+            " {:>9} => {:<9} {:2.1}x {:6.1}MB/s",
+            uncomp_mb_str, comp_mb_str, block_comp_ratio, uncomp_rate,
         ).unwrap();
         t.fg(term::color::WHITE).unwrap();
         t.flush().unwrap();
@@ -145,7 +140,6 @@ impl UI for ColorUI {
         t.flush().unwrap();
     }
 }
-
 
 impl fmt::Debug for ColorUI {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {

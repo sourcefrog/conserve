@@ -13,14 +13,13 @@ use std::vec;
 
 use rustc_serialize::json;
 
-use super::*;
 use super::apath::Apath;
 use super::block;
+use super::*;
 
 use globset::GlobSet;
 
 const MAX_ENTRIES_PER_HUNK: usize = 1000;
-
 
 /// Description of one archived file.
 ///
@@ -46,7 +45,6 @@ pub struct IndexEntry {
     pub target: Option<String>,
 }
 
-
 impl entry::Entry for IndexEntry {
     fn apath(&self) -> Apath {
         Apath::from_string(&self.apath)
@@ -61,13 +59,10 @@ impl entry::Entry for IndexEntry {
     }
 
     fn symlink_target(&self) -> Option<String> {
-        assert_eq!(
-            self.kind() == Kind::Symlink,
-            self.target.is_some());
+        assert_eq!(self.kind() == Kind::Symlink, self.target.is_some());
         self.target.clone()
     }
 }
-
 
 /// Accumulates ordered changes to the index and streams them out to index files.
 #[derive(Debug)]
@@ -86,7 +81,6 @@ pub struct IndexBuilder {
     /// hunk, and otherwise it's the last path from `entries`.
     check_order: apath::CheckOrder,
 }
-
 
 /// Accumulate and write out index entries into files in an index directory.
 impl IndexBuilder {
@@ -157,7 +151,6 @@ impl IndexBuilder {
     }
 }
 
-
 /// Return the subdirectory for a hunk numbered `hunk_number`.
 fn subdir_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
     let mut buf = dir.to_path_buf();
@@ -172,7 +165,6 @@ fn path_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
     buf
 }
 
-
 /// Read out all the entries from an existing index.
 pub struct Iter {
     /// The `i` directory within the band where all files for this index are written.
@@ -182,7 +174,6 @@ pub struct Iter {
     pub report: Report,
     excludes: GlobSet,
 }
-
 
 impl fmt::Debug for Iter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -194,7 +185,6 @@ impl fmt::Debug for Iter {
             .finish()
     }
 }
-
 
 impl Iterator for Iter {
     type Item = Result<IndexEntry>;
@@ -245,10 +235,8 @@ impl Iter {
             }
         };
         let (comp_len, index_bytes) = Snappy::decompress_read(&mut f)?;
-        self.report.increment_duration(
-            "index.read",
-            start_read.elapsed(),
-        );
+        self.report
+            .increment_duration("index.read", start_read.elapsed());
         self.report.increment_size(
             "index",
             Sizes {
@@ -259,19 +247,15 @@ impl Iter {
         self.report.increment("index.hunk", 1);
 
         let start_parse = time::Instant::now();
-        let index_json = str::from_utf8(&index_bytes).chain_err(|| {
-            format!("index file {:?} is not UTF-8", hunk_path)
-        })?;
-        let entries: Vec<IndexEntry> = json::decode(index_json).chain_err(|| {
-            format!("couldn't deserialize index hunk {:?}", hunk_path)
-        })?;
+        let index_json = str::from_utf8(&index_bytes)
+            .chain_err(|| format!("index file {:?} is not UTF-8", hunk_path))?;
+        let entries: Vec<IndexEntry> = json::decode(index_json)
+            .chain_err(|| format!("couldn't deserialize index hunk {:?}", hunk_path))?;
         if entries.is_empty() {
             warn!("Index hunk {} is empty", hunk_path.display());
         }
-        self.report.increment_duration(
-            "index.parse",
-            start_parse.elapsed(),
-        );
+        self.report
+            .increment_duration("index.parse", start_parse.elapsed());
 
         self.buffered_entries = entries
             .into_iter()
@@ -287,15 +271,13 @@ impl Iter {
                 } else {
                     true
                 }
-            })
-            .collect::<Vec<IndexEntry>>()
+            }).collect::<Vec<IndexEntry>>()
             .into_iter();
 
         self.next_hunk_number += 1;
         Ok(true)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -305,9 +287,10 @@ mod tests {
 
     use super::super::*;
 
-    pub const EXAMPLE_HASH: &'static str = "66ad1939a9289aa9f1f1d9ad7bcee69429\
-        3c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b\
-        2fb1d67e28262168013ba63c";
+    pub const EXAMPLE_HASH: &'static str =
+        "66ad1939a9289aa9f1f1d9ad7bcee69429\
+         3c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b\
+         2fb1d67e28262168013ba63c";
 
     pub fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder, Report) {
         let testdir = tempdir::TempDir::new("index_test").unwrap();
@@ -328,28 +311,26 @@ mod tests {
 
     #[test]
     fn serialize_index() {
-        let entries = [
-            IndexEntry {
-                apath: "/a/b".to_string(),
-                mtime: Some(1461736377),
-                kind: Kind::File,
-                blake2b: Some(EXAMPLE_HASH.to_string()),
-                addrs: vec![],
-                target: None,
-            },
-        ];
+        let entries = [IndexEntry {
+            apath: "/a/b".to_string(),
+            mtime: Some(1461736377),
+            kind: Kind::File,
+            blake2b: Some(EXAMPLE_HASH.to_string()),
+            addrs: vec![],
+            target: None,
+        }];
         let index_json = json::encode(&entries).unwrap();
         println!("{}", index_json);
         assert_eq!(
             index_json,
             "[{\"apath\":\"/a/b\",\
-            \"mtime\":1461736377,\
-            \"kind\":\"File\",\
-            \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3\
-            f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262\
-            168013ba63c\",\
-            \"addrs\":[],\
-            \"target\":null}]"
+             \"mtime\":1461736377,\
+             \"kind\":\"File\",\
+             \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3\
+             f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262\
+             168013ba63c\",\
+             \"addrs\":[],\
+             \"target\":null}]"
         );
     }
 
@@ -427,31 +408,33 @@ mod tests {
         assert_eq!(
             retrieved,
             "[{\"apath\":\"/apple\",\
-            \"mtime\":null,\
-            \"kind\":\"File\",\
-            \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb\
-            5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c\
-            2b2fb1d67e28262168013ba63c\",\
-            \"addrs\":[],\
-            \"target\":null},\
-            {\"apath\":\"/banana\",\
-            \"mtime\":null,\
-            \"kind\":\"File\",\
-            \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb\
-            5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c\
-            2b2fb1d67e28262168013ba63c\",\
-            \"addrs\":[],\
-            \"target\":null}]"
+             \"mtime\":null,\
+             \"kind\":\"File\",\
+             \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb\
+             5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c\
+             2b2fb1d67e28262168013ba63c\",\
+             \"addrs\":[],\
+             \"target\":null},\
+             {\"apath\":\"/banana\",\
+             \"mtime\":null,\
+             \"kind\":\"File\",\
+             \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb\
+             5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c\
+             2b2fb1d67e28262168013ba63c\",\
+             \"addrs\":[],\
+             \"target\":null}]"
         );
 
         let mut it = super::Iter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
-        let entry = it.next().expect("Get first entry").expect(
-            "First entry isn't an error",
-        );
+        let entry = it
+            .next()
+            .expect("Get first entry")
+            .expect("First entry isn't an error");
         assert_eq!(entry.apath, "/apple");
-        let entry = it.next().expect("Get second entry").expect(
-            "IndexEntry isn't an error",
-        );
+        let entry = it
+            .next()
+            .expect("Get second entry")
+            .expect("IndexEntry isn't an error");
         assert_eq!(entry.apath, "/banana");
         let opt_entry = it.next();
         if !opt_entry.is_none() {

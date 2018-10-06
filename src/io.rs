@@ -15,7 +15,6 @@ use tempfile;
 
 use super::*;
 
-
 pub struct AtomicFile {
     path: PathBuf,
     f: tempfile::NamedTempFile,
@@ -45,7 +44,6 @@ impl AtomicFile {
     }
 }
 
-
 impl Write for AtomicFile {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.f.write(buf)
@@ -56,7 +54,6 @@ impl Write for AtomicFile {
     }
 }
 
-
 impl Deref for AtomicFile {
     type Target = fs::File;
 
@@ -65,13 +62,11 @@ impl Deref for AtomicFile {
     }
 }
 
-
 impl DerefMut for AtomicFile {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.f
     }
 }
-
 
 pub fn ensure_dir_exists(path: &Path) -> Result<()> {
     if let Err(e) = fs::create_dir(path) {
@@ -81,7 +76,6 @@ pub fn ensure_dir_exists(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-
 
 /// True if path exists and is a directory, false if does not exist, error otherwise.
 #[allow(dead_code)]
@@ -94,15 +88,12 @@ pub fn directory_exists(path: &Path) -> Result<bool> {
                 Err("exists but not a directory".into())
             }
         }
-        Err(e) => {
-            match e.kind() {
-                io::ErrorKind::NotFound => Ok(false),
-                _ => Err(e.into()),
-            }
-        }
+        Err(e) => match e.kind() {
+            io::ErrorKind::NotFound => Ok(false),
+            _ => Err(e.into()),
+        },
     }
 }
-
 
 /// True if path exists and is a file, false if does not exist, error otherwise.
 pub fn file_exists(path: &Path) -> Result<bool> {
@@ -114,15 +105,12 @@ pub fn file_exists(path: &Path) -> Result<bool> {
                 Err("exists but not a file".into())
             }
         }
-        Err(e) => {
-            match e.kind() {
-                io::ErrorKind::NotFound => Ok(false),
-                _ => Err(e.into()),
-            }
-        }
+        Err(e) => match e.kind() {
+            io::ErrorKind::NotFound => Ok(false),
+            _ => Err(e.into()),
+        },
     }
 }
-
 
 /// List a directory.
 ///
@@ -146,7 +134,6 @@ pub fn list_dir(path: &Path) -> Result<(HashSet<String>, HashSet<String>)> {
     Ok((file_names, dir_names))
 }
 
-
 /// Create a directory if it doesn't exist; if it does then assert it must be empty.
 pub fn require_empty_directory(path: &Path) -> Result<()> {
     if let Err(e) = std::fs::create_dir(&path) {
@@ -164,7 +151,6 @@ pub fn require_empty_directory(path: &Path) -> Result<()> {
         Ok(()) // Created
     }
 }
-
 
 #[cfg(test)]
 mod tests {

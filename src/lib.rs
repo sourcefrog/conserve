@@ -4,9 +4,8 @@
 //!
 //! For user documentation and an overview see http://conserve.fyi/.
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-
+#![cfg_attr(feature = "clippy", feature(plugin))]
+#![cfg_attr(feature = "clippy", plugin(clippy))]
 #![recursion_limit = "1024"] // Needed by error-chain
 
 #[macro_use]
@@ -30,7 +29,6 @@ extern crate spectral;
 
 extern crate globset;
 
-
 // Conserve implementation modules.
 mod apath;
 mod archive;
@@ -38,10 +36,10 @@ mod backup;
 mod band;
 mod bandid;
 mod block;
-mod entry;
-pub mod excludes;
 pub mod compress;
+mod entry;
 pub mod errors;
+pub mod excludes;
 pub mod index;
 mod io;
 mod jsonio;
@@ -55,28 +53,27 @@ pub mod test_fixtures;
 mod tree;
 pub mod ui;
 
-pub use archive::Archive;
 pub use apath::Apath;
+pub use archive::Archive;
 pub use backup::BackupWriter;
 pub use band::Band;
 pub use bandid::BandId;
 pub use block::BlockDir;
-pub use compress::Compression;
 pub use compress::snappy::Snappy;
+pub use compress::Compression;
 pub use entry::{Entry, Kind};
 pub use errors::*;
-pub use io::{AtomicFile, ensure_dir_exists};
 pub use index::{IndexBuilder, IndexEntry};
+pub use io::{ensure_dir_exists, AtomicFile};
 pub use live_tree::LiveTree;
 pub use report::{HasReport, Report, Sizes};
 pub use restore::RestoreTree;
 pub use stored_tree::StoredTree;
-pub use tree::{ReadTree, WriteTree, copy_tree};
+pub use tree::{copy_tree, ReadTree, WriteTree};
 pub use ui::UI;
 
 // Commonly-used external types.
 pub use globset::GlobSet;
-
 
 /// Conserve version number as a semver string.
 ///

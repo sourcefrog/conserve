@@ -1,7 +1,6 @@
 // Copyright 2017 Martin Pool.
 
 /// Abstracted compression algorithms.
-
 use std::io;
 
 pub mod snappy;

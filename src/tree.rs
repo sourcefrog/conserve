@@ -6,7 +6,7 @@
 use super::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
-pub trait ReadTree : HasReport {
+pub trait ReadTree: HasReport {
     type E: Entry;
     type I: Iterator<Item = Result<Self::E>>;
     type R: std::io::Read;
@@ -14,7 +14,6 @@ pub trait ReadTree : HasReport {
     fn iter_entries(&self) -> Result<Self::I>;
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R>;
 }
-
 
 /// A tree open for writing, either local or an an archive.
 ///
@@ -29,7 +28,6 @@ pub trait WriteTree {
     fn write_symlink(&mut self, entry: &Entry) -> Result<()>;
     fn write_file(&mut self, entry: &Entry, content: &mut std::io::Read) -> Result<()>;
 }
-
 
 /// Copy files and other entries from one tree to another.
 ///

@@ -16,9 +16,7 @@ pub trait ShowArchive {
 }
 
 #[derive(Debug, Default)]
-pub struct ShortVersionList {
-}
-
+pub struct ShortVersionList {}
 
 impl ShowArchive for ShortVersionList {
     fn show_archive(&self, archive: &Archive) -> Result<()> {
@@ -39,10 +37,7 @@ impl VerboseVersionList {
     //
     // Setting this requires walking the band directories which takes some extra time.
     pub fn show_sizes(self, show_sizes: bool) -> VerboseVersionList {
-        VerboseVersionList {
-            show_sizes,
-            .. self
-        }
+        VerboseVersionList { show_sizes, ..self }
     }
 }
 
@@ -85,13 +80,10 @@ impl ShowArchive for VerboseVersionList {
             } else {
                 println!(
                     "{:<26} {:<10} {} {:>7}",
-                    band_id,
-                    is_complete_str,
-                    start_time_str,
-                    duration_str,
+                    band_id, is_complete_str, start_time_str, duration_str,
                 );
             }
-        };
+        }
         Ok(())
     }
 }
