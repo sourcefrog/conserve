@@ -26,9 +26,9 @@ impl BackupWriter {
         let block_dir = band.block_dir();
         let index_builder = band.index_builder();
         Ok(BackupWriter {
-            band: band,
-            block_dir: block_dir,
-            index_builder: index_builder,
+            band,
+            block_dir,
+            index_builder,
             report: archive.report().clone(),
         })
     }
@@ -70,7 +70,7 @@ impl tree::WriteTree for BackupWriter {
             apath: source_entry.apath().to_string().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::File,
-            addrs: addrs,
+            addrs,
             blake2b: Some(body_hash),
             target: None,
         })
@@ -86,7 +86,7 @@ impl tree::WriteTree for BackupWriter {
             kind: Kind::Symlink,
             addrs: vec![],
             blake2b: None,
-            target: target,
+            target,
         })
     }
 }

@@ -31,7 +31,7 @@ impl ColorUI {
     pub fn new() -> Option<ColorUI> {
         if let Some(t) = term::stdout() {
             Some(ColorUI {
-                t: t,
+                t,
                 last_update: None,
                 progress_present: false,
             })
