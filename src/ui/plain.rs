@@ -11,7 +11,7 @@ use super::Counts;
 use std::io;
 use std::io::prelude::*;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PlainUI;
 
 /// A plain text UI that prints log messages to stdout and does nothing about progress
@@ -32,6 +32,6 @@ impl super::UI for PlainUI {
     }
 
     fn print(&mut self, s: &str) {
-        io::stdout().write(s.as_bytes()).unwrap();
+        io::stdout().write_all(s.as_bytes()).unwrap();
     }
 }
