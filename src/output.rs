@@ -37,7 +37,7 @@ impl VerboseVersionList {
     //
     // Setting this requires walking the band directories which takes some extra time.
     pub fn show_sizes(self, show_sizes: bool) -> VerboseVersionList {
-        VerboseVersionList { show_sizes, ..self }
+        VerboseVersionList { show_sizes }
     }
 }
 
