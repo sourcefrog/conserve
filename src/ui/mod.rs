@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2018 Martin Pool.
 
 //! Abstract user interface trait.
 
@@ -20,6 +20,9 @@ pub trait UI: fmt::Debug {
 
     /// Show a log message.
     fn log(&mut self, record: &log::LogRecord);
+
+    /// Show a plain text message.
+    fn print(&mut self, s: &str);
 }
 
 /// Construct the best available UI for this environment.

@@ -8,6 +8,9 @@ use log;
 
 use super::Counts;
 
+use std::io;
+use std::io::prelude::*;
+
 #[derive(Debug)]
 pub struct PlainUI;
 
@@ -26,5 +29,9 @@ impl super::UI for PlainUI {
     /// Show a log message.
     fn log(&mut self, record: &log::LogRecord) {
         println!("{}", record.args());
+    }
+
+    fn print(&mut self, s: &str) {
+        io::stdout().write(s.as_bytes()).unwrap();
     }
 }

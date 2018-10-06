@@ -120,6 +120,10 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .global(true)
                 .possible_values(&["warn", "info", "debug"])
                 .help("Increased amount of debug logging"),
+        ).arg(
+            Arg::with_name("stats")
+                .long("stats")
+                .help("Show stats about IO, timing, and compression")
         ).subcommand(
             SubCommand::with_name("init")
                 .display_order(1)

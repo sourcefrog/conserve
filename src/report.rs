@@ -225,6 +225,10 @@ impl Report {
         // TODO: Leave cursor pending at the end of the line until it's finished?
         info!("{}", entry.apath());
     }
+
+    pub fn print(&self, s: &str) {
+        self.ui.lock().unwrap().print(s)
+    }
 }
 
 impl Default for Report {
@@ -233,6 +237,7 @@ impl Default for Report {
     }
 }
 
+// TODO: Maybe this should be on the Counts not the Report?
 impl Display for Report {
     fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), fmt::Error> {
         writeln!(f, "Counts:")?;

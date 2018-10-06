@@ -9,6 +9,9 @@
 
   `-v` ought to control listing filenames, not showing stats.
 
+  Maybe logging macros are too rarely used and not a good fit with Conserve's
+  problem-reporting pattern.
+
 * `--ignore .git` should probably ignore that anywhere in the tree. At present
   it'll try and fail to match the whole path.
 

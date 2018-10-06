@@ -139,6 +139,13 @@ impl UI for ColorUI {
         writeln!(t, "{}", record.args()).unwrap();
         t.flush().unwrap();
     }
+
+    fn print(&mut self, s: &str) {
+        self.clear();
+        let t = &mut self.t;
+        t.write(s.as_bytes()).unwrap();
+        t.flush().unwrap();
+    }
 }
 
 impl fmt::Debug for ColorUI {
