@@ -143,7 +143,7 @@ impl UI for ColorUI {
     fn print(&mut self, s: &str) {
         self.clear();
         let t = &mut self.t;
-        t.write_all(s.as_bytes()).unwrap();
+        writeln!(t, "{}", s).unwrap();
         t.flush().unwrap();
     }
 }

@@ -49,7 +49,8 @@ fn main() {
         Some("debug") => log::LogLevelFilter::Debug,
         Some(_level) => unimplemented!(),
     };
-    let report = Report::with_ui(ui);
+    let mut report = Report::with_ui(ui);
+    report.set_print_filenames(subm.is_present("v"));
     report.become_logger(log_level);
 
     let result = sub_fn(subm, &report);

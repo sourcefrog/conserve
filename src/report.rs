@@ -100,6 +100,7 @@ pub struct Counts {
 pub struct Report {
     counts: Arc<Mutex<Counts>>,
     ui: Arc<Mutex<Box<UI + Send>>>,
+    print_filenames: bool,
 }
 
 /// Trees and Archives have a Report as general context for operations on them.
@@ -132,7 +133,12 @@ impl Report {
         Report {
             counts: Arc::new(Mutex::new(Counts::new())),
             ui: Arc::new(Mutex::new(ui_box)),
+            print_filenames: false,
         }
+    }
+
+    pub fn set_print_filenames(&mut self, p: bool) {
+        self.print_filenames = p;
     }
 
     fn mut_counts(&self) -> MutexGuard<Counts> {
@@ -223,7 +229,9 @@ impl Report {
     /// Report that processing started for a given entry.
     pub fn start_entry(&self, entry: &Entry) {
         // TODO: Leave cursor pending at the end of the line until it's finished?
-        info!("{}", entry.apath());
+        if self.print_filenames {
+            self.print(&format!("{}", entry.apath()));
+        }
     }
 
     pub fn print(&self, s: &str) {
