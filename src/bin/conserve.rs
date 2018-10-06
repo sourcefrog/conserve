@@ -242,7 +242,7 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let lt = live_tree_from_options(subm, report)?;
     let mut bw = BackupWriter::begin(&archive)?;
-    copy_tree(&lt, &mut bw, &report)
+    copy_tree(&lt, &mut bw)
 }
 
 
@@ -289,7 +289,7 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     } else {
         RestoreTree::create(dest, report)
     }?;
-    copy_tree(&st, &mut rt, &report)
+    copy_tree(&st, &mut rt)
 }
 
 

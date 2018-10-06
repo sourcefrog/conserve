@@ -113,7 +113,7 @@ mod tests {
         let lt = LiveTree::open(srcdir.path(), &Report::new()).unwrap();
         let mut bw = BackupWriter::begin(&af).unwrap();
         let report = af.report();
-        tree::copy_tree(&lt, &mut bw, &report).unwrap();
+        tree::copy_tree(&lt, &mut bw).unwrap();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("file"));
         assert_eq!(1, report.get_count("symlink"));
@@ -157,7 +157,7 @@ mod tests {
         let lt = LiveTree::open(srcdir.path(), &report).unwrap()
             .with_excludes(excludes);
         let mut bw = BackupWriter::begin(&af).unwrap();
-        copy_tree(&lt, &mut bw, &report).unwrap();
+        copy_tree(&lt, &mut bw).unwrap();
 
         assert_eq!(1, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"));
@@ -177,7 +177,7 @@ mod tests {
         srcdir.create_file_with_contents("empty", &[]);
         let mut bw = BackupWriter::begin(&af).unwrap();
         let report = af.report();
-        copy_tree(&srcdir.live_tree(), &mut bw, &report).unwrap();
+        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
 
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"), "file count");

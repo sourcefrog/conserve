@@ -32,7 +32,10 @@ pub trait WriteTree {
 
 
 /// Copy files and other entries from one tree to another.
-pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT, report: &Report) -> Result<()> {
+///
+/// Progress and problems are reported to the source's report.
+pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Result<()> {
+    let report = source.report();
     for entry in source.iter_entries()? {
         let entry = entry?;
         report.start_entry(&entry);

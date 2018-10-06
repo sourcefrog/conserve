@@ -60,10 +60,10 @@ impl ScratchArchive {
 
         let report = Report::new();
         let lt = LiveTree::open(srcdir.path(), &report).unwrap();
-        copy_tree(&lt, &mut BackupWriter::begin(&self).unwrap(), &report).unwrap();
+        copy_tree(&lt, &mut BackupWriter::begin(&self).unwrap()).unwrap();
 
         srcdir.create_file("hello2");
-        copy_tree(&lt, &mut BackupWriter::begin(&self).unwrap(), &report).unwrap();
+        copy_tree(&lt, &mut BackupWriter::begin(&self).unwrap()).unwrap();
     }
 }
 
