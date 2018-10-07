@@ -20,8 +20,6 @@ use std::sync::{Mutex, MutexGuard};
 use std::time;
 use std::time::Duration;
 
-use log;
-
 use super::ui;
 use super::ui::plain::PlainUI;
 use super::ui::UI;
@@ -207,13 +205,6 @@ impl Report {
         result
     }
 
-    pub fn become_logger(&self, log_level: log::LogLevelFilter) {
-        log::set_logger(|max_log_level| {
-            max_log_level.set(log_level);
-            Box::new(self.clone())
-        }).ok();
-    }
-
     pub fn get_size(&self, counter_name: &str) -> Sizes {
         self.borrow_counts().get_size(counter_name)
     }
@@ -282,16 +273,6 @@ impl Display for Report {
             }
         }
         Ok(())
-    }
-}
-
-impl log::Log for Report {
-    fn enabled(&self, _metadata: &log::LogMetadata) -> bool {
-        true
-    }
-
-    fn log(&self, record: &log::LogRecord) {
-        self.ui.lock().unwrap().log(record);
     }
 }
 

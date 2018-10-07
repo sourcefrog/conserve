@@ -1,10 +1,8 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2018 Martin Pool.
 
 //! Display log messages to stdout with no color or cursor movement,
 //! perhaps for a log file.
-
-use log;
 
 use super::Counts;
 
@@ -22,11 +20,6 @@ impl PlainUI {
 
 impl super::UI for PlainUI {
     fn show_progress(&mut self, _counts: &Counts) {}
-
-    /// Show a log message.
-    fn log(&mut self, record: &log::LogRecord) {
-        println!("{}", record.args());
-    }
 
     fn print(&mut self, s: &str) {
         println!("{}", s);

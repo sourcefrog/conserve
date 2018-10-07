@@ -8,7 +8,6 @@ use std::fmt;
 pub use super::report::{Counts, Sizes};
 
 use isatty;
-use log;
 
 pub mod color;
 pub mod plain;
@@ -17,9 +16,6 @@ pub mod plain;
 pub trait UI: fmt::Debug {
     /// Show counters, eg as a progress bar.
     fn show_progress(&mut self, counts: &Counts);
-
-    /// Show a log message.
-    fn log(&mut self, record: &log::LogRecord);
 
     /// Show a plain text message.
     fn print(&mut self, s: &str);

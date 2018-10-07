@@ -8,7 +8,6 @@
 
 #[macro_use]
 extern crate error_chain;
-extern crate log;
 
 extern crate blake2_rfc;
 extern crate chrono;

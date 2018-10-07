@@ -7,7 +7,6 @@
 
 use std::path::Path;
 
-extern crate log;
 #[macro_use]
 extern crate clap;
 
@@ -41,16 +40,8 @@ fn main() {
         None => ui::best_ui(),
     };
 
-    let log_level = match matches.value_of("log-level").or(subm.value_of("log-level")) {
-        None => log::LogLevelFilter::Warn,
-        Some("warn") => log::LogLevelFilter::Warn,
-        Some("info") => log::LogLevelFilter::Info,
-        Some("debug") => log::LogLevelFilter::Debug,
-        Some(_level) => unimplemented!(),
-    };
     let mut report = Report::with_ui(ui);
     report.set_print_filenames(subm.is_present("v"));
-    report.become_logger(log_level);
 
     let result = sub_fn(subm, &report);
 
@@ -114,13 +105,6 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .help("UI for progress and messages")
                 .takes_value(true)
                 .possible_values(&["auto", "plain", "color"]),
-        ).arg(
-            Arg::with_name("log-level")
-                .takes_value(true)
-                .long("log-level")
-                .global(true)
-                .possible_values(&["warn", "info", "debug"])
-                .help("Increased amount of debug logging"),
         ).arg(
             Arg::with_name("stats")
                 .long("stats")

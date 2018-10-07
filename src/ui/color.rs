@@ -10,8 +10,6 @@ use std::fmt;
 use std::io::prelude::*;
 use std::time::{Duration, Instant};
 
-use log;
-use log::LogLevel;
 use term;
 
 use report::Counts;
@@ -121,22 +119,6 @@ impl UI for ColorUI {
             uncomp_mb_str, comp_mb_str, block_comp_ratio, uncomp_rate,
         ).unwrap();
         t.fg(term::color::WHITE).unwrap();
-        t.flush().unwrap();
-    }
-
-    fn log(&mut self, record: &log::LogRecord) {
-        let level = record.metadata().level();
-        self.clear();
-        let t = &mut self.t;
-        match level {
-            LogLevel::Error | LogLevel::Warn => {
-                t.fg(term::color::RED).unwrap();
-                (write!(t, "{}: ", level)).unwrap();
-                t.reset().unwrap();
-            }
-            _ => (),
-        }
-        writeln!(t, "{}", record.args()).unwrap();
         t.flush().unwrap();
     }
 
