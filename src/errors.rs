@@ -1,11 +1,7 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Conserve error types.
-
-// Clippy warns about a redundant closure, but the closure is in the error-chain crate
-// and not useful to flag here.
-#![allow(unknown_lints,redundant_closure)]
 
 use rustc_serialize;
 use std::io;
