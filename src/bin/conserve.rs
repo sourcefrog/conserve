@@ -221,9 +221,11 @@ fn show_chained_errors(e: &Error) {
     }
 }
 
-fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
+fn init(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive_path = subm.value_of("archive").expect("'archive' arg not found");
-    Archive::create(archive_path).and(Ok(()))
+    Archive::create(archive_path).and(Ok(()))?;
+    report.print(&format!("Created new archive in {}", archive_path));
+    Ok(())
 }
 
 fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
