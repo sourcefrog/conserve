@@ -46,7 +46,7 @@ impl ColorUI {
         }
     }
 
-    fn clear(&mut self) {
+    fn clear_progress(&mut self) {
         if self.progress_present {
             self.t.carriage_return().unwrap();
             self.t.delete_line().unwrap();
@@ -83,7 +83,7 @@ impl UI for ColorUI {
         if self.progress_present && self.throttle_updates() {
             return;
         }
-        self.clear();
+        self.clear_progress();
         self.last_update = Some(Instant::now());
         self.progress_present = true;
 
@@ -123,19 +123,18 @@ impl UI for ColorUI {
     }
 
     fn print(&mut self, s: &str) {
-        self.clear();
+        self.clear_progress();
         let t = &mut self.t;
         writeln!(t, "{}", s).unwrap();
         t.flush().unwrap();
     }
 
     fn problem(&mut self, s: &str) {
-        self.clear();
+        self.clear_progress();
         let t = &mut self.t;
         t.fg(term::color::RED).unwrap();
         (write!(t, "{}: ", s)).unwrap();
         t.reset().unwrap();
-        writeln!(t, "{}", s).unwrap();
         t.flush().unwrap();
     }
 }
