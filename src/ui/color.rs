@@ -126,7 +126,8 @@ impl UI for ColorUI {
             t,
             " {:>9} => {:<9} {:2.1}x {:6.1}MB/s",
             uncomp_mb_str, comp_mb_str, block_comp_ratio, uncomp_rate,
-        ).unwrap();
+        )
+        .unwrap();
         t.fg(term::color::WHITE).unwrap();
         t.flush().unwrap();
     }

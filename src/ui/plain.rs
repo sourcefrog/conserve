@@ -29,5 +29,5 @@ impl super::UI for PlainUI {
         self.print(s)
     }
 
-    fn finish(&mut self) { }
+    fn finish(&mut self) {}
 }

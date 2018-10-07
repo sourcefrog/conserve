@@ -34,7 +34,7 @@ impl UI {
     pub fn by_name(ui_name: &str, progress_bar: bool) -> Option<Box<UI + Send>> {
         if ui_name == "color" || (ui_name == "auto" && isatty::stdout_isatty()) {
             if let Some(ui) = color::ColorUI::new(progress_bar) {
-                return Some(Box::new(ui))
+                return Some(Box::new(ui));
             }
         }
         Some(Box::new(plain::PlainUI::new()))
@@ -60,8 +60,8 @@ pub fn compression_ratio(s: &Sizes) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use report::Sizes;
     use super::UI;
+    use report::Sizes;
 
     // TODO: Somehow test the type returned by `by_name`?
     #[test]

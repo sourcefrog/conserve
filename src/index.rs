@@ -252,7 +252,8 @@ impl Iter {
         let entries: Vec<IndexEntry> = json::decode(index_json)
             .chain_err(|| format!("couldn't deserialize index hunk {:?}", hunk_path))?;
         if entries.is_empty() {
-            self.report.problem(&format!("Index hunk {} is empty", hunk_path.display()));
+            self.report
+                .problem(&format!("Index hunk {} is empty", hunk_path.display()));
         }
         self.report
             .increment_duration("index.parse", start_parse.elapsed());
@@ -271,7 +272,8 @@ impl Iter {
                 } else {
                     true
                 }
-            }).collect::<Vec<IndexEntry>>()
+            })
+            .collect::<Vec<IndexEntry>>()
             .into_iter();
 
         self.next_hunk_number += 1;

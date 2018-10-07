@@ -42,7 +42,10 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
             Kind::File => dest.write_file(&entry, &mut source.file_contents(&entry)?),
             Kind::Symlink => dest.write_symlink(&entry),
             Kind::Unknown => {
-                report.problem(&format!("Skipping unsupported file kind of {}", &entry.apath()));
+                report.problem(&format!(
+                    "Skipping unsupported file kind of {}",
+                    &entry.apath()
+                ));
                 // TODO: Count them - make the report visible somewhere? Or rather, make this the
                 // job of the ST to skip them.
                 continue;

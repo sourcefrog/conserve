@@ -128,7 +128,8 @@ impl BlockDir {
                 block_hash = rayon::join(
                     || report.measure_duration("file.hash", || file_hasher.update(&in_buf)),
                     || report.measure_duration("block.hash", || hash_bytes(&in_buf).unwrap()),
-                ).1;
+                )
+                .1;
             }
 
             if self.contains(&block_hash)? {
@@ -179,7 +180,10 @@ impl BlockDir {
         if let Err(e) = tempf.persist(&self.path_for_file(&hex_hash)) {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
-                report.problem(&format!("Unexpected late detection of existing block {:?}", hex_hash));
+                report.problem(&format!(
+                    "Unexpected late detection of existing block {:?}",
+                    hex_hash
+                ));
                 report.increment("block.already_present", 1);
             } else {
                 return Err(e.error.into());
@@ -239,7 +243,8 @@ impl BlockDir {
             report.increment("block.misplaced", 1);
             report.problem(&format!(
                 "Block file {:?} has actual decompressed hash {:?}",
-                path, actual_hash));
+                path, actual_hash
+            ));
             return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
         Ok(decompressed)

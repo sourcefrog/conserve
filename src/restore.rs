@@ -71,7 +71,8 @@ impl tree::WriteTree for RestoreTree {
             unix_fs::symlink(target, self.entry_path(entry))?;
         } else {
             // TODO: Treat as an error.
-            self.report.problem(&format!("No target in symlink entry {}", entry.apath()));
+            self.report
+                .problem(&format!("No target in symlink entry {}", entry.apath()));
         }
         Ok(())
     }
@@ -80,7 +81,10 @@ impl tree::WriteTree for RestoreTree {
     fn write_symlink(&mut self, entry: &Entry) -> Result<()> {
         // TODO: Add a test with a canned index containing a symlink, and expect
         // it cannot be restored on Windows and can be on Unix.
-        self.report.problem(&format!("Can't restore symlinks on non-Unix: {}", entry.apath()));
+        self.report.problem(&format!(
+            "Can't restore symlinks on non-Unix: {}",
+            entry.apath()
+        ));
         self.report.increment("skipped.unsupported_file_kind", 1);
         Ok(())
     }

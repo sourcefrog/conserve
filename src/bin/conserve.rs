@@ -33,7 +33,10 @@ fn main() {
     };
     let subm = subm.unwrap();
 
-    let ui_name = matches.value_of("ui").or_else(|| subm.value_of("ui")).unwrap_or("auto");
+    let ui_name = matches
+        .value_of("ui")
+        .or_else(|| subm.value_of("ui"))
+        .unwrap_or("auto");
     let no_progress = matches.is_present("no-progress");
     let ui = UI::by_name(ui_name, !no_progress).expect("Couldn't make UI");
     let mut report = Report::with_ui(ui);
@@ -102,15 +105,18 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .help("UI for progress and messages")
                 .takes_value(true)
                 .possible_values(&["auto", "plain", "color"]),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("no-progress")
                 .long("no-progress")
-                .help("Hide progress bar")
-        ).arg(
+                .help("Hide progress bar"),
+        )
+        .arg(
             Arg::with_name("stats")
                 .long("stats")
-                .help("Show stats about IO, timing, and compression")
-        ).subcommand(
+                .help("Show stats about IO, timing, and compression"),
+        )
+        .subcommand(
             SubCommand::with_name("init")
                 .display_order(1)
                 .about("Create a new archive")
@@ -119,9 +125,11 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                         .help(
                             "Path for new archive directory: \
                              should either not exist or be an empty directory",
-                        ).required(true),
+                        )
+                        .required(true),
                 ),
-        ).subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("backup")
                 .display_order(2)
                 .about("Copy source directory into an archive")
@@ -130,9 +138,11 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                     Arg::with_name("source")
                         .help("Backup from this directory")
                         .required(true),
-                ).arg(exclude_arg())
+                )
+                .arg(exclude_arg())
                 .arg(verbose_arg()),
-        ).subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("restore")
                 .display_order(3)
                 .about("Copy a backup tree out of an archive")
@@ -145,17 +155,21 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                      to prevent you thinking you restored the whole tree when it may \
                      be truncated.  You can override this with --incomplete, or \
                      select an older version with --backup.",
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("destination")
                         .help("Restore to this new directory")
                         .required(true),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("force-overwrite")
                         .long("force-overwrite")
                         .help("Overwrite existing destination directory"),
-                ).arg(exclude_arg())
+                )
+                .arg(exclude_arg())
                 .arg(verbose_arg()),
-        ).subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("versions")
                 .display_order(4)
                 .about("List backup versions in an archive")
@@ -164,18 +178,21 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                      line.  For each version the output shows the version name, \
                      whether it is complete, when it started, and (if complete) \
                      how much time elapsed.",
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("sizes")
                         .help("Show version disk sizes")
                         .long("sizes"),
-                ).arg(archive_arg())
+                )
+                .arg(archive_arg())
                 .arg(
                     Arg::with_name("short")
                         .help("List just version name without details")
                         .long("short")
                         .short("s"),
                 ),
-        ).subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("ls")
                 .display_order(5)
                 .about("List files in a backup version")
@@ -183,14 +200,16 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .arg(backup_arg())
                 .arg(exclude_arg())
                 .arg(incomplete_arg()),
-        ).subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("list-source")
                 .about("Recursive list files from source directory")
                 .arg(
                     Arg::with_name("source")
                         .help("Source directory")
                         .required(true),
-                ).arg(exclude_arg()),
+                )
+                .arg(exclude_arg()),
         )
 }
 
@@ -265,11 +284,13 @@ fn stored_tree_from_options(subm: &ArgMatches, report: &Report) -> Result<Stored
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let st = match band_id_from_option(subm)? {
         None => StoredTree::open_last(&archive),
-        Some(ref b) => if subm.is_present("incomplete") {
-            StoredTree::open_incomplete_version(&archive, b)
-        } else {
-            StoredTree::open_version(&archive, b)
-        },
+        Some(ref b) => {
+            if subm.is_present("incomplete") {
+                StoredTree::open_incomplete_version(&archive, b)
+            } else {
+                StoredTree::open_version(&archive, b)
+            }
+        }
     }?;
     Ok(st.with_excludes(excludes_from_option(subm)?))
 }
