@@ -44,3 +44,7 @@ default = []
 
 # Use SIMD assembly, on nightly only.
 blake2_simd_asm = ["blake2-rfc/simd_asm"]
+
+[profile.release]
+# Include debug symbols for profiling
+debug = true
