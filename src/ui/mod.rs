@@ -24,16 +24,18 @@ pub trait UI: fmt::Debug {
     fn problem(&mut self, s: &str);
 }
 
-/// Construct a UI by name.
-///
-/// `ui_name` must be `"auto"`, `"plain"`, or `"color"`.
-pub fn by_name(ui_name: &str) -> Option<Box<UI + Send>> {
-    if ui_name == "color" || (ui_name == "auto" && isatty::stdout_isatty()) {
-        if let Some(ui) = color::ColorUI::new() {
-            return Some(Box::new(ui))
+impl UI {
+    /// Construct a UI by name.
+    ///
+    /// `ui_name` must be `"auto"`, `"plain"`, or `"color"`.
+    pub fn by_name(ui_name: &str) -> Option<Box<UI + Send>> {
+        if ui_name == "color" || (ui_name == "auto" && isatty::stdout_isatty()) {
+            if let Some(ui) = color::ColorUI::new() {
+                return Some(Box::new(ui))
+            }
         }
+        Some(Box::new(plain::PlainUI::new()))
     }
-    Some(Box::new(plain::PlainUI::new()))
 }
 
 pub fn compression_percent(s: &Sizes) -> i64 {

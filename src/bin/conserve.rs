@@ -16,8 +16,6 @@ extern crate globset;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
 extern crate conserve;
-
-use conserve::ui;
 use conserve::*;
 
 fn main() {
@@ -36,7 +34,7 @@ fn main() {
     let subm = subm.unwrap();
 
     let ui_name = matches.value_of("ui").or_else(|| subm.value_of("ui")).unwrap_or("auto");
-    let ui = ui::by_name(ui_name).expect("Couldn't make UI");
+    let ui = UI::by_name(ui_name).expect("Couldn't make UI");
 
     let mut report = Report::with_ui(ui);
     report.set_print_filenames(subm.is_present("v"));
