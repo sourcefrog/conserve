@@ -2,6 +2,5 @@ target
 .cargo/config
 *.bk
 .*.sw[po]
-Cargo.lock
 .idea/
 conserve.iml
