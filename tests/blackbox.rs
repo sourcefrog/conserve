@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017 Martin Pool.
+// Copyright 2016, 2017, 2018 Martin Pool.
 
 //! Run conserve CLI as a subprocess and test it.
 
