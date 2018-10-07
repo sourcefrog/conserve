@@ -48,7 +48,6 @@ impl Archive {
         let header_filename = path.join(HEADER_FILENAME);
         jsonio::write(&header_filename, &header, &archive.report)
             .chain_err(|| format!("Failed to write archive header: {:?}", header_filename))?;
-        info!("Created new archive in {:?}", path.display());
         Ok(archive)
     }
 

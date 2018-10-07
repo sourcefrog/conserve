@@ -81,7 +81,6 @@ impl Band {
         fs::create_dir(&new.path_buf)?;
         fs::create_dir(&new.block_dir_path)?;
         fs::create_dir(&new.index_dir_path)?;
-        info!("Created band {} in {:?}", new.id, &archive_dir);
 
         let head = Head {
             start_time: UTC::now().timestamp(),
