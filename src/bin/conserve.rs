@@ -34,7 +34,8 @@ fn main() {
     let subm = subm.unwrap();
 
     let ui_name = matches.value_of("ui").or_else(|| subm.value_of("ui")).unwrap_or("auto");
-    let ui = UI::by_name(ui_name).expect("Couldn't make UI");
+    let no_progress = matches.is_present("no-progress");
+    let ui = UI::by_name(ui_name, !no_progress).expect("Couldn't make UI");
 
     let mut report = Report::with_ui(ui);
     report.set_print_filenames(subm.is_present("v"));
@@ -101,6 +102,10 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .help("UI for progress and messages")
                 .takes_value(true)
                 .possible_values(&["auto", "plain", "color"]),
+        ).arg(
+            Arg::with_name("no-progress")
+                .long("no-progress")
+                .help("Hide progress bar")
         ).arg(
             Arg::with_name("stats")
                 .long("stats")

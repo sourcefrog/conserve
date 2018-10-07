@@ -28,9 +28,9 @@ impl UI {
     /// Construct a UI by name.
     ///
     /// `ui_name` must be `"auto"`, `"plain"`, or `"color"`.
-    pub fn by_name(ui_name: &str) -> Option<Box<UI + Send>> {
+    pub fn by_name(ui_name: &str, progress_bar: bool) -> Option<Box<UI + Send>> {
         if ui_name == "color" || (ui_name == "auto" && isatty::stdout_isatty()) {
-            if let Some(ui) = color::ColorUI::new() {
+            if let Some(ui) = color::ColorUI::new(progress_bar) {
                 return Some(Box::new(ui))
             }
         }
@@ -58,14 +58,15 @@ pub fn compression_ratio(s: &Sizes) -> f64 {
 #[cfg(test)]
 mod tests {
     use report::Sizes;
+    use super::UI;
 
     // TODO: Somehow test the type returned by `by_name`?
     #[test]
     pub fn by_name() {
         // You must get some UI back from the default.
-        assert!(super::by_name("auto").is_some());
+        assert!(UI::by_name("auto", true).is_some());
         // Plain UI should always be possible.
-        assert!(super::by_name("plain").is_some());
+        assert!(UI::by_name("plain", true).is_some());
     }
 
     #[test]

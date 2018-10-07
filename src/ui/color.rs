@@ -20,17 +20,23 @@ const MB: u64 = 1_000_000;
 pub struct ColorUI {
     t: Box<term::StdoutTerminal>,
     last_update: Option<Instant>,
+
+    /// Is a progress bar currently on the screen?
     progress_present: bool,
+
+    /// Should a progress bar be drawn?
+    progress_enabled: bool,
 }
 
 impl ColorUI {
     /// Return a new ColorUI or None if there isn't a suitable terminal.
-    pub fn new() -> Option<ColorUI> {
+    pub fn new(progress_bar: bool) -> Option<ColorUI> {
         if let Some(t) = term::stdout() {
             Some(ColorUI {
                 t,
                 last_update: None,
                 progress_present: false,
+                progress_enabled: progress_bar,
             })
         } else {
             None
@@ -80,6 +86,9 @@ fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
 
 impl UI for ColorUI {
     fn show_progress(&mut self, counts: &Counts) {
+        if !self.progress_enabled {
+            return;
+        }
         if self.progress_present && self.throttle_updates() {
             return;
         }
