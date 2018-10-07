@@ -146,6 +146,10 @@ impl UI for ColorUI {
         t.reset().unwrap();
         t.flush().unwrap();
     }
+
+    fn finish(&mut self) {
+        self.clear_progress();
+    }
 }
 
 impl fmt::Debug for ColorUI {

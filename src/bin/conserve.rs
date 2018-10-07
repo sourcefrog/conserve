@@ -36,11 +36,11 @@ fn main() {
     let ui_name = matches.value_of("ui").or_else(|| subm.value_of("ui")).unwrap_or("auto");
     let no_progress = matches.is_present("no-progress");
     let ui = UI::by_name(ui_name, !no_progress).expect("Couldn't make UI");
-
     let mut report = Report::with_ui(ui);
     report.set_print_filenames(subm.is_present("v"));
 
     let result = sub_fn(subm, &report);
+    report.finish();
 
     if matches.is_present("stats") {
         report.print(&format!("{}", report));

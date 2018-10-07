@@ -22,6 +22,9 @@ pub trait UI: fmt::Debug {
 
     /// Print an error message.
     fn problem(&mut self, s: &str);
+
+    /// Clear up the UI before exiting.
+    fn finish(&mut self);
 }
 
 impl UI {

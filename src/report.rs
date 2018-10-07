@@ -235,6 +235,10 @@ impl Report {
     pub fn problem(&self, s: &str) {
         self.ui.lock().unwrap().problem(s)
     }
+
+    pub fn finish(&self) {
+        self.ui.lock().unwrap().finish()
+    }
 }
 
 impl Default for Report {

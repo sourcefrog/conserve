@@ -28,4 +28,6 @@ impl super::UI for PlainUI {
     fn problem(&mut self, s: &str) {
         self.print(s)
     }
+
+    fn finish(&mut self) { }
 }
