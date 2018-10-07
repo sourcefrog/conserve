@@ -77,7 +77,7 @@ impl Archive {
     pub fn iter_bands_unsorted(self: &Archive) -> Result<IterBands> {
         let read_dir = read_dir(&self.path)
             .chain_err(|| format!("failed reading directory {:?}", &self.path))?;
-        Ok(IterBands { dir_iter: read_dir })
+        Ok(IterBands { dir_iter: read_dir, report: self.report.clone() })
     }
 
     /// Returns a vector of band ids, in sorted order from first to last.
@@ -132,6 +132,7 @@ impl HasReport for Archive {
 
 pub struct IterBands {
     dir_iter: fs::ReadDir,
+    report: Report,
 }
 
 impl Iterator for IterBands {
@@ -160,13 +161,13 @@ impl Iterator for IterBands {
                 if let Ok(band_id) = BandId::from_string(&name_string) {
                     return Some(Ok(band_id));
                 } else {
-                    warn!("unexpected archive subdirectory {:?}", &name_string);
+                    self.report.problem(&format!("unexpected archive subdirectory {:?}", &name_string));
                 }
             } else {
-                warn!(
+                self.report.problem(&format!(
                     "unexpected archive subdirectory with un-decodable name {:?}",
                     entry.file_name()
-                )
+                ));
             }
         }
     }

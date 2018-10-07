@@ -43,18 +43,19 @@ impl VerboseVersionList {
 
 impl ShowArchive for VerboseVersionList {
     fn show_archive(&self, archive: &Archive) -> Result<()> {
+        let report = archive.report();
         for band_id in archive.list_bands()? {
             let band = match Band::open(&archive, &band_id) {
                 Ok(band) => band,
                 Err(e) => {
-                    warn!("Failed to open band {:?}: {:?}", band_id, e);
+                    report.problem(&format!("Failed to open band {:?}: {:?}", band_id, e));
                     continue;
                 }
             };
             let info = match band.get_info(archive.report()) {
                 Ok(info) => info,
                 Err(e) => {
-                    warn!("Failed to read band tail {:?}: {:?}", band_id, e);
+                    report.problem(&format!("Failed to read band tail {:?}: {:?}", band_id, e));
                     continue;
                 }
             };

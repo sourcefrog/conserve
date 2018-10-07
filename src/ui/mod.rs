@@ -23,6 +23,9 @@ pub trait UI: fmt::Debug {
 
     /// Show a plain text message.
     fn print(&mut self, s: &str);
+
+    /// Print an error message.
+    fn problem(&mut self, s: &str);
 }
 
 /// Construct the best available UI for this environment.

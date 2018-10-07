@@ -146,6 +146,16 @@ impl UI for ColorUI {
         writeln!(t, "{}", s).unwrap();
         t.flush().unwrap();
     }
+
+    fn problem(&mut self, s: &str) {
+        self.clear();
+        let t = &mut self.t;
+        t.fg(term::color::RED).unwrap();
+        (write!(t, "{}: ", s)).unwrap();
+        t.reset().unwrap();
+        writeln!(t, "{}", s).unwrap();
+        t.flush().unwrap();
+    }
 }
 
 impl fmt::Debug for ColorUI {

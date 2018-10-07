@@ -57,7 +57,7 @@ impl tree::ReadTree for LiveTree {
         let root_metadata = match fs::symlink_metadata(&self.path) {
             Ok(metadata) => metadata,
             Err(e) => {
-                warn!("{}", e);
+                self.report.problem(&format!("{}", e));
                 return Err(e.into());
             }
         };
@@ -224,7 +224,7 @@ impl Iter {
             let metadata = match fs::symlink_metadata(&child_path) {
                 Ok(metadata) => metadata,
                 Err(e) => {
-                    warn!("{}", e);
+                    self.report.problem(&format!("source metadata error on {:?}: {}", child_path, e));
                     self.report.increment("source.error.metadata", 1);
                     continue;
                 }

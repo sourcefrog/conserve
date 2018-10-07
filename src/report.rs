@@ -237,6 +237,13 @@ impl Report {
     pub fn print(&self, s: &str) {
         self.ui.lock().unwrap().print(s)
     }
+
+    /// Report that a problem occurred.
+    ///
+    /// Later this might also count or summarize them.
+    pub fn problem(&self, s: &str) {
+        self.ui.lock().unwrap().problem(s)
+    }
 }
 
 impl Default for Report {

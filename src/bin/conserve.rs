@@ -7,7 +7,6 @@
 
 use std::path::Path;
 
-#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate clap;
@@ -59,7 +58,7 @@ fn main() {
         report.print(&format!("{}", report));
     }
     if let Err(e) = result {
-        show_chained_errors(&e);
+        show_chained_errors(&report, &e);
         std::process::exit(1)
     }
 }
@@ -210,14 +209,14 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         )
 }
 
-fn show_chained_errors(e: &Error) {
-    error!("{}", e);
+fn show_chained_errors(report: &Report, e: &Error) {
+    report.problem(&format!("{}", e));
     for suberr in e.iter().skip(1) {
         // First was already printed
-        error!("  {}", suberr);
+        report.problem(&format!("  {}", suberr));
     }
     if let Some(bt) = e.backtrace() {
-        println!("{:?}", bt)
+        report.problem(&format!("{:?}", bt));
     }
 }
 

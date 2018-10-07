@@ -31,4 +31,8 @@ impl super::UI for PlainUI {
     fn print(&mut self, s: &str) {
         println!("{}", s);
     }
+
+    fn problem(&mut self, s: &str) {
+        self.print(s)
+    }
 }

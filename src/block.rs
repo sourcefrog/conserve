@@ -179,7 +179,7 @@ impl BlockDir {
         if let Err(e) = tempf.persist(&self.path_for_file(&hex_hash)) {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
-                warn!("Unexpected late detection of existing block {:?}", hex_hash);
+                report.problem(&format!("Unexpected late detection of existing block {:?}", hex_hash));
                 report.increment("block.already_present", 1);
             } else {
                 return Err(e.error.into());
@@ -215,7 +215,7 @@ impl BlockDir {
             Ok(d) => d,
             Err(e) => {
                 report.increment("block.corrupt", 1);
-                error!("Block file {:?} read error {:?}", path, e);
+                report.problem(&format!("Block file {:?} read error {:?}", path, e));
                 return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
             }
         };
@@ -237,10 +237,9 @@ impl BlockDir {
             .to_hex();
         if actual_hash != *hash {
             report.increment("block.misplaced", 1);
-            error!(
+            report.problem(&format!(
                 "Block file {:?} has actual decompressed hash {:?}",
-                path, actual_hash
-            );
+                path, actual_hash));
             return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
         Ok(decompressed)
