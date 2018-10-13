@@ -1,25 +1,5 @@
 # Conserve TODO
 
-## Short-term UI snags
-
-* `conserve backup -v` and `conserve restore -v`
-  ought to list all filenames as they're written, and
-  turn off the progress bar. (Later we could show it, if it interleaves
-  nicely.)
-
-  `-v` ought to control listing filenames, not showing stats.
-
-  Maybe logging macros are too rarely used and not a good fit with Conserve's
-  problem-reporting pattern.
-
-* `--ignore .git` should probably ignore that anywhere in the tree. At present
-  it'll try and fail to match the whole path.
-
-  Perhaps this should be the same as gitignore <https://git-scm.com/docs/gitignore>.
-
-  This might require a change from <https://docs.rs/globset/0.4.2/globset/> that
-  we use at present.
-
 ## Next major feature: Incremental backups
 
 The most important thing is incremental backups, otherwise this just uses too
@@ -59,6 +39,16 @@ How much is this similar to just doing a restore and throwing away the results?
 * no unexpected files or subdirectories, in any directories
 * hash of data files is as expected
 * all referenced blocks, exist
+
+## Better ignore patterns
+
+* `--ignore .git` should probably ignore that anywhere in the tree. At present
+  it'll try and fail to match the whole path.
+
+  Perhaps this should be the same as gitignore <https://git-scm.com/docs/gitignore>.
+
+  This might require a change from <https://docs.rs/globset/0.4.2/globset/> that
+  we use at present.
 
 ## Internal cleanups
 
