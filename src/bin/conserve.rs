@@ -24,6 +24,7 @@ fn main() {
     let (sub_name, subm) = matches.subcommand();
     let sub_fn = match sub_name {
         "backup" => backup,
+        "debug_blocks_list" => debug_blocks_list,
         "init" => init,
         "list-source" => list_source,
         "ls" => ls,
@@ -115,6 +116,13 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             Arg::with_name("stats")
                 .long("stats")
                 .help("Show stats about IO, timing, and compression"),
+        )
+        .subcommand(
+            SubCommand::with_name("debug_blocks_list")
+            .arg(
+                Arg::with_name("archive")
+                    .required(true)
+                    )
         )
         .subcommand(
             SubCommand::with_name("init")
@@ -278,6 +286,14 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
         RestoreTree::create(dest, report)
     }?;
     copy_tree(&st, &mut rt)
+}
+
+fn debug_blocks_list(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
+    for b in archive.block_dir().blocks(report)? {
+        println!("{}", b);
+    }
+    Ok(())
 }
 
 fn stored_tree_from_options(subm: &ArgMatches, report: &Report) -> Result<StoredTree> {
