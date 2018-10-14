@@ -5,22 +5,20 @@
 The most important thing is incremental backups, otherwise this just uses too
 much space for large trees.
 
-That requires:
+In fact this is two stacked changes which can be done and tried out separately:
 
-1. Adequate confidence this stacked format will work - perhaps it's enough to
-   at least try it.
+1. Have just one block directory per archive. Pretty simple probably.
 
-   Change to the approach in [Rethinking-bands](Rethinking-bands.md)?
+1. `conserve gc` of blocks not referenced by any index version.
 
-1. Stacked `BlockDir` - higher-level blockdirs should only store things not
-   in their parents.
+1. Incrementally stacked indexes:
 
-1. An index concept of a whiteout.
+   1. An index concept of a whiteout.
 
-1. A tree writer that can notice differences versus the previous tree, and
-   record only that.
+   1. A tree reader that reads several indexes in parallel and merges them.
 
-1. A tree reader that reads several indexes in parallel and merges them.
+   1. A tree writer that notices only the differences versus the parent tree,
+      and records them, including whiteouts.
 
 ## Validate
 
@@ -84,6 +82,15 @@ changes in the source:
   was created.
 
 Perhaps run a named command (like `diff`) on files that differ.
+
+## Refactor of the UI
+
+I'm not sure there's a really meaningful difference between the `color` and
+`plain` UIs: both are essentially text UIs.  Perhaps the user visible options
+should be `--color=auto` and `--progress=auto`, and it's all the same text
+UI. It can contain a progress bar, or a progress sink that does nothing if
+it's turned off or the terminal doesn't support it. And similarly for drawing
+colors if possible and wanted, and not otherwise.
 
 ## Better progress bar
 
