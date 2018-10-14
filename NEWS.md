@@ -1,5 +1,10 @@
 # Conserve release history
 
+## Unreleased 0.5.0
+
+* New format with only one block directory per archive uses less space,
+  and breaks compatibility with 0.4.3.
+
 ## Conserve 0.4.3 2018-10-13
 
 * `conserve versions` has a new `--sizes` option, to show disk usage by each
