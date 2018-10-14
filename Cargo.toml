@@ -28,7 +28,7 @@ tempdir = "^0"
 tempfile = "^2"
 term = "0.5.1"
 time = "^0"
-vergen = "0.1.1"
+vergen = "2.1"
 walkdir = "2"
 globset = "0.4"
 
