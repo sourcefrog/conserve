@@ -43,6 +43,8 @@ How much is this similar to just doing a restore and throwing away the results?
 * hash of data files is as expected
 * all referenced blocks, exist
 
+Should report on (and gc could clean up) any old leftover tmp files.
+
 ## Better ignore patterns
 
 * `--ignore .git` should probably ignore that anywhere in the tree. At present
