@@ -188,9 +188,7 @@ mod tests {
 
     use super::*;
     use errors::ErrorKind;
-    use io::list_dir;
-    use test_fixtures::ScratchArchive;
-    use {BandId, Report};
+    use test_fixtures::{list_dir, ScratchArchive};
 
     #[test]
     fn create_then_open_archive() {

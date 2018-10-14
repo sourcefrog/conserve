@@ -208,11 +208,10 @@ mod tests {
     use chrono::Duration;
 
     use super::super::*;
-    use test_fixtures::ScratchArchive;
+    use test_fixtures::{ScratchArchive, list_dir};
 
     #[test]
     fn create_and_reopen_band() {
-        use super::super::io::list_dir;
         let af = ScratchArchive::new();
         let report = &Report::new();
         let band = Band::create(&af).unwrap();

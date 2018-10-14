@@ -110,31 +110,6 @@ pub fn file_exists(path: &Path) -> Result<bool> {
     }
 }
 
-/// List a directory.
-///
-/// Returns a list of filenames and a list of directory names respectively, forced to UTF-8, and
-/// sorted naively as UTF-8.
-#[cfg(test)] // Only from tests at the moment but could be more general.
-pub fn list_dir(path: &Path) -> Result<(Vec<String>, Vec<String>)> {
-    let mut file_names = Vec::<String>::new();
-    let mut dir_names = Vec::<String>::new();
-    for entry in fs::read_dir(path)? {
-        let entry = entry.unwrap();
-        let entry_filename = entry.file_name().into_string().unwrap();
-        let entry_type = entry.file_type()?;
-        if entry_type.is_file() {
-            file_names.push(entry_filename);
-        } else if entry_type.is_dir() {
-            dir_names.push(entry_filename);
-        } else {
-            panic!("don't recognize file type of {:?}", entry_filename);
-        }
-    }
-    file_names.sort_unstable();
-    dir_names.sort_unstable();
-    Ok((file_names, dir_names))
-}
-
 /// Create a directory if it doesn't exist; if it does then assert it must be empty.
 pub fn require_empty_directory(path: &Path) -> Result<()> {
     if let Err(e) = std::fs::create_dir(&path) {
