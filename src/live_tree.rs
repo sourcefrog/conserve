@@ -8,7 +8,6 @@ use std::ffi::OsString;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time;
 
 use super::*;
 
@@ -141,7 +140,7 @@ impl entry::Entry for Entry {
         self.metadata
             .modified()
             .ok()
-            .and_then(|t| t.duration_since(time::UNIX_EPOCH).ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .and_then(|dur| Some(dur.as_secs()))
     }
 

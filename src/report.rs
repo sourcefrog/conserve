@@ -17,8 +17,7 @@ use std::fmt::{Display, Formatter};
 use std::ops::AddAssign;
 use std::sync::Arc;
 use std::sync::{Mutex, MutexGuard};
-use std::time;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::ui;
 use super::ui::plain::PlainUI;
@@ -82,7 +81,7 @@ pub struct Counts {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, Sizes>,
     durations: BTreeMap<&'static str, Duration>,
-    start: time::Instant,
+    start: Instant,
 }
 
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
@@ -199,7 +198,7 @@ impl Report {
     where
         F: FnOnce() -> T,
     {
-        let start = time::Instant::now();
+        let start = Instant::now();
         let result = closure();
         self.increment_duration(duration_name, start.elapsed());
         result
@@ -298,7 +297,7 @@ impl Counts {
             count: inner_count,
             sizes: inner_sizes,
             durations: inner_durations,
-            start: time::Instant::now(),
+            start: Instant::now(),
         }
     }
 

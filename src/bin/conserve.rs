@@ -119,10 +119,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         )
         .subcommand(
             SubCommand::with_name("debug_blocks_list")
-            .arg(
-                Arg::with_name("archive")
-                    .required(true)
-                    )
+                .arg(Arg::with_name("archive").required(true)),
         )
         .subcommand(
             SubCommand::with_name("init")

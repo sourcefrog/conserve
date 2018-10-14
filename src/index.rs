@@ -8,7 +8,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str;
-use std::time;
+use std::time::Instant;
 use std::vec;
 
 use rustc_serialize::json;
@@ -221,7 +221,7 @@ impl Iter {
     /// Returns true if another hunk could be found, otherwise false.
     /// (It's possible though unlikely the hunks can be empty.)
     fn refill_entry_buffer(&mut self) -> Result<bool> {
-        let start_read = time::Instant::now();
+        let start_read = Instant::now();
         // Load the next index hunk into buffered_entries.
         let hunk_path = path_for_hunk(&self.dir, self.next_hunk_number);
         let mut f = match fs::File::open(&hunk_path) {
@@ -246,7 +246,7 @@ impl Iter {
         );
         self.report.increment("index.hunk", 1);
 
-        let start_parse = time::Instant::now();
+        let start_parse = Instant::now();
         let index_json = str::from_utf8(&index_bytes)
             .chain_err(|| format!("index file {:?} is not UTF-8", hunk_path))?;
         let entries: Vec<IndexEntry> = json::decode(index_json)
