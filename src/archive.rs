@@ -201,7 +201,7 @@ mod tests {
 
     use super::*;
     use errors::ErrorKind;
-    use test_fixtures::{list_dir, ScratchArchive};
+    use test_fixtures::ScratchArchive;
 
     #[test]
     fn create_then_open_archive() {

@@ -28,8 +28,12 @@ use super::*;
 /// Use the maximum 64-byte hash.
 const BLAKE_HASH_SIZE_BYTES: usize = 64;
 
+const BLOCKDIR_FILE_NAME: usize = BLAKE_HASH_SIZE_BYTES * 2;
+
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
+
+const TMP_PREFIX: &str = "tmp";
 
 /// Break blocks at this many uncompressed bytes.
 const MAX_BLOCK_SIZE: usize = 1 << 20;
@@ -78,12 +82,12 @@ impl BlockDir {
     }
 
     /// Return the subdirectory in which we'd put a file called `hash_hex`.
-    fn subdir_for(self: &BlockDir, hash_hex: &str) -> PathBuf {
+    fn subdir_for(&self, hash_hex: &str) -> PathBuf {
         self.path.join(block_name_to_subdirectory(hash_hex))
     }
 
     /// Return the full path for a file called `hex_hash`.
-    fn path_for_file(self: &BlockDir, hash_hex: &str) -> PathBuf {
+    fn path_for_file(&self, hash_hex: &str) -> PathBuf {
         self.subdir_for(hash_hex).join(hash_hex)
     }
 
@@ -169,7 +173,7 @@ impl BlockDir {
         let d = self.subdir_for(hex_hash);
         super::io::ensure_dir_exists(&d)?;
         let tempf = tempfile::NamedTempFileOptions::new()
-            .prefix("tmp")
+            .prefix(TMP_PREFIX)
             .create_in(&d)?;
         let mut bufw = io::BufWriter::new(tempf);
         report.measure_duration("block.compress", || {
@@ -199,7 +203,7 @@ impl BlockDir {
     }
 
     /// True if the named block is present in this directory.
-    pub fn contains(self: &BlockDir, hash: &str) -> Result<bool> {
+    pub fn contains(&self, hash: &str) -> Result<bool> {
         match fs::metadata(self.path_for_file(hash)) {
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
             Ok(_) => Ok(true),
@@ -210,7 +214,7 @@ impl BlockDir {
     /// Read back the contents of a block, as a byte array.
     ///
     /// To read a whole file, use StoredFile instead.
-    pub fn get(self: &BlockDir, addr: &Address, report: &Report) -> Result<Vec<u8>> {
+    pub fn get(&self, addr: &Address, report: &Report) -> Result<Vec<u8>> {
         // TODO: Return a Read rather than a Vec?
         // TODO: Accept vectors of multiple addresess, maybe in another function.
         let hash = &addr.hash;
@@ -254,6 +258,47 @@ impl BlockDir {
             return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
         Ok(decompressed)
+    }
+
+    /// Return a sorted vec of prefix subdirectories.
+    fn subdirs(&self, report: &Report) -> Result<Vec<String>> {
+        // This doesn't check every invariant that should be true; that's the job of the validation
+        // code.
+        let (_fs, mut ds) = list_dir(&self.path)?;
+        ds.retain(|dd| {
+            if dd.len() != SUBDIR_NAME_CHARS {
+                report.problem(&format!(
+                    "unexpected subdirectory in blockdir {:?}: {:?}",
+                    self, dd
+                ));
+                false
+            } else {
+                true
+            }
+        });
+        Ok(ds)
+    }
+
+    /// Return a sorted vec of all the blocknames in the blockdir.
+    pub fn blocks(&self, report: &Report) -> Result<Vec<String>> {
+        Ok(self
+            .subdirs(report)?
+            .iter()
+            .flat_map(|s| {
+                let (mut fs, _ds) = list_dir(&self.path.join(s)).unwrap();
+                fs.retain(|ff| {
+                    if ff.starts_with(TMP_PREFIX) {
+                        false
+                    } else if ff.len() != BLOCKDIR_FILE_NAME {
+                        report.problem(&format!("unlikely file name in {:?}: {:?}", self, ff));
+                        false
+                    } else {
+                        true
+                    }
+                });
+                fs.into_iter()
+            })
+            .collect())
     }
 }
 
@@ -308,6 +353,12 @@ mod tests {
         assert_eq!(1, refs.len());
         assert_eq!(0, refs[0].start);
         assert_eq!(EXAMPLE_BLOCK_HASH, refs[0].hash);
+
+        // Block should be the one block present in the list.
+        assert_eq!(
+            block_dir.blocks(&Report::new()).unwrap(),
+            &[EXAMPLE_BLOCK_HASH]
+        );
 
         // Subdirectory and file should exist
         let expected_file = testdir.path().join("66a").join(EXAMPLE_BLOCK_HASH);
