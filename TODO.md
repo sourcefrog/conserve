@@ -20,6 +20,10 @@ In fact this is two stacked changes which can be done and tried out separately:
    1. A tree writer that notices only the differences versus the parent tree,
       and records them, including whiteouts.
 
+1. `conserve versions --sizes` won't say much useful about the version sizes
+   any more, because most of the disk usage isn't in the band directory.
+   Maybe we need a `conserve archive describe` or `conserve archive measure`.
+
 ## Validate
 
 Before too long, should add a concept of validation that checks invariants

@@ -162,4 +162,3 @@ pub fn list_dir(path: &Path) -> Result<(Vec<String>, Vec<String>)> {
     dir_names.sort_unstable();
     Ok((file_names, dir_names))
 }
-

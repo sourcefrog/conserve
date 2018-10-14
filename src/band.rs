@@ -23,7 +23,6 @@ use super::*;
 
 use globset::GlobSet;
 
-static BLOCK_DIR: &'static str = "d";
 static INDEX_DIR: &'static str = "i";
 static HEAD_FILENAME: &'static str = "BANDHEAD";
 static TAIL_FILENAME: &'static str = "BANDTAIL";
@@ -33,7 +32,6 @@ static TAIL_FILENAME: &'static str = "BANDTAIL";
 pub struct Band {
     id: BandId,
     path_buf: PathBuf,
-    block_dir_path: PathBuf,
     index_dir_path: PathBuf,
 }
 
@@ -79,7 +77,6 @@ impl Band {
         let new = Band::new(archive_dir, id);
 
         fs::create_dir(&new.path_buf)?;
-        fs::create_dir(&new.block_dir_path)?;
         fs::create_dir(&new.index_dir_path)?;
 
         let head = Head {
@@ -111,15 +108,11 @@ impl Band {
     fn new(archive_dir: &Path, id: BandId) -> Band {
         let mut path_buf = archive_dir.to_path_buf();
         path_buf.push(id.as_string());
-        let mut block_dir_path = path_buf.clone();
-        block_dir_path.push(BLOCK_DIR);
         let mut index_dir_path = path_buf.clone();
         index_dir_path.push(INDEX_DIR);
-
         Band {
             id,
             path_buf,
-            block_dir_path,
             index_dir_path,
         }
     }
@@ -142,10 +135,6 @@ impl Band {
 
     fn tail_path(self: &Band) -> PathBuf {
         self.path_buf.join(TAIL_FILENAME)
-    }
-
-    pub fn block_dir(self: &Band) -> BlockDir {
-        BlockDir::new(&self.block_dir_path)
     }
 
     pub fn index_builder(self: &Band) -> IndexBuilder {
@@ -208,7 +197,7 @@ mod tests {
     use chrono::Duration;
 
     use super::super::*;
-    use test_fixtures::{ScratchArchive, list_dir};
+    use test_fixtures::{list_dir, ScratchArchive};
 
     #[test]
     fn create_and_reopen_band() {
@@ -220,13 +209,13 @@ mod tests {
 
         let (file_names, dir_names) = list_dir(band.path()).unwrap();
         assert_eq!(file_names, &["BANDHEAD"]);
-        assert_eq!(dir_names, ["d", "i"]);
+        assert_eq!(dir_names, ["i"]);
         assert!(!band.is_closed().unwrap());
 
         band.close(report).unwrap();
         let (file_names, dir_names) = list_dir(band.path()).unwrap();
         assert_eq!(file_names, &["BANDHEAD", "BANDTAIL"]);
-        assert_eq!(dir_names, ["d", "i"]);
+        assert_eq!(dir_names, ["i"]);
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_string("b0000").unwrap();

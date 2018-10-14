@@ -89,7 +89,7 @@ impl ReadTree for StoredTree {
 
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
         Ok(StoredFile::open(
-            self.band.block_dir(),
+            self.archive.block_dir().clone(),
             entry.addrs.clone(),
             self.report(),
         ))

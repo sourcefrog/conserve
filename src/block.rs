@@ -9,7 +9,7 @@
 //! The contents of a file is identified by an Address, which says which block holds the data,
 //! and which range of uncompressed bytes.
 //!
-//! The structure is: archive > band > blockdir > subdir > file.
+//! The structure is: archive > blockdir > subdir > file.
 
 use std::fs;
 use std::io;
@@ -53,7 +53,7 @@ pub struct Address {
 }
 
 /// A readable, writable directory within a band holding data blocks.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BlockDir {
     pub path: PathBuf,
 }
@@ -68,6 +68,12 @@ impl BlockDir {
         BlockDir {
             path: path.to_path_buf(),
         }
+    }
+
+    /// Create a BlockDir directory and return an object accessing it.
+    pub fn create(path: &Path) -> Result<BlockDir> {
+        fs::create_dir(path)?;
+        Ok(BlockDir::new(path))
     }
 
     /// Return the subdirectory in which we'd put a file called `hash_hex`.

@@ -21,7 +21,7 @@ impl BackupWriter {
     /// This currently makes a new top-level band.
     pub fn begin(archive: &Archive) -> Result<BackupWriter> {
         let band = Band::create(archive)?;
-        let block_dir = band.block_dir();
+        let block_dir = archive.block_dir().clone();
         let index_builder = band.index_builder();
         Ok(BackupWriter {
             band,

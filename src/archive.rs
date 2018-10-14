@@ -17,6 +17,7 @@ use super::jsonio;
 use super::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
+static BLOCK_DIR: &'static str = "d";
 
 /// An archive holding backup material.
 #[derive(Clone, Debug)]
@@ -26,6 +27,9 @@ pub struct Archive {
 
     /// Report for operations on this archive.
     report: Report,
+
+    /// Holds body content for all file versions.
+    block_dir: BlockDir,
 }
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
@@ -37,18 +41,20 @@ impl Archive {
     /// Make a new directory to hold an archive, and write the header.
     pub fn create<P: AsRef<Path>>(path: P) -> Result<Archive> {
         let path = path.as_ref();
-        let archive = Archive {
-            path: path.to_path_buf(),
-            report: Report::new(),
-        };
-        require_empty_directory(&archive.path)?;
+        require_empty_directory(path)?;
+        let block_dir = BlockDir::create(&path.join(BLOCK_DIR))?;
         let header = ArchiveHeader {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
         let header_filename = path.join(HEADER_FILENAME);
-        jsonio::write(&header_filename, &header, &archive.report)
+        let report = Report::new();
+        jsonio::write(&header_filename, &header, &report)
             .chain_err(|| format!("Failed to write archive header: {:?}", header_filename))?;
-        Ok(archive)
+        Ok(Archive {
+            path: path.to_path_buf(),
+            report,
+            block_dir,
+        })
     }
 
     /// Open an existing archive.
@@ -60,6 +66,7 @@ impl Archive {
         if !file_exists(&header_path)? {
             return Err(ErrorKind::NotAnArchive(path.into()).into());
         }
+        let block_dir = BlockDir::new(&path.join(BLOCK_DIR));
         let header: ArchiveHeader =
             jsonio::read(&header_path, &report).chain_err(|| "Failed to read archive header")?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
@@ -70,7 +77,12 @@ impl Archive {
         Ok(Archive {
             path: path.to_path_buf(),
             report: report.clone(),
+            block_dir,
         })
+    }
+
+    pub fn block_dir(&self) -> &BlockDir {
+        &self.block_dir
     }
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
@@ -87,7 +99,7 @@ impl Archive {
     pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
         // Note: For some reason `?` doesn't work here only `try!`.
         let mut band_ids: Vec<BandId> = try!(self.iter_bands_unsorted()?.collect());
-        band_ids.sort();
+        band_ids.sort_unstable();
         Ok(band_ids)
     }
 
@@ -159,9 +171,10 @@ impl Iterator for IterBands {
             if !ft.is_dir() {
                 // TODO: Complain about non-directory children other than the expected header?
                 continue;
-            }
-            if let Ok(name_string) = entry.file_name().into_string() {
-                if let Ok(band_id) = BandId::from_string(&name_string) {
+            } else if let Ok(name_string) = entry.file_name().into_string() {
+                if name_string == BLOCK_DIR {
+                    continue;
+                } else if let Ok(band_id) = BandId::from_string(&name_string) {
                     return Some(Ok(band_id));
                 } else {
                     self.report.problem(&format!(
@@ -225,7 +238,7 @@ mod tests {
         let af = ScratchArchive::new();
         let (file_names, dir_names) = list_dir(af.path()).unwrap();
         assert_eq!(file_names, &["CONSERVE"]);
-        assert!(dir_names.is_empty());
+        assert_eq!(dir_names, &["d"]);
 
         let header_path = af.path().join("CONSERVE");
         let mut header_file = fs::File::open(&header_path).unwrap();
@@ -253,7 +266,7 @@ mod tests {
         let _band1 = Band::create(&af).unwrap();
         assert!(directory_exists(af.path()).unwrap());
         let (_file_names, dir_names) = list_dir(af.path()).unwrap();
-        assert_eq!(dir_names, &["b0000"]);
+        assert_eq!(dir_names, &["b0000", "d"]);
 
         assert_eq!(af.list_bands().unwrap(), vec![BandId::new(&[0])]);
         assert_eq!(af.last_band_id().unwrap(), BandId::new(&[0]));
