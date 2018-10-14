@@ -8,6 +8,7 @@ much space for large trees.
 In fact this is two stacked changes which can be done and tried out separately:
 
 1. Have just one block directory per archive. Pretty simple probably.
+   (And now done!)
 
 1. `conserve gc` of blocks not referenced by any index version.
 

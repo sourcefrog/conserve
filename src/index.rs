@@ -14,7 +14,7 @@ use std::vec;
 use rustc_serialize::json;
 
 use super::apath::Apath;
-use super::block;
+use super::blockdir;
 use super::*;
 
 use globset::GlobSet;
@@ -39,7 +39,7 @@ pub struct IndexEntry {
     pub blake2b: Option<String>,
 
     /// Blocks holding the file contents.
-    pub addrs: Vec<block::Address>,
+    pub addrs: Vec<blockdir::Address>,
 
     /// For symlinks only, the target of the symlink.
     pub target: Option<String>,

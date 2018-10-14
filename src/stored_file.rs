@@ -11,7 +11,7 @@ pub struct StoredFile {
     block_dir: BlockDir,
 
     /// Block addresses remaining to be read.
-    addrs: std::vec::IntoIter<block::Address>,
+    addrs: std::vec::IntoIter<blockdir::Address>,
 
     /// Already-read but not yet returned data.
     buf: Vec<u8>,
@@ -24,7 +24,7 @@ pub struct StoredFile {
 
 impl StoredFile {
     /// Open a stored file.
-    pub fn open(block_dir: BlockDir, addrs: Vec<block::Address>, report: &Report) -> StoredFile {
+    pub fn open(block_dir: BlockDir, addrs: Vec<blockdir::Address>, report: &Report) -> StoredFile {
         StoredFile {
             block_dir,
             addrs: addrs.into_iter(),
