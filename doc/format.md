@@ -80,9 +80,12 @@ Archive filesystems must allow many files per directory.
 ## Archive header
 
 In the root directory of the archive there is a file called `CONSERVE`,
-which is contains a json dict:
+which is contains a json dict (with no compression):
 
-    {"conserve_archive_version":"0.3"}
+    {"conserve_archive_version":"0.5"}
+
+(For pre-1.0 versions of Conserve, older formats are described in the version
+of this file from the relevant release source tree.)
 
 ## Tiers
 
@@ -93,14 +96,16 @@ implicitly all the bands whose names identify them as being in the same tier.
 
 ## Bands
 
-Within each tier, there are multiple *bands*.  (For example, "the monthly
-backup made on 2012-10-01.")  A band that is not in the base tier has a
-*parent band* in the immediately lower tier.
+Within an archive, there are multiple *bands*, identified by a name starting
+with `b` and followed by a sequence of integers.
 
-A band can be *open*, while it is receiving data, or *closed* when
-everything from the source has been written.  Bands may remain open
+A band that is not in the base tier has a *parent band* in the immediately
+lower tier.
+
+A band can be *complete*, while it is receiving data, or *incomplete* when
+everything from the source has been written.  Bands may remain incomplete
 indefinitely, across multiple Conserve invocations, until they are finished.
-Once the band is finished, it will not be changed.
+Once the band is completed, it will not be changed.
 
 Bands are numbered hierarchically across tiers and sequentially within
 a tier, starting at 0.  So the first base tier band in the whole archive
@@ -116,8 +121,8 @@ relative to their ancestor bands.  A copy of the source directory at a
 particular time can be extracted by reading the closest band, plus all of its
 parents.
 
-Bands are represented as a subdirectory within the archive directory,
-as `b` followed by the number.  All bands are in the top-level directory.
+Bands are represented as a subdirectory within the archive directory, as `b`
+followed by the number.  All bands are in the top-level archive directory.
 
     my-archive/
       b0000/
@@ -149,12 +154,11 @@ Band footer contains:
 
 ## Data blocks
 
-Data blocks contain parts of the full text of stored files.
+Data blocks contain parts of the contents of stored files.
 
-One data block may contain data for a whole file, the concatenated
-text for several files, or part of a file.  One data block
-may be referenced from the index block of any number of files
-from the current or any descendent band.
+One data block may contain data for a whole file, the concatenated text for
+several files, or part of a file.  The index entries describe which parts of
+which blocks are concatenated to recreate the file.
 
 The writer can choose the data block size, except that both the uncompressed
 and compressed blocks must be <1GB, so they can reasonably fit in memory.
@@ -162,16 +166,29 @@ The writer might choose to break the file not at a fixed size but instead at
 some boundary it thinks will be stable as the file changes, for example using
 an rsync-like rolling checksum.
 
-All the data block for a band are stored within a `d/` subdirectory
-of the band, and then within a directory for the first three characters
-of their name.
+The name of the data block file is the BLAKE2 hash of the uncompressed
+contents.
+
+The blocks are spread across a single layer of subdirectories, where each
+subdirectory is the first three hex characters of the name of the contained
+block files.
 
 Data block are compressed in the Snappy format
 <https://github.com/google/snappy>.
 
-The name of the data block file is the BLAKE2 hash of the uncompressed
-contents.
+## Blockdir
 
+Starting from format 0.5, there is a single blockdir per archive, containing
+all content blocks from all bands. This is the `d/` directory directly with in
+the archive directory.
+
+Any band in the archive can refer to blocks from this single blockdir.
+
+Blocks can be garbage collected (only) by reading the list of all present
+blocks, and then subtracting the ones referenced by any band's index.  Anything
+left unreferenced can be deleted. It's important the operation be done in this
+order, so that it's safe in the case a band is being written concurrently with
+the gc operation, or if the filesystem is not quite coherent.
 
 ## Index hunks
 
