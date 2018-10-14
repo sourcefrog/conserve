@@ -220,18 +220,14 @@ mod tests {
         assert!(fs::metadata(band.path()).unwrap().is_dir());
 
         let (file_names, dir_names) = list_dir(band.path()).unwrap();
-        assert_eq!(file_names.len(), 1);
-        assert_eq!(dir_names.len(), 2);
-        assert!(dir_names.contains("d") && dir_names.contains("i"));
-        assert!(file_names.contains("BANDHEAD"));
+        assert_eq!(file_names, &["BANDHEAD"]);
+        assert_eq!(dir_names, ["d", "i"]);
         assert!(!band.is_closed().unwrap());
 
         band.close(report).unwrap();
         let (file_names, dir_names) = list_dir(band.path()).unwrap();
-        assert_eq!(file_names.len(), 2);
-        assert_eq!(dir_names.len(), 2);
-        assert!(file_names.contains("BANDTAIL"));
-
+        assert_eq!(file_names, &["BANDHEAD", "BANDTAIL"]);
+        assert_eq!(dir_names, ["d", "i"]);
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_string("b0000").unwrap();

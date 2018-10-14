@@ -1,10 +1,8 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! IO utilities.
 
-#[cfg(test)]
-use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
@@ -114,23 +112,26 @@ pub fn file_exists(path: &Path) -> Result<bool> {
 
 /// List a directory.
 ///
-/// Returns a set of filenames and a set of directory names respectively, forced to UTF-8.
+/// Returns a list of filenames and a list of directory names respectively, forced to UTF-8, and
+/// sorted naively as UTF-8.
 #[cfg(test)] // Only from tests at the moment but could be more general.
-pub fn list_dir(path: &Path) -> Result<(HashSet<String>, HashSet<String>)> {
-    let mut file_names = HashSet::<String>::new();
-    let mut dir_names = HashSet::<String>::new();
+pub fn list_dir(path: &Path) -> Result<(Vec<String>, Vec<String>)> {
+    let mut file_names = Vec::<String>::new();
+    let mut dir_names = Vec::<String>::new();
     for entry in fs::read_dir(path)? {
         let entry = entry.unwrap();
         let entry_filename = entry.file_name().into_string().unwrap();
         let entry_type = entry.file_type()?;
         if entry_type.is_file() {
-            file_names.insert(entry_filename);
+            file_names.push(entry_filename);
         } else if entry_type.is_dir() {
-            dir_names.insert(entry_filename);
+            dir_names.push(entry_filename);
         } else {
             panic!("don't recognize file type of {:?}", entry_filename);
         }
     }
+    file_names.sort_unstable();
+    dir_names.sort_unstable();
     Ok((file_names, dir_names))
 }
 

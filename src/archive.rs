@@ -226,9 +226,8 @@ mod tests {
     fn empty_archive() {
         let af = ScratchArchive::new();
         let (file_names, dir_names) = list_dir(af.path()).unwrap();
-        assert_eq!(file_names.len(), 1);
-        assert!(file_names.contains("CONSERVE"));
-        assert_eq!(dir_names.len(), 0);
+        assert_eq!(file_names, &["CONSERVE"]);
+        assert!(dir_names.is_empty());
 
         let header_path = af.path().join("CONSERVE");
         let mut header_file = fs::File::open(&header_path).unwrap();
@@ -247,7 +246,6 @@ mod tests {
         }
     }
 
-    /// Can create bands in an archive.
     #[test]
     fn create_bands() {
         use super::super::io::directory_exists;
@@ -257,8 +255,7 @@ mod tests {
         let _band1 = Band::create(&af).unwrap();
         assert!(directory_exists(af.path()).unwrap());
         let (_file_names, dir_names) = list_dir(af.path()).unwrap();
-        println!("dirs: {:?}", dir_names);
-        assert!(dir_names.contains("b0000"));
+        assert_eq!(dir_names, &["b0000"]);
 
         assert_eq!(af.list_bands().unwrap(), vec![BandId::new(&[0])]);
         assert_eq!(af.last_band_id().unwrap(), BandId::new(&[0]));
