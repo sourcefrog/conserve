@@ -15,6 +15,7 @@ use std::fs;
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
@@ -55,7 +56,7 @@ pub struct Address {
 /// A readable, writable directory within a band holding data blocks.
 #[derive(Clone, Debug)]
 pub struct BlockDir {
-    pub path: PathBuf,
+    pub path: Rc<PathBuf>,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
@@ -66,7 +67,7 @@ impl BlockDir {
     /// Create a BlockDir accessing `path`, which must exist as a directory.
     pub fn new(path: &Path) -> BlockDir {
         BlockDir {
-            path: path.to_path_buf(),
+            path: Rc::new(path.to_path_buf()),
         }
     }
 
@@ -78,16 +79,12 @@ impl BlockDir {
 
     /// Return the subdirectory in which we'd put a file called `hash_hex`.
     fn subdir_for(self: &BlockDir, hash_hex: &str) -> PathBuf {
-        let mut buf = self.path.clone();
-        buf.push(block_name_to_subdirectory(hash_hex));
-        buf
+        self.path.join(block_name_to_subdirectory(hash_hex))
     }
 
     /// Return the full path for a file called `hex_hash`.
     fn path_for_file(self: &BlockDir, hash_hex: &str) -> PathBuf {
-        let mut buf = self.subdir_for(hash_hex);
-        buf.push(hash_hex);
-        buf
+        self.subdir_for(hash_hex).join(hash_hex)
     }
 
     /// Store the contents of a readable file into the BlockDir.
@@ -167,10 +164,13 @@ impl BlockDir {
     }
 
     fn compress_and_store(&self, in_buf: &[u8], hex_hash: &str, report: &Report) -> Result<u64> {
-        super::io::ensure_dir_exists(&self.subdir_for(hex_hash))?;
+        // Note: When we come to support cloud storage, we should do one atomic write rather than
+        // a write and rename.
+        let d = self.subdir_for(hex_hash);
+        super::io::ensure_dir_exists(&d)?;
         let tempf = tempfile::NamedTempFileOptions::new()
             .prefix("tmp")
-            .create_in(&self.path)?;
+            .create_in(&d)?;
         let mut bufw = io::BufWriter::new(tempf);
         report.measure_duration("block.compress", || {
             Snappy::compress_and_write(&in_buf, &mut bufw)
