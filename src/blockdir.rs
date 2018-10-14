@@ -150,7 +150,7 @@ impl BlockDir {
                 );
             }
             addresses.push(Address {
-                hash: block_hash.clone(),
+                hash: block_hash,
                 start: 0,
                 len: read_len as u64,
             });
