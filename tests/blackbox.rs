@@ -82,6 +82,14 @@ fn blackbox_backup() {
     // versions --short
     assert_success_and_output(&["versions", "--short", &arch_dir_str], "b0000\n", "");
 
+    {
+        let (status, stdout, stderr) = run_conserve(&["debug", "block", "list", &arch_dir_str]);
+        assert!(status.success());
+        assert_eq!(stdout, "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3\
+        a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7\n");
+        assert_eq!(stderr, "");
+    }
+
     // versions: includes completion flag.
     {
         // TODO: Set a fake date when creating the archive and then we can check
