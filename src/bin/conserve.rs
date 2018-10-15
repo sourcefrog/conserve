@@ -125,9 +125,14 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                         .about("Debug blockdir")
                         .subcommand(
                             SubCommand::with_name("list")
-                                .about("List hashes of all blocks")
+                                .about("List hashes of all blocks in the blockdir")
                                 .arg(Arg::with_name("archive").required(true)),
-                        ),
+                        )
+                        .subcommand(
+                            SubCommand::with_name("referenced")
+                                .about("List hashes of all blocks referenced by an index")
+                                .arg(Arg::with_name("archive").required(true))
+                        )
                 ),
         )
         .subcommand(
@@ -298,6 +303,7 @@ fn debug(subm: &ArgMatches, report: &Report) -> Result<()> {
     match subm.subcommand() {
         ("block", Some(sm)) => match sm.subcommand() {
             ("list", Some(sm)) => debug_block_list(&sm, report),
+            ("referenced", Some(sm)) => debug_block_referenced(&sm, report),
             _ => panic!(),
         },
         _ => panic!(),
@@ -308,6 +314,23 @@ fn debug_block_list(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     for b in archive.block_dir().blocks(report)? {
         println!("{}", b);
+    }
+    Ok(())
+}
+
+fn debug_block_referenced(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let mut hs = std::collections::BTreeSet::<String>::new();
+    let archive = Archive::open(subm.value_of("archive").unwrap(), report)?;
+    for band_id in archive.iter_bands_unsorted()? {
+        let band = Band::open(&archive, &band_id?)?;
+        for ie in band.index_iter(&excludes::excludes_nothing(), report)? {
+            for a in ie?.addrs {
+                hs.insert(a.hash);
+            }
+        }
+    }
+    for h in hs {
+        report.print(&h);
     }
     Ok(())
 }
