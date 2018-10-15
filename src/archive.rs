@@ -97,8 +97,10 @@ impl Archive {
 
     /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_bands(&self) -> Result<Vec<BandId>> {
-        // Note: For some reason `?` doesn't work here only `try!`.
-        let mut band_ids: Vec<BandId> = try!(self.iter_bands_unsorted()?.collect());
+        let mut band_ids = Vec::<BandId>::new();
+        for b in self.iter_bands_unsorted()? {
+            band_ids.push(b?);
+        }
         band_ids.sort_unstable();
         Ok(band_ids)
     }
