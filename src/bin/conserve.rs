@@ -131,8 +131,8 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                         .subcommand(
                             SubCommand::with_name("referenced")
                                 .about("List hashes of all blocks referenced by an index")
-                                .arg(Arg::with_name("archive").required(true))
-                        )
+                                .arg(Arg::with_name("archive").required(true)),
+                        ),
                 ),
         )
         .subcommand(
@@ -319,17 +319,8 @@ fn debug_block_list(subm: &ArgMatches, report: &Report) -> Result<()> {
 }
 
 fn debug_block_referenced(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let mut hs = std::collections::BTreeSet::<String>::new();
     let archive = Archive::open(subm.value_of("archive").unwrap(), report)?;
-    for band_id in archive.iter_bands_unsorted()? {
-        let band = Band::open(&archive, &band_id?)?;
-        for ie in band.index_iter(&excludes::excludes_nothing(), report)? {
-            for a in ie?.addrs {
-                hs.insert(a.hash);
-            }
-        }
-    }
-    for h in hs {
+    for h in archive.referenced_blocks()? {
         report.print(&h);
     }
     Ok(())

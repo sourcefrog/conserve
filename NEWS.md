@@ -78,7 +78,6 @@ Released 2017-01-08.
   it may be truncated.  You can override this with `--incomplete`, or select an
   older version with `--backup`.
 
-
 ## Conserve 0.3.1
 
 Released 2016-12-17

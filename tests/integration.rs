@@ -12,6 +12,10 @@ use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;
 
+const HELLO_HASH: &'static str =
+    "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
+     896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7";
+
 #[test]
 pub fn simple_backup() {
     let af = ScratchArchive::new();
@@ -75,11 +79,10 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     assert_eq!(Kind::File, file_entry.kind);
     assert!(file_entry.mtime.unwrap() > 0);
     let hash = file_entry.blake2b.as_ref().unwrap();
-    assert_eq!(
-        "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee\
-         42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7",
-        hash
-    );
+    assert_eq!(HELLO_HASH, hash);
+
+    assert_eq!(af.referenced_blocks().unwrap().into_iter().collect::<Vec<String>>(), vec![HELLO_HASH]);
+    assert_eq!(af.block_dir().blocks(&af.report()).unwrap(), vec![HELLO_HASH]);
 }
 
 fn check_restore(af: &ScratchArchive) {

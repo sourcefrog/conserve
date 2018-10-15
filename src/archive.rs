@@ -7,7 +7,7 @@
 //!
 //! Archives can contain a tree of bands, which themselves contain file versions.
 
-use std;
+use std::collections::BTreeSet;
 use std::fs;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
@@ -136,6 +136,20 @@ impl Archive {
         }
         Err(ErrorKind::NoCompleteBands.into())
     }
+
+    /// Return a sorted set containing all the blocks referenced by all bands.
+    pub fn referenced_blocks(&self) -> Result<BTreeSet<String>> {
+        let mut hs = BTreeSet::<String>::new();
+        for band_id in self.iter_bands_unsorted()? {
+            let band = Band::open(&self, &band_id?)?;
+            for ie in band.index_iter(&excludes::excludes_nothing(), &self.report)? {
+                for a in ie?.addrs {
+                    hs.insert(a.hash);
+                }
+            }
+        }
+        Ok(hs)
+    }
 }
 
 impl HasReport for Archive {
@@ -255,6 +269,9 @@ mod tests {
             ErrorKind::NoCompleteBands => (),
             ref x => panic!("Unexpected error {:?}", x),
         }
+
+        assert!(af.referenced_blocks().unwrap().is_empty());
+        assert!(af.block_dir.blocks(&af.report).unwrap().is_empty());
     }
 
     #[test]
@@ -278,5 +295,8 @@ mod tests {
             vec![BandId::new(&[0]), BandId::new(&[1])]
         );
         assert_eq!(af.last_band_id().unwrap(), BandId::new(&[1]));
+
+        assert!(af.referenced_blocks().unwrap().is_empty());
+        assert!(af.block_dir.blocks(&af.report).unwrap().is_empty());
     }
 }
