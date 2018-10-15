@@ -24,13 +24,13 @@ fn main() {
     let (sub_name, subm) = matches.subcommand();
     let sub_fn = match sub_name {
         "backup" => backup,
-        "debug_blocks_list" => debug_blocks_list,
+        "debug" => debug,
         "init" => init,
         "list-source" => list_source,
         "ls" => ls,
         "restore" => restore,
         "versions" => versions,
-        _ => unimplemented!(),
+        _ => panic!(),
     };
     let subm = subm.unwrap();
 
@@ -118,8 +118,17 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .help("Show stats about IO, timing, and compression"),
         )
         .subcommand(
-            SubCommand::with_name("debug_blocks_list")
-                .arg(Arg::with_name("archive").required(true)),
+            SubCommand::with_name("debug")
+                .about("Show developer-oriented information")
+                .subcommand(
+                    SubCommand::with_name("block")
+                        .about("Debug blockdir")
+                        .subcommand(
+                            SubCommand::with_name("list")
+                                .about("List hashes of all blocks")
+                                .arg(Arg::with_name("archive").required(true)),
+                        ),
+                ),
         )
         .subcommand(
             SubCommand::with_name("init")
@@ -285,7 +294,17 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     copy_tree(&st, &mut rt)
 }
 
-fn debug_blocks_list(subm: &ArgMatches, report: &Report) -> Result<()> {
+fn debug(subm: &ArgMatches, report: &Report) -> Result<()> {
+    match subm.subcommand() {
+        ("block", Some(sm)) => match sm.subcommand() {
+            ("list", Some(sm)) => debug_block_list(&sm, report),
+            _ => panic!(),
+        },
+        _ => panic!(),
+    }
+}
+
+fn debug_block_list(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     for b in archive.block_dir().blocks(report)? {
         println!("{}", b);
