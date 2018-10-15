@@ -11,6 +11,7 @@
 use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 
 /// An ordered archive path.
 ///
@@ -53,7 +54,7 @@ impl Apath {
 
 impl Display for Apath {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", self.to_string())
+        write!(fmt, "{}", &self)
     }
 }
 
@@ -61,6 +62,14 @@ impl Display for Apath {
 impl PartialEq<str> for Apath {
     fn eq(&self, other: &str) -> bool {
         self.0 == other
+    }
+}
+
+/// Apaths can be coerced to Strings.
+impl Deref for Apath {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.0
     }
 }
 

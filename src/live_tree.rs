@@ -85,7 +85,7 @@ impl tree::ReadTree for LiveTree {
         use entry::Entry;
         assert_eq!(entry.kind(), Kind::File);
         let mut path = self.path.clone();
-        path.push(&entry.apath.to_string()[1..]);
+        path.push(&entry.apath[1..]);
         Ok(fs::File::open(&path)?)
     }
 }
