@@ -271,19 +271,20 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
     let lt = live_tree_from_options(subm, report)?;
-    list_tree_contents(&lt)?;
+    list_tree_contents(&lt, report)?;
     Ok(())
 }
 
 fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = stored_tree_from_options(subm, report)?;
-    list_tree_contents(&st)?;
+    list_tree_contents(&st, report)?;
     Ok(())
 }
 
-fn list_tree_contents<T: ReadTree>(tree: &T) -> Result<()> {
+fn list_tree_contents<T: ReadTree>(tree: &T, report: &Report) -> Result<()> {
+    // TODO: Maybe should be a specific concept in the UI.
     for entry in tree.iter_entries()? {
-        println!("{}", entry?.apath());
+        report.print(entry?.apath().to_string());
     }
     Ok(())
 }

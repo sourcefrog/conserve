@@ -124,8 +124,6 @@ Ideally should show some of these:
   for bulk data.
 * Erase at end of program and replace with a summary.
 
-Progress for `ls` is also bad.
-
 ## Better summary at end of run
 
 Just better formatting?
