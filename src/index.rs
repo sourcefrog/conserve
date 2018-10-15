@@ -27,6 +27,7 @@ const MAX_ENTRIES_PER_HUNK: usize = 1000;
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub struct IndexEntry {
     /// Path of this entry relative to the base of the backup, in `apath` form.
+    // TODO: Make it an actual Apath, once that's encodable.
     pub apath: String,
 
     /// File modification time, in whole seconds past the Unix epoch.
@@ -47,7 +48,7 @@ pub struct IndexEntry {
 
 impl entry::Entry for IndexEntry {
     fn apath(&self) -> Apath {
-        Apath::from_string(&self.apath)
+        Apath::from(self.apath.as_str())
     }
 
     fn kind(&self) -> Kind {
@@ -100,7 +101,7 @@ impl IndexBuilder {
     pub fn push(&mut self, entry: IndexEntry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
-        self.check_order.check(&Apath::from_string(&entry.apath));
+        self.check_order.check(&Apath::from(entry.apath.as_str()));
         self.entries.push(entry);
     }
 

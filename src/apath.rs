@@ -24,11 +24,6 @@ use std::ops::Deref;
 pub struct Apath(String);
 
 impl Apath {
-    pub fn from_string(s: &str) -> Apath {
-        assert!(Apath::is_valid(s));
-        Apath(s.to_string())
-    }
-
     pub fn to_string(&self) -> &String {
         &self.0
     }
@@ -55,6 +50,20 @@ impl Apath {
 impl From<Apath> for String {
     fn from(a: Apath) -> String {
         a.0
+    }
+}
+
+impl<'a> From<&'a str> for Apath {
+    fn from(s: &'a str) -> Apath {
+        assert!(Apath::is_valid(s), "invalid apath: {:?}", s);
+        Apath(s.to_string())
+    }
+}
+
+impl From<String> for Apath {
+    fn from(s: String) -> Apath {
+        assert!(Apath::is_valid(&s), "invalid apath: {:?}", s);
+        Apath(s)
     }
 }
 
@@ -211,10 +220,10 @@ mod tests {
             if !Apath::is_valid(a) {
                 panic!("{:?} incorrectly marked invalid", a);
             }
-            let ap = Apath::from_string(a);
+            let ap = Apath::from(*a);
             for (j, b) in ordered.iter().enumerate() {
                 let expected_order = i.cmp(&j);
-                let bp = Apath::from_string(b);
+                let bp = Apath::from(*b);
                 let r = ap.cmp(&bp);
                 if r != expected_order {
                     panic!(

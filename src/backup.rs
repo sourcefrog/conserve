@@ -63,7 +63,7 @@ impl tree::WriteTree for BackupWriter {
         let (addrs, body_hash) = self.block_dir.store(content, &self.report)?;
         // TODO: Perhaps return a future for an index, so that storage of the files can overlap.
         self.push_entry(IndexEntry {
-            apath: source_entry.apath().to_string().clone(),
+            apath: String::from(source_entry.apath()),
             mtime: source_entry.unix_mtime(),
             kind: Kind::File,
             addrs,
@@ -77,7 +77,7 @@ impl tree::WriteTree for BackupWriter {
         let target = source_entry.symlink_target();
         assert!(target.is_some());
         self.push_entry(IndexEntry {
-            apath: source_entry.apath().to_string().clone(),
+            apath: String::from(source_entry.apath()),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Symlink,
             addrs: vec![],

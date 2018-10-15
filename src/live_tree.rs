@@ -61,7 +61,7 @@ impl tree::ReadTree for LiveTree {
             }
         };
         let root_entry = Entry {
-            apath: Apath::from_string("/"),
+            apath: Apath::from("/"),
             path: self.path.clone(),
             metadata: root_metadata,
         };
@@ -213,7 +213,7 @@ impl Iter {
                 }
                 continue;
             }
-            children.push((entry.file_name(), ft.is_dir(), Apath::from_string(&path)));
+            children.push((entry.file_name(), ft.is_dir(), Apath::from(path)));
         }
 
         children.sort();
