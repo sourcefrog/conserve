@@ -24,10 +24,6 @@ use std::ops::Deref;
 pub struct Apath(String);
 
 impl Apath {
-    pub fn to_string(&self) -> &String {
-        &self.0
-    }
-
     /// True if this string is a well-formed apath.
     ///
     /// Rust strings are by contract always valid UTF-8, so to meet that requirement

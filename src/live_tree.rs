@@ -196,7 +196,7 @@ impl Iter {
         for entry in fs::read_dir(&dir_entry.path)? {
             let entry = entry?;
             let ft = entry.file_type()?;
-            let mut path = dir_entry.apath.to_string().clone();
+            let mut path = String::from(dir_entry.apath.clone());
             if path != "/" {
                 path.push('/');
             }
