@@ -38,7 +38,7 @@ impl BandId {
     }
 
     /// Return the next BandId at the same level as self.
-    pub fn next_sibling(self: &BandId) -> BandId {
+    pub fn next_sibling(&self) -> BandId {
         let mut next_seqs = self.seqs.clone();
         next_seqs[self.seqs.len() - 1] += 1;
         BandId::new(&next_seqs)
@@ -73,7 +73,7 @@ impl BandId {
     ///
     /// Numbers are zero-padded to what should normally be a reasonable length, but they can
     /// be longer.
-    pub fn as_string(self: &BandId) -> &String {
+    pub fn as_string(&self) -> &String {
         &self.string_form
     }
 

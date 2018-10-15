@@ -29,7 +29,7 @@ impl AtomicFile {
         })
     }
 
-    pub fn close(self: AtomicFile, _report: &Report) -> Result<()> {
+    pub fn close(self, _report: &Report) -> Result<()> {
         // try!(report.measure_duration("sync", || self.f.sync_all()));
         // We use `persist` rather than `persist_noclobber` here because the latter calls
         // `link` on Unix, and some filesystems don't support it.  That's probably fine

@@ -81,8 +81,17 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     let hash = file_entry.blake2b.as_ref().unwrap();
     assert_eq!(HELLO_HASH, hash);
 
-    assert_eq!(af.referenced_blocks().unwrap().into_iter().collect::<Vec<String>>(), vec![HELLO_HASH]);
-    assert_eq!(af.block_dir().blocks(&af.report()).unwrap(), vec![HELLO_HASH]);
+    assert_eq!(
+        af.referenced_blocks()
+            .unwrap()
+            .into_iter()
+            .collect::<Vec<String>>(),
+        vec![HELLO_HASH]
+    );
+    assert_eq!(
+        af.block_dir().blocks(&af.report()).unwrap(),
+        vec![HELLO_HASH]
+    );
 }
 
 fn check_restore(af: &ScratchArchive) {

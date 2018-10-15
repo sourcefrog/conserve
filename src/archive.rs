@@ -86,7 +86,7 @@ impl Archive {
     }
 
     /// Returns a iterator of ids for bands currently present, in arbitrary order.
-    pub fn iter_bands_unsorted(self: &Archive) -> Result<IterBands> {
+    pub fn iter_bands_unsorted(&self) -> Result<IterBands> {
         let read_dir = read_dir(&self.path)
             .chain_err(|| format!("failed reading directory {:?}", &self.path))?;
         Ok(IterBands {
@@ -96,7 +96,7 @@ impl Archive {
     }
 
     /// Returns a vector of band ids, in sorted order from first to last.
-    pub fn list_bands(self: &Archive) -> Result<Vec<BandId>> {
+    pub fn list_bands(&self) -> Result<Vec<BandId>> {
         // Note: For some reason `?` doesn't work here only `try!`.
         let mut band_ids: Vec<BandId> = try!(self.iter_bands_unsorted()?.collect());
         band_ids.sort_unstable();
@@ -107,13 +107,13 @@ impl Archive {
     ///
     /// The top-level directory contains a `CONSERVE` header file, and zero or more
     /// band directories.
-    pub fn path(self: &Archive) -> &Path {
+    pub fn path(&self) -> &Path {
         self.path.as_path()
     }
 
     /// Return the `BandId` of the highest-numbered band, or ArchiveEmpty,
     /// or an Err if any occurred reading the directory.
-    pub fn last_band_id(self: &Archive) -> Result<BandId> {
+    pub fn last_band_id(&self) -> Result<BandId> {
         // Walk through list of bands; if any error return that, otherwise return the greatest.
         let mut accum: Option<BandId> = None;
         for next in self.iter_bands_unsorted()? {
@@ -127,7 +127,7 @@ impl Archive {
     }
 
     /// Return the last completely-written band id.
-    pub fn last_complete_band(self: &Archive) -> Result<Band> {
+    pub fn last_complete_band(&self) -> Result<Band> {
         for id in self.list_bands()?.iter().rev() {
             let b = Band::open(self, &id)?;
             if b.is_closed()? {

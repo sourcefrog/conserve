@@ -87,7 +87,7 @@ impl Band {
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(self: &Band, report: &Report) -> Result<()> {
+    pub fn close(&self, report: &Report) -> Result<()> {
         let tail = Tail {
             end_time: UTC::now().timestamp(),
         };
@@ -117,15 +117,15 @@ impl Band {
         }
     }
 
-    pub fn is_closed(self: &Band) -> Result<bool> {
+    pub fn is_closed(&self) -> Result<bool> {
         file_exists(&self.tail_path())
     }
 
-    pub fn path(self: &Band) -> &Path {
+    pub fn path(&self) -> &Path {
         &self.path_buf
     }
 
-    pub fn id(self: &Band) -> BandId {
+    pub fn id(&self) -> BandId {
         self.id.clone()
     }
 
@@ -133,11 +133,11 @@ impl Band {
         self.path_buf.join(HEAD_FILENAME)
     }
 
-    fn tail_path(self: &Band) -> PathBuf {
+    fn tail_path(&self) -> PathBuf {
         self.path_buf.join(TAIL_FILENAME)
     }
 
-    pub fn index_builder(self: &Band) -> IndexBuilder {
+    pub fn index_builder(&self) -> IndexBuilder {
         IndexBuilder::new(&self.index_dir_path)
     }
 
