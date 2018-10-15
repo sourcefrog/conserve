@@ -7,6 +7,7 @@
 //!
 //! Archives can contain a tree of bands, which themselves contain file versions.
 
+use std::cmp::max;
 use std::collections::BTreeSet;
 use std::fs;
 use std::fs::read_dir;
@@ -106,9 +107,6 @@ impl Archive {
     }
 
     /// Returns the top-level directory for the archive.
-    ///
-    /// The top-level directory contains a `CONSERVE` header file, and zero or more
-    /// band directories.
     pub fn path(&self) -> &Path {
         self.path.as_path()
     }
@@ -118,12 +116,12 @@ impl Archive {
     pub fn last_band_id(&self) -> Result<BandId> {
         // Walk through list of bands; if any error return that, otherwise return the greatest.
         let mut accum: Option<BandId> = None;
-        for next in self.iter_bands_unsorted()? {
-            accum = Some(match (next, accum) {
-                (Err(e), _) => return Err(e),
-                (Ok(b), None) => b,
-                (Ok(b), Some(a)) => std::cmp::max(b, a),
-            })
+        for b in self.iter_bands_unsorted()? {
+            accum = if let Some(a) = accum {
+                Some(max(a, b?))
+            } else {
+                Some(b?)
+            }
         }
         accum.ok_or_else(|| ErrorKind::ArchiveEmpty.into())
     }
