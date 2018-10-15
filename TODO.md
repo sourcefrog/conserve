@@ -1,29 +1,29 @@
 # Conserve TODO
 
-## Next major feature: Incremental backups
+## gc
 
-The most important thing is incremental backups, otherwise this just uses too
-much space for large trees.
+Read all blocks that are present. Read all blocks that are referenced.
+Delete blocks that aren't referenced.
 
-In fact this is two stacked changes which can be done and tried out separately:
+## `archive size`
 
-1. Have just one block directory per archive. Pretty simple probably.
-   (And now done!)
+`conserve versions --sizes` won't say much useful about the version sizes
+any more, because most of the disk usage isn't in the band directory.
+Maybe we need a `conserve archive describe` or `conserve archive measure`.
 
-1. `conserve gc` of blocks not referenced by any index version.
+We could say the total size of all blocks referenced by that version.
 
-1. Incrementally stacked indexes:
+Perhaps it'd be good to say how many blocks are used by that version and
+not any newer version.
 
-   1. An index concept of a whiteout.
+## Incremental indexes
 
-   1. A tree reader that reads several indexes in parallel and merges them.
+1. An index concept of a whiteout.
 
-   1. A tree writer that notices only the differences versus the parent tree,
-      and records them, including whiteouts.
+1. A tree reader that reads several indexes in parallel and merges them.
 
-1. `conserve versions --sizes` won't say much useful about the version sizes
-   any more, because most of the disk usage isn't in the band directory.
-   Maybe we need a `conserve archive describe` or `conserve archive measure`.
+1. A tree writer that notices only the differences versus the parent tree,
+   and records them, including whiteouts.
 
 ## Validate
 
@@ -62,7 +62,10 @@ Should report on (and gc could clean up) any old leftover tmp files.
 * Add a 'high-level' module similar to the CLI, but not coupled to it?
 
 * Maybe don't use `error_chain`? I have an unjustified feeling it slows down
-  compilation.
+  compilation. Perhaps use `Failure`.
+
+* Report warnings by failures/errors that are passed to the UI rather than
+  returned.
 
 ## Purge old versions
 
@@ -116,6 +119,8 @@ Ideally should show some of these:
 * Disable progress for operations like `list-bands` that will use stdout
   for bulk data.
 * Erase at end of program and replace with a summary.
+
+Progress for `ls` is also bad.
 
 ## Better summary at end of run
 
