@@ -35,7 +35,7 @@ impl RestoreTree {
 
     fn entry_path(&self, entry: &Entry) -> PathBuf {
         // Remove initial slash so that the apath is relative to the destination.
-        self.path.join(&entry.apath().to_string()[1..])
+        self.path.join(&entry.apath()[1..])
     }
 }
 

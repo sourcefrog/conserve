@@ -48,7 +48,7 @@ impl tree::WriteTree for BackupWriter {
     fn write_dir(&mut self, source_entry: &Entry) -> Result<()> {
         self.report.increment("dir", 1);
         self.push_entry(IndexEntry {
-            apath: source_entry.apath().to_string().clone(),
+            apath: String::from(source_entry.apath()),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Dir,
             addrs: vec![],

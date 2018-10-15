@@ -52,6 +52,12 @@ impl Apath {
     }
 }
 
+impl From<Apath> for String {
+    fn from(a: Apath) -> String {
+        a.0
+    }
+}
+
 impl Display for Apath {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
         write!(fmt, "{}", &self)
