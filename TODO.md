@@ -55,6 +55,10 @@ Should report on (and gc could clean up) any old leftover tmp files.
   This might require a change from <https://docs.rs/globset/0.4.2/globset/> that
   we use at present.
 
+## Error handling
+
+Clean message, and test for it, when the archive directory just doesn't exist.
+
 ## Internal cleanups
 
 * Refactor text formatting into being part of the UI rather than within the CLI?
