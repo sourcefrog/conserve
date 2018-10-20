@@ -1,24 +1,32 @@
 [package]
-name = "conserve"
-version = "0.5.0"
 authors = ["Martin Pool <mbp@sourcefrog.net>"]
-homepage = "http://conserve.fyi/"
-repository = "https://github.com/sourcefrog/conserve/"
-description = """A robust backup tool."""
-readme = "README.md"
-keywords = ["archive", "backup"]
-license = "GPL-2.0"
 build = "build.rs"
+description = "A robust backup tool."
+homepage = "http://conserve.fyi/"
+keywords = [
+    "archive",
+    "backup",
+]
+license = "GPL-2.0"
+name = "conserve"
+readme = "README.md"
+repository = "https://github.com/sourcefrog/conserve/"
+version = "0.5.0"
 
 [[bin]]
+doc = false
 name = "conserve"
-doc = false  # Conflicts with library docs which are more useful.
+
+[build-dependencies]
+vergen = "~0.1.0"
 
 [dependencies]
 chrono = "0.2"
 clap = "~2.29"
 error-chain = "0.11"
+globset = "0.4"
 isatty = "0.1"
+proptest = "0.8.7"
 rayon = "0.9"
 regex = "0.2"
 rustc-serialize = "^0"
@@ -29,16 +37,10 @@ tempfile = "^2"
 term = "0.5.1"
 vergen = "2.1"
 walkdir = "2"
-globset = "0.4"
 
 [dependencies.blake2-rfc]
 version = "0.2.18"
 
-[build-dependencies]
-vergen = "~0.1.0"
-
 [features]
-default = []
-
-# Use SIMD assembly, on nightly only.
 blake2_simd_asm = ["blake2-rfc/simd_asm"]
+default = []
