@@ -216,7 +216,6 @@ impl BlockDir {
     /// To read a whole file, use StoredFile instead.
     pub fn get(&self, addr: &Address, report: &Report) -> Result<Vec<u8>> {
         // TODO: Return a Read rather than a Vec?
-        // TODO: Accept vectors of multiple addresess, maybe in another function.
         let hash = &addr.hash;
         if addr.start != 0 {
             unimplemented!();
@@ -246,6 +245,7 @@ impl BlockDir {
             },
         );
 
+        // TODO: Do this only for validation; not on every read.
         let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
             .as_bytes()
             .to_hex();
