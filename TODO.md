@@ -71,6 +71,24 @@ Clean message, and test for it, when the archive directory just doesn't exist.
 * Report warnings by failures/errors that are passed to the UI rather than
   returned.
 
+## Semi-incremental backups
+
+Write a full index, but look at the previous index to get hints for the hashes of
+files, or where they're stored.
+
+Two variants:
+
+- If the file metadata is unchanged, assume the hash and addresses are unchanged.
+  Just copy the index entry from the previous index.
+
+- Do hash the new file, even if the mtime hasn't changed. If the hash is the same,
+  copy the addresses. This'll be a bit more efficient in at least two cases:
+
+  - A small file was combined into a block: we can reference the old one even if
+    the exact combination would be different.
+
+  - For a large file we avoid also hashing every block.
+
 ## Purge old versions
 
 Pretty easy, just delete the subdirectory. Does require checking there are no
