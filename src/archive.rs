@@ -92,13 +92,12 @@ impl Archive {
 
     /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_bands(&self) -> Result<Vec<BandId>> {
-        let (_files, dirs) = list_dir(&self.path)?;
         let mut band_ids = Vec::<BandId>::new();
-        for d in dirs {
-            if d == BLOCK_DIR {
-                continue;
-            } else {
-                band_ids.push(BandId::from_string(&d)?);
+        for e in read_dir(self.path())? {
+            let e = e?;
+            let n = e.file_name().into_string().unwrap();
+            if e.file_type()?.is_dir() && n != BLOCK_DIR {
+                band_ids.push(BandId::from_string(&n)?);
             }
         }
         band_ids.sort_unstable();
