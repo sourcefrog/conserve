@@ -39,9 +39,26 @@ or machine crash or other likely underlying failures?
 
 How much is this similar to just doing a restore and throwing away the results?
 
-* no unexpected files or subdirectories, in any directories
-* hash of data files is as expected
-* all referenced blocks, exist
+* For the archive
+  * No unexpected directories or files
+  * All band directories are in the canonical format
+* For every band
+  * The index block numbers are contiguous and correctly formated
+  * No unexpected files or directories
+* For every entry in the index:
+  * Filenames are in order (and without duplicates)
+  * Filenames don't contain `/` or `.` or `..`
+  * The referenced blocks exist
+  * (Deep only) The blocks can be extracted and they reconstitute the expected hash
+* For the blockdir:
+  * No unexpected top-level files or directories
+  * Every prefix subdirectory is a hex prefix of the right length
+  * Every file inside a prefix subdirectory matches the prefix
+  * There are no unexpected files or directories inside prefix subdirectories
+  * No zero-byte files
+  * No temporary files
+* For every block in the blockdir:
+  * The hash of the block is what the name says.
 
 Should report on (and gc could clean up) any old leftover tmp files.
 
