@@ -120,7 +120,7 @@ impl Archive {
                 };
             }
         }
-        l.ok_or(ErrorKind::ArchiveEmpty.into())
+        l.ok_or_else(|| ErrorKind::ArchiveEmpty.into())
     }
 
     /// Return the last completely-written band id.
