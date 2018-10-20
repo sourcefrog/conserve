@@ -9,7 +9,6 @@
 
 use std::cmp::max;
 use std::collections::BTreeSet;
-use std::fs;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 
@@ -86,44 +85,42 @@ impl Archive {
         &self.block_dir
     }
 
-    /// Returns a iterator of ids for bands currently present, in arbitrary order.
-    pub fn iter_bands_unsorted(&self) -> Result<IterBands> {
-        let read_dir = read_dir(&self.path)
-            .chain_err(|| format!("failed reading directory {:?}", &self.path))?;
-        Ok(IterBands {
-            dir_iter: read_dir,
-            report: self.report.clone(),
-        })
-    }
-
-    /// Returns a vector of band ids, in sorted order from first to last.
-    pub fn list_bands(&self) -> Result<Vec<BandId>> {
-        let mut band_ids = Vec::<BandId>::new();
-        for b in self.iter_bands_unsorted()? {
-            band_ids.push(b?);
-        }
-        band_ids.sort_unstable();
-        Ok(band_ids)
-    }
-
     /// Returns the top-level directory for the archive.
     pub fn path(&self) -> &Path {
         self.path.as_path()
     }
 
+    /// Returns a vector of band ids, in sorted order from first to last.
+    pub fn list_bands(&self) -> Result<Vec<BandId>> {
+        let (_files, dirs) = list_dir(&self.path)?;
+        let mut band_ids = Vec::<BandId>::new();
+        for d in dirs {
+            if d == BLOCK_DIR {
+                continue;
+            } else {
+                band_ids.push(BandId::from_string(&d)?);
+            }
+        }
+        band_ids.sort_unstable();
+        Ok(band_ids)
+    }
+
     /// Return the `BandId` of the highest-numbered band, or ArchiveEmpty,
     /// or an Err if any occurred reading the directory.
     pub fn last_band_id(&self) -> Result<BandId> {
-        // Walk through list of bands; if any error return that, otherwise return the greatest.
-        let mut accum: Option<BandId> = None;
-        for b in self.iter_bands_unsorted()? {
-            accum = if let Some(a) = accum {
-                Some(max(a, b?))
-            } else {
-                Some(b?)
+        let mut l: Option<BandId> = None;
+        for e in read_dir(self.path())? {
+            let e = e?;
+            let n = e.file_name().into_string().unwrap();
+            if e.file_type()?.is_dir() && n != BLOCK_DIR {
+                let bn = BandId::from_string(&n)?;
+                l = match l {
+                    None => Some(bn),
+                    Some(ll) => Some(max(ll, bn)),
+                };
             }
         }
-        accum.ok_or_else(|| ErrorKind::ArchiveEmpty.into())
+        l.ok_or(ErrorKind::ArchiveEmpty.into())
     }
 
     /// Return the last completely-written band id.
@@ -140,8 +137,8 @@ impl Archive {
     /// Return a sorted set containing all the blocks referenced by all bands.
     pub fn referenced_blocks(&self) -> Result<BTreeSet<String>> {
         let mut hs = BTreeSet::<String>::new();
-        for band_id in self.iter_bands_unsorted()? {
-            let band = Band::open(&self, &band_id?)?;
+        for band_id in self.list_bands()? {
+            let band = Band::open(&self, &band_id)?;
             for ie in band.index_iter(&excludes::excludes_nothing(), &self.report)? {
                 for a in ie?.addrs {
                     hs.insert(a.hash);
@@ -156,53 +153,6 @@ impl HasReport for Archive {
     /// Return the Report that counts operations on this Archive and objects descended from it.
     fn report(&self) -> &Report {
         &self.report
-    }
-}
-
-pub struct IterBands {
-    dir_iter: fs::ReadDir,
-    report: Report,
-}
-
-impl Iterator for IterBands {
-    type Item = Result<BandId>;
-
-    fn next(&mut self) -> Option<Result<BandId>> {
-        loop {
-            let entry = match self.dir_iter.next() {
-                None => return None,
-                Some(Ok(entry)) => entry,
-                Some(Err(e)) => {
-                    return Some(Err(e.into()));
-                }
-            };
-            let ft = match entry.file_type() {
-                Ok(ft) => ft,
-                Err(e) => {
-                    return Some(Err(e.into()));
-                }
-            };
-            if !ft.is_dir() {
-                // TODO: Complain about non-directory children other than the expected header?
-                continue;
-            } else if let Ok(name_string) = entry.file_name().into_string() {
-                if name_string == BLOCK_DIR {
-                    continue;
-                } else if let Ok(band_id) = BandId::from_string(&name_string) {
-                    return Some(Ok(band_id));
-                } else {
-                    self.report.problem(&format!(
-                        "unexpected archive subdirectory {:?}",
-                        &name_string
-                    ));
-                }
-            } else {
-                self.report.problem(&format!(
-                    "unexpected archive subdirectory with un-decodable name {:?}",
-                    entry.file_name()
-                ));
-            }
-        }
     }
 }
 
