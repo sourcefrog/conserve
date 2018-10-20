@@ -16,12 +16,12 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use rustc_serialize::hex::ToHex;
 
+use rayon::prelude::*;
 use tempfile;
 
 use super::*;
@@ -61,7 +61,7 @@ pub struct Address {
 /// A readable, writable directory within a band holding data blocks.
 #[derive(Clone, Debug)]
 pub struct BlockDir {
-    pub path: Rc<PathBuf>,
+    pub path: PathBuf,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
@@ -72,7 +72,7 @@ impl BlockDir {
     /// Create a BlockDir accessing `path`, which must exist as a directory.
     pub fn new(path: &Path) -> BlockDir {
         BlockDir {
-            path: Rc::new(path.to_path_buf()),
+            path: path.to_path_buf(),
         }
     }
 
@@ -285,10 +285,10 @@ impl BlockDir {
     pub fn validate(&self, report: &Report) -> Result<()> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
-        for bn in self.blocks(report)? {
-            self.get_block(&bn).validate(report)?;
-        }
-        Ok(())
+        self.blocks(report)?
+            .par_iter()
+            .map(|bn| self.get_block(&bn).validate(report))
+            .try_for_each(|i| i)
     }
 }
 

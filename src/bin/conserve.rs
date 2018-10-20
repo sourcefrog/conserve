@@ -139,7 +139,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         .subcommand(
             SubCommand::with_name("validate")
                 .about("Check whether an archive is internally consistent")
-                .arg(archive_arg())
+                .arg(archive_arg()),
         )
         .subcommand(
             SubCommand::with_name("init")
@@ -265,7 +265,10 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn validate(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    archive.validate().and_then(|_| {report.print("Archive is OK."); Ok(()) })
+    archive.validate().and_then(|_| {
+        report.print("Archive is OK.");
+        Ok(())
+    })
 }
 
 fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
