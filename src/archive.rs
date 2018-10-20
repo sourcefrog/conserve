@@ -146,6 +146,11 @@ impl Archive {
         }
         Ok(hs)
     }
+
+    pub fn validate(&self) -> Result<()> {
+        // TODO: Validate archive top-level structure, and the indexes
+        self.block_dir.validate(self.report())
+    }
 }
 
 impl HasReport for Archive {

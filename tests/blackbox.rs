@@ -148,6 +148,14 @@ fn blackbox_backup() {
         // TODO: Check contents.
     }
 
+    // Validate
+    {
+        let (status, stdout, stderr) = run_conserve(&["validate", &arch_dir_str]);
+        assert!(status.success());
+        assert_eq!(stderr, "");
+        assert_eq!(stdout, "Archive is OK.\n")
+    }
+
     // TODO: Validate.
     // TODO: Compare vs source tree.
     //

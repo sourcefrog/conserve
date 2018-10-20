@@ -12,6 +12,7 @@
 //! The structure is: archive > blockdir > subdir > file.
 
 use std::fs;
+use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
@@ -211,51 +212,28 @@ impl BlockDir {
         }
     }
 
+    /// Get an object accessing a whole block.
+    /// The contents are not yet narrowed down to only the addressed region.
+    pub fn get_block(&self, hash: &str) -> Block {
+        Block {
+            path: self.path_for_file(&hash),
+            hash: hash.to_string(),
+        }
+    }
+
     /// Read back the contents of a block, as a byte array.
     ///
     /// To read a whole file, use StoredFile instead.
     pub fn get(&self, addr: &Address, report: &Report) -> Result<Vec<u8>> {
         // TODO: Return a Read rather than a Vec?
-        let hash = &addr.hash;
         if addr.start != 0 {
             unimplemented!();
         }
-        let path = self.path_for_file(hash);
-        let mut f = fs::File::open(&path)?;
-
-        // TODO: Specific error for compression failure (corruption?) vs io errors.
-        let (compressed_len, decompressed) = match Snappy::decompress_read(&mut f) {
-            Ok(d) => d,
-            Err(e) => {
-                report.increment("block.corrupt", 1);
-                report.problem(&format!("Block file {:?} read error {:?}", path, e));
-                return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
-            }
-        };
+        let b = self.get_block(&addr.hash);
+        let decompressed = b.get_all(report)?;
         // TODO: Accept addresses referring to only part of a block.
         if decompressed.len() != addr.len as usize {
             unimplemented!();
-        }
-        report.increment("block.read", 1);
-        report.increment_size(
-            "block",
-            Sizes {
-                uncompressed: decompressed.len() as u64,
-                compressed: compressed_len as u64,
-            },
-        );
-
-        // TODO: Do this only for validation; not on every read.
-        let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed)
-            .as_bytes()
-            .to_hex();
-        if actual_hash != *hash {
-            report.increment("block.misplaced", 1);
-            report.problem(&format!(
-                "Block file {:?} has actual decompressed hash {:?}",
-                path, actual_hash
-            ));
-            return Err(ErrorKind::BlockCorrupt(hash.clone()).into());
         }
         Ok(decompressed)
     }
@@ -281,6 +259,8 @@ impl BlockDir {
 
     /// Return a sorted vec of all the blocknames in the blockdir.
     pub fn blocks(&self, report: &Report) -> Result<Vec<String>> {
+        // The vecs from `subdirs` and `list_dir` are already sorted, so
+        // we don't need to sort here.
         Ok(self
             .subdirs(report)?
             .iter()
@@ -299,6 +279,65 @@ impl BlockDir {
                 fs.into_iter()
             })
             .collect())
+    }
+
+    /// Check format invariants of the BlockDir; report any problems to the Report.
+    pub fn validate(&self, report: &Report) -> Result<()> {
+        // TODO: In the top-level directory, no files or directories other than prefix
+        // directories of the right length.
+        for bn in self.blocks(report)? {
+            self.get_block(&bn).validate(report)?;
+        }
+        Ok(())
+    }
+}
+
+/// Read-only access to one block in the BlockDir.
+#[derive(Clone, Debug)]
+pub struct Block {
+    path: PathBuf,
+    hash: String,
+}
+
+impl Block {
+    /// Return the entire contents of the block.
+    pub fn get_all(&self, report: &Report) -> Result<Vec<u8>> {
+        let mut f = File::open(&self.path.as_path())?;
+        // TODO: Specific error for compression failure (corruption?) vs io errors.
+        let (compressed_len, de) = match Snappy::decompress_read(&mut f) {
+            Ok(d) => d,
+            Err(e) => {
+                report.increment("block.corrupt", 1);
+                report.problem(&format!("Block file {:?} read error {:?}", self.path, e));
+                return Err(ErrorKind::BlockCorrupt(self.hash.to_string()).into());
+            }
+        };
+        report.increment("block.read", 1);
+        report.increment_size(
+            "block",
+            Sizes {
+                uncompressed: de.len() as u64,
+                compressed: compressed_len as u64,
+            },
+        );
+        Ok(de)
+    }
+
+    pub fn validate(&self, report: &Report) -> Result<()> {
+        let de = self.get_all(report)?;
+
+        let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &de)
+            .as_bytes()
+            .to_hex();
+        if actual_hash != *self.hash {
+            report.increment("block.misplaced", 1);
+            report.problem(&format!(
+                "Block file {:?} has actual decompressed hash {:?}",
+                self.path, actual_hash
+            ));
+            return Err(ErrorKind::BlockCorrupt(self.hash.to_string()).into());
+        }
+        Ok(())
     }
 }
 
@@ -388,6 +427,10 @@ mod tests {
                 compressed: 8u64,
             }
         );
+
+        // Validate
+        let validate_r = Report::new();
+        block_dir.validate(&validate_r).unwrap();
     }
 
     #[test]

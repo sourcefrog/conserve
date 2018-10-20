@@ -29,6 +29,7 @@ fn main() {
         "list-source" => list_source,
         "ls" => ls,
         "restore" => restore,
+        "validate" => validate,
         "versions" => versions,
         _ => panic!(),
     };
@@ -134,6 +135,11 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                                 .arg(Arg::with_name("archive").required(true)),
                         ),
                 ),
+        )
+        .subcommand(
+            SubCommand::with_name("validate")
+                .about("Check whether an archive is internally consistent")
+                .arg(archive_arg())
         )
         .subcommand(
             SubCommand::with_name("init")
@@ -255,6 +261,11 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     let lt = live_tree_from_options(subm, report)?;
     let mut bw = BackupWriter::begin(&archive)?;
     copy_tree(&lt, &mut bw)
+}
+
+fn validate(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
+    archive.validate().and_then(|_| Ok(report.print("Archive is OK.")))
 }
 
 fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
