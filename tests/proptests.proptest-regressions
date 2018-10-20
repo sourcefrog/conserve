@@ -5,3 +5,5 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 xs 3942819386 2842588471 1494318946 1593635957 # shrinks to ref s = "൦"
+xs 2104439747 2869768515 1374430916 311973666 # shrinks to ref a = "/\u{0}", ref b = "/"
+xs 3744939157 1955749517 1337624453 1930864408 # shrinks to ref a = "/."
