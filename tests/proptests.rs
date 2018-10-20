@@ -6,6 +6,12 @@ extern crate proptest;
 extern crate conserve;
 use conserve::*;
 
+prop_compose! {
+    fn arb_single_apath(dot: bool, n in "[^/\0]+") {
+        "/" + if dot { "."} else { "" } + n
+    }
+}
+
 proptest! {
     #[test]
     fn parse_bandid(ref s in r"b[[:digit:]]{1,9}(-[[:digit:]]{1,9})*") {
