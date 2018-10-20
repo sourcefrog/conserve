@@ -65,7 +65,7 @@ impl From<String> for Apath {
 
 impl Display for Apath {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", &self)
+        write!(fmt, "{}", self.0)
     }
 }
 
@@ -217,6 +217,8 @@ mod tests {
                 panic!("{:?} incorrectly marked invalid", a);
             }
             let ap = Apath::from(*a);
+            // Check it can be formatted
+            assert_eq!(format!("{}", ap), *a);
             for (j, b) in ordered.iter().enumerate() {
                 let expected_order = i.cmp(&j);
                 let bp = Apath::from(*b);
