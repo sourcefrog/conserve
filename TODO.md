@@ -157,6 +157,9 @@ Ideally should show some of these:
 
 * Show current filename: maybe 2-line output?
 
+This could, at least on Unix, be even fancier by using terminfo to scroll up the
+region above the bar, leaving the bar there.
+
 ## Better summary at end of run
 
 Just better formatting?
@@ -167,6 +170,9 @@ Just better formatting?
 * `getrusage` or similar
 
 Make it more concise and then show it by default.
+
+Bytes in source file, after skipping unchanged files, after deduplicating
+already-present blocks, after compression of blocks that are stored.
 
 ## Performance
 

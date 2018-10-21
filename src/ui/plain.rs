@@ -9,8 +9,9 @@ use super::Counts;
 #[derive(Debug, Default)]
 pub struct PlainUI;
 
-/// A plain text UI that prints log messages to stdout and does nothing about progress
-/// counters.
+/// A plain text UI that can be used when there is no terminal control.
+///
+/// Progress updates are just ignored.
 impl PlainUI {
     /// Make a PlainUI.
     pub fn new() -> PlainUI {

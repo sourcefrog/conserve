@@ -16,10 +16,16 @@ use report::Counts;
 use ui::{duration_to_hms, mbps_rate, UI};
 
 const MB: u64 = 1_000_000;
-const PROGRESS_RATE_LIMIT_MS: u32 = 200;
+const PROGRESS_RATE_LIMIT_MS: u32 = 100;
 
+/// A terminal/text UI.
+///
+/// The same class is used whether or not we have a rich terminal,
+/// or just plain text output. (For example, output is redirected
+/// to a file, or the program's run with no tty.)
 pub struct ColorUI {
     t: Box<term::StdoutTerminal>,
+
     last_update: Option<Instant>,
 
     /// Is a progress bar currently on the screen?
@@ -66,6 +72,14 @@ impl ColorUI {
     fn updated(&mut self) {
         self.last_update = Some(Instant::now());
     }
+
+    fn fg_color(&mut self, c: term::color::Color) {
+        self.t.fg(c).unwrap();
+    }
+
+    fn reset_color(&mut self) {
+        self.t.reset().unwrap();
+    }
 }
 
 impl UI for ColorUI {
@@ -79,40 +93,33 @@ impl UI for ColorUI {
         self.clear_progress();
         self.progress_present = true;
 
-        let t = &mut self.t;
         // TODO: Input size should really be the number of source bytes before
         // block deduplication.
         // Measure compression on body bytes.
         let block_sizes = counts.get_size("block");
-        let block_comp_ratio = super::compression_ratio(&block_sizes);
         let elapsed = counts.elapsed_time();
         // TODO: Truncate to screen width (or draw on multiple lines with cursor-up)?
         // TODO: Rate limit etc.
         // TODO: Also show current filename.
         // TODO: Don't special-case for backups.
-        t.fg(term::color::GREEN).unwrap();
-        write!(t, " {} ", duration_to_hms(elapsed)).unwrap();
+        self.fg_color(term::color::GREEN);
+        write!(self.t, " {} ", duration_to_hms(elapsed)).unwrap();
         let uncomp_mb_str = format!("{}MB", block_sizes.uncompressed / MB);
         let comp_mb_str = format!("{}MB", block_sizes.compressed / MB);
         let uncomp_rate = mbps_rate(block_sizes.uncompressed, elapsed);
 
-        t.fg(term::color::GREEN).unwrap();
-        write!(t, "{:8}", counts.get_count("file")).unwrap();
-        t.fg(term::color::WHITE).unwrap();
-        write!(t, " files").unwrap();
-        t.fg(term::color::GREEN).unwrap();
-        write!(t, "{:8}", counts.get_count("dir")).unwrap();
-        t.fg(term::color::WHITE).unwrap();
-        write!(t, " dirs").unwrap();
-        t.fg(term::color::GREEN).unwrap();
+        self.fg_color(term::color::GREEN);
         write!(
-            t,
-            " {:>9} => {:<9} {:2.1}x {:6.1}MB/s",
-            uncomp_mb_str, comp_mb_str, block_comp_ratio, uncomp_rate,
-        )
-        .unwrap();
-        t.fg(term::color::WHITE).unwrap();
-        t.flush().unwrap();
+            self.t,
+            " {:>9} => {:<9} {:6.1}MB/s | ",
+            uncomp_mb_str, comp_mb_str, uncomp_rate,
+        ).unwrap();
+        self.reset_color();
+        write!(
+            self.t, "{}",
+            counts.get_latest_filename(),
+        ).unwrap();
+        self.t.flush().unwrap();
     }
 
     fn print(&mut self, s: &str) {

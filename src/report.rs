@@ -82,6 +82,9 @@ pub struct Counts {
     sizes: BTreeMap<&'static str, Sizes>,
     durations: BTreeMap<&'static str, Duration>,
     start: Instant,
+
+    /// Most recently started filename.
+    latest_filename: String,
 }
 
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
@@ -157,6 +160,11 @@ impl Report {
         } else {
             panic!("unregistered counter {:?}", counter_name);
         }
+        self.show_progress();
+    }
+
+    /// Update the progress bars for the current counts, etc.
+    fn show_progress(&self) {
         self.ui
             .lock()
             .unwrap()
@@ -222,6 +230,7 @@ impl Report {
         if self.print_filenames {
             self.print(&format!("{}", entry.apath()));
         }
+        self.mut_counts().latest_filename = entry.apath().to_string();
     }
 
     pub fn print(&self, s: &str) {
@@ -281,23 +290,24 @@ impl Display for Report {
 
 impl Counts {
     fn new() -> Counts {
-        let mut inner_count = BTreeMap::new();
+        let mut count = BTreeMap::new();
         for counter_name in KNOWN_COUNTERS {
-            inner_count.insert(*counter_name, 0);
+            count.insert(*counter_name, 0);
         }
-        let mut inner_sizes = BTreeMap::new();
+        let mut sizes = BTreeMap::new();
         for counter_name in KNOWN_SIZES {
-            inner_sizes.insert(*counter_name, Sizes::default());
+            sizes.insert(*counter_name, Sizes::default());
         }
-        let mut inner_durations: BTreeMap<&'static str, Duration> = BTreeMap::new();
+        let mut durations: BTreeMap<&'static str, Duration> = BTreeMap::new();
         for name in KNOWN_DURATIONS {
-            inner_durations.insert(name, Duration::new(0, 0));
+            durations.insert(name, Duration::new(0, 0));
         }
         Counts {
-            count: inner_count,
-            sizes: inner_sizes,
-            durations: inner_durations,
+            count,
+            sizes,
+            durations,
             start: Instant::now(),
+            latest_filename: String::new(),
         }
     }
 
@@ -329,6 +339,10 @@ impl Counts {
 
     pub fn elapsed_time(&self) -> Duration {
         self.start.elapsed()
+    }
+
+    pub fn get_latest_filename(&self) -> &str {
+        &self.latest_filename
     }
 }
 
