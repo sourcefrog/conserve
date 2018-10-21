@@ -4,6 +4,7 @@
 //! Abstract user interface trait.
 
 use std::fmt;
+use std::time::Duration;
 
 pub use super::report::{Counts, Sizes};
 
@@ -46,6 +47,29 @@ pub fn compression_percent(s: &Sizes) -> i64 {
         100i64 - (100 * s.compressed / s.uncompressed) as i64
     } else {
         0
+    }
+}
+
+fn duration_to_hms(d: Duration) -> String {
+    let elapsed_secs = d.as_secs();
+    if elapsed_secs >= 3600 {
+        format!(
+            "{:2}:{:02}:{:02}",
+            elapsed_secs / 3600,
+            (elapsed_secs / 60) % 60,
+            elapsed_secs % 60
+        )
+    } else {
+        format!("   {:2}:{:02}", (elapsed_secs / 60) % 60, elapsed_secs % 60)
+    }
+}
+
+fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
+    let float_secs = elapsed.as_secs() as f64;
+    if float_secs > 0.0 {
+        bytes as f64 / float_secs / 1e6_f64
+    } else {
+        0f64
     }
 }
 

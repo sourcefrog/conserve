@@ -143,21 +143,19 @@ colors if possible and wanted, and not otherwise.
 
 ## Better progress bar
 
-**Fix progress and logging for restore.**  Make it work the same way for restore
-as backup: don't rely on any backup-specific counters.
+After printing text above the terminal, wait a fraction of a second to see if
+there's more text, before drawing the bar again. This'll prevent flickering
+when there's a lot of text output.
 
 Ideally should show some of these:
 
 * Percent complete
-* Expected time to run
 * Bytes read (uncompressed source) and written (compressed and after deduplication)
 * Current filename
-* Progress within the current file
+* Progress within the current file (if that's known, but this will be complicated
+  with parallelism)
 
 * Show current filename: maybe 2-line output?
-* Disable progress for operations like `list-bands` that will use stdout
-  for bulk data.
-* Erase at end of program and replace with a summary.
 
 ## Better summary at end of run
 

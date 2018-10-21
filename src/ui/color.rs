@@ -8,12 +8,12 @@
 
 use std::fmt;
 use std::io::prelude::*;
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 
 use term;
 
 use report::Counts;
-use ui::UI;
+use ui::{duration_to_hms, mbps_rate, UI};
 
 const MB: u64 = 1_000_000;
 
@@ -58,29 +58,6 @@ impl ColorUI {
             self.t.delete_line().unwrap();
             self.progress_present = false;
         }
-    }
-}
-
-fn duration_to_hms(d: Duration) -> String {
-    let elapsed_secs = d.as_secs();
-    if elapsed_secs >= 3600 {
-        format!(
-            "{:2}:{:02}:{:02}",
-            elapsed_secs / 3600,
-            (elapsed_secs / 60) % 60,
-            elapsed_secs % 60
-        )
-    } else {
-        format!("   {:2}:{:02}", (elapsed_secs / 60) % 60, elapsed_secs % 60)
-    }
-}
-
-fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
-    let float_secs = elapsed.as_secs() as f64;
-    if float_secs > 0.0 {
-        bytes as f64 / float_secs / MB as f64
-    } else {
-        0f64
     }
 }
 
