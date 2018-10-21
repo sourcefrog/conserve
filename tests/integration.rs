@@ -42,6 +42,7 @@ pub fn simple_backup_with_excludes() {
     copy_tree(&lt, &mut bw).unwrap();
     check_backup(&af, &af.report());
     check_restore(&af);
+    af.validate().unwrap();
 }
 
 fn check_backup(af: &ScratchArchive, report: &Report) {
