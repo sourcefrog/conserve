@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Display progress and messages on a rich terminal with color
 //! and cursor movement.
@@ -8,7 +8,7 @@
 
 use std::fmt;
 use std::io::prelude::*;
-use std::time::{Instant};
+use std::time::Instant;
 
 use term;
 
@@ -16,6 +16,7 @@ use report::Counts;
 use ui::{duration_to_hms, mbps_rate, UI};
 
 const MB: u64 = 1_000_000;
+const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 
 pub struct ColorUI {
     t: Box<term::StdoutTerminal>,
@@ -46,7 +47,7 @@ impl ColorUI {
     fn throttle_updates(&mut self) -> bool {
         if let Some(last) = self.last_update {
             let e = last.elapsed();
-            e.as_secs() < 1 && e.subsec_nanos() < 200_000_000
+            e.as_secs() < 1 && e.subsec_millis() < PROGRESS_RATE_LIMIT_MS
         } else {
             false
         }
@@ -58,6 +59,12 @@ impl ColorUI {
             self.t.delete_line().unwrap();
             self.progress_present = false;
         }
+        self.updated();
+    }
+
+    /// Remember that the ui was just updated, for the sake of throttling.
+    fn updated(&mut self) {
+        self.last_update = Some(Instant::now());
     }
 }
 
@@ -66,11 +73,10 @@ impl UI for ColorUI {
         if !self.progress_enabled {
             return;
         }
-        if self.progress_present && self.throttle_updates() {
+        if self.throttle_updates() {
             return;
         }
         self.clear_progress();
-        self.last_update = Some(Instant::now());
         self.progress_present = true;
 
         let t = &mut self.t;
