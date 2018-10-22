@@ -18,6 +18,8 @@ extern crate snap;
 extern crate tempdir;
 extern crate tempfile;
 extern crate term;
+extern crate terminal_size;
+extern crate unicode_segmentation;
 extern crate walkdir;
 
 #[cfg(test)]

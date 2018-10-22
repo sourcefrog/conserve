@@ -11,6 +11,8 @@ use std::io::prelude::*;
 use std::time::Instant;
 
 use term;
+use terminal_size::{Width, terminal_size};
+use unicode_segmentation::UnicodeSegmentation;
 
 use report::Counts;
 use ui::{duration_to_hms, mbps_rate, UI};
@@ -84,41 +86,36 @@ impl ColorUI {
 
 impl UI for ColorUI {
     fn show_progress(&mut self, counts: &Counts) {
-        if !self.progress_enabled {
-            return;
-        }
-        if self.throttle_updates() {
+        if !self.progress_enabled || self.throttle_updates() {
             return;
         }
         self.clear_progress();
         self.progress_present = true;
 
+        let w = if let Some((Width(w), _)) = terminal_size() {
+            w as usize
+        } else {
+            return;
+        };
+
         // TODO: Input size should really be the number of source bytes before
         // block deduplication.
-        // Measure compression on body bytes.
         let block_sizes = counts.get_size("block");
         let elapsed = counts.elapsed_time();
-        // TODO: Truncate to screen width (or draw on multiple lines with cursor-up)?
-        // TODO: Rate limit etc.
-        // TODO: Also show current filename.
-        // TODO: Don't special-case for backups.
-        self.fg_color(term::color::GREEN);
-        write!(self.t, " {} ", duration_to_hms(elapsed)).unwrap();
         let uncomp_mb_str = format!("{}MB", block_sizes.uncompressed / MB);
         let comp_mb_str = format!("{}MB", block_sizes.compressed / MB);
         let uncomp_rate = mbps_rate(block_sizes.uncompressed, elapsed);
 
-        self.fg_color(term::color::GREEN);
-        write!(
-            self.t,
-            " {:>9} => {:<9} {:6.1}MB/s | ",
+        let pb_text = format!(
+            "{} {:>9} => {:<9} {:6.1}MB/s | {}",
+            duration_to_hms(elapsed),
             uncomp_mb_str, comp_mb_str, uncomp_rate,
-        ).unwrap();
+            counts.get_latest_filename());
+        let g = UnicodeSegmentation::graphemes(pb_text.as_str(), true);
+        let g = g.take(w).collect::<String>();
+        self.fg_color(term::color::GREEN);
+        self.t.write_all(g.as_bytes()).unwrap();
         self.reset_color();
-        write!(
-            self.t, "{}",
-            counts.get_latest_filename(),
-        ).unwrap();
         self.t.flush().unwrap();
     }
 

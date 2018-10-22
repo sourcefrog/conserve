@@ -141,6 +141,11 @@ UI. It can contain a progress bar, or a progress sink that does nothing if
 it's turned off or the terminal doesn't support it. And similarly for drawing
 colors if possible and wanted, and not otherwise.
 
+## Fancy UI seems to have some performance impact
+
+Backup with a UI is slower than without. Maybe due to contention for
+locks? Should we have a separate thread just to show UI updates?
+
 ## Better progress bar
 
 After printing text above the terminal, wait a fraction of a second to see if
