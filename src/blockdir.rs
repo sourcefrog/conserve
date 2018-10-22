@@ -100,8 +100,6 @@ impl BlockDir {
         from_file: &mut Read,
         report: &Report,
     ) -> Result<(Vec<Address>, BlockHash)> {
-        // TODO: Split large files, combine small files. Don't read them all into a single buffer.
-
         // loop
         //   read up to block_size bytes
         //   accumulate into the overall hasher

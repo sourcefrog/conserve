@@ -76,6 +76,14 @@ Should report on (and gc could clean up) any old leftover tmp files.
 
 Clean message, and test for it, when the archive directory just doesn't exist.
 
+## More parallelism in Report
+
+I want to avoid having threads that could be doing useful work stalling waiting
+to update the Report, or even worse drawing to the terminal.
+
+It might help to use atomic ints for the counters (when they're stable) rather
+than locking and unlocking.
+
 ## Internal cleanups
 
 * Refactor text formatting into being part of the UI rather than within the CLI?
@@ -178,6 +186,9 @@ Make it more concise and then show it by default.
 
 Bytes in source file, after skipping unchanged files, after deduplicating
 already-present blocks, after compression of blocks that are stored.
+
+I'm not sure the `Sizes` struct really helps, because some things such as
+source files don't have an easy compressed size.
 
 ## Performance
 
