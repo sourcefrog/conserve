@@ -294,11 +294,27 @@ even if it's incomplete. Similarly `ls` etc.
 
 ## Parallelism
 
-All of these need a bounded number of worker threads, and to run a bit ahead
-of the task but to still wait for it to complete.
+Both reading and writing do a lot of CPU-intensive hashing and de/compression,
+and are fairly easy to parallel.
 
-* Do compression on worker pool.
-* Write out on a background thread
+Parallelizing within a single file is probably possible, but doing random
+IO within the file will be complicated, especially for non-local filesystems.
+Similarly entries must be written into the index in order: they could arrive
+a bit out of order but we do need to finish one chunk at a time.
+
+However it should be easy to parallelize across multiple files, and index
+chunks give an obvious granularity for doing this:
+
+* Read a thousand filenames.
+* Compress and store all of them, generating index entries in the right order.
+  (Or, sort the index entries if necessary.)
+* Write out the index chunk and move to the next.
+
+It seems like it'll fit naturally on Rayon, which is great.
+
+I do want to also combine small blocks together, which means the index entry
+isn't available immediately after the file is written in, only when the chunk
+is complete. This could potentially be on a per-thread basis.
 
 ## Backup multiple source directories
 
