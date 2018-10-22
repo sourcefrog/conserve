@@ -107,7 +107,7 @@ impl Band {
     /// band corresponding to in-archive directory.
     fn new(archive_dir: &Path, id: BandId) -> Band {
         let mut path_buf = archive_dir.to_path_buf();
-        path_buf.push(id.as_string());
+        path_buf.push(id.to_string());
         let mut index_dir_path = path_buf.clone();
         index_dir_path.push(INDEX_DIR);
         Band {
@@ -224,7 +224,7 @@ mod tests {
 
         // Try get_info
         let info = band2.get_info(&Report::new()).expect("get_info failed");
-        assert_eq!(info.id.as_string(), "b0000");
+        assert_eq!(info.id.to_string(), "b0000");
         assert_eq!(info.is_closed, true);
         let dur = info.end_time.expect("info has an end_time") - info.start_time;
         // Test should have taken (much) less than 5s between starting and finishing

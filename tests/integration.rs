@@ -53,7 +53,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
 
     let band_ids = af.list_bands().unwrap();
     assert_eq!(1, band_ids.len());
-    assert_eq!("b0000", band_ids[0].as_string());
+    assert_eq!("b0000", band_ids[0].to_string());
     assert_eq!(af.last_complete_band().unwrap().id(), BandId::new(&[0]));
 
     let dur = report.get_duration("source.read");

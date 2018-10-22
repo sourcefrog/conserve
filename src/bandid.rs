@@ -12,15 +12,9 @@ use errors::*;
 /// `BandId`s implement a total ordering `std::cmp::Ord`.
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
 pub struct BandId {
-    // TODO: Maybe don't store both the vec and the string?
     /// The sequence numbers at each tier.
     seqs: Vec<u32>,
-
-    /// The pre-calculated string form for this id.
-    string_form: String,
 }
-
-// TODO: Maybe a more concise debug form?
 
 impl BandId {
     /// Makes a new BandId from a sequence of integers.
@@ -28,7 +22,6 @@ impl BandId {
         assert!(!seqs.is_empty());
         BandId {
             seqs: seqs.to_vec(),
-            string_form: BandId::make_string_form(seqs),
         }
     }
 
@@ -71,16 +64,12 @@ impl BandId {
     /// This is externally represented as a string like `b0001-0010`, which becomes
     /// their directory name in the archive.
     ///
-    /// Numbers are zero-padded to what should normally be a reasonable length, but they can
-    /// be longer.
-    pub fn as_string(&self) -> &String {
-        &self.string_form
-    }
-
-    fn make_string_form(seqs: &[u32]) -> String {
-        let mut result = String::with_capacity(30);
+    /// Numbers are zero-padded to what should normally be a reasonable length,
+    /// but they can be longer.
+    pub fn to_string(&self) -> String {
+        let mut result = String::with_capacity(self.seqs.len() * 5);
         result.push_str("b");
-        for s in seqs {
+        for s in &self.seqs {
             result.push_str(&format!("{:04}-", s));
         }
         result.pop(); // remove the last dash
@@ -91,7 +80,7 @@ impl BandId {
 
 impl fmt::Display for BandId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.as_string().fmt(f)
+        self.to_string().fmt(f)
     }
 }
 
@@ -112,24 +101,24 @@ mod tests {
 
     #[test]
     fn zero() {
-        assert_eq!(BandId::zero().as_string(), "b0000");
+        assert_eq!(BandId::zero().to_string(), "b0000");
     }
 
     #[test]
     fn next() {
-        assert_eq!(BandId::zero().next_sibling().as_string(), "b0001");
+        assert_eq!(BandId::zero().next_sibling().to_string(), "b0001");
         assert_eq!(
-            BandId::new(&[2, 3]).next_sibling().as_string(),
+            BandId::new(&[2, 3]).next_sibling().to_string(),
             "b0002-0004"
         );
     }
 
     #[test]
-    fn as_string() {
+    fn to_string() {
         let band_id = BandId::new(&[1, 10, 20]);
-        assert_eq!(band_id.as_string(), "b0001-0010-0020");
+        assert_eq!(band_id.to_string(), "b0001-0010-0020");
         assert_eq!(
-            BandId::new(&[1000000, 2000000]).as_string(),
+            BandId::new(&[1000000, 2000000]).to_string(),
             "b1000000-2000000"
         )
     }
@@ -152,13 +141,13 @@ mod tests {
 
     #[test]
     fn from_string_valid() {
-        assert_eq!(BandId::from_string("b0001").unwrap().as_string(), "b0001");
+        assert_eq!(BandId::from_string("b0001").unwrap().to_string(), "b0001");
         assert_eq!(
-            BandId::from_string("b123456").unwrap().as_string(),
+            BandId::from_string("b123456").unwrap().to_string(),
             "b123456"
         );
         assert_eq!(
-            BandId::from_string("b0001-0100-0234").unwrap().as_string(),
+            BandId::from_string("b0001-0100-0234").unwrap().to_string(),
             "b0001-0100-0234"
         );
     }

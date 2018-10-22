@@ -123,7 +123,7 @@ mod tests {
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
-        assert_eq!("b0000", band_ids[0].as_string());
+        assert_eq!("b0000", band_ids[0].to_string());
 
         let band = Band::open(&af, &band_ids[0]).unwrap();
         assert!(band.is_closed().unwrap());
