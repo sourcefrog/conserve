@@ -300,7 +300,7 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn list_tree_contents<T: ReadTree>(tree: &T, report: &Report) -> Result<()> {
     // TODO: Maybe should be a specific concept in the UI.
-    for entry in tree.iter_entries()? {
+    for entry in tree.iter_entries(report)? {
         report.print(&entry?.apath());
     }
     Ok(())

@@ -57,6 +57,8 @@ impl tree::WriteTree for RestoreTree {
     fn write_file(&mut self, entry: &Entry, content: &mut std::io::Read) -> Result<()> {
         // TODO: Restore permissions.
         // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
+        // TODO: For restore, maybe not necessary to rename into place, and
+        // we could just write directly.
         self.report.increment("file", 1);
         let mut af = AtomicFile::new(&self.entry_path(entry))?;
         let bytes = std::io::copy(content, &mut af)?;

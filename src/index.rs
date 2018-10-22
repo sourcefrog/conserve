@@ -15,11 +15,12 @@ use rustc_serialize::json;
 
 use super::apath::Apath;
 use super::blockdir;
+use super::io::file_exists;
 use super::*;
 
 use globset::GlobSet;
 
-const MAX_ENTRIES_PER_HUNK: usize = 1000;
+pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
 
 /// Description of one archived file.
 ///
@@ -89,7 +90,7 @@ impl IndexBuilder {
     pub fn new(dir: &Path) -> IndexBuilder {
         IndexBuilder {
             dir: dir.to_path_buf(),
-            entries: Vec::<IndexEntry>::new(),
+            entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
             sequence: 0,
             check_order: apath::CheckOrder::new(),
         }
@@ -166,7 +167,41 @@ fn path_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
     buf
 }
 
-/// Read out all the entries from an existing index.
+#[derive(Debug, Clone)]
+pub struct ReadIndex {
+    dir: PathBuf,
+}
+
+impl ReadIndex {
+    pub fn new(dir: &Path) -> ReadIndex {
+        ReadIndex {
+            dir: dir.to_path_buf(),
+        }
+    }
+
+    /// Return the (1-based) number of index hunks in an index directory.
+    pub fn count_hunks(&self) -> Result<u32> {
+        for i in 0.. {
+            if !file_exists(&path_for_hunk(&self.dir, i))? {
+                // If hunk 1 is missing, 1 hunks exists.
+                return Ok(i)
+            }
+        }
+        unreachable!();
+    }
+
+    pub fn estimate_entry_count(&self) -> Result<u64> {
+        Ok((self.count_hunks()? as u64) * (MAX_ENTRIES_PER_HUNK as u64))
+    }
+
+    /// Make an iterator that will return all entries in this band.
+    pub fn iter(&self, excludes: &GlobSet, report: &Report) -> Result<index::Iter> {
+        index::Iter::open(&self.dir, excludes, report)
+    }
+}
+
+/// Read out all the entries from an existing index, continuing across multiple
+/// hunks.
 pub struct Iter {
     /// The `i` directory within the band where all files for this index are written.
     dir: PathBuf,

@@ -17,16 +17,23 @@ pub struct StoredTree {
     archive: Archive,
     band: Band,
     excludes: GlobSet,
+    index: ReadIndex,
 }
 
 impl StoredTree {
+    fn new(archive: &Archive, band: Band, excludes: GlobSet) -> StoredTree {
+        let index = band.index();
+        StoredTree {
+            archive: archive.clone(),
+            band,
+            excludes,
+            index,
+        }
+    }
+
     /// Open the last complete version in the archive.
     pub fn open_last(archive: &Archive) -> Result<StoredTree> {
-        Ok(StoredTree {
-            archive: archive.clone(),
-            band: archive.last_complete_band()?,
-            excludes: excludes::excludes_nothing(),
-        })
+        Ok(StoredTree::new(archive, archive.last_complete_band()?, excludes::excludes_nothing()))
     }
 
     /// Open a specified version.
@@ -37,11 +44,7 @@ impl StoredTree {
         if !band.is_closed()? {
             return Err(ErrorKind::BandIncomplete(band_id.clone()).into());
         }
-        Ok(StoredTree {
-            archive: archive.clone(),
-            band,
-            excludes: excludes::excludes_nothing(),
-        })
+        Ok(StoredTree::new(archive, band, excludes::excludes_nothing()))
     }
 
     /// Open a specified version.
@@ -50,11 +53,7 @@ impl StoredTree {
     /// of the source tree, or maybe nothing at all.
     pub fn open_incomplete_version(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
         let band = Band::open(archive, band_id)?;
-        Ok(StoredTree {
-            archive: archive.clone(),
-            band,
-            excludes: excludes::excludes_nothing(),
-        })
+        Ok(StoredTree::new(archive, band, excludes::excludes_nothing()))
     }
 
     pub fn with_excludes(self, excludes: GlobSet) -> StoredTree {
@@ -83,8 +82,8 @@ impl ReadTree for StoredTree {
     type R = stored_file::StoredFile;
 
     /// Return an iter of index entries in this stored tree.
-    fn iter_entries(&self) -> Result<index::Iter> {
-        self.band.index_iter(&self.excludes, self.report())
+    fn iter_entries(&self, report: &Report) -> Result<index::Iter> {
+        self.band.index().iter(&self.excludes, report)
     }
 
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
@@ -93,6 +92,10 @@ impl ReadTree for StoredTree {
             entry.addrs.clone(),
             self.report(),
         ))
+    }
+
+    fn estimate_count(&self) -> Result<u64> {
+        self.index.estimate_entry_count()
     }
 }
 
@@ -118,7 +121,7 @@ mod test {
         assert_eq!(st.band().id(), last_band_id);
 
         let names: Vec<String> = st
-            .iter_entries()
+            .iter_entries(&af.report())
             .unwrap()
             .map(|e| e.unwrap().apath)
             .collect();

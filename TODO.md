@@ -76,15 +76,10 @@ Should report on (and gc could clean up) any old leftover tmp files.
 
 Clean message, and test for it, when the archive directory just doesn't exist.
 
-## More parallelism in Report
-
-I want to avoid having threads that could be doing useful work stalling waiting
-to update the Report, or even worse drawing to the terminal.
-
-It might help to use atomic ints for the counters (when they're stable) rather
-than locking and unlocking.
-
 ## Internal cleanups
+
+* Maybe make a first-class Index or ReadIndex class. At the moment some
+  methods that should be there are on the Band.
 
 * Refactor text formatting into being part of the UI rather than within the CLI?
 
@@ -154,50 +149,52 @@ colors if possible and wanted, and not otherwise.
 Backup with a color UI is slower than without. Maybe due to contention for
 locks? Should we have a separate thread just to show UI updates?
 
+I want to avoid having threads that could be doing useful work stalling waiting
+to update the Report, or even worse drawing to the terminal.
+
+It might help to use atomic ints for the counters (when they're stable) rather
+than locking and unlocking.
+
+It's probably not the cause of any slow down, but
+I'm not sure the `Sizes` struct really helps, because some things such as
+source files don't have an easy compressed size.
+
+## Percent completion
+
+Percent completion is now shown for validate, where it's pretty cheap and
+easy to know how many blocks there are to check. For backup and restore,
+we'd want to know how many files.
+
+For restore that can be cheaply estimated by the number of index chunks
+multiplied by the number of files per chunk. (This will overestimate
+but that's OK; if desired we can even correct the number when we enter the
+last block.)
+
+For backup we'd need to walk the tree.
+
 ## Better progress bar
 
-After printing text above the terminal, wait a fraction of a second to see if
-there's more text, before drawing the bar again. This'll prevent flickering
-when there's a lot of text output.
+* Show reasonable numbers for all cases; it's not necessarily files and blocks.
+  For validate, some of the fields stay at 0.
 
 Ideally should show some of these:
 
-* Percent complete
 * Bytes read (uncompressed source) and written (compressed and after deduplication)
 * Current filename
 * Progress within the current file (if that's known, but this will be complicated
   with parallelism)
 
-* Show current filename: maybe 2-line output?
-
 This could, at least on Unix, be even fancier by using terminfo to scroll up the
 region above the bar, leaving the bar there.
-
-## Better summary at end of run
-
-Just better formatting?
-
-* Number of files included, unchanged, stored.
-* Bytes read, stored.
-* Time
-* `getrusage` or similar
-
-Make it more concise and then show it by default.
-
-Bytes in source file, after skipping unchanged files, after deduplicating
-already-present blocks, after compression of blocks that are stored.
-
-I'm not sure the `Sizes` struct really helps, because some things such as
-source files don't have an easy compressed size.
 
 ## Performance
 
 * Use minimal compression on files whose name indicates they're already
   likely to be compressed (jpg, mpg, mp3, gz, etc)
+
 * Try <https://github.com/TyOverby/flame> flamegraph profiling.
   (May not be useful if the compression/hashing/etc is very tightly
   interleaved?  But we can still try.)
-* Don't load whole data files into memory, just one block at a time.
 
 ## Problem reporting infrastructure
 

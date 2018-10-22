@@ -16,12 +16,9 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, TimeZone, UTC};
 
-use super::index;
 use super::io::file_exists;
 use super::jsonio;
 use super::*;
-
-use globset::GlobSet;
 
 static INDEX_DIR: &'static str = "i";
 static HEAD_FILENAME: &'static str = "BANDHEAD";
@@ -32,7 +29,7 @@ static TAIL_FILENAME: &'static str = "BANDTAIL";
 pub struct Band {
     id: BandId,
     path_buf: PathBuf,
-    index_dir_path: PathBuf,
+    pub index_dir_path: PathBuf,
 }
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
@@ -141,9 +138,8 @@ impl Band {
         IndexBuilder::new(&self.index_dir_path)
     }
 
-    /// Make an iterator that will return all entries in this band.
-    pub fn index_iter(&self, excludes: &GlobSet, report: &Report) -> Result<index::Iter> {
-        index::Iter::open(&self.index_dir_path, excludes, report)
+    pub fn index(&self) -> ReadIndex {
+        ReadIndex::new(&self.index_dir_path)
     }
 
     fn read_head(&self, report: &Report) -> Result<Head> {
@@ -172,6 +168,8 @@ impl Band {
     }
 
     /// Get the total size in bytes of files stored for this band.
+    ///
+    /// Not very useful at the moment as it doesn't include the blocks.
     pub fn get_disk_size(&self) -> Result<u64> {
         // TODO: Better handling than panic of unexpected errors.
         let mut total = 0u64;

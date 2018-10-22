@@ -52,7 +52,7 @@ impl tree::ReadTree for LiveTree {
     /// name.
     ///
     /// The `Iter` has its own `Report` of how many directories and files were visited.
-    fn iter_entries(&self) -> Result<Self::I> {
+    fn iter_entries(&self, report: &Report) -> Result<Self::I> {
         let root_metadata = match fs::symlink_metadata(&self.path) {
             Ok(metadata) => metadata,
             Err(e) => {
@@ -75,7 +75,7 @@ impl tree::ReadTree for LiveTree {
         Ok(Iter {
             entry_deque,
             dir_deque,
-            report: self.report.clone(),
+            report: report.clone(),
             check_order: apath::CheckOrder::new(),
             excludes: self.excludes.clone(),
         })
@@ -87,6 +87,16 @@ impl tree::ReadTree for LiveTree {
         let mut path = self.path.clone();
         path.push(&entry.apath[1..]);
         Ok(fs::File::open(&path)?)
+    }
+
+    fn estimate_count(&self) -> Result<u64> {
+        // TODO: This stats the file and builds an entry about them, just to
+        // throw it away. We could perhaps change the iter to optionally do
+        // less work.
+
+        // Make a new report so it doesn't pollute the report for the actual
+        // backup work.
+        Ok(self.iter_entries(&Report::new())?.count() as u64)
     }
 }
 
@@ -305,7 +315,7 @@ mod tests {
         tf.create_dir("jam/.etc");
         let report = Report::new();
         let lt = LiveTree::open(tf.path(), &report).unwrap();
-        let mut source_iter = lt.iter_entries().unwrap();
+        let mut source_iter = lt.iter_entries(&report).unwrap();
         let result = source_iter.by_ref().collect::<Result<Vec<_>>>().unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -354,7 +364,7 @@ mod tests {
         let lt = LiveTree::open(tf.path(), &report)
             .unwrap()
             .with_excludes(excludes);
-        let mut source_iter = lt.iter_entries().unwrap();
+        let mut source_iter = lt.iter_entries(&report).unwrap();
         let result = source_iter.by_ref().collect::<Result<Vec<_>>>().unwrap();
 
         // First one is the root
@@ -403,7 +413,7 @@ mod tests {
 
         let lt = LiveTree::open(tf.path(), &report).unwrap();
         let result = lt
-            .iter_entries()
+            .iter_entries(&report)
             .unwrap()
             .collect::<Result<Vec<_>>>()
             .unwrap();

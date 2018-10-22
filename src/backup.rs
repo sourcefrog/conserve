@@ -129,7 +129,8 @@ mod tests {
         assert!(band.is_closed().unwrap());
 
         let index_entries = band
-            .index_iter(&excludes::excludes_nothing(), &report)
+            .index()
+            .iter(&excludes::excludes_nothing(), &report)
             .unwrap()
             .filter_map(|i| i.ok())
             .collect::<Vec<IndexEntry>>();
@@ -189,7 +190,7 @@ mod tests {
         // Read back the empty file
         let st = StoredTree::open_last(&af).unwrap();
         let empty_entry = st
-            .iter_entries()
+            .iter_entries(&af.report())
             .unwrap()
             .map(|i| i.unwrap())
             .find(|ref i| i.apath == "/empty")

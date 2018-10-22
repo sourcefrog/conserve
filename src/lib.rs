@@ -61,7 +61,7 @@ pub use compress::snappy::Snappy;
 pub use compress::Compression;
 pub use entry::{Entry, Kind};
 pub use errors::*;
-pub use index::{IndexBuilder, IndexEntry};
+pub use index::{IndexBuilder, IndexEntry, ReadIndex};
 pub use io::{ensure_dir_exists, list_dir, AtomicFile};
 pub use live_tree::LiveTree;
 pub use report::{HasReport, Report, Sizes};

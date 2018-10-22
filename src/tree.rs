@@ -11,8 +11,12 @@ pub trait ReadTree: HasReport {
     type I: Iterator<Item = Result<Self::E>>;
     type R: std::io::Read;
 
-    fn iter_entries(&self) -> Result<Self::I>;
+    fn iter_entries(&self, report: &Report) -> Result<Self::I>;
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R>;
+
+    /// Estimate the number of entries in the tree.
+    /// This might do somewhat expensive IO, so isn't the Iter's `size_hint`.
+    fn estimate_count(&self) -> Result<u64>;
 }
 
 /// A tree open for writing, either local or an an archive.
@@ -34,7 +38,8 @@ pub trait WriteTree {
 /// Progress and problems are reported to the source's report.
 pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Result<()> {
     let report = source.report();
-    for entry in source.iter_entries()? {
+    report.set_total_work(source.estimate_count()?);
+    for entry in source.iter_entries(&report)? {
         let entry = entry?;
         report.start_entry(&entry);
         match entry.kind() {
@@ -51,6 +56,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
                 continue;
             }
         }?;
+        report.increment_work(1);
     }
     dest.finish()
 }
