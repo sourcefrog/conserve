@@ -153,10 +153,9 @@ fn blackbox_backup() {
         let (status, stdout, stderr) = run_conserve(&["validate", &arch_dir_str]);
         assert!(status.success());
         assert_eq!(stderr, "");
-        assert_eq!(stdout, "Archive is OK.\n")
+        assert!(stdout.starts_with("Archive is OK.\n"));
     }
 
-    // TODO: Validate.
     // TODO: Compare vs source tree.
     //
     //     $ conserve restore myarchive restoredir
@@ -168,18 +167,6 @@ fn blackbox_backup() {
     //     $ conserve -L restore myarchive restoredir
     //     error creating restore destination directory "restoredir": File exists
     //     [3]
-    //
-    // There is a `validate` command that checks that an archive is internally
-    // consistent and well formatted.  Validation doesn't compare the contents
-    // of the archive to any external source.  Validation is intended to catch
-    // bugs in Conserve, underlying software, or hardware errors -- in the
-    // absence of such problems it should never fail.
-    //
-    // Validate just exits silently and successfully unless problems are
-    // detected.
-    //
-    //     $ conserve validate myarchive
-    //
 }
 
 #[test]
