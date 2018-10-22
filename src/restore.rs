@@ -59,7 +59,9 @@ impl tree::WriteTree for RestoreTree {
         // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
         self.report.increment("file", 1);
         let mut af = AtomicFile::new(&self.entry_path(entry))?;
-        std::io::copy(content, &mut af)?;
+        let bytes = std::io::copy(content, &mut af)?;
+        self.report.increment_size("file.bytes",
+            Sizes { uncompressed: bytes, compressed: 0});
         af.close(&self.report)
     }
 

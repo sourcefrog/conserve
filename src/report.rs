@@ -57,7 +57,9 @@ pub struct Sizes {
     pub uncompressed: u64,
 }
 
-static KNOWN_SIZES: &'static [&'static str] = &["block", "index"];
+static KNOWN_SIZES: &'static [&'static str] = &["block",
+    "file.bytes",
+    "index"];
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 static KNOWN_DURATIONS: &'static [&'static str] = &[

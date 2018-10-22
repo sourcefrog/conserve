@@ -11,7 +11,7 @@ use std::io::prelude::*;
 use std::time::Instant;
 
 use term;
-use terminal_size::{Width, terminal_size};
+use terminal_size::{terminal_size, Width};
 use unicode_segmentation::UnicodeSegmentation;
 
 use report::Counts;
@@ -102,15 +102,20 @@ impl UI for ColorUI {
         // block deduplication.
         let block_sizes = counts.get_size("block");
         let elapsed = counts.elapsed_time();
-        let uncomp_mb_str = format!("{}MB", block_sizes.uncompressed / MB);
+        let file_bytes = counts.get_size("file.bytes").uncompressed;
+        let file_mb = format!("{}MB", file_bytes / MB);
+        // let uncomp_mb_str = format!("{}MB", block_sizes.uncompressed / MB);
         let comp_mb_str = format!("{}MB", block_sizes.compressed / MB);
-        let uncomp_rate = mbps_rate(block_sizes.uncompressed, elapsed);
+        let file_rate = mbps_rate(file_bytes, elapsed);
 
         let pb_text = format!(
             "{} {:>9} => {:<9} {:6.1}MB/s | {}",
             duration_to_hms(elapsed),
-            uncomp_mb_str, comp_mb_str, uncomp_rate,
-            counts.get_latest_filename());
+            file_mb,
+            comp_mb_str,
+            file_rate,
+            counts.get_latest_filename()
+        );
         let g = UnicodeSegmentation::graphemes(pb_text.as_str(), true);
         let g = g.take(w).collect::<String>();
         self.fg_color(term::color::GREEN);

@@ -143,7 +143,7 @@ colors if possible and wanted, and not otherwise.
 
 ## Fancy UI seems to have some performance impact
 
-Backup with a UI is slower than without. Maybe due to contention for
+Backup with a color UI is slower than without. Maybe due to contention for
 locks? Should we have a separate thread just to show UI updates?
 
 ## Better progress bar
@@ -306,6 +306,29 @@ Perhaps there should be an option for the base directory.
   * Like an ordering-aware `gsutil rsync` or `rsync`
 * Test on GCS FUSE
 * For remote or slow storage, keep a local cache of which blocks are present?
+
+## Performance on large files
+
+Let's remember something about files we saw recently in the current band,
+or the previous band.
+
+If we see a file with the same size, let's see if it has the same hash. If it
+does, we know we can reuse all the same addresses, without needing to hash
+each block individually.
+
+This should be cheap because we have to hash every stored file, anyhow. It does
+mean waiting to do the per-file hashes, that could otherwise be started earlier,
+and it means reading the file twice, which might be a risk for correctness.
+Perhaps we'd have to hash the whole file twice, which'd be ugly.
+
+Alternatively: given the hash of the whole file, we could specifically find the
+address of the trailing short block, which would otherwise be duplicated.
+At the point we're trying to write it, we'll know the hash of the whole file,
+and the length of the short block. It must be (barring hash collisions)
+the same as the final block at the end of any other file with the same hash.
+
+This will do well on a tree containing multiple copies of a large file with
+a trailing short block, which is perhaps not a negligible case.
 
 ## Questionable features
 
