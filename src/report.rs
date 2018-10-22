@@ -87,6 +87,11 @@ pub struct Counts {
 
     /// Most recently started filename.
     latest_filename: String,
+
+    /// Total estimated work to be done (task-specific units).
+    pub total_work: u64,
+    /// Amount of work done so far, to indicate percentage completion.
+    pub done_work: u64,
 }
 
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
@@ -249,6 +254,14 @@ impl Report {
     pub fn finish(&self) {
         self.ui.lock().unwrap().finish()
     }
+
+    pub fn set_total_work(&self, w: u64) {
+        self.mut_counts().total_work = w;
+    }
+
+    pub fn increment_work(&self, w: u64) {
+        self.mut_counts().done_work += w;
+    }
 }
 
 impl Default for Report {
@@ -310,6 +323,8 @@ impl Counts {
             durations,
             start: Instant::now(),
             latest_filename: String::new(),
+            total_work: 0,
+            done_work: 0,
         }
     }
 

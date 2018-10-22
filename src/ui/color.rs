@@ -108,9 +108,15 @@ impl UI for ColorUI {
             let file_mb = format!("{}MB", file_bytes / MB);
             let comp_mb_str = format!("{}MB", block_sizes.compressed / MB);
             let file_rate = mbps_rate(file_bytes, elapsed);
+            let pct = if counts.total_work > 0 {
+                format!("{:>3}% ", 100 * counts.done_work / counts.total_work)
+            } else {
+                String::new()
+            };
 
             format!(
-                "{} {:>9} => {:<9} {:6.1}MB/s  {}",
+                "{}{} {:>9} => {:<9} {:6.1}MB/s  {}",
+                pct,
                 duration_to_hms(elapsed),
                 file_mb,
                 comp_mb_str,

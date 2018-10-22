@@ -283,9 +283,14 @@ impl BlockDir {
     pub fn validate(&self, report: &Report) -> Result<()> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
-        self.blocks(report)?
+        let bns = self.blocks(report)?;
+        report.set_total_work(bns.len() as u64);
+        bns
             .par_iter()
-            .map(|bn| self.get_block(&bn).validate(report))
+            .map(|bn| {
+                report.increment_work(1);
+                self.get_block(&bn).validate(report)
+            })
             .try_for_each(|i| i)
     }
 }
