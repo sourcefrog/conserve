@@ -169,7 +169,7 @@ impl Report {
     fn show_progress(&self) {
         // If another thread is drawing the UI, don't wait, just skip it.
         if let Ok(mut ui) = self.ui.try_lock() {
-            ui.show_progress(&*self.borrow_counts());
+            ui.show_progress(self);
         }
     }
 

@@ -4,7 +4,7 @@
 //! Display log messages to stdout with no color or cursor movement,
 //! perhaps for a log file.
 
-use super::Counts;
+use super::Report;
 
 #[derive(Debug, Default)]
 pub struct PlainUI;
@@ -20,7 +20,7 @@ impl PlainUI {
 }
 
 impl super::UI for PlainUI {
-    fn show_progress(&mut self, _counts: &Counts) {}
+    fn show_progress(&mut self, _report: &Report) {}
 
     fn print(&mut self, s: &str) {
         println!("{}", s);

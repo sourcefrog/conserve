@@ -6,7 +6,7 @@
 use std::fmt;
 use std::time::Duration;
 
-pub use super::report::{Counts, Sizes};
+pub use super::report::{Counts, Report, Sizes};
 
 use isatty;
 
@@ -16,7 +16,7 @@ pub mod plain;
 /// Display information about backup progress to the user in some way.
 pub trait UI: fmt::Debug {
     /// Show counters, eg as a progress bar.
-    fn show_progress(&mut self, counts: &Counts);
+    fn show_progress(&mut self, report: &Report);
 
     /// Show a plain text message.
     fn print(&mut self, s: &str);
