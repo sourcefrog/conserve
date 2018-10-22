@@ -121,7 +121,8 @@ impl UI for ColorUI {
         // TODO: If it's less than w bytes or characters, which will be a common
         // ascii case, we don't need to break graphemes.
         let g = UnicodeSegmentation::graphemes(pb_text.as_str(), true)
-            .take(w).collect::<String>();
+            .take(w)
+            .collect::<String>();
         self.fg_color(term::color::GREEN);
         self.t.write_all(g.as_bytes()).unwrap();
         self.reset_color();

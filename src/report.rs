@@ -59,9 +59,7 @@ pub struct Sizes {
     pub uncompressed: u64,
 }
 
-static KNOWN_SIZES: &'static [&'static str] = &["block",
-    "file.bytes",
-    "index"];
+static KNOWN_SIZES: &'static [&'static str] = &["block", "file.bytes", "index"];
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 static KNOWN_DURATIONS: &'static [&'static str] = &[
@@ -350,24 +348,29 @@ impl Counts {
     }
 
     pub fn summary_for_backup(&self) -> String {
-        // TODO: Compression ratio, index size.
+        // TODO: Just "index" might not be a good counter name when we both
+        // read and write for incremental indexes.
         format!(
             "{:>9} MB in {} files, {} directories, {} symlinks.\n\
-            {:>9.1} MB/s input rate.\n\
-            {:>9} MB after deduplication.\n\
-            {:>9} MB in {} blocks after {:.1}x compression.\n\
-            {:>9.1} s elapsed.\n",
+             {:>9.1} MB/s input rate.\n\
+             {:>9} MB after deduplication.\n\
+             {:>9} MB in {} blocks after {:.1}x compression.\n\
+             {:>9} MB in {} compressed index hunks.\n\
+             {:>9.1} s elapsed.\n",
             self.get_size("file.bytes").uncompressed / M,
             self.get_count("file"),
             self.get_count("dir"),
             self.get_count("symlink"),
             mbps_rate(
                 self.get_size("file.bytes").uncompressed,
-                self.elapsed_time()),
+                self.elapsed_time()
+            ),
             self.get_size("block").uncompressed / M,
             self.get_size("block").compressed / M,
             self.get_count("block.write"),
             compression_ratio(&self.get_size("block")),
+            self.get_size("index").compressed / M,
+            self.get_count("index.hunk"),
             self.elapsed_time().as_secs(),
         )
     }
@@ -375,8 +378,8 @@ impl Counts {
     pub fn summary_for_validate(&self) -> String {
         format!(
             "{:>9} MB in {} blocks.\n\
-            {:>9.1} MB/s block validation rate.\n\
-            {:>9} s elapsed.\n",
+             {:>9.1} MB/s block validation rate.\n\
+             {:>9} s elapsed.\n",
             self.get_size("block").uncompressed / M,
             self.get_count("block.read"),
             mbps_rate(self.get_size("block").uncompressed, self.elapsed_time()),

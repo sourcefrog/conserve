@@ -62,7 +62,13 @@ impl tree::WriteTree for BackupWriter {
         // TODO: Cope graciously if the file disappeared after readdir.
         let (addrs, body_hash) = self.block_dir.store(content, &self.report)?;
         let bytes = addrs.iter().map(|a| a.len).sum();
-        self.report.increment_size("file.bytes", Sizes { uncompressed: bytes, compressed: 0});
+        self.report.increment_size(
+            "file.bytes",
+            Sizes {
+                uncompressed: bytes,
+                compressed: 0,
+            },
+        );
         // TODO: Perhaps return a future for an index, so that storage of the files can overlap.
         self.push_entry(IndexEntry {
             apath: String::from(source_entry.apath()),

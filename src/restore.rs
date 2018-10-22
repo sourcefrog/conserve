@@ -60,8 +60,13 @@ impl tree::WriteTree for RestoreTree {
         self.report.increment("file", 1);
         let mut af = AtomicFile::new(&self.entry_path(entry))?;
         let bytes = std::io::copy(content, &mut af)?;
-        self.report.increment_size("file.bytes",
-            Sizes { uncompressed: bytes, compressed: 0});
+        self.report.increment_size(
+            "file.bytes",
+            Sizes {
+                uncompressed: bytes,
+                compressed: 0,
+            },
+        );
         af.close(&self.report)
     }
 
