@@ -268,10 +268,10 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn validate(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    archive.validate().and_then(|_| {
-        report.print("Archive is OK.");
-        Ok(())
-    })
+    archive.validate()?;
+    report.print("Archive is OK.");
+    report.print(&report.borrow_counts().summary_for_validate());
+    Ok(())
 }
 
 fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
