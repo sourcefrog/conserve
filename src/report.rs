@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 
 use super::ui;
 use super::ui::plain::PlainUI;
-use super::ui::{compression_ratio, duration_to_hms, mbps_rate, UI};
+use super::ui::{compression_ratio, mbps_rate, UI};
 use super::*;
 
 const M: u64 = 1_000_000;
@@ -345,6 +345,34 @@ impl Counts {
 
     pub fn get_latest_filename(&self) -> &str {
         &self.latest_filename
+    }
+
+    pub fn summary_for_restore(&self) -> String {
+        // TODO: Just "index" might not be a good counter name when we both
+        // read and write for incremental indexes.
+        format!(
+            "{:>9} MB in {} files, {} directories, {} symlinks.\n\
+             {:>9.1} MB/s output rate.\n\
+             {:>9} MB after deduplication.\n\
+             {:>9} MB in {} blocks after {:.1}x compression.\n\
+             {:>9} MB in {} compressed index hunks.\n\
+             {:>9.1} s elapsed.\n",
+            self.get_size("file.bytes").uncompressed / M,
+            self.get_count("file"),
+            self.get_count("dir"),
+            self.get_count("symlink"),
+            mbps_rate(
+                self.get_size("file.bytes").uncompressed,
+                self.elapsed_time()
+            ),
+            self.get_size("block").uncompressed / M,
+            self.get_size("block").compressed / M,
+            self.get_count("block.read"),
+            compression_ratio(&self.get_size("block")),
+            self.get_size("index").compressed / M,
+            self.get_count("index.hunk"),
+            self.elapsed_time().as_secs(),
+        )
     }
 
     pub fn summary_for_backup(&self) -> String {

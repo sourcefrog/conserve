@@ -314,7 +314,10 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     } else {
         RestoreTree::create(dest, report)
     }?;
-    copy_tree(&st, &mut rt)
+    copy_tree(&st, &mut rt)?;
+    report.print("Restore complete.");
+    report.print(&report.borrow_counts().summary_for_restore());
+    Ok(())
 }
 
 fn debug(subm: &ArgMatches, report: &Report) -> Result<()> {
