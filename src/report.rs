@@ -167,10 +167,10 @@ impl Report {
 
     /// Update the progress bars for the current counts, etc.
     fn show_progress(&self) {
-        self.ui
-            .lock()
-            .unwrap()
-            .show_progress(&*self.borrow_counts());
+        // If another thread is drawing the UI, don't wait, just skip it.
+        if let Ok(mut ui) = self.ui.try_lock() {
+            ui.show_progress(&*self.borrow_counts());
+        }
     }
 
     pub fn increment_size(&self, counter_name: &str, sizes: Sizes) {
