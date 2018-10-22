@@ -50,7 +50,7 @@ pub fn compression_percent(s: &Sizes) -> i64 {
     }
 }
 
-fn duration_to_hms(d: Duration) -> String {
+pub fn duration_to_hms(d: Duration) -> String {
     let elapsed_secs = d.as_secs();
     if elapsed_secs >= 3600 {
         format!(
@@ -64,7 +64,7 @@ fn duration_to_hms(d: Duration) -> String {
     }
 }
 
-fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
+pub fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
     let float_secs = elapsed.as_secs() as f64;
     if float_secs > 0.0 {
         bytes as f64 / float_secs / 1e6_f64

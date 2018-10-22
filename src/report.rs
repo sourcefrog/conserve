@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 
 use super::ui;
 use super::ui::plain::PlainUI;
-use super::ui::UI;
+use super::ui::{compression_ratio, duration_to_hms, mbps_rate, UI};
 use super::*;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -345,6 +345,30 @@ impl Counts {
 
     pub fn get_latest_filename(&self) -> &str {
         &self.latest_filename
+    }
+
+    pub fn summary_for_backup(&self) -> String {
+        const M: u64 = 1_000_000;
+        // TODO: Compression ratio, index size.
+        format!(
+            "{:>9} MB in {} files, {} directories, {} symlinks.\n\
+            {:>9.1} MB/s input rate.\n\
+            {:>9} MB after deduplication.\n\
+            {:>9} MB in {} blocks after {:.1}x compression.\n\
+            {:>9} elapsed.\n",
+            self.get_size("file.bytes").uncompressed / M,
+            self.get_count("file"),
+            self.get_count("dir"),
+            self.get_count("symlink"),
+            mbps_rate(
+                self.get_size("file.bytes").uncompressed,
+                self.elapsed_time()),
+            self.get_size("block").uncompressed / M,
+            self.get_size("block").compressed / M,
+            self.get_count("block.write"),
+            compression_ratio(&self.get_size("block")),
+            duration_to_hms(self.elapsed_time())
+        )
     }
 }
 
