@@ -217,6 +217,24 @@ Restore only a named subdirectory or file.
 This should also restore the parent directories with the right permissions, but
 also not complain if they already exist.
 
+## Restore incomplete band
+
+If asked to restore an incomplete band, act analogously to resuming a backup:
+
+* Restore to the end of the index of the incomplete band.
+* Give a warning.
+* Seek in the previous index to just after the last successfully read
+  file, and continue restoring from there.
+* Repeat this as long as necessary until you reach the end of a complete
+  band.
+
+This'd be nice to have but it tends to bias towards having freshest
+copies of the alphabetically first files, which is not so great. Before doing
+this we should resume interrupted backups, to avoid that effect.
+
+After doing this, it's safe for `restore` to choose the most recent band
+even if it's incomplete. Similarly `ls` etc.
+
 ## Split across blocks
 
 * Store block hash, start, length, as distinct from the file's own hash
