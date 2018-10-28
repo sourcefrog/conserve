@@ -174,8 +174,18 @@ For backup we'd need to walk the tree.
 
 ## Better progress bar
 
-* Show reasonable numbers for all cases; it's not necessarily files and blocks.
-  For validate, some of the fields stay at 0.
+* Show a progress bar during initial measurement of the source tree.
+
+* Don't measure the source tree when the progress bar is turned off. (And
+  maybe provide an option to skip this even when progress is one, or is that
+  too much complication?)
+
+For backup, and probably also for restore, it'd be better to calculate
+completion fraction based on percentage of bytes, rather than files. Walking
+the source tree, or even the stored tree, to get this, should be acceptably
+cheap. (For the source tree, not much more than listing the tree.) Obviously
+some files might go faster than others if their data is already stored, but
+that's fine.
 
 Ideally should show some of these:
 
@@ -186,6 +196,17 @@ Ideally should show some of these:
 
 This could, at least on Unix, be even fancier by using terminfo to scroll up the
 region above the bar, leaving the bar there.
+
+## Progress bar modes?
+
+In some cases we know the number of files or bytes to be processed; in others
+not.
+
+Perhaps it's best to just always get the total number of bytes up front,
+including for restore and validate?
+
+We do need a mode while we're still counting, when the total isn't known,
+and if pre-measuring is turned off we could stay in this mode.
 
 ## Performance
 
