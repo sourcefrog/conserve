@@ -6,9 +6,9 @@
 use std::fmt;
 use std::time::Duration;
 
-pub use super::report::{Counts, Report, Sizes};
-
 use isatty;
+
+pub use super::report::{Counts, Report, Sizes};
 
 pub mod color;
 pub mod plain;

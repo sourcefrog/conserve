@@ -19,6 +19,7 @@ extern crate tempdir;
 extern crate tempfile;
 extern crate term;
 extern crate terminal_size;
+extern crate thousands;
 extern crate unicode_segmentation;
 extern crate walkdir;
 

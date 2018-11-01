@@ -60,7 +60,7 @@ fn rollup_subcommands<'a>(matches: &'a ArgMatches) -> (String, &'a ArgMatches<'a
         };
         ns.push(scn.to_string());
         sm = ssm;
-    };
+    }
     (ns.join(" "), sm)
 }
 
@@ -244,7 +244,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                                 .required(true),
                         )
                         .arg(exclude_arg()),
-                        )
+                ),
         )
 }
 

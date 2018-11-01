@@ -12,6 +12,7 @@ use std::time::Instant;
 
 use term;
 use terminal_size::{terminal_size, Width};
+use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
 use report::Report;
@@ -105,8 +106,6 @@ impl UI for ColorUI {
             let block_sizes = counts.get_size("block");
             let elapsed = counts.elapsed_time();
             let file_bytes = counts.get_size("file.bytes").uncompressed;
-            let file_mb = format!("{}MB", file_bytes / MB);
-            let comp_mb_str = format!("{}MB", block_sizes.compressed / MB);
             let file_rate = mbps_rate(file_bytes, elapsed);
             let pct = if counts.total_work > 0 {
                 format!("{:>3}% ", 100 * counts.done_work / counts.total_work)
@@ -115,11 +114,11 @@ impl UI for ColorUI {
             };
 
             format!(
-                "{}{} {:>9} => {:<9} {:6.1}MB/s  {}",
+                "{}{} {:>6} MB => {:<6} {:6.1} MB/s  {}",
                 pct,
                 duration_to_hms(elapsed),
-                file_mb,
-                comp_mb_str,
+                (file_bytes / MB).separate_with_commas(),
+                (block_sizes.compressed / MB).separate_with_commas(),
                 file_rate,
                 counts.get_latest_filename()
             )
