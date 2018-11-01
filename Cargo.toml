@@ -16,7 +16,7 @@ doc = false  # Conflicts with library docs which are more useful.
 
 [dependencies]
 chrono = "0.2"
-clap = "~2.29"
+clap = "2.32"
 error-chain = "0.11"
 isatty = "0.1"
 rayon = "1.0.2"
