@@ -1,15 +1,23 @@
 # Conserve release history
 
-## Unreleased 0.5.0
+## Conserve 0.5.0 2018-11-01
 
-* New format with only one block directory per archive uses less space,
-  and breaks compatibility with 0.4.3.
+* Conserve 0.5 uses a new format, and can't read 0.4 repositories. The new
+  format has a single blockdir per archive for all file contents, rather
+  than one per band. This significantly reduces space usage and backup
+  time.
+   
+* New command `validate` checks some (but not yet all) internal correctness
+  and consistency properties of an archive.
 
-* New subcommands `conserve debug block list` and
-  `conserve debug block referenced`.
+* New commands `conserve debug block list` and `conserve debug block
+  referenced`.
 
-* New subcommand group `conserve source`, and `conserve list-source` was
-  renamed to `conserve source ls`.
+* `conserve list-source` was renamed to `conserve source ls`.
+
+* Better progress bars including percentage completion for many operations.
+
+* `backup`, `restore`, and `validate` show a summary of what they did.
 
 ## Conserve 0.4.3 2018-10-13
 
