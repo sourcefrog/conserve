@@ -159,19 +159,6 @@ It's probably not the cause of any slow down, but
 I'm not sure the `Sizes` struct really helps, because some things such as
 source files don't have an easy compressed size.
 
-## Percent completion
-
-Percent completion is now shown for validate, where it's pretty cheap and
-easy to know how many blocks there are to check. For backup and restore,
-we'd want to know how many files.
-
-For restore that can be cheaply estimated by the number of index chunks
-multiplied by the number of files per chunk. (This will overestimate
-but that's OK; if desired we can even correct the number when we enter the
-last block.)
-
-For backup we'd need to walk the tree.
-
 ## Better progress bar
 
 * Show a progress bar during initial measurement of the source tree.
