@@ -114,11 +114,9 @@ fn blackbox_backup() {
     let restore_dir_str = restore_dir.path().to_str().unwrap();
     let (status, _stdout, _stderr) = run_conserve(&["restore", &arch_dir_str, &restore_dir_str]);
     assert!(status.success());
-    assert!(
-        fs::metadata(restore_dir.path().join("subdir"))
-            .unwrap()
-            .is_dir()
-    );
+    assert!(fs::metadata(restore_dir.path().join("subdir"))
+        .unwrap()
+        .is_dir());
 
     let restore_hello = restore_dir.path().join("hello");
     assert!(fs::metadata(&restore_hello).unwrap().is_file());

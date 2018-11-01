@@ -285,8 +285,7 @@ impl BlockDir {
         // directories of the right length.
         let bns = self.blocks(report)?;
         report.set_total_work(bns.len() as u64);
-        bns
-            .par_iter()
+        bns.par_iter()
             .map(|bn| {
                 report.increment_work(1);
                 self.get_block(&bn).validate(report)

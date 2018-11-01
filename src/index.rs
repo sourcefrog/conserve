@@ -184,7 +184,7 @@ impl ReadIndex {
         for i in 0.. {
             if !file_exists(&path_for_hunk(&self.dir, i))? {
                 // If hunk 1 is missing, 1 hunks exists.
-                return Ok(i)
+                return Ok(i);
             }
         }
         unreachable!();

@@ -33,7 +33,11 @@ impl StoredTree {
 
     /// Open the last complete version in the archive.
     pub fn open_last(archive: &Archive) -> Result<StoredTree> {
-        Ok(StoredTree::new(archive, archive.last_complete_band()?, excludes::excludes_nothing()))
+        Ok(StoredTree::new(
+            archive,
+            archive.last_complete_band()?,
+            excludes::excludes_nothing(),
+        ))
     }
 
     /// Open a specified version.
