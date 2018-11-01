@@ -31,9 +31,9 @@ fn main() {
         "debug block list" => debug_block_list,
         "debug block referenced" => debug_block_referenced,
         "init" => init,
-        "list-source" => list_source,
         "ls" => ls,
         "restore" => restore,
+        "source ls" => source_ls,
         "validate" => validate,
         "versions" => versions,
         _ => panic!("unimplemented command"),
@@ -233,14 +233,18 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .arg(incomplete_arg()),
         )
         .subcommand(
-            SubCommand::with_name("list-source")
-                .about("Recursive list files from source directory")
-                .arg(
-                    Arg::with_name("source")
-                        .help("Source directory")
-                        .required(true),
-                )
-                .arg(exclude_arg()),
+            SubCommand::with_name("source")
+                .about("Operate on source directories")
+                .subcommand(
+                    SubCommand::with_name("ls")
+                        .about("Recursive list files from source directory")
+                        .arg(
+                            Arg::with_name("source")
+                                .help("Source directory")
+                                .required(true),
+                        )
+                        .arg(exclude_arg()),
+                        )
         )
 }
 
@@ -292,7 +296,7 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
     }
 }
 
-fn list_source(subm: &ArgMatches, report: &Report) -> Result<()> {
+fn source_ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let lt = live_tree_from_options(subm, report)?;
     list_tree_contents(&lt, report)?;
     Ok(())

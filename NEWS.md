@@ -8,6 +8,9 @@
 * New subcommands `conserve debug block list` and
   `conserve debug block referenced`.
 
+* New subcommand group `conserve source`, and `conserve list-source` was
+  renamed to `conserve source ls`.
+
 ## Conserve 0.4.3 2018-10-13
 
 * `conserve versions` has a new `--sizes` option, to show disk usage by each

@@ -72,6 +72,19 @@ fn blackbox_backup() {
     let src = TreeFixture::new();
     src.create_file("hello");
     src.create_dir("subdir");
+    let src_path_str = &src.path().to_str().unwrap();
+
+    {
+        let (status, stdout, stderr) = run_conserve(&["source", "ls", src_path_str]);
+        assert!(status.success());
+        assert!(stderr.is_empty());
+        assert_eq!(
+            stdout,
+            "/\n\
+             /hello\n\
+             /subdir\n"
+        );
+    }
 
     let (status, _stdout, stderr) =
         run_conserve(&["backup", &arch_dir_str, src.root.to_str().unwrap()]);
