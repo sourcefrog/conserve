@@ -20,33 +20,28 @@ use conserve::*;
 
 fn main() {
     let matches = make_clap().get_matches();
+    let ui_name = matches.value_of("ui").unwrap_or("auto");
+    let no_progress = matches.is_present("no-progress");
+    let ui = UI::by_name(ui_name, !no_progress).expect("Couldn't make UI");
+    let mut report = Report::with_ui(ui);
 
-    let (sub_name, subm) = matches.subcommand();
-    let sub_fn = match sub_name {
+    let (n, sm) = rollup_subcommands(&matches);
+    let c = match n.as_str() {
         "backup" => backup,
-        "debug" => debug,
+        "debug block list" => debug_block_list,
+        "debug block referenced" => debug_block_referenced,
         "init" => init,
         "list-source" => list_source,
         "ls" => ls,
         "restore" => restore,
         "validate" => validate,
         "versions" => versions,
-        _ => panic!(),
+        _ => panic!("unimplemented command"),
     };
-    let subm = subm.unwrap();
+    report.set_print_filenames(sm.is_present("v"));
+    let result = c(sm, &report);
 
-    let ui_name = matches
-        .value_of("ui")
-        .or_else(|| subm.value_of("ui"))
-        .unwrap_or("auto");
-    let no_progress = matches.is_present("no-progress");
-    let ui = UI::by_name(ui_name, !no_progress).expect("Couldn't make UI");
-    let mut report = Report::with_ui(ui);
-    report.set_print_filenames(subm.is_present("v"));
-
-    let result = sub_fn(subm, &report);
     report.finish();
-
     if matches.is_present("stats") {
         report.print(&format!("{}", report));
     }
@@ -54,6 +49,19 @@ fn main() {
         show_chained_errors(&report, &e);
         std::process::exit(1)
     }
+}
+
+fn rollup_subcommands<'a>(matches: &'a ArgMatches) -> (String, &'a ArgMatches<'a>) {
+    let mut sm = matches;
+    let mut ns = Vec::<String>::new();
+    while let (scn, Some(ssm)) = sm.subcommand() {
+        if scn.is_empty() {
+            break;
+        };
+        ns.push(scn.to_string());
+        sm = ssm;
+    };
+    (ns.join(" "), sm)
 }
 
 fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
@@ -93,8 +101,6 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         Arg::with_name("v").short("v").help("Print filenames")
     };
 
-    // TODO: Allow the global options to occur even after the subcommand:
-    // at the moment they have to be first.
     App::new("conserve")
         .about("A robust backup tool <http://conserve.fyi/>")
         .author(crate_authors!())
@@ -318,17 +324,6 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     report.print("Restore complete.");
     report.print(&report.borrow_counts().summary_for_restore());
     Ok(())
-}
-
-fn debug(subm: &ArgMatches, report: &Report) -> Result<()> {
-    match subm.subcommand() {
-        ("block", Some(sm)) => match sm.subcommand() {
-            ("list", Some(sm)) => debug_block_list(&sm, report),
-            ("referenced", Some(sm)) => debug_block_referenced(&sm, report),
-            _ => panic!(),
-        },
-        _ => panic!(),
-    }
 }
 
 fn debug_block_list(subm: &ArgMatches, report: &Report) -> Result<()> {
