@@ -48,9 +48,6 @@ source tree), the backup is considered *complete*.
 
     conserve backup /backup/home.cons ~
 
-Use `--exclude GLOB` to exclude files or directories from the backup using
-[glob patterns](https://docs.rs/globset/0.2.1/globset/#syntax).
-
 `conserve versions` lists the versions in an archive,
 whether or not the backup is *complete*,
 the time at which the backup started,
@@ -72,10 +69,13 @@ from the backup version.)
 
     $ conserve ls -b b0 /backup/home.cons | less
 
-
-`conserve restore` copies a version back out of an archive.
+`conserve restore` copies a version back out of an archive:
 
     $ conserve restore /backup/home.cons /tmp/trial-restore
+
+`conserve validate` checks the integrity of an archive:
+
+    $ conserve validate /backup/home.cons
 
 ## Exclusions
 
@@ -85,6 +85,12 @@ including `backup`, `restore`, `ls` and `list-source`.
 A `/` at the start of the exclusion pattern anchors it to the top of the backup
 tree (not the root of the filesystem.)  `**` recursively matches any number
 of directories.
+
+At the moment exclusion patterns must always start from the root, so you need
+`**/*.swp` to exclude `.swp` files anywhere in the tree.
+
+The syntax is comes from the Rust
+[globset](https://docs.rs/globset/0.2.1/globset/#syntax) crate.
 
 ## Install
 
@@ -126,12 +132,16 @@ On nightly Rust only, you can enable a potential speed-up to the blake2 hashes w
 
 ## Limitations
 
-Conserve is still in a pre-1.0 alpha.  It can be used to make and restore
-backups, but there are some important performance and functional limitations,
-which will be fixed before 1.0.
+Conserve is reasonable to use today, with regard to format and performance, but
+still pre-1.0.
 
-* [There are no incremental backups][41]: all backups store all files.
-* The planned `validate` command is [not implemented][5],
+The format may well change again before 1.0.  To use any archive written by
+Conserve 0.x.y, you need to use Conserve 0.x.  (Previous versions will always
+be available from git or crates.io.)
+
+Some other limitations:
+
+* `conserve validate` [does not yet check every property of the archive][5],
   however a trial restore from the archive will test everything can be read.
 * The planned feature of resuming an interrupted backup is not implemented:
   Conserve will just create a new full backup from the beginning.
