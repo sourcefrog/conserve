@@ -283,8 +283,8 @@ impl Iter {
         self.report.increment("index.hunk", 1);
 
         let start_parse = Instant::now();
-        let index_json =
-            str::from_utf8(&index_bytes).or_else(|_| Err(Error::IndexCorrupt(hunk_path.clone())))?;
+        let index_json = str::from_utf8(&index_bytes)
+            .or_else(|_| Err(Error::IndexCorrupt(hunk_path.clone())))?;
         let entries: Vec<IndexEntry> =
             json::decode(index_json).or_else(|e| Err(Error::JsonDecode(e)))?;
         if entries.is_empty() {

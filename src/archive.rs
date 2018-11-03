@@ -48,12 +48,11 @@ impl Archive {
         };
         let header_filename = path.join(HEADER_FILENAME);
         let report = Report::new();
-        jsonio::write(&header_filename, &header, &report)
-            .and(Ok(Archive {
-                path: path.to_path_buf(),
-                report,
-                block_dir,
-            }))
+        jsonio::write(&header_filename, &header, &report).and(Ok(Archive {
+            path: path.to_path_buf(),
+            report,
+            block_dir,
+        }))
     }
 
     /// Open an existing archive.

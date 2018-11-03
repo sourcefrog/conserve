@@ -23,7 +23,7 @@ pub fn write<T: Encodable>(path: &Path, obj: &T, report: &Report) -> Result<()> 
 }
 
 pub fn read<T: Decodable>(path: &Path, _report: &Report) -> Result<T> {
-    // TODO: Send something to the Report.  At present this is used only for 
+    // TODO: Send something to the Report.  At present this is used only for
     // small metadata files so measurement is not critical.
     let mut f = File::open(path).or_else(|e| Err(Error::IoError(e)))?;
     let mut buf = String::new();

@@ -7,6 +7,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use super::entry::Entry;
+use super::io::require_empty_directory;
 use super::*;
 
 /// A write-only tree on the filesystem, as a restore destination.
@@ -21,7 +22,7 @@ impl RestoreTree {
     ///
     /// The destination must either not yet exist, or be an empty directory.
     pub fn create(path: &Path, report: &Report) -> Result<RestoreTree> {
-        require_empty_destination(path)?;
+        require_empty_directory(path)?;
         Self::create_overwrite(path, report)
     }
 
@@ -96,24 +97,6 @@ impl tree::WriteTree for RestoreTree {
         ));
         self.report.increment("skipped.unsupported_file_kind", 1);
         Ok(())
-    }
-}
-
-/// The destination must either not exist, or be an empty directory.
-// TODO: Merge with or just use require_empty_directory?
-fn require_empty_destination(dest: &Path) -> Result<()> {
-    match fs::read_dir(&dest) {
-        Ok(mut it) => {
-            if it.next().is_some() {
-                Err(Error::DestinationNotEmpty(dest.to_path_buf()))
-            } else {
-                Ok(())
-            }
-        }
-        Err(e) => match e.kind() {
-            io::ErrorKind::NotFound => Ok(()),
-            _ => Err(e.into()),
-        },
     }
 }
 
