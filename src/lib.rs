@@ -69,12 +69,10 @@ pub use ui::UI;
 // Commonly-used external types.
 pub use globset::GlobSet;
 
-/// Conserve version number as a semver string.
-///
-/// This is populated at compile time by `build.rs`.
-include!(concat!(env!("OUT_DIR"), "/version.rs"));
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 pub fn version() -> &'static str {
-    semver()
+    VERSION
 }
 
 /// Format-compatibility version, normally the first two components of the package version.

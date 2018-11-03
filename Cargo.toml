@@ -8,7 +8,6 @@ description = """A robust backup tool."""
 readme = "README.md"
 keywords = ["archive", "backup"]
 license = "GPL-2.0"
-build = "build.rs"
 
 [[bin]]
 name = "conserve"
@@ -29,15 +28,11 @@ term = "0.5.1"
 terminal_size = "0.1.8"
 thousands = "0.1.2"
 unicode-segmentation = "1.2.1"
-vergen = "2.1"
 walkdir = "2"
 globset = "0.4"
 
 [dependencies.blake2-rfc]
 version = "0.2.18"
-
-[build-dependencies]
-vergen = "~0.1.0"
 
 [features]
 default = []
