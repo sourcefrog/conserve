@@ -55,7 +55,7 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {
-    fn cause(&self) -> Option<&dyn error::Error> {
+    fn source(&self) -> Option<&(error::Error + 'static)> {
         match self {
             Error::IoError(c) => Some(c),
             Error::JsonDecode(c) => Some(c),
