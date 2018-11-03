@@ -3,8 +3,6 @@
 
 //! Command-line entry point for Conserve backups.
 
-#![recursion_limit = "1024"] // Needed by error-chain
-
 use std::path::Path;
 
 #[macro_use]
