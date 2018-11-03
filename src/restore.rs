@@ -100,11 +100,12 @@ impl tree::WriteTree for RestoreTree {
 }
 
 /// The destination must either not exist, or be an empty directory.
+// TODO: Merge with or just use require_empty_directory?
 fn require_empty_destination(dest: &Path) -> Result<()> {
     match fs::read_dir(&dest) {
         Ok(mut it) => {
             if it.next().is_some() {
-                Err(ErrorKind::DestinationNotEmpty(dest.to_path_buf()).into())
+                Err(Error::DestinationNotEmpty(dest.to_path_buf()))
             } else {
                 Ok(())
             }

@@ -4,11 +4,6 @@
 //!
 //! For user documentation and an overview see http://conserve.fyi/.
 
-#![recursion_limit = "1024"] // Needed by error-chain
-
-#[macro_use]
-extern crate error_chain;
-
 extern crate blake2_rfc;
 extern crate chrono;
 extern crate isatty;

@@ -311,7 +311,7 @@ impl Block {
             Err(e) => {
                 report.increment("block.corrupt", 1);
                 report.problem(&format!("Block file {:?} read error {:?}", self.path, e));
-                return Err(ErrorKind::BlockCorrupt(self.hash.to_string()).into());
+                return Err(Error::BlockCorrupt(self.path.clone()));
             }
         };
         report.increment("block.read", 1);
@@ -337,7 +337,7 @@ impl Block {
                 "Block file {:?} has actual decompressed hash {:?}",
                 self.path, actual_hash
             ));
-            return Err(ErrorKind::BlockCorrupt(self.hash.to_string()).into());
+            return Err(Error::BlockCorrupt(self.path.clone()));
         }
         Ok(())
     }

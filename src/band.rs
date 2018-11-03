@@ -61,7 +61,7 @@ impl Band {
     /// The Band gets the next id after those that already exist.
     pub fn create(archive: &Archive) -> Result<Band> {
         let new_band_id = match archive.last_band_id() {
-            Err(Error(ErrorKind::ArchiveEmpty, _)) => BandId::zero(),
+            Err(Error::ArchiveEmpty) => BandId::zero(),
             Ok(b) => b.next_sibling(),
             Err(e) => return Err(e),
         };
@@ -240,7 +240,7 @@ mod tests {
         let band_id = BandId::from_string("b0001").unwrap();
         Band::create_specific_id(&af, band_id.clone()).unwrap();
         let e = Band::create_specific_id(&af, band_id).unwrap_err();
-        if let ErrorKind::Io(ref ioerror) = *e.kind() {
+        if let Error::IoError(ref ioerror) = e {
             assert_eq!(ioerror.kind(), io::ErrorKind::AlreadyExists);
         } else {
             panic!("expected an ioerror, got {:?}", e);

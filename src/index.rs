@@ -283,10 +283,10 @@ impl Iter {
         self.report.increment("index.hunk", 1);
 
         let start_parse = Instant::now();
-        let index_json = str::from_utf8(&index_bytes)
-            .chain_err(|| format!("index file {:?} is not UTF-8", hunk_path))?;
-        let entries: Vec<IndexEntry> = json::decode(index_json)
-            .chain_err(|| format!("couldn't deserialize index hunk {:?}", hunk_path))?;
+        let index_json =
+            str::from_utf8(&index_bytes).or_else(|_| Err(Error::IndexCorrupt(hunk_path.clone())))?;
+        let entries: Vec<IndexEntry> =
+            json::decode(index_json).or_else(|e| Err(Error::JsonDecode(e)))?;
         if entries.is_empty() {
             self.report
                 .problem(&format!("Index hunk {} is empty", hunk_path.display()));

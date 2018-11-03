@@ -249,14 +249,8 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
 }
 
 fn show_chained_errors(report: &Report, e: &Error) {
+    // TODO: Implement this again when core error types have backtraces.
     report.problem(&format!("{}", e));
-    for suberr in e.iter().skip(1) {
-        // First was already printed
-        report.problem(&format!("  {}", suberr));
-    }
-    if let Some(bt) = e.backtrace() {
-        report.problem(&format!("{:?}", bt));
-    }
 }
 
 fn init(subm: &ArgMatches, report: &Report) -> Result<()> {

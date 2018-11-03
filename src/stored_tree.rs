@@ -46,7 +46,7 @@ impl StoredTree {
     pub fn open_version(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
         let band = Band::open(archive, band_id)?;
         if !band.is_closed()? {
-            return Err(ErrorKind::BandIncomplete(band_id.clone()).into());
+            return Err(Error::BandIncomplete(band_id.clone()));
         }
         Ok(StoredTree::new(archive, band, excludes::excludes_nothing()))
     }

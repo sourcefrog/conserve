@@ -83,7 +83,7 @@ pub fn directory_exists(path: &Path) -> Result<bool> {
             if metadata.is_dir() {
                 Ok(true)
             } else {
-                Err("exists but not a directory".into())
+                Err(Error::NotADirectory(path.into()))
             }
         }
         Err(e) => match e.kind() {
@@ -100,7 +100,7 @@ pub fn file_exists(path: &Path) -> Result<bool> {
             if metadata.is_file() {
                 Ok(true)
             } else {
-                Err("exists but not a file".into())
+                Err(Error::NotAFile(path.into()))
             }
         }
         Err(e) => match e.kind() {
@@ -116,12 +116,12 @@ pub fn require_empty_directory(path: &Path) -> Result<()> {
         if e.kind() == io::ErrorKind::AlreadyExists {
             // Exists and hopefully empty?
             if std::fs::read_dir(&path)?.next().is_some() {
-                Err(e).chain_err(|| format!("Directory exists and is not empty {:?}", path))
+                Err(Error::DestinationNotEmpty(path.into()))
             } else {
                 Ok(()) // Exists and empty
             }
         } else {
-            Err(e).chain_err(|| format!("Failed to create directory {:?}", path))
+            Err(Error::IoError(e))
         }
     } else {
         Ok(()) // Created

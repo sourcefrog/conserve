@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016 Martin Pool.
+// Copyright 2015, 2016, 2018 Martin Pool.
 
 //! Read and write JSON files.
 
@@ -23,13 +23,12 @@ pub fn write<T: Encodable>(path: &Path, obj: &T, report: &Report) -> Result<()> 
 }
 
 pub fn read<T: Decodable>(path: &Path, _report: &Report) -> Result<T> {
-    // TODO: Send something to the Report.
-    // At present this is used only for small metadata files so measurement is not
-    // critical.
-    let mut f = File::open(path).chain_err(|| format!("Failed to open {:?}", path))?;
+    // TODO: Send something to the Report.  At present this is used only for 
+    // small metadata files so measurement is not critical.
+    let mut f = File::open(path).or_else(|e| Err(Error::IoError(e)))?;
     let mut buf = String::new();
     let _bytes_read = f.read_to_string(&mut buf)?;
-    json::decode(&buf).chain_err(|| format!("Couldn't deserialize {:?}", path))
+    json::decode(&buf).or_else(|e| Err(e.into()))
 }
 
 #[cfg(test)]

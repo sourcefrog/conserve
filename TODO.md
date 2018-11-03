@@ -85,9 +85,6 @@ Clean message, and test for it, when the archive directory just doesn't exist.
 
 * Add a 'high-level' module similar to the CLI, but not coupled to it?
 
-* Maybe don't use `error_chain`? I have an unjustified feeling it slows down
-  compilation. Perhaps use `Failure`.
-
 * Report warnings by failures/errors that are passed to the UI rather than
   returned.
 
@@ -213,7 +210,6 @@ and if pre-measuring is turned off we could stay in this mode.
 * Make a macro like `try!` that logs when it sees an error?
 * Errors to stderr rather than stdout?
       Hard to reconcile with use of terminal for colored errors.
-* Maybe have Conserve-specific error types rather than `io::Error` everywhere?
 
 ## Store/restore metadata
 

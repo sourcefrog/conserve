@@ -3,41 +3,82 @@
 
 //! Conserve error types.
 
-use rustc_serialize;
+use std::error;
+use std::fmt;
 use std::io;
 use std::path::PathBuf;
 
-use BandId;
+use rustc_serialize;
 
-error_chain! {
-    foreign_links {
-        Io(io::Error);
-        JsonDecode(rustc_serialize::json::DecoderError);
+use super::*;
+
+/// Conserve specific error.
+#[derive(Debug)]
+pub enum Error {
+    BlockCorrupt(PathBuf),
+    NotAnArchive(PathBuf),
+    NotADirectory(PathBuf),
+    NotAFile(PathBuf),
+    UnsupportedArchiveVersion(String),
+    DestinationNotEmpty(PathBuf),
+    ArchiveEmpty,
+    NoCompleteBands,
+    InvalidVersion,
+    BandIncomplete(BandId),
+    IoError(io::Error),
+    // TODO: Include the path in the json error.
+    JsonDecode(rustc_serialize::json::DecoderError),
+    BadGlob(globset::Error),
+    IndexCorrupt(PathBuf),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::DestinationNotEmpty(d) => write!(f, "Destination directory not empty: {:?}", d),
+            Error::ArchiveEmpty => write!(f, "Archive is empty"),
+            Error::NoCompleteBands => write!(f, "Archive has no complete bands"),
+            Error::InvalidVersion => write!(f, "Invalid version number"),
+            Error::NotAnArchive(p) => write!(f, "Not a Conserve archive: {:?}", p),
+            Error::BandIncomplete(b) => write!(f, "Band {} is incomplete", b),
+            Error::UnsupportedArchiveVersion(v) => write!(
+                f,
+                "Archive version {:?} is not supported by Conserve {}",
+                v,
+                version()
+            ),
+            _ => write!(f, "{:?}", self),
+        }
     }
+}
 
-    errors {
-        BlockCorrupt(block_hash: String) {
+impl std::error::Error for Error {
+    fn cause(&self) -> Option<&dyn error::Error> {
+        match self {
+            Error::IoError(c) => Some(c),
+            Error::JsonDecode(c) => Some(c),
+            Error::BadGlob(c) => Some(c),
+            _ => None,
         }
-        NotAnArchive(path: PathBuf) {
-            display("Not a Conserve archive: {:?}", path)
-        }
-        UnsupportedArchiveVersion(version: String) {
-            display("Unsupported archive version: {:?}", version)
-        }
-        DestinationNotEmpty(destination: PathBuf) {
-            display("Destination directory not empty: {:?}", destination)
-        }
-        ArchiveEmpty {
-            display("Archive is empty")
-        }
-        NoCompleteBands {
-            display("Archive has no complete bands")
-        }
-        InvalidVersion {
-            display("Invalid version number")
-        }
-        BandIncomplete(band_id: BandId) {
-            display("Band {} is incomplete", band_id)
-        }
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(c: io::Error) -> Error {
+        Error::IoError(c)
+    }
+}
+
+impl From<globset::Error> for Error {
+    fn from(c: globset::Error) -> Error {
+        Error::BadGlob(c)
+    }
+}
+
+impl From<rustc_serialize::json::DecoderError> for Error {
+    fn from(c: rustc_serialize::json::DecoderError) -> Error {
+        Error::JsonDecode(c)
     }
 }

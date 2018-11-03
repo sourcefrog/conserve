@@ -39,7 +39,7 @@ impl BandId {
 
     /// Make a new BandId from a string form.
     pub fn from_string(s: &str) -> Result<BandId> {
-        let nope = Err(ErrorKind::InvalidVersion.into());
+        let nope = Err(Error::InvalidVersion);
         if !s.starts_with('b') {
             return nope;
         }
@@ -53,7 +53,6 @@ impl BandId {
         if seqs.is_empty() {
             nope
         } else {
-            // This rebuilds a new string form to get it into the canonical form.
             Ok(BandId::new(&seqs))
         }
     }

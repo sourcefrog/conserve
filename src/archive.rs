@@ -49,12 +49,11 @@ impl Archive {
         let header_filename = path.join(HEADER_FILENAME);
         let report = Report::new();
         jsonio::write(&header_filename, &header, &report)
-            .chain_err(|| format!("Failed to write archive header: {:?}", header_filename))?;
-        Ok(Archive {
-            path: path.to_path_buf(),
-            report,
-            block_dir,
-        })
+            .and(Ok(Archive {
+                path: path.to_path_buf(),
+                report,
+                block_dir,
+            }))
     }
 
     /// Open an existing archive.
@@ -64,15 +63,14 @@ impl Archive {
         let path = path.as_ref();
         let header_path = path.join(HEADER_FILENAME);
         if !file_exists(&header_path)? {
-            return Err(ErrorKind::NotAnArchive(path.into()).into());
+            return Err(Error::NotAnArchive(path.into()));
         }
         let block_dir = BlockDir::new(&path.join(BLOCK_DIR));
-        let header: ArchiveHeader =
-            jsonio::read(&header_path, &report).chain_err(|| "Failed to read archive header")?;
+        let header: ArchiveHeader = jsonio::read(&header_path, &report)?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
-            return Err(
-                ErrorKind::UnsupportedArchiveVersion(header.conserve_archive_version).into(),
-            );
+            return Err(Error::UnsupportedArchiveVersion(
+                header.conserve_archive_version,
+            ));
         }
         Ok(Archive {
             path: path.to_path_buf(),
@@ -119,7 +117,7 @@ impl Archive {
                 };
             }
         }
-        l.ok_or_else(|| ErrorKind::ArchiveEmpty.into())
+        l.ok_or(Error::ArchiveEmpty)
     }
 
     /// Return the last completely-written band id.
@@ -130,7 +128,7 @@ impl Archive {
                 return Ok(b);
             }
         }
-        Err(ErrorKind::NoCompleteBands.into())
+        Err(Error::NoCompleteBands)
     }
 
     /// Return a sorted set containing all the blocks referenced by all bands.
@@ -171,7 +169,7 @@ mod tests {
     use std::io::Read;
 
     use super::*;
-    use errors::ErrorKind;
+    use errors::Error;
     use test_fixtures::ScratchArchive;
 
     #[test]
@@ -217,13 +215,13 @@ mod tests {
         header_file.read_to_string(&mut contents).unwrap();
         assert_eq!(contents, "{\"conserve_archive_version\":\"0.5\"}\n");
 
-        match *af.last_band_id().unwrap_err().kind() {
-            ErrorKind::ArchiveEmpty => (),
+        match af.last_band_id().unwrap_err() {
+            Error::ArchiveEmpty => (),
             ref x => panic!("Unexpected error {:?}", x),
         }
 
-        match *af.last_complete_band().unwrap_err().kind() {
-            ErrorKind::NoCompleteBands => (),
+        match af.last_complete_band().unwrap_err() {
+            Error::NoCompleteBands => (),
             ref x => panic!("Unexpected error {:?}", x),
         }
 
