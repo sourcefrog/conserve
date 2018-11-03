@@ -3,6 +3,7 @@
 
 //! Command-line entry point for Conserve backups.
 
+use std::error::Error;
 use std::path::Path;
 
 #[macro_use]
@@ -45,6 +46,8 @@ fn main() {
     }
     if let Err(e) = result {
         show_chained_errors(&report, &e);
+        // TODO: Maybe show backtraces once they're available in stable
+        // Rust Errors.
         std::process::exit(1)
     }
 }
@@ -247,8 +250,19 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
 }
 
 fn show_chained_errors(report: &Report, e: &Error) {
-    // TODO: Implement this again when core error types have backtraces.
     report.problem(&format!("{}", e));
+    let mut ce = e;
+    loop {
+        match ce.source() {
+            Some(c) => {
+                report.problem(&format!("  caused by: {}", c));
+                ce = c;
+            }
+            None => {
+                break;
+            }
+        }
+    }
 }
 
 fn init(subm: &ArgMatches, report: &Report) -> Result<()> {

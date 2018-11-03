@@ -49,6 +49,7 @@ impl fmt::Display for Error {
                 v,
                 version()
             ),
+            Error::IoError(e) => write!(f, "IO Error: {}", e),
             _ => write!(f, "{:?}", self),
         }
     }
@@ -57,9 +58,12 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(error::Error + 'static)> {
         match self {
-            Error::IoError(c) => Some(c),
-            Error::JsonDecode(c) => Some(c),
-            Error::BadGlob(c) => Some(c),
+            // For cases like IoError that essentially include an underlying
+            // error by value, it doesn't seem to help anything, and tends to
+            // cause doubled-up messages, to treat them as a separate cause.
+            //
+            // For now, I'll reserve this for cases where the conserve error
+            // is abstracted from its cause.
             _ => None,
         }
     }
