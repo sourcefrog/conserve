@@ -145,7 +145,7 @@ impl UI for ColorUI {
         self.clear_progress();
         let t = &mut self.t;
         t.fg(term::color::RED).unwrap();
-        (write!(t, "{}: ", s)).unwrap();
+        (writeln!(t, "conserve error: {}", s)).unwrap();
         t.reset().unwrap();
         t.flush().unwrap();
     }
