@@ -144,8 +144,11 @@ impl UI for ColorUI {
     fn problem(&mut self, s: &str) {
         self.clear_progress();
         let t = &mut self.t;
-        t.fg(term::color::RED).unwrap();
-        (writeln!(t, "conserve error: {}", s)).unwrap();
+        t.fg(term::color::BRIGHT_RED).unwrap();
+        t.attr(term::Attr::Bold).unwrap();
+        (write!(t, "conserve error: ")).unwrap();
+        t.reset().unwrap();
+        (writeln!(t, "{}", s)).unwrap();
         t.reset().unwrap();
         t.flush().unwrap();
     }
