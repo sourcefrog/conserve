@@ -27,10 +27,11 @@ extern crate conserve;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
 lazy_static! {
+    // This doesn's pass `.current_target()` because it doesn't seem
+    // necessary for typical cases (cross-builds won't work with this)
+    // and it causes everything to rebuild which slows the tests a lot.
     static ref CARGO_RUN: CargoRun = escargot::CargoBuild::new()
-        .bin("conserve")
         .current_release()
-        .current_target()
         .run() // Build it and return a proxy to run it
         .unwrap();
 }
