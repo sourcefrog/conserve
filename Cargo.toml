@@ -14,6 +14,7 @@ name = "conserve"
 doc = false  # Conflicts with library docs which are more useful.
 
 [dependencies]
+blake2-rfc = "0.2.18"
 chrono = "0.2"
 clap = "2.32"
 isatty = "0.1"
@@ -21,7 +22,6 @@ rayon = "1.0.2"
 regex = "0.2"
 rustc-serialize = "^0"
 snap = "0.2"
-spectral = "0.6.0"
 tempdir = "^0"
 tempfile = "^2"
 term = "0.5.1"
@@ -31,11 +31,9 @@ unicode-segmentation = "1.2.1"
 walkdir = "2"
 globset = "0.4"
 
-[dependencies.blake2-rfc]
-version = "0.2.18"
+[dev-dependencies]
+spectral = "0.6.0"
 
 [features]
 default = []
-
-# Use SIMD assembly, on nightly only.
-blake2_simd_asm = ["blake2-rfc/simd_asm"]
+blake2_simd_asm = ["blake2-rfc/simd_asm"] # Use SIMD assembly, on nightly only.
