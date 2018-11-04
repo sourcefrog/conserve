@@ -4,6 +4,7 @@
 //! Run conserve CLI as a subprocess and test it.
 
 extern crate assert_cmd;
+extern crate assert_fs;
 extern crate predicates;
 extern crate tempfile;
 
@@ -12,9 +13,11 @@ use std::io::prelude::*;
 use std::process::Command;
 
 use assert_cmd::prelude::*;
+use assert_fs::prelude::*;
+use assert_fs::TempDir;
 use predicates::prelude::*;
-use tempfile::TempDir;
 
+use predicate::path::{is_dir, is_file};
 use predicate::str::{contains, is_empty, is_match, starts_with};
 
 extern crate conserve;
@@ -165,18 +168,11 @@ fn blackbox_backup() {
              Restore complete.\n",
         ));
 
-    assert!(fs::metadata(restore_dir.path().join("subdir"))
-        .unwrap()
-        .is_dir());
-
-    let restore_hello = restore_dir.path().join("hello");
-    assert!(fs::metadata(&restore_hello).unwrap().is_file());
-    let mut file_contents = String::new();
-    fs::File::open(&restore_hello)
-        .unwrap()
-        .read_to_string(&mut file_contents)
-        .unwrap();
-    assert_eq!(file_contents, "contents");
+    restore_dir.child("subdir").assert(is_dir());
+    restore_dir
+        .child("hello")
+        .assert(is_file())
+        .assert("contents");
 
     // Try to restore again over the same directory: should decline.
     main_binary()
