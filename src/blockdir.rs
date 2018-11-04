@@ -134,8 +134,7 @@ impl BlockDir {
                 block_hash = rayon::join(
                     || report.measure_duration("file.hash", || file_hasher.update(&in_buf)),
                     || report.measure_duration("block.hash", || hash_bytes(&in_buf).unwrap()),
-                )
-                .1;
+                ).1;
             }
 
             if self.contains(&block_hash)? {
@@ -171,9 +170,9 @@ impl BlockDir {
         // a write and rename.
         let d = self.subdir_for(hex_hash);
         super::io::ensure_dir_exists(&d)?;
-        let tempf = tempfile::NamedTempFileOptions::new()
+        let tempf = tempfile::Builder::new()
             .prefix(TMP_PREFIX)
-            .create_in(&d)?;
+            .tempfile_in(&d)?;
         let mut bufw = io::BufWriter::new(tempf);
         report.measure_duration("block.compress", || {
             Snappy::compress_and_write(&in_buf, &mut bufw)
@@ -182,7 +181,7 @@ impl BlockDir {
         // report.measure_duration("sync", || tempf.sync_all())?;
 
         // TODO: Count bytes rather than stat-ing.
-        let comp_len = tempf.metadata()?.len();
+        let comp_len = tempf.as_file().metadata()?.len();
 
         // Also use plain `persist` not `persist_noclobber` to avoid
         // calling `link` on Unix, which won't work on all filesystems.
@@ -275,8 +274,7 @@ impl BlockDir {
                     }
                 });
                 fs.into_iter()
-            })
-            .collect())
+            }).collect())
     }
 
     /// Check format invariants of the BlockDir; report any problems to the Report.
@@ -289,8 +287,7 @@ impl BlockDir {
             .map(|bn| {
                 report.increment_work(1);
                 self.get_block(&bn).validate(report)
-            })
-            .try_for_each(|i| i)
+            }).try_for_each(|i| i)
     }
 }
 
@@ -354,8 +351,7 @@ mod tests {
     use std::fs;
     use std::io::prelude::*;
     use std::io::SeekFrom;
-    use tempdir;
-    use tempfile;
+    use tempfile::{NamedTempFile, TempDir};
 
     use super::super::*;
 
@@ -364,16 +360,16 @@ mod tests {
         "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd\
          3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
-    fn make_example_file() -> tempfile::NamedTempFile {
-        let mut tf = tempfile::NamedTempFile::new().unwrap();
+    fn make_example_file() -> NamedTempFile {
+        let mut tf = NamedTempFile::new().unwrap();
         tf.write_all(EXAMPLE_TEXT).unwrap();
         tf.flush().unwrap();
         tf.seek(SeekFrom::Start(0)).unwrap();
         tf
     }
 
-    fn setup() -> (tempdir::TempDir, BlockDir) {
-        let testdir = tempdir::TempDir::new("block_test").unwrap();
+    fn setup() -> (TempDir, BlockDir) {
+        let testdir = TempDir::new().unwrap();
         let block_dir = BlockDir::new(testdir.path());
         (testdir, block_dir)
     }
@@ -460,7 +456,7 @@ mod tests {
         use super::MAX_BLOCK_SIZE;
         let report = Report::new();
         let (_testdir, mut block_dir) = setup();
-        let mut tf = tempfile::NamedTempFile::new().unwrap();
+        let mut tf = NamedTempFile::new().unwrap();
         const N_CHUNKS: u64 = 10;
         const CHUNK_SIZE: u64 = 1 << 21;
         const TOTAL_SIZE: u64 = N_CHUNKS * CHUNK_SIZE;

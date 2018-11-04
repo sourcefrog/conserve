@@ -10,7 +10,6 @@ extern crate isatty;
 extern crate rayon;
 extern crate rustc_serialize;
 extern crate snap;
-extern crate tempdir;
 extern crate tempfile;
 extern crate term;
 extern crate terminal_size;

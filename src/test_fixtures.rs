@@ -10,7 +10,7 @@ use std::io::Write;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
-use tempdir;
+use tempfile::TempDir;
 
 use super::*;
 
@@ -18,13 +18,13 @@ use super::*;
 ///
 /// The ScratchArchive can be treated as an Archive.
 pub struct ScratchArchive {
-    _tempdir: tempdir::TempDir, // held only for cleanup
+    _tempdir: TempDir, // held only for cleanup
     archive: Archive,
 }
 
 impl ScratchArchive {
     pub fn new() -> ScratchArchive {
-        let tempdir = tempdir::TempDir::new("conserve_ScratchArchive").unwrap();
+        let tempdir = TempDir::new().unwrap();
         let arch_dir = tempdir.path().join("archive");
         let archive = Archive::create(&arch_dir).unwrap();
         ScratchArchive {
@@ -84,12 +84,12 @@ impl Default for ScratchArchive {
 /// Created in a temporary directory and automatically disposed when done.
 pub struct TreeFixture {
     pub root: PathBuf,
-    _tempdir: tempdir::TempDir, // held only for cleanup
+    _tempdir: TempDir, // held only for cleanup
 }
 
 impl TreeFixture {
     pub fn new() -> TreeFixture {
-        let tempdir = tempdir::TempDir::new("conserve_TreeFixture").unwrap();
+        let tempdir = TempDir::new().unwrap();
         let root = tempdir.path().to_path_buf();
         TreeFixture {
             _tempdir: tempdir,

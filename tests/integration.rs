@@ -3,10 +3,12 @@
 /// Test Conserve through its public API.
 extern crate conserve;
 
-extern crate tempdir;
+extern crate tempfile;
 
 use std::fs::File;
 use std::io::prelude::*;
+
+use tempfile::TempDir;
 
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
@@ -135,7 +137,7 @@ fn large_file() {
     assert_eq!(report.get_count("file.large"), 1);
 
     // Try to restore it
-    let rd = tempdir::TempDir::new("conserve_test_restore").unwrap();
+    let rd = TempDir::new().unwrap();
     let restore_report = Report::new();
     let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
     let st = StoredTree::open_last(&restore_archive).unwrap();

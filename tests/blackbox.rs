@@ -6,7 +6,7 @@
 extern crate spectral;
 
 extern crate regex;
-extern crate tempdir;
+extern crate tempfile;
 
 use std::env;
 use std::fs;
@@ -17,6 +17,7 @@ use std::str;
 
 use regex::Regex;
 use spectral::prelude::*;
+use tempfile::TempDir;
 
 extern crate conserve;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
@@ -42,7 +43,7 @@ fn blackbox_help() {
 #[test]
 fn clean_error_on_non_archive() {
     // Try to backup into a directory that is not an archive.
-    let testdir = make_tempdir();
+    let testdir = TempDir::new().unwrap();
     let not_archive_path_str = testdir.path().to_str().unwrap();
     let (status, stdout, _) = run_conserve(&["backup", &not_archive_path_str, "."]);
     // TODO: Errors really should go to stderr not stdout.
@@ -53,7 +54,7 @@ fn clean_error_on_non_archive() {
 
 #[test]
 fn blackbox_backup() {
-    let testdir = make_tempdir();
+    let testdir = TempDir::new().unwrap();
     let arch_dir = testdir.path().join("a");
     let arch_dir_str = arch_dir.to_str().unwrap();
 
@@ -123,13 +124,15 @@ fn blackbox_backup() {
     assert_success_and_output(&["ls", &arch_dir_str], "/\n/hello\n/subdir\n", "");
 
     // TODO: Factor out comparison to expected tree.
-    let restore_dir = make_tempdir();
+    let restore_dir = TempDir::new().unwrap();
     let restore_dir_str = restore_dir.path().to_str().unwrap();
     let (status, _stdout, _stderr) = run_conserve(&["restore", &arch_dir_str, &restore_dir_str]);
     assert!(status.success());
-    assert!(fs::metadata(restore_dir.path().join("subdir"))
-        .unwrap()
-        .is_dir());
+    assert!(
+        fs::metadata(restore_dir.path().join("subdir"))
+            .unwrap()
+            .is_dir()
+    );
 
     let restore_hello = restore_dir.path().join("hello");
     assert!(fs::metadata(&restore_hello).unwrap().is_file());
@@ -147,7 +150,7 @@ fn blackbox_backup() {
 
     // Restore with specified band id / backup version.
     {
-        let restore_dir = make_tempdir();
+        let restore_dir = TempDir::new().unwrap();
         let (status, _stdout, _stderr) = run_conserve(&[
             "restore",
             "-b",
@@ -182,12 +185,12 @@ fn blackbox_backup() {
 
 #[test]
 fn empty_archive() {
-    let adir = make_tempdir();
+    let adir = TempDir::new().unwrap();
     let adir_str = adir.path().to_str().unwrap();
     let (status, _, _) = run_conserve(&["init", adir_str]);
     assert!(status.success());
 
-    let restore_dir = make_tempdir();
+    let restore_dir = TempDir::new().unwrap();
     {
         let (status, stdout, stderr) =
             run_conserve(&["restore", adir_str, restore_dir.path().to_str().unwrap()]);
@@ -240,10 +243,6 @@ fn incomplete_version() {
         assert!(stderr.is_empty());
         assert_eq!(stdout, "");
     }
-}
-
-fn make_tempdir() -> tempdir::TempDir {
-    tempdir::TempDir::new("conserve_blackbox").unwrap()
 }
 
 fn assert_success_and_output(args: &[&str], expected_stdout: &str, expected_stderr: &str) {

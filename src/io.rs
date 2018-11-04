@@ -23,9 +23,7 @@ impl AtomicFile {
         let dir = path.parent().unwrap();
         Ok(AtomicFile {
             path: path.to_path_buf(),
-            f: tempfile::NamedTempFileOptions::new()
-                .prefix("tmp")
-                .create_in(dir)?,
+            f: tempfile::Builder::new().prefix("tmp").tempfile_in(dir)?,
         })
     }
 
@@ -56,13 +54,13 @@ impl Deref for AtomicFile {
     type Target = fs::File;
 
     fn deref(&self) -> &Self::Target {
-        &self.f
+        self.f.as_file()
     }
 }
 
 impl DerefMut for AtomicFile {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.f
+        self.f.as_file_mut()
     }
 }
 

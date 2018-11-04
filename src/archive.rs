@@ -162,10 +162,9 @@ impl HasReport for Archive {
 
 #[cfg(test)]
 mod tests {
-    extern crate tempdir;
-
     use std::fs;
     use std::io::Read;
+    use tempfile::TempDir;
 
     use super::*;
     use errors::Error;
@@ -173,7 +172,7 @@ mod tests {
 
     #[test]
     fn create_then_open_archive() {
-        let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
+        let testdir = TempDir::new().unwrap();
         let arch_path = &testdir.path().join("arch");
         let arch = Archive::create(arch_path).unwrap();
 
@@ -188,7 +187,7 @@ mod tests {
 
     #[test]
     fn init_empty_dir() {
-        let testdir = tempdir::TempDir::new("conserve-tests").unwrap();
+        let testdir = TempDir::new().unwrap();
         let arch_path = testdir.path();
         let arch = Archive::create(arch_path).unwrap();
 

@@ -308,8 +308,7 @@ impl Iter {
                 } else {
                     true
                 }
-            })
-            .collect::<Vec<IndexEntry>>()
+            }).collect::<Vec<IndexEntry>>()
             .into_iter();
 
         self.next_hunk_number += 1;
@@ -321,7 +320,7 @@ impl Iter {
 mod tests {
     use rustc_serialize::json;
     use std::path::Path;
-    use tempdir;
+    use tempfile::TempDir;
 
     use super::super::*;
 
@@ -330,8 +329,8 @@ mod tests {
          3c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b\
          2fb1d67e28262168013ba63c";
 
-    pub fn scratch_indexbuilder() -> (tempdir::TempDir, IndexBuilder, Report) {
-        let testdir = tempdir::TempDir::new("index_test").unwrap();
+    pub fn scratch_indexbuilder() -> (TempDir, IndexBuilder, Report) {
+        let testdir = TempDir::new().unwrap();
         let ib = IndexBuilder::new(testdir.path());
         (testdir, ib, Report::new())
     }
