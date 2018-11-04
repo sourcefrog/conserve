@@ -208,16 +208,6 @@ fn blackbox_backup() {
         .stdout(starts_with("Archive is OK.\n"));
 
     // TODO: Compare vs source tree.
-    //
-    //     $ conserve restore myarchive restoredir
-    //     $ cat restoredir/afile
-    //     strawberry
-    //
-    // For safety, you cannot restore to the same directory twice:
-    //
-    //     $ conserve -L restore myarchive restoredir
-    //     error creating restore destination directory "restoredir": File exists
-    //     [3]
 }
 
 #[test]
