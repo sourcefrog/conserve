@@ -3,18 +3,21 @@
 
 //! Run conserve CLI as a subprocess and test it.
 
+#[macro_use]
+extern crate lazy_static;
+
 extern crate assert_cmd;
 extern crate assert_fs;
+extern crate escargot;
 extern crate predicates;
 extern crate tempfile;
 
-use std::fs;
-use std::io::prelude::*;
 use std::process::Command;
 
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use escargot::CargoRun;
 use predicates::prelude::*;
 
 use predicate::path::{is_dir, is_file};
@@ -22,6 +25,19 @@ use predicate::str::{contains, is_empty, is_match, starts_with};
 
 extern crate conserve;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+
+lazy_static! {
+    static ref CARGO_RUN: CargoRun = escargot::CargoBuild::new()
+        .bin("conserve")
+        .current_release()
+        .current_target()
+        .run() // Build it and return a proxy to run it
+        .unwrap();
+}
+
+fn main_binary() -> Command {
+    CARGO_RUN.command()
+}
 
 #[test]
 fn blackbox_no_args() {
@@ -278,8 +294,4 @@ fn incomplete_version() {
         .success()
         .stderr(is_empty())
         .stdout(is_empty());
-}
-
-fn main_binary() -> std::process::Command {
-    Command::main_binary().unwrap()
 }
