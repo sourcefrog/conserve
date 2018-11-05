@@ -65,9 +65,10 @@ pub fn duration_to_hms(d: Duration) -> String {
 }
 
 pub fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
-    let float_secs = elapsed.as_secs() as f64;
-    if float_secs > 0.0 {
-        bytes as f64 / float_secs / 1e6_f64
+    let secs = elapsed.as_secs() as f64
+        + elapsed.subsec_millis() as f64 / 1000.0;
+    if secs > 0.0 {
+        bytes as f64 / secs / 1e6
     } else {
         0f64
     }
