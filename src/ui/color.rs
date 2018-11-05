@@ -128,7 +128,7 @@ impl UI for ColorUI {
                         );
             }
             write!(pb_text,
-                    "{:6.1} MB/s  {} {}",
+                    "{:6.0} MB/s  {} {}",
                     rate,
                     counts.phase,
                     counts.get_latest_filename()
