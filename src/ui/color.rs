@@ -111,27 +111,33 @@ impl UI for ColorUI {
             let rate = mbps_rate(counts.done_work, elapsed);
             let comp_bytes = block_sizes.compressed;
             if counts.total_work > 0 {
-                write!(pb_text,
-                    "{:>3}% ", 100 * counts.done_work / counts.total_work);
+                write!(
+                    pb_text,
+                    "{:>3}% ",
+                    100 * counts.done_work / counts.total_work
+                );
             };
 
             pb_text.push_str(&duration_to_hms(elapsed));
 
-            write!(pb_text,
-                    "{:>8} MB ",
-                    (counts.done_work / MB).separate_with_commas(),
-                    );
+            write!(
+                pb_text,
+                "{:>8} MB ",
+                (counts.done_work / MB).separate_with_commas(),
+            );
             if comp_bytes > 0 {
-                write!(pb_text,
-                        "=> {:<8} ",
-                        (block_sizes.compressed / MB).separate_with_commas(),
-                        );
+                write!(
+                    pb_text,
+                    "=> {:<8} ",
+                    (block_sizes.compressed / MB).separate_with_commas(),
+                );
             }
-            write!(pb_text,
-                    "{:6.0} MB/s  {} {}",
-                    rate,
-                    counts.phase,
-                    counts.get_latest_filename()
+            write!(
+                pb_text,
+                "{:6} MB/s  {} {}",
+                (rate as u64).separate_with_commas(),
+                counts.phase,
+                counts.get_latest_filename()
             );
         };
         // TODO: If it's less than w bytes or characters, which will be a common

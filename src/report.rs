@@ -385,7 +385,7 @@ impl Counts {
         // read and write for incremental indexes.
         format!(
             "{:>12} MB in {} files, {} directories, {} symlinks.\n\
-             {:>12.0} MB/s output rate.\n\
+             {:>12} MB/s output rate.\n\
              {:>12} MB after deduplication.\n\
              {:>12} MB in {} blocks after {:.1}x compression.\n\
              {:>12} MB in {} compressed index hunks.\n\
@@ -394,10 +394,11 @@ impl Counts {
             self.get_count("file").separate_with_commas(),
             self.get_count("dir").separate_with_commas(),
             self.get_count("symlink").separate_with_commas(),
-            mbps_rate(
+            (mbps_rate(
                 self.get_size("file.bytes").uncompressed,
                 self.elapsed_time()
-            ),
+            ) as u64)
+                .separate_with_commas(),
             (self.get_size("block").uncompressed / M).separate_with_commas(),
             (self.get_size("block").compressed / M).separate_with_commas(),
             self.get_count("block.read").separate_with_commas(),
@@ -413,7 +414,7 @@ impl Counts {
         // read and write for incremental indexes.
         format!(
             "{:>12} MB in {} files, {} directories, {} symlinks.\n\
-             {:>12.0} MB/s input rate.\n\
+             {:>12} MB/s input rate.\n\
              {:>12} MB after deduplication.\n\
              {:>12} MB in {} blocks after {:.1}x compression.\n\
              {:>12} MB in {} compressed index hunks.\n\
@@ -422,10 +423,11 @@ impl Counts {
             self.get_count("file").separate_with_commas(),
             self.get_count("dir").separate_with_commas(),
             self.get_count("symlink").separate_with_commas(),
-            mbps_rate(
+            (mbps_rate(
                 self.get_size("file.bytes").uncompressed,
                 self.elapsed_time()
-            ),
+            ) as u64)
+                .separate_with_commas(),
             (self.get_size("block").uncompressed / M).separate_with_commas(),
             (self.get_size("block").compressed / M).separate_with_commas(),
             self.get_count("block.write").separate_with_commas(),
@@ -439,11 +441,12 @@ impl Counts {
     pub fn summary_for_validate(&self) -> String {
         format!(
             "{:>12} MB in {} blocks.\n\
-             {:>12.0} MB/s block validation rate.\n\
+             {:>12} MB/s block validation rate.\n\
              {:>12} s elapsed.\n",
             (self.get_size("block").uncompressed / M).separate_with_commas(),
             self.get_count("block.read").separate_with_commas(),
-            mbps_rate(self.get_size("block").uncompressed, self.elapsed_time()),
+            (mbps_rate(self.get_size("block").uncompressed, self.elapsed_time()) as u64)
+                .separate_with_commas(),
             self.elapsed_time().as_secs(),
         )
     }
