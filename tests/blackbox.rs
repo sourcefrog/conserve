@@ -114,6 +114,14 @@ fn blackbox_backup() {
              /subdir\n",
         );
 
+    main_binary()
+        .args(&["source", "size"])
+        .arg(src.path())
+        .assert()
+        .success()
+        .stderr(is_empty())
+        .stdout("8\n"); // "contents"
+
     // backup
     main_binary()
         .arg("backup")
@@ -124,6 +132,14 @@ fn blackbox_backup() {
         .stderr(is_empty())
         .stdout(starts_with("Backup complete.\n"));
     // TODO: Now inspect the archive.
+
+    main_binary()
+        .args(&["tree", "size"])
+        .arg(&arch_dir)
+        .assert()
+        .success()
+        .stderr(is_empty())
+        .stdout("8\n"); // "contents"
 
     // versions --short
     main_binary()
