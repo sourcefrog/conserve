@@ -11,8 +11,10 @@ extern crate clap;
 
 extern crate chrono;
 extern crate globset;
+extern crate thousands;
 
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use thousands::Separable;
 
 extern crate conserve;
 use conserve::*;
@@ -334,7 +336,7 @@ fn source_ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn source_size(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source = live_tree_from_options(subm, report)?;
-    report.print(&format!("{}", source.size()?.file_bytes));
+    report.print(&format!("{}", source.size()?.file_bytes).separate_with_commas());
     Ok(())
 }
 
@@ -384,7 +386,7 @@ fn debug_block_referenced(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn tree_size(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = stored_tree_from_options(subm, report)?;
-    report.print(&format!("{}", st.size()?.file_bytes));
+    report.print(&format!("{}", st.size()?.file_bytes).separate_with_commas());
     Ok(())
 }
 
