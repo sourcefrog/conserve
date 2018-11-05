@@ -62,7 +62,7 @@ pub use live_tree::LiveTree;
 pub use report::{HasReport, Report, Sizes};
 pub use restore::RestoreTree;
 pub use stored_tree::StoredTree;
-pub use tree::{copy_tree, ReadTree, WriteTree};
+pub use tree::{copy_tree, ReadTree, TreeSize, WriteTree};
 pub use ui::UI;
 
 // Commonly-used external types.

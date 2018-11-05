@@ -129,8 +129,8 @@ pub struct Entry {
 
 impl entry::Entry for Entry {
     fn apath(&self) -> Apath {
-        // TODO: Better to just return a reference with the same lifetime, once index entries can
-        // support that.
+        // TODO: Better to just return a reference with the same lifetime,
+        // once index entries can support that.
         self.apath.clone()
     }
 
@@ -167,6 +167,14 @@ impl entry::Entry for Entry {
                     .unwrap(),
             ),
             _ => None,
+        }
+    }
+
+    fn size(&self) -> Option<u64> {
+        if self.metadata.is_file() {
+            Some(self.metadata.len())
+        } else {
+            None
         }
     }
 }

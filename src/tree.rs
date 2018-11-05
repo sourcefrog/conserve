@@ -17,6 +17,18 @@ pub trait ReadTree: HasReport {
     /// Estimate the number of entries in the tree.
     /// This might do somewhat expensive IO, so isn't the Iter's `size_hint`.
     fn estimate_count(&self) -> Result<u64>;
+
+    /// Measure the tree size: typically requires walking all entries so
+    /// takes a while.
+    fn size(&self) -> Result<TreeSize> {
+        let total_bytes = self
+            .iter_entries(self.report())?
+            .try_fold(0u64, |s, e| { Ok(s + e?.size().unwrap_or(0)) }
+                as Result<u64>)?;
+        Ok(TreeSize {
+            file_bytes: total_bytes,
+        })
+    }
 }
 
 /// A tree open for writing, either local or an an archive.
@@ -31,6 +43,11 @@ pub trait WriteTree {
     fn write_dir(&mut self, entry: &Entry) -> Result<()>;
     fn write_symlink(&mut self, entry: &Entry) -> Result<()>;
     fn write_file(&mut self, entry: &Entry, content: &mut std::io::Read) -> Result<()>;
+}
+
+/// The measured size of a tree.
+pub struct TreeSize {
+    pub file_bytes: u64,
 }
 
 /// Copy files and other entries from one tree to another.

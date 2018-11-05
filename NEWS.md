@@ -2,6 +2,8 @@
 
 ## UNRELEASED
 
+* New `source size` and `tree size` commands.
+
 ## Conserve 0.5.0 2018-11-01
 
 * Conserve 0.5 uses a new format, and can't read 0.4 repositories. The new

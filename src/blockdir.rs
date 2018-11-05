@@ -134,7 +134,8 @@ impl BlockDir {
                 block_hash = rayon::join(
                     || report.measure_duration("file.hash", || file_hasher.update(&in_buf)),
                     || report.measure_duration("block.hash", || hash_bytes(&in_buf).unwrap()),
-                ).1;
+                )
+                .1;
             }
 
             if self.contains(&block_hash)? {
@@ -274,7 +275,8 @@ impl BlockDir {
                     }
                 });
                 fs.into_iter()
-            }).collect())
+            })
+            .collect())
     }
 
     /// Check format invariants of the BlockDir; report any problems to the Report.
@@ -287,7 +289,8 @@ impl BlockDir {
             .map(|bn| {
                 report.increment_work(1);
                 self.get_block(&bn).validate(report)
-            }).try_for_each(|i| i)
+            })
+            .try_for_each(|i| i)
     }
 }
 

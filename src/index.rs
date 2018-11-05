@@ -64,6 +64,13 @@ impl entry::Entry for IndexEntry {
         assert_eq!(self.kind() == Kind::Symlink, self.target.is_some());
         self.target.clone()
     }
+
+    fn size(&self) -> Option<u64> {
+        match self.kind {
+            Kind::File => Some(self.addrs.iter().map(|a| a.len).sum()),
+            _ => None,
+        }
+    }
 }
 
 /// Accumulates ordered changes to the index and streams them out to index files.
@@ -308,7 +315,8 @@ impl Iter {
                 } else {
                     true
                 }
-            }).collect::<Vec<IndexEntry>>()
+            })
+            .collect::<Vec<IndexEntry>>()
             .into_iter();
 
         self.next_hunk_number += 1;

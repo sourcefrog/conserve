@@ -32,4 +32,7 @@ pub trait Entry {
 
     /// Target of the symlink, if this is a symlink.
     fn symlink_target(&self) -> Option<String>;
+
+    /// Size of the file, if it is a file. None for directories and symlinks.
+    fn size(&self) -> Option<u64>;
 }

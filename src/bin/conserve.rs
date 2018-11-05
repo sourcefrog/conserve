@@ -33,6 +33,8 @@ fn main() {
         "ls" => ls,
         "restore" => restore,
         "source ls" => source_ls,
+        "source size" => source_size,
+        "tree size" => tree_size,
         "validate" => validate,
         "versions" => versions,
         _ => panic!("unimplemented command"),
@@ -245,6 +247,28 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                                 .required(true),
                         )
                         .arg(exclude_arg()),
+                )
+                .subcommand(
+                    SubCommand::with_name("size")
+                        .about("Show the size of a source directory")
+                        .arg(
+                            Arg::with_name("source")
+                                .help("Source directory")
+                                .required(true),
+                        ),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("tree")
+                .about("Operate on stored trees")
+                .subcommand(
+                    SubCommand::with_name("size")
+                        .about(
+                            "Show the size of a stored tree (as it\
+                             would be when restored)",
+                        )
+                        .arg(archive_arg())
+                        .arg(backup_arg()),
                 ),
         )
 }
@@ -308,6 +332,12 @@ fn source_ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     Ok(())
 }
 
+fn source_size(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let source = live_tree_from_options(subm, report)?;
+    report.print(&format!("{}", source.size()?.file_bytes));
+    Ok(())
+}
+
 fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = stored_tree_from_options(subm, report)?;
     list_tree_contents(&st, report)?;
@@ -349,6 +379,12 @@ fn debug_block_referenced(subm: &ArgMatches, report: &Report) -> Result<()> {
     for h in archive.referenced_blocks()? {
         report.print(&h);
     }
+    Ok(())
+}
+
+fn tree_size(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let st = stored_tree_from_options(subm, report)?;
+    report.print(&format!("{}", st.size()?.file_bytes));
     Ok(())
 }
 
