@@ -21,12 +21,19 @@ pub trait ReadTree: HasReport {
     /// Measure the tree size: typically requires walking all entries so
     /// takes a while.
     fn size(&self) -> Result<TreeSize> {
-        let total_bytes = self
-            .iter_entries(self.report())?
-            .try_fold(0u64, |s, e| { Ok(s + e?.size().unwrap_or(0)) }
-                as Result<u64>)?;
+        let report = self.report();
+        report.set_phase("Measuring");
+        report.set_total_work(0);
+        let mut tot = 0u64;
+        for e in self.iter_entries(self.report())? {
+            if let Some(s) = e?.size() {
+                tot += s;
+                report.increment_work(s);
+            }
+        }
+        report.clear_phase();
         Ok(TreeSize {
-            file_bytes: total_bytes,
+            file_bytes: tot,
         })
     }
 }
@@ -55,6 +62,7 @@ pub struct TreeSize {
 /// Progress and problems are reported to the source's report.
 pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Result<()> {
     let report = source.report();
+    report.set_phase("Copying");
     report.set_total_work(source.estimate_count()?);
     for entry in source.iter_entries(&report)? {
         let entry = entry?;
@@ -75,5 +83,6 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
         }?;
         report.increment_work(1);
     }
+    report.clear_phase();
     dest.finish()
 }

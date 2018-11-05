@@ -90,6 +90,9 @@ pub struct Counts {
     /// Most recently started filename.
     latest_filename: String,
 
+    /// General phase of work.
+    pub phase: &'static str,
+
     /// Total estimated work to be done (task-specific units).
     pub total_work: u64,
     /// Amount of work done so far, to indicate percentage completion.
@@ -242,6 +245,15 @@ impl Report {
         self.mut_counts().latest_filename = entry.apath().to_string();
     }
 
+    /// Briefly describe the phase of work.
+    pub fn set_phase(&self, phase: &'static str) {
+        self.mut_counts().phase = phase;
+    }
+
+    pub fn clear_phase(&self) {
+        self.set_phase("");
+    }
+
     pub fn print(&self, s: &str) {
         self.ui.lock().unwrap().print(s)
     }
@@ -325,6 +337,7 @@ impl Counts {
             durations,
             start: Instant::now(),
             latest_filename: String::new(),
+            phase: "",
             total_work: 0,
             done_work: 0,
         }

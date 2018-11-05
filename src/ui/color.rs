@@ -7,6 +7,8 @@
 //! This acts as a view and the Report is the model.
 
 use std::fmt;
+use std::fmt::Write;
+#[allow(unused)]
 use std::io::prelude::*;
 use std::time::Instant;
 
@@ -101,27 +103,36 @@ impl UI for ColorUI {
 
         // TODO: Input size should really be the number of source bytes before
         // block deduplication.
-        let pb_text = {
+        let mut pb_text = String::with_capacity(200);
+        {
             let counts = report.borrow_counts();
             let block_sizes = counts.get_size("block");
             let elapsed = counts.elapsed_time();
-            let file_bytes = counts.get_size("file.bytes").uncompressed;
-            let file_rate = mbps_rate(file_bytes, elapsed);
-            let pct = if counts.total_work > 0 {
-                format!("{:>3}% ", 100 * counts.done_work / counts.total_work)
-            } else {
-                String::new()
+            let rate = mbps_rate(counts.done_work, elapsed);
+            let comp_bytes = block_sizes.compressed;
+            if counts.total_work > 0 {
+                write!(pb_text,
+                    "{:>3}% ", 100 * counts.done_work / counts.total_work);
             };
 
-            format!(
-                "{}{} {:>6} MB => {:<6} {:6.1} MB/s  {}",
-                pct,
-                duration_to_hms(elapsed),
-                (file_bytes / MB).separate_with_commas(),
-                (block_sizes.compressed / MB).separate_with_commas(),
-                file_rate,
-                counts.get_latest_filename()
-            )
+            pb_text.push_str(&duration_to_hms(elapsed));
+
+            write!(pb_text,
+                    "{:>8} MB ",
+                    (counts.done_work / MB).separate_with_commas(),
+                    );
+            if comp_bytes > 0 {
+                write!(pb_text,
+                        "=> {:<8} ",
+                        (block_sizes.compressed / MB).separate_with_commas(),
+                        );
+            }
+            write!(pb_text,
+                    "{:6.1} MB/s  {} {}",
+                    rate,
+                    counts.phase,
+                    counts.get_latest_filename()
+            );
         };
         // TODO: If it's less than w bytes or characters, which will be a common
         // ascii case, we don't need to break graphemes.
