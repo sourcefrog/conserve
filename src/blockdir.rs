@@ -256,7 +256,7 @@ impl BlockDir {
     }
 
     /// Return a sorted vec of all the blocknames in the blockdir.
-    pub fn blocks(&self, report: &Report) -> Result<Vec<String>> {
+    pub fn block_names(&self, report: &Report) -> Result<Vec<String>> {
         // The vecs from `subdirs` and `list_dir` are already sorted, so
         // we don't need to sort here.
         Ok(self
@@ -279,24 +279,36 @@ impl BlockDir {
             .collect())
     }
 
+    pub fn blocks(&self, report: &Report) -> Result<Vec<Block>> {
+        Ok(self.block_names(report)?.iter().map(|b| self.get_block(b)).collect::<Vec<Block>>())
+    }
+
     /// Check format invariants of the BlockDir; report any problems to the Report.
     pub fn validate(&self, report: &Report) -> Result<()> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
-        let bns = self.blocks(report)?;
-        report.set_total_work(bns.len() as u64);
-        bns.par_iter()
-            .map(|bn| {
-                report.increment_work(1);
-                self.get_block(&bn).validate(report)
+        report.set_phase("Count blocks");
+        let bs = self.blocks(report)?;
+        let tot = bs.iter().try_fold(
+            0u64,
+            |t, b| Ok(t + b.compressed_size()?) as Result<u64> )?;
+        report.set_total_work(tot);
+
+        report.set_phase("Check block hashes");
+        bs.par_iter()
+            .map(|b| {
+                report.increment_work(b.compressed_size()?);
+                b.validate(report)
             })
-            .try_for_each(|i| i)
+            .try_for_each(|i| i)?;
+        Ok(())
     }
 }
 
 /// Read-only access to one block in the BlockDir.
 #[derive(Clone, Debug)]
 pub struct Block {
+    // TODO: Maybe hold an Rc on the root path and compute the block's path on demand?
     path: PathBuf,
     hash: String,
 }
@@ -340,6 +352,10 @@ impl Block {
             return Err(Error::BlockCorrupt(self.path.clone()));
         }
         Ok(())
+    }
+
+    pub fn compressed_size(&self) -> Result<u64> {
+        Ok(fs::metadata(&self.path)?.len())
     }
 }
 
@@ -396,7 +412,7 @@ mod tests {
 
         // Block should be the one block present in the list.
         assert_eq!(
-            block_dir.blocks(&Report::new()).unwrap(),
+            block_dir.block_names(&Report::new()).unwrap(),
             &[EXAMPLE_BLOCK_HASH]
         );
 
