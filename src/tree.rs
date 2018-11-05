@@ -62,8 +62,11 @@ pub struct TreeSize {
 /// Progress and problems are reported to the source's report.
 pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Result<()> {
     let report = source.report();
+    // This causes us to walk the source tree twice, which is probably an acceptable option
+    // since it's nice to see realistic overall progress. We could keep all the entries
+    // in memory, and maybe we should, but it might get unreasonably big.
+    report.set_total_work(source.size()?.file_bytes);
     report.set_phase("Copying");
-    report.set_total_work(source.estimate_count()?);
     for entry in source.iter_entries(&report)? {
         let entry = entry?;
         report.start_entry(&entry);
@@ -81,7 +84,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
                 continue;
             }
         }?;
-        report.increment_work(1);
+        report.increment_work(entry.size().unwrap_or(0));
     }
     report.clear_phase();
     dest.finish()

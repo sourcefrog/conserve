@@ -269,8 +269,11 @@ impl Report {
         self.ui.lock().unwrap().finish()
     }
 
+    /// Set the total expected work (in bytes); this also resets the amount of work done.
     pub fn set_total_work(&self, w: u64) {
-        self.mut_counts().total_work = w;
+        let mut c = self.mut_counts();
+        c.total_work = w;
+        c.done_work = 0;
     }
 
     pub fn increment_work(&self, w: u64) {
