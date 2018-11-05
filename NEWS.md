@@ -4,6 +4,9 @@
 
 * New `source size` and `tree size` commands.
 
+* Progress percentage is now measured as a fraction of the total tree
+  to be copied, which is a more linear measurement.
+
 ## Conserve 0.5.0 2018-11-01
 
 * Conserve 0.5 uses a new format, and can't read 0.4 repositories. The new
