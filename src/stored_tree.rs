@@ -8,6 +8,13 @@
 //! across incremental backups, hiding from the caller that data may be distributed across
 //! multiple index files, bands, and blocks.
 
+use std::io::prelude::*;
+
+use blake2_rfc::blake2b::Blake2b;
+use rayon::prelude::*;
+use rustc_serialize::hex::ToHex;
+
+use super::blockdir::{BLAKE_HASH_SIZE_BYTES, MAX_BLOCK_SIZE};
 use super::stored_file::StoredFile;
 use super::*;
 
@@ -74,6 +81,38 @@ impl StoredTree {
 
     pub fn is_closed(&self) -> Result<bool> {
         self.band.is_closed()
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        let report = self.report();
+        report.set_phase(format!("Check tree {}", self.band().id()));
+        // TODO: Maybe parallel over chunks; don't read the whole index into
+        // memory?
+        // TODO: Remove unwraps.
+        let ev = self
+            .iter_entries(self.report())?
+            .map(|e| e.unwrap())
+            .filter(|e| e.kind() == Kind::File)
+            .collect::<Vec<_>>();
+        ev.par_iter()
+            .map(|e| {
+                report.start_entry(e);
+                let mut in_buf = vec![0; MAX_BLOCK_SIZE];
+                let mut fc = self.file_contents(&e).unwrap();
+                let mut file_hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
+                loop {
+                    let read_bytes = fc.read(&mut in_buf).unwrap();
+                    if read_bytes == 0 {
+                        break;
+                    }
+                    file_hasher.update(&in_buf[0..read_bytes]);
+                }
+                let file_hash = file_hasher.finalize().as_bytes().to_hex();
+                assert_eq!(file_hash, e.blake2b().unwrap());
+                report.increment_work(e.size().unwrap_or(0));
+            })
+            .count();
+        Ok(())
     }
 
     // TODO: Perhaps add a way to open a file by name, bearing in mind this might be slow to

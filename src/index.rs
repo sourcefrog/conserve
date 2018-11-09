@@ -71,6 +71,10 @@ impl entry::Entry for IndexEntry {
             _ => None,
         }
     }
+    
+    fn blake2b(&self) -> Option<String> {
+        self.blake2b.clone()
+    }
 }
 
 /// Accumulates ordered changes to the index and streams them out to index files.

@@ -27,7 +27,7 @@ use tempfile;
 use super::*;
 
 /// Use the maximum 64-byte hash.
-const BLAKE_HASH_SIZE_BYTES: usize = 64;
+pub const BLAKE_HASH_SIZE_BYTES: usize = 64;
 
 const BLOCKDIR_FILE_NAME: usize = BLAKE_HASH_SIZE_BYTES * 2;
 
@@ -37,7 +37,7 @@ const SUBDIR_NAME_CHARS: usize = 3;
 const TMP_PREFIX: &str = "tmp";
 
 /// Break blocks at this many uncompressed bytes.
-const MAX_BLOCK_SIZE: usize = 1 << 20;
+pub const MAX_BLOCK_SIZE: usize = 1 << 20;
 
 /// The unique identifier for a block: its hexadecimal `BLAKE2b` hash.
 pub type BlockHash = String;

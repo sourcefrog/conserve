@@ -205,10 +205,21 @@ impl Archive {
     }
 
     fn validate_bands(&self) -> Result<()> {
-        self.report.print("Check bands...");
+        self.report.print("Check stored trees...");
+        self.report.set_phase("Measure stored trees");
+        let mut total_size: u64 = 0;
+        for bid in self.list_bands()?.iter() {
+            total_size += StoredTree::open_incomplete_version(self, bid)?
+                .size()?
+                .file_bytes;
+        }
+        self.report.set_total_work(total_size);
         for bid in self.list_bands()?.iter() {
             let b = Band::open(self, bid)?;
             b.validate(&self.report)?;
+
+            let st = StoredTree::open_incomplete_version(self, bid)?;
+            st.validate()?;
         }
         Ok(())
     }

@@ -91,7 +91,7 @@ pub struct Counts {
     latest_filename: String,
 
     /// General phase of work.
-    pub phase: &'static str,
+    pub phase: String,
 
     /// Total estimated work to be done (task-specific units).
     pub total_work: u64,
@@ -246,8 +246,8 @@ impl Report {
     }
 
     /// Briefly describe the phase of work.
-    pub fn set_phase(&self, phase: &'static str) {
-        self.mut_counts().phase = phase;
+    pub fn set_phase<S: ToString>(&self, phase: S) {
+        self.mut_counts().phase = phase.to_string();
     }
 
     pub fn clear_phase(&self) {
@@ -340,7 +340,7 @@ impl Counts {
             durations,
             start: Instant::now(),
             latest_filename: String::new(),
-            phase: "",
+            phase: String::new(),
             total_work: 0,
             done_work: 0,
         }
