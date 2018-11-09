@@ -18,6 +18,7 @@ use chrono::{DateTime, TimeZone, UTC};
 
 use super::io::file_exists;
 use super::jsonio;
+use super::misc::remove_item;
 use super::*;
 
 static INDEX_DIR: &'static str = "i";
@@ -184,6 +185,34 @@ impl Band {
             }
         }
         Ok(total)
+    }
+
+    pub fn validate(&self, report: &Report) -> Result<()> {
+        self.validate_band_dir(report)?;
+        Ok(())
+    }
+
+    fn validate_band_dir(&self, report: &Report) -> Result<()> {
+        let (mut files, dirs) = list_dir(self.path())?;
+        if !files.contains(&HEAD_FILENAME.to_string()) {
+            report.problem(&format!(
+                    "No band head file in {:?}", self.path()));
+        }
+        remove_item(&mut files, &HEAD_FILENAME);
+        remove_item(&mut files, &TAIL_FILENAME);
+        if !files.is_empty() {
+            report.problem(&format!(
+                    "Unexpected files in {:?}: {:?}",
+                    self.path(), files));
+        }
+
+        if dirs != &[INDEX_DIR.to_string()] {
+            report.problem(&format!(
+                    "Incongruous directories in {:?}: {:?}",
+                    self.path(), dirs));
+        }
+
+        Ok(())
     }
 }
 

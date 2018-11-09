@@ -158,6 +158,7 @@ impl Archive {
         self.validate_archive_dir()?;
         self.report.print("Check blockdir...");
         self.block_dir.validate(self.report())?;
+        self.validate_bands()?;
 
         // TODO: Don't say "OK" if there were non-fatal problems.
         self.report.print("Archive is OK.");
@@ -200,6 +201,15 @@ impl Archive {
             }
         }
 
+        Ok(())
+    }
+
+    fn validate_bands(&self) -> Result<()> {
+        self.report.print("Check bands...");
+        for bid in self.list_bands()?.iter() {
+            let b = Band::open(self, bid)?;
+            b.validate(&self.report)?;
+        }
         Ok(())
     }
 }
