@@ -4,27 +4,26 @@
 
 All metadata is stored as json dictionaries.
 
-
 ## Software version
 
 Conserve archives include the version of the software that wrote them, which is
 an _x.y.z_ tuple.  See [versioning.md](versioning.md) for the semantics.
 
-
 ## Filenames
 
 Files have names in the source and restore directories, and within the archive.
 
-In source and restore directories, file naming is defined by the OS: on Windows as UTF-16,
-on OS X as UTF-8 and on Linux as an arbitrary 8-bit encoding.
+In source and restore directories, file naming is defined by the OS: on Windows
+as UTF-16, on OS X as UTF-8 and on Linux as an arbitrary 8-bit encoding.
 
-(Linux filenames are very commonly UTF-8, but there are important exceptions: users who
-choose to use different encodings for whole filesystems; network or USB filesystems
-using different encodings; files is source trees that are intentionally in odd encodings; and
-files that accidentally have anomalous names.  It is useful to include the occasionally
-oddly-named file in the backup, and also for users with non-UTF-8 encodings to be able to
-configure this. The filename encoding is not easily detectable.  Linux does require that the
-separator `/` have the same byte value.)
+(Linux filenames are very commonly UTF-8, but there are important exceptions:
+users who choose to use different encodings for whole filesystems; network or
+USB filesystems using different encodings; files is source trees that are
+intentionally in odd encodings; and files that accidentally have anomalous
+names.  It is useful to include the occasionally oddly-named file in the
+backup, and also for users with non-UTF-8 encodings to be able to configure
+this. The filename encoding is not easily detectable.  Linux does require that
+the separator `/` have the same byte value.)
 
 In the archive, Conserve uses "apaths" as a platform-independent path format.
 
@@ -87,13 +86,6 @@ which is contains a json dict (with no compression):
 (For pre-1.0 versions of Conserve, older formats are described in the version
 of this file from the relevant release source tree.)
 
-## Tiers
-
-Within an archive there are multiple *tiers* for incremental/hierarchical
-backups.  (For example, they might be annual, monthly, weekly, daily, and
-hourly backups.)  Tiers are not directly represented on disk; they're
-implicitly all the bands whose names identify them as being in the same tier.
-
 ## Bands
 
 Within an archive, there are multiple *bands*, identified by a name starting
@@ -107,19 +99,20 @@ everything from the source has been written.  Bands may remain incomplete
 indefinitely, across multiple Conserve invocations, until they are finished.
 Once the band is completed, it will not be changed.
 
-Bands are numbered hierarchically across tiers and sequentially within
-a tier, starting at 0.  So the first base tier band in the whole archive
-is `0000`, the first incremental band on top of it is `0000-0000`,
-and so on.  The numbers are zero-padded to four digits in each
-area, so that they will be grouped conveniently for humans looking at
-naively sorted listings of the directory.  (Conserve does not rely on them
-being less than five digits, or on the transport returning any particular
-ordering; bands numbered over 9999 are supported.)
+Bands can be *top level* in which case their index contains a list of all
+entries (files, directories, and symlinks) in that tree. Or, they can be
+*child bands*, in which case they contain only changes relative to a parent
+band's index. (Child bands are not implemented as of Conserve 0.5.)
 
-Band directories contain a description of files that changed, or were deleted,
-relative to their ancestor bands.  A copy of the source directory at a
-particular time can be extracted by reading the closest band, plus all of its
-parents.
+All band names start with the character `b`. Top level bands are numbered
+sequentially from `b0000`. Child bands have additional numbers appended to
+their parent's name, like `b0000-0000`. 
+
+The numbers are zero-padded to four digits in each area, so that they will be
+grouped conveniently for humans looking at naively sorted listings of the
+directory.  (Conserve does not rely on them being less than five digits, or on
+the transport returning any particular ordering; bands numbered over 9999 are
+supported.)
 
 Bands are represented as a subdirectory within the archive directory, as `b`
 followed by the number.  All bands are in the top-level archive directory.
@@ -231,15 +224,3 @@ which is a dict of
 
 So, the length of any file is the sum of the `length` entries for all
 its `blocks`.
-
-Index blocks can reference any section of any data block in the current
-or any ancestor tier band, but not sibling, descendent, or unrelated bands.
-The writer may deduplicate blocks or partial blocks against any of these data
-blocks using any algorithm, including referencing a different length or offset
-into the same block.
-
-Rationale: Constraining which indexes can reference a data block allows
-Conserve to purge a band and its children without needing to consider whether
-its data is used elsewhere.  This means that the purge operation takes time
-proportional only to the data being purged, and does not need to walk the whole
-archive or any other index.
