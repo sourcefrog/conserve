@@ -40,8 +40,8 @@ or machine crash or other likely underlying failures?
 How much is this similar to just doing a restore and throwing away the results?
 
 * For the archive
-  * No unexpected directories or files
-  * All band directories are in the canonical format
+  * [done] No unexpected directories or files
+  * [done] All band directories are in the canonical format
 * For every band
   * The index block numbers are contiguous and correctly formated
   * No unexpected files or directories
@@ -58,7 +58,7 @@ How much is this similar to just doing a restore and throwing away the results?
   * No zero-byte files
   * No temporary files
 * For every block in the blockdir:
-  * The hash of the block is what the name says.
+  * [done] The hash of the block is what the name says.
 
 Should report on (and gc could clean up) any old leftover tmp files.
 

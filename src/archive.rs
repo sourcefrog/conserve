@@ -5,7 +5,12 @@
 //!
 //! Archives must be initialized before use, which creates the directory.
 //!
-//! Archives can contain a tree of bands, which themselves contain file versions.
+//! Archives contain:
+//!
+//! * one blockdir holding file content addressed by hash
+//!
+//! * any number of bands, holding tree indexs to describe which files
+//!   are present in a version.
 
 use std::cmp::max;
 use std::collections::BTreeSet;
@@ -14,6 +19,7 @@ use std::path::{Path, PathBuf};
 
 use super::io::{file_exists, require_empty_directory};
 use super::jsonio;
+use super::misc::remove_item;
 use super::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -148,8 +154,53 @@ impl Archive {
     }
 
     pub fn validate(&self) -> Result<()> {
-        // TODO: Validate archive top-level structure, and the indexes
-        self.block_dir.validate(self.report())
+        // Check there's no extra top-level contents.
+        self.validate_archive_dir()?;
+        self.report.print("Check blockdir...");
+        self.block_dir.validate(self.report())?;
+
+        // TODO: Don't say "OK" if there were non-fatal problems.
+        self.report.print("Archive is OK.");
+        Ok(())
+    }
+
+    fn validate_archive_dir(&self) -> Result<()> {
+        self.report.print("Check archive top-level directory...");
+        let (mut files, mut dirs) = list_dir(self.path())?;
+
+        remove_item(&mut files, &HEADER_FILENAME);
+        if !files.is_empty() {
+            self.report.problem(&format!(
+                "Unexpected files in archive directory {:?}: {:?}",
+                self.path(),
+                files
+            ));
+        }
+
+        remove_item(&mut dirs, &BLOCK_DIR);
+        dirs.sort();
+        let mut bs = BTreeSet::<BandId>::new();
+        for d in dirs.iter() {
+            if let Ok(b) = BandId::from_string(&d) {
+                if bs.contains(&b) {
+                    self.report.problem(&format!(
+                        "Duplicated band directory in {:?}: {:?}",
+                        self.path(),
+                        d
+                    ));
+                } else {
+                    bs.insert(b);
+                }
+            } else {
+                self.report.problem(&format!(
+                    "Unexpected directory in {:?}: {:?}",
+                    self.path(),
+                    d
+                ));
+            }
+        }
+
+        Ok(())
     }
 }
 

@@ -238,7 +238,7 @@ fn blackbox_backup() {
         .assert()
         .success()
         .stderr(is_empty())
-        .stdout(starts_with("Archive is OK.\n"));
+        .stdout(contains("Archive is OK.\n"));
 
     // TODO: Compare vs source tree.
 }
