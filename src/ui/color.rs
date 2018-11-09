@@ -115,7 +115,8 @@ impl UI for ColorUI {
                     pb_text,
                     "{:>3}% ",
                     100 * counts.done_work / counts.total_work
-                );
+                )
+                .unwrap();
             };
 
             pb_text.push_str(&duration_to_hms(elapsed));
@@ -124,13 +125,15 @@ impl UI for ColorUI {
                 pb_text,
                 "{:>8} MB ",
                 (counts.done_work / MB).separate_with_commas(),
-            );
+            )
+            .unwrap();
             if comp_bytes > 0 {
                 write!(
                     pb_text,
                     "=> {:<8} ",
                     (block_sizes.compressed / MB).separate_with_commas(),
-                );
+                )
+                .unwrap();
             }
             write!(
                 pb_text,
@@ -138,7 +141,8 @@ impl UI for ColorUI {
                 (rate as u64).separate_with_commas(),
                 counts.phase,
                 counts.get_latest_filename()
-            );
+            )
+            .unwrap();
         };
         // TODO: If it's less than w bytes or characters, which will be a common
         // ascii case, we don't need to break graphemes.
