@@ -11,6 +11,7 @@
 use std::io::prelude::*;
 
 use blake2_rfc::blake2b::Blake2b;
+use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use rustc_serialize::hex::ToHex;
 
@@ -85,16 +86,18 @@ impl StoredTree {
     pub fn validate(&self) -> Result<()> {
         let report = self.report();
         report.set_phase(format!("Check tree {}", self.band().id()));
-        // Collects into a vector so that we can parallelize over it (which
-        // might not be necessary?)
-        let ev = self
-            .iter_entries(self.report())?
+        self.iter_entries(self.report())?
             .map(|e| e.unwrap())
             .filter(|e| e.kind() == Kind::File)
-            .collect::<Vec<_>>();
-        ev.par_iter()
-            .try_fold_with((), |_a, e| self.validate_one_entry(e))
-            .try_reduce(|| (), |_a, _b| Ok(()))
+            .par_bridge()
+            .map(|e| self.validate_one_entry(&e))
+            .inspect(|e| {
+                if let Err(e) = e {
+                    report.problem(&e.to_string());
+                }
+            })
+            .find_any(Result::is_err)
+            .unwrap_or(Ok(()))
     }
 
     fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {
