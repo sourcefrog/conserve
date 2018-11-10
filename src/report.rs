@@ -28,7 +28,7 @@ use super::*;
 
 const M: u64 = 1_000_000;
 
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::rustfmt_skip]
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "dir",
     "file",
@@ -205,8 +205,8 @@ impl Report {
     }
 
     /// Briefly describe the phase of work.
-    pub fn set_phase<S: ToString>(&self, phase: S) {
-        self.mut_counts().phase = phase.to_string();
+    pub fn set_phase<S: Into<String>>(&self, phase: S) {
+        self.mut_counts().phase = phase.into();
     }
 
     pub fn clear_phase(&self) {
@@ -433,7 +433,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[rustfmt::rustfmt_skip]
     #[test]
     pub fn display() {
         let r1 = Report::new();

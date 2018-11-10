@@ -8,8 +8,6 @@
 
 use std::fmt;
 use std::fmt::Write;
-#[allow(unused)]
-use std::io::prelude::*;
 use std::time::Instant;
 
 use term;

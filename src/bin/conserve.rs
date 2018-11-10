@@ -278,16 +278,9 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
 fn show_chained_errors(report: &Report, e: &Error) {
     report.problem(&format!("{}", e));
     let mut ce = e;
-    loop {
-        match ce.source() {
-            Some(c) => {
-                report.problem(&format!("  caused by: {}", c));
-                ce = c;
-            }
-            None => {
-                break;
-            }
-        }
+    while let Some(c) = ce.source() {
+        report.problem(&format!("  caused by: {}", c));
+        ce = c;
     }
 }
 

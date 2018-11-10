@@ -94,7 +94,7 @@ impl StoredTree {
             .collect::<Vec<_>>();
         ev.par_iter()
             .try_fold_with((), |_a, e| self.validate_one_entry(e))
-            .try_reduce(|| (), |_a, b| Ok(b))
+            .try_reduce(|| (), |_a, _b| Ok(()))
     }
 
     fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {

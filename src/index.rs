@@ -197,7 +197,7 @@ impl ReadIndex {
     }
 
     pub fn estimate_entry_count(&self) -> Result<u64> {
-        Ok((self.count_hunks()? as u64) * (MAX_ENTRIES_PER_HUNK as u64))
+        Ok(u64::from(self.count_hunks()?) * (MAX_ENTRIES_PER_HUNK as u64))
     }
 
     /// Make an iterator that will return all entries in this band.

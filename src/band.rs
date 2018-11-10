@@ -206,7 +206,7 @@ impl Band {
                     self.path(), files));
         }
 
-        if dirs != &[INDEX_DIR.to_string()] {
+        if dirs != [INDEX_DIR.to_string()] {
             report.problem(&format!(
                     "Incongruous directories in {:?}: {:?}",
                     self.path(), dirs));
