@@ -219,7 +219,6 @@ impl BlockDir {
     ///
     /// To read a whole file, use StoredFile instead.
     pub fn get(&self, addr: &Address, report: &Report) -> Result<Vec<u8>> {
-        // TODO: Return a Read rather than a Vec?
         if addr.start != 0 {
             unimplemented!();
         }

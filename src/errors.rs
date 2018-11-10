@@ -31,7 +31,7 @@ pub enum Error {
     BadGlob(globset::Error),
     IndexCorrupt(PathBuf),
     FileCorrupt {
-        band_id: BandId,
+        // band_id: BandId,
         apath: Apath,
         expected_hex: String,
         actual_hex: String,

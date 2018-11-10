@@ -8,14 +8,9 @@
 //! across incremental backups, hiding from the caller that data may be distributed across
 //! multiple index files, bands, and blocks.
 
-use std::io::prelude::*;
-
-use blake2_rfc::blake2b::Blake2b;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
-use rustc_serialize::hex::ToHex;
 
-use crate::blockdir::{BLAKE_HASH_SIZE_BYTES, MAX_BLOCK_SIZE};
 use crate::index::IndexEntry;
 use crate::stored_file::StoredFile;
 use crate::*;
@@ -102,29 +97,18 @@ impl StoredTree {
 
     fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {
         self.report().start_entry(e);
-        let mut in_buf = vec![0; MAX_BLOCK_SIZE];
-        let mut fc = self.file_contents(&e)?;
-        let mut file_hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
-        loop {
-            let read_bytes = fc.read(&mut in_buf)?;
-            if read_bytes == 0 {
-                break;
-            }
-            file_hasher.update(&in_buf[0..read_bytes]);
-        }
-        let actual_hex = file_hasher.finalize().as_bytes().to_hex();
-        let expected_hex = e.blake2b.as_ref().unwrap();
-        self.report().increment_work(e.size().unwrap_or(0));
-        if actual_hex != *expected_hex {
-            Err(Error::FileCorrupt {
-                band_id: self.band.id(),
-                apath: e.apath(),
-                expected_hex: expected_hex.clone(),
-                actual_hex,
-            })
-        } else {
-            Ok(())
-        }
+        self.open_stored_file(&e)?
+            .validate(&e.apath.clone().into(), e.blake2b.as_ref().unwrap())
+    }
+
+
+    /// Open a file stored within this tree.
+    fn open_stored_file(&self, entry: &IndexEntry) -> Result<StoredFile> {
+        Ok(StoredFile::open(
+            self.archive.block_dir().clone(),
+            entry.addrs.clone(),
+            self.report(),
+        ))
     }
 
     // TODO: Perhaps add a way to open a file by name, bearing in mind this might be slow to
@@ -142,11 +126,7 @@ impl ReadTree for StoredTree {
     }
 
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
-        Ok(StoredFile::open(
-            self.archive.block_dir().clone(),
-            entry.addrs.clone(),
-            self.report(),
-        ))
+        self.open_stored_file(entry)
     }
 
     fn estimate_count(&self) -> Result<u64> {
