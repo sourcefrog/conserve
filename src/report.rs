@@ -28,7 +28,7 @@ use super::*;
 
 const M: u64 = 1_000_000;
 
-#[rustfmt::rustfmt_skip]
+#[rustfmt::skip]
 static KNOWN_COUNTERS: &'static [&'static str] = &[
     "dir",
     "file",
@@ -433,7 +433,7 @@ mod tests {
         );
     }
 
-    #[rustfmt::rustfmt_skip]
+    #[rustfmt::skip]
     #[test]
     pub fn display() {
         let r1 = Report::new();
