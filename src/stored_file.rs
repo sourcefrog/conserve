@@ -20,31 +20,16 @@ pub struct StoredFile {
     /// All addresses for this file.
     addrs: Vec<blockdir::Address>,
 
-    /// Block addresses remaining to be read.
-    remaining_addrs: std::vec::IntoIter<blockdir::Address>,
-
-    // TODO: buf, buf_cursor, remaining_addrs all really belong in some kind of `Read` adapter, not
-    // the StoredFile itself.
-    /// Already-read but not yet returned data.
-    buf: Vec<u8>,
-
-    /// How far through buf has been returned?
-    buf_cursor: usize,
-
     report: Report,
 }
 
 impl StoredFile {
     /// Open a stored file.
     pub fn open(block_dir: BlockDir, addrs: Vec<blockdir::Address>, report: &Report) -> StoredFile {
-        let remaining_addrs = addrs.clone().into_iter();
         StoredFile {
             block_dir,
             addrs,
-            remaining_addrs,
             report: report.clone(),
-            buf: Vec::<u8>::new(),
-            buf_cursor: 0,
         }
     }
 
@@ -75,9 +60,38 @@ impl StoredFile {
             Ok(())
         }
     }
+
+    /// Open a cursor on this file that implements `std::io::Read`.
+    pub(crate) fn as_read(self) -> ReadStoredFile {
+        ReadStoredFile {
+            remaining_addrs: self.addrs.clone().into_iter(),
+            buf: Vec::<u8>::new(),
+            buf_cursor: 0,
+            block_dir: self.block_dir.clone(),
+            report: self.report.clone(),
+        }
+    }
 }
 
-impl std::io::Read for StoredFile {
+/// Adapt a StoredFile to `std::io::Read`, which requires keeping a cursor position.
+#[derive(Debug)]
+pub struct ReadStoredFile {
+    /// Block addresses remaining to be read.
+    remaining_addrs: std::vec::IntoIter<blockdir::Address>,
+
+    // TODO: buf, buf_cursor, remaining_addrs all really belong in some kind of `Read` adapter, not
+    // the StoredFile itself.
+    /// Already-read but not yet returned data.
+    buf: Vec<u8>,
+
+    /// How far through buf has been returned?
+    buf_cursor: usize,
+
+    block_dir: BlockDir,
+    report: Report,
+}
+
+impl std::io::Read for ReadStoredFile {
     fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
         // TODO: Readahead n_cpus blocks into memory, using futures-cpupool or similar.
         loop {

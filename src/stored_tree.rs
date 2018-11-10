@@ -12,7 +12,7 @@ use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 
 use crate::index::IndexEntry;
-use crate::stored_file::StoredFile;
+use crate::stored_file::{ReadStoredFile, StoredFile};
 use crate::*;
 
 /// Read index and file contents for a version stored in the archive.
@@ -117,7 +117,7 @@ impl StoredTree {
 impl ReadTree for StoredTree {
     type E = index::IndexEntry;
     type I = index::Iter;
-    type R = StoredFile;
+    type R = ReadStoredFile;
 
     /// Return an iter of index entries in this stored tree.
     fn iter_entries(&self, report: &Report) -> Result<index::Iter> {
@@ -125,7 +125,7 @@ impl ReadTree for StoredTree {
     }
 
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
-        self.open_stored_file(entry)
+        Ok(self.open_stored_file(entry)?.as_read())
     }
 
     fn estimate_count(&self) -> Result<u64> {
