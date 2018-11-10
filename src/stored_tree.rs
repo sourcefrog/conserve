@@ -24,27 +24,17 @@ pub struct StoredTree {
     archive: Archive,
     band: Band,
     excludes: GlobSet,
-    index: ReadIndex,
 }
 
 impl StoredTree {
-    fn new(archive: &Archive, band: Band, excludes: GlobSet) -> StoredTree {
-        let index = band.index();
-        StoredTree {
-            archive: archive.clone(),
-            band,
-            excludes,
-            index,
-        }
-    }
-
     /// Open the last complete version in the archive.
     pub fn open_last(archive: &Archive) -> Result<StoredTree> {
-        Ok(StoredTree::new(
-            archive,
-            archive.last_complete_band()?,
-            excludes::excludes_nothing(),
-        ))
+        let band = archive.last_complete_band()?;
+        Ok(StoredTree {
+            archive: archive.clone(),
+            band,
+            excludes: excludes::excludes_nothing(),
+        })
     }
 
     /// Open a specified version.
@@ -55,7 +45,11 @@ impl StoredTree {
         if !band.is_closed()? {
             return Err(Error::BandIncomplete(band_id.clone()));
         }
-        Ok(StoredTree::new(archive, band, excludes::excludes_nothing()))
+        Ok(StoredTree {
+            archive: archive.clone(),
+            band,
+            excludes: excludes::excludes_nothing(),
+        })
     }
 
     /// Open a specified version.
@@ -64,7 +58,11 @@ impl StoredTree {
     /// of the source tree, or maybe nothing at all.
     pub fn open_incomplete_version(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
         let band = Band::open(archive, band_id)?;
-        Ok(StoredTree::new(archive, band, excludes::excludes_nothing()))
+        Ok(StoredTree {
+            archive: archive.clone(),
+            band,
+            excludes: excludes::excludes_nothing(),
+        })
     }
 
     pub fn with_excludes(self, excludes: GlobSet) -> StoredTree {
@@ -138,7 +136,7 @@ impl ReadTree for StoredTree {
     }
 
     fn estimate_count(&self) -> Result<u64> {
-        self.index.estimate_entry_count()
+        self.band.index().estimate_entry_count()
     }
 }
 
