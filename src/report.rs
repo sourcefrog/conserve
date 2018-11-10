@@ -439,15 +439,23 @@ mod tests {
         let r1 = Report::new();
         r1.increment("block.write", 10);
         r1.increment("block.write", 5);
-        r1.increment_size("block",
-            Sizes { uncompressed: 300, compressed: 100 });
+        r1.increment_size(
+            "block",
+            Sizes {
+                uncompressed: 300,
+                compressed: 100,
+            },
+        );
 
         let formatted = format!("{}", r1);
-        assert_eq!(formatted, "\
+        assert_eq!(
+            formatted,
+            "\
 Counts:
   block.write                                     15
 Bytes (before and after compression):
   block                                          300       100       3.0x
-");
+"
+        );
     }
 }

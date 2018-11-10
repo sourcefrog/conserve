@@ -22,8 +22,6 @@ pub trait ReadTree: HasReport {
     /// takes a while.
     fn size(&self) -> Result<TreeSize> {
         let report = self.report();
-        report.set_phase("Measuring");
-        report.set_total_work(0);
         let mut tot = 0u64;
         for e in self.iter_entries(self.report())? {
             if let Some(s) = e?.size() {
@@ -31,7 +29,6 @@ pub trait ReadTree: HasReport {
                 report.increment_work(s);
             }
         }
-        report.clear_phase();
         Ok(TreeSize { file_bytes: tot })
     }
 }

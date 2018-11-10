@@ -328,6 +328,7 @@ fn source_ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn source_size(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source = live_tree_from_options(subm, report)?;
+    report.set_phase("Measuring");
     report.print(&format!("{}", source.size()?.file_bytes).separate_with_commas());
     Ok(())
 }
@@ -378,6 +379,7 @@ fn debug_block_referenced(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn tree_size(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = stored_tree_from_options(subm, report)?;
+    report.set_phase("Measuring");
     report.print(&format!("{}", st.size()?.file_bytes).separate_with_commas());
     Ok(())
 }

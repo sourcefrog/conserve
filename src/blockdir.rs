@@ -19,10 +19,10 @@ use std::path::{Path, PathBuf};
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use rustc_serialize::hex::ToHex;
-
 use rayon::prelude::*;
+use rustc_serialize::hex::ToHex;
 use tempfile;
+use thousands::Separable;
 
 use super::*;
 
@@ -293,6 +293,10 @@ impl BlockDir {
             .try_fold(0u64, |t, b| Ok(t + b.compressed_size()?) as Result<u64>)?;
         report.set_total_work(tot);
 
+        report.print(&format!(
+            "Check {} MB in blocks...",
+            (tot / 1_000_000).separate_with_commas()
+        ));
         report.set_phase("Check block hashes");
         bs.par_iter()
             .map(|b| {

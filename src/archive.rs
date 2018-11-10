@@ -17,6 +17,8 @@ use std::collections::BTreeSet;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 
+use thousands::Separable;
+
 use super::io::{file_exists, require_empty_directory};
 use super::jsonio;
 use super::misc::remove_item;
@@ -205,14 +207,22 @@ impl Archive {
     }
 
     fn validate_bands(&self) -> Result<()> {
-        self.report.print("Check stored trees...");
+        self.report.print("Measure stored trees...");
         self.report.set_phase("Measure stored trees");
+        self.report.set_total_work(0);
         let mut total_size: u64 = 0;
         for bid in self.list_bands()?.iter() {
-            total_size += StoredTree::open_incomplete_version(self, bid)?
+            let b = StoredTree::open_incomplete_version(self, bid)?
                 .size()?
                 .file_bytes;
+            total_size += b;
+            self.report.increment_work(b);
         }
+
+        self.report.print(&format!(
+            "Check {} MB in stored files...",
+            (total_size / 1_000_000).separate_with_commas()
+        ));
         self.report.set_total_work(total_size);
         for bid in self.list_bands()?.iter() {
             let b = Band::open(self, bid)?;

@@ -50,7 +50,6 @@ impl StoredFile {
 
     /// Return a iterator of chunks of the file, as they're stored.
     pub fn content_chunks(&self) -> impl Iterator<Item = Result<Vec<u8>>> + '_ {
-        // self.addrs
         let block_dir = self.block_dir.clone();
         let report = self.report.clone();
         self.addrs.iter().map(move |a| block_dir.get(&a, &report))
