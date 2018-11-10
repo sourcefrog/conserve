@@ -63,28 +63,12 @@ pub struct Sizes {
 
 static KNOWN_SIZES: &'static [&'static str] = &["block", "file.bytes", "index"];
 
-#[cfg_attr(rustfmt, rustfmt_skip)]
-static KNOWN_DURATIONS: &'static [&'static str] = &[
-    "block.compress",
-    "block.hash",
-    "block.write",
-    "file.hash",
-    "index.compress",
-    "index.encode",
-    "index.parse",
-    "index.read",
-    "source.read",
-    "sync",
-    "test",
-];
-
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
 #[derive(Debug)]
 pub struct Counts {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, Sizes>,
-    durations: BTreeMap<&'static str, Duration>,
     start: Instant,
 
     /// Most recently started filename.
@@ -192,14 +176,6 @@ impl Report {
         *e += sizes;
     }
 
-    pub fn increment_duration(&self, name: &str, duration: Duration) {
-        *self
-            .mut_counts()
-            .durations
-            .get_mut(name)
-            .expect("undefined duration counter") += duration;
-    }
-
     /// Merge the contents of `from_report` into `self`.
     pub fn merge_from(&self, from_report: &Report) {
         let from_counts = from_report.mut_counts();
@@ -209,19 +185,6 @@ impl Report {
         for (name, s) in &from_counts.sizes {
             self.increment_size(name, s.clone());
         }
-        for (name, duration) in &from_counts.durations {
-            self.increment_duration(name, *duration);
-        }
-    }
-
-    pub fn measure_duration<T, F>(&self, duration_name: &str, closure: F) -> T
-    where
-        F: FnOnce() -> T,
-    {
-        let start = Instant::now();
-        let result = closure();
-        self.increment_duration(duration_name, start.elapsed());
-        result
     }
 
     pub fn get_size(&self, counter_name: &str) -> Sizes {
@@ -230,10 +193,6 @@ impl Report {
 
     pub fn get_count(&self, counter_name: &str) -> u64 {
         self.borrow_counts().get_count(counter_name)
-    }
-
-    pub fn get_duration(&self, name: &str) -> Duration {
-        self.borrow_counts().get_duration(name)
     }
 
     /// Report that processing started for a given entry.
@@ -308,14 +267,6 @@ impl Display for Report {
                 )?;
             }
         }
-        writeln!(f, "Durations (seconds):")?;
-        for (key, &dur) in &counts.durations {
-            let millis = dur.subsec_millis();
-            let secs = dur.as_secs();
-            if millis > 0 || secs > 0 {
-                writeln!(f, "  {:<40} {:>5}.{:>03}", key, secs, millis)?;
-            }
-        }
         Ok(())
     }
 }
@@ -330,27 +281,15 @@ impl Counts {
         for counter_name in KNOWN_SIZES {
             sizes.insert(*counter_name, Sizes::default());
         }
-        let mut durations: BTreeMap<&'static str, Duration> = BTreeMap::new();
-        for name in KNOWN_DURATIONS {
-            durations.insert(name, Duration::new(0, 0));
-        }
         Counts {
             count,
             sizes,
-            durations,
             start: Instant::now(),
             latest_filename: String::new(),
             phase: String::new(),
             total_work: 0,
             done_work: 0,
         }
-    }
-
-    pub fn get_duration(&self, name: &str) -> Duration {
-        *self
-            .durations
-            .get(name)
-            .unwrap_or_else(|| panic!("unknown duration {:?}", name))
     }
 
     /// Return the value of a counter.  A counter that has not yet been updated is 0.
@@ -455,7 +394,6 @@ impl Counts {
 #[cfg(test)]
 mod tests {
     use super::{Report, Sizes};
-    use std::time::Duration;
 
     #[test]
     pub fn count() {
@@ -482,7 +420,6 @@ mod tests {
                 compressed: 100,
             },
         );
-        r2.increment_duration("test", Duration::new(5, 0));
         r1.merge_from(&r2);
         let cs = r1.borrow_counts();
         assert_eq!(cs.get_count("block.write"), 2);
@@ -494,7 +431,6 @@ mod tests {
                 compressed: 100,
             }
         );
-        assert_eq!(cs.get_duration("test"), Duration::new(5, 0));
     }
 
     #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -505,7 +441,6 @@ mod tests {
         r1.increment("block.write", 5);
         r1.increment_size("block",
             Sizes { uncompressed: 300, compressed: 100 });
-        r1.increment_duration("test", Duration::new(42, 479760000));
 
         let formatted = format!("{}", r1);
         assert_eq!(formatted, "\
@@ -513,8 +448,6 @@ Counts:
   block.write                                     15
 Bytes (before and after compression):
   block                                          300       100       3.0x
-Durations (seconds):
-  test                                        42.479
 ");
     }
 }

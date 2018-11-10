@@ -117,8 +117,7 @@ impl BlockDir {
             };
             // TODO: Possibly read repeatedly in case we get a short read and have room for more,
             // so that short reads don't lead to short blocks being stored.
-            let read_len =
-                report.measure_duration("source.read", || from_file.read(&mut in_buf))?;
+            let read_len = from_file.read(&mut in_buf)?;
             if read_len == 0 {
                 break;
             }
@@ -126,14 +125,14 @@ impl BlockDir {
 
             let block_hash: String;
             if addresses.is_empty() {
-                report.measure_duration("file.hash", || file_hasher.update(&in_buf));
+                file_hasher.update(&in_buf);
                 block_hash = file_hasher.clone().finalize().as_bytes().to_hex()
             } else {
                 // Not the first block, must update file and block hash separately, but we can do
                 // them in parallel.
                 block_hash = rayon::join(
-                    || report.measure_duration("file.hash", || file_hasher.update(&in_buf)),
-                    || report.measure_duration("block.hash", || hash_bytes(&in_buf).unwrap()),
+                    || file_hasher.update(&in_buf),
+                    || hash_bytes(&in_buf).unwrap(),
                 )
                 .1;
             }
@@ -175,11 +174,8 @@ impl BlockDir {
             .prefix(TMP_PREFIX)
             .tempfile_in(&d)?;
         let mut bufw = io::BufWriter::new(tempf);
-        report.measure_duration("block.compress", || {
-            Snappy::compress_and_write(&in_buf, &mut bufw)
-        })?;
+        Snappy::compress_and_write(&in_buf, &mut bufw)?;
         let tempf = bufw.into_inner().unwrap();
-        // report.measure_duration("sync", || tempf.sync_all())?;
 
         // TODO: Count bytes rather than stat-ing.
         let comp_len = tempf.as_file().metadata()?.len();

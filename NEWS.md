@@ -7,6 +7,10 @@
 * Progress percentage is now measured as a fraction of the total tree
   to be copied, which is a more linear measurement.
 
+* Removed internal timing of operations, shown in `--stats`. Now that
+  Conserve is increasingly aggressively multithreaded, these times aren't
+  very meaningful, and the implementation causes some lock contention.
+
 ## Conserve 0.5.0 2018-11-01
 
 * Conserve 0.5 uses a new format, and can't read 0.4 repositories. The new

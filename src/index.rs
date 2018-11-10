@@ -8,7 +8,6 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str;
-use std::time::Instant;
 use std::vec;
 
 use rustc_serialize::json;
@@ -71,7 +70,7 @@ impl entry::Entry for IndexEntry {
             _ => None,
         }
     }
-    
+
     fn blake2b(&self) -> Option<String> {
         self.blake2b.clone()
     }
@@ -134,15 +133,11 @@ impl IndexBuilder {
         ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))?;
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
 
-        let json_string = report
-            .measure_duration("index.encode", || json::encode(&self.entries))
-            .unwrap();
+        let json_string = json::encode(&self.entries).unwrap();
         let uncompressed_len = json_string.len() as u64;
 
         let mut af = AtomicFile::new(hunk_path)?;
-        let compressed_len = report.measure_duration("index.compress", || {
-            Snappy::compress_and_write(json_string.as_bytes(), &mut af)
-        })?;
+        let compressed_len = Snappy::compress_and_write(json_string.as_bytes(), &mut af)?;
 
         // TODO: Don't seek, just count bytes as they're compressed.
         // TODO: Measure time to compress separately from time to write.
@@ -268,7 +263,6 @@ impl Iter {
     /// Returns true if another hunk could be found, otherwise false.
     /// (It's possible though unlikely the hunks can be empty.)
     fn refill_entry_buffer(&mut self) -> Result<bool> {
-        let start_read = Instant::now();
         // Load the next index hunk into buffered_entries.
         let hunk_path = path_for_hunk(&self.dir, self.next_hunk_number);
         let mut f = match fs::File::open(&hunk_path) {
@@ -282,8 +276,6 @@ impl Iter {
             }
         };
         let (comp_len, index_bytes) = Snappy::decompress_read(&mut f)?;
-        self.report
-            .increment_duration("index.read", start_read.elapsed());
         self.report.increment_size(
             "index",
             Sizes {
@@ -293,7 +285,6 @@ impl Iter {
         );
         self.report.increment("index.hunk", 1);
 
-        let start_parse = Instant::now();
         let index_json = str::from_utf8(&index_bytes)
             .or_else(|_| Err(Error::IndexCorrupt(hunk_path.clone())))?;
         let entries: Vec<IndexEntry> =
@@ -302,8 +293,6 @@ impl Iter {
             self.report
                 .problem(&format!("Index hunk {} is empty", hunk_path.display()));
         }
-        self.report
-            .increment_duration("index.parse", start_parse.elapsed());
 
         self.buffered_entries = entries
             .into_iter()
