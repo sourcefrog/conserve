@@ -112,7 +112,8 @@ fn check_restore(af: &ScratchArchive) {
     let index_sizes = restore_report.get_size("index");
     // Doubled because we currently read the index twice.
     assert_eq!(
-        index_sizes.uncompressed, 462 * 2,
+        index_sizes.uncompressed,
+        462 * 2,
         "index_sizes.uncompressed on restore"
     );
     assert!(index_sizes.compressed <= 292 * 2, index_sizes.compressed);

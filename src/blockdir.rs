@@ -275,7 +275,11 @@ impl BlockDir {
     }
 
     pub fn blocks(&self, report: &Report) -> Result<Vec<Block>> {
-        Ok(self.block_names(report)?.iter().map(|b| self.get_block(b)).collect::<Vec<Block>>())
+        Ok(self
+            .block_names(report)?
+            .iter()
+            .map(|b| self.get_block(b))
+            .collect::<Vec<Block>>())
     }
 
     /// Check format invariants of the BlockDir; report any problems to the Report.
@@ -284,9 +288,9 @@ impl BlockDir {
         // directories of the right length.
         report.set_phase("Count blocks");
         let bs = self.blocks(report)?;
-        let tot = bs.iter().try_fold(
-            0u64,
-            |t, b| Ok(t + b.compressed_size()?) as Result<u64> )?;
+        let tot = bs
+            .iter()
+            .try_fold(0u64, |t, b| Ok(t + b.compressed_size()?) as Result<u64>)?;
         report.set_total_work(tot);
 
         report.set_phase("Check block hashes");

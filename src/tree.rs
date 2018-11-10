@@ -32,9 +32,7 @@ pub trait ReadTree: HasReport {
             }
         }
         report.clear_phase();
-        Ok(TreeSize {
-            file_bytes: tot,
-        })
+        Ok(TreeSize { file_bytes: tot })
     }
 }
 

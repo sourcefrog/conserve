@@ -195,21 +195,24 @@ impl Band {
     fn validate_band_dir(&self, report: &Report) -> Result<()> {
         let (mut files, dirs) = list_dir(self.path())?;
         if !files.contains(&HEAD_FILENAME.to_string()) {
-            report.problem(&format!(
-                    "No band head file in {:?}", self.path()));
+            report.problem(&format!("No band head file in {:?}", self.path()));
         }
         remove_item(&mut files, &HEAD_FILENAME);
         remove_item(&mut files, &TAIL_FILENAME);
         if !files.is_empty() {
             report.problem(&format!(
-                    "Unexpected files in {:?}: {:?}",
-                    self.path(), files));
+                "Unexpected files in {:?}: {:?}",
+                self.path(),
+                files
+            ));
         }
 
         if dirs != [INDEX_DIR.to_string()] {
             report.problem(&format!(
-                    "Incongruous directories in {:?}: {:?}",
-                    self.path(), dirs));
+                "Incongruous directories in {:?}: {:?}",
+                self.path(),
+                dirs
+            ));
         }
 
         Ok(())

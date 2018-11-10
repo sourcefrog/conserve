@@ -101,7 +101,6 @@ impl StoredTree {
             .validate(&e.apath.clone().into(), e.blake2b.as_ref().unwrap())
     }
 
-
     /// Open a file stored within this tree.
     fn open_stored_file(&self, entry: &IndexEntry) -> Result<StoredFile> {
         Ok(StoredFile::open(
