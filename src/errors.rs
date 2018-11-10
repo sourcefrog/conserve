@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 use rustc_serialize;
 
-use super::*;
+use crate::*;
 
 /// Conserve specific error.
 #[derive(Debug)]
@@ -30,6 +30,12 @@ pub enum Error {
     JsonDecode(rustc_serialize::json::DecoderError),
     BadGlob(globset::Error),
     IndexCorrupt(PathBuf),
+    FileCorrupt {
+        band_id: BandId,
+        apath: Apath,
+        expected_hex: String,
+        actual_hex: String,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

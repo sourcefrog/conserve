@@ -14,9 +14,10 @@ use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
 use rustc_serialize::hex::ToHex;
 
-use super::blockdir::{BLAKE_HASH_SIZE_BYTES, MAX_BLOCK_SIZE};
-use super::stored_file::StoredFile;
-use super::*;
+use crate::blockdir::{BLAKE_HASH_SIZE_BYTES, MAX_BLOCK_SIZE};
+use crate::index::IndexEntry;
+use crate::stored_file::StoredFile;
+use crate::*;
 
 /// Read index and file contents for a version stored in the archive.
 #[derive(Debug)]
@@ -84,33 +85,43 @@ impl StoredTree {
     pub fn validate(&self) -> Result<()> {
         let report = self.report();
         report.set_phase(format!("Check tree {}", self.band().id()));
-        // TODO: Maybe parallel over chunks; don't read the whole index into
-        // memory?
-        // TODO: Remove unwraps.
+        // Collects into a vector so that we can parallelize over it (which
+        // might not be necessary?)
         let ev = self
             .iter_entries(self.report())?
             .map(|e| e.unwrap())
             .filter(|e| e.kind() == Kind::File)
             .collect::<Vec<_>>();
         ev.par_iter()
-            .map(|e| {
-                report.start_entry(e);
-                let mut in_buf = vec![0; MAX_BLOCK_SIZE];
-                let mut fc = self.file_contents(&e).unwrap();
-                let mut file_hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
-                loop {
-                    let read_bytes = fc.read(&mut in_buf).unwrap();
-                    if read_bytes == 0 {
-                        break;
-                    }
-                    file_hasher.update(&in_buf[0..read_bytes]);
-                }
-                let file_hash = file_hasher.finalize().as_bytes().to_hex();
-                assert_eq!(file_hash, e.blake2b().unwrap());
-                report.increment_work(e.size().unwrap_or(0));
+            .try_fold_with((), |_a, e| self.validate_one_entry(e))
+            .try_reduce(|| (), |_a, b| Ok(b))
+    }
+
+    fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {
+        self.report().start_entry(e);
+        let mut in_buf = vec![0; MAX_BLOCK_SIZE];
+        let mut fc = self.file_contents(&e)?;
+        let mut file_hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
+        loop {
+            let read_bytes = fc.read(&mut in_buf)?;
+            if read_bytes == 0 {
+                break;
+            }
+            file_hasher.update(&in_buf[0..read_bytes]);
+        }
+        let actual_hex = file_hasher.finalize().as_bytes().to_hex();
+        let expected_hex = e.blake2b.as_ref().unwrap();
+        self.report().increment_work(e.size().unwrap_or(0));
+        if actual_hex != *expected_hex {
+            Err(Error::FileCorrupt {
+                band_id: self.band.id(),
+                apath: e.apath(),
+                expected_hex: expected_hex.clone(),
+                actual_hex,
             })
-            .count();
-        Ok(())
+        } else {
+            Ok(())
+        }
     }
 
     // TODO: Perhaps add a way to open a file by name, bearing in mind this might be slow to
@@ -120,7 +131,7 @@ impl StoredTree {
 impl ReadTree for StoredTree {
     type E = index::IndexEntry;
     type I = index::Iter;
-    type R = stored_file::StoredFile;
+    type R = StoredFile;
 
     /// Return an iter of index entries in this stored tree.
     fn iter_entries(&self, report: &Report) -> Result<index::Iter> {
