@@ -86,7 +86,7 @@ pub fn compression_ratio(s: &Sizes) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::UI;
-    use report::Sizes;
+    use crate::report::Sizes;
 
     // TODO: Somehow test the type returned by `by_name`?
     #[test]

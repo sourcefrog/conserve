@@ -82,7 +82,7 @@ impl tree::ReadTree for LiveTree {
     }
 
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
-        use entry::Entry;
+        use crate::entry::Entry;
         assert_eq!(entry.kind(), Kind::File);
         let mut path = self.path.clone();
         path.push(&entry.apath[1..]);
@@ -304,7 +304,7 @@ impl Iterator for Iter {
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use test_fixtures::TreeFixture;
+    use crate::test_fixtures::TreeFixture;
 
     #[test]
     fn open_tree() {

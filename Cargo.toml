@@ -9,6 +9,8 @@ readme = "README.md"
 keywords = ["archive", "backup"]
 license = "GPL-2.0"
 
+# Once it's stable: edition = "2018"
+
 [[bin]]
 name = "conserve"
 doc = false  # Conflicts with library docs which are more useful.

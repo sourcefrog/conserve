@@ -239,8 +239,8 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use errors::Error;
-    use test_fixtures::ScratchArchive;
+    use crate::errors::Error;
+    use crate::test_fixtures::ScratchArchive;
 
     #[test]
     fn create_then_open_archive() {

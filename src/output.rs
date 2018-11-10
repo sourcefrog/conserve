@@ -12,7 +12,7 @@ use chrono::Local;
 
 /// Show something about an archive.
 pub trait ShowArchive {
-    fn show_archive(&self, &Archive) -> Result<()>;
+    fn show_archive(&self, _: &Archive) -> Result<()>;
 }
 
 #[derive(Debug, Default)]

@@ -17,8 +17,8 @@ use terminal_size::{terminal_size, Width};
 use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
-use report::Report;
-use ui::{duration_to_hms, mbps_rate, UI};
+use crate::report::Report;
+use crate::ui::{duration_to_hms, mbps_rate, UI};
 
 const MB: u64 = 1_000_000;
 const PROGRESS_RATE_LIMIT_MS: u32 = 100;

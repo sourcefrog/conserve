@@ -104,7 +104,7 @@ impl HasReport for BackupWriter {
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use test_fixtures::{ScratchArchive, TreeFixture};
+    use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     #[cfg(unix)]
     #[test]

@@ -107,7 +107,7 @@ mod tests {
     use spectral::prelude::*;
 
     use super::super::*;
-    use test_fixtures::{ScratchArchive, TreeFixture};
+    use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     #[test]
     pub fn simple_restore() {
