@@ -52,11 +52,11 @@ impl StoredFile {
     /// Open a cursor on this file that implements `std::io::Read`.
     pub(crate) fn as_read(self) -> ReadStoredFile {
         ReadStoredFile {
-            remaining_addrs: self.addrs.clone().into_iter(),
+            remaining_addrs: self.addrs.into_iter(),
             buf: Vec::<u8>::new(),
             buf_cursor: 0,
-            block_dir: self.block_dir.clone(),
-            report: self.report.clone(),
+            block_dir: self.block_dir,
+            report: self.report,
         }
     }
 }
