@@ -115,17 +115,19 @@ impl UI for ColorUI {
                     100 * counts.done_work / counts.total_work
                 )
                 .unwrap();
-            };
+            } else {
+                write!(pb_text, "---% ").unwrap();
+            }
 
             pb_text.push_str(&duration_to_hms(elapsed));
 
             write!(
                 pb_text,
-                "{:>8} MB ",
+                "{:>12} MB ",
                 (counts.done_work / MB).separate_with_commas(),
             )
             .unwrap();
-            if comp_bytes > 0 {
+            if false && comp_bytes > 0 {
                 write!(
                     pb_text,
                     "=> {:<8} ",
@@ -135,7 +137,7 @@ impl UI for ColorUI {
             }
             write!(
                 pb_text,
-                "{:6} MB/s  {} {}",
+                "{:>8} MB/s  {} {}",
                 (rate as u64).separate_with_commas(),
                 counts.phase,
                 counts.get_latest_filename()
