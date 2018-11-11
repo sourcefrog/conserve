@@ -12,6 +12,10 @@ pub trait ReadTree: HasReport {
     type R: std::io::Read;
 
     fn iter_entries(&self, report: &Report) -> Result<Self::I>;
+
+    /// Read file contents as a `std::io::Read`.
+    ///
+    /// This is softly deprecated in favor of `read_file_blocks`.
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R>;
 
     /// Estimate the number of entries in the tree.
@@ -46,6 +50,18 @@ pub trait WriteTree {
     fn write_symlink(&mut self, entry: &Entry) -> Result<()>;
     fn write_file(&mut self, entry: &Entry, content: &mut std::io::Read) -> Result<()>;
 }
+
+/// Read a file as a series of blocks of bytes.
+///
+/// When reading from the archive, the blocks are whatever size is stored.
+/// When reading from the filesystem they're MAX_BLOCK_SIZE. But the caller
+/// shouldn't assume the size.
+pub trait ReadBlocks {
+    fn num_blocks(&self) -> Result<usize>;
+
+    fn read_block(&self, i: usize) -> Result<Vec<u8>>;
+}
+
 
 /// The measured size of a tree.
 pub struct TreeSize {

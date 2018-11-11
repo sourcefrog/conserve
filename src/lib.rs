@@ -63,7 +63,7 @@ pub use crate::live_tree::LiveTree;
 pub use crate::report::{HasReport, Report, Sizes};
 pub use crate::restore::RestoreTree;
 pub use crate::stored_tree::StoredTree;
-pub use crate::tree::{copy_tree, ReadTree, TreeSize, WriteTree};
+pub use crate::tree::{copy_tree, ReadBlocks, ReadTree, TreeSize, WriteTree};
 pub use crate::ui::UI;
 
 // Commonly-used external types.

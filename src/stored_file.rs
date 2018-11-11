@@ -30,9 +30,8 @@ impl StoredFile {
 
     /// Return a iterator of chunks of the file, as they're stored.
     pub fn content_chunks(&self) -> impl Iterator<Item = Result<Vec<u8>>> + '_ {
-        let block_dir = self.block_dir.clone();
-        let report = self.report.clone();
-        self.addrs.iter().map(move |a| block_dir.get(&a, &report))
+        (0..self.num_blocks().unwrap()).map(
+            move |i| self.read_block(i))
     }
 
     /// Validate the stored file hash is as expected.
@@ -58,6 +57,16 @@ impl StoredFile {
             block_dir: self.block_dir,
             report: self.report,
         }
+    }
+}
+
+impl ReadBlocks for StoredFile {
+    fn num_blocks(&self) -> Result<usize> {
+        Ok(self.addrs.len())
+    }
+
+    fn read_block(&self, i: usize) -> Result<Vec<u8>> {
+        self.block_dir.get(&self.addrs[i], &self.report)
     }
 }
 
