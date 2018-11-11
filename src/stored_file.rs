@@ -1,7 +1,8 @@
 // Copyright 2017, 2018 Martin Pool.
 
 ///! Access a file stored in the archive.
-// use rayon::prelude::*;
+use rayon::prelude::*;
+
 use crate::*;
 
 /// Returns the contents of a file stored in the archive, as an iter of byte blocks.
@@ -28,12 +29,6 @@ impl StoredFile {
         }
     }
 
-    /// Return a iterator of chunks of the file, as they're stored.
-    pub fn content_chunks(&self) -> impl Iterator<Item = Result<Vec<u8>>> + '_ {
-        (0..self.num_blocks().unwrap()).map(
-            move |i| self.read_block(i))
-    }
-
     /// Validate the stored file hash is as expected.
     pub(crate) fn validate(&self, _apath: &Apath) -> Result<()> {
         // TODO: Perhaps the file should know its apath and hold its entry.
@@ -41,11 +36,15 @@ impl StoredFile {
         // the content can't be loaded.
         // TODO: Arguably we don't need to actually load the chunks here; it's
         // enough to remember that all the blocks were loaded before.
-        for c in self.content_chunks() {
-            let c = c?;
-            self.report.increment_work(c.len() as u64);
-        }
-        Ok(())
+        self.block_range().unwrap()
+            .into_par_iter()
+            .map(|i| {
+                let c = self.read_block(i)?;
+                self.report.increment_work(c.len() as u64);
+                Ok(())
+            })
+            .find_any(Result::is_err)
+            .unwrap_or(Ok(()))
     }
 
     /// Open a cursor on this file that implements `std::io::Read`.
