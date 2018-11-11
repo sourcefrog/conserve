@@ -83,6 +83,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
     // This causes us to walk the source tree twice, which is probably an acceptable option
     // since it's nice to see realistic overall progress. We could keep all the entries
     // in memory, and maybe we should, but it might get unreasonably big.
+    report.set_phase("Measure source tree");
     report.set_total_work(source.size()?.file_bytes);
     report.set_phase("Copying");
     for entry in source.iter_entries(&report)? {
