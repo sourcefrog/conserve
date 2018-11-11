@@ -1,6 +1,8 @@
 # Conserve release history
 
-## UNRELEASED
+## Conserve 0.5.1 2018-11-11
+
+* `conserve validate` checks the archive much more thoroughly.
 
 * New `source size` and `tree size` commands.
 
@@ -10,8 +12,6 @@
 * Removed internal timing of operations, shown in `--stats`. Now that
   Conserve is increasingly aggressively multithreaded, these times aren't
   very meaningful, and the implementation causes some lock contention.
-
-* `conserve validate` checks the archive more thoroughly.
 
 ## Conserve 0.5.0 2018-11-01
 
