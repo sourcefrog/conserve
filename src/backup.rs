@@ -52,7 +52,6 @@ impl tree::WriteTree for BackupWriter {
             mtime: source_entry.unix_mtime(),
             kind: Kind::Dir,
             addrs: vec![],
-            blake2b: None,
             target: None,
         })
     }
@@ -60,7 +59,7 @@ impl tree::WriteTree for BackupWriter {
     fn write_file(&mut self, source_entry: &Entry, content: &mut std::io::Read) -> Result<()> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
-        let (addrs, body_hash) = self.block_dir.store(content, &self.report)?;
+        let addrs = self.block_dir.store(content, &self.report)?;
         let bytes = addrs.iter().map(|a| a.len).sum();
         self.report.increment_size(
             "file.bytes",
@@ -75,7 +74,6 @@ impl tree::WriteTree for BackupWriter {
             mtime: source_entry.unix_mtime(),
             kind: Kind::File,
             addrs,
-            blake2b: Some(body_hash),
             target: None,
         })
     }
@@ -89,7 +87,6 @@ impl tree::WriteTree for BackupWriter {
             mtime: source_entry.unix_mtime(),
             kind: Kind::Symlink,
             addrs: vec![],
-            blake2b: None,
             target,
         })
     }

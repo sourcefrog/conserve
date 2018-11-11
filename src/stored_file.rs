@@ -2,11 +2,6 @@
 
 ///! Access a file stored in the archive.
 // use rayon::prelude::*;
-use blake2_rfc::blake2b::Blake2b;
-
-use rustc_serialize::hex::ToHex;
-
-use crate::blockdir::BLAKE_HASH_SIZE_BYTES;
 use crate::*;
 
 /// Returns the contents of a file stored in the archive, as an iter of byte blocks.
@@ -41,24 +36,17 @@ impl StoredFile {
     }
 
     /// Validate the stored file hash is as expected.
-    pub(crate) fn validate(&self, apath: &Apath, expected_hex: &str) -> Result<()> {
+    pub(crate) fn validate(&self, _apath: &Apath) -> Result<()> {
         // TODO: Perhaps the file should know its apath and hold its entry.
-        let mut file_hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
+        // TODO: Give a more specific message including the band and apath, if
+        // the content can't be loaded.
+        // TODO: Arguably we don't need to actually load the chunks here; it's
+        // enough to remember that all the blocks were loaded before.
         for c in self.content_chunks() {
             let c = c?;
-            file_hasher.update(&c);
             self.report.increment_work(c.len() as u64);
         }
-        let actual_hex = file_hasher.finalize().as_bytes().to_hex();
-        if actual_hex != *expected_hex {
-            Err(Error::FileCorrupt {
-                apath: apath.clone(),
-                expected_hex: expected_hex.to_string(),
-                actual_hex,
-            })
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 
     /// Open a cursor on this file that implements `std::io::Read`.

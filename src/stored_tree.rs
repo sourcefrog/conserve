@@ -97,8 +97,7 @@ impl StoredTree {
 
     fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {
         self.report().start_entry(e);
-        self.open_stored_file(&e)?
-            .validate(&e.apath.clone().into(), e.blake2b.as_ref().unwrap())
+        self.open_stored_file(&e)?.validate(&e.apath.clone().into())
     }
 
     /// Open a file stored within this tree.

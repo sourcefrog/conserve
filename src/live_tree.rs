@@ -177,10 +177,6 @@ impl entry::Entry for Entry {
             None
         }
     }
-
-    fn blake2b(&self) -> Option<String> {
-        unimplemented!()
-    }
 }
 
 impl fmt::Debug for Entry {

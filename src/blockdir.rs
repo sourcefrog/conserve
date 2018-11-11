@@ -95,20 +95,8 @@ impl BlockDir {
     /// Store the contents of a readable file into the BlockDir.
     ///
     /// Returns the addresses at which it was stored, plus the hash of the overall original file.
-    pub fn store(
-        &mut self,
-        from_file: &mut Read,
-        report: &Report,
-    ) -> Result<(Vec<Address>, BlockHash)> {
-        // loop
-        //   read up to block_size bytes
-        //   accumulate into the overall hasher
-        //   hash those bytes - as a special case if this is the first block, it's the same as
-        //     the overall hash.
-        //   if already stored: don't store again
-        //   compress and store
+    pub fn store(&mut self, from_file: &mut Read, report: &Report) -> Result<(Vec<Address>)> {
         let mut addresses = Vec::<Address>::with_capacity(1);
-        let mut file_hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
         let mut in_buf = Vec::<u8>::with_capacity(MAX_BLOCK_SIZE);
         loop {
             unsafe {
@@ -123,19 +111,7 @@ impl BlockDir {
             }
             in_buf.truncate(read_len);
 
-            let block_hash: String;
-            if addresses.is_empty() {
-                file_hasher.update(&in_buf);
-                block_hash = file_hasher.clone().finalize().as_bytes().to_hex()
-            } else {
-                // Not the first block, must update file and block hash separately, but we can do
-                // them in parallel.
-                block_hash = rayon::join(
-                    || file_hasher.update(&in_buf),
-                    || hash_bytes(&in_buf).unwrap(),
-                )
-                .1;
-            }
+            let block_hash: String = hash_bytes(&in_buf).unwrap();
 
             if self.contains(&block_hash)? {
                 report.increment("block.already_present", 1);
@@ -162,7 +138,7 @@ impl BlockDir {
             1 => report.increment("file.medium", 1),
             _ => report.increment("file.large", 1),
         }
-        Ok((addresses, file_hasher.finalize().as_bytes().to_hex()))
+        Ok(addresses)
     }
 
     fn compress_and_store(&self, in_buf: &[u8], hex_hash: &str, report: &Report) -> Result<u64> {
@@ -405,13 +381,12 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
-        let (refs, hash_hex) = block_dir.store(&mut example_file, &report).unwrap();
-        assert_eq!(hash_hex, EXAMPLE_BLOCK_HASH);
+        let addrs = block_dir.store(&mut example_file, &report).unwrap();
 
         // Should be in one block, and as it's currently unsalted the hash is the same.
-        assert_eq!(1, refs.len());
-        assert_eq!(0, refs[0].start);
-        assert_eq!(EXAMPLE_BLOCK_HASH, refs[0].hash);
+        assert_eq!(1, addrs.len());
+        assert_eq!(0, addrs[0].start);
+        assert_eq!(EXAMPLE_BLOCK_HASH, addrs[0].hash);
 
         // Block should be the one block present in the list.
         assert_eq!(
@@ -437,7 +412,7 @@ mod tests {
         // Try to read back
         let read_report = Report::new();
         assert_eq!(read_report.get_count("block.read"), 0);
-        let back = block_dir.get(&refs[0], &read_report).unwrap();
+        let back = block_dir.get(&addrs[0], &read_report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
         assert_eq!(read_report.get_count("block.read"), 1);
         assert_eq!(
@@ -459,17 +434,16 @@ mod tests {
         let (_testdir, mut block_dir) = setup();
 
         let mut example_file = make_example_file();
-        let (refs1, hash1) = block_dir.store(&mut example_file, &report).unwrap();
+        let addrs1 = block_dir.store(&mut example_file, &report).unwrap();
         assert_eq!(report.get_count("block.already_present"), 0);
         assert_eq!(report.get_count("block.write"), 1);
 
         let mut example_file = make_example_file();
-        let (refs2, hash2) = block_dir.store(&mut example_file, &report).unwrap();
+        let addrs2 = block_dir.store(&mut example_file, &report).unwrap();
         assert_eq!(report.get_count("block.already_present"), 1);
         assert_eq!(report.get_count("block.write"), 1);
 
-        assert_eq!(hash1, hash2);
-        assert_eq!(refs1, refs2);
+        assert_eq!(addrs1, addrs2);
     }
 
     #[test]
@@ -492,7 +466,7 @@ mod tests {
         assert_eq!(tf_len, TOTAL_SIZE);
         tf.seek(SeekFrom::Start(0)).unwrap();
 
-        let (addrs, _overall_hash) = block_dir.store(&mut tf, &report).unwrap();
+        let addrs = block_dir.store(&mut tf, &report).unwrap();
         println!("Report after store: {}", report);
 
         // Since the blocks are identical we should see them only stored once, and several

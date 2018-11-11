@@ -35,7 +35,4 @@ pub trait Entry {
 
     /// Size of the file, if it is a file. None for directories and symlinks.
     fn size(&self) -> Option<u64>;
-
-    /// Hash of the whole file, if it is a file.
-    fn blake2b(&self) -> Option<String>;
 }

@@ -36,9 +36,6 @@ pub struct IndexEntry {
     /// Type of file.
     pub kind: Kind,
 
-    /// BLAKE2b hash of the entire original file, without salt.
-    pub blake2b: Option<String>,
-
     /// Blocks holding the file contents.
     pub addrs: Vec<blockdir::Address>,
 
@@ -69,10 +66,6 @@ impl entry::Entry for IndexEntry {
             Kind::File => Some(self.addrs.iter().map(|a| a.len).sum()),
             _ => None,
         }
-    }
-
-    fn blake2b(&self) -> Option<String> {
-        self.blake2b.clone()
     }
 }
 
@@ -319,16 +312,12 @@ impl Iter {
 
 #[cfg(test)]
 mod tests {
-    use rustc_serialize::json;
     use std::path::Path;
+
+    use rustc_serialize::json;
     use tempfile::TempDir;
 
-    use super::super::*;
-
-    pub const EXAMPLE_HASH: &'static str =
-        "66ad1939a9289aa9f1f1d9ad7bcee69429\
-         3c7623affb5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b\
-         2fb1d67e28262168013ba63c";
+    use crate::*;
 
     pub fn scratch_indexbuilder() -> (TempDir, IndexBuilder, Report) {
         let testdir = TempDir::new().unwrap();
@@ -341,7 +330,6 @@ mod tests {
             apath: apath.to_string(),
             mtime: None,
             kind: Kind::File,
-            blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
             target: None,
         });
@@ -353,7 +341,6 @@ mod tests {
             apath: "/a/b".to_string(),
             mtime: Some(1461736377),
             kind: Kind::File,
-            blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
             target: None,
         }];
@@ -364,9 +351,6 @@ mod tests {
             "[{\"apath\":\"/a/b\",\
              \"mtime\":1461736377,\
              \"kind\":\"File\",\
-             \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd3\
-             f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262\
-             168013ba63c\",\
              \"addrs\":[],\
              \"target\":null}]"
         );
@@ -380,7 +364,6 @@ mod tests {
             apath: "/zzz".to_string(),
             mtime: None,
             kind: Kind::File,
-            blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
             target: None,
         });
@@ -388,7 +371,6 @@ mod tests {
             apath: "aaa".to_string(),
             mtime: None,
             kind: Kind::File,
-            blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
             target: None,
         });
@@ -402,7 +384,6 @@ mod tests {
             apath: "../escapecat".to_string(),
             mtime: None,
             kind: Kind::File,
-            blake2b: Some(EXAMPLE_HASH.to_string()),
             addrs: vec![],
             target: None,
         })
@@ -448,17 +429,11 @@ mod tests {
             "[{\"apath\":\"/apple\",\
              \"mtime\":null,\
              \"kind\":\"File\",\
-             \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb\
-             5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c\
-             2b2fb1d67e28262168013ba63c\",\
              \"addrs\":[],\
              \"target\":null},\
              {\"apath\":\"/banana\",\
              \"mtime\":null,\
              \"kind\":\"File\",\
-             \"blake2b\":\"66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb\
-             5979bd3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c\
-             2b2fb1d67e28262168013ba63c\",\
              \"addrs\":[],\
              \"target\":null}]"
         );

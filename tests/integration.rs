@@ -78,8 +78,6 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     assert_eq!("/hello", file_entry.apath);
     assert_eq!(Kind::File, file_entry.kind);
     assert!(file_entry.mtime.unwrap() > 0);
-    let hash = file_entry.blake2b.as_ref().unwrap();
-    assert_eq!(HELLO_HASH, hash);
 
     assert_eq!(
         af.referenced_blocks()
@@ -113,10 +111,10 @@ fn check_restore(af: &ScratchArchive) {
     // Doubled because we currently read the index twice.
     assert_eq!(
         index_sizes.uncompressed,
-        462 * 2,
+        306 * 2,
         "index_sizes.uncompressed on restore"
     );
-    assert!(index_sizes.compressed <= 292 * 2, index_sizes.compressed);
+    assert!(index_sizes.compressed <= 306 * 2, index_sizes.compressed);
     // TODO: Check what was restored.
 }
 

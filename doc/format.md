@@ -212,7 +212,6 @@ which is a dict of
    - `kind`: one of `"File"`, `"Dir"`, `"Symlink"`
    - `deleted`: true if it was present in a parent band and was
      deleted in this band
-   - `blake2`: the BLAKE2 hash in hex of the full text of the file
    - `addrs`: a list of tuples of:
      - `hash`: data block hash: from the current or any
        parent directory
@@ -223,4 +222,4 @@ which is a dict of
      `target`: For symlinks, the string target of the symlink.
 
 So, the length of any file is the sum of the `length` entries for all
-its `blocks`.
+its `addrs`.

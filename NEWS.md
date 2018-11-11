@@ -1,5 +1,10 @@
 # Conserve release history
 
+## UNRELEASED
+
+The archive format has changed to "0.6": install an older Conserve release
+to read from older archives.
+
 ## Conserve 0.5.1 2018-11-11
 
 * `conserve validate` checks the archive much more thoroughly.
