@@ -69,7 +69,7 @@ pub use crate::ui::UI;
 // Commonly-used external types.
 pub use globset::GlobSet;
 
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn version() -> &'static str {
     VERSION
