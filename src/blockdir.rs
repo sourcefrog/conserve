@@ -95,25 +95,24 @@ impl BlockDir {
     pub fn store(&mut self, from_file: &mut Read, report: &Report) -> Result<(Vec<Address>)> {
         let mut addresses = Vec::<Address>::with_capacity(1);
         let mut in_buf = Vec::<u8>::with_capacity(MAX_BLOCK_SIZE);
+        unsafe {
+            // Increase size to capacity without initializing data that will be overwritten.
+            in_buf.set_len(MAX_BLOCK_SIZE);
+        };
         loop {
-            unsafe {
-                // Increase size to capacity without initializing data that will be overwritten.
-                in_buf.set_len(MAX_BLOCK_SIZE);
-            };
             // TODO: Possibly read repeatedly in case we get a short read and have room for more,
             // so that short reads don't lead to short blocks being stored.
             let read_len = from_file.read(&mut in_buf)?;
             if read_len == 0 {
                 break;
             }
-            in_buf.truncate(read_len);
+            let rb = &in_buf[..read_len];
 
-            let block_hash: String = hash_bytes(&in_buf).unwrap();
-
+            let block_hash: String = hash_bytes(rb).unwrap();
             if self.contains(&block_hash)? {
                 report.increment("block.already_present", 1);
             } else {
-                let comp_len = self.compress_and_store(&in_buf, &block_hash, &report)?;
+                let comp_len = self.compress_and_store(rb, &block_hash, &report)?;
                 // Maybe rename counter to 'block.write'?
                 report.increment("block.write", 1);
                 report.increment_size(
