@@ -24,7 +24,7 @@ use rustc_serialize::hex::ToHex;
 use tempfile;
 use thousands::Separable;
 
-use super::*;
+use crate::*;
 
 /// Use the maximum 64-byte hash.
 pub const BLAKE_HASH_SIZE_BYTES: usize = 64;
@@ -35,9 +35,6 @@ const BLOCKDIR_FILE_NAME: usize = BLAKE_HASH_SIZE_BYTES * 2;
 const SUBDIR_NAME_CHARS: usize = 3;
 
 const TMP_PREFIX: &str = "tmp";
-
-/// Break blocks at this many uncompressed bytes.
-pub const MAX_BLOCK_SIZE: usize = 1 << 20;
 
 /// The unique identifier for a block: its hexadecimal `BLAKE2b` hash.
 pub type BlockHash = String;
@@ -351,7 +348,7 @@ mod tests {
     use std::io::SeekFrom;
     use tempfile::{NamedTempFile, TempDir};
 
-    use super::super::*;
+    use crate::*;
 
     const EXAMPLE_TEXT: &'static [u8] = b"hello!";
     const EXAMPLE_BLOCK_HASH: &'static str =

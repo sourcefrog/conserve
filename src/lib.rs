@@ -81,3 +81,6 @@ pub fn version() -> &'static str {
 pub const ARCHIVE_VERSION: &str = "0.6";
 
 pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");
+
+/// Break blocks at this many uncompressed bytes.
+pub(crate) const MAX_BLOCK_SIZE: usize = 1 << 20;
