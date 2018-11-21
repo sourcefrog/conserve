@@ -4,6 +4,8 @@
 //! An entry representing a file, directory, etc, in either a
 //! stored tree or local tree.
 
+use std::fmt::Debug;
+
 use super::*;
 
 /// Kind of file that can be stored in the archive.
@@ -19,7 +21,7 @@ pub enum Kind {
 /// A file, directory, or symlink stored in any tree.
 ///
 /// To get the contents of a plain file, use `ReadTree::file_contents`.
-pub trait Entry {
+pub trait Entry : Debug {
     fn kind(&self) -> Kind;
 
     // TODO: Would be better to return a reference, but it's difficult because IndexEntry doesn't
