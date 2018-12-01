@@ -69,7 +69,6 @@ pub trait ReadBlocks {
     fn read_block(&self, i: usize) -> Result<Vec<u8>>;
 }
 
-
 /// The measured size of a tree.
 pub struct TreeSize {
     pub file_bytes: u64,

@@ -14,12 +14,30 @@ use super::errors::*;
 use super::io::AtomicFile;
 use super::Report;
 
+pub fn write_serde<T: serde::Serialize>(path: &Path, obj: &T, report: &Report) -> Result<()> {
+    let mut f = AtomicFile::new(path)?;
+    let mut s = serde_json::to_string(&obj).unwrap();
+    s.push('\n');
+    f.write_all(s.as_bytes())?;
+    f.close(report)?;
+    Ok(())
+}
+
 pub fn write<T: Encodable>(path: &Path, obj: &T, report: &Report) -> Result<()> {
     let mut f = AtomicFile::new(path)?;
     f.write_all(json::encode(&obj).unwrap().as_bytes())?;
     f.write_all(b"\n")?;
     f.close(report)?;
     Ok(())
+}
+
+pub fn read_serde<T: serde::de::DeserializeOwned>(path: &Path, _report: &Report) -> Result<T> {
+    // TODO: Send something to the Report.  At present this is used only for
+    // small metadata files so measurement is not critical.
+    let mut f = File::open(path).or_else(|e| Err(Error::IoError(e)))?;
+    let mut buf = String::new();
+    let _bytes_read = f.read_to_string(&mut buf)?;
+    serde_json::from_str(&buf).or_else(|e| Err(e.into()))
 }
 
 pub fn read<T: Decodable>(path: &Path, _report: &Report) -> Result<T> {

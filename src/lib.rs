@@ -9,6 +9,11 @@ extern crate chrono;
 extern crate isatty;
 extern crate rayon;
 extern crate rustc_serialize;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
+
 extern crate snap;
 extern crate tempfile;
 extern crate term;

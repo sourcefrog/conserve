@@ -36,7 +36,8 @@ impl StoredFile {
         // the content can't be loaded.
         // TODO: Arguably we don't need to actually load the chunks here; it's
         // enough to remember that all the blocks were loaded before.
-        self.block_range().unwrap()
+        self.block_range()
+            .unwrap()
             .into_par_iter()
             .map(|i| {
                 let c = self.read_block(i)?;

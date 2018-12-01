@@ -28,6 +28,7 @@ pub enum Error {
     IoError(io::Error),
     // TODO: Include the path in the json error.
     JsonDecode(rustc_serialize::json::DecoderError),
+    JsonDeserialize(serde_json::Error),
     BadGlob(globset::Error),
     IndexCorrupt(PathBuf),
     FileCorrupt {
@@ -90,5 +91,11 @@ impl From<globset::Error> for Error {
 impl From<rustc_serialize::json::DecoderError> for Error {
     fn from(c: rustc_serialize::json::DecoderError) -> Error {
         Error::JsonDecode(c)
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(c: serde_json::Error) -> Error {
+        Error::JsonDeserialize(c)
     }
 }

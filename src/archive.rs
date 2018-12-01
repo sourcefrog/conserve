@@ -40,7 +40,7 @@ pub struct Archive {
     block_dir: BlockDir,
 }
 
-#[derive(Debug, RustcDecodable, RustcEncodable)]
+#[derive(Debug, Serialize, Deserialize)]
 struct ArchiveHeader {
     conserve_archive_version: String,
 }
@@ -56,11 +56,12 @@ impl Archive {
         };
         let header_filename = path.join(HEADER_FILENAME);
         let report = Report::new();
-        jsonio::write(&header_filename, &header, &report).and(Ok(Archive {
+        jsonio::write_serde(&header_filename, &header, &report)?;
+        Ok(Archive {
             path: path.to_path_buf(),
             report,
             block_dir,
-        }))
+        })
     }
 
     /// Open an existing archive.
@@ -73,7 +74,7 @@ impl Archive {
             return Err(Error::NotAnArchive(path.into()));
         }
         let block_dir = BlockDir::new(&path.join(BLOCK_DIR));
-        let header: ArchiveHeader = jsonio::read(&header_path, &report)?;
+        let header: ArchiveHeader = jsonio::read_serde(&header_path, &report)?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(Error::UnsupportedArchiveVersion(
                 header.conserve_archive_version,
