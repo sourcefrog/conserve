@@ -1,7 +1,7 @@
 // Conserve backup system.
 // Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
-//! Listing of files in a band in the archive.
+//! Index lists the files in a band in the archive.
 
 use std::fmt;
 use std::fs;
@@ -9,8 +9,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::str;
 use std::vec;
-
-use rustc_serialize::json;
 
 use super::apath::Apath;
 use super::blockdir;
@@ -24,7 +22,7 @@ pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
 /// Description of one archived file.
 ///
 /// This struct is directly encoded/decoded to the json index file.
-#[derive(Debug, RustcDecodable, RustcEncodable)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct IndexEntry {
     /// Path of this entry relative to the base of the backup, in `apath` form.
     // TODO: Make it an actual Apath, once that's encodable.
@@ -126,7 +124,7 @@ impl IndexBuilder {
         ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))?;
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
 
-        let json_string = json::encode(&self.entries).unwrap();
+        let json_string = serde_json::to_string(&self.entries)?;
         let uncompressed_len = json_string.len() as u64;
 
         let mut af = AtomicFile::new(hunk_path)?;
@@ -278,10 +276,10 @@ impl Iter {
         );
         self.report.increment("index.hunk", 1);
 
+        // TODO: More specific error messages including the filename.
         let index_json = str::from_utf8(&index_bytes)
             .or_else(|_| Err(Error::IndexCorrupt(hunk_path.clone())))?;
-        let entries: Vec<IndexEntry> =
-            json::decode(index_json).or_else(|e| Err(Error::JsonDecode(e)))?;
+        let entries: Vec<IndexEntry> = serde_json::from_str(index_json)?;
         if entries.is_empty() {
             self.report
                 .problem(&format!("Index hunk {} is empty", hunk_path.display()));
@@ -314,7 +312,6 @@ impl Iter {
 mod tests {
     use std::path::Path;
 
-    use rustc_serialize::json;
     use tempfile::TempDir;
 
     use crate::*;
@@ -344,7 +341,7 @@ mod tests {
             addrs: vec![],
             target: None,
         }];
-        let index_json = json::encode(&entries).unwrap();
+        let index_json = serde_json::to_string(&entries).unwrap();
         println!("{}", index_json);
         assert_eq!(
             index_json,

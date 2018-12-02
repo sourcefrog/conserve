@@ -13,7 +13,7 @@ use super::Report;
 
 pub fn write_serde<T: serde::Serialize>(path: &Path, obj: &T, report: &Report) -> Result<()> {
     let mut f = AtomicFile::new(path)?;
-    let mut s = serde_json::to_string(&obj).unwrap();
+    let mut s = serde_json::to_string(&obj)?;
     s.push('\n');
     f.write_all(s.as_bytes())?;
     f.close(report)?;

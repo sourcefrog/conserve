@@ -7,7 +7,7 @@
 use super::*;
 
 /// Kind of file that can be stored in the archive.
-#[derive(Clone, Copy, Debug, PartialEq, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Kind {
     File,
     Dir,
