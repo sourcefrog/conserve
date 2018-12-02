@@ -33,13 +33,13 @@ pub struct Band {
     pub index_dir_path: PathBuf,
 }
 
-#[derive(Debug, RustcDecodable, RustcEncodable)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Head {
     start_time: i64,
 }
 
 /// Format of the on-disk tail file.
-#[derive(Debug, RustcDecodable, RustcEncodable)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Tail {
     end_time: i64,
 }
@@ -80,7 +80,7 @@ impl Band {
         let head = Head {
             start_time: UTC::now().timestamp(),
         };
-        jsonio::write(&new.head_path(), &head, archive.report())?;
+        jsonio::write_serde(&new.head_path(), &head, archive.report())?;
         Ok(new)
     }
 
@@ -89,7 +89,7 @@ impl Band {
         let tail = Tail {
             end_time: UTC::now().timestamp(),
         };
-        jsonio::write(&self.tail_path(), &tail, report)
+        jsonio::write_serde(&self.tail_path(), &tail, report)
     }
 
     /// Open a given band, or by default the latest complete backup in the archive.
@@ -144,11 +144,11 @@ impl Band {
     }
 
     fn read_head(&self, report: &Report) -> Result<Head> {
-        jsonio::read(&self.head_path(), &report)
+        jsonio::read_serde(&self.head_path(), &report)
     }
 
     fn read_tail(&self, report: &Report) -> Result<Tail> {
-        jsonio::read(&self.tail_path(), &report)
+        jsonio::read_serde(&self.tail_path(), &report)
     }
 
     /// Return info about the state of this band.
