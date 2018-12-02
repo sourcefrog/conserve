@@ -8,8 +8,6 @@ use std::fmt;
 use std::io;
 use std::path::PathBuf;
 
-use rustc_serialize;
-
 use crate::*;
 
 /// Conserve specific error.
@@ -27,7 +25,6 @@ pub enum Error {
     BandIncomplete(BandId),
     IoError(io::Error),
     // TODO: Include the path in the json error.
-    JsonDecode(rustc_serialize::json::DecoderError),
     JsonDeserialize(serde_json::Error),
     BadGlob(globset::Error),
     IndexCorrupt(PathBuf),
@@ -85,12 +82,6 @@ impl From<io::Error> for Error {
 impl From<globset::Error> for Error {
     fn from(c: globset::Error) -> Error {
         Error::BadGlob(c)
-    }
-}
-
-impl From<rustc_serialize::json::DecoderError> for Error {
-    fn from(c: rustc_serialize::json::DecoderError) -> Error {
-        Error::JsonDecode(c)
     }
 }
 

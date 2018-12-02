@@ -9,7 +9,6 @@ extern crate chrono;
 extern crate hex;
 extern crate isatty;
 extern crate rayon;
-extern crate rustc_serialize;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
