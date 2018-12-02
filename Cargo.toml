@@ -19,6 +19,7 @@ doc = false  # Conflicts with library docs which are more useful.
 blake2-rfc = "0.2.18"
 chrono = "0.2"
 clap = "2.32"
+hex = "0.3.2"
 isatty = "0.1"
 rayon = "1.0.2"
 regex = "0.2"

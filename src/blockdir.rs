@@ -20,7 +20,6 @@ use std::path::{Path, PathBuf};
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
-use rustc_serialize::hex::ToHex;
 use tempfile;
 use thousands::Separable;
 
@@ -314,10 +313,7 @@ impl Block {
 
     pub fn validate(&self, report: &Report) -> Result<()> {
         let de = self.get_all(report)?;
-
-        let actual_hash = blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &de)
-            .as_bytes()
-            .to_hex();
+        let actual_hash = hex::encode(blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &de).as_bytes());
         if actual_hash != *self.hash {
             report.increment("block.misplaced", 1);
             report.problem(&format!(
@@ -337,7 +333,7 @@ impl Block {
 fn hash_bytes(in_buf: &[u8]) -> Result<BlockHash> {
     let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
     hasher.update(in_buf);
-    Ok(hasher.finalize().as_bytes().to_hex())
+    Ok(hex::encode(hasher.finalize().as_bytes()))
 }
 
 #[cfg(test)]

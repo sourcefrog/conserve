@@ -3,7 +3,11 @@
 ## UNRELEASED
 
 The archive format has changed to "0.6": install an older Conserve release
-to read from older archives.
+to read from older archives. This format removes the whole-file hash, in favor
+of just per-block hashes. The whole-file hash slows backups and adds little
+protection.
+
+* Change from `rustc_serialize` to `serde`.
 
 ## Conserve 0.5.1 2018-11-11
 
@@ -24,7 +28,7 @@ to read from older archives.
   format has a single blockdir per archive for all file contents, rather
   than one per band. This significantly reduces space usage and backup
   time.
-   
+
 * New command `validate` checks some (but not yet all) internal correctness
   and consistency properties of an archive.
 
