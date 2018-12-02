@@ -7,9 +7,6 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-use rustc_serialize::json;
-use rustc_serialize::{Decodable, Encodable};
-
 use super::errors::*;
 use super::io::AtomicFile;
 use super::Report;
@@ -23,14 +20,6 @@ pub fn write_serde<T: serde::Serialize>(path: &Path, obj: &T, report: &Report) -
     Ok(())
 }
 
-pub fn write<T: Encodable>(path: &Path, obj: &T, report: &Report) -> Result<()> {
-    let mut f = AtomicFile::new(path)?;
-    f.write_all(json::encode(&obj).unwrap().as_bytes())?;
-    f.write_all(b"\n")?;
-    f.close(report)?;
-    Ok(())
-}
-
 pub fn read_serde<T: serde::de::DeserializeOwned>(path: &Path, _report: &Report) -> Result<T> {
     // TODO: Send something to the Report.  At present this is used only for
     // small metadata files so measurement is not critical.
@@ -40,21 +29,12 @@ pub fn read_serde<T: serde::de::DeserializeOwned>(path: &Path, _report: &Report)
     serde_json::from_str(&buf).or_else(|e| Err(e.into()))
 }
 
-pub fn read<T: Decodable>(path: &Path, _report: &Report) -> Result<T> {
-    // TODO: Send something to the Report.  At present this is used only for
-    // small metadata files so measurement is not critical.
-    let mut f = File::open(path).or_else(|e| Err(Error::IoError(e)))?;
-    let mut buf = String::new();
-    let _bytes_read = f.read_to_string(&mut buf)?;
-    json::decode(&buf).or_else(|e| Err(e.into()))
-}
-
 #[cfg(test)]
 mod tests {
     use crate::test_fixtures::TreeFixture;
     use crate::Report;
 
-    #[derive(Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+    #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
     pub struct TestContents {
         pub id: u64,
         pub weather: String,
@@ -69,11 +49,11 @@ mod tests {
             weather: "cold".to_string(),
         };
         let p = tree.path().join("test.json");
-        super::write(&p, &entry, &write_report).unwrap();
+        super::write_serde(&p, &entry, &write_report).unwrap();
         // NB: This does not currently do much with `report` other than measure timing.
 
         let read_report = Report::new();
-        let r: TestContents = super::read(&p, &read_report).unwrap();
+        let r: TestContents = super::read_serde(&p, &read_report).unwrap();
         assert_eq!(r, entry);
     }
 }
