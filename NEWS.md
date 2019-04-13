@@ -5,6 +5,9 @@
 The archive format has changed to "0.6": install an older Conserve release
 to read from older archives.
 
+* Very basic `conserve diff` command, which compares a source directory
+  to a stored tree.
+
 ## Conserve 0.5.1 2018-11-11
 
 * `conserve validate` checks the archive much more thoroughly.

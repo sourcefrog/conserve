@@ -1,5 +1,8 @@
 // Copyright 2018, 2019 Martin Pool.
 
+// TODO: Perhaps split out zipped iteration of entries (without looking
+// at their metadata or contents), from actual diff-ing.
+
 use std::cmp::Ordering;
 
 use crate::*;
@@ -19,8 +22,9 @@ use self::DiffEntryKind::*;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DiffEntry {
-    apath: Apath,
-    kind: DiffEntryKind,
+    // TODO: Add accessors rather than making these public?
+    pub apath: Apath,
+    pub kind: DiffEntryKind,
 }
 
 /// Zip together entries from two trees, into an iterator of
@@ -55,6 +59,7 @@ where
     type Item = Result<DiffEntry>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // TODO: Count into report?
         let ait = &mut self.ait;
         let bit = &mut self.bit;
         // Preload next-A and next-B, if they're not already

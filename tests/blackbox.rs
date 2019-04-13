@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018 Martin Pool.
+// Copyright 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Run conserve CLI as a subprocess and test it.
 
@@ -126,7 +126,7 @@ fn blackbox_backup() {
     main_binary()
         .arg("backup")
         .arg(&arch_dir)
-        .arg(src.root)
+        .arg(&src.root)
         .assert()
         .success()
         .stderr(is_empty())
@@ -141,7 +141,19 @@ fn blackbox_backup() {
         .stderr(is_empty())
         .stdout("8\n"); // "contents"
 
-    // versions --short
+    main_binary()
+        .arg("diff")
+        .arg(&arch_dir)
+        .arg(src.path())
+        .assert()
+        .success()
+        .stderr(is_empty())
+        .stdout("\
+Both       /
+Both       /hello
+Both       /subdir
+");
+
     main_binary()
         .args(&["versions", "--short"])
         .arg(&arch_dir)

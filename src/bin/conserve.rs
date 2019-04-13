@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Command-line entry point for Conserve backups.
 
@@ -31,6 +31,7 @@ fn main() {
         "backup" => backup,
         "debug block list" => debug_block_list,
         "debug block referenced" => debug_block_referenced,
+        "diff" => diff,
         "init" => init,
         "ls" => ls,
         "restore" => restore,
@@ -179,6 +180,16 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .arg(verbose_arg()),
         )
         .subcommand(
+            SubCommand::with_name("diff")
+                .about("Diff source against a stored tree")
+                .arg(archive_arg())
+                .arg(
+                    Arg::with_name("source")
+                        .help("Diff against this source")
+                        .required(true),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("restore")
                 .display_order(3)
                 .about("Copy a backup tree out of an archive")
@@ -298,6 +309,20 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     copy_tree(&lt, &mut bw)?;
     report.print("Backup complete.");
     report.print(&report.borrow_counts().summary_for_backup());
+    Ok(())
+}
+
+fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
+    let st = stored_tree_from_options(subm, report)?;
+    let lt = live_tree_from_options(subm, report)?;
+    for e in conserve::diff(&st, &lt, &report)? {
+        let ee = e?;
+        report.print(&format!("{:<10} {}", format!("{:?}", ee.kind), ee.apath));
+        // TODO: Move this to a text-mode formatter library?
+        // TODO: Consider whether the actual files have changed.
+    }
+    // TODO: Summarize diff.
+    // report.print(&report.borrow_counts().summary_for_backup());
     Ok(())
 }
 
