@@ -104,10 +104,8 @@ impl UI for ColorUI {
         let mut pb_text = String::with_capacity(200);
         {
             let counts = report.borrow_counts();
-            let block_sizes = counts.get_size("block");
             let elapsed = counts.elapsed_time();
             let rate = mbps_rate(counts.done_work, elapsed);
-            let comp_bytes = block_sizes.compressed;
             if counts.total_work > 0 {
                 write!(
                     pb_text,
@@ -127,14 +125,16 @@ impl UI for ColorUI {
                 (counts.done_work / MB).separate_with_commas(),
             )
             .unwrap();
-            if false && comp_bytes > 0 {
-                write!(
-                    pb_text,
-                    "=> {:<8} ",
-                    (block_sizes.compressed / MB).separate_with_commas(),
-                )
-                .unwrap();
-            }
+            // let block_sizes = counts.get_size("block");
+            // let comp_bytes = block_sizes.compressed;
+            // if comp_bytes > 0 {
+            //     write!(
+            //         pb_text,
+            //         "=> {:<8} ",
+            //         (block_sizes.compressed / MB).separate_with_commas(),
+            //     )
+            //     .unwrap();
+            // }
             write!(
                 pb_text,
                 "{:>8} MB/s  {} {}",
