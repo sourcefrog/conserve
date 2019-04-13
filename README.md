@@ -135,6 +135,9 @@ On nightly Rust only, you can enable a potential speed-up to the blake2 hashes w
 Conserve is reasonable to use today, with regard to format and performance, but
 still pre-1.0.
 
+Be aware that Conserve is developed as a (very) part-time non-commercial
+project and there's no guarantee of support.
+
 The format may well change again before 1.0.  To use any archive written by
 Conserve 0.x.y, you need to use Conserve 0.x.  (Previous versions will always
 be available from git or crates.io.)
