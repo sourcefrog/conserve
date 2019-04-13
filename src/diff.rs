@@ -1,15 +1,30 @@
-// Copyright 2018 Martin Pool.
+// Copyright 2018, 2019 Martin Pool.
 
 use std::cmp::Ordering;
 
 use crate::*;
 
-///! Diff two trees.
+///! Diff two trees by walking them in order, in parallel.
 
-/// Zip together entries from two trees, returning
-/// pairs of options.
-///
-/// This should, later, be an iterator of DiffEntry.
+#[derive(Debug, PartialEq, Eq)]
+pub enum DiffEntryKind {
+    LeftOnly,
+    RightOnly,
+    Both,
+
+    // TODO: Perhaps also include the tree-specific entry kind?
+}
+
+use self::DiffEntryKind::*;
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DiffEntry {
+    apath: Apath,
+    kind: DiffEntryKind,
+}
+
+/// Zip together entries from two trees, into an iterator of
+/// either Results or DiffEntry.
 pub fn diff<AT, BT>(a: &AT, b: &BT, report: &Report) -> Result<DiffTrees<AT, BT>>
 where
     AT: ReadTree,
@@ -37,11 +52,13 @@ where
     AT: ReadTree,
     BT: ReadTree,
 {
-    type Item = Result<(Option<AT::E>, Option<BT::E>)>;
+    type Item = Result<DiffEntry>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let ait = &mut self.ait;
         let bit = &mut self.bit;
+        // Preload next-A and next-B, if they're not already
+        // loaded.
         if self.na.is_none() {
             self.na = match ait.next() {
                 None => None,
@@ -60,17 +77,42 @@ where
             if self.nb.is_none() {
                 None
             } else {
-                Some(Ok((None, self.nb.take())))
+                let tb = self.nb.take().unwrap();
+                Some(Ok(DiffEntry {
+                    apath: tb.apath(),
+                    kind: RightOnly,
+                }))
             }
         } else if self.nb.is_none() {
-            Some(Ok((self.na.take(), None)))
+            Some(Ok(DiffEntry {
+                apath: self.na.take().unwrap().apath(),
+                kind: LeftOnly,
+            }))
         } else {
             let pa = self.na.as_ref().unwrap().apath();
             let pb = self.nb.as_ref().unwrap().apath();
             match pa.cmp(&pb) {
-                Ordering::Equal => Some(Ok((self.na.take(), self.nb.take()))),
-                Ordering::Less => Some(Ok((self.na.take(), None))),
-                Ordering::Greater => Some(Ok((None, self.nb.take()))),
+                Ordering::Equal => {
+                    (self.na.take(), self.nb.take());
+                    Some(Ok(DiffEntry {
+                        apath: pa.clone(),
+                        kind: Both,
+                    }))
+                }
+                Ordering::Less => {
+                    self.na.take().unwrap();
+                    Some(Ok(DiffEntry {
+                        apath: pa,
+                        kind: LeftOnly,
+                    }))
+                }
+                Ordering::Greater => {
+                    self.nb.take().unwrap();
+                    Some(Ok(DiffEntry {
+                        apath: pb,
+                        kind: RightOnly,
+                    }))
+                }
             }
         }
     }
@@ -78,6 +120,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::DiffEntry;
+    use super::DiffEntryKind::*;
     use crate::test_fixtures::*;
     use crate::*;
 
@@ -91,6 +135,14 @@ mod tests {
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(di.len(), 1);
-        assert_eq!(&di[0].unwrap().0.unwrap().apath(), "/");
+        assert_eq!(
+            *di[0].as_ref().unwrap(),
+            DiffEntry {
+                apath: "/".into(),
+                kind: Both,
+            }
+        );
     }
+
+    // TODO: More tests of various diff situations.
 }
