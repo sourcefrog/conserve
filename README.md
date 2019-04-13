@@ -177,7 +177,7 @@ from both systems.
 
 ## Licence and non-warranty
 
-Copyright 2012-2018 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
+Copyright 2012-2019 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
