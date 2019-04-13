@@ -1,8 +1,6 @@
 // Copyright 2015, 2016, 2017, 2018 Martin Pool.
 
 //! Conserve backup system.
-//!
-//! For user documentation and an overview see http://conserve.fyi/.
 
 extern crate blake2_rfc;
 extern crate chrono;
@@ -35,6 +33,7 @@ mod band;
 mod bandid;
 mod blockdir;
 pub mod compress;
+mod diff;
 mod entry;
 pub mod errors;
 pub mod excludes;
@@ -60,6 +59,7 @@ pub use crate::bandid::BandId;
 pub use crate::blockdir::BlockDir;
 pub use crate::compress::snappy::Snappy;
 pub use crate::compress::Compression;
+pub use crate::diff::diff;
 pub use crate::entry::{Entry, Kind};
 pub use crate::errors::*;
 pub use crate::index::{IndexBuilder, IndexEntry, ReadIndex};

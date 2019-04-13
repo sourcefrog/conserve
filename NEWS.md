@@ -9,6 +9,9 @@ protection.
 
 * Change from `rustc_serialize` to `serde`.
 
+* Very basic `conserve diff` command, which compares a source directory
+  to a stored tree.
+
 ## Conserve 0.5.1 2018-11-11
 
 * `conserve validate` checks the archive much more thoroughly.
