@@ -82,7 +82,7 @@ impl StoredTree {
         let report = self.report();
         report.set_phase(format!("Check tree {}", self.band().id()));
         self.iter_entries(self.report())?
-            .map(|e| e.unwrap())
+            .map(Result::unwrap)
             .filter(|e| e.kind() == Kind::File)
             .par_bridge()
             .map(|e| self.validate_one_entry(&e))
