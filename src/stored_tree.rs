@@ -1,4 +1,4 @@
-// Copyright 2017, 2018 Martin Pool.
+// Copyright 2017, 2018, 2019 Martin Pool.
 
 //! Access a versioned tree stored in the archive.
 //!
@@ -124,7 +124,7 @@ impl ReadTree for StoredTree {
     }
 
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
-        Ok(self.open_stored_file(entry)?.as_read())
+        Ok(self.open_stored_file(entry)?.into_read())
     }
 
     fn estimate_count(&self) -> Result<u64> {

@@ -1,4 +1,4 @@
-// Copyright 2017, 2018 Martin Pool.
+// Copyright 2017, 2018, 2019 Martin Pool.
 
 ///! Access a file stored in the archive.
 use rayon::prelude::*;
@@ -49,7 +49,7 @@ impl StoredFile {
     }
 
     /// Open a cursor on this file that implements `std::io::Read`.
-    pub(crate) fn as_read(self) -> ReadStoredFile {
+    pub(crate) fn into_read(self) -> ReadStoredFile {
         ReadStoredFile {
             remaining_addrs: self.addrs.into_iter(),
             buf: Vec::<u8>::new(),
