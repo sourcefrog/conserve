@@ -1,6 +1,6 @@
 # Conserve: a robust backup program
 
-<http://conserve.fyi>
+<https://github.com/sourcefrog/conserve/>
 
 [![Linux build status](https://travis-ci.org/sourcefrog/conserve.svg?branch=master)](https://travis-ci.org/sourcefrog/conserve)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)

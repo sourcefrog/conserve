@@ -108,7 +108,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
     };
 
     App::new("conserve")
-        .about("A robust backup tool <http://conserve.fyi/>")
+        .about("A robust backup tool <https://github.com/sourcefrog/conserve/>")
         .author(crate_authors!())
         .version(conserve::version())
         .setting(AppSettings::SubcommandRequiredElseHelp)

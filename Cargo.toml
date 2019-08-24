@@ -2,7 +2,7 @@
 name = "conserve"
 version = "0.6.0"
 authors = ["Martin Pool <mbp@sourcefrog.net>"]
-homepage = "http://conserve.fyi/"
+homepage = "https://github.com/sourcefrog/conserve/"
 repository = "https://github.com/sourcefrog/conserve/"
 description = """A robust backup tool."""
 readme = "README.md"
