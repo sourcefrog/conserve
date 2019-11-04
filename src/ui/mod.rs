@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2018 Martin Pool.
+// Copyright 2015, 2016, 2018, 2019 Martin Pool.
 
 //! Abstract user interface trait.
 
@@ -28,11 +28,11 @@ pub trait UI: fmt::Debug {
     fn finish(&mut self);
 }
 
-impl UI {
+impl dyn UI {
     /// Construct a UI by name.
     ///
     /// `ui_name` must be `"auto"`, `"plain"`, or `"color"`.
-    pub fn by_name(ui_name: &str, progress_bar: bool) -> Option<Box<UI + Send>> {
+    pub fn by_name(ui_name: &str, progress_bar: bool) -> Option<Box<dyn UI + Send>> {
         if ui_name == "color" || (ui_name == "auto" && isatty::stdout_isatty()) {
             if let Some(ui) = color::ColorUI::new(progress_bar) {
                 return Some(Box::new(ui));

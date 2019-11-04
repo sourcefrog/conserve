@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2017, 2018 Martin Pool.
+// Copyright 2017, 2018, 2019 Martin Pool.
 
 //! Abstract Tree trait.
 
@@ -48,9 +48,9 @@ pub trait ReadTree: HasReport {
 pub trait WriteTree {
     fn finish(&mut self) -> Result<()>;
 
-    fn write_dir(&mut self, entry: &Entry) -> Result<()>;
-    fn write_symlink(&mut self, entry: &Entry) -> Result<()>;
-    fn write_file(&mut self, entry: &Entry, content: &mut std::io::Read) -> Result<()>;
+    fn write_dir(&mut self, entry: &dyn Entry) -> Result<()>;
+    fn write_symlink(&mut self, entry: &dyn Entry) -> Result<()>;
+    fn write_file(&mut self, entry: &dyn Entry, content: &mut dyn std::io::Read) -> Result<()>;
 }
 
 /// Read a file as a series of blocks of bytes.

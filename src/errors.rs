@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Conserve error types.
 
@@ -60,7 +60,7 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {
-    fn source(&self) -> Option<&(error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
             // For cases like IoError that essentially include an underlying
             // error by value, it doesn't seem to help anything, and tends to

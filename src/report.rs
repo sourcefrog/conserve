@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Accumulate statistics about a Conserve operation.
 //!
@@ -95,7 +95,7 @@ pub struct Counts {
 #[derive(Clone, Debug)]
 pub struct Report {
     counts: Arc<Mutex<Counts>>,
-    ui: Arc<Mutex<Box<UI + Send>>>,
+    ui: Arc<Mutex<Box<dyn UI + Send>>>,
     print_filenames: bool,
 }
 
@@ -125,7 +125,7 @@ impl Report {
     }
 
     /// Make a new report viewed by a given UI.
-    pub fn with_ui(ui_box: Box<UI + Send>) -> Report {
+    pub fn with_ui(ui_box: Box<dyn UI + Send>) -> Report {
         Report {
             counts: Arc::new(Mutex::new(Counts::new())),
             ui: Arc::new(Mutex::new(ui_box)),
@@ -196,7 +196,7 @@ impl Report {
     }
 
     /// Report that processing started for a given entry.
-    pub fn start_entry(&self, entry: &Entry) {
+    pub fn start_entry(&self, entry: &dyn Entry) {
         // TODO: Leave cursor pending at the end of the line until it's finished?
         if self.print_filenames {
             self.print(&format!("{}", entry.apath()));

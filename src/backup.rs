@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
@@ -45,7 +45,7 @@ impl tree::WriteTree for BackupWriter {
         Ok(())
     }
 
-    fn write_dir(&mut self, source_entry: &Entry) -> Result<()> {
+    fn write_dir(&mut self, source_entry: &dyn Entry) -> Result<()> {
         self.report.increment("dir", 1);
         self.push_entry(IndexEntry {
             apath: String::from(source_entry.apath()),
@@ -56,7 +56,11 @@ impl tree::WriteTree for BackupWriter {
         })
     }
 
-    fn write_file(&mut self, source_entry: &Entry, content: &mut std::io::Read) -> Result<()> {
+    fn write_file(
+        &mut self,
+        source_entry: &dyn Entry,
+        content: &mut dyn std::io::Read,
+    ) -> Result<()> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
         let addrs = self.block_dir.store(content, &self.report)?;
@@ -78,7 +82,7 @@ impl tree::WriteTree for BackupWriter {
         })
     }
 
-    fn write_symlink(&mut self, source_entry: &Entry) -> Result<()> {
+    fn write_symlink(&mut self, source_entry: &dyn Entry) -> Result<()> {
         self.report.increment("symlink", 1);
         let target = source_entry.symlink_target();
         assert!(target.is_some());

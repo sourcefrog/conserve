@@ -286,7 +286,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         )
 }
 
-fn show_chained_errors(report: &Report, e: &Error) {
+fn show_chained_errors(report: &Report, e: &dyn Error) {
     report.problem(&format!("{}", e));
     let mut ce = e;
     while let Some(c) = ce.source() {

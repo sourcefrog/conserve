@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! File contents are stored in data blocks.
 //!
@@ -91,7 +91,7 @@ impl BlockDir {
     /// Store the contents of a readable file into the BlockDir.
     ///
     /// Returns the addresses at which it was stored.
-    pub fn store(&mut self, from_file: &mut Read, report: &Report) -> Result<(Vec<Address>)> {
+    pub fn store(&mut self, from_file: &mut dyn Read, report: &Report) -> Result<(Vec<Address>)> {
         let mut addresses = Vec::<Address>::with_capacity(1);
         let mut in_buf = Vec::<u8>::with_capacity(MAX_BLOCK_SIZE);
         unsafe {
