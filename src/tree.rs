@@ -90,7 +90,18 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
         report.start_entry(&entry);
         match entry.kind() {
             Kind::Dir => dest.write_dir(&entry),
-            Kind::File => dest.write_file(&entry, &mut source.file_contents(&entry)?),
+            Kind::File => match source.file_contents(&entry) {
+                Ok(mut content) => dest.write_file(&entry, &mut content),
+                Err(e) => {
+                    report.problem(&format!(
+                        "Skipping unreadable source file {}: {}",
+                        &entry.apath(),
+                        e,
+                    ));
+                    // TODO: Count and accumulate problems.
+                    continue;
+                }
+            },
             Kind::Symlink => dest.write_symlink(&entry),
             Kind::Unknown => {
                 report.problem(&format!(
