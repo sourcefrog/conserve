@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018 Martin Pool.
+// Copyright 2016, 2017, 2018, 2019 Martin Pool.
 
 /// Utilities to set up test environments.
 ///
@@ -129,6 +129,17 @@ impl TreeFixture {
     pub fn live_tree(&self) -> LiveTree {
         // TODO: Maybe allow deref TreeFixture to LiveTree.
         LiveTree::open(self.path(), &Report::new()).unwrap()
+    }
+
+    #[cfg(unix)]
+    pub fn make_file_unreadable(&self, relative_path: &str) {
+        use std::fs::File;
+        use std::os::unix::fs::PermissionsExt;
+        let p = self.root.join(relative_path);
+        let f = File::open(&p).unwrap();
+        let mut perms = f.metadata().unwrap().permissions();
+        perms.set_mode(0);
+        fs::set_permissions(&p, perms).unwrap();
     }
 }
 

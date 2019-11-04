@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017 Martin Pool.
+// Copyright 2015, 2016, 2017, 2019 Martin Pool.
 
 /// Test Conserve through its public API.
 extern crate conserve;
@@ -149,4 +149,25 @@ fn large_file() {
         .read_to_string(&mut content)
         .unwrap();
     assert_eq!(large_content, content);
+}
+
+/// If some files are unreadable, others are stored and the backup completes with warnings.
+#[cfg(unix)]
+#[test]
+fn source_unreadable() {
+    let af = ScratchArchive::new();
+    let tf = TreeFixture::new();
+
+    tf.create_file("a");
+    tf.create_file("b_unreadable");
+    tf.create_file("c");
+
+    tf.make_file_unreadable("b_unreadable");
+
+    let mut bw = BackupWriter::begin(&af).unwrap();
+    let r = copy_tree(&tf.live_tree(), &mut bw);
+    r.unwrap();
+
+    // TODO: On Windows change the ACL to make the file unreadable to the current user or to
+    // everyone.
 }
