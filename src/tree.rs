@@ -86,7 +86,15 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
     report.set_total_work(source.size()?.file_bytes);
     report.set_phase("Copying");
     for entry in source.iter_entries(&report)? {
-        let entry = entry?;
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(e) => {
+                // TODO: Show the filename that we failed to load: this requires changing the
+                // `iter_entries` contract.
+                report.problem(&format!("Error iterating source, continuing: {}", e));
+                continue;
+            }
+        };
         report.start_entry(&entry);
         match entry.kind() {
             Kind::Dir => dest.write_dir(&entry),
