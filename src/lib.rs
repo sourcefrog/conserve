@@ -60,6 +60,7 @@ pub use crate::blockdir::BlockDir;
 pub use crate::compress::snappy::Snappy;
 pub use crate::compress::Compression;
 pub use crate::diff::diff;
+pub use crate::diff::DiffEntryKind;
 pub use crate::entry::{Entry, Kind};
 pub use crate::errors::*;
 pub use crate::index::{IndexBuilder, IndexEntry, ReadIndex};
