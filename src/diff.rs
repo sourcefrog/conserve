@@ -14,7 +14,6 @@ pub enum DiffEntryKind {
     LeftOnly,
     RightOnly,
     Both,
-
     // TODO: Perhaps also include the tree-specific entry kind?
 }
 
@@ -27,8 +26,10 @@ pub struct DiffEntry {
     pub kind: DiffEntryKind,
 }
 
-/// Zip together entries from two trees, into an iterator of
-/// either Results or DiffEntry.
+/// Zip together entries from two trees, into an iterator of either Results or DiffEntry.
+///
+/// Note that at present this only says whether files are absent from either
+/// side, not whether there is a content difference.
 pub fn diff<AT, BT>(a: &AT, b: &BT, report: &Report) -> Result<DiffTrees<AT, BT>>
 where
     AT: ReadTree,
