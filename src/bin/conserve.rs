@@ -313,15 +313,22 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
 }
 
 fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
+    // TODO: Move this to a text-mode formatter library?
+    // TODO: Consider whether the actual files have changed.
+    // TODO: Summarize diff.
+    // TODO: Optionally include unchanged files.
     let st = stored_tree_from_options(subm, report)?;
     let lt = live_tree_from_options(subm, report)?;
     for e in conserve::diff(&st, &lt, &report)? {
+        use DiffEntryKind::*;
         let ee = e?;
-        report.print(&format!("{:<10} {}", format!("{:?}", ee.kind), ee.apath));
-        // TODO: Move this to a text-mode formatter library?
-        // TODO: Consider whether the actual files have changed.
+        let ks = match ee.kind {
+            LeftOnly => "left",
+            RightOnly => "right",
+            Both => "both",
+        };
+        report.print(&format!("{:<8} {}", ks, ee.apath));
     }
-    // TODO: Summarize diff.
     // report.print(&report.borrow_counts().summary_for_backup());
     Ok(())
 }
