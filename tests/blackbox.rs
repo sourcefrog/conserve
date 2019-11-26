@@ -148,11 +148,13 @@ fn blackbox_backup() {
         .assert()
         .success()
         .stderr(is_empty())
-        .stdout("\
-Both       /
-Both       /hello
-Both       /subdir
-");
+        .stdout(
+            "\
+both     /
+both     /hello
+both     /subdir
+",
+        );
 
     main_binary()
         .args(&["versions", "--short"])
