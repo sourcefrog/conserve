@@ -7,7 +7,7 @@ backing up to either nearby local disks or in to cloud storage.
 Storage environment
 -------------------
 
-Conserve makes limited assumptions about the archive storage, guided by what is 
+Conserve makes limited assumptions about the archive storage, guided by what is
 commonly supported by cloud storage.
 
 - You can write whole files, but not update in place
@@ -26,7 +26,7 @@ commonly supported by cloud storage.
 
 - May or may not be case sensitive.
 
-- Can't detect whether an empty directory exists or not, and might not have a strong 
+- Can't detect whether an empty directory exists or not, and might not have a strong
   concept of directories, perhaps only ordered names.
 
 - Can try to not overwrite files, but not guaranteed coherent.
@@ -36,7 +36,7 @@ commonly supported by cloud storage.
 
 - Connection may be lost and the backup terminated at any point.
 
-- No guarantee of read-after-write consistency.  (In practice, perhaps several seconds 
+- No guarantee of read-after-write consistency.  (In practice, perhaps several seconds
   after writing the change will be visible.)
 
 Requirements
@@ -69,9 +69,9 @@ Testing
 Write/write concurrency
 -----------------------
 
-Conserve is supposed to be run with just one process writing to destination archive at 
-any time, obviously just from one source.  It is basically up to the user to 
-configure the clients so this happens: to make sure that only one logical machine 
+Conserve is supposed to be run with just one process writing to destination archive at
+any time, obviously just from one source.  It is basically up to the user to
+configure the clients so this happens: to make sure that only one logical machine
 tries to write to one archive, and that only one backup process runs on that machine
 at any time.
 
@@ -86,37 +86,37 @@ dual-master situation.  Requirements for that case are:
  - This situation is expected to be rare so detecting it should not impose a large
    performance or complexity cost.
 
-There may be different cases depending when the race occurs: 
+There may be different cases depending when the race occurs:
 
  - both are starting a new stripe
- 
+
  - both writing blocks within an existing strip
 
 Possible approaches (not mutually exclusive):
 
- 1. Write a lock file when active and remove it when done.  This is difficult 
-    because of confusion about taking the lock without global consistency, 
+ 1. Write a lock file when active and remove it when done.  This is difficult
+    because of confusion about taking the lock without global consistency,
     and the client may die holding its lock.
 
  2. Name block files uniquely so that multiple writers don't conflict.  Not great
     though because effort and space will be wasted making multiple backups.
 
- 3. Use deterministic names and detect if the file to be written already exists 
-    (maybe writing it using a do-not-overwrite option, if the back end supports 
-    that).  But, without global consistency, we're not guaranteed to detect 
+ 3. Use deterministic names and detect if the file to be written already exists
+    (maybe writing it using a do-not-overwrite option, if the back end supports
+    that).  But, without global consistency, we're not guaranteed to detect
     conflicts.
 
- 4. Check the most-recently-written file before starting.  If it's recent 
-    (within say 20 minutes) and not from the same machine, or not from a 
+ 4. Check the most-recently-written file before starting.  If it's recent
+    (within say 20 minutes) and not from the same machine, or not from a
     process we can see is dead, warn or pause or abort.
 
  5. Keep a client-side lock file, on a filesystem that probably is coherent.
     Store the pid and similar information to try to detect stale processes.
-    (Doesn't protect against multiple machines all thinking they should 
-    write to the same archive, or eg having different home directories on the 
+    (Doesn't protect against multiple machines all thinking they should
+    write to the same archive, or eg having different home directories on the
     same source.)
 
- 6. Just make sure each block can be read in isolation even they do come 
+ 6. Just make sure each block can be read in isolation even they do come
     from racing processes - minimal data dependencies between blocks.
 
 
@@ -126,8 +126,8 @@ Read/write concurrency
 Logical readers are physically read-only, so any number can run without interfering
 with writers or with each other.
 
-Because the storage layer does not promise coherency readers will see data in 
-approximately but not exactly the order it was written by the writer.  In practice 
+Because the storage layer does not promise coherency readers will see data in
+approximately but not exactly the order it was written by the writer.  In practice
 this means that some files we might expect to be present may be missing.
 
 Perhaps, if a file is missing, we should wait a few seconds to see if it appears.
@@ -135,7 +135,7 @@ Perhaps, if a file is missing, we should wait a few seconds to see if it appears
 But, the file may be permanently missing, perhaps because the writer crashed
 before the file was committed.
 
-So concurrency seems to be just a special case of readers being robust with 
+So concurrency seems to be just a special case of readers being robust with
 incomplete or damaged archives.
 
 
@@ -162,20 +162,41 @@ header file per block).
 I think it's good not to split files across blocks - but this does mean
 that blocks can grow arbitrarily large if you have large files.
 
+Backup
+------
 
-Incremental update
-------------------
+Backup is essentially: walk over the source tree, subject to exclusions. Trees
+are always walked in apath order.
 
-There are two approaches to doing an incremental update: go just by date,
-or look at every file relative to the previous bands.  The former might
-accidentally upload some files repeatedly; the latter might require
-rereading all the previous indexes if we don't already have them cached.
+For each file, hash every block, and store all their blocks.
+
+Build an index including references to these blocks.
+
+Incremental backups
+-------------------
+
+(not implmented yet)
+
+When there's a previous backup, we can avoid some work of hashing blocks, by
+looking at the previous index. If the file has the same mtime/ctime and length
+as in the previous tree, we can assume it has the same content, and just copy
+across the block hashes from the previous version. We should also check that
+those blocks do actually exist.
+
+The parallel-iteration code is similar to, or builds on, what is needed to
+implement diff.
+
+Continuing interrupted backups
+------------------------------
+
+(not implmented yet)
 
 To continue with a band, we need to just find the last file completely
 stored, which is the last name of the last block footer present in this
 bound.
 
-
+It might also be worth checking that all the data blocks for the interrupted
+backup have actually been stored.
 
 Random features
 ---------------
@@ -202,7 +223,7 @@ UI
 --
 
 Goals:
- 
+
  * accumulate all actions so they can easily be compared to expected
    results at the end of a test
 
@@ -215,7 +236,7 @@ Goals:
 
  * ui interactions can be externalized onto pipes
 
- * show progress bars, which implies knowing when an operation starts 
+ * show progress bars, which implies knowing when an operation starts
    and ends and if possible how many items are to be processed
 
  * simple inside the main application code
@@ -229,11 +250,11 @@ Human strings are internationalized: this should be done strictly in
 the UI layer.  Debug/log strings can be emitted anywhere and don't need
 i18n.
 
-XXX: is it enough, perhaps, just to use logging? Perhaps that's the 
-simplest thing that would work, for now, enough to do some testing? 
+XXX: is it enough, perhaps, just to use logging? Perhaps that's the
+simplest thing that would work, for now, enough to do some testing?
 Open questions:
 
- * Transmit the actual text to be shown to the user, or some kind of 
+ * Transmit the actual text to be shown to the user, or some kind of
    symbol?  Text is enough to test it, but not so good for reformatting
    things.
 
