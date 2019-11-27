@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Bands are identified by a string like `b0001-0023`, represented by a `BandId` object.
 
@@ -56,7 +56,9 @@ impl BandId {
             Ok(BandId::new(&seqs))
         }
     }
+}
 
+impl fmt::Display for BandId {
     /// Returns the string representation of this BandId.
     ///
     /// Bands have an id which is a sequence of one or more non-negative integers.
@@ -65,7 +67,7 @@ impl BandId {
     ///
     /// Numbers are zero-padded to what should normally be a reasonable length,
     /// but they can be longer.
-    pub fn to_string(&self) -> String {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut result = String::with_capacity(self.seqs.len() * 5);
         result.push_str("b");
         for s in &self.seqs {
@@ -73,13 +75,7 @@ impl BandId {
         }
         result.pop(); // remove the last dash
         result.shrink_to_fit();
-        result
-    }
-}
-
-impl fmt::Display for BandId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.to_string().fmt(f)
+        f.pad(&result)
     }
 }
 
