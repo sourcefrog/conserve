@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Bands are the top-level structure inside an archive.
 //!
@@ -21,9 +21,9 @@ use super::jsonio;
 use super::misc::remove_item;
 use super::*;
 
-static INDEX_DIR: &'static str = "i";
-static HEAD_FILENAME: &'static str = "BANDHEAD";
-static TAIL_FILENAME: &'static str = "BANDTAIL";
+static INDEX_DIR: &str = "i";
+static HEAD_FILENAME: &str = "BANDHEAD";
+static TAIL_FILENAME: &str = "BANDTAIL";
 
 /// All backup data is stored in a band.
 #[derive(Debug)]

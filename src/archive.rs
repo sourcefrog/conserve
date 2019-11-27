@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Archives holding backup material.
 //!
@@ -25,7 +25,7 @@ use super::misc::remove_item;
 use super::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
-static BLOCK_DIR: &'static str = "d";
+static BLOCK_DIR: &str = "d";
 
 /// An archive holding backup material.
 #[derive(Clone, Debug)]

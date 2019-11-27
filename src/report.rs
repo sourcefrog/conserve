@@ -29,7 +29,7 @@ use super::*;
 const M: u64 = 1_000_000;
 
 #[rustfmt::skip]
-static KNOWN_COUNTERS: &'static [&'static str] = &[
+static KNOWN_COUNTERS: &[&str] = &[
     "dir",
     "file",
     "file.empty",
