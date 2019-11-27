@@ -97,7 +97,8 @@ where
             let pb = self.nb.as_ref().unwrap().apath();
             match pa.cmp(&pb) {
                 Ordering::Equal => {
-                    (self.na.take(), self.nb.take());
+                    self.na.take();
+                    self.nb.take();
                     Some(Ok(MergedEntry {
                         apath: pa,
                         kind: Both,
