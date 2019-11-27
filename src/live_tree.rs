@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Find source files within a source directory, in apath order.
 
@@ -151,7 +151,7 @@ impl entry::Entry for Entry {
             .modified()
             .ok()
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .and_then(|dur| Some(dur.as_secs()))
+            .map(|dur| dur.as_secs())
     }
 
     fn symlink_target(&self) -> Option<String> {
