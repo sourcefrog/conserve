@@ -99,7 +99,7 @@ where
                 Ordering::Equal => {
                     (self.na.take(), self.nb.take());
                     Some(Ok(MergedEntry {
-                        apath: pa.clone(),
+                        apath: pa,
                         kind: Both,
                     }))
                 }
