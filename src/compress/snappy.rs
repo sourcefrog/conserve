@@ -8,7 +8,7 @@ use snap;
 pub struct Snappy {}
 
 impl super::Compression for Snappy {
-    fn compress_and_write(in_buf: &[u8], w: &mut dyn io::Write) -> io::Result<(usize)> {
+    fn compress_and_write(in_buf: &[u8], w: &mut dyn io::Write) -> io::Result<usize> {
         let mut encoder = snap::Encoder::new();
         let r = encoder.compress_vec(in_buf).unwrap();
         w.write_all(&r)?;
