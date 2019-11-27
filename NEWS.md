@@ -12,6 +12,8 @@ protection.
 * Very basic `conserve diff` command, which compares a source directory
   to a stored tree.
 
+* Move to Rust edition 2018.
+
 ## Conserve 0.5.1 2018-11-11
 
 * `conserve validate` checks the archive much more thoroughly.
