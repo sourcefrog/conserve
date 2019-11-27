@@ -116,7 +116,7 @@ mod tests {
         let lt = LiveTree::open(srcdir.path(), &Report::new()).unwrap();
         let mut bw = BackupWriter::begin(&af).unwrap();
         let report = af.report();
-        tree::copy_tree(&lt, &mut bw).unwrap();
+        copy_tree(&lt, &mut bw).unwrap();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("file"));
         assert_eq!(1, report.get_count("symlink"));

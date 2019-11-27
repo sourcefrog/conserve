@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Conserve backup system.
 
@@ -33,6 +33,7 @@ mod band;
 mod bandid;
 mod blockdir;
 pub mod compress;
+mod copy_tree;
 mod entry;
 pub mod errors;
 pub mod excludes;
@@ -59,6 +60,7 @@ pub use crate::bandid::BandId;
 pub use crate::blockdir::BlockDir;
 pub use crate::compress::snappy::Snappy;
 pub use crate::compress::Compression;
+pub use crate::copy_tree::copy_tree;
 pub use crate::entry::{Entry, Kind};
 pub use crate::errors::*;
 pub use crate::index::{IndexBuilder, IndexEntry, ReadIndex};
@@ -68,7 +70,7 @@ pub use crate::merge::{iter_merged_entries, MergedEntryKind};
 pub use crate::report::{HasReport, Report, Sizes};
 pub use crate::restore::RestoreTree;
 pub use crate::stored_tree::StoredTree;
-pub use crate::tree::{copy_tree, ReadBlocks, ReadTree, TreeSize, WriteTree};
+pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
 pub use crate::ui::UI;
 
 // Commonly-used external types.
