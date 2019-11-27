@@ -2,7 +2,7 @@
 
 ## UNRELEASED
 
-The archive format has changed to "0.6": install an older Conserve release
+The archive format has changed to "0.7": install an older Conserve release
 to read from older archives. This format removes the whole-file hash, in favor
 of just per-block hashes. The whole-file hash slows backups and adds little
 protection.
@@ -11,6 +11,8 @@ protection.
 
 * Very basic `conserve diff` command, which compares a source directory
   to a stored tree.
+
+* Change compression to zstd.
 
 ## Conserve 0.5.1 2018-11-11
 

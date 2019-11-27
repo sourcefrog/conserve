@@ -4,6 +4,7 @@
 use std::io;
 
 pub mod snappy;
+pub mod zstd;
 
 pub trait Compression {
     fn compress_and_write(b: &[u8], w: &mut dyn io::Write) -> io::Result<(usize)>;

@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Conserve backup system.
 
@@ -19,6 +19,7 @@ extern crate terminal_size;
 extern crate thousands;
 extern crate unicode_segmentation;
 extern crate walkdir;
+extern crate zstd;
 
 #[cfg(test)]
 extern crate spectral;
@@ -57,7 +58,7 @@ pub use crate::backup::BackupWriter;
 pub use crate::band::Band;
 pub use crate::bandid::BandId;
 pub use crate::blockdir::BlockDir;
-pub use crate::compress::snappy::Snappy;
+pub use crate::compress::zstd::Zstd;
 pub use crate::compress::Compression;
 pub use crate::diff::diff;
 pub use crate::diff::DiffEntryKind;
@@ -84,7 +85,7 @@ pub fn version() -> &'static str {
 /// Format-compatibility version, normally the first two components of the package version.
 ///
 /// (This might be older than the program version.)
-pub const ARCHIVE_VERSION: &str = "0.6";
+pub const ARCHIVE_VERSION: &str = "0.7";
 
 pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");
 

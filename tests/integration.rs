@@ -104,7 +104,7 @@ fn check_restore(af: &ScratchArchive) {
 
     let block_sizes = restore_report.get_size("block");
     assert!(
-        block_sizes.uncompressed == 8 && block_sizes.compressed == 10,
+        block_sizes.uncompressed == 8 && block_sizes.compressed == 17,
         format!("{:?}", block_sizes)
     );
     let index_sizes = restore_report.get_size("index");

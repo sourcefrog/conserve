@@ -166,8 +166,7 @@ The blocks are spread across a single layer of subdirectories, where each
 subdirectory is the first three hex characters of the name of the contained
 block files.
 
-Data block are compressed in the Snappy format
-<https://github.com/google/snappy>.
+Data block are compressed in the zstd format.
 
 ## Blockdir
 
@@ -194,7 +193,7 @@ Index hunks are stored in an `i/` subdirectory of the band, and then
 in a subdirectory for the sequence number divided by 10000 and
 padded to five digits.  So, the first block is `i/00000/000000000`.
 
-Index hunks are stored in json and also Snappy compressed.
+Index hunks are stored in json and also zstd compressed.
 
 Stored files are in order by filename across all of the index hunks
 within a band.

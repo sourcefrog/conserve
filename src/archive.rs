@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Archives holding backup material.
 //!
@@ -294,7 +294,7 @@ mod tests {
         let mut header_file = fs::File::open(&header_path).unwrap();
         let mut contents = String::new();
         header_file.read_to_string(&mut contents).unwrap();
-        assert_eq!(contents, "{\"conserve_archive_version\":\"0.6\"}\n");
+        assert_eq!(contents, "{\"conserve_archive_version\":\"0.7\"}\n");
 
         match af.last_band_id().unwrap_err() {
             Error::ArchiveEmpty => (),

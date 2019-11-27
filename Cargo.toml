@@ -1,6 +1,6 @@
 [package]
 name = "conserve"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Martin Pool <mbp@sourcefrog.net>"]
 homepage = "https://github.com/sourcefrog/conserve/"
 repository = "https://github.com/sourcefrog/conserve/"
@@ -19,6 +19,7 @@ doc = false  # Conflicts with library docs which are more useful.
 blake2-rfc = "0.2.18"
 chrono = "0.2"
 clap = "2.32"
+globset = "0.4"
 hex = "0.3.2"
 isatty = "0.1"
 rayon = "1.0.2"
@@ -33,7 +34,7 @@ terminal_size = "0.1.8"
 thousands = "0.1.2"
 unicode-segmentation = "1.2.1"
 walkdir = "2"
-globset = "0.4"
+zstd = "0.5.1"
 
 [dev-dependencies]
 assert_cmd = "0.10.1"
@@ -44,5 +45,5 @@ predicates = "1.0.0"
 spectral = "0.6.0"
 
 [features]
+blake2_simd_asm = ["blake2-rfc/simd_asm"]
 default = []
-blake2_simd_asm = ["blake2-rfc/simd_asm"] # Use SIMD assembly, on nightly only.

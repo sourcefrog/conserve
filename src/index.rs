@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Index lists the files in a band in the archive.
 
@@ -128,7 +128,7 @@ impl IndexBuilder {
         let uncompressed_len = json_string.len() as u64;
 
         let mut af = AtomicFile::new(hunk_path)?;
-        let compressed_len = Snappy::compress_and_write(json_string.as_bytes(), &mut af)?;
+        let compressed_len = Zstd::compress_and_write(json_string.as_bytes(), &mut af)?;
 
         // TODO: Don't seek, just count bytes as they're compressed.
         // TODO: Measure time to compress separately from time to write.
@@ -266,7 +266,7 @@ impl Iter {
                 return Err(e.into());
             }
         };
-        let (comp_len, index_bytes) = Snappy::decompress_read(&mut f)?;
+        let (comp_len, index_bytes) = Zstd::decompress_read(&mut f)?;
         self.report.increment_size(
             "index",
             Sizes {
@@ -419,7 +419,7 @@ mod tests {
 
         // Check the stored json version
         let mut f = fs::File::open(&expected_path).unwrap();
-        let (_comp_len, retrieved_bytes) = Snappy::decompress_read(&mut f).unwrap();
+        let (_comp_len, retrieved_bytes) = Zstd::decompress_read(&mut f).unwrap();
         let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
         assert_eq!(
             retrieved,

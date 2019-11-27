@@ -145,7 +145,7 @@ impl BlockDir {
             .prefix(TMP_PREFIX)
             .tempfile_in(&d)?;
         let mut bufw = io::BufWriter::new(tempf);
-        Snappy::compress_and_write(&in_buf, &mut bufw)?;
+        Zstd::compress_and_write(&in_buf, &mut bufw)?;
         let tempf = bufw.into_inner().unwrap();
 
         // TODO: Count bytes rather than stat-ing.
@@ -292,7 +292,7 @@ impl Block {
     pub fn get_all(&self, report: &Report) -> Result<Vec<u8>> {
         let mut f = File::open(&self.path.as_path())?;
         // TODO: Specific error for compression failure (corruption?) vs io errors.
-        let (compressed_len, de) = match Snappy::decompress_read(&mut f) {
+        let (compressed_len, de) = match Zstd::decompress_read(&mut f) {
             Ok(d) => d,
             Err(e) => {
                 report.increment("block.corrupt", 1);
@@ -411,7 +411,7 @@ mod tests {
             read_report.get_size("block"),
             Sizes {
                 uncompressed: EXAMPLE_TEXT.len() as u64,
-                compressed: 8u64,
+                compressed: 15u64,
             }
         );
 
