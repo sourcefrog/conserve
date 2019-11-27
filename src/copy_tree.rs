@@ -37,7 +37,6 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
                         &entry.apath(),
                         e,
                     ));
-                    // TODO: Count and accumulate problems.
                     continue;
                 }
             },
@@ -47,8 +46,6 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
                     "Skipping unsupported file kind of {}",
                     &entry.apath()
                 ));
-                // TODO: Count them - make the report visible somewhere? Or rather, make this the
-                // job of the ST to skip them.
                 continue;
             }
         }?;

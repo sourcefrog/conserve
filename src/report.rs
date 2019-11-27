@@ -221,6 +221,9 @@ impl Report {
     ///
     /// Later this might also count or summarize them.
     pub fn problem(&self, s: &str) {
+        // TODO: Rather than taking an arbitrary string, take an enum plus a path and perhaps an
+        // underlying IO error. Keep counts.
+        // <https://github.com/sourcefrog/conserve/issues/72>.
         self.ui.lock().unwrap().problem(s)
     }
 
