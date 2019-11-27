@@ -319,8 +319,8 @@ fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
     // TODO: Optionally include unchanged files.
     let st = stored_tree_from_options(subm, report)?;
     let lt = live_tree_from_options(subm, report)?;
-    for e in conserve::diff(&st, &lt, &report)? {
-        use DiffEntryKind::*;
+    for e in conserve::iter_merged_entries(&st, &lt, &report)? {
+        use MergedEntryKind::*;
         let ee = e?;
         let ks = match ee.kind {
             LeftOnly => "left",

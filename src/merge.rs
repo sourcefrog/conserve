@@ -1,41 +1,39 @@
 // Copyright 2018, 2019 Martin Pool.
 
-// TODO: Perhaps split out zipped iteration of entries (without looking
-// at their metadata or contents), from actual diff-ing.
+//! Merge two trees by iterating them in lock step.
 
 use std::cmp::Ordering;
 
 use crate::*;
 
-///! Diff two trees by walking them in order, in parallel.
-
 #[derive(Debug, PartialEq, Eq)]
-pub enum DiffEntryKind {
+pub enum MergedEntryKind {
     LeftOnly,
     RightOnly,
     Both,
     // TODO: Perhaps also include the tree-specific entry kind?
 }
 
-use self::DiffEntryKind::*;
+use self::MergedEntryKind::*;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct DiffEntry {
+pub struct MergedEntry {
     // TODO: Add accessors rather than making these public?
+    // TODO: Include the original entries from either side?
     pub apath: Apath,
-    pub kind: DiffEntryKind,
+    pub kind: MergedEntryKind,
 }
 
-/// Zip together entries from two trees, into an iterator of either Results or DiffEntry.
+/// Zip together entries from two trees, into an iterator of MergedEntryKind.
 ///
 /// Note that at present this only says whether files are absent from either
 /// side, not whether there is a content difference.
-pub fn diff<AT, BT>(a: &AT, b: &BT, report: &Report) -> Result<DiffTrees<AT, BT>>
+pub fn iter_merged_entries<AT, BT>(a: &AT, b: &BT, report: &Report) -> Result<MergeTrees<AT, BT>>
 where
     AT: ReadTree,
     BT: ReadTree,
 {
-    Ok(DiffTrees {
+    Ok(MergeTrees {
         ait: a.iter_entries(report)?,
         bit: b.iter_entries(report)?,
         na: None,
@@ -43,7 +41,7 @@ where
     })
 }
 
-pub struct DiffTrees<AT: ReadTree, BT: ReadTree> {
+pub struct MergeTrees<AT: ReadTree, BT: ReadTree> {
     ait: AT::I,
     bit: BT::I,
 
@@ -52,12 +50,12 @@ pub struct DiffTrees<AT: ReadTree, BT: ReadTree> {
     nb: Option<BT::E>,
 }
 
-impl<AT, BT> Iterator for DiffTrees<AT, BT>
+impl<AT, BT> Iterator for MergeTrees<AT, BT>
 where
     AT: ReadTree,
     BT: ReadTree,
 {
-    type Item = Result<DiffEntry>;
+    type Item = Result<MergedEntry>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // TODO: Count into report?
@@ -84,13 +82,13 @@ where
                 None
             } else {
                 let tb = self.nb.take().unwrap();
-                Some(Ok(DiffEntry {
+                Some(Ok(MergedEntry {
                     apath: tb.apath(),
                     kind: RightOnly,
                 }))
             }
         } else if self.nb.is_none() {
-            Some(Ok(DiffEntry {
+            Some(Ok(MergedEntry {
                 apath: self.na.take().unwrap().apath(),
                 kind: LeftOnly,
             }))
@@ -100,21 +98,21 @@ where
             match pa.cmp(&pb) {
                 Ordering::Equal => {
                     (self.na.take(), self.nb.take());
-                    Some(Ok(DiffEntry {
+                    Some(Ok(MergedEntry {
                         apath: pa.clone(),
                         kind: Both,
                     }))
                 }
                 Ordering::Less => {
                     self.na.take().unwrap();
-                    Some(Ok(DiffEntry {
+                    Some(Ok(MergedEntry {
                         apath: pa,
                         kind: LeftOnly,
                     }))
                 }
                 Ordering::Greater => {
                     self.nb.take().unwrap();
-                    Some(Ok(DiffEntry {
+                    Some(Ok(MergedEntry {
                         apath: pb,
                         kind: RightOnly,
                     }))
@@ -126,8 +124,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::DiffEntry;
-    use super::DiffEntryKind::*;
+    use super::MergedEntry;
+    use super::MergedEntryKind::*;
     use crate::test_fixtures::*;
     use crate::*;
 
@@ -137,13 +135,13 @@ mod tests {
         let tb = TreeFixture::new();
         let report = Report::new();
 
-        let di = diff(&ta.live_tree(), &tb.live_tree(), &report)
+        let di = iter_merged_entries(&ta.live_tree(), &tb.live_tree(), &report)
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(di.len(), 1);
         assert_eq!(
             *di[0].as_ref().unwrap(),
-            DiffEntry {
+            MergedEntry {
                 apath: "/".into(),
                 kind: Both,
             }
