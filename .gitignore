@@ -1,4 +1,5 @@
 target
+tags
 .cargo/config
 *.bk
 .*.sw[po]
