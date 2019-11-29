@@ -54,9 +54,9 @@ impl entry::Entry for IndexEntry {
         self.mtime
     }
 
-    fn symlink_target(&self) -> Option<String> {
+    fn symlink_target(&self) -> &Option<String> {
         assert_eq!(self.kind() == Kind::Symlink, self.target.is_some());
-        self.target.clone()
+        &self.target
     }
 
     fn size(&self) -> Option<u64> {

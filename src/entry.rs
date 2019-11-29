@@ -21,7 +21,7 @@ pub enum Kind {
 /// A file, directory, or symlink stored in any tree.
 ///
 /// To get the contents of a plain file, use `ReadTree::file_contents`.
-pub trait Entry : Debug {
+pub trait Entry: Debug {
     fn kind(&self) -> Kind;
 
     // TODO: Would be better to return a reference, but it's difficult because IndexEntry doesn't
@@ -33,7 +33,7 @@ pub trait Entry : Debug {
     fn unix_mtime(&self) -> Option<u64>;
 
     /// Target of the symlink, if this is a symlink.
-    fn symlink_target(&self) -> Option<String>;
+    fn symlink_target(&self) -> &Option<String>;
 
     /// Size of the file, if it is a file. None for directories and symlinks.
     fn size(&self) -> Option<u64>;

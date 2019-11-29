@@ -84,7 +84,7 @@ impl tree::WriteTree for BackupWriter {
 
     fn write_symlink(&mut self, source_entry: &dyn Entry) -> Result<()> {
         self.report.increment("symlink", 1);
-        let target = source_entry.symlink_target();
+        let target = source_entry.symlink_target().clone();
         assert!(target.is_some());
         self.push_entry(IndexEntry {
             apath: String::from(source_entry.apath()),

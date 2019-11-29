@@ -37,6 +37,16 @@ impl LiveTree {
     pub fn with_excludes(self, excludes: GlobSet) -> LiveTree {
         LiveTree { excludes, ..self }
     }
+
+    fn relative_path(&self, apath: &Apath) -> PathBuf {
+        relative_path(&self.path, apath)
+    }
+}
+
+fn relative_path(root: &PathBuf, apath: &Apath) -> PathBuf {
+    let mut path = root.clone();
+    path.push(&apath[1..]);
+    path
 }
 
 impl tree::ReadTree for LiveTree {
@@ -60,11 +70,7 @@ impl tree::ReadTree for LiveTree {
                 return Err(e.into());
             }
         };
-        let root_entry = Entry {
-            apath: Apath::from("/"),
-            path: self.path.clone(),
-            metadata: root_metadata,
-        };
+        let root_entry = Entry::new(Apath::from("/"), self.path.clone(), &root_metadata);
         // Preload iter to return the root and then recurse into it.
         let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();
         entry_deque.push_back(root_entry.clone());
@@ -73,6 +79,7 @@ impl tree::ReadTree for LiveTree {
         let mut dir_deque = VecDeque::<Entry>::new();
         dir_deque.push_back(root_entry);
         Ok(Iter {
+            root_path: self.path.clone(),
             entry_deque,
             dir_deque,
             report: report.clone(),
@@ -84,8 +91,7 @@ impl tree::ReadTree for LiveTree {
     fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
         use crate::entry::Entry;
         assert_eq!(entry.kind(), Kind::File);
-        let mut path = self.path.clone();
-        path.push(&entry.apath[1..]);
+        let path = self.relative_path(&entry.apath);
         Ok(fs::File::open(&path)?)
     }
 
@@ -115,16 +121,60 @@ impl fmt::Debug for LiveTree {
 }
 
 /// An entry in a live tree, describing a real file etc on disk.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Entry {
     /// Conserve apath, relative to the top-level directory.
-    pub apath: Apath,
+    apath: Apath,
 
-    /// Possibly absolute path through which the file can be opened.
-    pub path: PathBuf,
+    kind: Kind,
+    mtime: Option<u64>,
+    target: Option<String>,
+    size: Option<u64>,
+}
 
-    /// stat-like structure including kind, mtime, etc.
-    pub metadata: fs::Metadata,
+impl Entry {
+    fn new(apath: Apath, path: PathBuf, metadata: &fs::Metadata) -> Entry {
+        // TODO: This should either do no IO, or all the IO.
+        let kind = if metadata.is_file() {
+            Kind::File
+        } else if metadata.is_dir() {
+            Kind::Dir
+        } else if metadata.file_type().is_symlink() {
+            Kind::Symlink
+        } else {
+            Kind::Unknown
+        };
+        let mtime = metadata
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|dur| dur.as_secs());
+        // TODO: Record a problem and log a message if the target is not decodable, rather than
+        // panicing.
+        // TODO: Also return a Result if the link can't be read?
+        let target = match kind {
+            Kind::Symlink => Some(
+                fs::read_link(&path)
+                    .unwrap()
+                    .into_os_string()
+                    .into_string()
+                    .unwrap(),
+            ),
+            _ => None,
+        };
+        let size = if metadata.is_file() {
+            Some(metadata.len())
+        } else {
+            None
+        };
+        Entry {
+            apath,
+            kind,
+            mtime,
+            target,
+            size,
+        }
+    }
 }
 
 impl entry::Entry for Entry {
@@ -135,62 +185,28 @@ impl entry::Entry for Entry {
     }
 
     fn kind(&self) -> Kind {
-        if self.metadata.is_file() {
-            Kind::File
-        } else if self.metadata.is_dir() {
-            Kind::Dir
-        } else if self.metadata.file_type().is_symlink() {
-            Kind::Symlink
-        } else {
-            Kind::Unknown
-        }
+        self.kind
     }
 
     fn unix_mtime(&self) -> Option<u64> {
-        self.metadata
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|dur| dur.as_secs())
+        self.mtime
     }
 
-    fn symlink_target(&self) -> Option<String> {
-        // TODO: Record a problem and log a message if the target is not decodable, rather than
-        // panicing.
-        // TODO: Also return a Result if the link can't be read?
-        match self.kind() {
-            Kind::Symlink => Some(
-                fs::read_link(&self.path)
-                    .unwrap()
-                    .into_os_string()
-                    .into_string()
-                    .unwrap(),
-            ),
-            _ => None,
-        }
+    fn symlink_target(&self) -> &Option<String> {
+        &self.target
     }
 
     fn size(&self) -> Option<u64> {
-        if self.metadata.is_file() {
-            Some(self.metadata.len())
-        } else {
-            None
-        }
+        self.size
     }
 }
 
-impl fmt::Debug for Entry {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("live_tree::Entry")
-            .field("apath", &self.apath)
-            .field("path", &self.path)
-            .finish()
-    }
-}
-
-/// Recursive iterator of the contents of a source directory.
+/// Recursive iterator of the contents of a live tree.
 #[derive(Debug)]
 pub struct Iter {
+    /// Root of the source tree.
+    root_path: PathBuf,
+
     /// Directories yet to be visited.
     dir_deque: VecDeque<Entry>,
 
@@ -211,7 +227,8 @@ impl Iter {
     fn visit_next_directory(&mut self, dir_entry: &Entry) -> Result<()> {
         self.report.increment("source.visited.directories", 1);
         let mut children = Vec::<(OsString, bool, Apath)>::new();
-        for entry in fs::read_dir(&dir_entry.path)? {
+        let dir_path = relative_path(&self.root_path, &dir_entry.apath);
+        for entry in fs::read_dir(&dir_path)? {
             let entry = entry?;
             let ft = entry.file_type()?;
             let mut path = String::from(dir_entry.apath.clone());
@@ -237,7 +254,7 @@ impl Iter {
         children.sort();
         let mut directory_insert_point = 0;
         for (child_name, is_dir, apath) in children {
-            let child_path = dir_entry.path.join(&child_name).to_path_buf();
+            let child_path = dir_path.join(&child_name).to_path_buf();
             let metadata = match fs::symlink_metadata(&child_path) {
                 Ok(metadata) => metadata,
                 Err(e) => {
@@ -247,11 +264,7 @@ impl Iter {
                     continue;
                 }
             };
-            let new_entry = Entry {
-                apath,
-                path: child_path,
-                metadata,
-            };
+            let new_entry = Entry::new(apath, child_path, &metadata);
             if is_dir {
                 self.dir_deque
                     .insert(directory_insert_point, new_entry.clone());
@@ -302,6 +315,8 @@ mod tests {
     use super::super::*;
     use crate::test_fixtures::TreeFixture;
 
+    use regex::Regex;
+
     #[test]
     fn open_tree() {
         let tf = TreeFixture::new();
@@ -327,29 +342,17 @@ mod tests {
         let result = source_iter.by_ref().collect::<Result<Vec<_>>>().unwrap();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
-        assert_eq!(&result[0].path, &tf.root);
         assert_eq!(&result[1].apath, "/aaa");
-        assert_eq!(&result[1].path, &tf.root.join("aaa"));
         assert_eq!(&result[2].apath, "/bba");
-        assert_eq!(&result[2].path, &tf.root.join("bba"));
         assert_eq!(&result[3].apath, "/jam");
-        assert_eq!(&result[3].path, &tf.root.join("jam"));
         assert_eq!(&result[4].apath, "/jelly");
-        assert_eq!(&result[4].path, &tf.root.join("jelly"));
         assert_eq!(&result[5].apath, "/jam/.etc");
-        assert_eq!(&result[5].path, &tf.root.join("jam").join(".etc"));
         assert_eq!(&result[6].apath, "/jam/apricot");
-        assert_eq!(&result[6].path, &tf.root.join("jam").join("apricot"));
         assert_eq!(result.len(), 7);
 
-        assert_eq!(
-            format!("{:?}", &result[6]),
-            format!(
-                "live_tree::Entry {{ apath: Apath({:?}), path: {:?} }}",
-                "/jam/apricot",
-                &tf.root.join("jam").join("apricot")
-            )
-        );
+        let repr = format!("{:?}", &result[6]);
+        let re = Regex::new(r#"Entry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: Some\(\d+\), target: None, size: Some\(8\) \}"#).unwrap();
+        assert!(re.is_match(&repr), repr);
 
         assert_eq!(report.get_count("source.visited.directories"), 4);
         assert_eq!(report.get_count("source.selected"), 7);
@@ -377,21 +380,13 @@ mod tests {
 
         // First one is the root
         assert_eq!(&result[0].apath, "/");
-        assert_eq!(&result[0].path, &tf.root);
         assert_eq!(&result[1].apath, "/baz");
-        assert_eq!(&result[1].path, &tf.root.join("baz"));
         assert_eq!(&result[2].apath, "/baz/test");
-        assert_eq!(&result[2].path, &tf.root.join("baz").join("test"));
         assert_eq!(result.len(), 3);
 
-        assert_eq!(
-            format!("{:?}", &result[2]),
-            format!(
-                "live_tree::Entry {{ apath: Apath({:?}), path: {:?} }}",
-                "/baz/test",
-                &tf.root.join("baz").join("test")
-            )
-        );
+        let repr = format!("{:?}", &result[2]);
+        let re = Regex::new(r#"Entry \{ apath: Apath\("/baz/test"\), kind: File, mtime: Some\(\d+\), target: None, size: Some\(8\) \}"#).unwrap();
+        assert!(re.is_match(&repr), repr);
 
         assert_eq!(
             2,
@@ -427,9 +422,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(&result[0].apath, "/");
-        assert_eq!(&result[0].path, &tf.root);
-
         assert_eq!(&result[1].apath, "/from");
-        assert_eq!(&result[1].path, &tf.root.join("from"));
     }
 }
