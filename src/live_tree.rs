@@ -50,7 +50,6 @@ fn relative_path(root: &PathBuf, apath: &Apath) -> PathBuf {
 }
 
 impl tree::ReadTree for LiveTree {
-    type E = Entry;
     type I = Iter;
     type R = std::fs::File;
 
@@ -70,7 +69,7 @@ impl tree::ReadTree for LiveTree {
                 return Err(e.into());
             }
         };
-        let root_entry = Entry::new(Apath::from("/"), self.path.clone(), &root_metadata);
+        let root_entry = entry_from_fs(Apath::from("/"), self.path.clone(), &root_metadata);
         // Preload iter to return the root and then recurse into it.
         let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();
         entry_deque.push_back(root_entry.clone());
@@ -88,8 +87,7 @@ impl tree::ReadTree for LiveTree {
         })
     }
 
-    fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
-        use crate::entry::Entry;
+    fn file_contents(&self, entry: &Entry) -> Result<Self::R> {
         assert_eq!(entry.kind(), Kind::File);
         let path = self.relative_path(&entry.apath);
         Ok(fs::File::open(&path)?)
@@ -120,84 +118,47 @@ impl fmt::Debug for LiveTree {
     }
 }
 
-/// An entry in a live tree, describing a real file etc on disk.
-#[derive(Clone, Debug)]
-pub struct Entry {
-    /// Conserve apath, relative to the top-level directory.
-    apath: Apath,
-
-    kind: Kind,
-    mtime: Option<u64>,
-    target: Option<String>,
-    size: Option<u64>,
-}
-
-impl Entry {
-    fn new(apath: Apath, path: PathBuf, metadata: &fs::Metadata) -> Entry {
-        // TODO: This should either do no IO, or all the IO.
-        let kind = if metadata.is_file() {
-            Kind::File
-        } else if metadata.is_dir() {
-            Kind::Dir
-        } else if metadata.file_type().is_symlink() {
-            Kind::Symlink
-        } else {
-            Kind::Unknown
-        };
-        let mtime = metadata
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|dur| dur.as_secs());
-        // TODO: Record a problem and log a message if the target is not decodable, rather than
-        // panicing.
-        // TODO: Also return a Result if the link can't be read?
-        let target = match kind {
-            Kind::Symlink => Some(
-                fs::read_link(&path)
-                    .unwrap()
-                    .into_os_string()
-                    .into_string()
-                    .unwrap(),
-            ),
-            _ => None,
-        };
-        let size = if metadata.is_file() {
-            Some(metadata.len())
-        } else {
-            None
-        };
-        Entry {
-            apath,
-            kind,
-            mtime,
-            target,
-            size,
-        }
-    }
-}
-
-impl entry::Entry for Entry {
-    fn apath(&self) -> Apath {
-        // TODO: Better to just return a reference with the same lifetime,
-        // once index entries can support that.
-        self.apath.clone()
-    }
-
-    fn kind(&self) -> Kind {
-        self.kind
-    }
-
-    fn unix_mtime(&self) -> Option<u64> {
-        self.mtime
-    }
-
-    fn symlink_target(&self) -> &Option<String> {
-        &self.target
-    }
-
-    fn size(&self) -> Option<u64> {
-        self.size
+fn entry_from_fs(apath: Apath, path: PathBuf, metadata: &fs::Metadata) -> Entry {
+    // TODO: This should either do no IO, or all the IO.
+    let kind = if metadata.is_file() {
+        Kind::File
+    } else if metadata.is_dir() {
+        Kind::Dir
+    } else if metadata.file_type().is_symlink() {
+        Kind::Symlink
+    } else {
+        Kind::Unknown
+    };
+    let mtime = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|dur| dur.as_secs());
+    // TODO: Record a problem and log a message if the target is not decodable, rather than
+    // panicing.
+    // TODO: Also return a Result if the link can't be read?
+    let target = match kind {
+        Kind::Symlink => Some(
+            fs::read_link(&path)
+                .unwrap()
+                .into_os_string()
+                .into_string()
+                .unwrap(),
+        ),
+        _ => None,
+    };
+    let size = if metadata.is_file() {
+        Some(metadata.len())
+    } else {
+        None
+    };
+    Entry {
+        apath,
+        kind,
+        mtime,
+        target,
+        size,
+        addrs: vec![],
     }
 }
 
@@ -264,7 +225,7 @@ impl Iter {
                     continue;
                 }
             };
-            let new_entry = Entry::new(apath, child_path, &metadata);
+            let new_entry = entry_from_fs(apath, child_path, &metadata);
             if is_dir {
                 self.dir_deque
                     .insert(directory_insert_point, new_entry.clone());
@@ -351,7 +312,7 @@ mod tests {
         assert_eq!(result.len(), 7);
 
         let repr = format!("{:?}", &result[6]);
-        let re = Regex::new(r#"Entry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: Some\(\d+\), target: None, size: Some\(8\) \}"#).unwrap();
+        let re = Regex::new(r#"Entry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: Some\(\d+\), addrs: \[\], target: None, size: Some\(8\) \}"#).unwrap();
         assert!(re.is_match(&repr), repr);
 
         assert_eq!(report.get_count("source.visited.directories"), 4);
@@ -385,7 +346,7 @@ mod tests {
         assert_eq!(result.len(), 3);
 
         let repr = format!("{:?}", &result[2]);
-        let re = Regex::new(r#"Entry \{ apath: Apath\("/baz/test"\), kind: File, mtime: Some\(\d+\), target: None, size: Some\(8\) \}"#).unwrap();
+        let re = Regex::new(r#"Entry \{ apath: Apath\("/baz/test"\), kind: File, mtime: Some\(\d+\), addrs: \[\], target: None, size: Some\(8\) \}"#).unwrap();
         assert!(re.is_match(&repr), repr);
 
         assert_eq!(

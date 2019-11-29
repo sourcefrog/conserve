@@ -31,7 +31,7 @@ impl BackupWriter {
         })
     }
 
-    fn push_entry(&mut self, index_entry: IndexEntry) -> Result<()> {
+    fn push_entry(&mut self, index_entry: Entry) -> Result<()> {
         self.index_builder.push(index_entry);
         self.index_builder.maybe_flush(&self.report)?;
         Ok(())
@@ -45,53 +45,51 @@ impl tree::WriteTree for BackupWriter {
         Ok(())
     }
 
-    fn write_dir(&mut self, source_entry: &dyn Entry) -> Result<()> {
+    fn write_dir(&mut self, source_entry: &Entry) -> Result<()> {
         self.report.increment("dir", 1);
-        self.push_entry(IndexEntry {
+        self.push_entry(Entry {
             apath: source_entry.apath(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Dir,
             addrs: vec![],
             target: None,
+            size: None,
         })
     }
 
-    fn write_file(
-        &mut self,
-        source_entry: &dyn Entry,
-        content: &mut dyn std::io::Read,
-    ) -> Result<()> {
+    fn write_file(&mut self, source_entry: &Entry, content: &mut dyn std::io::Read) -> Result<()> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
         let addrs = self.block_dir.store(content, &self.report)?;
-        let bytes = addrs.iter().map(|a| a.len).sum();
+        let size = addrs.iter().map(|a| a.len).sum();
         self.report.increment_size(
             "file.bytes",
             Sizes {
-                uncompressed: bytes,
+                uncompressed: size,
                 compressed: 0,
             },
         );
-        // TODO: Perhaps return a future for an index, so that storage of the files can overlap.
-        self.push_entry(IndexEntry {
+        self.push_entry(Entry {
             apath: source_entry.apath(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::File,
             addrs,
             target: None,
+            size: Some(size),
         })
     }
 
-    fn write_symlink(&mut self, source_entry: &dyn Entry) -> Result<()> {
+    fn write_symlink(&mut self, source_entry: &Entry) -> Result<()> {
         self.report.increment("symlink", 1);
         let target = source_entry.symlink_target().clone();
         assert!(target.is_some());
-        self.push_entry(IndexEntry {
+        self.push_entry(Entry {
             apath: source_entry.apath(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Symlink,
             addrs: vec![],
             target,
+            size: None,
         })
     }
 }
@@ -134,7 +132,7 @@ mod tests {
             .iter(&excludes::excludes_nothing(), &report)
             .unwrap()
             .filter_map(|i| i.ok())
-            .collect::<Vec<IndexEntry>>();
+            .collect::<Vec<Entry>>();
         assert_eq!(2, index_entries.len());
 
         let e2 = &index_entries[1];

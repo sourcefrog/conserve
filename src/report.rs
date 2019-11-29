@@ -61,7 +61,7 @@ pub struct Sizes {
     pub uncompressed: u64,
 }
 
-static KNOWN_SIZES: &'static [&'static str] = &["block", "file.bytes", "index"];
+static KNOWN_SIZES: &[&str] = &["block", "file.bytes", "index"];
 
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
@@ -196,7 +196,7 @@ impl Report {
     }
 
     /// Report that processing started for a given entry.
-    pub fn start_entry(&self, entry: &dyn Entry) {
+    pub fn start_entry(&self, entry: &Entry) {
         // TODO: Leave cursor pending at the end of the line until it's finished?
         if self.print_filenames {
             self.print(&format!("{}", entry.apath()));

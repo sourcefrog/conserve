@@ -63,7 +63,7 @@ pub use crate::compress::Compression;
 pub use crate::copy_tree::copy_tree;
 pub use crate::entry::{Entry, Kind};
 pub use crate::errors::*;
-pub use crate::index::{IndexBuilder, IndexEntry, ReadIndex};
+pub use crate::index::{IndexBuilder, ReadIndex};
 pub use crate::io::{ensure_dir_exists, list_dir, AtomicFile};
 pub use crate::live_tree::LiveTree;
 pub use crate::merge::{iter_merged_entries, MergedEntryKind};

@@ -66,7 +66,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
         .iter(&excludes::excludes_nothing(), &report)
         .unwrap()
         .filter_map(|i| i.ok())
-        .collect::<Vec<IndexEntry>>();
+        .collect::<Vec<Entry>>();
     assert_eq!(2, index_entries.len());
 
     let root_entry = &index_entries[0];
@@ -111,10 +111,10 @@ fn check_restore(af: &ScratchArchive) {
     // Doubled because we currently read the index twice.
     assert_eq!(
         index_sizes.uncompressed,
-        306 * 2,
+        327 * 2,
         "index_sizes.uncompressed on restore"
     );
-    assert!(index_sizes.compressed <= 306 * 2, index_sizes.compressed);
+    assert!(index_sizes.compressed <= 327 * 2, index_sizes.compressed);
     // TODO: Check what was restored.
 }
 

@@ -11,7 +11,6 @@
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 
-use crate::index::IndexEntry;
 use crate::stored_file::{ReadStoredFile, StoredFile};
 use crate::*;
 
@@ -95,13 +94,13 @@ impl StoredTree {
             .unwrap_or(Ok(()))
     }
 
-    fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {
+    fn validate_one_entry(&self, e: &Entry) -> Result<()> {
         self.report().start_entry(e);
         self.open_stored_file(&e)?.validate()
     }
 
     /// Open a file stored within this tree.
-    fn open_stored_file(&self, entry: &IndexEntry) -> Result<StoredFile> {
+    fn open_stored_file(&self, entry: &Entry) -> Result<StoredFile> {
         Ok(StoredFile::open(
             self.archive.block_dir().clone(),
             entry.addrs.clone(),
@@ -114,7 +113,6 @@ impl StoredTree {
 }
 
 impl ReadTree for StoredTree {
-    type E = index::IndexEntry;
     type I = index::Iter;
     type R = ReadStoredFile;
 
@@ -123,7 +121,7 @@ impl ReadTree for StoredTree {
         self.band.index().iter(&self.excludes, report)
     }
 
-    fn file_contents(&self, entry: &Self::E) -> Result<Self::R> {
+    fn file_contents(&self, entry: &Entry) -> Result<Self::R> {
         Ok(self.open_stored_file(entry)?.into_read())
     }
 

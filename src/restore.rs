@@ -34,7 +34,7 @@ impl RestoreTree {
         })
     }
 
-    fn entry_path(&self, entry: &dyn Entry) -> PathBuf {
+    fn entry_path(&self, entry: &Entry) -> PathBuf {
         // Remove initial slash so that the apath is relative to the destination.
         self.path.join(&entry.apath()[1..])
     }
@@ -46,7 +46,7 @@ impl tree::WriteTree for RestoreTree {
         Ok(())
     }
 
-    fn write_dir(&mut self, entry: &dyn Entry) -> Result<()> {
+    fn write_dir(&mut self, entry: &Entry) -> Result<()> {
         self.report.increment("dir", 1);
         match fs::create_dir(self.entry_path(entry)) {
             Ok(_) => Ok(()),
@@ -55,7 +55,7 @@ impl tree::WriteTree for RestoreTree {
         }
     }
 
-    fn write_file(&mut self, entry: &dyn Entry, content: &mut dyn std::io::Read) -> Result<()> {
+    fn write_file(&mut self, entry: &Entry, content: &mut dyn std::io::Read) -> Result<()> {
         // TODO: Restore permissions.
         // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
         // TODO: For restore, maybe not necessary to rename into place, and
@@ -74,7 +74,7 @@ impl tree::WriteTree for RestoreTree {
     }
 
     #[cfg(unix)]
-    fn write_symlink(&mut self, entry: &dyn Entry) -> Result<()> {
+    fn write_symlink(&mut self, entry: &Entry) -> Result<()> {
         use std::os::unix::fs as unix_fs;
         self.report.increment("symlink", 1);
         if let Some(ref target) = entry.symlink_target() {
@@ -88,7 +88,7 @@ impl tree::WriteTree for RestoreTree {
     }
 
     #[cfg(not(unix))]
-    fn write_symlink(&mut self, entry: &dyn Entry) -> Result<()> {
+    fn write_symlink(&mut self, entry: &Entry) -> Result<()> {
         // TODO: Add a test with a canned index containing a symlink, and expect
         // it cannot be restored on Windows and can be on Unix.
         self.report.problem(&format!(

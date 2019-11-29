@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use super::*;
 
 /// Kind of file that can be stored in the archive.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Kind {
     File,
     Dir,
@@ -18,23 +18,54 @@ pub enum Kind {
     Unknown,
 }
 
-/// A file, directory, or symlink stored in any tree.
+/// Description of one archived file.
 ///
-/// To get the contents of a plain file, use `ReadTree::file_contents`.
-pub trait Entry: Debug {
-    fn kind(&self) -> Kind;
+/// This struct is directly encoded/decoded to the json index file, and also can be constructed by
+/// stat-ing (but not reading) a live file.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Entry {
+    /// Path of this entry relative to the base of the backup, in `apath` form.
+    pub apath: Apath,
 
-    // TODO: Would be better to return a reference, but it's difficult because IndexEntry doesn't
-    // directly store an Apath due to serialization.
+    /// Type of file.
+    pub kind: Kind,
+
+    /// File modification time, in whole seconds past the Unix epoch.
+    pub mtime: Option<u64>,
+
+    /// For stored files, the blocks holding the file contents.
+    pub addrs: Vec<blockdir::Address>,
+
+    /// For symlinks only, the target of the symlink.
+    pub target: Option<String>,
+
+    /// Total file size.
+    pub size: Option<u64>,
+}
+
+impl Entry {
     /// Return apath relative to the top of the tree.
-    fn apath(&self) -> Apath;
+    pub fn apath(&self) -> Apath {
+        // TODO: Better to just return a reference with the same lifetime.
+        self.apath.clone()
+    }
+
+    pub fn kind(&self) -> Kind {
+        self.kind
+    }
 
     /// Return Unix-format mtime if known.
-    fn unix_mtime(&self) -> Option<u64>;
+    pub fn unix_mtime(&self) -> Option<u64> {
+        self.mtime
+    }
 
     /// Target of the symlink, if this is a symlink.
-    fn symlink_target(&self) -> &Option<String>;
+    pub fn symlink_target(&self) -> &Option<String> {
+        &self.target
+    }
 
     /// Size of the file, if it is a file. None for directories and symlinks.
-    fn size(&self) -> Option<u64>;
+    pub fn size(&self) -> Option<u64> {
+        self.size
+    }
 }

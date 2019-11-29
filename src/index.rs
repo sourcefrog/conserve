@@ -10,61 +10,12 @@ use std::path::{Path, PathBuf};
 use std::str;
 use std::vec;
 
-use super::apath::Apath;
-use super::blockdir;
 use super::io::file_exists;
 use super::*;
 
 use globset::GlobSet;
 
 pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
-
-/// Description of one archived file.
-///
-/// This struct is directly encoded/decoded to the json index file.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct IndexEntry {
-    /// Path of this entry relative to the base of the backup, in `apath` form.
-    pub apath: Apath,
-
-    /// File modification time, in whole seconds past the Unix epoch.
-    pub mtime: Option<u64>,
-
-    /// Type of file.
-    pub kind: Kind,
-
-    /// Blocks holding the file contents.
-    pub addrs: Vec<blockdir::Address>,
-
-    /// For symlinks only, the target of the symlink.
-    pub target: Option<String>,
-}
-
-impl entry::Entry for IndexEntry {
-    fn apath(&self) -> Apath {
-        self.apath.clone()
-    }
-
-    fn kind(&self) -> Kind {
-        self.kind
-    }
-
-    fn unix_mtime(&self) -> Option<u64> {
-        self.mtime
-    }
-
-    fn symlink_target(&self) -> &Option<String> {
-        assert_eq!(self.kind() == Kind::Symlink, self.target.is_some());
-        &self.target
-    }
-
-    fn size(&self) -> Option<u64> {
-        match self.kind {
-            Kind::File => Some(self.addrs.iter().map(|a| a.len).sum()),
-            _ => None,
-        }
-    }
-}
 
 /// Accumulates ordered changes to the index and streams them out to index files.
 #[derive(Debug)]
@@ -73,7 +24,7 @@ pub struct IndexBuilder {
     dir: PathBuf,
 
     /// Currently queued entries to be written out.
-    entries: Vec<IndexEntry>,
+    entries: Vec<Entry>,
 
     /// Index hunk number, starting at 0.
     sequence: u32,
@@ -90,7 +41,7 @@ impl IndexBuilder {
     pub fn new(dir: &Path) -> IndexBuilder {
         IndexBuilder {
             dir: dir.to_path_buf(),
-            entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
+            entries: Vec::<Entry>::with_capacity(MAX_ENTRIES_PER_HUNK),
             sequence: 0,
             check_order: apath::CheckOrder::new(),
         }
@@ -99,7 +50,7 @@ impl IndexBuilder {
     /// Append an entry to the index.
     ///
     /// The new entry must sort after everything already written to the index.
-    pub fn push(&mut self, entry: IndexEntry) {
+    pub fn push(&mut self, entry: Entry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
         self.check_order.check(&entry.apath);
@@ -201,7 +152,7 @@ impl ReadIndex {
 pub struct Iter {
     /// The `i` directory within the band where all files for this index are written.
     dir: PathBuf,
-    buffered_entries: vec::IntoIter<IndexEntry>,
+    buffered_entries: vec::IntoIter<Entry>,
     next_hunk_number: u32,
     pub report: Report,
     excludes: GlobSet,
@@ -219,9 +170,9 @@ impl fmt::Debug for Iter {
 }
 
 impl Iterator for Iter {
-    type Item = Result<IndexEntry>;
+    type Item = Result<Entry>;
 
-    fn next(&mut self) -> Option<Result<IndexEntry>> {
+    fn next(&mut self) -> Option<Result<Entry>> {
         loop {
             if let Some(entry) = self.buffered_entries.next() {
                 return Some(Ok(entry));
@@ -242,7 +193,7 @@ impl Iter {
     pub fn open(index_dir: &Path, excludes: &GlobSet, report: &Report) -> Result<Iter> {
         Ok(Iter {
             dir: index_dir.to_path_buf(),
-            buffered_entries: Vec::<IndexEntry>::new().into_iter(),
+            buffered_entries: Vec::<Entry>::new().into_iter(),
             next_hunk_number: 0,
             report: report.clone(),
             excludes: excludes.clone(),
@@ -278,7 +229,7 @@ impl Iter {
         // TODO: More specific error messages including the filename.
         let index_json = str::from_utf8(&index_bytes)
             .or_else(|_| Err(Error::IndexCorrupt(hunk_path.clone())))?;
-        let entries: Vec<IndexEntry> = serde_json::from_str(index_json)?;
+        let entries: Vec<Entry> = serde_json::from_str(index_json)?;
         if entries.is_empty() {
             self.report
                 .problem(&format!("Index hunk {} is empty", hunk_path.display()));
@@ -299,7 +250,7 @@ impl Iter {
                     true
                 }
             })
-            .collect::<Vec<IndexEntry>>()
+            .collect::<Vec<Entry>>()
             .into_iter();
 
         self.next_hunk_number += 1;
@@ -322,33 +273,36 @@ mod tests {
     }
 
     pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
-        ib.push(IndexEntry {
+        ib.push(Entry {
             apath: apath.into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            size: Some(0),
         });
     }
 
     #[test]
     fn serialize_index() {
-        let entries = [IndexEntry {
+        let entries = [Entry {
             apath: "/a/b".into(),
             mtime: Some(1461736377),
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            size: Some(0),
         }];
         let index_json = serde_json::to_string(&entries).unwrap();
         println!("{}", index_json);
         assert_eq!(
             index_json,
             "[{\"apath\":\"/a/b\",\
-             \"mtime\":1461736377,\
              \"kind\":\"File\",\
+             \"mtime\":1461736377,\
              \"addrs\":[],\
-             \"target\":null}]"
+             \"target\":null,\
+             \"size\":0}]"
         );
     }
 
@@ -356,19 +310,21 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_order() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
-        ib.push(IndexEntry {
+        ib.push(Entry {
             apath: "/zzz".into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            size: Some(0),
         });
-        ib.push(IndexEntry {
+        ib.push(Entry {
             apath: "aaa".into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            size: Some(0),
         });
     }
 
@@ -376,12 +332,13 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_names() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
-        ib.push(IndexEntry {
+        ib.push(Entry {
             apath: "../escapecat".into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            size: Some(0),
         })
     }
 
@@ -423,15 +380,17 @@ mod tests {
         assert_eq!(
             retrieved,
             "[{\"apath\":\"/apple\",\
-             \"mtime\":null,\
              \"kind\":\"File\",\
+             \"mtime\":null,\
              \"addrs\":[],\
-             \"target\":null},\
+             \"target\":null,\
+             \"size\":0},\
              {\"apath\":\"/banana\",\
-             \"mtime\":null,\
              \"kind\":\"File\",\
+             \"mtime\":null,\
              \"addrs\":[],\
-             \"target\":null}]"
+             \"target\":null,\
+             \"size\":0}]"
         );
 
         let mut it = super::Iter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
@@ -443,7 +402,7 @@ mod tests {
         let entry = it
             .next()
             .expect("Get second entry")
-            .expect("IndexEntry isn't an error");
+            .expect("Entry isn't an error");
         assert_eq!(&entry.apath, "/banana");
         let opt_entry = it.next();
         if !opt_entry.is_none() {
