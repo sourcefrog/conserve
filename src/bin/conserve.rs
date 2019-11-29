@@ -276,10 +276,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                 .about("Operate on stored trees")
                 .subcommand(
                     SubCommand::with_name("size")
-                        .about(
-                            "Show the size of a stored tree (as it\
-                             would be when restored)",
-                        )
+                        .about("Show the size of a stored tree (as it would be when restored)")
                         .arg(archive_arg())
                         .arg(backup_arg()),
                 ),
