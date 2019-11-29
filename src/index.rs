@@ -299,8 +299,7 @@ mod tests {
             index_json,
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
-             \"mtime\":1461736377,\
-             \"size\":0}]"
+             \"mtime\":1461736377}]"
         );
     }
 
@@ -378,11 +377,9 @@ mod tests {
         assert_eq!(
             retrieved,
             "[{\"apath\":\"/apple\",\
-             \"kind\":\"File\",\
-             \"size\":0},\
+             \"kind\":\"File\"},\
              {\"apath\":\"/banana\",\
-             \"kind\":\"File\",\
-             \"size\":0}]"
+             \"kind\":\"File\"}]"
         );
 
         let mut it = super::Iter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();

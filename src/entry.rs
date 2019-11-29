@@ -45,9 +45,10 @@ pub struct Entry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
 
-    /// Total file size.
+    /// For live files, the known size. For stored files, the size can be calculated as the sum of
+    /// the blocks.
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing)]
     pub size: Option<u64>,
 }
 
@@ -74,6 +75,12 @@ impl Entry {
 
     /// Size of the file, if it is a file. None for directories and symlinks.
     pub fn size(&self) -> Option<u64> {
-        self.size
+        if self.size.is_some() {
+            self.size
+        } else if self.addrs.is_empty() {
+            None
+        } else {
+            Some(self.addrs.iter().map(|a| a.len).sum())
+        }
     }
 }

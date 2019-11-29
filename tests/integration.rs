@@ -111,10 +111,10 @@ fn check_restore(af: &ScratchArchive) {
     // Doubled because we currently read the index twice.
     assert_eq!(
         index_sizes.uncompressed,
-        276 * 2,
+        267 * 2,
         "index_sizes.uncompressed on restore"
     );
-    assert!(index_sizes.compressed <= 276 * 2, index_sizes.compressed);
+    assert!(index_sizes.compressed <= 267 * 2, index_sizes.compressed);
     // TODO: Check what was restored.
 }
 
