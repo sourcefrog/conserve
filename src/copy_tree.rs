@@ -27,19 +27,9 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
             }
         };
         report.start_entry(&entry);
-        match entry.kind() {
+        if let Err(e) = match entry.kind() {
             Kind::Dir => dest.write_dir(&entry),
-            Kind::File => match source.file_contents(&entry) {
-                Ok(mut content) => dest.write_file(&entry, &mut content),
-                Err(e) => {
-                    report.problem(&format!(
-                        "Skipping unreadable source file {}: {}",
-                        &entry.apath(),
-                        e,
-                    ));
-                    continue;
-                }
-            },
+            Kind::File => dest.copy_file(&entry, source),
             Kind::Symlink => dest.write_symlink(&entry),
             Kind::Unknown => {
                 report.problem(&format!(
@@ -48,7 +38,10 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
                 ));
                 continue;
             }
-        }?;
+        } {
+            report.problem(&format!("Error copying {}: {}", &entry.apath(), e));
+            continue;
+        }
         report.increment_work(entry.size().unwrap_or(0));
     }
     report.clear_phase();
