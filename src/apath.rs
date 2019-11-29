@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! "Apaths" (for archive paths) are platform-independent relative file paths used
 //! inside archive snapshots.
@@ -13,6 +13,8 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 
+use serde::{Deserialize, Serialize};
+
 /// An ordered archive path.
 ///
 /// The ordering groups all the direct parents of a directory together, followed
@@ -20,7 +22,7 @@ use std::ops::Deref;
 ///
 /// Equal strings are equivalent to equal apaths, but the ordering is not the same as
 /// string ordering.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Apath(String);
 
 impl Apath {

@@ -30,7 +30,7 @@ impl StoredFile {
     }
 
     /// Validate the stored file hash is as expected.
-    pub(crate) fn validate(&self, _apath: &Apath) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         // TODO: Perhaps the file should know its apath and hold its entry.
         // TODO: Give a more specific message including the band and apath, if
         // the content can't be loaded.

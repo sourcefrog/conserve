@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
 
 //! Index lists the files in a band in the archive.
 
@@ -25,8 +25,7 @@ pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IndexEntry {
     /// Path of this entry relative to the base of the backup, in `apath` form.
-    // TODO: Make it an actual Apath, once that's encodable.
-    pub apath: String,
+    pub apath: Apath,
 
     /// File modification time, in whole seconds past the Unix epoch.
     pub mtime: Option<u64>,
@@ -43,7 +42,7 @@ pub struct IndexEntry {
 
 impl entry::Entry for IndexEntry {
     fn apath(&self) -> Apath {
-        Apath::from(self.apath.as_str())
+        self.apath.clone()
     }
 
     fn kind(&self) -> Kind {
@@ -103,7 +102,7 @@ impl IndexBuilder {
     pub fn push(&mut self, entry: IndexEntry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
-        self.check_order.check(&Apath::from(entry.apath.as_str()));
+        self.check_order.check(&entry.apath);
         self.entries.push(entry);
     }
 
@@ -288,7 +287,7 @@ impl Iter {
         self.buffered_entries = entries
             .into_iter()
             .filter(|entry| {
-                if self.excludes.is_match(&entry.apath) {
+                if self.excludes.is_match(Path::new(&entry.apath.to_string())) {
                     match entry.kind() {
                         Kind::Dir => self.report.increment("skipped.excluded.directories", 1),
                         Kind::Symlink => self.report.increment("skipped.excluded.symlinks", 1),
@@ -324,7 +323,7 @@ mod tests {
 
     pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
         ib.push(IndexEntry {
-            apath: apath.to_string(),
+            apath: apath.into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
@@ -335,7 +334,7 @@ mod tests {
     #[test]
     fn serialize_index() {
         let entries = [IndexEntry {
-            apath: "/a/b".to_string(),
+            apath: "/a/b".into(),
             mtime: Some(1461736377),
             kind: Kind::File,
             addrs: vec![],
@@ -358,14 +357,14 @@ mod tests {
     fn index_builder_checks_order() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
-            apath: "/zzz".to_string(),
+            apath: "/zzz".into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
             target: None,
         });
         ib.push(IndexEntry {
-            apath: "aaa".to_string(),
+            apath: "aaa".into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
@@ -378,7 +377,7 @@ mod tests {
     fn index_builder_checks_names() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
-            apath: "../escapecat".to_string(),
+            apath: "../escapecat".into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
@@ -440,12 +439,12 @@ mod tests {
             .next()
             .expect("Get first entry")
             .expect("First entry isn't an error");
-        assert_eq!(entry.apath, "/apple");
+        assert_eq!(&entry.apath, "/apple");
         let entry = it
             .next()
             .expect("Get second entry")
             .expect("IndexEntry isn't an error");
-        assert_eq!(entry.apath, "/banana");
+        assert_eq!(&entry.apath, "/banana");
         let opt_entry = it.next();
         if !opt_entry.is_none() {
             panic!("Expected no more entries but got {:?}", opt_entry);
@@ -469,7 +468,7 @@ mod tests {
             format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir)
         );
 
-        let names: Vec<String> = it.map(|x| x.unwrap().apath).collect();
+        let names: Vec<String> = it.map(|x| x.unwrap().apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
     }
 
@@ -508,7 +507,7 @@ mod tests {
             format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir)
         );
 
-        let names: Vec<String> = it.map(|x| x.unwrap().apath).collect();
+        let names: Vec<String> = it.map(|x| x.unwrap().apath.into()).collect();
         assert_eq!(names, &["/bar"]);
     }
 }

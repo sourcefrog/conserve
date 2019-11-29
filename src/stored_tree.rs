@@ -97,7 +97,7 @@ impl StoredTree {
 
     fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {
         self.report().start_entry(e);
-        self.open_stored_file(&e)?.validate(&e.apath.clone().into())
+        self.open_stored_file(&e)?.validate()
     }
 
     /// Open a file stored within this tree.
@@ -156,7 +156,7 @@ mod test {
         let names: Vec<String> = st
             .iter_entries(&af.report())
             .unwrap()
-            .map(|e| e.unwrap().apath)
+            .map(|e| e.unwrap().apath.into())
             .collect();
         let expected = if SYMLINKS_SUPPORTED {
             vec![

@@ -70,12 +70,12 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     assert_eq!(2, index_entries.len());
 
     let root_entry = &index_entries[0];
-    assert_eq!("/", root_entry.apath);
+    assert_eq!("/", root_entry.apath.to_string());
     assert_eq!(Kind::Dir, root_entry.kind);
     assert!(root_entry.mtime.unwrap() > 0);
 
     let file_entry = &index_entries[1];
-    assert_eq!("/hello", file_entry.apath);
+    assert_eq!("/hello", file_entry.apath.to_string());
     assert_eq!(Kind::File, file_entry.kind);
     assert!(file_entry.mtime.unwrap() > 0);
 

@@ -48,7 +48,7 @@ impl tree::WriteTree for BackupWriter {
     fn write_dir(&mut self, source_entry: &dyn Entry) -> Result<()> {
         self.report.increment("dir", 1);
         self.push_entry(IndexEntry {
-            apath: String::from(source_entry.apath()),
+            apath: source_entry.apath(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Dir,
             addrs: vec![],
@@ -74,7 +74,7 @@ impl tree::WriteTree for BackupWriter {
         );
         // TODO: Perhaps return a future for an index, so that storage of the files can overlap.
         self.push_entry(IndexEntry {
-            apath: String::from(source_entry.apath()),
+            apath: source_entry.apath(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::File,
             addrs,
@@ -87,7 +87,7 @@ impl tree::WriteTree for BackupWriter {
         let target = source_entry.symlink_target().clone();
         assert!(target.is_some());
         self.push_entry(IndexEntry {
-            apath: String::from(source_entry.apath()),
+            apath: source_entry.apath(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Symlink,
             addrs: vec![],
@@ -139,7 +139,7 @@ mod tests {
 
         let e2 = &index_entries[1];
         assert_eq!(e2.kind(), Kind::Symlink);
-        assert_eq!(e2.apath, "/symlink");
+        assert_eq!(&e2.apath, "/symlink");
         assert_eq!(e2.target.as_ref().unwrap(), "/a/broken/destination");
     }
 
@@ -196,7 +196,7 @@ mod tests {
             .iter_entries(&af.report())
             .unwrap()
             .map(|i| i.unwrap())
-            .find(|ref i| i.apath == "/empty")
+            .find(|ref i| &i.apath == "/empty")
             .expect("found one entry");
         let mut sf = st.file_contents(&empty_entry).unwrap();
         let mut s = String::new();
