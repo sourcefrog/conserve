@@ -176,7 +176,7 @@ mod tests {
             "../a",
             "/hello\0",
         ];
-        for v in invalid_cases.into_iter() {
+        for v in invalid_cases.iter() {
             if Apath::is_valid(v) {
                 panic!("{:?} incorrectly marked valid", v);
             }
