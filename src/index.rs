@@ -300,8 +300,6 @@ mod tests {
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
              \"mtime\":1461736377,\
-             \"addrs\":[],\
-             \"target\":null,\
              \"size\":0}]"
         );
     }
@@ -381,15 +379,9 @@ mod tests {
             retrieved,
             "[{\"apath\":\"/apple\",\
              \"kind\":\"File\",\
-             \"mtime\":null,\
-             \"addrs\":[],\
-             \"target\":null,\
              \"size\":0},\
              {\"apath\":\"/banana\",\
              \"kind\":\"File\",\
-             \"mtime\":null,\
-             \"addrs\":[],\
-             \"target\":null,\
              \"size\":0}]"
         );
 

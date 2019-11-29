@@ -31,15 +31,23 @@ pub struct Entry {
     pub kind: Kind,
 
     /// File modification time, in whole seconds past the Unix epoch.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mtime: Option<u64>,
 
     /// For stored files, the blocks holding the file contents.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub addrs: Vec<blockdir::Address>,
 
     /// For symlinks only, the target of the symlink.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
 
     /// Total file size.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<u64>,
 }
 
