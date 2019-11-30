@@ -39,7 +39,8 @@ pub trait ReadTree: HasReport {
                     report.increment_work(s);
                 }
                 Err(Error::IoError(ioe)) => match ioe.kind() {
-                    // Fairly harmless errors to encounter while walking a tree.
+                    // Fairly harmless errors to encounter while walking a tree; can be ignored
+                    // while computing the size.
                     ErrorKind::NotFound | ErrorKind::PermissionDenied => (),
                     // May be serious?
                     _ => return Err(Error::IoError(ioe)),
