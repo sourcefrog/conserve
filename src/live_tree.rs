@@ -7,6 +7,7 @@ use std::collections::vec_deque::VecDeque;
 use std::ffi::OsString;
 use std::fmt;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use super::*;
@@ -216,14 +217,27 @@ impl Iter {
         let mut directory_insert_point = 0;
         for (child_name, is_dir, apath) in children {
             let child_path = dir_path.join(&child_name).to_path_buf();
+            // TODO: Use DirEntry::metadata, which will be cheaper at least on Windows.
             let metadata = match fs::symlink_metadata(&child_path) {
                 Ok(metadata) => metadata,
                 Err(e) => {
-                    self.report.problem(&format!(
-                        "Failed to read source metadata from {:?}: {}",
-                        child_path, e
-                    ));
-                    self.report.increment("source.error.metadata", 1);
+                    match e.kind() {
+                        ErrorKind::NotFound => {
+                            // Fairly harmless, and maybe not even worth logging. Just a race
+                            // between listing the directory and looking at the contents.
+                            self.report.problem(&format!(
+                                "File disappeared during iteration: {:?}: {}",
+                                child_path, e
+                            ));
+                        }
+                        _ => {
+                            self.report.problem(&format!(
+                                "Failed to read source metadata from {:?}: {}",
+                                child_path, e
+                            ));
+                            self.report.increment("source.error.metadata", 1);
+                        }
+                    };
                     continue;
                 }
             };
