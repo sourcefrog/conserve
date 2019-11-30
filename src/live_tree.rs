@@ -219,8 +219,10 @@ impl Iter {
             let metadata = match fs::symlink_metadata(&child_path) {
                 Ok(metadata) => metadata,
                 Err(e) => {
-                    self.report
-                        .problem(&format!("source metadata error on {:?}: {}", child_path, e));
+                    self.report.problem(&format!(
+                        "Failed to read source metadata from {:?}: {}",
+                        child_path, e
+                    ));
                     self.report.increment("source.error.metadata", 1);
                     continue;
                 }
