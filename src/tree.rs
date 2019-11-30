@@ -3,6 +3,7 @@
 
 //! Abstract Tree trait.
 
+use std::io::ErrorKind;
 use std::ops::Range;
 
 use crate::*;
@@ -26,16 +27,25 @@ pub trait ReadTree: HasReport {
     /// Measure the tree size.
     ///
     /// This typically requires walking all entries, which may take a while.
-    ///
-    /// Errors reading directories or metadata are ignored while computing the size.
     fn size(&self) -> Result<TreeSize> {
         let report = self.report();
         let mut tot = 0u64;
         for e in self.iter_entries(self.report())? {
             // While just measuring size, ignore directories/files we can't stat.
-            let s = e.map(|e| e.size()).unwrap_or(Some(0)).unwrap_or(0);
-            tot += s;
-            report.increment_work(s);
+            match e {
+                Ok(e) => {
+                    let s = e.size().unwrap_or(0);
+                    tot += s;
+                    report.increment_work(s);
+                }
+                Err(Error::IoError(ioe)) => match ioe.kind() {
+                    // Fairly harmless errors to encounter while walking a tree.
+                    ErrorKind::NotFound | ErrorKind::PermissionDenied => (),
+                    // May be serious?
+                    _ => return Err(Error::IoError(ioe)),
+                },
+                Err(err) => return Err(err),
+            }
         }
         Ok(TreeSize { file_bytes: tot })
     }
