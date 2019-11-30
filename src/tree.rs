@@ -23,16 +23,19 @@ pub trait ReadTree: HasReport {
     /// This might do somewhat expensive IO, so isn't the Iter's `size_hint`.
     fn estimate_count(&self) -> Result<u64>;
 
-    /// Measure the tree size: typically requires walking all entries so
-    /// takes a while.
+    /// Measure the tree size.
+    ///
+    /// This typically requires walking all entries, which may take a while.
+    ///
+    /// Errors reading directories or metadata are ignored while computing the size.
     fn size(&self) -> Result<TreeSize> {
         let report = self.report();
         let mut tot = 0u64;
         for e in self.iter_entries(self.report())? {
-            if let Some(s) = e?.size() {
-                tot += s;
-                report.increment_work(s);
-            }
+            // While just measuring size, ignore directories/files we can't stat.
+            let s = e.map(|e| e.size()).unwrap_or(Some(0)).unwrap_or(0);
+            tot += s;
+            report.increment_work(s);
         }
         Ok(TreeSize { file_bytes: tot })
     }
