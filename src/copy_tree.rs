@@ -24,8 +24,6 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
         let entry = match entry {
             Ok(entry) => entry,
             Err(e) => {
-                // TODO: Show the filename that we failed to load: this requires changing the
-                // `iter_entries` contract.
                 report.problem(&format!("Error iterating source, continuing: {}", e));
                 continue;
             }

@@ -190,15 +190,41 @@ impl Iter {
         self.report.increment("source.visited.directories", 1);
         let mut children = Vec::<(OsString, bool, Apath)>::new();
         let dir_path = relative_path(&self.root_path, &dir_entry.apath);
-        for entry in fs::read_dir(&dir_path)? {
-            let entry = entry?;
-            let ft = entry.file_type()?;
+        let dir_iter = match fs::read_dir(&dir_path) {
+            Ok(dir_iter) => dir_iter,
+            Err(e) => {
+                self.report
+                    .problem(&format!("Error reading directory {:?}: {}", &dir_path, e));
+                return Err(e.into());
+            }
+        };
+        for entry in dir_iter {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(e) => {
+                    self.report.problem(&format!(
+                        "Error reading next entry from directory {:?}: {}",
+                        &dir_path, e
+                    ));
+                    continue;
+                }
+            };
             let mut path = String::from(dir_entry.apath.clone());
             if path != "/" {
                 path.push('/');
             }
             // TODO: Don't be lossy, error if not convertible.
             path.push_str(&entry.file_name().to_string_lossy());
+            let ft = match entry.file_type() {
+                Ok(ft) => ft,
+                Err(e) => {
+                    self.report.problem(&format!(
+                        "Error getting type of {:?} during iteration: {}",
+                        path, e
+                    ));
+                    continue;
+                }
+            };
 
             if self.excludes.is_match(&path) {
                 if ft.is_file() {
