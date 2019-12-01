@@ -186,10 +186,10 @@ pub struct Iter {
 }
 
 impl Iter {
-    fn visit_next_directory(&mut self, dir_entry: &Entry) -> Result<()> {
+    fn visit_next_directory(&mut self, parent_entry: &Entry) -> Result<()> {
         self.report.increment("source.visited.directories", 1);
-        let mut children = Vec::<(OsString, bool, Apath)>::new();
-        let dir_path = relative_path(&self.root_path, &dir_entry.apath);
+        let mut children = Vec::<(OsString, bool, Apath, fs::Metadata)>::new();
+        let dir_path = relative_path(&self.root_path, &parent_entry.apath);
         let dir_iter = match fs::read_dir(&dir_path) {
             Ok(dir_iter) => dir_iter,
             Err(e) => {
@@ -198,9 +198,9 @@ impl Iter {
                 return Err(e.into());
             }
         };
-        for entry in dir_iter {
-            let entry = match entry {
-                Ok(entry) => entry,
+        for dir_entry in dir_iter {
+            let dir_entry = match dir_entry {
+                Ok(dir_entry) => dir_entry,
                 Err(e) => {
                     self.report.problem(&format!(
                         "Error reading next entry from directory {:?}: {}",
@@ -209,13 +209,14 @@ impl Iter {
                     continue;
                 }
             };
-            let mut path = String::from(dir_entry.apath.clone());
+            let mut path = String::from(parent_entry.apath.clone());
+            // TODO: Specific Apath join method?
             if path != "/" {
                 path.push('/');
             }
             // TODO: Don't be lossy, error if not convertible.
-            path.push_str(&entry.file_name().to_string_lossy());
-            let ft = match entry.file_type() {
+            path.push_str(&dir_entry.file_name().to_string_lossy());
+            let ft = match dir_entry.file_type() {
                 Ok(ft) => ft,
                 Err(e) => {
                     self.report.problem(&format!(
@@ -236,15 +237,7 @@ impl Iter {
                 }
                 continue;
             }
-            children.push((entry.file_name(), ft.is_dir(), Apath::from(path)));
-        }
-
-        children.sort();
-        let mut directory_insert_point = 0;
-        for (child_name, is_dir, apath) in children {
-            let child_path = dir_path.join(&child_name).to_path_buf();
-            // TODO: Use DirEntry::metadata, which will be cheaper at least on Windows.
-            let metadata = match fs::symlink_metadata(&child_path) {
+            let metadata = match dir_entry.metadata() {
                 Ok(metadata) => metadata,
                 Err(e) => {
                     match e.kind() {
@@ -253,13 +246,13 @@ impl Iter {
                             // between listing the directory and looking at the contents.
                             self.report.problem(&format!(
                                 "File disappeared during iteration: {:?}: {}",
-                                child_path, e
+                                path, e
                             ));
                         }
                         _ => {
                             self.report.problem(&format!(
                                 "Failed to read source metadata from {:?}: {}",
-                                child_path, e
+                                path, e
                             ));
                             self.report.increment("source.error.metadata", 1);
                         }
@@ -267,6 +260,23 @@ impl Iter {
                     continue;
                 }
             };
+            children.push((
+                dir_entry.file_name(),
+                ft.is_dir(),
+                Apath::from(path),
+                metadata,
+            ));
+        }
+
+        // Names might come back from the fs in arbitrary order, but sort them by apath
+        // and remember to yield all of them and to visit new subdirectories.
+        children.sort_unstable_by(|x, y| x.0.cmp(&y.0));
+        // To get the right overall tree ordering, any new subdirectories discovered here should
+        // be visited together in apath order, but before any previously pending directories.
+        let mut directory_insert_point = 0;
+        self.entry_deque.reserve(children.len());
+        for (child_name, is_dir, apath, metadata) in children {
+            let child_path = dir_path.join(&child_name).to_path_buf();
             let new_entry = entry_from_fs(apath, child_path, &metadata);
             if is_dir {
                 self.dir_deque
