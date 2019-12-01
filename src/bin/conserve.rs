@@ -3,7 +3,6 @@
 
 //! Command-line entry point for Conserve backups.
 
-use std::error::Error;
 use std::path::Path;
 
 #[macro_use]
@@ -19,7 +18,9 @@ use thousands::Separable;
 extern crate conserve;
 use conserve::*;
 
-fn main() {
+use conserve::Result;
+
+fn main() -> conserve::Result<()> {
     let matches = make_clap().get_matches();
     let ui_name = matches.value_of("ui").unwrap_or("auto");
     let no_progress = matches.is_present("no-progress");
@@ -49,12 +50,12 @@ fn main() {
     if matches.is_present("stats") {
         report.print(&format!("{}", report));
     }
-    if let Err(e) = result {
-        show_chained_errors(&report, &e);
+    if let Err(ref e) = result {
+        show_chained_errors(&report, e);
         // TODO: Maybe show backtraces once they're available in stable
         // Rust Errors.
-        std::process::exit(1)
     }
+    result
 }
 
 fn rollup_subcommands<'a>(matches: &'a ArgMatches) -> (String, &'a ArgMatches<'a>) {
@@ -283,7 +284,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         )
 }
 
-fn show_chained_errors(report: &Report, e: &dyn Error) {
+fn show_chained_errors(report: &Report, e: &dyn std::error::Error) {
     report.problem(&format!("{}", e));
     let mut ce = e;
     while let Some(c) = ce.source() {

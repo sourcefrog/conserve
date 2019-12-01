@@ -229,7 +229,7 @@ both     /subdir
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stderr(is_empty())
+        .stderr(contains("Error: DestinationNotEmpty"))
         .stdout(contains("Destination directory not empty"));
 
     // Restore with specified band id / backup version.
@@ -314,7 +314,7 @@ fn incomplete_version() {
         .arg(af.path())
         .assert()
         .failure()
-        .stderr(is_empty())
+        .stderr(contains("Error: NoCompleteBands"))
         .stdout(contains("Archive has no complete bands"));
 
     // ls --incomplete accurately says it has nothing
