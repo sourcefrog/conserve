@@ -4,7 +4,6 @@
 //! Find source files within a source directory, in apath order.
 
 use std::collections::vec_deque::VecDeque;
-use std::ffi::OsString;
 use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
@@ -66,18 +65,20 @@ impl tree::ReadTree for LiveTree {
         let root_metadata = match fs::symlink_metadata(&self.path) {
             Ok(metadata) => metadata,
             Err(e) => {
-                self.report.problem(&format!("{}", e));
+                self.report.problem(&format!(
+                    "Couldn't get tree root metadata for {:?}: {}",
+                    &self.path, e
+                ));
                 return Err(e.into());
             }
         };
-        let root_entry = entry_from_fs(Apath::from("/"), self.path.clone(), &root_metadata);
         // Preload iter to return the root and then recurse into it.
-        let mut entry_deque: VecDeque<Entry> = VecDeque::<Entry>::new();
-        entry_deque.push_back(root_entry.clone());
+        let mut entry_deque = VecDeque::<Entry>::new();
+        entry_deque.push_back(entry_from_fs(Apath::from("/"), &root_metadata, None));
         // TODO: Consider the case where the root is not actually a directory?
         // Should that be supported?
-        let mut dir_deque = VecDeque::<Entry>::new();
-        dir_deque.push_back(root_entry);
+        let mut dir_deque = VecDeque::<Apath>::new();
+        dir_deque.push_back("/".into());
         Ok(Iter {
             root_path: self.path.clone(),
             entry_deque,
@@ -119,7 +120,7 @@ impl fmt::Debug for LiveTree {
     }
 }
 
-fn entry_from_fs(apath: Apath, path: PathBuf, metadata: &fs::Metadata) -> Entry {
+fn entry_from_fs(apath: Apath, metadata: &fs::Metadata, target: Option<String>) -> Entry {
     // TODO: This should either do no IO, or all the IO.
     let kind = if metadata.is_file() {
         Kind::File
@@ -138,16 +139,6 @@ fn entry_from_fs(apath: Apath, path: PathBuf, metadata: &fs::Metadata) -> Entry 
     // TODO: Record a problem and log a message if the target is not decodable, rather than
     // panicing.
     // TODO: Also return a Result if the link can't be read?
-    let target = match kind {
-        Kind::Symlink => Some(
-            fs::read_link(&path)
-                .unwrap()
-                .into_os_string()
-                .into_string()
-                .unwrap(),
-        ),
-        _ => None,
-    };
     let size = if metadata.is_file() {
         Some(metadata.len())
     } else {
@@ -170,9 +161,10 @@ pub struct Iter {
     root_path: PathBuf,
 
     /// Directories yet to be visited.
-    dir_deque: VecDeque<Entry>,
+    dir_deque: VecDeque<Apath>,
 
-    /// Direct children of the current directory yet to be returned.
+    /// All entries that have been seen but not yet returned by the iterator, in the order they
+    /// should be returned.
     entry_deque: VecDeque<Entry>,
 
     /// Count of directories and files visited by this iterator.
@@ -186,10 +178,11 @@ pub struct Iter {
 }
 
 impl Iter {
-    fn visit_next_directory(&mut self, parent_entry: &Entry) -> Result<()> {
+    fn visit_next_directory(&mut self, parent_apath: &Apath) -> Result<()> {
         self.report.increment("source.visited.directories", 1);
-        let mut children = Vec::<(OsString, bool, Apath, fs::Metadata)>::new();
-        let dir_path = relative_path(&self.root_path, &parent_entry.apath);
+        let mut children = Vec::<Entry>::new();
+        let mut child_dirs = Vec::<Apath>::new();
+        let dir_path = relative_path(&self.root_path, parent_apath);
         let dir_iter = match fs::read_dir(&dir_path) {
             Ok(dir_iter) => dir_iter,
             Err(e) => {
@@ -209,25 +202,37 @@ impl Iter {
                     continue;
                 }
             };
-            let mut path = String::from(parent_entry.apath.clone());
+            let mut child_apath = parent_apath.to_string();
             // TODO: Specific Apath join method?
-            if path != "/" {
-                path.push('/');
+            if child_apath != "/" {
+                child_apath.push('/');
             }
-            // TODO: Don't be lossy, error if not convertible.
-            path.push_str(&dir_entry.file_name().to_string_lossy());
+            {
+                let child_osstr = &dir_entry.file_name();
+                let child_name = match child_osstr.to_str() {
+                    Some(c) => c,
+                    None => {
+                        self.report.problem(&format!(
+                            "Can't decode filename {:?} in {:?}",
+                            child_osstr, dir_path,
+                        ));
+                        continue;
+                    }
+                };
+                child_apath.push_str(child_name);
+            }
             let ft = match dir_entry.file_type() {
                 Ok(ft) => ft,
                 Err(e) => {
                     self.report.problem(&format!(
                         "Error getting type of {:?} during iteration: {}",
-                        path, e
+                        child_apath, e
                     ));
                     continue;
                 }
             };
 
-            if self.excludes.is_match(&path) {
+            if self.excludes.is_match(&child_apath) {
                 if ft.is_file() {
                     self.report.increment("skipped.excluded.files", 1);
                 } else if ft.is_dir() {
@@ -246,13 +251,13 @@ impl Iter {
                             // between listing the directory and looking at the contents.
                             self.report.problem(&format!(
                                 "File disappeared during iteration: {:?}: {}",
-                                path, e
+                                child_apath, e
                             ));
                         }
                         _ => {
                             self.report.problem(&format!(
                                 "Failed to read source metadata from {:?}: {}",
-                                path, e
+                                child_apath, e
                             ));
                             self.report.increment("source.error.metadata", 1);
                         }
@@ -260,30 +265,56 @@ impl Iter {
                     continue;
                 }
             };
-            children.push((
-                dir_entry.file_name(),
-                ft.is_dir(),
-                Apath::from(path),
-                metadata,
-            ));
+
+            let target: Option<String> = if ft.is_symlink() {
+                let t = match dir_path.join(dir_entry.file_name()).read_link() {
+                    Ok(t) => t,
+                    Err(e) => {
+                        self.report.problem(&format!(
+                            "Failed to read target of symlink {:?}: {}",
+                            child_apath, e
+                        ));
+                        continue;
+                    }
+                };
+                match t.into_os_string().into_string() {
+                    Ok(t) => Some(t),
+                    Err(e) => {
+                        self.report.problem(&format!(
+                            "Failed to decode target of symlink {:?}: {:?}",
+                            child_apath, e
+                        ));
+                        continue;
+                    }
+                }
+            } else {
+                None
+            };
+
+            let child_apath = Apath::from(child_apath);
+            if ft.is_dir() {
+                child_dirs.push(child_apath.clone());
+            }
+            children.push(entry_from_fs(child_apath, &metadata, target));
         }
 
         // Names might come back from the fs in arbitrary order, but sort them by apath
         // and remember to yield all of them and to visit new subdirectories.
-        children.sort_unstable_by(|x, y| x.0.cmp(&y.0));
+        //
         // To get the right overall tree ordering, any new subdirectories discovered here should
         // be visited together in apath order, but before any previously pending directories.
-        let mut directory_insert_point = 0;
-        self.entry_deque.reserve(children.len());
-        for (child_name, is_dir, apath, metadata) in children {
-            let child_path = dir_path.join(&child_name).to_path_buf();
-            let new_entry = entry_from_fs(apath, child_path, &metadata);
-            if is_dir {
-                self.dir_deque
-                    .insert(directory_insert_point, new_entry.clone());
-                directory_insert_point += 1;
+        if !child_dirs.is_empty() {
+            child_dirs.sort_unstable();
+            self.dir_deque.reserve(child_dirs.len());
+            for child_dir_apath in child_dirs.into_iter().rev() {
+                self.dir_deque.push_front(child_dir_apath);
             }
-            self.entry_deque.push_back(new_entry);
+        }
+
+        children.sort_unstable_by(|x, y| x.apath.cmp(&y.apath));
+        self.entry_deque.reserve(children.len());
+        for child_entry in children {
+            self.entry_deque.push_back(child_entry);
         }
         Ok(())
     }
