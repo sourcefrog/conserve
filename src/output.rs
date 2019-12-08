@@ -88,3 +88,40 @@ impl ShowArchive for VerboseVersionList {
         Ok(())
     }
 }
+
+#[derive(Debug)]
+pub struct IndexDump {
+    band_id: String,
+}
+
+impl IndexDump {
+    pub fn new(band_id: &str) -> Self {
+        Self {
+            band_id: band_id.to_string(),
+        }
+    }
+}
+
+impl ShowArchive for IndexDump {
+    fn show_archive(&self, archive: &Archive) -> Result<()> {
+        let report = archive.report();
+        let band_id = BandId::from_string(&self.band_id)?;
+        let band = match Band::open(&archive, &band_id) {
+            Ok(band) => band,
+            Err(e) => {
+                report.problem(&format!("Failed to open band {:?}: {:?}", band_id, e));
+                return Err(e);
+            }
+        };
+        let index_entries = band
+            .index()
+            .iter(&excludes::excludes_nothing(), &report)
+            .unwrap()
+            .filter_map(|i| i.ok())
+            .collect::<Vec<Entry>>();
+        for entry in index_entries {
+            println!("{}", serde_json::to_string_pretty(&entry)?);
+        }
+        Ok(())
+    }
+}
