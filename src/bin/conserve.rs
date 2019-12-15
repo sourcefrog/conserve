@@ -155,8 +155,8 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                         .subcommand(
                             SubCommand::with_name("dump")
                                 .about("Show the stored index for the given band")
-                                .arg(Arg::with_name("archive").required(true))
-                                .arg(Arg::with_name("band-id").required(true)),
+                                .arg(backup_arg())
+                                .arg(Arg::with_name("archive").required(true)),
                         ),
                 ),
         )
@@ -421,7 +421,8 @@ fn debug_block_referenced(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn debug_index_dump(subm: &ArgMatches, report: &Report) -> Result<()> {
     use conserve::output::ShowArchive;
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    output::IndexDump::new(subm.value_of("band-id").unwrap()).show_archive(&archive)
+    let st = stored_tree_from_options(subm, report)?;
+    output::IndexDump::new(st.band()).show_archive(&archive)
 }
 
 fn tree_size(subm: &ArgMatches, report: &Report) -> Result<()> {

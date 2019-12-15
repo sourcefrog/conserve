@@ -90,30 +90,21 @@ impl ShowArchive for VerboseVersionList {
 }
 
 #[derive(Debug)]
-pub struct IndexDump {
-    band_id: String,
+pub struct IndexDump<'a> {
+    band: &'a Band,
 }
 
-impl IndexDump {
-    pub fn new(band_id: &str) -> Self {
-        Self {
-            band_id: band_id.to_string(),
-        }
+impl<'a> IndexDump<'a> {
+    pub fn new(band: &'a Band) -> Self {
+        Self { band }
     }
 }
 
-impl ShowArchive for IndexDump {
+impl<'a> ShowArchive for IndexDump<'a> {
     fn show_archive(&self, archive: &Archive) -> Result<()> {
         let report = archive.report();
-        let band_id = BandId::from_string(&self.band_id)?;
-        let band = match Band::open(&archive, &band_id) {
-            Ok(band) => band,
-            Err(e) => {
-                report.problem(&format!("Failed to open band {:?}: {:?}", band_id, e));
-                return Err(e);
-            }
-        };
-        let index_entries = band
+        let index_entries = self
+            .band
             .index()
             .iter(&excludes::excludes_nothing(), &report)
             .unwrap()
