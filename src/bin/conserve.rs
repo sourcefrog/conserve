@@ -32,6 +32,7 @@ fn main() -> conserve::Result<()> {
         "backup" => backup,
         "debug block list" => debug_block_list,
         "debug block referenced" => debug_block_referenced,
+        "debug index dump" => debug_index_dump,
         "diff" => diff,
         "init" => init,
         "ls" => ls,
@@ -145,6 +146,16 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                         .subcommand(
                             SubCommand::with_name("referenced")
                                 .about("List hashes of all blocks referenced by an index")
+                                .arg(Arg::with_name("archive").required(true)),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("index")
+                        .about("Debug index")
+                        .subcommand(
+                            SubCommand::with_name("dump")
+                                .about("Show the stored index for the given band")
+                                .arg(backup_arg())
                                 .arg(Arg::with_name("archive").required(true)),
                         ),
                 ),
@@ -405,6 +416,13 @@ fn debug_block_referenced(subm: &ArgMatches, report: &Report) -> Result<()> {
         report.print(&h);
     }
     Ok(())
+}
+
+fn debug_index_dump(subm: &ArgMatches, report: &Report) -> Result<()> {
+    use conserve::output::ShowArchive;
+    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
+    let st = stored_tree_from_options(subm, report)?;
+    output::IndexDump::new(st.band()).show_archive(&archive)
 }
 
 fn tree_size(subm: &ArgMatches, report: &Report) -> Result<()> {

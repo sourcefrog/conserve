@@ -88,3 +88,30 @@ impl ShowArchive for VerboseVersionList {
         Ok(())
     }
 }
+
+#[derive(Debug)]
+pub struct IndexDump<'a> {
+    band: &'a Band,
+}
+
+impl<'a> IndexDump<'a> {
+    pub fn new(band: &'a Band) -> Self {
+        Self { band }
+    }
+}
+
+impl<'a> ShowArchive for IndexDump<'a> {
+    fn show_archive(&self, archive: &Archive) -> Result<()> {
+        let report = archive.report();
+        let index_entries = self
+            .band
+            .index()
+            .iter(&excludes::excludes_nothing(), &report)
+            .unwrap()
+            .filter_map(|i| i.ok())
+            .collect::<Vec<Entry>>();
+        let output = serde_json::to_string_pretty(&index_entries)?;
+        report.print(&output);
+        Ok(())
+    }
+}

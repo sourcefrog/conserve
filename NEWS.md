@@ -14,6 +14,8 @@ protection.
 
 * Move to Rust edition 2018.
 
+* New command `conserve debug index dump`.
+
 ## Conserve 0.5.1 2018-11-11
 
 * `conserve validate` checks the archive much more thoroughly.
