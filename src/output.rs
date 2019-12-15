@@ -119,9 +119,8 @@ impl ShowArchive for IndexDump {
             .unwrap()
             .filter_map(|i| i.ok())
             .collect::<Vec<Entry>>();
-        for entry in index_entries {
-            println!("{}", serde_json::to_string_pretty(&entry)?);
-        }
+        let output = serde_json::to_string_pretty(&index_entries)?;
+        report.print(&output);
         Ok(())
     }
 }
