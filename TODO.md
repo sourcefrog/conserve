@@ -1,5 +1,20 @@
 # Conserve TODO
 
+## Incremental backup / guided backup
+
+We can do a 'guided backup', which is a kind of incremental backup where the
+resulting index contains all the files in the tree, but we don't need to
+actually fully read files that are unmodified since the previous backup. That
+works as follows:
+
+We walk through the source tree and the last stored tree in parallel, looking
+at each apath. If the file is only in the source tree, it's new, and we store
+it as usual. If the file is only in the destination, it's now deleted and we
+don't need to do anything.
+
+If the same filename is in both the old tree and the new tree, we then need to
+stat it in both to determine whether it's the same or not. If 
+  
 ## gc
 
 Read all blocks that are present. Read all blocks that are referenced.
