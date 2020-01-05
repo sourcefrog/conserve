@@ -1,29 +1,27 @@
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Conserve backup system.
 
 extern crate blake2_rfc;
 extern crate chrono;
+extern crate globset;
 extern crate hex;
+extern crate indicatif;
 extern crate isatty;
 extern crate rayon;
 extern crate serde;
-#[macro_use]
-extern crate serde_derive;
 extern crate serde_json;
-
 extern crate snap;
 extern crate tempfile;
-extern crate term;
-extern crate terminal_size;
 extern crate thousands;
 extern crate unicode_segmentation;
 extern crate walkdir;
 
+#[macro_use]
+extern crate serde_derive;
+
 #[cfg(test)]
 extern crate spectral;
-
-extern crate globset;
 
 // Conserve implementation modules.
 mod apath;

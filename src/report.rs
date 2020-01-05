@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 use thousands::Separable;
 
 use super::ui;
-use super::ui::plain::PlainUI;
+use super::ui::PlainUI;
 use super::ui::{compression_ratio, mbps_rate, UI};
 use super::*;
 
