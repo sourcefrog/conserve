@@ -22,8 +22,7 @@ use std::time::{Duration, Instant};
 use thousands::Separable;
 
 use super::ui;
-use super::ui::plain::PlainUI;
-use super::ui::{compression_ratio, mbps_rate, UI};
+use super::ui::{compression_ratio, mbps_rate, PlainUI, UI};
 use super::*;
 
 const M: u64 = 1_000_000;
