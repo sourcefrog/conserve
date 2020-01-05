@@ -8,7 +8,7 @@ use std::fmt::Write;
 use std::time::Duration;
 use std::time::Instant;
 
-use isatty;
+use atty;
 use term;
 use terminal_size::{terminal_size, Width};
 use thousands::Separable;
@@ -39,7 +39,7 @@ impl dyn UI {
     ///
     /// `ui_name` must be `"auto"`, `"plain"`, or `"color"`.
     pub fn by_name(ui_name: &str, progress_bar: bool) -> Option<Box<dyn UI + Send>> {
-        if ui_name == "color" || (ui_name == "auto" && isatty::stdout_isatty()) {
+        if ui_name == "color" || (ui_name == "auto" && atty::is(atty::Stream::Stdout)) {
             if let Some(ui) = ColorUI::new(progress_bar) {
                 return Some(Box::new(ui));
             }

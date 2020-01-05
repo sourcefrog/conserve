@@ -2,10 +2,10 @@
 
 //! Conserve backup system.
 
+extern crate atty;
 extern crate blake2_rfc;
 extern crate chrono;
 extern crate hex;
-extern crate isatty;
 extern crate rayon;
 extern crate serde;
 #[macro_use]
