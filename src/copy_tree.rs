@@ -18,7 +18,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
     // again a second time? But, that'll potentially use memory proportional to tree size, which
     // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
     // deleted or changed while this is running.
-    report.set_total_work(source.size()?.file_bytes);
+    // report.set_total_work(source.size()?.file_bytes);
     report.set_phase("Copying");
     for entry in source.iter_entries(&report)? {
         let entry = match entry {
