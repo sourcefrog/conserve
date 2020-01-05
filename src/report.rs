@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Accumulate statistics about a Conserve operation.
 //!
@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 use thousands::Separable;
 
 use super::ui;
-use super::ui::{compression_ratio, mbps_rate, PlainUI, UI};
+use super::ui::{compression_ratio, duration_to_hms, mbps_rate, PlainUI, UI};
 use super::*;
 
 const M: u64 = 1_000_000;
@@ -325,12 +325,12 @@ impl Counts {
         // TODO: Just "index" might not be a good counter name when we both
         // read and write for incremental indexes.
         format!(
-            "{:>12} MB in {} files, {} directories, {} symlinks.\n\
+            "{:>12} MB   in {} files, {} directories, {} symlinks.\n\
              {:>12} MB/s output rate.\n\
-             {:>12} MB after deduplication.\n\
-             {:>12} MB in {} blocks after {:.1}x compression.\n\
-             {:>12} MB in {} compressed index hunks.\n\
-             {:>12} s elapsed.\n",
+             {:>12} MB   after deduplication.\n\
+             {:>12} MB   in {} blocks after {:.1}x compression.\n\
+             {:>12} MB   in {} compressed index hunks.\n\
+             {:>12}      elapsed.\n",
             (self.get_size("file.bytes").uncompressed / M).separate_with_commas(),
             self.get_count("file").separate_with_commas(),
             self.get_count("dir").separate_with_commas(),
@@ -346,7 +346,7 @@ impl Counts {
             compression_ratio(&self.get_size("block")),
             (self.get_size("index").compressed / M).separate_with_commas(),
             self.get_count("index.hunk").separate_with_commas(),
-            self.elapsed_time().as_secs(),
+            duration_to_hms(self.elapsed_time()),
         )
     }
 
@@ -354,12 +354,12 @@ impl Counts {
         // TODO: Just "index" might not be a good counter name when we both
         // read and write for incremental indexes.
         format!(
-            "{:>12} MB in {} files, {} directories, {} symlinks.\n\
+            "{:>12} MB   in {} files, {} directories, {} symlinks.\n\
              {:>12} MB/s input rate.\n\
-             {:>12} MB after deduplication.\n\
-             {:>12} MB in {} blocks after {:.1}x compression.\n\
-             {:>12} MB in {} compressed index hunks.\n\
-             {:>12} s elapsed.\n",
+             {:>12} MB   after deduplication.\n\
+             {:>12} MB   in {} blocks after {:.1}x compression.\n\
+             {:>12} MB   in {} compressed index hunks.\n\
+             {:>12}      elapsed.\n",
             (self.get_size("file.bytes").uncompressed / M).separate_with_commas(),
             self.get_count("file").separate_with_commas(),
             self.get_count("dir").separate_with_commas(),
@@ -375,7 +375,7 @@ impl Counts {
             compression_ratio(&self.get_size("block")),
             (self.get_size("index").compressed / M).separate_with_commas(),
             self.get_count("index.hunk").separate_with_commas(),
-            self.elapsed_time().as_secs(),
+            duration_to_hms(self.elapsed_time()),
         )
     }
 
