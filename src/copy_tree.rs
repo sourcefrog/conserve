@@ -38,10 +38,8 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
             Kind::File => dest.copy_file(&entry, source),
             Kind::Symlink => dest.write_symlink(&entry),
             Kind::Unknown => {
-                report.problem(&format!(
-                    "Skipping unsupported file kind of {}",
-                    &entry.apath()
-                ));
+                // TODO: Perhaps eventually we could backup and restore pipes, sockets, etc. Or at least
+                // count them. For now, silently skip.
                 continue;
             }
         } {
