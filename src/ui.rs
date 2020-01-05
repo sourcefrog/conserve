@@ -160,6 +160,8 @@ impl UI for ColorUI {
         self.clear_progress();
         self.progress_present = true;
 
+        const SHOW_PERCENT: bool = true;
+
         let w = if let Some((Width(w), _)) = terminal_size() {
             w as usize
         } else {
@@ -168,26 +170,25 @@ impl UI for ColorUI {
 
         // TODO: Input size should really be the number of source bytes before
         // block deduplication.
-        let mut pb_text = String::with_capacity(200);
+        let mut prefix = String::with_capacity(50);
+        let mut message = String::with_capacity(200);
         {
             let counts = report.borrow_counts();
             let elapsed = counts.elapsed_time();
             let rate = mbps_rate(counts.done_work, elapsed);
-            if counts.total_work > 0 {
+            if SHOW_PERCENT && counts.total_work > 0 {
                 write!(
-                    pb_text,
+                    prefix,
                     "{:>3}% ",
                     100 * counts.done_work / counts.total_work
                 )
                 .unwrap();
-            } else {
-                write!(pb_text, "---% ").unwrap();
             }
 
-            pb_text.push_str(&duration_to_hms(elapsed));
+            prefix.push_str(&duration_to_hms(elapsed));
 
             write!(
-                pb_text,
+                prefix,
                 "{:>12} MB ",
                 (counts.done_work / MB).separate_with_commas(),
             )
@@ -202,10 +203,10 @@ impl UI for ColorUI {
             //     )
             //     .unwrap();
             // }
+            write!(prefix, "{:>8} MB/s", (rate as u64).separate_with_commas(),).unwrap();
             write!(
-                pb_text,
-                "{:>8} MB/s  {} {}",
-                (rate as u64).separate_with_commas(),
+                message,
+                " {} {}",
                 counts.phase,
                 counts.get_latest_filename()
             )
@@ -213,12 +214,19 @@ impl UI for ColorUI {
         };
         // TODO: If it's less than w bytes or characters, which will be a common
         // ascii case, we don't need to break graphemes.
-        let g = UnicodeSegmentation::graphemes(pb_text.as_str(), true)
-            .take(w)
-            .collect::<String>();
         self.fg_color(term::color::GREEN);
-        self.t.write_all(g.as_bytes()).unwrap();
+        self.t.write_all(prefix.as_bytes()).unwrap();
+        let message_limit = w - prefix.len();
+        let truncated_message = if message.len() < message_limit {
+            message
+        } else {
+            // Do this so we don't break in the middle of a grapheme
+            UnicodeSegmentation::graphemes(message.as_str(), true)
+                .take(message_limit)
+                .collect::<String>()
+        };
         self.reset_color();
+        self.t.write_all(truncated_message.as_bytes()).unwrap();
         self.t.flush().unwrap();
     }
 
