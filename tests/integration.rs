@@ -14,7 +14,7 @@ use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;
 
-const HELLO_HASH: &'static str =
+const HELLO_HASH: &str =
     "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
      896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7";
 
@@ -124,7 +124,7 @@ fn large_file() {
     let af = ScratchArchive::new();
 
     let tf = TreeFixture::new();
-    let large_content = String::from("a sample large file\n").repeat(1000000);
+    let large_content = String::from("a sample large file\n").repeat(1_000_000);
     tf.create_file_with_contents("large", &large_content.as_bytes());
     let report = af.report();
     let mut bw = BackupWriter::begin(&af).unwrap();

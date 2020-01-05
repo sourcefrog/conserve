@@ -113,7 +113,7 @@ mod tests {
         let band_id = BandId::new(&[1, 10, 20]);
         assert_eq!(band_id.to_string(), "b0001-0010-0020");
         assert_eq!(
-            BandId::new(&[1000000, 2000000]).to_string(),
+            BandId::new(&[1_000_000, 2_000_000]).to_string(),
             "b1000000-2000000"
         )
     }

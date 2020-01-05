@@ -287,7 +287,7 @@ mod tests {
     fn serialize_index() {
         let entries = [Entry {
             apath: "/a/b".into(),
-            mtime: Some(1461736377),
+            mtime: Some(1_461_736_377),
             kind: Kind::File,
             addrs: vec![],
             target: None,
@@ -393,10 +393,7 @@ mod tests {
             .expect("Get second entry")
             .expect("Entry isn't an error");
         assert_eq!(&entry.apath, "/banana");
-        let opt_entry = it.next();
-        if !opt_entry.is_none() {
-            panic!("Expected no more entries but got {:?}", opt_entry);
-        }
+        assert!(it.next().is_none(), "Expected no more entries");
     }
 
     #[test]
