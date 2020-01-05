@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, TimeZone, UTC};
+use chrono::{DateTime, TimeZone, Utc};
 
 use super::io::file_exists;
 use super::jsonio;
@@ -50,10 +50,10 @@ pub struct Info {
     pub is_closed: bool,
 
     /// Time Conserve started writing this band.
-    pub start_time: DateTime<UTC>,
+    pub start_time: DateTime<Utc>,
 
     /// Time this band was completed, if it is complete.
-    pub end_time: Option<DateTime<UTC>>,
+    pub end_time: Option<DateTime<Utc>>,
 }
 
 impl Band {
@@ -78,7 +78,7 @@ impl Band {
         fs::create_dir(&new.index_dir_path)?;
 
         let head = Head {
-            start_time: UTC::now().timestamp(),
+            start_time: Utc::now().timestamp(),
         };
         jsonio::write_serde(&new.head_path(), &head, archive.report())?;
         Ok(new)
@@ -87,7 +87,7 @@ impl Band {
     /// Mark this band closed: no more blocks should be written after this.
     pub fn close(&self, report: &Report) -> Result<()> {
         let tail = Tail {
-            end_time: UTC::now().timestamp(),
+            end_time: Utc::now().timestamp(),
         };
         jsonio::write_serde(&self.tail_path(), &tail, report)
     }
@@ -156,14 +156,14 @@ impl Band {
         let head = self.read_head(&report)?;
         let is_closed = self.is_closed()?;
         let end_time = if is_closed {
-            Some(UTC.timestamp(self.read_tail(&report)?.end_time, 0))
+            Some(Utc.timestamp(self.read_tail(&report)?.end_time, 0))
         } else {
             None
         };
         Ok(Info {
             id: self.id.clone(),
             is_closed,
-            start_time: UTC.timestamp(head.start_time, 0),
+            start_time: Utc.timestamp(head.start_time, 0),
             end_time,
         })
     }
