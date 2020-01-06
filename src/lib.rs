@@ -1,10 +1,11 @@
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Conserve backup system.
 
 extern crate atty;
 extern crate blake2_rfc;
 extern crate chrono;
+extern crate crossterm;
 extern crate hex;
 extern crate rayon;
 extern crate serde;
@@ -15,7 +16,6 @@ extern crate serde_json;
 extern crate snap;
 extern crate tempfile;
 extern crate term;
-extern crate terminal_size;
 extern crate thousands;
 extern crate unicode_segmentation;
 extern crate walkdir;

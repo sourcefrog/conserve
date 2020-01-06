@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2018, 2019, 2020 Martin Pool.
 
 //! Abstract user interface trait.
 
@@ -9,8 +9,8 @@ use std::time::Duration;
 use std::time::Instant;
 
 use atty;
+use crossterm::terminal;
 use term;
-use terminal_size::{terminal_size, Width};
 use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -157,16 +157,15 @@ impl UI for ColorUI {
         if !self.progress_enabled || self.throttle_updates() {
             return;
         }
-        self.clear_progress();
-        self.progress_present = true;
-
-        const SHOW_PERCENT: bool = true;
-
-        let w = if let Some((Width(w), _)) = terminal_size() {
+        let w = if let Ok((w, _)) = terminal::size() {
             w as usize
         } else {
             return;
         };
+        self.clear_progress();
+        self.progress_present = true;
+
+        const SHOW_PERCENT: bool = true;
 
         // TODO: Input size should really be the number of source bytes before
         // block deduplication.
