@@ -10,8 +10,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use atty;
-use crossterm::terminal;
-use crossterm::{cursor, style, QueueableCommand};
+use crossterm::{cursor, style, terminal};
 use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -234,17 +233,20 @@ impl UI for TerminalUI {
     }
 
     fn problem(&mut self, s: &str) -> Result<()> {
-        let t = &mut self.t;
-        t.queue(terminal::Clear(terminal::ClearType::CurrentLine))?;
-        t.queue(cursor::MoveToColumn(0))?;
         self.progress_present = false;
-        t.queue(style::SetForegroundColor(style::Color::Red))?;
-        t.queue(style::SetAttribute(style::Attribute::Bold))?;
-        write!(t, "conserve error: ")?;
-        t.queue(style::SetAttribute(style::Attribute::Reset))?;
-        writeln!(t, "{}", s)?;
-        t.queue(style::ResetColor)?;
-        t.flush()?;
+        queue!(
+            self.t,
+            terminal::Clear(terminal::ClearType::CurrentLine),
+            cursor::MoveToColumn(0),
+            style::SetForegroundColor(style::Color::Red),
+            style::SetAttribute(style::Attribute::Bold),
+            style::Print("conserve error: "),
+            style::SetAttribute(style::Attribute::Reset),
+            style::Print(s),
+            style::ResetColor,
+        )
+        .unwrap();
+        self.t.flush()?;
         Ok(())
     }
 
