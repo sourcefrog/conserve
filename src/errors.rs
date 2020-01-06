@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Conserve error types.
 
@@ -28,6 +28,7 @@ pub enum Error {
     JsonDeserialize(serde_json::Error),
     BadGlob(globset::Error),
     IndexCorrupt(PathBuf),
+    CrossTerm(crossterm::ErrorKind),
     FileCorrupt {
         // band_id: BandId,
         apath: Apath,
@@ -88,5 +89,11 @@ impl From<globset::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(c: serde_json::Error) -> Error {
         Error::JsonDeserialize(c)
+    }
+}
+
+impl From<crossterm::ErrorKind> for Error {
+    fn from(c: crossterm::ErrorKind) -> Error {
+        Error::CrossTerm(c)
     }
 }

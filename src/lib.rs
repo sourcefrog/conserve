@@ -5,25 +5,23 @@
 extern crate atty;
 extern crate blake2_rfc;
 extern crate chrono;
+#[macro_use]
 extern crate crossterm;
+extern crate globset;
 extern crate hex;
 extern crate rayon;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-
 extern crate snap;
 extern crate tempfile;
-extern crate term;
 extern crate thousands;
 extern crate unicode_segmentation;
 extern crate walkdir;
 
 #[cfg(test)]
 extern crate spectral;
-
-extern crate globset;
 
 // Conserve implementation modules.
 mod apath;
