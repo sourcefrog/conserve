@@ -18,7 +18,7 @@ use crate::report::{Report, Sizes};
 use crate::Result;
 
 const MB: u64 = 1_000_000;
-const PROGRESS_RATE_LIMIT_MS: u32 = 100;
+const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 
 /// Display information about backup progress to the user in some way.
 pub trait UI: fmt::Debug {
@@ -117,12 +117,13 @@ impl TerminalUI {
         })
     }
 
-    fn throttle_updates(&mut self) -> bool {
+    /// Return false if it's too soon after the progress bar was last drawn.
+    fn can_update_yet(&mut self) -> bool {
         if let Some(last) = self.last_update {
             let e = last.elapsed();
-            e.as_secs() < 1 && e.subsec_millis() < PROGRESS_RATE_LIMIT_MS
+            e.as_secs() > 1 || e.subsec_millis() > PROGRESS_RATE_LIMIT_MS
         } else {
-            false
+            true
         }
     }
 
@@ -137,18 +138,18 @@ impl TerminalUI {
             self.t.flush().unwrap();
             self.progress_present = false;
         }
-        self.updated();
+        self.set_update_timestamp();
     }
 
     /// Remember that the ui was just updated, for the sake of throttling.
-    fn updated(&mut self) {
+    fn set_update_timestamp(&mut self) {
         self.last_update = Some(Instant::now());
     }
 }
 
 impl UI for TerminalUI {
     fn show_progress(&mut self, report: &Report) {
-        if !self.progress_enabled || self.throttle_updates() {
+        if !self.progress_enabled || !self.can_update_yet() {
             return;
         }
         let w = if let Ok((w, _)) = terminal::size() {
@@ -156,8 +157,6 @@ impl UI for TerminalUI {
         } else {
             return;
         };
-        self.clear_progress();
-        self.progress_present = true;
 
         const SHOW_PERCENT: bool = true;
 
@@ -177,9 +176,7 @@ impl UI for TerminalUI {
                 )
                 .unwrap();
             }
-
-            prefix.push_str(&duration_to_hms(elapsed));
-
+            write!(prefix, "{} ", duration_to_hms(elapsed)).unwrap();
             write!(
                 prefix,
                 "{:>12} MB ",
@@ -196,33 +193,32 @@ impl UI for TerminalUI {
             //     )
             //     .unwrap();
             // }
-            write!(prefix, "{:>8} MB/s", (rate as u64).separate_with_commas(),).unwrap();
-            write!(
-                message,
-                " {} {}",
-                counts.phase,
-                counts.get_latest_filename()
-            )
-            .unwrap();
+            write!(prefix, "{:>8} MB/s ", (rate as u64).separate_with_commas(),).unwrap();
+            write!(message, "{} {}", counts.phase, counts.get_latest_filename()).unwrap();
         };
         let message_limit = w - prefix.len();
         let truncated_message = if message.len() < message_limit {
             message
         } else {
-            // Don't truncate in the middle of a grapheme, which might look ugly.
             UnicodeSegmentation::graphemes(message.as_str(), true)
                 .take(message_limit)
                 .collect::<String>()
         };
         queue!(
             self.t,
+            cursor::Hide,
+            cursor::MoveToColumn(0),
             style::SetForegroundColor(style::Color::Green),
             style::Print(prefix),
             style::ResetColor,
-            style::Print(truncated_message)
+            style::Print(truncated_message),
+            terminal::Clear(terminal::ClearType::UntilNewLine),
+            cursor::Show,
         )
         .unwrap();
         self.t.flush().unwrap();
+        self.progress_present = true;
+        self.set_update_timestamp();
     }
 
     fn print(&mut self, s: &str) {
