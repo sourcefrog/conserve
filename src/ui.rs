@@ -239,6 +239,7 @@ impl UI for TerminalUI {
             style::Print("conserve error: "),
             style::SetAttribute(style::Attribute::Reset),
             style::Print(s),
+            style::Print("\n"),
             style::ResetColor,
         )
         .unwrap();
