@@ -13,8 +13,6 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 
-use serde::{Deserialize, Serialize};
-
 /// An ordered archive path.
 ///
 /// The ordering groups all the direct parents of a directory together, followed
