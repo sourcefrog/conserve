@@ -177,15 +177,6 @@ impl BlockDir {
         }
     }
 
-    /// Get an object accessing a whole block.
-    /// The contents are not yet narrowed down to only the addressed region.
-    pub fn get_block(&self, hash: &str) -> Block {
-        Block {
-            path: self.path_for_file(&hash),
-            hash: hash.to_string(),
-        }
-    }
-
     /// Read back the contents of a block, as a byte array.
     ///
     /// To read a whole file, use StoredFile instead.
@@ -193,8 +184,7 @@ impl BlockDir {
         if addr.start != 0 {
             unimplemented!();
         }
-        let b = self.get_block(&addr.hash);
-        let decompressed = b.get_all(report)?;
+        let decompressed = self.get_block_content(&addr.hash, report)?;
         // TODO: Accept addresses referring to only part of a block.
         if decompressed.len() != addr.len as usize {
             unimplemented!();
@@ -245,23 +235,15 @@ impl BlockDir {
             .collect())
     }
 
-    pub fn blocks(&self, report: &Report) -> Result<Vec<Block>> {
-        Ok(self
-            .block_names(report)?
-            .iter()
-            .map(|b| self.get_block(b))
-            .collect::<Vec<Block>>())
-    }
-
     /// Check format invariants of the BlockDir; report any problems to the Report.
     pub fn validate(&self, report: &Report) -> Result<()> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         report.set_phase("Count blocks");
-        let bs = self.blocks(report)?;
-        let tot = bs
+        let bns = self.block_names(report)?;
+        let tot = bns
             .iter()
-            .try_fold(0u64, |t, b| Ok(t + b.compressed_size()?) as Result<u64>)?;
+            .try_fold(0u64, |t, bn| Ok(t + self.compressed_block_size(bn)?) as Result<u64>)?;
         report.set_total_work(tot);
 
         report.print(&format!(
@@ -269,28 +251,33 @@ impl BlockDir {
             (tot / 1_000_000).separate_with_commas()
         ));
         report.set_phase("Check block hashes");
-        bs.par_iter()
-            .map(|b| {
-                report.increment_work(b.compressed_size()?);
-                b.validate(report)
+        // TODO: Don't repeatedly measure the size.
+        bns.par_iter()
+            .map(|bn| {
+                report.increment_work(self.compressed_block_size(&bn)?);
+                self.validate_block(bn, report)
             })
             .try_for_each(|i| i)?;
         Ok(())
     }
-}
 
-/// Read-only access to one block in the BlockDir.
-#[derive(Clone, Debug)]
-pub struct Block {
-    // TODO: Maybe hold an Rc on the root path and compute the block's path on demand?
-    path: PathBuf,
-    hash: String,
-}
+    pub fn validate_block(&self, hash: &BlockHash, report: &Report) -> Result<()> {
+        let de = self.get_block_content(hash, report)?;
+        let actual_hash = hex::encode(blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &de).as_bytes());
+        if actual_hash != *hash {
+            report.increment("block.misplaced", 1);
+            report.problem(&format!(
+                "Block file {:?} has actual decompressed hash {:?}",
+                self.path, actual_hash
+            ));
+            return Err(Error::BlockCorrupt(self.path.clone()));
+        }
+        Ok(())
+    }
 
-impl Block {
     /// Return the entire contents of the block.
-    pub fn get_all(&self, report: &Report) -> Result<Vec<u8>> {
-        let mut f = File::open(&self.path.as_path())?;
+    pub fn get_block_content(&self, hash: &BlockHash, report: &Report) -> Result<Vec<u8>> {
+        let mut f = File::open(&self.path_for_file(hash))?;
         // TODO: Specific error for compression failure (corruption?) vs io errors.
         let (compressed_len, de) = match Snappy::decompress_read(&mut f) {
             Ok(d) => d,
@@ -311,22 +298,8 @@ impl Block {
         Ok(de)
     }
 
-    pub fn validate(&self, report: &Report) -> Result<()> {
-        let de = self.get_all(report)?;
-        let actual_hash = hex::encode(blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &de).as_bytes());
-        if actual_hash != *self.hash {
-            report.increment("block.misplaced", 1);
-            report.problem(&format!(
-                "Block file {:?} has actual decompressed hash {:?}",
-                self.path, actual_hash
-            ));
-            return Err(Error::BlockCorrupt(self.path.clone()));
-        }
-        Ok(())
-    }
-
-    pub fn compressed_size(&self) -> Result<u64> {
-        Ok(fs::metadata(&self.path)?.len())
+    fn compressed_block_size(&self, hash: &BlockHash) -> Result<u64> {
+        Ok(fs::metadata(&self.path_for_file(hash))?.len())
     }
 }
 
