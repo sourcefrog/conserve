@@ -240,10 +240,13 @@ impl BlockDir {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         report.set_phase("Count blocks");
+        report.print("Count blocks...");
         let bns = self.block_names(report)?;
+        report.print(&format!("Measuring {} blocks...", bns.len().separate_with_commas()));
         let tot = bns
-            .iter()
-            .try_fold(0u64, |t, bn| Ok(t + self.compressed_block_size(bn)?) as Result<u64>)?;
+            .par_iter()
+            .map(|bn| self.compressed_block_size(bn))
+            .try_reduce(|| 0u64, |t, s| Ok(t + s))?;
         report.set_total_work(tot);
 
         report.print(&format!(
@@ -261,7 +264,7 @@ impl BlockDir {
         Ok(())
     }
 
-    pub fn validate_block(&self, hash: &BlockHash, report: &Report) -> Result<()> {
+    fn validate_block(&self, hash: &BlockHash, report: &Report) -> Result<()> {
         let de = self.get_block_content(hash, report)?;
         let actual_hash = hex::encode(blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &de).as_bytes());
         if actual_hash != *hash {
