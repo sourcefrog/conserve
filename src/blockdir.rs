@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! File contents are stored in data blocks.
 //!
@@ -28,7 +28,7 @@ use crate::*;
 /// Use the maximum 64-byte hash.
 pub const BLAKE_HASH_SIZE_BYTES: usize = 64;
 
-const BLOCKDIR_FILE_NAME: usize = BLAKE_HASH_SIZE_BYTES * 2;
+const BLOCKDIR_FILE_NAME_LEN: usize = BLAKE_HASH_SIZE_BYTES * 2;
 
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
@@ -212,27 +212,26 @@ impl BlockDir {
     }
 
     /// Return a sorted vec of all the blocknames in the blockdir.
-    pub fn block_names(&self, report: &Report) -> Result<Vec<String>> {
+    pub fn block_names(&self, report: &Report) -> Result<impl Iterator<Item = String>> {
         // The vecs from `subdirs` and `list_dir` are already sorted, so
         // we don't need to sort here.
-        Ok(self
-            .subdirs(report)?
-            .iter()
-            .flat_map(|s| {
-                let (mut fs, _ds) = list_dir(&self.path.join(s)).unwrap();
-                fs.retain(|ff| {
-                    if ff.starts_with(TMP_PREFIX) {
-                        false
-                    } else if ff.len() != BLOCKDIR_FILE_NAME {
-                        report.problem(&format!("unlikely file name in {:?}: {:?}", self, ff));
-                        false
-                    } else {
-                        true
-                    }
-                });
-                fs.into_iter()
+        let path = self.path.clone();
+        let subdirs = self.subdirs(report)?;
+        Ok(subdirs.into_iter().flat_map(move |s| {
+            // TODO: Avoid `unwrap`; cleanly return error into iterator?
+            fs::read_dir(&path.join(s)).unwrap().filter_map(|entry| {
+                let entry = entry.unwrap();
+                let name = entry.file_name().into_string().unwrap();
+                if entry.file_type().unwrap().is_file()
+                    && !name.starts_with(TMP_PREFIX)
+                    && name.len() == BLOCKDIR_FILE_NAME_LEN
+                {
+                    Some(name)
+                } else {
+                    None
+                }
             })
-            .collect())
+        }))
     }
 
     /// Check format invariants of the BlockDir; report any problems to the Report.
@@ -241,7 +240,18 @@ impl BlockDir {
         // directories of the right length.
         report.set_phase("Count blocks");
         report.print("Count blocks...");
-        let bns = self.block_names(report)?;
+        let bns = self
+            .block_names(report)?
+            .enumerate()
+            .map(|(_i, bn)| {
+                report.increment_work(1);
+                // if i % 1000 == 0 {
+                //     eprintln!("{:>5}: {}", i, bn);
+                // }
+                bn
+            })
+            .collect::<Vec<String>>();
+        report.set_total_work(0);
         report.print(&format!(
             "Measuring {} blocks...",
             bns.len().separate_with_commas()
@@ -366,7 +376,10 @@ mod tests {
 
         // Block should be the one block present in the list.
         assert_eq!(
-            block_dir.block_names(&Report::new()).unwrap(),
+            block_dir
+                .block_names(&Report::new())
+                .unwrap()
+                .collect::<Vec<_>>(),
             &[EXAMPLE_BLOCK_HASH]
         );
 

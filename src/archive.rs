@@ -307,7 +307,7 @@ mod tests {
         }
 
         assert!(af.referenced_blocks().unwrap().is_empty());
-        assert!(af.block_dir.block_names(&af.report).unwrap().is_empty());
+        assert_eq!(af.block_dir.block_names(&af.report).unwrap().count(), 0);
     }
 
     #[test]
@@ -333,6 +333,6 @@ mod tests {
         assert_eq!(af.last_band_id().unwrap(), BandId::new(&[1]));
 
         assert!(af.referenced_blocks().unwrap().is_empty());
-        assert!(af.block_dir.block_names(&af.report).unwrap().is_empty());
+        assert_eq!(af.block_dir.block_names(&af.report).unwrap().count(), 0);
     }
 }
