@@ -242,10 +242,19 @@ impl BlockDir {
         report.set_phase("Count blocks");
         report.print("Count blocks...");
         let bns = self.block_names(report)?;
-        report.print(&format!("Measuring {} blocks...", bns.len().separate_with_commas()));
+        report.print(&format!(
+            "Measuring {} blocks...",
+            bns.len().separate_with_commas()
+        ));
         let tot = bns
             .par_iter()
-            .map(|bn| self.compressed_block_size(bn))
+            .map(|bn| {
+                let bs = self.compressed_block_size(bn);
+                if let Ok(bytes) = bs {
+                    report.increment_work(bytes);
+                }
+                bs
+            })
             .try_reduce(|| 0u64, |t, s| Ok(t + s))?;
         report.set_total_work(tot);
 
