@@ -211,10 +211,11 @@ impl BlockDir {
         Ok(ds)
     }
 
-    /// Return a sorted vec of all the blocknames in the blockdir.
+    /// Return an iterator through all the blocknames in the blockdir,
+    /// in arbitrary order.
     pub fn block_names(&self, report: &Report) -> Result<impl Iterator<Item = String>> {
-        // The vecs from `subdirs` and `list_dir` are already sorted, so
-        // we don't need to sort here.
+        // TODO: Perhaps return compressed sizes too? Might be fastest
+        // to get them from the fs::DirEntry.
         let path = self.path.clone();
         let subdirs = self.subdirs(report)?;
         Ok(subdirs.into_iter().flat_map(move |s| {
@@ -242,30 +243,14 @@ impl BlockDir {
         report.print("Count blocks...");
         let bns = self
             .block_names(report)?
-            .enumerate()
-            .map(|(_i, bn)| {
-                report.increment_work(1);
-                // if i % 1000 == 0 {
-                //     eprintln!("{:>5}: {}", i, bn);
-                // }
-                bn
-            })
-            .collect::<Vec<String>>();
-        report.set_total_work(0);
-        report.print(&format!(
-            "Measuring {} blocks...",
-            bns.len().separate_with_commas()
-        ));
-        let tot = bns
-            .par_iter()
+            .par_bridge()
             .map(|bn| {
-                let bs = self.compressed_block_size(bn);
-                if let Ok(bytes) = bs {
-                    report.increment_work(bytes);
-                }
-                bs
+                let bsize = self.compressed_block_size(&bn).unwrap_or(0);
+                report.increment_work(bsize);
+                (bn, bsize)
             })
-            .try_reduce(|| 0u64, |t, s| Ok(t + s))?;
+            .collect::<Vec<(String, u64)>>();
+        let tot = bns.iter().map(|(_bn, bsize)| bsize).sum();
         report.set_total_work(tot);
 
         report.print(&format!(
@@ -273,10 +258,9 @@ impl BlockDir {
             (tot / 1_000_000).separate_with_commas()
         ));
         report.set_phase("Check block hashes");
-        // TODO: Don't repeatedly measure the size.
         bns.par_iter()
-            .map(|bn| {
-                report.increment_work(self.compressed_block_size(&bn)?);
+            .map(|(bn, bsize)| {
+                report.increment_work(*bsize);
                 self.validate_block(bn, report)
             })
             .try_for_each(|i| i)?;
