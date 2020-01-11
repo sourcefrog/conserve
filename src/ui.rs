@@ -129,6 +129,7 @@ impl TerminalUI {
 
     fn clear_progress(&mut self) {
         if self.progress_present {
+            #[allow(deprecated)]
             queue!(
                 self.t,
                 terminal::Clear(terminal::ClearType::CurrentLine),
@@ -204,6 +205,7 @@ impl UI for TerminalUI {
                 .take(message_limit)
                 .collect::<String>()
         };
+        #[allow(deprecated)]
         queue!(
             self.t,
             cursor::Hide,
@@ -230,6 +232,7 @@ impl UI for TerminalUI {
 
     fn problem(&mut self, s: &str) -> Result<()> {
         self.progress_present = false;
+        #[allow(deprecated)]
         queue!(
             self.t,
             terminal::Clear(terminal::ClearType::CurrentLine),
