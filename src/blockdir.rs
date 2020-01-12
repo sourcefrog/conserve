@@ -267,8 +267,8 @@ impl BlockDir {
         Ok(())
     }
 
-    fn validate_block(&self, hash: &BlockHash, report: &Report) -> Result<()> {
-        let de = self.get_block_content(hash, report)?;
+    fn validate_block(&self, hash: &str, report: &Report) -> Result<()> {
+        let de = self.get_block_content(&hash, report)?;
         let actual_hash = hex::encode(blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &de).as_bytes());
         if actual_hash != *hash {
             report.increment("block.misplaced", 1);
@@ -282,7 +282,7 @@ impl BlockDir {
     }
 
     /// Return the entire contents of the block.
-    pub fn get_block_content(&self, hash: &BlockHash, report: &Report) -> Result<Vec<u8>> {
+    pub fn get_block_content(&self, hash: &str, report: &Report) -> Result<Vec<u8>> {
         let mut f = File::open(&self.path_for_file(hash))?;
         // TODO: Specific error for compression failure (corruption?) vs io errors.
         let (compressed_len, de) = match Snappy::decompress_read(&mut f) {
@@ -304,7 +304,7 @@ impl BlockDir {
         Ok(de)
     }
 
-    fn compressed_block_size(&self, hash: &BlockHash) -> Result<u64> {
+    fn compressed_block_size(&self, hash: &str) -> Result<u64> {
         Ok(fs::metadata(&self.path_for_file(hash))?.len())
     }
 }
