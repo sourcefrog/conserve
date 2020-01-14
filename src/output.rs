@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2018 Martin Pool.
+// Copyright 2018, 2020 Martin Pool.
 
 //! Text output formats for structured data.
 //!
@@ -7,6 +7,8 @@
 //! file (typically stdout).
 
 use super::*;
+
+use snafu::ResultExt;
 
 use chrono::Local;
 
@@ -110,7 +112,8 @@ impl<'a> ShowArchive for IndexDump<'a> {
             .unwrap()
             .filter_map(|i| i.ok())
             .collect::<Vec<Entry>>();
-        let output = serde_json::to_string_pretty(&index_entries)?;
+        let output =
+            serde_json::to_string_pretty(&index_entries).context(errors::SerializeIndex)?;
         report.print(&output);
         Ok(())
     }

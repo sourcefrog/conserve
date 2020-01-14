@@ -246,7 +246,7 @@ impl UI for TerminalUI {
             style::ResetColor,
         )
         .unwrap();
-        self.t.flush()?;
+        self.t.flush().expect("flush terminal output");
         Ok(())
     }
 

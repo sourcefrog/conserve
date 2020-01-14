@@ -1,22 +1,20 @@
 // Copyright 2017 Julian Raufelder.
+// Copyright 2020 Martin Pool.
 
 //! Create GlobSet from a list of strings
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
+
+use snafu::ResultExt;
 
 use super::*;
 
 pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
     for i in excludes {
-        match Glob::new(i.as_ref()) {
-            Ok(g) => builder.add(g),
-            Err(e) => {
-                return Err(e.into());
-            }
-        };
+        builder.add(Glob::new(i.as_ref()).context(errors::ParseGlob)?);
     }
-    builder.build().or_else(|e| Err(e.into()))
+    builder.build().context(errors::ParseGlob)
 }
 
 pub fn excludes_nothing() -> GlobSet {

@@ -1,4 +1,4 @@
-// Copyright 2017, 2018, 2019 Martin Pool.
+// Copyright 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Access a versioned tree stored in the archive.
 //!
@@ -39,7 +39,9 @@ impl StoredTree {
     pub fn open_version(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
         let band = Band::open(archive, band_id)?;
         if !band.is_closed()? {
-            return Err(Error::BandIncomplete(band_id.clone()));
+            return Err(Error::BandIncomplete {
+                band_id: band_id.clone(),
+            });
         }
         Ok(StoredTree {
             archive: archive.clone(),

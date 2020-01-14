@@ -20,6 +20,7 @@ use std::path::{Path, PathBuf};
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
+use snafu::ResultExt;
 use tempfile;
 use thousands::Separable;
 
@@ -74,7 +75,7 @@ impl BlockDir {
 
     /// Create a BlockDir directory and return an object accessing it.
     pub fn create(path: &Path) -> Result<BlockDir> {
-        fs::create_dir(path)?;
+        fs::create_dir(path).context(errors::CreateBlockDir)?;
         Ok(BlockDir::new(path))
     }
 
@@ -101,7 +102,7 @@ impl BlockDir {
         loop {
             // TODO: Possibly read repeatedly in case we get a short read and have room for more,
             // so that short reads don't lead to short blocks being stored.
-            let read_len = from_file.read(&mut in_buf)?;
+            let read_len = from_file.read(&mut in_buf).context(errors::StoreFile)?;
             if read_len == 0 {
                 break;
             }
@@ -140,16 +141,21 @@ impl BlockDir {
         // Note: When we come to support cloud storage, we should do one atomic write rather than
         // a write and rename.
         let d = self.subdir_for(hex_hash);
-        super::io::ensure_dir_exists(&d)?;
+        super::io::ensure_dir_exists(&d).context(errors::WriteBlockFile)?;
         let tempf = tempfile::Builder::new()
             .prefix(TMP_PREFIX)
-            .tempfile_in(&d)?;
+            .tempfile_in(&d)
+            .context(errors::WriteBlockFile)?;
         let mut bufw = io::BufWriter::new(tempf);
-        Snappy::compress_and_write(&in_buf, &mut bufw)?;
+        Snappy::compress_and_write(&in_buf, &mut bufw).context(errors::WriteBlockFile)?;
         let tempf = bufw.into_inner().unwrap();
 
         // TODO: Count bytes rather than stat-ing.
-        let comp_len = tempf.as_file().metadata()?.len();
+        let comp_len = tempf
+            .as_file()
+            .metadata()
+            .context(errors::WriteBlockFile)?
+            .len();
 
         // Also use plain `persist` not `persist_noclobber` to avoid
         // calling `link` on Unix, which won't work on all filesystems.
@@ -162,7 +168,7 @@ impl BlockDir {
                 ));
                 report.increment("block.already_present", 1);
             } else {
-                return Err(e.error.into());
+                return Err(e).context(errors::PersistBlockFile);
             }
         }
         Ok(comp_len)
@@ -173,7 +179,7 @@ impl BlockDir {
         match fs::metadata(self.path_for_file(hash)) {
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
             Ok(_) => Ok(true),
-            Err(e) => Err(e.into()),
+            Err(e) => Err(e).context(errors::ReadBlock),
         }
     }
 
@@ -193,7 +199,7 @@ impl BlockDir {
     }
 
     /// Return a sorted vec of prefix subdirectories.
-    fn subdirs(&self, report: &Report) -> Result<Vec<String>> {
+    fn subdirs(&self, report: &Report) -> std::io::Result<Vec<String>> {
         // This doesn't check every invariant that should be true; that's the job of the validation
         // code.
         let (_fs, mut ds) = list_dir(&self.path)?;
@@ -217,7 +223,7 @@ impl BlockDir {
         // TODO: Perhaps return compressed sizes too? Might be fastest
         // to get them from the fs::DirEntry.
         let path = self.path.clone();
-        let subdirs = self.subdirs(report)?;
+        let subdirs = self.subdirs(report).context(errors::ListBlocks)?;
         Ok(subdirs.into_iter().flat_map(move |s| {
             // TODO: Avoid `unwrap`; cleanly return error into iterator?
             fs::read_dir(&path.join(s)).unwrap().filter_map(|entry| {
@@ -271,26 +277,27 @@ impl BlockDir {
         let de = self.get_block_content(&hash, report)?;
         let actual_hash = hex::encode(blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &de).as_bytes());
         if actual_hash != *hash {
+            let path = self.path_for_file(&hash);
             report.increment("block.misplaced", 1);
             report.problem(&format!(
                 "Block file {:?} has actual decompressed hash {:?}",
-                self.path, actual_hash
+                path, actual_hash
             ));
-            return Err(Error::BlockCorrupt(self.path.clone()));
+            return Err(Error::BlockCorrupt { path });
         }
         Ok(())
     }
 
     /// Return the entire contents of the block.
     pub fn get_block_content(&self, hash: &str, report: &Report) -> Result<Vec<u8>> {
-        let mut f = File::open(&self.path_for_file(hash))?;
-        // TODO: Specific error for compression failure (corruption?) vs io errors.
+        let path = self.path_for_file(hash);
+        let mut f = File::open(&path).context(errors::ReadBlock)?;
         let (compressed_len, de) = match Snappy::decompress_read(&mut f) {
             Ok(d) => d,
             Err(e) => {
                 report.increment("block.corrupt", 1);
-                report.problem(&format!("Block file {:?} read error {:?}", self.path, e));
-                return Err(Error::BlockCorrupt(self.path.clone()));
+                report.problem(&format!("Block file {:?} read error {:?}", path, e));
+                return Err(Error::BlockCorrupt { path });
             }
         };
         report.increment("block.read", 1);
@@ -305,7 +312,9 @@ impl BlockDir {
     }
 
     fn compressed_block_size(&self, hash: &str) -> Result<u64> {
-        Ok(fs::metadata(&self.path_for_file(hash))?.len())
+        Ok(fs::metadata(&self.path_for_file(hash))
+            .context(errors::ReadBlock)?
+            .len())
     }
 }
 

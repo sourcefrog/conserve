@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2020 Martin Pool.
 
 //! IO utilities.
 
@@ -9,6 +9,7 @@ use std::io::prelude::*;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
+use snafu::ResultExt;
 use tempfile;
 
 use super::*;
@@ -19,7 +20,7 @@ pub struct AtomicFile {
 }
 
 impl AtomicFile {
-    pub fn new(path: &Path) -> Result<AtomicFile> {
+    pub fn new(path: &Path) -> std::io::Result<AtomicFile> {
         let dir = path.parent().unwrap();
         Ok(AtomicFile {
             path: path.to_path_buf(),
@@ -27,15 +28,15 @@ impl AtomicFile {
         })
     }
 
-    pub fn close(self, _report: &Report) -> Result<()> {
+    pub fn close(self, _report: &Report) -> std::io::Result<()> {
         // We use `persist` rather than `persist_noclobber` here because the latter calls
         // `link` on Unix, and some filesystems don't support it.  That's probably fine
         // because the files being updated by this should never already exist, though
         // it does mean we won't detect unexpected cases where it does.
-        if let Err(e) = self.f.persist(&self.path) {
-            return Err(e.error.into());
-        };
-        Ok(())
+        self.f
+            .persist(&self.path)
+            .and(Ok(()))
+            .or_else(|e| Err(e.error))
     }
 }
 
@@ -63,46 +64,22 @@ impl DerefMut for AtomicFile {
     }
 }
 
-pub fn ensure_dir_exists(path: &Path) -> Result<()> {
+pub fn ensure_dir_exists(path: &Path) -> std::io::Result<()> {
     if let Err(e) = fs::create_dir(path) {
         if e.kind() != io::ErrorKind::AlreadyExists {
-            return Err(e.into());
+            return Err(e);
         }
     }
     Ok(())
 }
 
-/// True if path exists and is a directory, false if does not exist, error otherwise.
-#[allow(dead_code)]
-pub fn directory_exists(path: &Path) -> Result<bool> {
-    match fs::metadata(path) {
-        Ok(metadata) => {
-            if metadata.is_dir() {
-                Ok(true)
-            } else {
-                Err(Error::NotADirectory(path.into()))
-            }
-        }
-        Err(e) => match e.kind() {
-            io::ErrorKind::NotFound => Ok(false),
-            _ => Err(e.into()),
-        },
-    }
-}
-
 /// True if path exists and is a file, false if does not exist, error otherwise.
-pub fn file_exists(path: &Path) -> Result<bool> {
+pub fn file_exists(path: &Path) -> std::io::Result<bool> {
     match fs::metadata(path) {
-        Ok(metadata) => {
-            if metadata.is_file() {
-                Ok(true)
-            } else {
-                Err(Error::NotAFile(path.into()))
-            }
-        }
+        Ok(metadata) => Ok(metadata.is_file()),
         Err(e) => match e.kind() {
             io::ErrorKind::NotFound => Ok(false),
-            _ => Err(e.into()),
+            _ => Err(e),
         },
     }
 }
@@ -112,13 +89,20 @@ pub fn require_empty_directory(path: &Path) -> Result<()> {
     if let Err(e) = std::fs::create_dir(&path) {
         if e.kind() == io::ErrorKind::AlreadyExists {
             // Exists and hopefully empty?
-            if std::fs::read_dir(&path)?.next().is_some() {
-                Err(Error::DestinationNotEmpty(path.into()))
+            if std::fs::read_dir(&path)
+                .context(errors::CreateDirectory { path })?
+                .next()
+                .is_some()
+            {
+                Err(Error::DestinationNotEmpty { path: path.into() })
             } else {
                 Ok(()) // Exists and empty
             }
         } else {
-            Err(Error::IoError(e))
+            Err(Error::CreateDirectory {
+                path: path.into(),
+                source: e,
+            })
         }
     } else {
         Ok(()) // Created
@@ -129,7 +113,7 @@ pub fn require_empty_directory(path: &Path) -> Result<()> {
 ///
 /// Returns a list of filenames and a list of directory names respectively, forced to UTF-8, and
 /// sorted naively as UTF-8.
-pub fn list_dir(path: &Path) -> Result<(Vec<String>, Vec<String>)> {
+pub fn list_dir(path: &Path) -> std::io::Result<(Vec<String>, Vec<String>)> {
     let mut file_names = Vec::<String>::new();
     let mut dir_names = Vec::<String>::new();
     for entry in fs::read_dir(path)? {

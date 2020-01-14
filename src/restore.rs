@@ -1,10 +1,12 @@
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Restore from the archive to the filesystem.
 
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+
+use snafu::ResultExt;
 
 use super::entry::Entry;
 use super::io::require_empty_directory;
@@ -48,10 +50,11 @@ impl tree::WriteTree for RestoreTree {
 
     fn write_dir(&mut self, entry: &Entry) -> Result<()> {
         self.report.increment("dir", 1);
-        match fs::create_dir(self.entry_path(entry)) {
-            Ok(_) => Ok(()),
-            Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-            Err(e) => Err(e.into()),
+        let path = self.entry_path(entry);
+        match fs::create_dir(&path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+            e => e.context(errors::Restore { path }),
         }
     }
 
@@ -61,8 +64,10 @@ impl tree::WriteTree for RestoreTree {
         // TODO: For restore, maybe not necessary to rename into place, and
         // we could just write directly.
         self.report.increment("file", 1);
-        let mut af = AtomicFile::new(&self.entry_path(entry))?;
-        let bytes = std::io::copy(content, &mut af)?;
+        let path = self.entry_path(entry);
+        let ctx = || errors::Restore { path: path.clone() };
+        let mut af = AtomicFile::new(&path).with_context(ctx)?;
+        let bytes = std::io::copy(content, &mut af).with_context(ctx)?;
         self.report.increment_size(
             "file.bytes",
             Sizes {
@@ -70,7 +75,7 @@ impl tree::WriteTree for RestoreTree {
                 compressed: 0,
             },
         );
-        af.close(&self.report)
+        af.close(&self.report).context(errors::Restore { path })
     }
 
     #[cfg(unix)]
@@ -78,7 +83,8 @@ impl tree::WriteTree for RestoreTree {
         use std::os::unix::fs as unix_fs;
         self.report.increment("symlink", 1);
         if let Some(ref target) = entry.symlink_target() {
-            unix_fs::symlink(target, self.entry_path(entry))?;
+            let path = self.entry_path(entry);
+            unix_fs::symlink(target, &path).context(errors::Restore { path })?;
         } else {
             // TODO: Treat as an error.
             self.report

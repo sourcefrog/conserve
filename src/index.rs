@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Index lists the files in a band in the archive.
 
@@ -10,10 +10,11 @@ use std::path::{Path, PathBuf};
 use std::str;
 use std::vec;
 
+use globset::GlobSet;
+use snafu::ResultExt;
+
 use super::io::file_exists;
 use super::*;
-
-use globset::GlobSet;
 
 pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
 
@@ -71,18 +72,21 @@ impl IndexBuilder {
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
     pub fn finish_hunk(&mut self, report: &Report) -> Result<()> {
-        ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))?;
+        ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))
+            .context(errors::WriteIndex)?;
         let hunk_path = &path_for_hunk(&self.dir, self.sequence);
 
-        let json_string = serde_json::to_string(&self.entries)?;
+        let json_string = serde_json::to_string(&self.entries)
+            .context(errors::SerializeJson { path: hunk_path })?;
         let uncompressed_len = json_string.len() as u64;
 
-        let mut af = AtomicFile::new(hunk_path)?;
-        let compressed_len = Snappy::compress_and_write(json_string.as_bytes(), &mut af)?;
+        let mut af = AtomicFile::new(hunk_path).context(errors::WriteIndex)?;
+        let compressed_len = Snappy::compress_and_write(json_string.as_bytes(), &mut af)
+            .context(errors::WriteIndex)?;
 
         // TODO: Don't seek, just count bytes as they're compressed.
         // TODO: Measure time to compress separately from time to write.
-        af.close(report)?;
+        af.close(report).context(errors::WriteIndex)?;
 
         report.increment_size(
             "index",
@@ -129,7 +133,7 @@ impl ReadIndex {
     /// Return the (1-based) number of index hunks in an index directory.
     pub fn count_hunks(&self) -> Result<u32> {
         for i in 0.. {
-            if !file_exists(&path_for_hunk(&self.dir, i))? {
+            if !file_exists(&path_for_hunk(&self.dir, i)).context(errors::ReadIndex)? {
                 // If hunk 1 is missing, 1 hunks exists.
                 return Ok(i);
             }
@@ -212,11 +216,9 @@ impl Iter {
                 // No (more) index hunk files.
                 return Ok(false);
             }
-            Err(e) => {
-                return Err(e.into());
-            }
+            Err(e) => return Err(e).context(errors::ReadIndex),
         };
-        let (comp_len, index_bytes) = Snappy::decompress_read(&mut f)?;
+        let (comp_len, index_bytes) = Snappy::decompress_read(&mut f).context(errors::ReadIndex)?;
         self.report.increment_size(
             "index",
             Sizes {
@@ -227,9 +229,13 @@ impl Iter {
         self.report.increment("index.hunk", 1);
 
         // TODO: More specific error messages including the filename.
-        let index_json = str::from_utf8(&index_bytes)
-            .or_else(|_| Err(Error::IndexCorrupt(hunk_path.clone())))?;
-        let entries: Vec<Entry> = serde_json::from_str(index_json)?;
+        let index_json = str::from_utf8(&index_bytes).map_err(|_e| Error::IndexCorrupt {
+            path: hunk_path.clone(),
+        })?;
+        let entries: Vec<Entry> =
+            serde_json::from_str(index_json).with_context(|| errors::DeserializeIndex {
+                path: hunk_path.clone(),
+            })?;
         if entries.is_empty() {
             self.report
                 .problem(&format!("Index hunk {} is empty", hunk_path.display()));

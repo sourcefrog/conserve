@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Find source files within a source directory, in apath order.
 
@@ -9,9 +9,11 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use super::*;
+use snafu::ResultExt;
 
 use globset::GlobSet;
+
+use super::*;
 
 /// A real tree on the filesystem, for use as a backup source or restore destination.
 #[derive(Clone)]
@@ -69,7 +71,9 @@ impl tree::ReadTree for LiveTree {
                     "Couldn't get tree root metadata for {:?}: {}",
                     &self.path, e
                 ));
-                return Err(e.into());
+                return Err(e).context(errors::ListSourceTree {
+                    path: self.path.clone(),
+                });
             }
         };
         // Preload iter to return the root and then recurse into it.
@@ -92,7 +96,7 @@ impl tree::ReadTree for LiveTree {
     fn file_contents(&self, entry: &Entry) -> Result<Self::R> {
         assert_eq!(entry.kind(), Kind::File);
         let path = self.relative_path(&entry.apath);
-        Ok(fs::File::open(&path)?)
+        fs::File::open(&path).context(errors::ReadSourceFile { path })
     }
 
     fn estimate_count(&self) -> Result<u64> {
@@ -183,14 +187,15 @@ impl Iter {
         let mut children = Vec::<Entry>::new();
         let mut child_dirs = Vec::<Apath>::new();
         let dir_path = relative_path(&self.root_path, parent_apath);
-        let dir_iter = match fs::read_dir(&dir_path) {
-            Ok(dir_iter) => dir_iter,
-            Err(e) => {
+        let dir_iter = fs::read_dir(&dir_path)
+            .with_context(|| errors::ListSourceTree {
+                path: dir_path.clone(),
+            })
+            .map_err(|e| {
                 self.report
                     .problem(&format!("Error reading directory {:?}: {}", &dir_path, e));
-                return Err(e.into());
-            }
-        };
+                e
+            })?;
         for dir_entry in dir_iter {
             let dir_entry = match dir_entry {
                 Ok(dir_entry) => dir_entry,

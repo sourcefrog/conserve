@@ -1,32 +1,36 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2018 Martin Pool.
+// Copyright 2015, 2016, 2018, 2020 Martin Pool.
 
 //! Read and write JSON files.
 
-use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-use super::errors::*;
+use snafu::ResultExt;
+
 use super::io::AtomicFile;
 use super::Report;
+use super::*;
 
-pub fn write_serde<T: serde::Serialize>(path: &Path, obj: &T, report: &Report) -> Result<()> {
-    let mut f = AtomicFile::new(path)?;
-    let mut s = serde_json::to_string(&obj)?;
+pub fn write_json_metadata_file<T: serde::Serialize>(
+    path: &Path,
+    obj: &T,
+    report: &Report,
+) -> Result<()> {
+    let mut f = AtomicFile::new(path).context(errors::WriteMetadata { path })?;
+    let mut s = serde_json::to_string(&obj).context(errors::SerializeJson { path })?;
     s.push('\n');
-    f.write_all(s.as_bytes())?;
-    f.close(report)?;
+    f.write_all(s.as_bytes())
+        .context(errors::WriteMetadata { path })?;
+    f.close(report).context(errors::WriteMetadata { path })?;
     Ok(())
 }
 
 pub fn read_serde<T: serde::de::DeserializeOwned>(path: &Path, _report: &Report) -> Result<T> {
     // TODO: Send something to the Report.  At present this is used only for
     // small metadata files so measurement is not critical.
-    let mut f = File::open(path).or_else(|e| Err(Error::IoError(e)))?;
-    let mut buf = String::new();
-    let _bytes_read = f.read_to_string(&mut buf)?;
-    serde_json::from_str(&buf).or_else(|e| Err(e.into()))
+    let buf = std::fs::read_to_string(&path).context(errors::ReadMetadata { path })?;
+    serde_json::from_str(&buf).context(DeserializeJson { path })
 }
 
 #[cfg(test)]
@@ -49,7 +53,7 @@ mod tests {
             weather: "cold".to_string(),
         };
         let p = tree.path().join("test.json");
-        super::write_serde(&p, &entry, &write_report).unwrap();
+        super::write_json_metadata_file(&p, &entry, &write_report).unwrap();
         // NB: This does not currently do much with `report` other than measure timing.
 
         let read_report = Report::new();

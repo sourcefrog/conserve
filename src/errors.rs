@@ -3,97 +3,131 @@
 
 //! Conserve error types.
 
-use std::error;
-use std::fmt;
-use std::io;
 use std::path::PathBuf;
+
+use snafu::Snafu;
 
 use crate::*;
 
+type IOError = std::io::Error;
+
 /// Conserve specific error.
-#[derive(Debug)]
+// TODO: Perhaps have an enum per module?
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
 pub enum Error {
-    BlockCorrupt(PathBuf),
-    NotAnArchive(PathBuf),
-    NotADirectory(PathBuf),
-    NotAFile(PathBuf),
-    UnsupportedArchiveVersion(String),
-    DestinationNotEmpty(PathBuf),
+    BlockCorrupt {
+        path: PathBuf,
+    },
+    WriteBlockFile {
+        source: IOError,
+    },
+    PersistBlockFile {
+        source: tempfile::PersistError,
+    },
+    ReadBlock {
+        source: IOError,
+    },
+    ListBlocks {
+        source: IOError,
+    },
+    #[snafu(display("Not a Conserve archive: {}", path.display()))]
+    NotAnArchive {
+        path: PathBuf,
+    },
+    NotADirectory {
+        path: PathBuf,
+    },
+    NotAFile {
+        path: PathBuf,
+    },
+    UnsupportedArchiveVersion {
+        version: String,
+    },
+    #[snafu(display("Destination directory not empty: {}", path.display()))]
+    DestinationNotEmpty {
+        path: PathBuf,
+    },
     ArchiveEmpty,
+    #[snafu(display("Archive has no complete bands"))]
     NoCompleteBands,
     InvalidVersion,
-    BandIncomplete(BandId),
-    IoError(io::Error),
-    // TODO: Include the path in the json error.
-    JsonDeserialize(serde_json::Error),
-    BadGlob(globset::Error),
-    IndexCorrupt(PathBuf),
-    CrossTerm(crossterm::ErrorKind),
+    CreateBand {
+        source: std::io::Error,
+    },
+    CreateBlockDir {
+        source: std::io::Error,
+    },
+    CreateDirectory {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    BandIncomplete {
+        band_id: BandId,
+    },
+    ParseGlob {
+        source: globset::Error,
+    },
+    IndexCorrupt {
+        path: PathBuf,
+    },
+    WriteIndex {
+        source: IOError,
+    },
+    ReadIndex {
+        source: IOError,
+    },
+    SerializeIndex {
+        source: serde_json::Error,
+    },
+    DeserializeIndex {
+        path: PathBuf,
+        source: serde_json::Error,
+    },
     FileCorrupt {
         // band_id: BandId,
         apath: Apath,
         expected_hex: String,
         actual_hex: String,
     },
+    ReadMetadata {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    DeserializeJson {
+        path: PathBuf,
+        source: serde_json::Error,
+    },
+    WriteMetadata {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    SerializeJson {
+        path: PathBuf,
+        source: serde_json::Error,
+    },
+    ListBands {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    MeasureBandSize {
+        source: walkdir::Error,
+    },
+    ReadSourceFile {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    ListSourceTree {
+        path: PathBuf,
+        source: IOError,
+    },
+    StoreFile {
+        source: IOError,
+    },
+    Restore {
+        path: PathBuf,
+        source: IOError,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::DestinationNotEmpty(d) => write!(f, "Destination directory not empty: {:?}", d),
-            Error::ArchiveEmpty => write!(f, "Archive is empty"),
-            Error::NoCompleteBands => write!(f, "Archive has no complete bands"),
-            Error::InvalidVersion => write!(f, "Invalid version number"),
-            Error::NotAnArchive(p) => write!(f, "Not a Conserve archive: {:?}", p),
-            Error::BandIncomplete(b) => write!(f, "Band {} is incomplete", b),
-            Error::UnsupportedArchiveVersion(v) => write!(
-                f,
-                "Archive version {:?} is not supported by Conserve {}",
-                v,
-                version()
-            ),
-            Error::IoError(e) => write!(f, "IO Error: {}", e),
-            _ => write!(f, "{:?}", self),
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            // For cases like IoError that essentially include an underlying
-            // error by value, it doesn't seem to help anything, and tends to
-            // cause doubled-up messages, to treat them as a separate cause.
-            //
-            // For now, I'll reserve this for cases where the conserve error
-            // is abstracted from its cause.
-            _ => None,
-        }
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(c: io::Error) -> Error {
-        Error::IoError(c)
-    }
-}
-
-impl From<globset::Error> for Error {
-    fn from(c: globset::Error) -> Error {
-        Error::BadGlob(c)
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(c: serde_json::Error) -> Error {
-        Error::JsonDeserialize(c)
-    }
-}
-
-impl From<crossterm::ErrorKind> for Error {
-    fn from(c: crossterm::ErrorKind) -> Error {
-        Error::CrossTerm(c)
-    }
-}

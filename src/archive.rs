@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Archives holding backup material.
 //!
@@ -12,11 +12,11 @@
 //! * any number of bands, holding tree indexs to describe which files
 //!   are present in a version.
 
-use std::cmp::max;
 use std::collections::BTreeSet;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 
+use snafu::ResultExt;
 use thousands::Separable;
 
 use super::io::{file_exists, require_empty_directory};
@@ -56,7 +56,7 @@ impl Archive {
         };
         let header_filename = path.join(HEADER_FILENAME);
         let report = Report::new();
-        jsonio::write_serde(&header_filename, &header, &report)?;
+        jsonio::write_json_metadata_file(&header_filename, &header, &report)?;
         Ok(Archive {
             path: path.to_path_buf(),
             report,
@@ -70,15 +70,15 @@ impl Archive {
     pub fn open<P: AsRef<Path>>(path: P, report: &Report) -> Result<Archive> {
         let path = path.as_ref();
         let header_path = path.join(HEADER_FILENAME);
-        if !file_exists(&header_path)? {
-            return Err(Error::NotAnArchive(path.into()));
+        if !file_exists(&header_path).context(errors::ReadMetadata { path })? {
+            return Err(Error::NotAnArchive { path: path.into() });
         }
         let block_dir = BlockDir::new(&path.join(BLOCK_DIR));
         let header: ArchiveHeader = jsonio::read_serde(&header_path, &report)?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
-            return Err(Error::UnsupportedArchiveVersion(
-                header.conserve_archive_version,
-            ));
+            return Err(Error::UnsupportedArchiveVersion {
+                version: header.conserve_archive_version,
+            });
         }
         Ok(Archive {
             path: path.to_path_buf(),
@@ -99,10 +99,13 @@ impl Archive {
     /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_bands(&self) -> Result<Vec<BandId>> {
         let mut band_ids = Vec::<BandId>::new();
-        for e in read_dir(self.path())? {
-            let e = e?;
+        let context = || errors::ListBands {
+            path: self.path.clone(),
+        };
+        for e in read_dir(self.path()).with_context(context)? {
+            let e = e.with_context(context)?;
             let n = e.file_name().into_string().unwrap();
-            if e.file_type()?.is_dir() && n != BLOCK_DIR {
+            if e.file_type().with_context(context)?.is_dir() && n != BLOCK_DIR {
                 band_ids.push(BandId::from_string(&n)?);
             }
         }
@@ -113,19 +116,12 @@ impl Archive {
     /// Return the `BandId` of the highest-numbered band, or ArchiveEmpty,
     /// or an Err if any occurred reading the directory.
     pub fn last_band_id(&self) -> Result<BandId> {
-        let mut l: Option<BandId> = None;
-        for e in read_dir(self.path())? {
-            let e = e?;
-            let n = e.file_name().into_string().unwrap();
-            if e.file_type()?.is_dir() && n != BLOCK_DIR {
-                let bn = BandId::from_string(&n)?;
-                l = match l {
-                    None => Some(bn),
-                    Some(ll) => Some(max(ll, bn)),
-                };
-            }
-        }
-        l.ok_or(Error::ArchiveEmpty)
+        // TODO: Perhaps factor out an iter_bands_unsorted, common
+        // between this and list_bands.
+        self.list_bands()?
+            .into_iter()
+            .last()
+            .ok_or(Error::ArchiveEmpty)
     }
 
     /// Return the last completely-written band id.
@@ -170,8 +166,8 @@ impl Archive {
 
     fn validate_archive_dir(&self) -> Result<()> {
         self.report.print("Check archive top-level directory...");
-        let (mut files, mut dirs) = list_dir(self.path())?;
-
+        let (mut files, mut dirs) =
+            list_dir(self.path()).context(errors::ReadMetadata { path: self.path() })?;
         remove_item(&mut files, &HEADER_FILENAME);
         if !files.is_empty() {
             self.report.problem(&format!(
@@ -312,12 +308,10 @@ mod tests {
 
     #[test]
     fn create_bands() {
-        use super::super::io::directory_exists;
         let af = ScratchArchive::new();
 
         // Make one band
         let _band1 = Band::create(&af).unwrap();
-        assert!(directory_exists(af.path()).unwrap());
         let (_file_names, dir_names) = list_dir(af.path()).unwrap();
         assert_eq!(dir_names, &["b0000", "d"]);
 

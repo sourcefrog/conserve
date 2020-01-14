@@ -1,9 +1,8 @@
 // Conserve backup system.
-// Copyright 2017, 2018, 2019 Martin Pool.
+// Copyright 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Abstract Tree trait.
 
-use std::io::ErrorKind;
 use std::ops::Range;
 
 use crate::*;
@@ -31,22 +30,11 @@ pub trait ReadTree: HasReport {
         let report = self.report();
         let mut tot = 0u64;
         for e in self.iter_entries(self.report())? {
+            let e = e?;
             // While just measuring size, ignore directories/files we can't stat.
-            match e {
-                Ok(e) => {
-                    let s = e.size().unwrap_or(0);
-                    tot += s;
-                    report.increment_work(s);
-                }
-                Err(Error::IoError(ioe)) => match ioe.kind() {
-                    // Fairly harmless errors to encounter while walking a tree; can be ignored
-                    // while computing the size.
-                    ErrorKind::NotFound | ErrorKind::PermissionDenied => (),
-                    // May be serious?
-                    _ => return Err(Error::IoError(ioe)),
-                },
-                Err(err) => return Err(err),
-            }
+            let s = e.size().unwrap_or(0);
+            tot += s;
+            report.increment_work(s);
         }
         Ok(TreeSize { file_bytes: tot })
     }
