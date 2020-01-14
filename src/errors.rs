@@ -51,7 +51,12 @@ pub enum Error {
     ArchiveEmpty,
     #[snafu(display("Archive has no complete bands"))]
     NoCompleteBands,
-    InvalidVersion,
+
+    #[snafu(display("Invalid version {:?}", version))]
+    InvalidVersion {
+        version: String,
+    },
+
     CreateBand {
         source: std::io::Error,
     },

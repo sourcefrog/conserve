@@ -39,19 +39,19 @@ impl BandId {
 
     /// Make a new BandId from a string form.
     pub fn from_string(s: &str) -> Result<BandId> {
-        let nope = Err(Error::InvalidVersion);
+        let nope = || Err(Error::InvalidVersion { version: s.into() });
         if !s.starts_with('b') {
-            return nope;
+            return nope();
         }
         let mut seqs = Vec::<u32>::new();
         for num_part in s[1..].split('-') {
             match num_part.parse::<u32>() {
                 Ok(num) => seqs.push(num),
-                Err(..) => return nope,
+                Err(..) => return nope(),
             }
         }
         if seqs.is_empty() {
-            nope
+            nope()
         } else {
             Ok(BandId::new(&seqs))
         }
