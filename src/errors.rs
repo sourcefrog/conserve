@@ -12,10 +12,12 @@ use crate::*;
 type IOError = std::io::Error;
 
 /// Conserve specific error.
-// TODO: Perhaps have an enum per module?
 #[derive(Debug, Snafu)]
 #[snafu(visibility = "pub(crate)")]
 pub enum Error {
+    // TODO: Add messages and perhaps more fields to all of these.
+    // TODO: Add `backtrace` members on errors that are more likely to be
+    // internal errors or have mysterious tracebacks.
     BlockCorrupt {
         path: PathBuf,
     },
@@ -52,7 +54,7 @@ pub enum Error {
     #[snafu(display("Archive has no complete bands"))]
     NoCompleteBands,
 
-    #[snafu(display("Invalid version {:?}", version))]
+    #[snafu(display("Invalid backup version number {:?}", version))]
     InvalidVersion {
         version: String,
     },
