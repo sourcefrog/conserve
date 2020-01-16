@@ -53,8 +53,14 @@ fn main() -> conserve::Result<()> {
     }
     if let Err(ref e) = result {
         show_chained_errors(&report, e);
-        // TODO: Maybe show backtraces once they're available in stable
-        // Rust Errors.
+        // TODO: Perhaps always log the traceback to a log file.
+        if let Some(bt) = snafu::ErrorCompat::backtrace(e) {
+            if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {
+                println!("{}", bt);
+            }
+        }
+        // Avoid Rust redundantly printing the error.
+        std::process::exit(1);
     }
     result
 }
