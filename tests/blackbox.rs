@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Run conserve CLI as a subprocess and test it.
 
@@ -229,7 +229,6 @@ both     /subdir
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stderr(contains("Error: DestinationNotEmpty"))
         .stdout(contains("Destination directory not empty"));
 
     // Restore with specified band id / backup version.
@@ -314,7 +313,6 @@ fn incomplete_version() {
         .arg(af.path())
         .assert()
         .failure()
-        .stderr(contains("Error: NoCompleteBands"))
         .stdout(contains("Archive has no complete bands"));
 
     // ls --incomplete accurately says it has nothing
