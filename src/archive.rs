@@ -70,10 +70,10 @@ impl Archive {
     pub fn open<P: AsRef<Path>>(path: P, report: &Report) -> Result<Archive> {
         let path = path.as_ref();
         let header_path = path.join(HEADER_FILENAME);
-        if !file_exists(&header_path).context(errors::ReadMetadata { path })? {
-            return Err(Error::NotAnArchive { path: path.into() });
-        }
-        let block_dir = BlockDir::new(&path.join(BLOCK_DIR));
+        ensure!(
+            file_exists(&header_path).context(errors::ReadMetadata { path })?,
+            errors::NotAnArchive { path }
+        );
         let header: ArchiveHeader = jsonio::read_serde(&header_path, &report)?;
         ensure!(
             header.conserve_archive_version == ARCHIVE_VERSION,
@@ -85,7 +85,7 @@ impl Archive {
         Ok(Archive {
             path: path.to_path_buf(),
             report: report.clone(),
-            block_dir,
+            block_dir: BlockDir::new(&path.join(BLOCK_DIR)),
         })
     }
 

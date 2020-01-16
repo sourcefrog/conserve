@@ -39,6 +39,12 @@ pub enum Error {
         path: PathBuf,
     },
 
+    #[snafu(display("Failed to read archive header {}", path.display()))]
+    ReadArchiveHeader {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
     #[snafu(display("Archive version {:?} in {} is not supported by Conserve {}",
         version, path.display(), crate::version()))]
     UnsupportedArchiveVersion {
@@ -97,10 +103,13 @@ pub enum Error {
         expected_hex: String,
         actual_hex: String,
     },
+
+    #[snafu(display("Failed to read metadata file {}", path.display()))]
     ReadMetadata {
         path: PathBuf,
         source: std::io::Error,
     },
+
     DeserializeJson {
         path: PathBuf,
         source: serde_json::Error,
