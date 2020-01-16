@@ -48,7 +48,7 @@ spectral = "0.6.0"
 
 [features]
 blake2_simd_asm = ["blake2-rfc/simd_asm"]
-default = []
+default = ["snafu/backtraces"]
 
 [lib]
 doctest = false
