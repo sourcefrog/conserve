@@ -33,13 +33,19 @@ pub enum Error {
     ListBlocks {
         source: IOError,
     },
+
     #[snafu(display("Not a Conserve archive: {}", path.display()))]
     NotAnArchive {
         path: PathBuf,
     },
+
+    #[snafu(display("Archive version {:?} in {} is not supported by Conserve {}",
+        version, path.display(), crate::version()))]
     UnsupportedArchiveVersion {
+        path: PathBuf,
         version: String,
     },
+
     #[snafu(display("Destination directory not empty: {}", path.display()))]
     DestinationNotEmpty {
         path: PathBuf,

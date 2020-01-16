@@ -16,7 +16,7 @@ use std::collections::BTreeSet;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 
-use snafu::ResultExt;
+use snafu::{ensure, ResultExt};
 use thousands::Separable;
 
 use super::io::{file_exists, require_empty_directory};
@@ -75,11 +75,13 @@ impl Archive {
         }
         let block_dir = BlockDir::new(&path.join(BLOCK_DIR));
         let header: ArchiveHeader = jsonio::read_serde(&header_path, &report)?;
-        if header.conserve_archive_version != ARCHIVE_VERSION {
-            return Err(Error::UnsupportedArchiveVersion {
+        ensure!(
+            header.conserve_archive_version == ARCHIVE_VERSION,
+            errors::UnsupportedArchiveVersion {
                 version: header.conserve_archive_version,
-            });
-        }
+                path,
+            }
+        );
         Ok(Archive {
             path: path.to_path_buf(),
             report: report.clone(),
