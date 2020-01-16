@@ -37,12 +37,6 @@ pub enum Error {
     NotAnArchive {
         path: PathBuf,
     },
-    NotADirectory {
-        path: PathBuf,
-    },
-    NotAFile {
-        path: PathBuf,
-    },
     UnsupportedArchiveVersion {
         version: String,
     },
