@@ -89,53 +89,6 @@ impl BlockDir {
         self.subdir_for(hash_hex).join(hash_hex)
     }
 
-    /// Store the contents of a readable file into the BlockDir.
-    ///
-    /// Returns the addresses at which it was stored.
-    pub fn store_file_content(
-        &mut self,
-        from_file: &mut dyn Read,
-        report: &Report,
-    ) -> Result<Vec<Address>> {
-        let mut addresses = Vec::<Address>::with_capacity(1);
-        let mut in_buf = vec![0; MAX_BLOCK_SIZE];
-        loop {
-            // TODO: Possibly read repeatedly in case we get a short read and have room for more,
-            // so that short reads don't lead to short blocks being stored.
-            let read_len = from_file.read(&mut in_buf).context(errors::StoreFile)?;
-            if read_len == 0 {
-                break;
-            }
-            let rb = &in_buf[..read_len];
-
-            let block_hash: String = hash_bytes(rb).unwrap();
-            if self.contains(&block_hash)? {
-                report.increment("block.already_present", 1);
-            } else {
-                let comp_len = self.compress_and_store(rb, &block_hash, &report)?;
-                report.increment("block.write", 1);
-                report.increment_size(
-                    "block",
-                    Sizes {
-                        compressed: comp_len,
-                        uncompressed: read_len as u64,
-                    },
-                );
-            }
-            addresses.push(Address {
-                hash: block_hash,
-                start: 0,
-                len: read_len as u64,
-            });
-        }
-        match addresses.len() {
-            0 => report.increment("file.empty", 1),
-            1 => report.increment("file.medium", 1),
-            _ => report.increment("file.large", 1),
-        }
-        Ok(addresses)
-    }
-
     fn compress_and_store(&self, in_buf: &[u8], hex_hash: &str, report: &Report) -> Result<u64> {
         // Note: When we come to support cloud storage, we should do one atomic write rather than
         // a write and rename.
@@ -319,6 +272,72 @@ impl BlockDir {
     }
 }
 
+/// Manages storage into the BlockDir of any number of files.
+///
+/// At present this just holds a reusable input buffer.
+///
+/// In future it will combine small files into aggregate blocks,
+/// and perhaps compress them in parallel.
+pub(crate) struct StoreFiles {
+    block_dir: BlockDir,
+    input_buf: Vec<u8>,
+}
+
+impl StoreFiles {
+    pub(crate) fn new(block_dir: BlockDir) -> StoreFiles {
+        StoreFiles {
+            block_dir,
+            input_buf: vec![0; MAX_BLOCK_SIZE],
+        }
+    }
+
+    pub(crate) fn store_file_content(
+        &mut self,
+        from_file: &mut dyn Read,
+        report: &Report,
+    ) -> Result<Vec<Address>> {
+        let mut addresses = Vec::<Address>::with_capacity(1);
+        loop {
+            // TODO: Possibly read repeatedly in case we get a short read and have room for more,
+            // so that short reads don't lead to short blocks being stored.
+            let read_len = from_file
+                .read(&mut self.input_buf)
+                .context(errors::StoreFile)?;
+            if read_len == 0 {
+                break;
+            }
+            let block_data = &self.input_buf[..read_len];
+            let block_hash: String = hash_bytes(block_data).unwrap();
+            if self.block_dir.contains(&block_hash)? {
+                report.increment("block.already_present", 1);
+            } else {
+                let comp_len =
+                    self.block_dir
+                        .compress_and_store(block_data, &block_hash, &report)?;
+                report.increment("block.write", 1);
+                report.increment_size(
+                    "block",
+                    Sizes {
+                        compressed: comp_len,
+                        uncompressed: read_len as u64,
+                    },
+                );
+            }
+            addresses.push(Address {
+                hash: block_hash,
+                start: 0,
+                len: read_len as u64,
+            });
+        }
+        match addresses.len() {
+            0 => report.increment("file.empty", 1),
+            1 => report.increment("file.medium", 1),
+            _ => report.increment("file.large", 1),
+        }
+        Ok(addresses)
+    }
+}
+
 fn hash_bytes(in_buf: &[u8]) -> Result<BlockHash> {
     let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
     hasher.update(in_buf);
@@ -332,7 +351,7 @@ mod tests {
     use std::io::SeekFrom;
     use tempfile::{NamedTempFile, TempDir};
 
-    use crate::*;
+    use super::*;
 
     const EXAMPLE_TEXT: &[u8] = b"hello!";
     const EXAMPLE_BLOCK_HASH: &str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd\
@@ -353,15 +372,18 @@ mod tests {
     }
 
     #[test]
-    pub fn write_to_file() {
+    pub fn store_a_file() {
         let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
         let report = Report::new();
-        let (testdir, mut block_dir) = setup();
+        let (testdir, block_dir) = setup();
         let mut example_file = make_example_file();
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
+        let mut store = StoreFiles::new(block_dir.clone());
 
-        let addrs = block_dir.store(&mut example_file, &report).unwrap();
+        let addrs = store
+            .store_file_content(&mut example_file, &report)
+            .unwrap();
 
         // Should be in one block, and as it's currently unsalted the hash is the same.
         assert_eq!(1, addrs.len());
@@ -414,17 +436,18 @@ mod tests {
     #[test]
     pub fn write_same_data_again() {
         let report = Report::new();
-        let (_testdir, mut block_dir) = setup();
+        let (_testdir, block_dir) = setup();
 
         let mut example_file = make_example_file();
-        let addrs1 = block_dir
+        let mut store = StoreFiles::new(block_dir);
+        let addrs1 = store
             .store_file_content(&mut example_file, &report)
             .unwrap();
         assert_eq!(report.get_count("block.already_present"), 0);
         assert_eq!(report.get_count("block.write"), 1);
 
         let mut example_file = make_example_file();
-        let addrs2 = block_dir
+        let addrs2 = store
             .store_file_content(&mut example_file, &report)
             .unwrap();
         assert_eq!(report.get_count("block.already_present"), 1);
@@ -438,7 +461,7 @@ mod tests {
     pub fn large_file() {
         use super::MAX_BLOCK_SIZE;
         let report = Report::new();
-        let (_testdir, mut block_dir) = setup();
+        let (_testdir, block_dir) = setup();
         let mut tf = NamedTempFile::new().unwrap();
         const N_CHUNKS: u64 = 10;
         const CHUNK_SIZE: u64 = 1 << 21;
@@ -453,7 +476,8 @@ mod tests {
         assert_eq!(tf_len, TOTAL_SIZE);
         tf.seek(SeekFrom::Start(0)).unwrap();
 
-        let addrs = block_dir.store_file_content(&mut tf, &report).unwrap();
+        let mut store = StoreFiles::new(block_dir.clone());
+        let addrs = store.store_file_content(&mut tf, &report).unwrap();
         println!("Report after store: {}", report);
 
         // Since the blocks are identical we should see them only stored once, and several

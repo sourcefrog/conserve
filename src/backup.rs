@@ -1,18 +1,18 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
+use super::blockdir::StoreFiles;
 use super::*;
 
 /// Accepts files to write in the archive (in apath order.)
-#[derive(Debug)]
 pub struct BackupWriter {
     band: Band,
-    block_dir: BlockDir,
     index_builder: IndexBuilder,
     report: Report,
+    store_files: StoreFiles,
 }
 
 impl BackupWriter {
@@ -21,13 +21,12 @@ impl BackupWriter {
     /// This currently makes a new top-level band.
     pub fn begin(archive: &Archive) -> Result<BackupWriter> {
         let band = Band::create(archive)?;
-        let block_dir = archive.block_dir().clone();
         let index_builder = band.index_builder();
         Ok(BackupWriter {
             band,
-            block_dir,
             index_builder,
             report: archive.report().clone(),
+            store_files: StoreFiles::new(archive.block_dir().clone()),
         })
     }
 
@@ -60,7 +59,7 @@ impl tree::WriteTree for BackupWriter {
     fn write_file(&mut self, source_entry: &Entry, content: &mut dyn std::io::Read) -> Result<()> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
-        let addrs = self.block_dir.store_file_content(content, &self.report)?;
+        let addrs = self.store_files.store_file_content(content, &self.report)?;
         let size = addrs.iter().map(|a| a.len).sum();
         self.report.increment_size(
             "file.bytes",
