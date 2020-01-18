@@ -28,13 +28,6 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
     }
     report.set_phase("Copying");
     for entry in source.iter_entries(&report)? {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(e) => {
-                report.show_error(&e);
-                continue;
-            }
-        };
         report.start_entry(&entry);
         if let Err(e) = match entry.kind() {
             Kind::Dir => dest.write_dir(&entry),

@@ -179,7 +179,7 @@ impl BlockDir {
         let path = self.path.clone();
         let subdirs = self.subdirs(report).context(errors::ListBlocks)?;
         Ok(subdirs.into_iter().flat_map(move |s| {
-            // TODO: Avoid `unwrap`; cleanly return error into iterator?
+            // TODO: Avoid `unwrap`; send errors to the report.
             fs::read_dir(&path.join(s)).unwrap().filter_map(|entry| {
                 let entry = entry.unwrap();
                 let name = entry.file_name().into_string().unwrap();

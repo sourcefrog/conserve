@@ -9,14 +9,17 @@ use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
 pub trait ReadTree: HasReport {
-    type I: Iterator<Item = Result<Entry>>;
+    type I: Iterator<Item = Entry>;
     type R: std::io::Read;
 
+    /// Iterate, in apath order, all the entries in this tree.
+    ///
+    /// Errors reading individual paths or directories are sent to the report
+    /// but are not treated as fatal, and don't appear as Results in the
+    /// iterator.
     fn iter_entries(&self, report: &Report) -> Result<Self::I>;
 
     /// Read file contents as a `std::io::Read`.
-    ///
-    /// This is softly deprecated in favor of `read_file_blocks`.
     fn file_contents(&self, entry: &Entry) -> Result<Self::R>;
 
     /// Estimate the number of entries in the tree.
@@ -30,7 +33,6 @@ pub trait ReadTree: HasReport {
         let report = self.report();
         let mut tot = 0u64;
         for e in self.iter_entries(self.report())? {
-            let e = e?;
             // While just measuring size, ignore directories/files we can't stat.
             let s = e.size().unwrap_or(0);
             tot += s;

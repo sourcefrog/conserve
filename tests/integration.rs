@@ -65,7 +65,6 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
         .index()
         .iter(&excludes::excludes_nothing(), &report)
         .unwrap()
-        .filter_map(|i| i.ok())
         .collect::<Vec<Entry>>();
     assert_eq!(2, index_entries.len());
 

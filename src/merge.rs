@@ -1,4 +1,4 @@
-// Copyright 2018, 2019 Martin Pool.
+// Copyright 2018, 2019, 2020 Martin Pool.
 
 //! Merge two trees by iterating them in lock step.
 
@@ -55,7 +55,7 @@ where
     AT: ReadTree,
     BT: ReadTree,
 {
-    type Item = Result<MergedEntry>;
+    type Item = MergedEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
         // TODO: Count into report?
@@ -64,34 +64,26 @@ where
         // Preload next-A and next-B, if they're not already
         // loaded.
         if self.na.is_none() {
-            self.na = match ait.next() {
-                None => None,
-                Some(Err(e)) => return Some(Err(e)),
-                Some(Ok(i)) => Some(i),
-            }
+            self.na = ait.next();
         }
         if self.nb.is_none() {
-            self.nb = match bit.next() {
-                None => None,
-                Some(Err(e)) => return Some(Err(e)),
-                Some(Ok(i)) => Some(i),
-            }
+            self.nb = bit.next();
         }
         if self.na.is_none() {
             if self.nb.is_none() {
                 None
             } else {
                 let tb = self.nb.take().unwrap();
-                Some(Ok(MergedEntry {
+                Some(MergedEntry {
                     apath: tb.apath(),
                     kind: RightOnly,
-                }))
+                })
             }
         } else if self.nb.is_none() {
-            Some(Ok(MergedEntry {
+            Some(MergedEntry {
                 apath: self.na.take().unwrap().apath(),
                 kind: LeftOnly,
-            }))
+            })
         } else {
             let pa = self.na.as_ref().unwrap().apath();
             let pb = self.nb.as_ref().unwrap().apath();
@@ -99,24 +91,24 @@ where
                 Ordering::Equal => {
                     self.na.take();
                     self.nb.take();
-                    Some(Ok(MergedEntry {
+                    Some(MergedEntry {
                         apath: pa,
                         kind: Both,
-                    }))
+                    })
                 }
                 Ordering::Less => {
                     self.na.take().unwrap();
-                    Some(Ok(MergedEntry {
+                    Some(MergedEntry {
                         apath: pa,
                         kind: LeftOnly,
-                    }))
+                    })
                 }
                 Ordering::Greater => {
                     self.nb.take().unwrap();
-                    Some(Ok(MergedEntry {
+                    Some(MergedEntry {
                         apath: pb,
                         kind: RightOnly,
-                    }))
+                    })
                 }
             }
         }
@@ -141,7 +133,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(di.len(), 1);
         assert_eq!(
-            *di[0].as_ref().unwrap(),
+            di[0],
             MergedEntry {
                 apath: "/".into(),
                 kind: Both,

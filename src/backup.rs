@@ -136,7 +136,6 @@ mod tests {
             .index()
             .iter(&excludes::excludes_nothing(), &report)
             .unwrap()
-            .filter_map(|i| i.ok())
             .collect::<Vec<Entry>>();
         assert_eq!(2, index_entries.len());
 
@@ -198,7 +197,6 @@ mod tests {
         let empty_entry = st
             .iter_entries(&af.report())
             .unwrap()
-            .map(|i| i.unwrap())
             .find(|ref i| &i.apath == "/empty")
             .expect("found one entry");
         let mut sf = st.file_contents(&empty_entry).unwrap();

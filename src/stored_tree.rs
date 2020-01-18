@@ -83,7 +83,6 @@ impl StoredTree {
         let report = self.report();
         report.set_phase(format!("Check tree {}", self.band().id()));
         self.iter_entries(self.report())?
-            .map(Result::unwrap)
             .filter(|e| e.kind() == Kind::File)
             .par_bridge()
             .map(|e| self.validate_one_entry(&e))
@@ -156,7 +155,7 @@ mod test {
         let names: Vec<String> = st
             .iter_entries(&af.report())
             .unwrap()
-            .map(|e| e.unwrap().apath.into())
+            .map(|e| e.apath.into())
             .collect();
         let expected = if SYMLINKS_SUPPORTED {
             vec![

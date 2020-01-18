@@ -329,13 +329,12 @@ fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
     let lt = live_tree_from_options(subm, report)?;
     for e in conserve::iter_merged_entries(&st, &lt, &report)? {
         use MergedEntryKind::*;
-        let ee = e?;
-        let ks = match ee.kind {
+        let ks = match e.kind {
             LeftOnly => "left",
             RightOnly => "right",
             Both => "both",
         };
-        report.print(&format!("{:<8} {}", ks, ee.apath));
+        report.print(&format!("{:<8} {}", ks, e.apath));
     }
     // report.print(&report.borrow_counts().summary_for_backup());
     Ok(())
@@ -381,8 +380,11 @@ fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn list_tree_contents<T: ReadTree>(tree: &T, report: &Report) -> Result<()> {
     // TODO: Maybe should be a specific concept in the UI.
+    // TODO: Perhaps writing them one at a time causes too much locking
+    // or bad buffering. Perhaps we can write to a BufferedWriter, making
+    // sure that the progress bar is disabled.
     for entry in tree.iter_entries(report)? {
-        report.print(&entry?.apath());
+        report.print(&entry.apath());
     }
     Ok(())
 }

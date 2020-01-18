@@ -110,7 +110,6 @@ impl<'a> ShowArchive for IndexDump<'a> {
             .index()
             .iter(&excludes::excludes_nothing(), &report)
             .unwrap()
-            .filter_map(|i| i.ok())
             .collect::<Vec<Entry>>();
         let output =
             serde_json::to_string_pretty(&index_entries).context(errors::SerializeIndex)?;

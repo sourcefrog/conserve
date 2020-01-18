@@ -136,9 +136,6 @@ fn entry_from_fs(apath: Apath, metadata: &fs::Metadata, target: Option<String>) 
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|dur| dur.as_secs());
-    // TODO: Record a problem and log a message if the target is not decodable, rather than
-    // panicing.
-    // TODO: Also return a Result if the link can't be read?
     let size = if metadata.is_file() {
         Some(metadata.len())
     } else {
@@ -178,20 +175,27 @@ pub struct Iter {
 }
 
 impl Iter {
-    fn visit_next_directory(&mut self, parent_apath: &Apath) -> Result<()> {
+    /// Visit the next directory.
+    ///
+    /// Any errors occurring are logged but not returned; we'll continue to
+    /// visit whatever can be read.
+    fn visit_next_directory(&mut self, parent_apath: &Apath) {
+        // TODO: Rather than mutating self, return new vectors to append, so that
+        // this function isn't too big?
         self.report.increment("source.visited.directories", 1);
         let mut children = Vec::<Entry>::new();
         let mut child_dirs = Vec::<Apath>::new();
         let dir_path = relative_path(&self.root_path, parent_apath);
-        let dir_iter = fs::read_dir(&dir_path)
-            .with_context(|| errors::ListSourceTree {
-                path: dir_path.clone(),
-            })
-            .map_err(|e| {
+        let dir_iter = match fs::read_dir(&dir_path).with_context(|| errors::ListSourceTree {
+            path: dir_path.clone(),
+        }) {
+            Ok(i) => i,
+            Err(e) => {
                 self.report
                     .problem(&format!("Error reading directory {:?}: {}", &dir_path, e));
-                e
-            })?;
+                return;
+            }
+        };
         for dir_entry in dir_iter {
             let dir_entry = match dir_entry {
                 Ok(dir_entry) => dir_entry,
@@ -317,7 +321,6 @@ impl Iter {
         for child_entry in children {
             self.entry_deque.push_back(child_entry);
         }
-        Ok(())
     }
 }
 
@@ -330,23 +333,19 @@ impl Iter {
 // subdirectories are then visited, also in sorted order, before returning to
 // any higher-level directories.
 impl Iterator for Iter {
-    type Item = Result<Entry>;
+    type Item = Entry;
 
-    fn next(&mut self) -> Option<Result<Entry>> {
+    fn next(&mut self) -> Option<Entry> {
         loop {
             if let Some(entry) = self.entry_deque.pop_front() {
                 // Have already found some entries, so just return the first.
                 self.report.increment("source.selected", 1);
                 // Sanity check that all the returned paths are in correct order.
                 self.check_order.check(&entry.apath);
-                return Some(Ok(entry));
-            }
-
-            // No entries already queued, visit a new directory to try to refill the queue.
-            if let Some(entry) = self.dir_deque.pop_front() {
-                if let Err(e) = self.visit_next_directory(&entry) {
-                    return Some(Err(e));
-                }
+                return Some(entry);
+            } else if let Some(entry) = self.dir_deque.pop_front() {
+                // No entries already queued, visit a new directory to try to refill the queue.
+                self.visit_next_directory(&entry)
             } else {
                 // No entries queued and no more directories to visit.
                 return None;
@@ -384,7 +383,7 @@ mod tests {
         let report = Report::new();
         let lt = LiveTree::open(tf.path(), &report).unwrap();
         let mut source_iter = lt.iter_entries(&report).unwrap();
-        let result = source_iter.by_ref().collect::<Result<Vec<_>>>().unwrap();
+        let result = source_iter.by_ref().collect::<Vec<_>>();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[1].apath, "/aaa");
@@ -421,7 +420,7 @@ mod tests {
             .unwrap()
             .with_excludes(excludes);
         let mut source_iter = lt.iter_entries(&report).unwrap();
-        let result = source_iter.by_ref().collect::<Result<Vec<_>>>().unwrap();
+        let result = source_iter.by_ref().collect::<Vec<_>>();
 
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -460,11 +459,7 @@ mod tests {
         let report = Report::new();
 
         let lt = LiveTree::open(tf.path(), &report).unwrap();
-        let result = lt
-            .iter_entries(&report)
-            .unwrap()
-            .collect::<Result<Vec<_>>>()
-            .unwrap();
+        let result = lt.iter_entries(&report).unwrap().collect::<Vec<_>>();
 
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[1].apath, "/from");

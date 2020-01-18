@@ -174,17 +174,16 @@ impl fmt::Debug for Iter {
 }
 
 impl Iterator for Iter {
-    type Item = Result<Entry>;
+    type Item = Entry;
 
-    fn next(&mut self) -> Option<Result<Entry>> {
+    fn next(&mut self) -> Option<Entry> {
         loop {
             if let Some(entry) = self.buffered_entries.next() {
-                return Some(Ok(entry));
+                return Some(entry);
             }
-            match self.refill_entry_buffer() {
-                Err(e) => return Some(Err(e)),
-                Ok(false) => return None, // No more hunks
-                Ok(true) => (),
+            // TODO: refill_entry_buffer shouldn't return a Result.
+            if !self.refill_entry_buffer().unwrap() {
+                return None; // No more hunks
             }
         }
     }
@@ -389,15 +388,9 @@ mod tests {
         );
 
         let mut it = super::Iter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
-        let entry = it
-            .next()
-            .expect("Get first entry")
-            .expect("First entry isn't an error");
+        let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
-        let entry = it
-            .next()
-            .expect("Get second entry")
-            .expect("Entry isn't an error");
+        let entry = it.next().expect("Get second entry");
         assert_eq!(&entry.apath, "/banana");
         assert!(it.next().is_none(), "Expected no more entries");
     }
@@ -419,7 +412,7 @@ mod tests {
             format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir)
         );
 
-        let names: Vec<String> = it.map(|x| x.unwrap().apath.into()).collect();
+        let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
     }
 
@@ -458,7 +451,7 @@ mod tests {
             format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir)
         );
 
-        let names: Vec<String> = it.map(|x| x.unwrap().apath.into()).collect();
+        let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/bar"]);
     }
 }

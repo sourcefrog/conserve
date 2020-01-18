@@ -147,7 +147,7 @@ impl Archive {
                 .index()
                 .iter(&excludes::excludes_nothing(), &self.report)?
             {
-                for a in ie?.addrs {
+                for a in ie.addrs {
                     hs.insert(a.hash);
                 }
             }
