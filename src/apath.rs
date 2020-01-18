@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! "Apaths" (for archive paths) are platform-independent relative file paths used
 //! inside archive snapshots.
@@ -12,6 +12,8 @@ use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
+
+use serde::{Deserialize, Serialize};
 
 /// An ordered archive path.
 ///

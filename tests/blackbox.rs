@@ -3,12 +3,10 @@
 
 //! Run conserve CLI as a subprocess and test it.
 
-#[macro_use]
-extern crate lazy_static;
-
 extern crate assert_cmd;
 extern crate assert_fs;
 extern crate escargot;
+extern crate lazy_static;
 extern crate predicates;
 extern crate tempfile;
 
@@ -18,6 +16,7 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use escargot::CargoRun;
+use lazy_static::lazy_static;
 use predicates::prelude::*;
 
 use crate::predicate::path::{is_dir, is_file};

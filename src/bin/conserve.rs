@@ -5,14 +5,13 @@
 
 use std::path::Path;
 
-#[macro_use]
 extern crate clap;
 
 extern crate chrono;
 extern crate globset;
 extern crate thousands;
 
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{crate_authors, App, AppSettings, Arg, ArgMatches, SubCommand};
 use thousands::Separable;
 
 extern crate conserve;

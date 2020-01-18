@@ -35,6 +35,8 @@ pub fn read_serde<T: serde::de::DeserializeOwned>(path: &Path, _report: &Report)
 
 #[cfg(test)]
 mod tests {
+    use serde::{Deserialize, Serialize};
+
     use crate::test_fixtures::TreeFixture;
     use crate::Report;
 

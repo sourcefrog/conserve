@@ -6,6 +6,8 @@
 
 use std::fmt::Debug;
 
+use serde::{Deserialize, Serialize};
+
 use super::*;
 
 /// Kind of file that can be stored in the archive.

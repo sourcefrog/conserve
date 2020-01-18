@@ -15,6 +15,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, TimeZone, Utc};
+use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use super::io::file_exists;

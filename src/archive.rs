@@ -16,6 +16,7 @@ use std::collections::BTreeSet;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
 use snafu::{ensure, ResultExt};
 use thousands::Separable;
 

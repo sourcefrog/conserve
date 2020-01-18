@@ -5,13 +5,11 @@
 extern crate atty;
 extern crate blake2_rfc;
 extern crate chrono;
-#[macro_use]
 extern crate crossterm;
 extern crate globset;
 extern crate hex;
 extern crate rayon;
 extern crate serde;
-#[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
 extern crate snafu;

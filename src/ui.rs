@@ -10,7 +10,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use atty;
-use crossterm::{cursor, style, terminal};
+use crossterm::{cursor, queue, style, terminal};
 use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
