@@ -92,13 +92,13 @@ impl BlockDir {
     /// Store the contents of a readable file into the BlockDir.
     ///
     /// Returns the addresses at which it was stored.
-    pub fn store(&mut self, from_file: &mut dyn Read, report: &Report) -> Result<Vec<Address>> {
+    pub fn store_file_content(
+        &mut self,
+        from_file: &mut dyn Read,
+        report: &Report,
+    ) -> Result<Vec<Address>> {
         let mut addresses = Vec::<Address>::with_capacity(1);
-        let mut in_buf = Vec::<u8>::with_capacity(MAX_BLOCK_SIZE);
-        unsafe {
-            // Increase size to capacity without initializing data that will be overwritten.
-            in_buf.set_len(MAX_BLOCK_SIZE);
-        };
+        let mut in_buf = vec![0; MAX_BLOCK_SIZE];
         loop {
             // TODO: Possibly read repeatedly in case we get a short read and have room for more,
             // so that short reads don't lead to short blocks being stored.
@@ -113,7 +113,6 @@ impl BlockDir {
                 report.increment("block.already_present", 1);
             } else {
                 let comp_len = self.compress_and_store(rb, &block_hash, &report)?;
-                // Maybe rename counter to 'block.write'?
                 report.increment("block.write", 1);
                 report.increment_size(
                     "block",
@@ -290,6 +289,8 @@ impl BlockDir {
 
     /// Return the entire contents of the block.
     pub fn get_block_content(&self, hash: &str, report: &Report) -> Result<Vec<u8>> {
+        // TODO: Probably this should return an iterator rather than pulling the
+        // whole file in to memory immediately.
         let path = self.path_for_file(hash);
         let mut f = File::open(&path).context(errors::ReadBlock)?;
         let (compressed_len, de) = match Snappy::decompress_read(&mut f) {
@@ -334,8 +335,7 @@ mod tests {
     use crate::*;
 
     const EXAMPLE_TEXT: &[u8] = b"hello!";
-    const EXAMPLE_BLOCK_HASH: &str =
-        "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd\
+    const EXAMPLE_BLOCK_HASH: &str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd\
          3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
 
     fn make_example_file() -> NamedTempFile {
@@ -417,12 +417,16 @@ mod tests {
         let (_testdir, mut block_dir) = setup();
 
         let mut example_file = make_example_file();
-        let addrs1 = block_dir.store(&mut example_file, &report).unwrap();
+        let addrs1 = block_dir
+            .store_file_content(&mut example_file, &report)
+            .unwrap();
         assert_eq!(report.get_count("block.already_present"), 0);
         assert_eq!(report.get_count("block.write"), 1);
 
         let mut example_file = make_example_file();
-        let addrs2 = block_dir.store(&mut example_file, &report).unwrap();
+        let addrs2 = block_dir
+            .store_file_content(&mut example_file, &report)
+            .unwrap();
         assert_eq!(report.get_count("block.already_present"), 1);
         assert_eq!(report.get_count("block.write"), 1);
 
@@ -449,7 +453,7 @@ mod tests {
         assert_eq!(tf_len, TOTAL_SIZE);
         tf.seek(SeekFrom::Start(0)).unwrap();
 
-        let addrs = block_dir.store(&mut tf, &report).unwrap();
+        let addrs = block_dir.store_file_content(&mut tf, &report).unwrap();
         println!("Report after store: {}", report);
 
         // Since the blocks are identical we should see them only stored once, and several
