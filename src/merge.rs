@@ -1,6 +1,9 @@
 // Copyright 2018, 2019, 2020 Martin Pool.
 
 //! Merge two trees by iterating them in lock step.
+//!
+//! This is a foundation for showing the diff between a stored and
+//! live tree, or storing an incremental backup.
 
 use std::cmp::Ordering;
 
@@ -63,6 +66,9 @@ where
         let bit = &mut self.bit;
         // Preload next-A and next-B, if they're not already
         // loaded.
+        //
+        // TODO: Perhaps use <https://doc.rust-lang.org/stable/core/iter/struct.Peekable.html> instead of keeping a
+        // readahead here?
         if self.na.is_none() {
             self.na = ait.next();
         }
@@ -123,7 +129,7 @@ mod tests {
     use crate::*;
 
     #[test]
-    fn diff_empty_trees() {
+    fn merge_entry_trees() {
         let ta = TreeFixture::new();
         let tb = TreeFixture::new();
         let report = Report::new();
