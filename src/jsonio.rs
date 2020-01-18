@@ -26,7 +26,10 @@ pub fn write_json_metadata_file<T: serde::Serialize>(
     Ok(())
 }
 
-pub fn read_serde<T: serde::de::DeserializeOwned>(path: &Path, _report: &Report) -> Result<T> {
+pub fn read_json_metadata_file<T: serde::de::DeserializeOwned>(
+    path: &Path,
+    _report: &Report,
+) -> Result<T> {
     // TODO: Send something to the Report.  At present this is used only for
     // small metadata files so measurement is not critical.
     let buf = std::fs::read_to_string(&path).context(errors::ReadMetadata { path })?;
@@ -59,7 +62,7 @@ mod tests {
         // NB: This does not currently do much with `report` other than measure timing.
 
         let read_report = Report::new();
-        let r: TestContents = super::read_serde(&p, &read_report).unwrap();
+        let r: TestContents = super::read_json_metadata_file(&p, &read_report).unwrap();
         assert_eq!(r, entry);
     }
 }

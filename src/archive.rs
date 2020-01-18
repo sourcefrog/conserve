@@ -75,7 +75,7 @@ impl Archive {
             file_exists(&header_path).context(errors::ReadMetadata { path })?,
             errors::NotAnArchive { path }
         );
-        let header: ArchiveHeader = jsonio::read_serde(&header_path, &report)?;
+        let header: ArchiveHeader = jsonio::read_json_metadata_file(&header_path, &report)?;
         ensure!(
             header.conserve_archive_version == ARCHIVE_VERSION,
             errors::UnsupportedArchiveVersion {

@@ -147,11 +147,11 @@ impl Band {
     }
 
     fn read_head(&self, report: &Report) -> Result<Head> {
-        jsonio::read_serde(&self.head_path(), &report)
+        jsonio::read_json_metadata_file(&self.head_path(), &report)
     }
 
     fn read_tail(&self, report: &Report) -> Result<Tail> {
-        jsonio::read_serde(&self.tail_path(), &report)
+        jsonio::read_json_metadata_file(&self.tail_path(), &report)
     }
 
     /// Return info about the state of this band.
