@@ -171,27 +171,44 @@ impl BlockDir {
         Ok(ds)
     }
 
-    /// Return an iterator through all the blocknames in the blockdir,
-    /// in arbitrary order.
-    pub fn block_names(&self, report: &Report) -> Result<impl Iterator<Item = String>> {
-        // TODO: Perhaps return compressed sizes too? Might be fastest
-        // to get them from the fs::DirEntry.
+    fn iter_block_dir_entries(
+        &self,
+        report: &Report,
+    ) -> Result<impl Iterator<Item = std::fs::DirEntry>> {
         let path = self.path.clone();
         let subdirs = self.subdirs(report).context(errors::ListBlocks)?;
         Ok(subdirs.into_iter().flat_map(move |s| {
             // TODO: Avoid `unwrap`; send errors to the report.
-            fs::read_dir(&path.join(s)).unwrap().filter_map(|entry| {
-                let entry = entry.unwrap();
-                let name = entry.file_name().into_string().unwrap();
-                if entry.file_type().unwrap().is_file()
-                    && !name.starts_with(TMP_PREFIX)
-                    && name.len() == BLOCKDIR_FILE_NAME_LEN
-                {
-                    Some(name)
-                } else {
-                    None
-                }
-            })
+            fs::read_dir(&path.join(s))
+                .unwrap()
+                .map(std::io::Result::unwrap)
+                .filter(|entry| {
+                    let name = entry.file_name().into_string().unwrap();
+                    entry.file_type().unwrap().is_file()
+                        && !name.starts_with(TMP_PREFIX)
+                        && name.len() == BLOCKDIR_FILE_NAME_LEN
+                })
+        }))
+    }
+
+    /// Return an iterator through all the blocknames in the blockdir,
+    /// in arbitrary order.
+    pub fn block_names(&self, report: &Report) -> Result<impl Iterator<Item = String>> {
+        Ok(self
+            .iter_block_dir_entries(report)?
+            .map(|de| de.file_name().into_string().unwrap()))
+    }
+
+    /// Return an iterator of block names and sizes.
+    fn block_names_and_sizes(
+        &self,
+        report: &Report,
+    ) -> Result<impl Iterator<Item = (String, u64)>> {
+        Ok(self.iter_block_dir_entries(report)?.map(|de| {
+            (
+                de.file_name().into_string().unwrap(),
+                de.metadata().unwrap().len(),
+            )
         }))
     }
 
@@ -199,20 +216,13 @@ impl BlockDir {
     pub fn validate(&self, report: &Report) -> Result<()> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
+        // TODO: Provide a progress bar that just works on counts, not bytes:
+        // then we don't need to count the sizes in advance.
         report.set_phase("Count blocks");
         report.print("Count blocks...");
-        let bns = self
-            .block_names(report)?
-            .par_bridge()
-            .map(|bn| {
-                let bsize = self.compressed_block_size(&bn).unwrap_or(0);
-                report.increment_work(bsize);
-                (bn, bsize)
-            })
-            .collect::<Vec<(String, u64)>>();
-        let tot = bns.iter().map(|(_bn, bsize)| bsize).sum();
+        let bns: Vec<(String, u64)> = self.block_names_and_sizes(report)?.collect();
+        let tot = bns.iter().map(|a| a.1).sum();
         report.set_total_work(tot);
-
         report.print(&format!(
             "Check {} MB in blocks...",
             (tot / 1_000_000).separate_with_commas()
@@ -266,6 +276,7 @@ impl BlockDir {
         Ok(de)
     }
 
+    #[allow(dead_code)]
     fn compressed_block_size(&self, hash: &str) -> Result<u64> {
         let path = self.path_for_file(hash);
         Ok(fs::metadata(&path)
