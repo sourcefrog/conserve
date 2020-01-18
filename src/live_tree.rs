@@ -64,18 +64,14 @@ impl tree::ReadTree for LiveTree {
     ///
     /// The `Iter` has its own `Report` of how many directories and files were visited.
     fn iter_entries(&self, report: &Report) -> Result<Self::I> {
-        let root_metadata = match fs::symlink_metadata(&self.path) {
-            Ok(metadata) => metadata,
-            Err(e) => {
-                self.report.problem(&format!(
-                    "Couldn't get tree root metadata for {:?}: {}",
-                    &self.path, e
-                ));
-                return Err(e).context(errors::ListSourceTree {
-                    path: self.path.clone(),
-                });
-            }
-        };
+        let root_metadata = fs::symlink_metadata(&self.path)
+            .with_context(|| errors::ListSourceTree {
+                path: self.path.clone(),
+            })
+            .map_err(|e| {
+                report.show_error(&e);
+                e
+            })?;
         // Preload iter to return the root and then recurse into it.
         let mut entry_deque = VecDeque::<Entry>::new();
         entry_deque.push_back(entry_from_fs(Apath::from("/"), &root_metadata, None));

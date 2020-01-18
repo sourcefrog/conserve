@@ -51,7 +51,7 @@ fn main() -> conserve::Result<()> {
         report.print(&format!("{}", report));
     }
     if let Err(ref e) = result {
-        show_chained_errors(&report, e);
+        report.show_error(e);
         // TODO: Perhaps always log the traceback to a log file.
         if let Some(bt) = snafu::ErrorCompat::backtrace(e) {
             if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {
@@ -59,6 +59,9 @@ fn main() -> conserve::Result<()> {
             }
         }
         // Avoid Rust redundantly printing the error.
+        std::process::exit(1);
+    }
+    if report.borrow_counts().error_count > 0 {
         std::process::exit(1);
     }
     result
@@ -298,15 +301,6 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                         .arg(backup_arg()),
                 ),
         )
-}
-
-fn show_chained_errors(report: &Report, e: &dyn std::error::Error) {
-    report.problem(&format!("{}", e));
-    let mut ce = e;
-    while let Some(c) = ce.source() {
-        report.problem(&format!("  caused by: {}", c));
-        ce = c;
-    }
 }
 
 fn init(subm: &ArgMatches, report: &Report) -> Result<()> {

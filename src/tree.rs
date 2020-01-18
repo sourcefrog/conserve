@@ -55,7 +55,6 @@ pub trait WriteTree {
 
     /// Copy in the contents of a file from another tree.
     fn copy_file<R: ReadTree>(&mut self, entry: &Entry, from_tree: &R) -> Result<()> {
-        let mut content = from_tree.file_contents(&entry)?;
         // TODO(#69): Rather than always writing the content, check if it's changed versus
         // a reference tree. (Should that be a parameter to this method, or tracked by the
         // WriteTree?)
@@ -71,6 +70,7 @@ pub trait WriteTree {
         // could potentially pass in the stat information and give the WriteTree a
         // chance to mark the file as unchanged. If it is changed, then we need to get
         // the content from this file (preferably as a `Read`) and store that...
+        let mut content = from_tree.file_contents(&entry)?;
         self.write_file(entry, &mut content)
     }
 }

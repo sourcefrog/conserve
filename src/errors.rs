@@ -27,9 +27,13 @@ pub enum Error {
     PersistBlockFile {
         source: tempfile::PersistError,
     },
+
+    #[snafu(display("Error reading block {:?}", path))]
     ReadBlock {
+        path: PathBuf,
         source: IOError,
     },
+
     ListBlocks {
         source: IOError,
     },
@@ -133,13 +137,18 @@ pub enum Error {
         path: PathBuf,
         source: std::io::Error,
     },
+
     ListSourceTree {
         path: PathBuf,
         source: IOError,
     },
+
+    #[snafu(display("Error storing file {}", apath))]
     StoreFile {
+        apath: Apath,
         source: IOError,
     },
+
     Restore {
         path: PathBuf,
         source: IOError,

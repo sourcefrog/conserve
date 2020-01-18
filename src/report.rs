@@ -78,8 +78,12 @@ pub struct Counts {
 
     /// Total estimated work to be done (task-specific units).
     pub total_work: u64,
+
     /// Amount of work done so far, to indicate percentage completion.
     pub done_work: u64,
+
+    /// Number of errors observed.
+    pub error_count: u64,
 }
 
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
@@ -220,10 +224,25 @@ impl Report {
     ///
     /// Later this might also count or summarize them.
     pub fn problem(&self, s: &str) {
-        // TODO: Rather than taking an arbitrary string, take an enum plus a path and perhaps an
-        // underlying IO error. Keep counts.
+        // TODO: Convert callers to calling Report::warning passing a structured
+        // error.
         // <https://github.com/sourcefrog/conserve/issues/72>.
+        self.mut_counts().error_count += 1;
         self.ui.lock().unwrap().problem(s).unwrap();
+    }
+
+    /// Report that a non-fatal error occurred.
+    ///
+    /// The program will continue.
+    pub fn show_error(&self, e: &dyn std::error::Error) {
+        self.mut_counts().error_count += 1;
+        let mut ui = self.ui.lock().unwrap();
+        ui.problem(&e.to_string()).unwrap();
+        let mut ce = e;
+        while let Some(c) = ce.source() {
+            ui.problem(&format!("  caused by: {}", c)).unwrap();
+            ce = c;
+        }
     }
 
     pub fn finish(&self) {
@@ -291,6 +310,7 @@ impl Counts {
             phase: String::new(),
             total_work: 0,
             done_work: 0,
+            error_count: 0,
         }
     }
 

@@ -3,6 +3,9 @@
 
 //! Copy tree contents.
 
+#[allow(unused_imports)]
+use snafu::ResultExt;
+
 use crate::*;
 
 const MEASURE_FIRST: bool = false;
@@ -28,7 +31,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
         let entry = match entry {
             Ok(entry) => entry,
             Err(e) => {
-                report.problem(&format!("Error iterating source, continuing: {}", e));
+                report.show_error(&e);
                 continue;
             }
         };
@@ -43,7 +46,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
                 continue;
             }
         } {
-            report.problem(&format!("Error copying {}: {}", &entry.apath(), e));
+            report.show_error(&e);
             continue;
         }
         report.increment_work(entry.size().unwrap_or(0));

@@ -129,10 +129,11 @@ impl BlockDir {
 
     /// True if the named block is present in this directory.
     pub fn contains(&self, hash: &str) -> Result<bool> {
-        match fs::metadata(self.path_for_file(hash)) {
+        let path = self.path_for_file(hash);
+        match fs::metadata(&path) {
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
             Ok(_) => Ok(true),
-            Err(e) => Err(e).context(errors::ReadBlock),
+            Err(e) => Err(e).context(errors::ReadBlock { path }),
         }
     }
 
@@ -246,15 +247,14 @@ impl BlockDir {
         // TODO: Probably this should return an iterator rather than pulling the
         // whole file in to memory immediately.
         let path = self.path_for_file(hash);
-        let mut f = File::open(&path).context(errors::ReadBlock)?;
-        let (compressed_len, de) = match Snappy::decompress_read(&mut f) {
-            Ok(d) => d,
-            Err(e) => {
+        let (compressed_len, de) = File::open(&path)
+            .and_then(|mut f| Snappy::decompress_read(&mut f))
+            .context(errors::ReadBlock { path })
+            .map_err(|e| {
                 report.increment("block.corrupt", 1);
-                report.problem(&format!("Block file {:?} read error {:?}", path, e));
-                return Err(Error::BlockCorrupt { path });
-            }
-        };
+                report.show_error(&e);
+                e
+            })?;
         report.increment("block.read", 1);
         report.increment_size(
             "block",
@@ -267,8 +267,9 @@ impl BlockDir {
     }
 
     fn compressed_block_size(&self, hash: &str) -> Result<u64> {
-        Ok(fs::metadata(&self.path_for_file(hash))
-            .context(errors::ReadBlock)?
+        let path = self.path_for_file(hash);
+        Ok(fs::metadata(&path)
+            .context(errors::ReadBlock { path })?
             .len())
     }
 }
@@ -294,6 +295,7 @@ impl StoreFiles {
 
     pub(crate) fn store_file_content(
         &mut self,
+        apath: &Apath,
         from_file: &mut dyn Read,
         report: &Report,
     ) -> Result<Vec<Address>> {
@@ -301,9 +303,12 @@ impl StoreFiles {
         loop {
             // TODO: Possibly read repeatedly in case we get a short read and have room for more,
             // so that short reads don't lead to short blocks being stored.
-            let read_len = from_file
-                .read(&mut self.input_buf)
-                .context(errors::StoreFile)?;
+            let read_len =
+                from_file
+                    .read(&mut self.input_buf)
+                    .with_context(|| errors::StoreFile {
+                        apath: apath.clone(),
+                    })?;
             if read_len == 0 {
                 break;
             }
@@ -383,7 +388,7 @@ mod tests {
         let mut store = StoreFiles::new(block_dir.clone());
 
         let addrs = store
-            .store_file_content(&mut example_file, &report)
+            .store_file_content(&Apath::from("/hello"), &mut example_file, &report)
             .unwrap();
 
         // Should be in one block, and as it's currently unsalted the hash is the same.
@@ -442,14 +447,14 @@ mod tests {
         let mut example_file = make_example_file();
         let mut store = StoreFiles::new(block_dir);
         let addrs1 = store
-            .store_file_content(&mut example_file, &report)
+            .store_file_content(&Apath::from("/ello"), &mut example_file, &report)
             .unwrap();
         assert_eq!(report.get_count("block.already_present"), 0);
         assert_eq!(report.get_count("block.write"), 1);
 
         let mut example_file = make_example_file();
         let addrs2 = store
-            .store_file_content(&mut example_file, &report)
+            .store_file_content(&Apath::from("/ello2"), &mut example_file, &report)
             .unwrap();
         assert_eq!(report.get_count("block.already_present"), 1);
         assert_eq!(report.get_count("block.write"), 1);
@@ -478,7 +483,9 @@ mod tests {
         tf.seek(SeekFrom::Start(0)).unwrap();
 
         let mut store = StoreFiles::new(block_dir.clone());
-        let addrs = store.store_file_content(&mut tf, &report).unwrap();
+        let addrs = store
+            .store_file_content(&Apath::from("/big"), &mut tf, &report)
+            .unwrap();
         println!("Report after store: {}", report);
 
         // Since the blocks are identical we should see them only stored once, and several

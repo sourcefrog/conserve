@@ -4,6 +4,9 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
+#[allow(unused_imports)]
+use snafu::ResultExt;
+
 use super::blockdir::StoreFiles;
 use super::*;
 
@@ -59,7 +62,10 @@ impl tree::WriteTree for BackupWriter {
     fn write_file(&mut self, source_entry: &Entry, content: &mut dyn std::io::Read) -> Result<()> {
         self.report.increment("file", 1);
         // TODO: Cope graciously if the file disappeared after readdir.
-        let addrs = self.store_files.store_file_content(content, &self.report)?;
+        let apath = source_entry.apath();
+        let addrs = self
+            .store_files
+            .store_file_content(&apath, content, &self.report)?;
         let size = addrs.iter().map(|a| a.len).sum();
         self.report.increment_size(
             "file.bytes",
@@ -69,7 +75,7 @@ impl tree::WriteTree for BackupWriter {
             },
         );
         self.push_entry(Entry {
-            apath: source_entry.apath(),
+            apath,
             mtime: source_entry.unix_mtime(),
             kind: Kind::File,
             addrs,
