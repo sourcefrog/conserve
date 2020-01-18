@@ -5,28 +5,36 @@
 1. The overall priority is that stored data be retrieved when it's
    needed, and within reason it's worth compromising space, speed, or other
    metrics to increase the chance of this.
-   
+
 2. Time-to-restore after data loss is important, both for a full restore
    and a restore of only part of a subtree.
-   
+
 3. For the data to be retrieved it must first be stored, so backups must
    proceed reasonably fast and must make incremental progress.
-   
+
 4. Storage has a cost, and the more data that is stored the longer it will
    take to read and write.
 
+
 ## Robustness
 
-There will be bugs in Conserve and underlying software, and there may be
-data loss in underlying storage. When problems occur, don't fail entirely.
+There will be bugs in Conserve and underlying software, and there may be data
+loss in underlying storage. When problems occur, Conserve should not fail
+entirely.
 
-The format should not be brittle: if some data is lost due to a bug or a
-problem with underlying storage, it should still be
-possible to retrieve the rest of the tree. The program should not abort due
-to one missing or corrupt file.
+The program should not abort due to one missing or corrupt file.
 
-The basic approach is to skip and continue during backups and restores,
-but it must be clear to the user that problems did occur.
+The format should not be brittle: if some data is lost due to a bug or a problem
+with underlying storage, it should still be possible to retrieve the rest of the
+tree. This has consequences for both the format design, and how errors are
+handled.
+
+If an error occurs during backup or restore, we log it and continue. However, it
+must be clear to the user that problems did occur. In particular at the
+conclusion of the operation, Conserve should flag that not all files were
+copied, if that's the case, so that the message is not lost in text that may
+have scrolled off the screen. And, if there were problems, it should of course
+have a non-zero error code.
 
 Use simple formats and conservative internal design, to minimize the risk of
 loss due to internal bugs.
@@ -36,7 +44,7 @@ and history of backup operations.  (If the backup metadata includes
 a timestamp, you can pass in the timestamp to get the same result.)
 
 Files once written should never be updated until their data is retrenched.
-  
+
 
 ## Retrenchment
 
@@ -49,16 +57,16 @@ Conserve will allow you to delete previous versions. Retrenchment speed should
 be proportional to the data being removed, not to the total size of the archive
 or tree.  Per the robustness principles, retrenchment operations should not
 touch or rewrite any files other than those being deleted.
-  
 
-  
 ## Assumptions about backing storage
 
-The primary target is cloud storage, though local disks or removable
-disks are also important.
+Storage to cloud object stores, local disks, and removable media are
+all important.
+
+### Cloud object stores
 
 Cloud storage (and to a lesser extent local network or USB storage)
-is high-latency and limited bandwidth.  
+is high-latency and limited bandwidth.
 
 We cannot assume a remote smart server: the only network calls are
 read, write, list, delete, etc.
@@ -72,7 +80,7 @@ may not strictly serialize operations. Writes or deletes may take
 some time to be visible to readers. So, locking patterns that would
 work locally will not work.
 
-Storage is private by an ACL, but still held by a third party so 
+Storage is private by an ACL, but still held by a third party so
 should have an option for encryption.  However there is a risk the keys
 will be lost so encryption should be optional.
 
@@ -103,7 +111,7 @@ all for twenty years.  So on the order of: 10-100TB in about 1e9 files.
 filesystem as a single tree.)
 
 
-  
+
 ## Progress
 
 Since the source is very large and the backing storage is relatively
@@ -117,8 +125,8 @@ archive.
 
 The program should expect to be regularly interrupted (by eg being
 stopped or losing connectivity) and should cleanly resume when re-run.
-    
-  
+
+
 ## Validation
 
 Test restores of the whole tree take a long time and users don't do them
