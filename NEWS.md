@@ -16,6 +16,10 @@ protection.
 
 * New command `conserve debug index dump`.
 
+* Remove `conserve versions --sizes` options, as storage is now shared
+  across bands. The size of one stored tree can be measured with
+  `conserve tree size`.
+
 ## Conserve 0.5.1 2018-11-11
 
 * `conserve validate` checks the archive much more thoroughly.

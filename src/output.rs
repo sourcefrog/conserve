@@ -30,18 +30,9 @@ impl ShowArchive for ShortVersionList {
 }
 
 #[derive(Debug, Default)]
-pub struct VerboseVersionList {
-    show_sizes: bool,
-}
+pub struct VerboseVersionList {}
 
-impl VerboseVersionList {
-    // Control whether to show the size of version disk usage.
-    //
-    // Setting this requires walking the band directories which takes some extra time.
-    pub fn show_sizes(self, show_sizes: bool) -> VerboseVersionList {
-        VerboseVersionList { show_sizes }
-    }
-}
+impl VerboseVersionList {}
 
 impl ShowArchive for VerboseVersionList {
     fn show_archive(&self, archive: &Archive) -> Result<()> {
@@ -70,22 +61,10 @@ impl ShowArchive for VerboseVersionList {
             let duration_str = info.end_time.map_or_else(String::new, |t| {
                 format!("{}s", (t - info.start_time).num_seconds())
             });
-            if self.show_sizes {
-                let disk_bytes = band.get_disk_size()?;
-                println!(
-                    "{:<26} {:<10} {} {:>7} {:>8}MB",
-                    band_id,
-                    is_complete_str,
-                    start_time_str,
-                    duration_str,
-                    disk_bytes / 1_000_000,
-                );
-            } else {
-                println!(
-                    "{:<26} {:<10} {} {:>7}",
-                    band_id, is_complete_str, start_time_str, duration_str,
-                );
-            }
+            println!(
+                "{:<26} {:<10} {} {:>7}",
+                band_id, is_complete_str, start_time_str, duration_str,
+            );
         }
         Ok(())
     }

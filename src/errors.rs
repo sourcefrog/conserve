@@ -130,9 +130,7 @@ pub enum Error {
         path: PathBuf,
         source: std::io::Error,
     },
-    MeasureBandSize {
-        source: walkdir::Error,
-    },
+
     ReadSourceFile {
         path: PathBuf,
         source: std::io::Error,

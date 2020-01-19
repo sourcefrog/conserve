@@ -171,21 +171,6 @@ impl Band {
         })
     }
 
-    /// Get the total size in bytes of files stored for this band.
-    ///
-    /// Not very useful at the moment as it doesn't include the blocks.
-    pub fn get_disk_size(&self) -> Result<u64> {
-        // TODO: Better handling than panic of unexpected errors.
-        let mut total = 0u64;
-        for entry in walkdir::WalkDir::new(self.path()) {
-            let entry = entry.context(errors::MeasureBandSize)?;
-            if entry.file_type().is_file() {
-                total += entry.metadata().unwrap().len();
-            }
-        }
-        Ok(total)
-    }
-
     pub fn validate(&self, report: &Report) -> Result<()> {
         self.validate_band_dir(report)?;
         Ok(())
@@ -259,10 +244,6 @@ mod tests {
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)
         assert!(dur < Duration::seconds(5));
-
-        // It takes some amount of space
-        let bytes = band2.get_disk_size().unwrap();
-        assert!(bytes > 10 && bytes < 8000, bytes);
     }
 
     // XXX: Should this API even exist?

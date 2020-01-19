@@ -246,11 +246,6 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
                      whether it is complete, when it started, and (if complete) \
                      how much time elapsed.",
                 )
-                .arg(
-                    Arg::with_name("sizes")
-                        .help("Show version disk sizes")
-                        .long("sizes"),
-                )
                 .arg(archive_arg())
                 .arg(
                     Arg::with_name("short")
@@ -354,7 +349,6 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
         output::ShortVersionList::default().show_archive(&archive)
     } else {
         output::VerboseVersionList::default()
-            .show_sizes(subm.is_present("sizes"))
             .show_archive(&archive)
     }
 }
