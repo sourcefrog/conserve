@@ -61,7 +61,6 @@ impl tree::WriteTree for BackupWriter {
 
     fn write_file(&mut self, source_entry: &Entry, content: &mut dyn std::io::Read) -> Result<()> {
         self.report.increment("file", 1);
-        // TODO: Cope graciously if the file disappeared after readdir.
         let apath = source_entry.apath();
         let addrs = self
             .store_files
