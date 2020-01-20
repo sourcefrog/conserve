@@ -143,13 +143,13 @@ impl ReadIndex {
     }
 
     /// Make an iterator that will return all entries in this band.
-    pub fn iter(&self, excludes: &GlobSet, report: &Report) -> Result<index::Iter> {
-        index::Iter::open(&self.dir, excludes, report)
+    pub fn iter(&self, excludes: &GlobSet, report: &Report) -> Result<index::IndexEntryIter> {
+        index::IndexEntryIter::open(&self.dir, excludes, report)
     }
 }
 
 /// Read out all the entries from a stored index, in apath order.
-pub struct Iter {
+pub struct IndexEntryIter {
     /// The `i` directory within the band where all files for this index are written.
     dir: PathBuf,
     /// Temporarily buffered entries, read from the index files but not yet
@@ -160,7 +160,7 @@ pub struct Iter {
     excludes: GlobSet,
 }
 
-impl fmt::Debug for Iter {
+impl fmt::Debug for IndexEntryIter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("index::Iter")
             .field("dir", &self.dir)
@@ -171,7 +171,7 @@ impl fmt::Debug for Iter {
     }
 }
 
-impl Iterator for Iter {
+impl Iterator for IndexEntryIter {
     type Item = Entry;
 
     fn next(&mut self) -> Option<Entry> {
@@ -186,12 +186,12 @@ impl Iterator for Iter {
     }
 }
 
-impl Iter {
+impl IndexEntryIter {
     /// Create an iterator that will read all entires from an existing index.
     ///
     /// Prefer to use `Band::index_iter` instead.
-    pub fn open(index_dir: &Path, excludes: &GlobSet, report: &Report) -> Result<Iter> {
-        Ok(Iter {
+    pub fn open(index_dir: &Path, excludes: &GlobSet, report: &Report) -> Result<IndexEntryIter> {
+        Ok(IndexEntryIter {
             dir: index_dir.to_path_buf(),
             buffered_entries: Vec::<Entry>::new().into_iter(),
             next_hunk_number: 0,
@@ -274,7 +274,7 @@ mod tests {
 
     use tempfile::TempDir;
 
-    use crate::*;
+    use super::*;
 
     pub fn scratch_indexbuilder() -> (TempDir, IndexBuilder, Report) {
         let testdir = TempDir::new().unwrap();
@@ -392,7 +392,7 @@ mod tests {
              \"kind\":\"File\"}]"
         );
 
-        let mut it = super::Iter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
@@ -411,10 +411,13 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk(&report).unwrap();
 
-        let it = super::Iter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        let it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
         assert_eq!(
             format!("{:?}", &it),
-            format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir)
+            format!(
+                "index::IndexEntryIter {{ dir: {:?}, next_hunk_number: 0 }}",
+                ib.dir
+            )
         );
 
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
@@ -450,10 +453,13 @@ mod tests {
         ib.finish_hunk(&report).unwrap();
 
         let excludes = excludes::from_strings(&["/fo*"]).unwrap();
-        let it = super::Iter::open(&ib.dir, &excludes, &report).unwrap();
+        let it = IndexEntryIter::open(&ib.dir, &excludes, &report).unwrap();
         assert_eq!(
             format!("{:?}", &it),
-            format!("index::Iter {{ dir: {:?}, next_hunk_number: 0 }}", ib.dir)
+            format!(
+                "index::IndexEntryIter {{ dir: {:?}, next_hunk_number: 0 }}",
+                ib.dir
+            )
         );
 
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();

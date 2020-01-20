@@ -114,11 +114,11 @@ impl StoredTree {
 }
 
 impl ReadTree for StoredTree {
-    type I = index::Iter;
+    type I = index::IndexEntryIter;
     type R = ReadStoredFile;
 
     /// Return an iter of index entries in this stored tree.
-    fn iter_entries(&self, report: &Report) -> Result<index::Iter> {
+    fn iter_entries(&self, report: &Report) -> Result<index::IndexEntryIter> {
         self.band.iter_entries(&self.excludes, report)
     }
 
