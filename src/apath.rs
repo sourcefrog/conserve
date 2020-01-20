@@ -12,6 +12,7 @@ use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
@@ -83,6 +84,18 @@ impl Deref for Apath {
     type Target = str;
     fn deref(&self) -> &str {
         &self.0
+    }
+}
+
+impl AsRef<str> for Apath {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<Path> for Apath {
+    fn as_ref(&self) -> &Path {
+        self.0.as_ref()
     }
 }
 
