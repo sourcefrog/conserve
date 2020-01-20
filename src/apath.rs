@@ -52,6 +52,12 @@ impl From<Apath> for String {
     }
 }
 
+impl<'a> From<&'a Apath> for &'a str {
+    fn from(a: &'a Apath) -> &'a str {
+        &a.0
+    }
+}
+
 impl<'a> From<&'a str> for Apath {
     fn from(s: &'a str) -> Apath {
         assert!(Apath::is_valid(s), "invalid apath: {:?}", s);
@@ -75,11 +81,23 @@ impl Display for Apath {
 /// Compare for equality an Apath to a str.
 impl PartialEq<str> for Apath {
     fn eq(&self, other: &str) -> bool {
-        self.0 == other
+        self.0 == *other
     }
 }
 
-/// Apaths can be coerced to Strings.
+impl PartialEq<&str> for Apath {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == **other
+    }
+}
+
+impl PartialEq<Apath> for &str {
+    fn eq(&self, other: &Apath) -> bool {
+        other == *self
+    }
+}
+
+/// Apaths can be coerced to str.
 impl Deref for Apath {
     type Target = str;
     fn deref(&self) -> &str {
