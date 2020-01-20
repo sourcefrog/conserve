@@ -85,7 +85,7 @@ impl Band {
         jsonio::write_json_metadata_file(&self.tail_path(), &tail, report)
     }
 
-    /// Open a given band, or by default the latest complete backup in the archive.
+    /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
         let new = Band::new(archive.path(), band_id.clone());
         new.read_head(&archive.report())?; // Just check it can be read
