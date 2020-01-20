@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use snafu::ResultExt;
 
 use super::entry::Entry;
-use super::io::require_empty_directory;
+use super::io::{directory_is_empty, ensure_dir_exists};
 use super::*;
 
 /// A write-only tree on the filesystem, as a restore destination.
@@ -24,8 +24,19 @@ impl RestoreTree {
     ///
     /// The destination must either not yet exist, or be an empty directory.
     pub fn create(path: &Path, report: &Report) -> Result<RestoreTree> {
-        require_empty_directory(path)?;
-        Self::create_overwrite(path, report)
+        if ensure_dir_exists(&path)
+            .and_then(|()| directory_is_empty(&path))
+            .context(errors::Restore {
+                path: path.to_path_buf(),
+            })?
+        {
+            Ok(RestoreTree {
+                path: path.to_path_buf(),
+                report: report.clone(),
+            })
+        } else {
+            errors::DestinationNotEmpty { path }.fail()
+        }
     }
 
     /// Create a RestoreTree, even if the destination directory is not empty.
@@ -60,7 +71,7 @@ impl tree::WriteTree for RestoreTree {
 
     fn write_file(&mut self, entry: &Entry, content: &mut dyn std::io::Read) -> Result<()> {
         // TODO: Restore permissions.
-        // TODO: Reset mtime: can probably use lutimes() but it's not in stable yet.
+        // TODO: Reset mtime: can probably use https://docs.rs/utime/0.2.2/utime/
         // TODO: For restore, maybe not necessary to rename into place, and
         // we could just write directly.
         self.report.increment("file", 1);

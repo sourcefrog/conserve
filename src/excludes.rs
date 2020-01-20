@@ -12,9 +12,11 @@ use super::*;
 pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
     for i in excludes {
-        builder.add(Glob::new(i.as_ref()).context(errors::ParseGlob)?);
+        builder.add(Glob::new(i.as_ref()).with_context(|| errors::ParseGlob {
+            glob: i.as_ref().to_string(),
+        })?);
     }
-    builder.build().context(errors::ParseGlob)
+    builder.build().context(errors::ParseGlob { glob: "" })
 }
 
 pub fn excludes_nothing() -> GlobSet {

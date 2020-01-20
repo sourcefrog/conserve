@@ -90,29 +90,30 @@ impl BlockDir {
         self.subdir_for(hash_hex).join(hash_hex)
     }
 
-    fn compress_and_store(&self, in_buf: &[u8], hex_hash: &str, report: &Report) -> Result<u64> {
+    fn compress_and_store(
+        &self,
+        in_buf: &[u8],
+        hex_hash: &str,
+        report: &Report,
+    ) -> std::io::Result<u64> {
         // Note: When we come to support cloud storage, we should do one atomic write rather than
         // a write and rename.
+        let path = self.path_for_file(&hex_hash);
         let d = self.subdir_for(hex_hash);
-        super::io::ensure_dir_exists(&d).context(errors::WriteBlockFile)?;
+        super::io::ensure_dir_exists(&d)?;
         let tempf = tempfile::Builder::new()
             .prefix(TMP_PREFIX)
-            .tempfile_in(&d)
-            .context(errors::WriteBlockFile)?;
+            .tempfile_in(&d)?;
         let mut bufw = io::BufWriter::new(tempf);
-        Snappy::compress_and_write(&in_buf, &mut bufw).context(errors::WriteBlockFile)?;
+        Snappy::compress_and_write(&in_buf, &mut bufw)?;
         let tempf = bufw.into_inner().unwrap();
 
         // TODO: Count bytes rather than stat-ing.
-        let comp_len = tempf
-            .as_file()
-            .metadata()
-            .context(errors::WriteBlockFile)?
-            .len();
+        let comp_len = tempf.as_file().metadata()?.len();
 
         // Also use plain `persist` not `persist_noclobber` to avoid
         // calling `link` on Unix, which won't work on all filesystems.
-        if let Err(e) = tempf.persist(&self.path_for_file(&hex_hash)) {
+        if let Err(e) = tempf.persist(&path) {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
                 // Suprising we saw this rather than detecting it above.
                 report.problem(&format!(
@@ -120,8 +121,9 @@ impl BlockDir {
                     hex_hash
                 ));
                 report.increment("block.already_present", 1);
+                e.file.close()?;
             } else {
-                return Err(e).context(errors::PersistBlockFile);
+                return Err(e.error);
             }
         }
         Ok(comp_len)
@@ -176,7 +178,9 @@ impl BlockDir {
         report: &Report,
     ) -> Result<impl Iterator<Item = std::fs::DirEntry>> {
         let path = self.path.clone();
-        let subdirs = self.subdirs(report).context(errors::ListBlocks)?;
+        let subdirs = self
+            .subdirs(report)
+            .with_context(|| errors::ListBlocks { path: path.clone() })?;
         Ok(subdirs.into_iter().flat_map(move |s| {
             // TODO: Avoid `unwrap`; send errors to the report.
             fs::read_dir(&path.join(s))
@@ -247,7 +251,7 @@ impl BlockDir {
                 "Block file {:?} has actual decompressed hash {:?}",
                 path, actual_hash
             ));
-            return Err(Error::BlockCorrupt { path });
+            return Err(Error::BlockCorrupt { path, actual_hash });
         }
         Ok(())
     }
@@ -328,9 +332,12 @@ impl StoreFiles {
             if self.block_dir.contains(&block_hash)? {
                 report.increment("block.already_present", 1);
             } else {
-                let comp_len =
-                    self.block_dir
-                        .compress_and_store(block_data, &block_hash, &report)?;
+                let comp_len = self
+                    .block_dir
+                    .compress_and_store(block_data, &block_hash, &report)
+                    .with_context(|| errors::StoreBlock {
+                        block_hash: block_hash.clone(),
+                    })?;
                 report.increment("block.write", 1);
                 report.increment_size(
                     "block",

@@ -7,7 +7,6 @@ use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::str;
 use std::vec;
 
 use globset::GlobSet;
@@ -72,21 +71,18 @@ impl IndexBuilder {
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
     pub fn finish_hunk(&mut self, report: &Report) -> Result<()> {
+        let path = &path_for_hunk(&self.dir, self.sequence);
+
         ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))
-            .context(errors::WriteIndex)?;
-        let hunk_path = &path_for_hunk(&self.dir, self.sequence);
+            .context(errors::WriteIndex { path })?;
 
-        let json_string = serde_json::to_string(&self.entries)
-            .context(errors::SerializeJson { path: hunk_path })?;
-        let uncompressed_len = json_string.len() as u64;
+        let json = serde_json::to_vec(&self.entries).context(errors::SerializeJson { path })?;
+        let uncompressed_len = json.len() as u64;
+        let mut af = AtomicFile::new(path).context(errors::WriteIndex { path })?;
+        let compressed_len =
+            Snappy::compress_and_write(&json, &mut af).context(errors::WriteIndex { path })?;
 
-        let mut af = AtomicFile::new(hunk_path).context(errors::WriteIndex)?;
-        let compressed_len = Snappy::compress_and_write(json_string.as_bytes(), &mut af)
-            .context(errors::WriteIndex)?;
-
-        // TODO: Don't seek, just count bytes as they're compressed.
-        // TODO: Measure time to compress separately from time to write.
-        af.close(report).context(errors::WriteIndex)?;
+        af.close(report).context(errors::WriteIndex { path })?;
 
         report.increment_size(
             "index",
@@ -133,7 +129,8 @@ impl ReadIndex {
     /// Return the (1-based) number of index hunks in an index directory.
     pub fn count_hunks(&self) -> Result<u32> {
         for i in 0.. {
-            if !file_exists(&path_for_hunk(&self.dir, i)).context(errors::ReadIndex)? {
+            let path = path_for_hunk(&self.dir, i);
+            if !file_exists(&path).context(errors::ReadIndex { path })? {
                 // If hunk 1 is missing, 1 hunks exists.
                 return Ok(i);
             }
@@ -208,16 +205,17 @@ impl Iter {
     /// (It's possible though unlikely the hunks can be empty.)
     fn refill_entry_buffer(&mut self) -> Result<bool> {
         // Load the next index hunk into buffered_entries.
-        let hunk_path = path_for_hunk(&self.dir, self.next_hunk_number);
-        let mut f = match fs::File::open(&hunk_path) {
+        let path = &path_for_hunk(&self.dir, self.next_hunk_number);
+        let mut f = match fs::File::open(&path) {
             Ok(f) => f,
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
                 // No (more) index hunk files.
                 return Ok(false);
             }
-            Err(e) => return Err(e).context(errors::ReadIndex),
+            Err(e) => return Err(e).with_context(|| errors::ReadIndex { path }),
         };
-        let (comp_len, index_bytes) = Snappy::decompress_read(&mut f).context(errors::ReadIndex)?;
+        let (comp_len, index_bytes) =
+            Snappy::decompress_read(&mut f).with_context(|| errors::ReadIndex { path })?;
         self.report.increment_size(
             "index",
             Sizes {
@@ -227,19 +225,22 @@ impl Iter {
         );
         self.report.increment("index.hunk", 1);
 
-        // TODO: More specific error messages including the filename.
-        let index_json = str::from_utf8(&index_bytes).map_err(|_e| Error::IndexCorrupt {
-            path: hunk_path.clone(),
-        })?;
-        let entries: Vec<Entry> =
-            serde_json::from_str(index_json).with_context(|| errors::DeserializeIndex {
-                path: hunk_path.clone(),
-            })?;
+        let entries: Vec<Entry> = serde_json::from_slice(&index_bytes)
+            .with_context(|| errors::DeserializeIndex { path: path.clone() })?;
         if entries.is_empty() {
             self.report
-                .problem(&format!("Index hunk {} is empty", hunk_path.display()));
+                .problem(&format!("Index hunk {} is empty", path.display()));
         }
 
+        // TODO: It's a bit ugly to do exclusion filtering here, but it
+        // does make sense in the LiveTree impl, where it can actually skip
+        // reading excluded directories.
+        //
+        // TODO: Perhaps do this by `retain` on entries? Presumably often most
+        // of them are retained.
+        //
+        // TODO: Are these counters really worth it when reading from an index?
+        // Maybe not.
         self.buffered_entries = entries
             .into_iter()
             .filter(|entry| {

@@ -90,8 +90,8 @@ impl<'a> ShowArchive for IndexDump<'a> {
             .iter(&excludes::excludes_nothing(), &report)
             .unwrap()
             .collect::<Vec<Entry>>();
-        let output =
-            serde_json::to_string_pretty(&index_entries).context(errors::SerializeIndex)?;
+        let output = serde_json::to_string_pretty(&index_entries)
+            .context(errors::SerializeIndex { path: "-" })?;
         report.print(&output);
         Ok(())
     }

@@ -257,17 +257,15 @@ both     /subdir
 
 #[test]
 fn empty_archive() {
-    let adir = TempDir::new().unwrap();
-    main_binary()
-        .arg("init")
-        .arg(adir.path())
-        .assert()
-        .success();
-
+    let tempdir = TempDir::new().unwrap();
+    let adir = tempdir.path().join("archive");
     let restore_dir = TempDir::new().unwrap();
+
+    main_binary().arg("init").arg(&adir).assert().success();
+
     main_binary()
         .arg("restore")
-        .arg(adir.path())
+        .arg(&adir)
         .arg(restore_dir.path())
         .assert()
         .failure()
@@ -275,14 +273,14 @@ fn empty_archive() {
 
     main_binary()
         .arg("ls")
-        .arg(adir.path())
+        .arg(&adir)
         .assert()
         .failure()
         .stdout(contains("Archive has no complete bands"));
 
     main_binary()
         .arg("versions")
-        .arg(adir.path())
+        .arg(&adir)
         .assert()
         .success()
         .stdout(is_empty());

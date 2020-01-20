@@ -2,15 +2,6 @@
 // Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Archives holding backup material.
-//!
-//! Archives must be initialized before use, which creates the directory.
-//!
-//! Archives contain:
-//!
-//! * one blockdir holding file content addressed by hash
-//!
-//! * any number of bands, holding tree indexs to describe which files
-//!   are present in a version.
 
 use std::collections::BTreeSet;
 use std::fs::read_dir;
@@ -20,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ensure, ResultExt};
 use thousands::Separable;
 
-use super::io::{file_exists, require_empty_directory};
+use super::io::file_exists;
 use super::jsonio;
 use super::misc::remove_item;
 use super::*;
@@ -50,14 +41,13 @@ impl Archive {
     /// Make a new directory to hold an archive, and write the header.
     pub fn create<P: AsRef<Path>>(path: P) -> Result<Archive> {
         let path = path.as_ref();
-        require_empty_directory(path)?;
+        std::fs::create_dir(&path).with_context(|| errors::CreateArchiveDirectory { path })?;
         let block_dir = BlockDir::create(&path.join(BLOCK_DIR))?;
         let header = ArchiveHeader {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
-        let header_filename = path.join(HEADER_FILENAME);
         let report = Report::new();
-        jsonio::write_json_metadata_file(&header_filename, &header, &report)?;
+        jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header, &report)?;
         Ok(Archive {
             path: path.to_path_buf(),
             report,
@@ -102,15 +92,19 @@ impl Archive {
     /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_bands(&self) -> Result<Vec<BandId>> {
         let mut band_ids = Vec::<BandId>::new();
-        let context = || errors::ListBands {
-            path: self.path.clone(),
-        };
-        for e in read_dir(self.path()).with_context(context)? {
-            let e = e.with_context(context)?;
-            let n = e.file_name().into_string().unwrap();
-            if e.file_type().with_context(context)?.is_dir() && n != BLOCK_DIR {
-                band_ids.push(BandId::from_string(&n)?);
+        for e in read_dir(self.path())
+            .with_context(|| errors::ListBands {
+                path: self.path.clone(),
+            })?
+            .filter_map(std::result::Result::ok)
+        {
+            if let Ok(n) = e.file_name().into_string() {
+                if e.file_type().map_or(false, |ft| ft.is_dir()) && n != BLOCK_DIR {
+                    band_ids.push(BandId::from_string(&n)?);
+                }
             }
+            // TODO: Log errors while reading the directory, but no Report
+            // is currently available here.
         }
         band_ids.sort_unstable();
         Ok(band_ids)
@@ -265,19 +259,6 @@ mod tests {
         Archive::open(arch_path, &Report::new()).unwrap();
         assert!(arch.list_bands().unwrap().is_empty());
         assert!(arch.last_complete_band().is_err());
-    }
-
-    #[test]
-    fn init_empty_dir() {
-        let testdir = TempDir::new().unwrap();
-        let arch_path = testdir.path();
-        let arch = Archive::create(arch_path).unwrap();
-
-        assert_eq!(arch.path(), arch_path);
-        assert!(arch.list_bands().unwrap().is_empty());
-
-        Archive::open(arch_path, &Report::new()).unwrap();
-        assert!(arch.list_bands().unwrap().is_empty());
     }
 
     /// A new archive contains just one header file.

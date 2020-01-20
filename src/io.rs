@@ -9,7 +9,6 @@ use std::io::prelude::*;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
-use snafu::ResultExt;
 use tempfile;
 
 use super::*;
@@ -84,29 +83,9 @@ pub fn file_exists(path: &Path) -> std::io::Result<bool> {
     }
 }
 
-/// Create a directory if it doesn't exist; if it does then assert it must be empty.
-pub fn require_empty_directory(path: &Path) -> Result<()> {
-    if let Err(e) = std::fs::create_dir(&path) {
-        if e.kind() == io::ErrorKind::AlreadyExists {
-            // Exists and hopefully empty?
-            if std::fs::read_dir(&path)
-                .context(errors::CreateDirectory { path })?
-                .next()
-                .is_some()
-            {
-                Err(Error::DestinationNotEmpty { path: path.into() })
-            } else {
-                Ok(()) // Exists and empty
-            }
-        } else {
-            Err(Error::CreateDirectory {
-                path: path.into(),
-                source: e,
-            })
-        }
-    } else {
-        Ok(()) // Created
-    }
+/// True if a directory exists and is empty.
+pub fn directory_is_empty(path: &Path) -> std::io::Result<bool> {
+    Ok(std::fs::read_dir(path)?.next().is_none())
 }
 
 /// List a directory.

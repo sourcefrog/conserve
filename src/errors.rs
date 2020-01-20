@@ -16,141 +16,130 @@ type IOError = std::io::Error;
 #[snafu(visibility = "pub(crate)")]
 pub enum Error {
     // TODO: Add messages and perhaps more fields to all of these.
-    // TODO: Add `backtrace` members on errors that are more likely to be
-    // internal errors or have mysterious tracebacks.
-    BlockCorrupt {
-        path: PathBuf,
-    },
-    WriteBlockFile {
-        source: IOError,
-    },
-    PersistBlockFile {
-        source: tempfile::PersistError,
-    },
+    #[snafu(display("Block file {:?} corrupt; actual hash {:?}", path, actual_hash))]
+    BlockCorrupt { path: PathBuf, actual_hash: String },
 
-    #[snafu(display("Error reading block {:?}", path))]
-    ReadBlock {
-        path: PathBuf,
-        source: IOError,
-    },
+    #[snafu(display("Failed to store block {}", block_hash))]
+    StoreBlock { block_hash: String, source: IOError },
 
-    ListBlocks {
-        source: IOError,
-    },
+    #[snafu(display("Failed to read block {:?}", path))]
+    ReadBlock { path: PathBuf, source: IOError },
 
-    #[snafu(display("Not a Conserve archive: {}", path.display()))]
-    NotAnArchive {
-        path: PathBuf,
-    },
+    #[snafu(display("Failed to list block files in {:?}", path))]
+    ListBlocks { path: PathBuf, source: IOError },
 
-    #[snafu(display("Failed to read archive header {}", path.display()))]
+    #[snafu(display("Not a Conserve archive: {:?}", path))]
+    NotAnArchive { path: PathBuf },
+
+    #[snafu(display("Failed to read archive header from {:?}", path))]
     ReadArchiveHeader {
         path: PathBuf,
         source: std::io::Error,
     },
 
-    #[snafu(display("Archive version {:?} in {} is not supported by Conserve {}",
-        version, path.display(), crate::version()))]
-    UnsupportedArchiveVersion {
-        path: PathBuf,
-        version: String,
-    },
+    #[snafu(display(
+        "Archive version {:?} in {:?} is not supported by Conserve {}",
+        version,
+        path,
+        crate::version()
+    ))]
+    UnsupportedArchiveVersion { path: PathBuf, version: String },
 
-    #[snafu(display("Destination directory not empty: {}", path.display()))]
-    DestinationNotEmpty {
-        path: PathBuf,
-    },
+    #[snafu(display("Destination directory not empty: {:?}", path))]
+    DestinationNotEmpty { path: PathBuf },
+
+    #[snafu(display("Archive has no bands"))]
     ArchiveEmpty,
+
     #[snafu(display("Archive has no complete bands"))]
     NoCompleteBands,
 
     #[snafu(display("Invalid backup version number {:?}", version))]
-    InvalidVersion {
-        version: String,
+    InvalidVersion { version: String },
+
+    #[snafu(display("Failed to create band"))]
+    CreateBand { source: std::io::Error },
+
+    #[snafu(display("Failed to create block directory",))]
+    CreateBlockDir { source: std::io::Error },
+
+    #[snafu(display("Failed to create archive directory {:?}", path))]
+    CreateArchiveDirectory {
+        path: PathBuf,
+        source: std::io::Error,
     },
 
-    CreateBand {
-        source: std::io::Error,
-    },
-    CreateBlockDir {
-        source: std::io::Error,
-    },
-    CreateDirectory {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-    BandIncomplete {
-        band_id: BandId,
-    },
+    #[snafu(display("Band {} is incomplete", band_id))]
+    BandIncomplete { band_id: BandId },
+
+    #[snafu(display("Failed to parse glob {:?}", glob))]
     ParseGlob {
+        glob: String,
         source: globset::Error,
     },
-    IndexCorrupt {
-        path: PathBuf,
-    },
-    WriteIndex {
-        source: IOError,
-    },
-    ReadIndex {
-        source: IOError,
-    },
+
+    #[snafu(display("Failed to write index hunk {:?}", path))]
+    WriteIndex { path: PathBuf, source: IOError },
+
+    #[snafu(display("Failed to read index hunk {:?}", path))]
+    ReadIndex { path: PathBuf, source: IOError },
+
+    #[snafu(display("Failed to serialize index hunk {:?}", path))]
     SerializeIndex {
+        path: PathBuf,
         source: serde_json::Error,
     },
+
+    #[snafu(display("Failed to deserialize index hunk {:?}", path))]
     DeserializeIndex {
         path: PathBuf,
         source: serde_json::Error,
     },
-    FileCorrupt {
-        // band_id: BandId,
-        apath: Apath,
-        expected_hex: String,
-        actual_hex: String,
-    },
 
-    #[snafu(display("Failed to read metadata file {}", path.display()))]
+    #[snafu(display("Failed to read metadata file {:?}", path))]
     ReadMetadata {
         path: PathBuf,
         source: std::io::Error,
     },
 
-    DeserializeJson {
-        path: PathBuf,
-        source: serde_json::Error,
-    },
+    #[snafu(display("Failed to write metadata file {:?}", path))]
     WriteMetadata {
         path: PathBuf,
         source: std::io::Error,
     },
+
+    #[snafu(display("Failed to deserialize json from {:?}", path))]
+    DeserializeJson {
+        path: PathBuf,
+        source: serde_json::Error,
+    },
+
+    #[snafu(display("Failed to serialize json to {:?}", path))]
     SerializeJson {
         path: PathBuf,
         source: serde_json::Error,
     },
+
+    #[snafu(display("Failed to list bands in {:?}", path))]
     ListBands {
         path: PathBuf,
         source: std::io::Error,
     },
 
+    #[snafu(display("Failed to read source file {}", path.display()))]
     ReadSourceFile {
         path: PathBuf,
         source: std::io::Error,
     },
 
-    ListSourceTree {
-        path: PathBuf,
-        source: IOError,
-    },
+    #[snafu(display("Failed to read source tree {}", path.display()))]
+    ListSourceTree { path: PathBuf, source: IOError },
 
-    #[snafu(display("Error storing file {}", apath))]
-    StoreFile {
-        apath: Apath,
-        source: IOError,
-    },
+    #[snafu(display("Failed to store file {}", apath))]
+    StoreFile { apath: Apath, source: IOError },
 
-    Restore {
-        path: PathBuf,
-        source: IOError,
-    },
+    #[snafu(display("Failed to restore {}", path.display()))]
+    Restore { path: PathBuf, source: IOError },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
