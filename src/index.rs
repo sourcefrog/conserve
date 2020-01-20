@@ -178,8 +178,10 @@ impl Iterator for IndexEntryIter {
 
     fn next(&mut self) -> Option<Entry> {
         loop {
-            if let Some(entry) = self.buffered_entries.next() {
-                return Some(entry);
+            while let Some(entry) = self.buffered_entries.next() {
+                if !self.excludes.is_match(&entry.apath) {
+                    return Some(entry);
+                }
             }
             match self.refill_entry_buffer() {
                 Ok(false) => return None,
@@ -210,14 +212,14 @@ impl IndexEntryIter {
     ///
     /// Returns true if another hunk could be found, otherwise false.
     fn refill_entry_buffer(&mut self) -> Result<bool> {
-        // TODO: refill_entry_buffer shouldn't return a Result, because it can't
-        // really be returned through the iter, and because we generally want
-        // to continue with a warning, not stop.
-
-        // Load the next index hunk into buffered_entries.
+        assert!(
+            self.buffered_entries.next().is_none(),
+            "refill_entry_buffer called with non-empty buffer"
+        );
         let path = &path_for_hunk(&self.dir, self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
+        self.report.increment("index.hunk", 1);
         let mut f = match fs::File::open(&path) {
             Ok(f) => f,
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
@@ -237,45 +239,14 @@ impl IndexEntryIter {
                 compressed: comp_len as u64,
             },
         );
-        self.report.increment("index.hunk", 1);
-
         let entries: Vec<Entry> = serde_json::from_slice(&index_bytes)
             .with_context(|| errors::DeserializeIndex { path })?;
         if entries.is_empty() {
             self.report
-                .problem(&format!("Index hunk {} is empty", path.display()));
-            return Ok(true);
+                .problem(&format!("Index hunk {:?} is empty", path));
         }
-
-        // TODO: It's a bit ugly to do exclusion filtering here, but it
-        // does make sense in the LiveTree impl, where it can actually skip
-        // reading excluded directories.
-        //
-        // TODO: Perhaps do this by `retain` on entries? Presumably often most
-        // of them are retained.
-        //
-        // TODO: Are these counters really worth it when reading from an index?
-        // Maybe not.
-
-        assert!(self.buffered_entries.next().is_none());
-        self.buffered_entries = entries
-            .into_iter()
-            .filter(|entry| {
-                if self.excludes.is_match(Path::new(&entry.apath.to_string())) {
-                    match entry.kind() {
-                        Kind::Dir => self.report.increment("skipped.excluded.directories", 1),
-                        Kind::Symlink => self.report.increment("skipped.excluded.symlinks", 1),
-                        Kind::File => self.report.increment("skipped.excluded.files", 1),
-                        Kind::Unknown => self.report.increment("skipped.excluded.unknown", 1),
-                    }
-                    false
-                } else {
-                    true
-                }
-            })
-            .collect::<Vec<Entry>>()
-            .into_iter();
-
+        // NOTE: Not updating 'skipped' counters; here. Questionable value.
+        self.buffered_entries = entries.into_iter();
         Ok(true)
     }
 }
