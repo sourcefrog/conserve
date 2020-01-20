@@ -132,6 +132,8 @@ impl ReadIndex {
             let path = path_for_hunk(&self.dir, i);
             if !file_exists(&path).context(errors::ReadIndex { path })? {
                 // If hunk 1 is missing, 1 hunks exists.
+                // TODO: Perhaps, list the directories and cope cleanly with
+                // one hunk being missing.
                 return Ok(i);
             }
         }
@@ -143,8 +145,8 @@ impl ReadIndex {
     }
 
     /// Make an iterator that will return all entries in this band.
-    pub fn iter(&self, excludes: &GlobSet, report: &Report) -> Result<index::IndexEntryIter> {
-        index::IndexEntryIter::open(&self.dir, excludes, report)
+    pub fn iter(&self, excludes: &GlobSet, report: &Report) -> Result<IndexEntryIter> {
+        IndexEntryIter::open(&self.dir, excludes, report)
     }
 }
 
@@ -179,8 +181,12 @@ impl Iterator for IndexEntryIter {
             if let Some(entry) = self.buffered_entries.next() {
                 return Some(entry);
             }
-            if !self.refill_entry_buffer().unwrap() {
-                return None; // No more hunks
+            match self.refill_entry_buffer() {
+                Ok(false) => return None,
+                Ok(true) => (),
+                Err(e) => {
+                    self.report.show_error(&e); // Continue to read next hunk.
+                }
             }
         }
     }
@@ -201,8 +207,8 @@ impl IndexEntryIter {
     }
 
     /// Read another hunk file and put it into buffered_entries.
+    ///
     /// Returns true if another hunk could be found, otherwise false.
-    /// (It's possible, though unlikely, that the hunks can be empty.)
     fn refill_entry_buffer(&mut self) -> Result<bool> {
         // TODO: refill_entry_buffer shouldn't return a Result, because it can't
         // really be returned through the iter, and because we generally want
@@ -210,10 +216,14 @@ impl IndexEntryIter {
 
         // Load the next index hunk into buffered_entries.
         let path = &path_for_hunk(&self.dir, self.next_hunk_number);
+        // Whether we succeed or fail, don't try to read this hunk again.
+        self.next_hunk_number += 1;
         let mut f = match fs::File::open(&path) {
             Ok(f) => f,
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
-                // No (more) index hunk files.
+                // TODO: Cope with one hunk being missing, while there are still
+                // later-numbered hunks. This would require reading the whole
+                // list of hunks first.
                 return Ok(false);
             }
             Err(e) => return Err(e).with_context(|| errors::ReadIndex { path }),
@@ -230,10 +240,11 @@ impl IndexEntryIter {
         self.report.increment("index.hunk", 1);
 
         let entries: Vec<Entry> = serde_json::from_slice(&index_bytes)
-            .with_context(|| errors::DeserializeIndex { path: path.clone() })?;
+            .with_context(|| errors::DeserializeIndex { path })?;
         if entries.is_empty() {
             self.report
                 .problem(&format!("Index hunk {} is empty", path.display()));
+            return Ok(true);
         }
 
         // TODO: It's a bit ugly to do exclusion filtering here, but it
@@ -245,6 +256,8 @@ impl IndexEntryIter {
         //
         // TODO: Are these counters really worth it when reading from an index?
         // Maybe not.
+
+        assert!(self.buffered_entries.next().is_none());
         self.buffered_entries = entries
             .into_iter()
             .filter(|entry| {
@@ -263,7 +276,6 @@ impl IndexEntryIter {
             .collect::<Vec<Entry>>()
             .into_iter();
 
-        self.next_hunk_number += 1;
         Ok(true)
     }
 }
