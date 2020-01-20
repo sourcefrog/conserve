@@ -139,12 +139,8 @@ impl Band {
     }
 
     /// Return an iterator through entries in this band.
-    pub fn iter_entries(
-        &self,
-        excludes: &GlobSet,
-        report: &Report,
-    ) -> Result<index::IndexEntryIter> {
-        index::IndexEntryIter::open(&self.index_dir_path, excludes, report)
+    pub fn iter_entries(&self, report: &Report) -> Result<index::IndexEntryIter> {
+        index::IndexEntryIter::open(&self.index_dir_path, report)
     }
 
     fn read_head(&self, report: &Report) -> Result<Head> {

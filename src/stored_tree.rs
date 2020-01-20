@@ -121,7 +121,10 @@ impl ReadTree for StoredTree {
 
     /// Return an iter of index entries in this stored tree.
     fn iter_entries(&self, report: &Report) -> Result<index::IndexEntryIter> {
-        self.band.iter_entries(&self.excludes, report)
+        Ok(self
+            .band
+            .iter_entries(report)?
+            .with_excludes(self.excludes.clone()))
     }
 
     fn file_contents(&self, entry: &Entry) -> Result<Self::R> {

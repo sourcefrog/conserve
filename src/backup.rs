@@ -131,10 +131,7 @@ mod tests {
         let band = Band::open(&af, &band_ids[0]).unwrap();
         assert!(band.is_closed().unwrap());
 
-        let index_entries = band
-            .iter_entries(&excludes::excludes_nothing(), &report)
-            .unwrap()
-            .collect::<Vec<Entry>>();
+        let index_entries = band.iter_entries(&report).unwrap().collect::<Vec<Entry>>();
         assert_eq!(2, index_entries.len());
 
         let e2 = &index_entries[1];

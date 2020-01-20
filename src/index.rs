@@ -147,8 +147,8 @@ impl ReadIndex {
     }
 
     /// Make an iterator that will return all entries in this band.
-    pub fn iter(&self, excludes: &GlobSet, report: &Report) -> Result<IndexEntryIter> {
-        IndexEntryIter::open(&self.dir, excludes, report)
+    pub fn iter(&self, report: &Report) -> Result<IndexEntryIter> {
+        IndexEntryIter::open(&self.dir, report)
     }
 }
 
@@ -196,14 +196,19 @@ impl IndexEntryIter {
     /// Create an iterator that will read all entires from an existing index.
     ///
     /// Prefer to use `Band::index_iter` instead.
-    pub fn open(index_dir: &Path, excludes: &GlobSet, report: &Report) -> Result<IndexEntryIter> {
+    pub fn open(index_dir: &Path, report: &Report) -> Result<IndexEntryIter> {
         Ok(IndexEntryIter {
             dir: index_dir.to_path_buf(),
             buffered_entries: Vec::<Entry>::new().into_iter().peekable(),
             next_hunk_number: 0,
             report: report.clone(),
-            excludes: excludes.clone(),
+            excludes: excludes::excludes_nothing(),
         })
+    }
+
+    /// Consume this iterator and return a new one with exclusions.
+    pub fn with_excludes(self, excludes: globset::GlobSet) -> IndexEntryIter {
+        IndexEntryIter { excludes, ..self }
     }
 
     /// Return the entry for given apath, if it is present, otherwise None.
@@ -413,7 +418,7 @@ mod tests {
              \"kind\":\"File\"}]"
         );
 
-        let mut it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
@@ -432,7 +437,7 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk(&report).unwrap();
 
-        let it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        let it = IndexEntryIter::open(&ib.dir, &report).unwrap();
         assert_eq!(
             format!("{:?}", &it),
             format!(
@@ -474,7 +479,9 @@ mod tests {
         ib.finish_hunk(&report).unwrap();
 
         let excludes = excludes::from_strings(&["/fo*"]).unwrap();
-        let it = IndexEntryIter::open(&ib.dir, &excludes, &report).unwrap();
+        let it = IndexEntryIter::open(&ib.dir, &report)
+            .unwrap()
+            .with_excludes(excludes);
         assert_eq!(
             format!("{:?}", &it),
             format!(
@@ -502,25 +509,25 @@ mod tests {
         ib.finish_hunk(&report).unwrap();
 
         // Advance to /foo and read on from there.
-        let mut it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
         assert_eq!(it.advance_to(&Apath::from("/foo")).unwrap().apath, "/foo");
         assert_eq!(it.next().unwrap().apath, "/foobar");
         assert_eq!(it.next().unwrap().apath, "/g01");
 
         // Advance to before /g01
-        let mut it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
         assert_eq!(it.advance_to(&Apath::from("/fxxx")), None);
         assert_eq!(it.next().unwrap().apath, "/g01");
         assert_eq!(it.next().unwrap().apath, "/g02");
 
         // Advance to before the first entry
-        let mut it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
         assert_eq!(it.advance_to(&Apath::from("/aaaa")), None);
         assert_eq!(it.next().unwrap().apath, "/bar");
         assert_eq!(it.next().unwrap().apath, "/foo");
 
         // Advance to after the last entry
-        let mut it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
         assert_eq!(it.advance_to(&Apath::from("/zz")), None);
         assert_eq!(it.next(), None);
     }
