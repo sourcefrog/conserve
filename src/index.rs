@@ -148,11 +148,12 @@ impl ReadIndex {
     }
 }
 
-/// Read out all the entries from an existing index, continuing across multiple
-/// hunks.
+/// Read out all the entries from a stored index, in apath order.
 pub struct Iter {
     /// The `i` directory within the band where all files for this index are written.
     dir: PathBuf,
+    /// Temporarily buffered entries, read from the index files but not yet
+    /// returned to the client.
     buffered_entries: vec::IntoIter<Entry>,
     next_hunk_number: u32,
     pub report: Report,
@@ -178,7 +179,6 @@ impl Iterator for Iter {
             if let Some(entry) = self.buffered_entries.next() {
                 return Some(entry);
             }
-            // TODO: refill_entry_buffer shouldn't return a Result.
             if !self.refill_entry_buffer().unwrap() {
                 return None; // No more hunks
             }
@@ -202,8 +202,12 @@ impl Iter {
 
     /// Read another hunk file and put it into buffered_entries.
     /// Returns true if another hunk could be found, otherwise false.
-    /// (It's possible though unlikely the hunks can be empty.)
+    /// (It's possible, though unlikely, that the hunks can be empty.)
     fn refill_entry_buffer(&mut self) -> Result<bool> {
+        // TODO: refill_entry_buffer shouldn't return a Result, because it can't
+        // really be returned through the iter, and because we generally want
+        // to continue with a warning, not stop.
+
         // Load the next index hunk into buffered_entries.
         let path = &path_for_hunk(&self.dir, self.next_hunk_number);
         let mut f = match fs::File::open(&path) {
