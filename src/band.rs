@@ -66,17 +66,10 @@ impl Band {
         let new_band_id = archive
             .last_band_id()?
             .map_or_else(BandId::zero, |b| b.next_sibling());
-        Band::create_specific_id(archive, new_band_id)
-    }
-
-    /// Create a Band with a given id.
-    fn create_specific_id(archive: &Archive, id: BandId) -> Result<Band> {
         let archive_dir = archive.path();
-        let new = Band::new(archive_dir, id);
-
+        let new = Band::new(archive_dir, new_band_id);
         fs::create_dir(&new.path_buf).context(errors::CreateBand)?;
         fs::create_dir(&new.index_dir_path).context(errors::CreateBand)?;
-
         let head = Head {
             start_time: Utc::now().timestamp(),
         };
@@ -101,8 +94,8 @@ impl Band {
 
     /// Create a new in-memory Band object.
     ///
-    /// Instead of creating the in-memory object you typically should either `create` or `open` the
-    /// band corresponding to in-archive directory.
+    /// Instead of creating the in-memory object you typically should either
+    /// `create` or `open` the band corresponding to in-archive directory.
     fn new(archive_dir: &Path, id: BandId) -> Band {
         let mut path_buf = archive_dir.to_path_buf();
         path_buf.push(id.to_string());
