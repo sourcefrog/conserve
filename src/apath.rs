@@ -97,7 +97,6 @@ impl PartialEq<Apath> for &str {
     }
 }
 
-/// Apaths can be coerced to str.
 impl Deref for Apath {
     type Target = str;
     fn deref(&self) -> &str {

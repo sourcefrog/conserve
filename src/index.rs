@@ -3,9 +3,11 @@
 
 //! Index lists the files in a band in the archive.
 
+use std::cmp::Ordering;
 use std::fmt;
 use std::fs;
 use std::io;
+use std::iter::Peekable;
 use std::path::{Path, PathBuf};
 use std::vec;
 
@@ -156,7 +158,7 @@ pub struct IndexEntryIter {
     dir: PathBuf,
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
-    buffered_entries: vec::IntoIter<Entry>,
+    buffered_entries: Peekable<vec::IntoIter<Entry>>,
     next_hunk_number: u32,
     pub report: Report,
     excludes: GlobSet,
@@ -183,12 +185,8 @@ impl Iterator for IndexEntryIter {
                     return Some(entry);
                 }
             }
-            match self.refill_entry_buffer() {
-                Ok(false) => return None,
-                Ok(true) => (),
-                Err(e) => {
-                    self.report.show_error(&e); // Continue to read next hunk.
-                }
+            if !self.refill_entry_buffer_or_warn() {
+                return None;
             }
         }
     }
@@ -201,10 +199,50 @@ impl IndexEntryIter {
     pub fn open(index_dir: &Path, excludes: &GlobSet, report: &Report) -> Result<IndexEntryIter> {
         Ok(IndexEntryIter {
             dir: index_dir.to_path_buf(),
-            buffered_entries: Vec::<Entry>::new().into_iter(),
+            buffered_entries: Vec::<Entry>::new().into_iter().peekable(),
             next_hunk_number: 0,
             report: report.clone(),
             excludes: excludes.clone(),
+        })
+    }
+
+    /// Return the entry for given apath, if it is present, otherwise None.
+    /// It follows this will also return None at the end of the index.
+    ///
+    /// After this is called, the iter has skipped forward to this apath,
+    /// discarding entries for any earlier files. However, even if the apath
+    /// is not present, other entries coming after it can still be read.
+    pub fn advance_to(&mut self, apath: &Apath) -> Option<Entry> {
+        // This takes some care because we don't want to consume the entry
+        // that tells us we went too far.
+        loop {
+            if let Some(cand) = self.buffered_entries.peek() {
+                match cand.apath.cmp(apath) {
+                    Ordering::Less => {
+                        // Discard this and continue looking
+                        self.buffered_entries.next().unwrap();
+                    }
+                    Ordering::Equal => {
+                        return Some(self.buffered_entries.next().unwrap());
+                    }
+                    Ordering::Greater => {
+                        // We passed the point where this entry would have been:
+                        return None;
+                    }
+                }
+            } else if !self.refill_entry_buffer_or_warn() {
+                return None;
+            }
+        }
+    }
+
+    /// Refill entry buffer, converting errors to warnings.
+    ///
+    /// Returns true if a hunk was read; false at the end.
+    fn refill_entry_buffer_or_warn(&mut self) -> bool {
+        self.refill_entry_buffer().unwrap_or_else(|e| {
+            self.report.show_error(&e); // Continue to read next hunk.
+            true
         })
     }
 
@@ -246,7 +284,7 @@ impl IndexEntryIter {
                 .problem(&format!("Index hunk {:?} is empty", path));
         }
         // NOTE: Not updating 'skipped' counters; here. Questionable value.
-        self.buffered_entries = entries.into_iter();
+        self.buffered_entries = entries.into_iter().peekable();
         Ok(true)
     }
 }
@@ -447,5 +485,43 @@ mod tests {
 
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/bar"]);
+    }
+
+    #[test]
+    fn advance() {
+        let (_testdir, mut ib, report) = scratch_indexbuilder();
+        add_an_entry(&mut ib, "/bar");
+        add_an_entry(&mut ib, "/foo");
+        add_an_entry(&mut ib, "/foobar");
+        ib.finish_hunk(&report).unwrap();
+
+        // Make multiple hunks to test traversal across hunks.
+        add_an_entry(&mut ib, "/g01");
+        add_an_entry(&mut ib, "/g02");
+        add_an_entry(&mut ib, "/g03");
+        ib.finish_hunk(&report).unwrap();
+
+        // Advance to /foo and read on from there.
+        let mut it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        assert_eq!(it.advance_to(&Apath::from("/foo")).unwrap().apath, "/foo");
+        assert_eq!(it.next().unwrap().apath, "/foobar");
+        assert_eq!(it.next().unwrap().apath, "/g01");
+
+        // Advance to before /g01
+        let mut it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        assert_eq!(it.advance_to(&Apath::from("/fxxx")), None);
+        assert_eq!(it.next().unwrap().apath, "/g01");
+        assert_eq!(it.next().unwrap().apath, "/g02");
+
+        // Advance to before the first entry
+        let mut it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        assert_eq!(it.advance_to(&Apath::from("/aaaa")), None);
+        assert_eq!(it.next().unwrap().apath, "/bar");
+        assert_eq!(it.next().unwrap().apath, "/foo");
+
+        // Advance to after the last entry
+        let mut it = IndexEntryIter::open(&ib.dir, &excludes::excludes_nothing(), &report).unwrap();
+        assert_eq!(it.advance_to(&Apath::from("/zz")), None);
+        assert_eq!(it.next(), None);
     }
 }
