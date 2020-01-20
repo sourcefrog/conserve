@@ -99,7 +99,7 @@ impl Archive {
             .filter_map(std::result::Result::ok)
         {
             if let Ok(n) = e.file_name().into_string() {
-                if e.file_type().map_or(false, |ft| ft.is_dir()) && n != BLOCK_DIR {
+                if e.file_type().map(|ft| ft.is_dir()).unwrap_or(false) && n != BLOCK_DIR {
                     band_ids.push(BandId::from_string(&n)?);
                 }
             }
