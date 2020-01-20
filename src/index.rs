@@ -162,7 +162,7 @@ pub struct IndexEntryIter {
 
 impl fmt::Debug for IndexEntryIter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("index::Iter")
+        f.debug_struct("IndexEntryIter")
             .field("dir", &self.dir)
             .field("next_hunk_number", &self.next_hunk_number)
             // .field("report", &self.report)
@@ -415,7 +415,7 @@ mod tests {
         assert_eq!(
             format!("{:?}", &it),
             format!(
-                "index::IndexEntryIter {{ dir: {:?}, next_hunk_number: 0 }}",
+                "IndexEntryIter {{ dir: {:?}, next_hunk_number: 0 }}",
                 ib.dir
             )
         );
@@ -457,7 +457,7 @@ mod tests {
         assert_eq!(
             format!("{:?}", &it),
             format!(
-                "index::IndexEntryIter {{ dir: {:?}, next_hunk_number: 0 }}",
+                "IndexEntryIter {{ dir: {:?}, next_hunk_number: 0 }}",
                 ib.dir
             )
         );
