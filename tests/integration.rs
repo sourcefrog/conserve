@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2019, 2020 Martin Pool.
 
 /// Test Conserve through its public API.
 extern crate conserve;
@@ -56,7 +56,10 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     let band_ids = af.list_bands().unwrap();
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
-    assert_eq!(af.last_complete_band().unwrap().id(), BandId::new(&[0]));
+    assert_eq!(
+        af.last_complete_band().unwrap().unwrap().id(),
+        BandId::new(&[0])
+    );
 
     let band = Band::open(&af, &band_ids[0]).unwrap();
     assert!(band.is_closed().unwrap());
@@ -99,9 +102,9 @@ fn check_restore(af: &ScratchArchive) {
     let restore_dir = TreeFixture::new();
 
     let restore_report = Report::new();
-    let restore_a = Archive::open(af.path(), &restore_report).unwrap();
+    let archive = Archive::open(af.path(), &restore_report).unwrap();
     let mut restore_tree = RestoreTree::create(&restore_dir.path(), &restore_report).unwrap();
-    let st = StoredTree::open_last(&restore_a).unwrap();
+    let st = StoredTree::open_last(&archive).unwrap();
     copy_tree(&st, &mut restore_tree).unwrap();
 
     let block_sizes = restore_report.get_size("block");

@@ -51,9 +51,6 @@ pub enum Error {
     #[snafu(display("Archive has no bands"))]
     ArchiveEmpty,
 
-    #[snafu(display("Archive has no complete bands"))]
-    NoCompleteBands,
-
     #[snafu(display("Invalid backup version number {:?}", version))]
     InvalidVersion { version: String },
 

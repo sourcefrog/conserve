@@ -63,11 +63,9 @@ impl Band {
     ///
     /// The Band gets the next id after those that already exist.
     pub fn create(archive: &Archive) -> Result<Band> {
-        let new_band_id = match archive.last_band_id() {
-            Err(Error::ArchiveEmpty) => BandId::zero(),
-            Ok(b) => b.next_sibling(),
-            Err(e) => return Err(e),
-        };
+        let new_band_id = archive
+            .last_band_id()?
+            .map_or_else(BandId::zero, |b| b.next_sibling());
         Band::create_specific_id(archive, new_band_id)
     }
 
@@ -148,7 +146,11 @@ impl Band {
     }
 
     /// Return an iterator through entries in this band.
-    pub fn iter_entries(&self, excludes: &GlobSet, report: &Report) -> Result<index::IndexEntryIter> {
+    pub fn iter_entries(
+        &self,
+        excludes: &GlobSet,
+        report: &Report,
+    ) -> Result<index::IndexEntryIter> {
         index::IndexEntryIter::open(&self.index_dir_path, excludes, report)
     }
 
@@ -251,20 +253,4 @@ mod tests {
         // the band.  (It might fail if you set a breakpoint right there.)
         assert!(dur < Duration::seconds(5));
     }
-
-    // XXX: Should this API even exist?
-    //
-    // #[test]
-    // fn create_existing_band() {
-    //     let af = ScratchArchive::new();
-    //     let band_id = BandId::from_string("b0001").unwrap();
-    //     Band::create_specific_id(&af, band_id.clone()).unwrap();
-    //     match Band::create_specific_id(&af, band_id).unwrap_err() {
-
-    //     if let Error::BandExists(ref ioerror) = e {
-    //         assert_eq!(ioerror.kind(), io::ErrorKind::AlreadyExists);
-    //     } else {
-    //         panic!("expected an ioerror, got {:?}", e);
-    //     };
-    // }
 }

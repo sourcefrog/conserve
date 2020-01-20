@@ -25,7 +25,9 @@ pub struct StoredTree {
 impl StoredTree {
     /// Open the last complete version in the archive.
     pub fn open_last(archive: &Archive) -> Result<StoredTree> {
-        let band = archive.last_complete_band()?;
+        let band = archive
+            .last_complete_band()?
+            .ok_or(errors::Error::ArchiveEmpty)?;
         Ok(StoredTree {
             archive: archive.clone(),
             band,
@@ -147,7 +149,7 @@ mod test {
         let af = ScratchArchive::new();
         af.store_two_versions();
 
-        let last_band_id = af.last_band_id().unwrap();
+        let last_band_id = af.last_band_id().unwrap().unwrap();
         let st = StoredTree::open_last(&af).unwrap();
 
         assert_eq!(st.band().id(), last_band_id);

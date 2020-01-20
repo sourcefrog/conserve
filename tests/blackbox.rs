@@ -269,14 +269,14 @@ fn empty_archive() {
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stdout(contains("Archive has no complete bands"));
+        .stdout(contains("Archive has no bands"));
 
     main_binary()
         .arg("ls")
         .arg(&adir)
         .assert()
         .failure()
-        .stdout(contains("Archive has no complete bands"));
+        .stdout(contains("Archive has no bands"));
 
     main_binary()
         .arg("versions")
@@ -310,7 +310,7 @@ fn incomplete_version() {
         .arg(af.path())
         .assert()
         .failure()
-        .stdout(contains("Archive has no complete bands"));
+        .stdout(contains("Archive has no bands"));
 
     // ls --incomplete accurately says it has nothing
     main_binary()

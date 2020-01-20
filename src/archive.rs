@@ -110,26 +110,23 @@ impl Archive {
         Ok(band_ids)
     }
 
-    /// Return the `BandId` of the highest-numbered band, or ArchiveEmpty,
-    /// or an Err if any occurred reading the directory.
-    pub fn last_band_id(&self) -> Result<BandId> {
+    /// Return the `BandId` of the highest-numbered band, or Ok(None) if there
+    /// are no bands, or an Err if any occurred reading the directory.
+    pub fn last_band_id(&self) -> Result<Option<BandId>> {
         // TODO: Perhaps factor out an iter_bands_unsorted, common
         // between this and list_bands.
-        self.list_bands()?
-            .into_iter()
-            .last()
-            .ok_or(Error::ArchiveEmpty)
+        Ok(self.list_bands()?.into_iter().last())
     }
 
-    /// Return the last completely-written band id.
-    pub fn last_complete_band(&self) -> Result<Band> {
+    /// Return the last completely-written band id, if any.
+    pub fn last_complete_band(&self) -> Result<Option<Band>> {
         for id in self.list_bands()?.iter().rev() {
             let b = Band::open(self, &id)?;
             if b.is_closed()? {
-                return Ok(b);
+                return Ok(Some(b));
             }
         }
-        Err(Error::NoCompleteBands)
+        Ok(None)
     }
 
     /// Return a sorted set containing all the blocks referenced by all bands.
@@ -240,7 +237,6 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::errors::Error;
     use crate::test_fixtures::ScratchArchive;
 
     #[test]
@@ -255,7 +251,7 @@ mod tests {
         // We can re-open it.
         Archive::open(arch_path, &Report::new()).unwrap();
         assert!(arch.list_bands().unwrap().is_empty());
-        assert!(arch.last_complete_band().is_err());
+        assert!(arch.last_complete_band().unwrap().is_none());
     }
 
     /// A new archive contains just one header file.
@@ -273,16 +269,14 @@ mod tests {
         header_file.read_to_string(&mut contents).unwrap();
         assert_eq!(contents, "{\"conserve_archive_version\":\"0.6\"}\n");
 
-        match af.last_band_id().unwrap_err() {
-            Error::ArchiveEmpty => (),
-            ref x => panic!("Unexpected error {:?}", x),
-        }
-
-        match af.last_complete_band().unwrap_err() {
-            Error::NoCompleteBands => (),
-            ref x => panic!("Unexpected error {:?}", x),
-        }
-
+        assert!(
+            af.last_band_id().unwrap().is_none(),
+            "Archive should have no bands yet"
+        );
+        assert!(
+            af.last_complete_band().unwrap().is_none(),
+            "Archive should have no bands yet"
+        );
         assert!(af.referenced_blocks().unwrap().is_empty());
         assert_eq!(af.block_dir.block_names(&af.report).unwrap().count(), 0);
     }
@@ -297,7 +291,7 @@ mod tests {
         assert_eq!(dir_names, &["b0000", "d"]);
 
         assert_eq!(af.list_bands().unwrap(), vec![BandId::new(&[0])]);
-        assert_eq!(af.last_band_id().unwrap(), BandId::new(&[0]));
+        assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[0])));
 
         // Try creating a second band.
         let _band2 = Band::create(&af).unwrap();
@@ -305,7 +299,7 @@ mod tests {
             af.list_bands().unwrap(),
             vec![BandId::new(&[0]), BandId::new(&[1])]
         );
-        assert_eq!(af.last_band_id().unwrap(), BandId::new(&[1]));
+        assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
         assert!(af.referenced_blocks().unwrap().is_empty());
         assert_eq!(af.block_dir.block_names(&af.report).unwrap().count(), 0);
