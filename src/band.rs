@@ -142,8 +142,14 @@ impl Band {
         IndexBuilder::new(&self.index_dir_path)
     }
 
+    /// Get read-only access to the index of this band.
     pub fn index(&self) -> ReadIndex {
         ReadIndex::new(&self.index_dir_path)
+    }
+
+    /// Return an iterator through entries in this band.
+    pub fn iter_entries(&self, excludes: &GlobSet, report: &Report) -> Result<index::Iter> {
+        index::Iter::open(&self.index_dir_path, excludes, report)
     }
 
     fn read_head(&self, report: &Report) -> Result<Head> {

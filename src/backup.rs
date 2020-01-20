@@ -132,8 +132,7 @@ mod tests {
         assert!(band.is_closed().unwrap());
 
         let index_entries = band
-            .index()
-            .iter(&excludes::excludes_nothing(), &report)
+            .iter_entries(&excludes::excludes_nothing(), &report)
             .unwrap()
             .collect::<Vec<Entry>>();
         assert_eq!(2, index_entries.len());

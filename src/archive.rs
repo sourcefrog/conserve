@@ -137,10 +137,7 @@ impl Archive {
         let mut hs = BTreeSet::<String>::new();
         for band_id in self.list_bands()? {
             let band = Band::open(&self, &band_id)?;
-            for ie in band
-                .index()
-                .iter(&excludes::excludes_nothing(), &self.report)?
-            {
+            for ie in band.iter_entries(&excludes::excludes_nothing(), &self.report)? {
                 for a in ie.addrs {
                     hs.insert(a.hash);
                 }

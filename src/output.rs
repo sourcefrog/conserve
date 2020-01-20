@@ -86,8 +86,7 @@ impl<'a> ShowArchive for IndexDump<'a> {
         let report = archive.report();
         let index_entries = self
             .band
-            .index()
-            .iter(&excludes::excludes_nothing(), &report)
+            .iter_entries(&excludes::excludes_nothing(), &report)
             .unwrap()
             .collect::<Vec<Entry>>();
         let output = serde_json::to_string_pretty(&index_entries)
