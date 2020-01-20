@@ -64,12 +64,13 @@ impl DerefMut for AtomicFile {
 }
 
 pub fn ensure_dir_exists(path: &Path) -> std::io::Result<()> {
-    if let Err(e) = fs::create_dir(path) {
-        if e.kind() != io::ErrorKind::AlreadyExists {
-            return Err(e);
+    fs::create_dir(path).or_else(|e| {
+        if e.kind() == io::ErrorKind::AlreadyExists {
+            Ok(())
+        } else {
+            Err(e)
         }
-    }
-    Ok(())
+    })
 }
 
 /// True if path exists and is a file, false if does not exist, error otherwise.
