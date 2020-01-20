@@ -10,7 +10,6 @@ extern crate globset;
 extern crate hex;
 extern crate rayon;
 extern crate serde;
-extern crate serde_derive;
 extern crate serde_json;
 extern crate snafu;
 extern crate snap;
