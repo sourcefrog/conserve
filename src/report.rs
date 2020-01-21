@@ -380,7 +380,7 @@ impl Counts {
              {:>12} MB/s input rate.\n\
              {:>12} MB   after deduplication.\n\
              {:>12} MB   in {} blocks after {:.1}x compression.\n\
-             {:>12} MB   in {} compressed index hunks.\n\
+             {:>12} MB   in {} index hunks after {:.1}x compression.\n\
              {:>12}      elapsed.\n",
             (self.get_size("file.bytes").uncompressed / M).separate_with_commas(),
             self.get_count("file").separate_with_commas(),
@@ -398,6 +398,7 @@ impl Counts {
             compression_ratio(&self.get_size("block")),
             (self.get_size("index").compressed / M).separate_with_commas(),
             self.get_count("index.hunk").separate_with_commas(),
+            compression_ratio(&self.get_size("index")),
             duration_to_hms(self.elapsed_time()),
         )
     }
