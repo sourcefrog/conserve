@@ -34,6 +34,7 @@ static KNOWN_COUNTERS: &[&str] = &[
     "file.empty",
     "file.medium",
     "file.large",
+    "file.unchanged",
     "symlink",
     "backup.error.stat",
     "block.read",
@@ -375,6 +376,7 @@ impl Counts {
         // read and write for incremental indexes.
         format!(
             "{:>12} MB   in {} files, {} directories, {} symlinks.\n\
+             {:>12}      files are unchanged.\n\
              {:>12} MB/s input rate.\n\
              {:>12} MB   after deduplication.\n\
              {:>12} MB   in {} blocks after {:.1}x compression.\n\
@@ -384,6 +386,7 @@ impl Counts {
             self.get_count("file").separate_with_commas(),
             self.get_count("dir").separate_with_commas(),
             self.get_count("symlink").separate_with_commas(),
+            self.get_count("file.unchanged").separate_with_commas(),
             (mbps_rate(
                 self.get_size("file.bytes").uncompressed,
                 self.elapsed_time()

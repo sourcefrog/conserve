@@ -2,23 +2,25 @@
 
 ## UNRELEASED
 
-The archive format has changed to "0.6": install an older Conserve release
-to read from older archives. This format removes the whole-file hash, in favor
-of just per-block hashes. The whole-file hash slows backups and adds little
-protection.
+* Changed to new archive format "0.6", which has common block storage across
+  bands, and removes the whole-file hash in favor of per-block hashes.
 
-* Change from `rustc_serialize` to `serde`.
+  To read from Conserve 0.5 archives, use an old Conserve binary. Until 1.0,
+  support for old formats won't be kept in the head version.
 
-* Very basic `conserve diff` command, which compares a source directory
+* Added incremental backups! If files have the same size and mtime (tracked with
+  integer second accuracy), they aren't read and stored but rather a reference
+  to the previous block is added.
+
+* Added a basic `conserve diff` command, which compares a source directory
   to a stored tree.
 
-* Move to Rust edition 2018.
+* Changed to Rust edition 2018.
 
-* New command `conserve debug index dump`.
+* Added command `conserve debug index dump`.
 
-* Remove `conserve versions --sizes` options, as storage is now shared
-  across bands. The size of one stored tree can be measured with
-  `conserve tree size`.
+* Removed `conserve versions --sizes` options, as storage is now shared across
+  bands. The size of one stored tree can be measured with `conserve tree size`.
 
 ## Conserve 0.5.1 2018-11-11
 

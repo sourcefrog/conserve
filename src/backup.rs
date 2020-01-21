@@ -9,6 +9,7 @@ use snafu::ResultExt;
 
 use super::blockdir::StoreFiles;
 use super::*;
+use crate::index::IndexEntryIter;
 
 /// Accepts files to write in the archive (in apath order.)
 pub struct BackupWriter {
@@ -16,6 +17,11 @@ pub struct BackupWriter {
     index_builder: IndexBuilder,
     report: Report,
     store_files: StoreFiles,
+    block_dir: BlockDir,
+
+    /// The index for the last stored band, used as hints for whether newly
+    /// stored files have changed.
+    basis_index: Option<IndexEntryIter>,
 }
 
 impl BackupWriter {
@@ -23,6 +29,11 @@ impl BackupWriter {
     ///
     /// This currently makes a new top-level band.
     pub fn begin(archive: &Archive) -> Result<BackupWriter> {
+        let basis_index = archive
+            .last_complete_band()?
+            .map(|b| b.iter_entries(&archive.report()))
+            .transpose()?;
+        // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;
         let index_builder = band.index_builder();
         Ok(BackupWriter {
@@ -30,6 +41,8 @@ impl BackupWriter {
             index_builder,
             report: archive.report().clone(),
             store_files: StoreFiles::new(archive.block_dir().clone()),
+            block_dir: archive.block_dir().clone(),
+            basis_index,
         })
     }
 
@@ -62,6 +75,35 @@ impl tree::WriteTree for BackupWriter {
     fn write_file(&mut self, source_entry: &Entry, content: &mut dyn std::io::Read) -> Result<()> {
         self.report.increment("file", 1);
         let apath = source_entry.apath();
+        if let Some(basis_entry) = self
+            .basis_index
+            .as_mut()
+            .map(|bi| bi.advance_to(&apath))
+            .flatten()
+        {
+            if source_entry.is_unchanged_from(&basis_entry) {
+                // TODO: In verbose mode, say if the file is changed, unchanged,
+                // etc.
+                //
+                // self.report.print(&format!("unchanged file {}", apath));
+                if self.block_dir.contains_all_blocks(&basis_entry.addrs) {
+                    self.report.increment("file.unchanged", 1);
+                    self.report.increment_size(
+                        "file.bytes",
+                        Sizes {
+                            uncompressed: source_entry.size().unwrap_or_default(),
+                            compressed: 0,
+                        },
+                    );
+                    return self.push_entry(basis_entry);
+                } else {
+                    // self.report.problem(&format!("Some blocks of basis file {} are missing from the blockdir; writing them again", apath));
+                }
+            } else {
+                self.report.print(&format!("changed file {}", apath));
+            }
+        }
+
         let addrs = self
             .store_files
             .store_file_content(&apath, content, &self.report)?;
@@ -198,5 +240,44 @@ mod tests {
         let mut s = String::new();
         assert_eq!(sf.read_to_string(&mut s).unwrap(), 0);
         assert_eq!(s.len(), 0);
+    }
+
+    #[test]
+    pub fn detect_unchanged() {
+        let af = ScratchArchive::new();
+        let srcdir = TreeFixture::new();
+        srcdir.create_file("aaa");
+        srcdir.create_file("bbb");
+
+        let mut bw = BackupWriter::begin(&af).unwrap();
+        let report = af.report();
+        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+
+        assert_eq!(report.get_count("file"), 2);
+        assert_eq!(report.get_count("file.unchanged"), 0);
+
+        // Make a second backup from the same tree, and we should see that
+        // both files are unchanged.
+        let mut bw = BackupWriter::begin(&af).unwrap();
+        bw.report = Report::new();
+        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+
+        assert_eq!(bw.report.get_count("file"), 2);
+        assert_eq!(bw.report.get_count("file.unchanged"), 2);
+
+        // Change one of the files; we should now see it has changed.
+        //
+        // There is a possibility of a race if the file is changed within the granularity of the mtime, without the size changing.
+        // The proper fix for that is to store a more precise mtime
+        // <https://github.com/sourcefrog/conserve/issues/81>. To avoid
+        // it for now, we'll make sure the length changes.
+        srcdir.create_file_with_contents("bbb", b"longer content for bbb");
+
+        let mut bw = BackupWriter::begin(&af).unwrap();
+        bw.report = Report::new();
+        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+
+        assert_eq!(bw.report.get_count("file"), 2);
+        assert_eq!(bw.report.get_count("file.unchanged"), 1);
     }
 }

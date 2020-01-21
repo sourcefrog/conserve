@@ -77,12 +77,20 @@ impl Entry {
 
     /// Size of the file, if it is a file. None for directories and symlinks.
     pub fn size(&self) -> Option<u64> {
-        if self.size.is_some() {
-            self.size
-        } else if self.addrs.is_empty() {
-            None
-        } else {
-            Some(self.addrs.iter().map(|a| a.len).sum())
-        }
+        // TODO: This is a little gross, because really there are two distinct
+        // cases and we should know in advance which it is: files read from a
+        // live tree should always have the `size` field populated, and files in
+        // a stored tree should always have a list of addrs.
+        self.size
+            .or_else(|| Some(self.addrs.iter().map(|a| a.len).sum()))
+    }
+
+    /// True if the metadata supports an assumption the file contents have
+    /// not changed.
+    pub fn is_unchanged_from(&self, basis_entry: &Entry) -> bool {
+        basis_entry.kind == self.kind
+            && basis_entry.mtime.is_some()
+            && basis_entry.mtime == self.mtime
+            && basis_entry.size() == self.size()
     }
 }
