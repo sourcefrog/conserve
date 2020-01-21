@@ -1,6 +1,6 @@
 # Conserve release history
 
-## UNRELEASED
+## Conserve 0.6.0 2020-01-20
 
 * Changed to new archive format "0.6", which has common block storage across
   bands, and removes the whole-file hash in favor of per-block hashes.
