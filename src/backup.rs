@@ -83,7 +83,7 @@ impl tree::WriteTree for BackupWriter {
         {
             if source_entry.is_unchanged_from(&basis_entry) {
                 // TODO: In verbose mode, say if the file is changed, unchanged,
-                // etc.
+                // etc, but without duplicating the filenames.
                 //
                 // self.report.print(&format!("unchanged file {}", apath));
                 if self.block_dir.contains_all_blocks(&basis_entry.addrs) {
@@ -97,10 +97,11 @@ impl tree::WriteTree for BackupWriter {
                     );
                     return self.push_entry(basis_entry);
                 } else {
-                    // self.report.problem(&format!("Some blocks of basis file {} are missing from the blockdir; writing them again", apath));
+                    self.report.problem(&format!(
+                        "Some blocks of basis file {} are missing from the blockdir; writing them again", apath));
                 }
             } else {
-                self.report.print(&format!("changed file {}", apath));
+                // self.report.print(&format!("changed file {}", apath));
             }
         }
 
