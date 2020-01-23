@@ -138,21 +138,14 @@ still pre-1.0.
 Be aware that Conserve is developed as a (very) part-time non-commercial
 project and there's no guarantee of support.
 
-The format may well change again before 1.0.  To use any archive written by
-Conserve 0.x.y, you need to use Conserve 0.x.  (Previous versions will always
-be available from git or crates.io.)
-
 Some other limitations:
 
-* `conserve validate` [does not yet check every property of the archive][5],
-  however a trial restore from the archive will test everything can be read.
-* The planned feature of resuming an interrupted backup is not implemented:
-  Conserve will just create a new full backup from the beginning.
+* `conserve validate` checks some [but not all possible propertises of the archive][5].
 * `conserve diff` is also not implemented, but can be simulated by restoring to
   a temporary directory and comparing that to the source.
 * [The `conserve purge` command to trim the backup archive is not implemented][43],
   but the `b0123` band directories can be deleted directly.
-* Permissions and ownership are not stored.
+* [Permissions and ownership are not stored](https://github.com/sourcefrog/conserve/issues/46).
 
 Prior to 1.0, data formats may change on each minor version number change (0.x):
 you should restore using the same version that you used to make the backup.
@@ -177,7 +170,7 @@ from both systems.
 
 ## Licence and non-warranty
 
-Copyright 2012-2019 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
+Copyright 2012-2020 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
