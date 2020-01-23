@@ -69,15 +69,17 @@ impl tree::WriteTree for RestoreTree {
         }
     }
 
-    fn write_file(&mut self, entry: &Entry, content: &mut dyn std::io::Read) -> Result<()> {
+    /// Copy in the contents of a file from another tree.
+    fn copy_file<R: ReadTree>(&mut self, source_entry: &Entry, from_tree: &R) -> Result<()> {
         // TODO: Restore permissions.
         // TODO: Reset mtime: can probably use https://docs.rs/utime/0.2.2/utime/
         // TODO: For restore, maybe not necessary to rename into place, and
         // we could just write directly.
         self.report.increment("file", 1);
-        let path = self.entry_path(entry);
+        let path = self.entry_path(source_entry);
         let ctx = || errors::Restore { path: path.clone() };
         let mut af = AtomicFile::new(&path).with_context(ctx)?;
+        let content = &mut from_tree.file_contents(&source_entry)?;
         let bytes = std::io::copy(content, &mut af).with_context(ctx)?;
         self.report.increment_size(
             "file.bytes",

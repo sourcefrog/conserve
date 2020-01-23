@@ -72,7 +72,8 @@ impl tree::WriteTree for BackupWriter {
         })
     }
 
-    fn write_file(&mut self, source_entry: &Entry, content: &mut dyn std::io::Read) -> Result<()> {
+    /// Copy in the contents of a file from another tree.
+    fn copy_file<R: ReadTree>(&mut self, source_entry: &Entry, from_tree: &R) -> Result<()> {
         self.report.increment("file", 1);
         let apath = source_entry.apath();
         if let Some(basis_entry) = self
@@ -104,7 +105,7 @@ impl tree::WriteTree for BackupWriter {
                 // self.report.print(&format!("changed file {}", apath));
             }
         }
-
+        let content = &mut from_tree.file_contents(&source_entry)?;
         let addrs = self
             .store_files
             .store_file_content(&apath, content, &self.report)?;

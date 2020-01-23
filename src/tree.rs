@@ -53,28 +53,9 @@ pub trait WriteTree {
 
     fn write_dir(&mut self, entry: &Entry) -> Result<()>;
     fn write_symlink(&mut self, entry: &Entry) -> Result<()>;
-    fn write_file(&mut self, entry: &Entry, content: &mut dyn std::io::Read) -> Result<()>;
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(&mut self, entry: &Entry, from_tree: &R) -> Result<()> {
-        // TODO(#69): Rather than always writing the content, check if it's changed versus
-        // a reference tree. (Should that be a parameter to this method, or tracked by the
-        // WriteTree?)
-        //
-        // If it has changed, copy the content as usual. If not, tell the WriteTree that
-        // it's unchanged, which can be handled in a tree-specific way. So, this probably
-        // means the WriteTree can pass an object.
-        //
-        // The BackupWriter already is stateful and visits files in order, so perhaps
-        // it's fine to have it internally hold an iterator over the reference tree(s).
-        //
-        // Then, instead of passing back an object saying whether it's new or not, we
-        // could potentially pass in the stat information and give the WriteTree a
-        // chance to mark the file as unchanged. If it is changed, then we need to get
-        // the content from this file (preferably as a `Read`) and store that...
-        let mut content = from_tree.file_contents(&entry)?;
-        self.write_file(entry, &mut content)
-    }
+    fn copy_file<R: ReadTree>(&mut self, entry: &Entry, from_tree: &R) -> Result<()>;
 }
 
 /// Read a file as a series of blocks of bytes.

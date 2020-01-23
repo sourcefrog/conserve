@@ -1,5 +1,10 @@
 # Conserve release history
 
+## UNRELEASED
+
+* Improved performance on backup, by waiting to open source files until
+  after checking their mtime.
+
 ## Conserve 0.6.0 2020-01-20
 
 * Changed to new archive format "0.6", which has common block storage across
