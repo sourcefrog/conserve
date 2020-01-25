@@ -108,7 +108,7 @@ To install from a git checkout, run
 Binaries for some platforms are available from
 <https://github.com/sourcefrog/conserve/releases>.
 
-[rust]: https://rust-lang.org/
+[rust]: https://rustup.rs/
 [sourcefrog]: http://sourcefrog.net/
 
 On nightly Rust only, you can enable a potential speed-up to the blake2 hashes with
