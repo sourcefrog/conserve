@@ -1,9 +1,9 @@
 # Conserve release history
 
-## UNRELEASED
+## Conserve 0.6.1 2020-01-25
 
-* Improved performance on backup, by waiting to open source files until
-  after checking their mtime.
+* Improved performance on incremental backup, by only opening source files if
+  we need to read the contents.
 
 ## Conserve 0.6.0 2020-01-20
 
