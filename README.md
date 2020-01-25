@@ -23,7 +23,8 @@ Conserve's [guiding principles](doc/manifesto.md):
 * **Careful**: Backup data files are never touched or altered after they're
   written, unless you choose to purge them.
 
-* **When you need help now**: Restoring a subset of a large backup is fast.
+* **When you need help now**: Restoring a subset of a large backup is fast,
+  because it doesn't require reading the whole backup.
 
 * **Always making progress**: Even if the backup process or its network
   connection is repeatedly killed, Conserve can quickly pick up
@@ -31,7 +32,13 @@ Conserve's [guiding principles](doc/manifesto.md):
 
 * **Ready for today**: The storage format is fast and reliable on on
   high-latency, limited-capability, unlimited-capacity, eventually-consistent
-  cloud object storage.  Conserve is tested on Windows, Linux (x86 and ARM),
+  cloud object storage.
+
+* **Fast**: Conserve exploits Rust's *fearless concurrency* to make full use
+  of multiple cores and IO bandwidth. (In the current release there's still room
+  to add more concurrency.)
+
+* **Portable**: Conserve is tested on Windows, Linux (x86 and ARM),
   and OS X.
 
 
