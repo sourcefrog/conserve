@@ -61,16 +61,19 @@ impl Entry {
         self.apath.clone()
     }
 
+    #[inline]
     pub fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Return Unix-format mtime if known.
+    #[inline]
     pub fn unix_mtime(&self) -> Option<u64> {
         self.mtime
     }
 
     /// Target of the symlink, if this is a symlink.
+    #[inline]
     pub fn symlink_target(&self) -> &Option<String> {
         &self.target
     }
