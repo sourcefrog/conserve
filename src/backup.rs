@@ -63,7 +63,7 @@ impl tree::WriteTree for BackupWriter {
     fn write_dir(&mut self, source_entry: &Entry) -> Result<()> {
         self.report.increment("dir", 1);
         self.push_entry(Entry {
-            apath: source_entry.apath(),
+            apath: source_entry.apath().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Dir,
             addrs: vec![],
@@ -118,7 +118,7 @@ impl tree::WriteTree for BackupWriter {
             },
         );
         self.push_entry(Entry {
-            apath,
+            apath: apath.clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::File,
             addrs,
@@ -132,7 +132,7 @@ impl tree::WriteTree for BackupWriter {
         let target = source_entry.symlink_target().clone();
         assert!(target.is_some());
         self.push_entry(Entry {
-            apath: source_entry.apath(),
+            apath: source_entry.apath().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Symlink,
             addrs: vec![],

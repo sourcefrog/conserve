@@ -56,9 +56,8 @@ pub struct Entry {
 
 impl Entry {
     /// Return apath relative to the top of the tree.
-    pub fn apath(&self) -> Apath {
-        // TODO: Better to just return a reference with the same lifetime.
-        self.apath.clone()
+    pub fn apath(&self) -> &Apath {
+        &self.apath
     }
 
     #[inline]

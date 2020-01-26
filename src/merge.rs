@@ -81,18 +81,18 @@ where
             } else {
                 let tb = self.nb.take().unwrap();
                 Some(MergedEntry {
-                    apath: tb.apath(),
+                    apath: tb.apath().clone(),
                     kind: RightOnly,
                 })
             }
         } else if self.nb.is_none() {
             Some(MergedEntry {
-                apath: self.na.take().unwrap().apath(),
+                apath: self.na.take().unwrap().apath().clone(),
                 kind: LeftOnly,
             })
         } else {
-            let pa = self.na.as_ref().unwrap().apath();
-            let pb = self.nb.as_ref().unwrap().apath();
+            let pa = self.na.as_ref().unwrap().apath().clone();
+            let pb = self.nb.as_ref().unwrap().apath().clone();
             match pa.cmp(&pb) {
                 Ordering::Equal => {
                     self.na.take();
