@@ -97,27 +97,25 @@ impl StoredTree {
             .unwrap_or(Ok(()))
     }
 
-    fn validate_one_entry(&self, e: &Entry) -> Result<()> {
-        self.report().start_entry(e);
+    fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {
+        self.report().start_entry(e.apath());
         self.open_stored_file(&e)?.validate()
     }
 
     /// Open a file stored within this tree.
-    fn open_stored_file(&self, entry: &Entry) -> Result<StoredFile> {
+    fn open_stored_file(&self, entry: &IndexEntry) -> Result<StoredFile> {
         Ok(StoredFile::open(
             self.archive.block_dir().clone(),
             entry.addrs.clone(),
             self.report(),
         ))
     }
-
-    // TODO: Perhaps add a way to open a file by name, bearing in mind this might be slow to
-    // call if it reads the whole index.
 }
 
 impl ReadTree for StoredTree {
     type I = index::IndexEntryIter;
     type R = ReadStoredFile;
+    type Entry = IndexEntry;
 
     /// Return an iter of index entries in this stored tree.
     fn iter_entries(&self, report: &Report) -> Result<index::IndexEntryIter> {
@@ -127,7 +125,7 @@ impl ReadTree for StoredTree {
             .with_excludes(self.excludes.clone()))
     }
 
-    fn file_contents(&self, entry: &Entry) -> Result<Self::R> {
+    fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R> {
         Ok(self.open_stored_file(entry)?.into_read())
     }
 

@@ -200,12 +200,12 @@ impl Report {
     }
 
     /// Report that processing started for a given entry.
-    pub fn start_entry(&self, entry: &Entry) {
+    pub fn start_entry(&self, apath: &Apath) {
         // TODO: Leave cursor pending at the end of the line until it's finished?
         if self.print_filenames {
-            self.print(&format!("{}", entry.apath()));
+            self.print(&format!("{}", apath));
         }
-        self.mut_counts().latest_filename = entry.apath().to_string();
+        self.mut_counts().latest_filename = apath.to_string();
     }
 
     /// Briefly describe the phase of work.

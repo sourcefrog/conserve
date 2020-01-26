@@ -49,8 +49,8 @@ pub struct MergeTrees<AT: ReadTree, BT: ReadTree> {
     bit: BT::I,
 
     // Read in advance entries from A and B.
-    na: Option<Entry>,
-    nb: Option<Entry>,
+    na: Option<AT::Entry>,
+    nb: Option<BT::Entry>,
 }
 
 impl<AT, BT> Iterator for MergeTrees<AT, BT>

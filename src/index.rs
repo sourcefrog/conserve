@@ -19,6 +19,65 @@ use super::*;
 
 pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
 
+/// Description of one archived file.
+///
+/// This struct is directly encoded/decoded to the json index file, and also can be constructed by
+/// stat-ing (but not reading) a live file.
+#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct IndexEntry {
+    /// Path of this entry relative to the base of the backup, in `apath` form.
+    pub apath: Apath,
+
+    /// Type of file.
+    pub kind: Kind,
+
+    /// File modification time, in whole seconds past the Unix epoch.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mtime: Option<u64>,
+
+    /// For stored files, the blocks holding the file contents.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub addrs: Vec<blockdir::Address>,
+
+    /// For symlinks only, the target of the symlink.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+}
+
+impl Entry for IndexEntry {
+    /// Return apath relative to the top of the tree.
+    fn apath(&self) -> &Apath {
+        &self.apath
+    }
+
+    #[inline]
+    fn kind(&self) -> Kind {
+        self.kind
+    }
+
+    // #[inline]
+    // fn mtime(&self) -> Option<SystemTime> {
+    // }
+
+    fn unix_mtime(&self) -> Option<u64> {
+        self.mtime
+    }
+
+    /// Size of the file, if it is a file. None for directories and symlinks.
+    fn size(&self) -> Option<u64> {
+        Some(self.addrs.iter().map(|a| a.len).sum())
+    }
+
+    /// Target of the symlink, if this is a symlink.
+    #[inline]
+    fn symlink_target(&self) -> &Option<String> {
+        &self.target
+    }
+}
+
 /// Accumulates ordered changes to the index and streams them out to index files.
 #[derive(Debug)]
 pub struct IndexBuilder {
@@ -26,7 +85,7 @@ pub struct IndexBuilder {
     dir: PathBuf,
 
     /// Currently queued entries to be written out.
-    entries: Vec<Entry>,
+    entries: Vec<IndexEntry>,
 
     /// Index hunk number, starting at 0.
     sequence: u32,
@@ -43,7 +102,7 @@ impl IndexBuilder {
     pub fn new(dir: &Path) -> IndexBuilder {
         IndexBuilder {
             dir: dir.to_path_buf(),
-            entries: Vec::<Entry>::with_capacity(MAX_ENTRIES_PER_HUNK),
+            entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
             sequence: 0,
             check_order: apath::CheckOrder::new(),
         }
@@ -52,7 +111,7 @@ impl IndexBuilder {
     /// Append an entry to the index.
     ///
     /// The new entry must sort after everything already written to the index.
-    pub fn push(&mut self, entry: Entry) {
+    pub fn push(&mut self, entry: IndexEntry) {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
         self.check_order.check(&entry.apath);
@@ -158,7 +217,7 @@ pub struct IndexEntryIter {
     dir: PathBuf,
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
-    buffered_entries: Peekable<vec::IntoIter<Entry>>,
+    buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
     next_hunk_number: u32,
     pub report: Report,
     excludes: GlobSet,
@@ -176,9 +235,9 @@ impl fmt::Debug for IndexEntryIter {
 }
 
 impl Iterator for IndexEntryIter {
-    type Item = Entry;
+    type Item = IndexEntry;
 
-    fn next(&mut self) -> Option<Entry> {
+    fn next(&mut self) -> Option<IndexEntry> {
         loop {
             while let Some(entry) = self.buffered_entries.next() {
                 if !self.excludes.is_match(&entry.apath) {
@@ -199,7 +258,7 @@ impl IndexEntryIter {
     pub fn open(index_dir: &Path, report: &Report) -> Result<IndexEntryIter> {
         Ok(IndexEntryIter {
             dir: index_dir.to_path_buf(),
-            buffered_entries: Vec::<Entry>::new().into_iter().peekable(),
+            buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             next_hunk_number: 0,
             report: report.clone(),
             excludes: excludes::excludes_nothing(),
@@ -217,7 +276,7 @@ impl IndexEntryIter {
     /// After this is called, the iter has skipped forward to this apath,
     /// discarding entries for any earlier files. However, even if the apath
     /// is not present, other entries coming after it can still be read.
-    pub fn advance_to(&mut self, apath: &Apath) -> Option<Entry> {
+    pub fn advance_to(&mut self, apath: &Apath) -> Option<IndexEntry> {
         // This takes some care because we don't want to consume the entry
         // that tells us we went too far.
         loop {
@@ -282,7 +341,7 @@ impl IndexEntryIter {
                 compressed: comp_len as u64,
             },
         );
-        let entries: Vec<Entry> = serde_json::from_slice(&index_bytes)
+        let entries: Vec<IndexEntry> = serde_json::from_slice(&index_bytes)
             .with_context(|| errors::DeserializeIndex { path })?;
         if entries.is_empty() {
             self.report
@@ -309,25 +368,23 @@ mod tests {
     }
 
     pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
-        ib.push(Entry {
+        ib.push(IndexEntry {
             apath: apath.into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            size: Some(0),
         });
     }
 
     #[test]
     fn serialize_index() {
-        let entries = [Entry {
+        let entries = [IndexEntry {
             apath: "/a/b".into(),
             mtime: Some(1_461_736_377),
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            size: Some(0),
         }];
         let index_json = serde_json::to_string(&entries).unwrap();
         println!("{}", index_json);
@@ -343,21 +400,19 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_order() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
-        ib.push(Entry {
+        ib.push(IndexEntry {
             apath: "/zzz".into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            size: Some(0),
         });
-        ib.push(Entry {
+        ib.push(IndexEntry {
             apath: "aaa".into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            size: Some(0),
         });
     }
 
@@ -365,13 +420,12 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_names() {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
-        ib.push(Entry {
+        ib.push(IndexEntry {
             apath: "../escapecat".into(),
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            size: Some(0),
         })
     }
 

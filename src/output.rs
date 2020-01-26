@@ -84,7 +84,10 @@ impl<'a> IndexDump<'a> {
 impl<'a> ShowArchive for IndexDump<'a> {
     fn show_archive(&self, archive: &Archive) -> Result<()> {
         let report = archive.report();
-        let index_entries = self.band.iter_entries(&report)?.collect::<Vec<Entry>>();
+        let index_entries = self
+            .band
+            .iter_entries(&report)?
+            .collect::<Vec<IndexEntry>>();
         let output = serde_json::to_string_pretty(&index_entries)
             .context(errors::SerializeIndex { path: "-" })?;
         report.print(&output);

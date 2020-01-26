@@ -47,9 +47,9 @@ impl RestoreTree {
         })
     }
 
-    fn entry_path(&self, entry: &Entry) -> PathBuf {
+    fn rooted_path(&self, apath: &Apath) -> PathBuf {
         // Remove initial slash so that the apath is relative to the destination.
-        self.path.join(&entry.apath()[1..])
+        self.path.join(&apath[1..])
     }
 }
 
@@ -59,9 +59,9 @@ impl tree::WriteTree for RestoreTree {
         Ok(())
     }
 
-    fn write_dir(&mut self, entry: &Entry) -> Result<()> {
+    fn copy_dir<E: Entry>(&mut self, entry: &E) -> Result<()> {
         self.report.increment("dir", 1);
-        let path = self.entry_path(entry);
+        let path = self.rooted_path(entry.apath());
         match fs::create_dir(&path) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
@@ -70,13 +70,13 @@ impl tree::WriteTree for RestoreTree {
     }
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(&mut self, source_entry: &Entry, from_tree: &R) -> Result<()> {
+    fn copy_file<R: ReadTree>(&mut self, source_entry: &R::Entry, from_tree: &R) -> Result<()> {
         // TODO: Restore permissions.
         // TODO: Reset mtime: can probably use https://docs.rs/utime/0.2.2/utime/
         // TODO: For restore, maybe not necessary to rename into place, and
         // we could just write directly.
         self.report.increment("file", 1);
-        let path = self.entry_path(source_entry);
+        let path = self.rooted_path(source_entry.apath());
         let ctx = || errors::Restore { path: path.clone() };
         let mut af = AtomicFile::new(&path).with_context(ctx)?;
         let content = &mut from_tree.file_contents(&source_entry)?;
@@ -92,11 +92,11 @@ impl tree::WriteTree for RestoreTree {
     }
 
     #[cfg(unix)]
-    fn write_symlink(&mut self, entry: &Entry) -> Result<()> {
+    fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()> {
         use std::os::unix::fs as unix_fs;
         self.report.increment("symlink", 1);
         if let Some(ref target) = entry.symlink_target() {
-            let path = self.entry_path(entry);
+            let path = self.rooted_path(entry.apath());
             unix_fs::symlink(target, &path).context(errors::Restore { path })?;
         } else {
             // TODO: Treat as an error.
@@ -107,7 +107,7 @@ impl tree::WriteTree for RestoreTree {
     }
 
     #[cfg(not(unix))]
-    fn write_symlink(&mut self, entry: &Entry) -> Result<()> {
+    fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()> {
         // TODO: Add a test with a canned index containing a symlink, and expect
         // it cannot be restored on Windows and can be on Unix.
         self.report.problem(&format!(

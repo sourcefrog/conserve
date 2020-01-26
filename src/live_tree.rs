@@ -8,6 +8,7 @@ use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use snafu::ResultExt;
 
@@ -45,6 +46,16 @@ impl LiveTree {
     }
 }
 
+/// An in-memory Entry describing a file/dir/symlink in a live tree.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct LiveEntry {
+    apath: Apath,
+    kind: Kind,
+    mtime: Option<SystemTime>,
+    size: Option<u64>,
+    symlink_target: Option<String>,
+}
+
 fn relative_path(root: &PathBuf, apath: &Apath) -> PathBuf {
     let mut path = root.clone();
     path.push(&apath[1..]);
@@ -52,6 +63,7 @@ fn relative_path(root: &PathBuf, apath: &Apath) -> PathBuf {
 }
 
 impl tree::ReadTree for LiveTree {
+    type Entry = LiveEntry;
     type I = Iter;
     type R = std::fs::File;
 
@@ -73,8 +85,12 @@ impl tree::ReadTree for LiveTree {
                 e
             })?;
         // Preload iter to return the root and then recurse into it.
-        let mut entry_deque = VecDeque::<Entry>::new();
-        entry_deque.push_back(entry_from_fs(Apath::from("/"), &root_metadata, None));
+        let mut entry_deque = VecDeque::<LiveEntry>::new();
+        entry_deque.push_back(LiveEntry::from_fs_metadata(
+            Apath::from("/"),
+            &root_metadata,
+            None,
+        ));
         // TODO: Consider the case where the root is not actually a directory?
         // Should that be supported?
         let mut dir_deque = VecDeque::<Apath>::new();
@@ -89,7 +105,7 @@ impl tree::ReadTree for LiveTree {
         })
     }
 
-    fn file_contents(&self, entry: &Entry) -> Result<Self::R> {
+    fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
         assert_eq!(entry.kind(), Kind::File);
         let path = self.relative_path(&entry.apath);
         fs::File::open(&path).context(errors::ReadSourceFile { path })
@@ -120,34 +136,59 @@ impl fmt::Debug for LiveTree {
     }
 }
 
-fn entry_from_fs(apath: Apath, metadata: &fs::Metadata, target: Option<String>) -> Entry {
-    // TODO: This should either do no IO, or all the IO.
-    let kind = if metadata.is_file() {
-        Kind::File
-    } else if metadata.is_dir() {
-        Kind::Dir
-    } else if metadata.file_type().is_symlink() {
-        Kind::Symlink
-    } else {
-        Kind::Unknown
-    };
-    let mtime = metadata
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|dur| dur.as_secs());
-    let size = if metadata.is_file() {
-        Some(metadata.len())
-    } else {
-        None
-    };
-    Entry {
-        apath,
-        kind,
-        mtime,
-        target,
-        size,
-        addrs: vec![],
+impl Entry for LiveEntry {
+    fn apath(&self) -> &Apath {
+        &self.apath
+    }
+
+    fn kind(&self) -> Kind {
+        self.kind
+    }
+
+    fn unix_mtime(&self) -> Option<u64> {
+        self.mtime
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|dur| dur.as_secs())
+    }
+
+    fn size(&self) -> Option<u64> {
+        self.size
+    }
+
+    fn symlink_target(&self) -> &Option<String> {
+        &self.symlink_target
+    }
+}
+
+impl LiveEntry {
+    fn from_fs_metadata(
+        apath: Apath,
+        metadata: &fs::Metadata,
+        symlink_target: Option<String>,
+    ) -> LiveEntry {
+        // TODO: Could we read the symlink target here, rather than in the caller?
+        let kind = if metadata.is_file() {
+            Kind::File
+        } else if metadata.is_dir() {
+            Kind::Dir
+        } else if metadata.file_type().is_symlink() {
+            Kind::Symlink
+        } else {
+            Kind::Unknown
+        };
+        let mtime = metadata.modified().ok();
+        let size = if metadata.is_file() {
+            Some(metadata.len())
+        } else {
+            None
+        };
+        LiveEntry {
+            apath,
+            kind,
+            mtime,
+            symlink_target,
+            size,
+        }
     }
 }
 
@@ -162,7 +203,7 @@ pub struct Iter {
 
     /// All entries that have been seen but not yet returned by the iterator, in the order they
     /// should be returned.
-    entry_deque: VecDeque<Entry>,
+    entry_deque: VecDeque<LiveEntry>,
 
     /// Count of directories and files visited by this iterator.
     report: Report,
@@ -183,7 +224,7 @@ impl Iter {
         // TODO: Rather than mutating self, return new vectors to append, so that
         // this function isn't too big?
         self.report.increment("source.visited.directories", 1);
-        let mut children = Vec::<Entry>::new();
+        let mut children = Vec::<LiveEntry>::new();
         let mut child_dirs = Vec::<Apath>::new();
         let dir_path = relative_path(&self.root_path, parent_apath);
         let dir_iter = match fs::read_dir(&dir_path).with_context(|| errors::ListSourceTree {
@@ -271,6 +312,8 @@ impl Iter {
                 }
             };
 
+            // TODO: Move this into LiveEntry::from_fs_metadata, once there's a
+            // global way for it to complain about errors.
             let target: Option<String> = if ft.is_symlink() {
                 let t = match dir_path.join(dir_entry.file_name()).read_link() {
                     Ok(t) => t,
@@ -300,7 +343,7 @@ impl Iter {
             if ft.is_dir() {
                 child_dirs.push(child_apath.clone());
             }
-            children.push(entry_from_fs(child_apath, &metadata, target));
+            children.push(LiveEntry::from_fs_metadata(child_apath, &metadata, target));
         }
 
         // Names might come back from the fs in arbitrary order, but sort them by apath
@@ -333,9 +376,9 @@ impl Iter {
 // subdirectories are then visited, also in sorted order, before returning to
 // any higher-level directories.
 impl Iterator for Iter {
-    type Item = Entry;
+    type Item = LiveEntry;
 
-    fn next(&mut self) -> Option<Entry> {
+    fn next(&mut self) -> Option<LiveEntry> {
         loop {
             if let Some(entry) = self.entry_deque.pop_front() {
                 // Have already found some entries, so just return the first.
@@ -395,7 +438,7 @@ mod tests {
         assert_eq!(result.len(), 7);
 
         let repr = format!("{:?}", &result[6]);
-        let re = Regex::new(r#"Entry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: Some\(\d+\), addrs: \[\], target: None, size: Some\(8\) \}"#).unwrap();
+        let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: Some\(SystemTime[^)]*\), size: Some\(8\), symlink_target: None \}"#).unwrap();
         assert!(re.is_match(&repr), repr);
 
         assert_eq!(report.get_count("source.visited.directories"), 4);
@@ -427,10 +470,6 @@ mod tests {
         assert_eq!(&result[1].apath, "/baz");
         assert_eq!(&result[2].apath, "/baz/test");
         assert_eq!(result.len(), 3);
-
-        let repr = format!("{:?}", &result[2]);
-        let re = Regex::new(r#"Entry \{ apath: Apath\("/baz/test"\), kind: File, mtime: Some\(\d+\), addrs: \[\], target: None, size: Some\(8\) \}"#).unwrap();
-        assert!(re.is_match(&repr), repr);
 
         assert_eq!(
             2,

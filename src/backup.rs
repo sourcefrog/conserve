@@ -46,7 +46,7 @@ impl BackupWriter {
         })
     }
 
-    fn push_entry(&mut self, index_entry: Entry) -> Result<()> {
+    fn push_entry(&mut self, index_entry: IndexEntry) -> Result<()> {
         self.index_builder.push(index_entry);
         self.index_builder.maybe_flush(&self.report)?;
         Ok(())
@@ -60,20 +60,19 @@ impl tree::WriteTree for BackupWriter {
         Ok(())
     }
 
-    fn write_dir(&mut self, source_entry: &Entry) -> Result<()> {
+    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         self.report.increment("dir", 1);
-        self.push_entry(Entry {
+        self.push_entry(IndexEntry {
             apath: source_entry.apath().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Dir,
             addrs: vec![],
             target: None,
-            size: None,
         })
     }
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(&mut self, source_entry: &Entry, from_tree: &R) -> Result<()> {
+    fn copy_file<R: ReadTree>(&mut self, source_entry: &R::Entry, from_tree: &R) -> Result<()> {
         self.report.increment("file", 1);
         let apath = source_entry.apath();
         if let Some(basis_entry) = self
@@ -117,27 +116,25 @@ impl tree::WriteTree for BackupWriter {
                 compressed: 0,
             },
         );
-        self.push_entry(Entry {
+        self.push_entry(IndexEntry {
             apath: apath.clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::File,
             addrs,
             target: None,
-            size: Some(size),
         })
     }
 
-    fn write_symlink(&mut self, source_entry: &Entry) -> Result<()> {
+    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         self.report.increment("symlink", 1);
         let target = source_entry.symlink_target().clone();
         assert!(target.is_some());
-        self.push_entry(Entry {
+        self.push_entry(IndexEntry {
             apath: source_entry.apath().clone(),
             mtime: source_entry.unix_mtime(),
             kind: Kind::Symlink,
             addrs: vec![],
             target,
-            size: None,
         })
     }
 }
@@ -175,7 +172,10 @@ mod tests {
         let band = Band::open(&af, &band_ids[0]).unwrap();
         assert!(band.is_closed().unwrap());
 
-        let index_entries = band.iter_entries(&report).unwrap().collect::<Vec<Entry>>();
+        let index_entries = band
+            .iter_entries(&report)
+            .unwrap()
+            .collect::<Vec<IndexEntry>>();
         assert_eq!(2, index_entries.len());
 
         let e2 = &index_entries[1];

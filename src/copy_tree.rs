@@ -28,11 +28,11 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
     }
     report.set_phase("Copying");
     for entry in source.iter_entries(&report)? {
-        report.start_entry(&entry);
+        report.start_entry(entry.apath());
         if let Err(e) = match entry.kind() {
-            Kind::Dir => dest.write_dir(&entry),
+            Kind::Dir => dest.copy_dir(&entry),
             Kind::File => dest.copy_file(&entry, source),
-            Kind::Symlink => dest.write_symlink(&entry),
+            Kind::Symlink => dest.copy_symlink(&entry),
             Kind::Unknown => {
                 // TODO: Perhaps eventually we could backup and restore pipes,
                 // sockets, etc. Or at least count them. For now, silently skip.

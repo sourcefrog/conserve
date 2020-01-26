@@ -9,7 +9,8 @@ use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
 pub trait ReadTree: HasReport {
-    type I: Iterator<Item = Entry>;
+    type Entry: Entry;
+    type I: Iterator<Item = Self::Entry>;
     type R: std::io::Read;
 
     /// Iterate, in apath order, all the entries in this tree.
@@ -20,7 +21,7 @@ pub trait ReadTree: HasReport {
     fn iter_entries(&self, report: &Report) -> Result<Self::I>;
 
     /// Read file contents as a `std::io::Read`.
-    fn file_contents(&self, entry: &Entry) -> Result<Self::R>;
+    fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R>;
 
     /// Estimate the number of entries in the tree.
     /// This might do somewhat expensive IO, so isn't the Iter's `size_hint`.
@@ -51,11 +52,14 @@ pub trait ReadTree: HasReport {
 pub trait WriteTree {
     fn finish(&mut self) -> Result<()>;
 
-    fn write_dir(&mut self, entry: &Entry) -> Result<()>;
-    fn write_symlink(&mut self, entry: &Entry) -> Result<()>;
+    /// Copy a directory entry from a source tree to this tree.
+    fn copy_dir<E: Entry>(&mut self, entry: &E) -> Result<()>;
+
+    /// Copy a symlink entry from a source tree to this tree.
+    fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()>;
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(&mut self, entry: &Entry, from_tree: &R) -> Result<()>;
+    fn copy_file<R: ReadTree>(&mut self, entry: &R::Entry, from_tree: &R) -> Result<()>;
 }
 
 /// Read a file as a series of blocks of bytes.
