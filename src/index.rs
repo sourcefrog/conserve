@@ -34,9 +34,7 @@ pub struct IndexEntry {
 
     /// File modification time, in whole seconds past the Unix epoch.
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    // TODO: Perhaps this should not be optional?
-    pub mtime: Option<u64>,
+    pub mtime: u64,
 
     /// Fractional nanoseconds for modification time.
     ///
@@ -79,9 +77,8 @@ impl Entry for IndexEntry {
     }
 
     #[inline]
-    fn mtime(&self) -> Option<SystemTime> {
-        self.mtime
-            .map(|secs| UNIX_EPOCH + Duration::new(secs, self.mtime_nanos))
+    fn mtime(&self) -> SystemTime {
+        UNIX_EPOCH + Duration::new(self.mtime, self.mtime_nanos)
     }
 
     /// Size of the file, if it is a file. None for directories and symlinks.
@@ -99,9 +96,10 @@ impl Entry for IndexEntry {
 impl IndexEntry {
     /// Copy the metadata, but not the body content, from another entry.
     pub(crate) fn metadata_from<E: Entry>(source: &E) -> IndexEntry {
-        let mtime_unix: Option<Duration> = source
+        let mtime_unix: Duration = source
             .mtime()
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok());
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to convert to unix time");
         assert_eq!(
             source.symlink_target().is_some(),
             source.kind() == Kind::Symlink
@@ -111,8 +109,8 @@ impl IndexEntry {
             kind: source.kind(),
             addrs: Vec::new(),
             target: source.symlink_target().clone(),
-            mtime: mtime_unix.map(|d| d.as_secs()),
-            mtime_nanos: mtime_unix.map(|d| d.subsec_nanos()).unwrap_or_default(),
+            mtime: mtime_unix.as_secs(),
+            mtime_nanos: mtime_unix.subsec_nanos(),
         }
     }
 }
@@ -409,7 +407,7 @@ mod tests {
     pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
         ib.push(IndexEntry {
             apath: apath.into(),
-            mtime: None,
+            mtime: 1_461_736_377,
             mtime_nanos: 0,
             kind: Kind::File,
             addrs: vec![],
@@ -421,7 +419,7 @@ mod tests {
     fn serialize_index() {
         let entries = [IndexEntry {
             apath: "/a/b".into(),
-            mtime: Some(1_461_736_377),
+            mtime: 1_461_736_377,
             mtime_nanos: 0,
             kind: Kind::File,
             addrs: vec![],
@@ -433,7 +431,7 @@ mod tests {
             index_json,
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
-             \"mtime\":1461736377,\"mtime_nanos\":0}]"
+             \"mtime\":1461736377}]"
         );
     }
 
@@ -443,7 +441,7 @@ mod tests {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
             apath: "/zzz".into(),
-            mtime: None,
+            mtime: 1_461_736_377,
             mtime_nanos: 0,
 
             kind: Kind::File,
@@ -452,7 +450,7 @@ mod tests {
         });
         ib.push(IndexEntry {
             apath: "aaa".into(),
-            mtime: None,
+            mtime: 1_461_736_377,
             mtime_nanos: 0,
             kind: Kind::File,
             addrs: vec![],
@@ -466,7 +464,7 @@ mod tests {
         let (_testdir, mut ib, _report) = scratch_indexbuilder();
         ib.push(IndexEntry {
             apath: "../escapecat".into(),
-            mtime: None,
+            mtime: 1_461_736_377,
             kind: Kind::File,
             addrs: vec![],
             mtime_nanos: 0,

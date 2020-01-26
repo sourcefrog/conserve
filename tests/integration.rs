@@ -69,12 +69,12 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     let root_entry = &index_entries[0];
     assert_eq!("/", root_entry.apath.to_string());
     assert_eq!(Kind::Dir, root_entry.kind);
-    assert!(root_entry.mtime.unwrap() > 0);
+    assert!(root_entry.mtime > 0);
 
     let file_entry = &index_entries[1];
     assert_eq!("/hello", file_entry.apath.to_string());
     assert_eq!(Kind::File, file_entry.kind);
-    assert!(file_entry.mtime.unwrap() > 0);
+    assert!(file_entry.mtime > 0);
 
     assert_eq!(
         af.referenced_blocks()
@@ -108,9 +108,9 @@ fn check_restore(af: &ScratchArchive) {
         format!("{:?}", block_sizes)
     );
     let index_sizes = restore_report.get_size("index");
-    // Doubled because we currently read the index twice.
-    assert_eq!(
-        index_sizes.uncompressed, 315,
+    // Can vary a bit depending on the lengths of the timestamps.
+    assert!(
+        index_sizes.uncompressed <= 320,
         "index_sizes.uncompressed on restore"
     );
     assert!(index_sizes.compressed <= 315);

@@ -51,7 +51,7 @@ impl LiveTree {
 pub struct LiveEntry {
     apath: Apath,
     kind: Kind,
-    mtime: Option<SystemTime>,
+    mtime: SystemTime,
     size: Option<u64>,
     symlink_target: Option<String>,
 }
@@ -145,7 +145,7 @@ impl Entry for LiveEntry {
         self.kind
     }
 
-    fn mtime(&self) -> Option<SystemTime> {
+    fn mtime(&self) -> SystemTime {
         self.mtime
     }
 
@@ -174,7 +174,7 @@ impl LiveEntry {
         } else {
             Kind::Unknown
         };
-        let mtime = metadata.modified().ok();
+        let mtime = metadata.modified().expect("Failed to get file mtime");
         let size = if metadata.is_file() {
             Some(metadata.len())
         } else {
@@ -436,7 +436,7 @@ mod tests {
         assert_eq!(result.len(), 7);
 
         let repr = format!("{:?}", &result[6]);
-        let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: Some\(SystemTime[^)]*\), size: Some\(8\), symlink_target: None \}"#).unwrap();
+        let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: SystemTime \{ [^)]* \}, size: Some\(8\), symlink_target: None \}"#).unwrap();
         assert!(re.is_match(&repr), repr);
 
         assert_eq!(report.get_count("source.visited.directories"), 4);
