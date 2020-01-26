@@ -9,6 +9,7 @@ use std::fs;
 use std::io;
 use std::iter::Peekable;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, UNIX_EPOCH};
 use std::vec;
 
 use globset::GlobSet;
@@ -75,6 +76,22 @@ impl Entry for IndexEntry {
     #[inline]
     fn symlink_target(&self) -> &Option<String> {
         &self.target
+    }
+}
+
+impl IndexEntry {
+    /// Copy the metadata, but not the body content, from another entry.
+    pub(crate) fn metadata_from<E: Entry>(le: &E) -> IndexEntry {
+        // let mtime_dur: Option<Duration> =
+        //     le.mtime().and_then(|t| t.duration_since(UNIX_EPOCH).ok());
+        IndexEntry {
+            apath: le.apath().clone(),
+            kind: le.kind(),
+            addrs: Vec::new(),
+            target: le.symlink_target().clone(),
+            mtime: le.unix_mtime(),
+            // mtime_dur.map(|d| d.as_secs()),
+        }
     }
 }
 

@@ -62,13 +62,7 @@ impl tree::WriteTree for BackupWriter {
 
     fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         self.report.increment("dir", 1);
-        self.push_entry(IndexEntry {
-            apath: source_entry.apath().clone(),
-            mtime: source_entry.unix_mtime(),
-            kind: Kind::Dir,
-            addrs: vec![],
-            target: None,
-        })
+        self.push_entry(IndexEntry::metadata_from(source_entry))
     }
 
     /// Copy in the contents of a file from another tree.
@@ -117,11 +111,8 @@ impl tree::WriteTree for BackupWriter {
             },
         );
         self.push_entry(IndexEntry {
-            apath: apath.clone(),
-            mtime: source_entry.unix_mtime(),
-            kind: Kind::File,
             addrs,
-            target: None,
+            ..IndexEntry::metadata_from(source_entry)
         })
     }
 
@@ -129,13 +120,7 @@ impl tree::WriteTree for BackupWriter {
         self.report.increment("symlink", 1);
         let target = source_entry.symlink_target().clone();
         assert!(target.is_some());
-        self.push_entry(IndexEntry {
-            apath: source_entry.apath().clone(),
-            mtime: source_entry.unix_mtime(),
-            kind: Kind::Symlink,
-            addrs: vec![],
-            target,
-        })
+        self.push_entry(IndexEntry::metadata_from(source_entry))
     }
 }
 
