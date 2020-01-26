@@ -25,8 +25,7 @@ pub enum Kind {
 pub trait Entry: Debug + Eq + PartialEq {
     fn apath(&self) -> &Apath;
     fn kind(&self) -> Kind;
-    // fn mtime(&self) -> Option<SystemTime>;
-    fn unix_mtime(&self) -> Option<u64>;
+    fn mtime(&self) -> Option<SystemTime>;
     fn size(&self) -> Option<u64>;
     fn symlink_target(&self) -> &Option<String>;
 
@@ -34,8 +33,8 @@ pub trait Entry: Debug + Eq + PartialEq {
     /// not changed.
     fn is_unchanged_from<O: Entry>(&self, basis_entry: &O) -> bool {
         basis_entry.kind() == self.kind()
-            && basis_entry.unix_mtime().is_some()
-            && basis_entry.unix_mtime() == self.unix_mtime()
+            && basis_entry.mtime().is_some()
+            && basis_entry.mtime() == self.mtime()
             && basis_entry.size() == self.size()
     }
 }

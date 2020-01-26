@@ -1,5 +1,11 @@
 # Conserve release history
 
+## UNRELEASED
+
+* Added nanosecond precision to stored mtimes. The main benefit of this is
+  more-precise detection of files that changed less than a second after
+  the previous backup.
+
 ## Conserve 0.6.1 2020-01-25
 
 * Improved performance on incremental backup, by only opening source files if

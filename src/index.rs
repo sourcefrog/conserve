@@ -9,7 +9,7 @@ use std::fs;
 use std::io;
 use std::iter::Peekable;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::vec;
 
 use globset::GlobSet;
@@ -35,7 +35,21 @@ pub struct IndexEntry {
     /// File modification time, in whole seconds past the Unix epoch.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
+    // TODO: Perhaps this should not be optional?
     pub mtime: Option<u64>,
+
+    /// Fractional nanoseconds for modification time.
+    ///
+    /// This is zero in indexes written prior to 0.6.2, but treating it as
+    /// zero is harmless - around the transition files will be seen as
+    /// potentially touched.
+    ///
+    /// It seems moderately common that the nanos are zero, probably because
+    /// the time was set by something that didn't preserve them. In that case,
+    /// skip serializing.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_zero")]
+    pub mtime_nanos: u32,
 
     /// For stored files, the blocks holding the file contents.
     #[serde(default)]
@@ -46,6 +60,11 @@ pub struct IndexEntry {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero(a: &u32) -> bool {
+    *a == 0
 }
 
 impl Entry for IndexEntry {
@@ -59,12 +78,10 @@ impl Entry for IndexEntry {
         self.kind
     }
 
-    // #[inline]
-    // fn mtime(&self) -> Option<SystemTime> {
-    // }
-
-    fn unix_mtime(&self) -> Option<u64> {
+    #[inline]
+    fn mtime(&self) -> Option<SystemTime> {
         self.mtime
+            .map(|secs| UNIX_EPOCH + Duration::new(secs, self.mtime_nanos))
     }
 
     /// Size of the file, if it is a file. None for directories and symlinks.
@@ -81,16 +98,21 @@ impl Entry for IndexEntry {
 
 impl IndexEntry {
     /// Copy the metadata, but not the body content, from another entry.
-    pub(crate) fn metadata_from<E: Entry>(le: &E) -> IndexEntry {
-        // let mtime_dur: Option<Duration> =
-        //     le.mtime().and_then(|t| t.duration_since(UNIX_EPOCH).ok());
+    pub(crate) fn metadata_from<E: Entry>(source: &E) -> IndexEntry {
+        let mtime_unix: Option<Duration> = source
+            .mtime()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok());
+        assert_eq!(
+            source.symlink_target().is_some(),
+            source.kind() == Kind::Symlink
+        );
         IndexEntry {
-            apath: le.apath().clone(),
-            kind: le.kind(),
+            apath: source.apath().clone(),
+            kind: source.kind(),
             addrs: Vec::new(),
-            target: le.symlink_target().clone(),
-            mtime: le.unix_mtime(),
-            // mtime_dur.map(|d| d.as_secs()),
+            target: source.symlink_target().clone(),
+            mtime: mtime_unix.map(|d| d.as_secs()),
+            mtime_nanos: mtime_unix.map(|d| d.subsec_nanos()).unwrap_or_default(),
         }
     }
 }
@@ -388,6 +410,7 @@ mod tests {
         ib.push(IndexEntry {
             apath: apath.into(),
             mtime: None,
+            mtime_nanos: 0,
             kind: Kind::File,
             addrs: vec![],
             target: None,
@@ -399,6 +422,7 @@ mod tests {
         let entries = [IndexEntry {
             apath: "/a/b".into(),
             mtime: Some(1_461_736_377),
+            mtime_nanos: 0,
             kind: Kind::File,
             addrs: vec![],
             target: None,
@@ -409,7 +433,7 @@ mod tests {
             index_json,
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
-             \"mtime\":1461736377}]"
+             \"mtime\":1461736377,\"mtime_nanos\":0}]"
         );
     }
 
@@ -420,6 +444,8 @@ mod tests {
         ib.push(IndexEntry {
             apath: "/zzz".into(),
             mtime: None,
+            mtime_nanos: 0,
+
             kind: Kind::File,
             addrs: vec![],
             target: None,
@@ -427,6 +453,7 @@ mod tests {
         ib.push(IndexEntry {
             apath: "aaa".into(),
             mtime: None,
+            mtime_nanos: 0,
             kind: Kind::File,
             addrs: vec![],
             target: None,
@@ -442,6 +469,7 @@ mod tests {
             mtime: None,
             kind: Kind::File,
             addrs: vec![],
+            mtime_nanos: 0,
             target: None,
         })
     }
@@ -464,9 +492,6 @@ mod tests {
 
     #[test]
     fn basic() {
-        use std::fs;
-        use std::str;
-
         let (_testdir, mut ib, report) = scratch_indexbuilder();
         add_an_entry(&mut ib, "/apple");
         add_an_entry(&mut ib, "/banana");
@@ -476,18 +501,6 @@ mod tests {
         let mut expected_path = ib.dir.to_path_buf();
         expected_path.push("00000");
         expected_path.push("000000000");
-
-        // Check the stored json version
-        let mut f = fs::File::open(&expected_path).unwrap();
-        let (_comp_len, retrieved_bytes) = Snappy::decompress_read(&mut f).unwrap();
-        let retrieved = str::from_utf8(&retrieved_bytes).unwrap();
-        assert_eq!(
-            retrieved,
-            "[{\"apath\":\"/apple\",\
-             \"kind\":\"File\"},\
-             {\"apath\":\"/banana\",\
-             \"kind\":\"File\"}]"
-        );
 
         let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
         let entry = it.next().expect("Get first entry");

@@ -8,7 +8,7 @@ use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 use snafu::ResultExt;
 
@@ -145,10 +145,8 @@ impl Entry for LiveEntry {
         self.kind
     }
 
-    fn unix_mtime(&self) -> Option<u64> {
+    fn mtime(&self) -> Option<SystemTime> {
         self.mtime
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|dur| dur.as_secs())
     }
 
     fn size(&self) -> Option<u64> {
