@@ -1,20 +1,13 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Command-line entry point for Conserve backups.
 
 use std::path::Path;
 
-extern crate clap;
-
-extern crate chrono;
-extern crate globset;
-extern crate thousands;
-
 use clap::{crate_authors, App, AppSettings, Arg, ArgMatches, SubCommand};
 use thousands::Separable;
 
-extern crate conserve;
 use conserve::*;
 
 use conserve::Result;
@@ -348,8 +341,7 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
     if subm.is_present("short") {
         output::ShortVersionList::default().show_archive(&archive)
     } else {
-        output::VerboseVersionList::default()
-            .show_archive(&archive)
+        output::VerboseVersionList::default().show_archive(&archive)
     }
 }
 

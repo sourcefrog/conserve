@@ -1,10 +1,6 @@
 // Copyright 2015, 2016, 2017, 2019, 2020 Martin Pool.
 
 /// Test Conserve through its public API.
-extern crate conserve;
-
-extern crate tempfile;
-
 use std::fs::File;
 use std::io::prelude::*;
 

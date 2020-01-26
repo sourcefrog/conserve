@@ -2,25 +2,6 @@
 
 //! Conserve backup system.
 
-extern crate atty;
-extern crate blake2_rfc;
-extern crate chrono;
-extern crate crossterm;
-extern crate globset;
-extern crate hex;
-extern crate rayon;
-extern crate serde;
-extern crate serde_json;
-extern crate snafu;
-extern crate snap;
-extern crate tempfile;
-extern crate thousands;
-extern crate unicode_segmentation;
-extern crate walkdir;
-
-#[cfg(test)]
-extern crate spectral;
-
 // Conserve implementation modules.
 mod apath;
 mod archive;

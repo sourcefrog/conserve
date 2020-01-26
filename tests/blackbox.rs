@@ -3,13 +3,6 @@
 
 //! Run conserve CLI as a subprocess and test it.
 
-extern crate assert_cmd;
-extern crate assert_fs;
-extern crate escargot;
-extern crate lazy_static;
-extern crate predicates;
-extern crate tempfile;
-
 use std::process::Command;
 
 use assert_cmd::prelude::*;
@@ -22,7 +15,6 @@ use predicates::prelude::*;
 use crate::predicate::path::{is_dir, is_file};
 use crate::predicate::str::{contains, is_empty, is_match, starts_with};
 
-extern crate conserve;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
 lazy_static! {
