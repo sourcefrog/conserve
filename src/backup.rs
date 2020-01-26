@@ -262,18 +262,36 @@ mod tests {
 
         assert_eq!(bw.report.get_count("file"), 2);
         assert_eq!(bw.report.get_count("file.unchanged"), 1);
+    }
 
-        // Sleep a little while, so that even on systems with less than
-        // nanosecond filesystem time resolution we can still see this is later.
-        std::thread::sleep(std::time::Duration::from_millis(200));
+    #[test]
+    pub fn detect_minimal_mtime_change() {
+        let af = ScratchArchive::new();
+        let srcdir = TreeFixture::new();
+        srcdir.create_file("aaa");
+        srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
-        // Change one of the files, keeping the same length, and in a new
-        // backup it should still be recognized as unchanged, because we
-        // store nanosecond timestamps.
-        //
-        // This test may fail if run on a filesystem that doesn't have ns
-        // timestamps.
-        srcdir.create_file_with_contents("bbb", b"woofer content for bbb");
+        let mut bw = BackupWriter::begin(&af).unwrap();
+        let report = af.report();
+        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+
+        assert_eq!(report.get_count("file"), 2);
+        assert_eq!(report.get_count("file.unchanged"), 0);
+
+        // Spin until the file's mtime is visibly different to what it was before.
+        let bpath = srcdir.path().join("bbb");
+        let orig_mtime = std::fs::metadata(&bpath).unwrap().modified().unwrap();
+        loop {
+            // Sleep a little while, so that even on systems with less than
+            // nanosecond filesystem time resolution we can still see this is later.
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            // Change one of the files, keeping the same length. If the mtime
+            // changed, even fractionally, we should see the file was changed.
+            srcdir.create_file_with_contents("bbb", b"woofer content for bbb");
+            if std::fs::metadata(&bpath).unwrap().modified().unwrap() != orig_mtime {
+                break;
+            }
+        }
 
         let mut bw = BackupWriter::begin(&af).unwrap();
         bw.report = Report::new();
