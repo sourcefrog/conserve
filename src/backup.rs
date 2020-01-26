@@ -263,6 +263,10 @@ mod tests {
         assert_eq!(bw.report.get_count("file"), 2);
         assert_eq!(bw.report.get_count("file.unchanged"), 1);
 
+        // Sleep a little while, so that even on systems with less than
+        // nanosecond filesystem time resolution we can still see this is later.
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
         // Change one of the files, keeping the same length, and in a new
         // backup it should still be recognized as unchanged, because we
         // store nanosecond timestamps.
