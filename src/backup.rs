@@ -252,13 +252,24 @@ mod tests {
         assert_eq!(bw.report.get_count("file"), 2);
         assert_eq!(bw.report.get_count("file.unchanged"), 2);
 
-        // Change one of the files; we should now see it has changed.
-        //
-        // There is a possibility of a race if the file is changed within the granularity of the mtime, without the size changing.
-        // The proper fix for that is to store a more precise mtime
-        // <https://github.com/sourcefrog/conserve/issues/81>. To avoid
-        // it for now, we'll make sure the length changes.
+        // Change one of the files, and in a new backup it should be recognized
+        // as unchanged.
         srcdir.create_file_with_contents("bbb", b"longer content for bbb");
+
+        let mut bw = BackupWriter::begin(&af).unwrap();
+        bw.report = Report::new();
+        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+
+        assert_eq!(bw.report.get_count("file"), 2);
+        assert_eq!(bw.report.get_count("file.unchanged"), 1);
+
+        // Change one of the files, keeping the same length, and in a new
+        // backup it should still be recognized as unchanged, because we
+        // store nanosecond timestamps.
+        //
+        // This test may fail if run on a filesystem that doesn't have ns
+        // timestamps.
+        srcdir.create_file_with_contents("bbb", b"woofer content for bbb");
 
         let mut bw = BackupWriter::begin(&af).unwrap();
         bw.report = Report::new();
