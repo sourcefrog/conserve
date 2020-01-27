@@ -405,14 +405,14 @@ impl Counts {
 
     pub fn summary_for_validate(&self) -> String {
         format!(
-            "{:>12} MB in {} blocks.\n\
+            "{:>12} MB   in {} blocks.\n\
              {:>12} MB/s block validation rate.\n\
-             {:>12} s elapsed.\n",
+             {:>12}      elapsed.\n",
             (self.get_size("block").uncompressed / M).separate_with_commas(),
             self.get_count("block.read").separate_with_commas(),
             (mbps_rate(self.get_size("block").uncompressed, self.elapsed_time()) as u64)
                 .separate_with_commas(),
-            self.elapsed_time().as_secs(),
+            duration_to_hms(self.elapsed_time()),
         )
     }
 }
