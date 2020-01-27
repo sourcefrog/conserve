@@ -129,27 +129,31 @@ impl Ord for Apath {
         let mut oa = ait.next().expect("paths must not be empty");
         let mut ob = bit.next().expect("paths must not be empty");
         loop {
-            return match (ait.next(), bit.next(), oa.cmp(ob)) {
+            match (ait.next(), bit.next()) {
                 // Both paths end here: eg ".../aa" < ".../zz"
-                (None, None, cmp) => cmp,
+                (None, None) => return oa.cmp(ob),
 
                 // If one is a direct child and the other is in a subdirectory,
                 // the direct child comes first.
                 // eg ".../zz" < ".../aa/bb"
-                (None, Some(_bc), _) => return Ordering::Less,
-                (Some(_ac), None, _) => return Ordering::Greater,
+                (None, Some(_bc)) => return Ordering::Less,
+                (Some(_ac), None) => return Ordering::Greater,
 
-                // If parents are the same and both have children keep looking.
-                (Some(ac), Some(bc), Ordering::Equal) => {
-                    oa = ac;
-                    ob = bc;
-                    continue;
-                }
-
-                // Both paths have children but they differ at this point.
-                (Some(_), Some(_), o @ Ordering::Less) => o,
-                (Some(_), Some(_), o @ Ordering::Greater) => o,
-            };
+                // Both paths have children after this point
+                (Some(ac), Some(bc)) => match oa.cmp(ob) {
+                    Ordering::Equal => {
+                        // a/b/c/..., a/b/c/...
+                        // If parents are the same and both have children keep looking.
+                        oa = ac;
+                        ob = bc;
+                        continue;
+                    }
+                    // a/b/c/... < a/b/d/...
+                    // Both paths have children, but the path prefixes are
+                    // different.
+                    other => return other,
+                },
+            }
         }
     }
 }
