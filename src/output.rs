@@ -30,9 +30,18 @@ impl ShowArchive for ShortVersionList {
 }
 
 #[derive(Debug, Default)]
-pub struct VerboseVersionList {}
+pub struct VerboseVersionList {
+    show_sizes: bool,
+}
 
-impl VerboseVersionList {}
+impl VerboseVersionList {
+    // Control whether to show the size of version disk usage.
+    //
+    // Setting this requires walking the band directories which takes some extra time.
+    pub fn show_sizes(self, show_sizes: bool) -> VerboseVersionList {
+        VerboseVersionList { show_sizes }
+    }
+}
 
 impl ShowArchive for VerboseVersionList {
     fn show_archive(&self, archive: &Archive) -> Result<()> {
@@ -63,10 +72,22 @@ impl ShowArchive for VerboseVersionList {
                 .and_then(|et| (et - info.start_time).to_std().ok())
                 .map(crate::ui::duration_to_hms)
                 .unwrap_or_default();
-            println!(
-                "{:<26} {:<10} {} {:>12}",
-                band_id, is_complete_str, start_time_str, duration_str,
-            );
+            if self.show_sizes {
+                let tree_mb = crate::misc::bytes_to_human_mb(
+                    StoredTree::open_version(archive, &band.id())?
+                        .size()?
+                        .file_bytes,
+                );
+                println!(
+                    "{:<26} {:<10} {} {:>7} {:>8}MB",
+                    band_id, is_complete_str, start_time_str, duration_str, tree_mb,
+                );
+            } else {
+                println!(
+                    "{:<26} {:<10} {} {:>7}",
+                    band_id, is_complete_str, start_time_str, duration_str,
+                );
+            }
         }
         Ok(())
     }

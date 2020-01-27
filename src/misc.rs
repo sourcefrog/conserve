@@ -9,3 +9,8 @@ pub(crate) fn remove_item<T, U: PartialEq<T>>(v: &mut Vec<T>, item: &U) {
         v.remove(pos);
     }
 }
+
+pub(crate) fn bytes_to_human_mb(s: u64) -> String {
+    use thousands::Separable;
+    (s / 1_000_000).separate_with_commas()
+}
