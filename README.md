@@ -120,7 +120,7 @@ Binaries for some platforms are available from
 
 On nightly Rust only, you can enable a potential speed-up to the blake2 hashes with
 
-    rustup run nightly cargo build --release --features blake2_simd_asm
+    cargo +nightly install -f --path . --features blake2_simd_asm
 
 ## More documentation
 
