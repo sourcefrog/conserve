@@ -344,6 +344,10 @@ impl Iter {
             children.push(LiveEntry::from_fs_metadata(child_apath, &metadata, target));
         }
 
+        // TODO: It could be a bit more efficient to sort by only the last
+        // component of the name (which is all that's new) rather than the
+        // whole apath.
+
         // Names might come back from the fs in arbitrary order, but sort them by apath
         // and remember to yield all of them and to visit new subdirectories.
         //
@@ -359,9 +363,7 @@ impl Iter {
 
         children.sort_unstable_by(|x, y| x.apath.cmp(&y.apath));
         self.entry_deque.reserve(children.len());
-        for child_entry in children {
-            self.entry_deque.push_back(child_entry);
-        }
+        self.entry_deque.extend(children);
     }
 }
 
