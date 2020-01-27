@@ -58,11 +58,13 @@ impl ShowArchive for VerboseVersionList {
                 "incomplete"
             };
             let start_time_str = info.start_time.with_timezone(&Local).to_rfc3339();
-            let duration_str = info.end_time.map_or_else(String::new, |t| {
-                format!("{}s", (t - info.start_time).num_seconds())
-            });
+            let duration_str = info
+                .end_time
+                .and_then(|et| (et - info.start_time).to_std().ok())
+                .map(crate::ui::duration_to_hms)
+                .unwrap_or_default();
             println!(
-                "{:<26} {:<10} {} {:>7}",
+                "{:<26} {:<10} {} {:>12}",
                 band_id, is_complete_str, start_time_str, duration_str,
             );
         }

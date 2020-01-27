@@ -172,7 +172,7 @@ both     /subdir
         .assert()
         .success()
         .stderr(is_empty())
-        .stdout(is_match(r"^b0000 {21} complete   20[-0-9T:+]+\s +\d+s\n$").unwrap());
+        .stdout(is_match(r"^b0000 {21} complete   20[-0-9T:+]+\s +0:\d+\n$").unwrap());
     // TODO: Set a fake date when creating the archive and then we can check
     // the format of the output?
 
