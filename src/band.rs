@@ -117,8 +117,8 @@ impl Band {
         &self.path_buf
     }
 
-    pub fn id(&self) -> BandId {
-        self.id.clone()
+    pub fn id(&self) -> &BandId {
+        &self.id
     }
 
     fn head_path(&self) -> PathBuf {

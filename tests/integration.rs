@@ -53,7 +53,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
     assert_eq!(
-        af.last_complete_band().unwrap().unwrap().id(),
+        *af.last_complete_band().unwrap().unwrap().id(),
         BandId::new(&[0])
     );
 

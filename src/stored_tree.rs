@@ -153,7 +153,7 @@ mod test {
         let last_band_id = af.last_band_id().unwrap().unwrap();
         let st = StoredTree::open_last(&af).unwrap();
 
-        assert_eq!(st.band().id(), last_band_id);
+        assert_eq!(*st.band().id(), last_band_id);
 
         let names: Vec<String> = st
             .iter_entries(&af.report())
