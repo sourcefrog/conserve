@@ -44,6 +44,7 @@ pub use crate::index::{IndexBuilder, IndexEntry, ReadIndex};
 pub use crate::io::{ensure_dir_exists, list_dir, AtomicFile};
 pub use crate::live_tree::{LiveEntry, LiveTree};
 pub use crate::merge::{iter_merged_entries, MergedEntryKind};
+pub use crate::misc::bytes_to_human_mb;
 pub use crate::report::{HasReport, Report, Sizes};
 pub use crate::restore::RestoreTree;
 pub use crate::stored_tree::StoredTree;

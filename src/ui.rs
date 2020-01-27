@@ -17,7 +17,6 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::report::{Report, Sizes};
 use crate::Result;
 
-const MB: u64 = 1_000_000;
 const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 
 /// Display information about backup progress to the user in some way.
@@ -180,8 +179,8 @@ impl UI for TerminalUI {
             write!(prefix, "{} ", duration_to_hms(elapsed)).unwrap();
             write!(
                 prefix,
-                "{:>12} MB ",
-                (counts.done_work / MB).separate_with_commas(),
+                "{:>15} ",
+                crate::misc::bytes_to_human_mb(counts.done_work),
             )
             .unwrap();
             // let block_sizes = counts.get_size("block");

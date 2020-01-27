@@ -6,11 +6,8 @@
 use std::path::Path;
 
 use clap::{crate_authors, App, AppSettings, Arg, ArgMatches, SubCommand};
-use thousands::Separable;
 
 use conserve::*;
-
-use conserve::Result;
 
 fn main() -> conserve::Result<()> {
     let matches = make_clap().get_matches();
@@ -361,7 +358,7 @@ fn source_ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn source_size(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source = live_tree_from_options(subm, report)?;
     report.set_phase("Measuring");
-    report.print(&format!("{}", source.size()?.file_bytes).separate_with_commas());
+    report.print(&conserve::bytes_to_human_mb(source.size()?.file_bytes));
     Ok(())
 }
 
@@ -422,7 +419,7 @@ fn debug_index_dump(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn tree_size(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = stored_tree_from_options(subm, report)?;
     report.set_phase("Measuring");
-    report.print(&format!("{}", st.size()?.file_bytes).separate_with_commas());
+    report.print(&bytes_to_human_mb(st.size()?.file_bytes));
     Ok(())
 }
 

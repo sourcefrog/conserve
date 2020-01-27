@@ -10,7 +10,9 @@ pub(crate) fn remove_item<T, U: PartialEq<T>>(v: &mut Vec<T>, item: &U) {
     }
 }
 
-pub(crate) fn bytes_to_human_mb(s: u64) -> String {
+pub fn bytes_to_human_mb(s: u64) -> String {
     use thousands::Separable;
-    (s / 1_000_000).separate_with_commas()
+    let mut s = (s / 1_000_000).separate_with_commas();
+    s.push_str(" MB");
+    s
 }

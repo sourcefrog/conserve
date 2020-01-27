@@ -79,7 +79,7 @@ impl ShowArchive for VerboseVersionList {
                         .file_bytes,
                 );
                 println!(
-                    "{:<26} {:<10} {} {:>7} {:>8}MB",
+                    "{:<26} {:<10} {} {:>7} {:>10}",
                     band_id, is_complete_str, start_time_str, duration_str, tree_mb,
                 );
             } else {

@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use snafu::{ensure, ResultExt};
-use thousands::Separable;
 
 use super::io::file_exists;
 use super::jsonio;
@@ -208,8 +207,8 @@ impl Archive {
         }
 
         self.report.print(&format!(
-            "Check {} MB in stored files...",
-            (total_size / 1_000_000).separate_with_commas()
+            "Check {} in stored files...",
+            crate::misc::bytes_to_human_mb(total_size)
         ));
         self.report.set_total_work(total_size);
         for bid in self.list_bands()?.iter() {

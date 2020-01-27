@@ -23,7 +23,6 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tempfile;
-use thousands::Separable;
 
 use crate::*;
 
@@ -228,8 +227,8 @@ impl BlockDir {
         let tot = bns.iter().map(|a| a.1).sum();
         report.set_total_work(tot);
         report.print(&format!(
-            "Check {} MB in blocks...",
-            (tot / 1_000_000).separate_with_commas()
+            "Check {} in blocks...",
+            crate::misc::bytes_to_human_mb(tot)
         ));
         report.set_phase("Check block hashes");
         bns.par_iter()

@@ -111,7 +111,7 @@ fn blackbox_backup() {
         .assert()
         .success()
         .stderr(is_empty())
-        .stdout("8\n"); // "contents"
+        .stdout("0 MB\n"); // "contents"
 
     // backup
     main_binary()
@@ -130,7 +130,7 @@ fn blackbox_backup() {
         .assert()
         .success()
         .stderr(is_empty())
-        .stdout("8\n"); // "contents"
+        .stdout("0 MB\n"); // "contents"
 
     main_binary()
         .arg("diff")
