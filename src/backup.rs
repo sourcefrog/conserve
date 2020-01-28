@@ -98,10 +98,13 @@ impl tree::WriteTree for BackupWriter {
                 // self.report.print(&format!("changed file {}", apath));
             }
         }
-        let content = &mut from_tree.file_contents(&source_entry)?;
-        let addrs = self
-            .store_files
-            .store_file_content(&apath, content, &self.report)?;
+        let addrs = if source_entry.size().map(|x| x > 0).unwrap_or(false) {
+            let content = &mut from_tree.file_contents(&source_entry)?;
+            self.store_files
+                .store_file_content(&apath, content, &self.report)?
+        } else {
+            Vec::new()
+        };
         let size = addrs.iter().map(|a| a.len).sum();
         self.report.increment_size(
             "file.bytes",
