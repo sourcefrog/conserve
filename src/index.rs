@@ -169,6 +169,8 @@ impl IndexBuilder {
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
     pub fn finish_hunk(&mut self, report: &Report) -> Result<()> {
+        // TODO: Don't write a new (empty) file if there are no entries queued.
+        // And add a test for this.
         let path = &path_for_hunk(&self.dir, self.sequence);
 
         ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))
