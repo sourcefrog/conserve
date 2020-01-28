@@ -12,5 +12,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Show version
+      run: rustup show
     - name: Build and run tests
       run: cargo test --verbose
