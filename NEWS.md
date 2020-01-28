@@ -11,6 +11,8 @@
 
 * Improved the speed of source tree iteration, and therefore the speed of
   backups with many unchanged files.
+  
+* Add back `conserve versions --sizes`, but showing the size of the tree in each version.
 
 ## Conserve 0.6.1 2020-01-25
 
