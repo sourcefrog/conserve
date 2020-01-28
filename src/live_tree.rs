@@ -229,7 +229,6 @@ impl Iter {
         // this function isn't too big?
         self.report.increment("source.visited.directories", 1);
         let mut children = Vec::<LiveEntry>::new();
-        let mut child_dirs = Vec::<Apath>::new();
         let dir_path = relative_path(&self.root_path, parent_apath);
         let dir_iter = match fs::read_dir(&dir_path).with_context(|| errors::ListSourceTree {
             path: dir_path.clone(),
@@ -344,9 +343,6 @@ impl Iter {
             };
 
             let child_apath = Apath::from(child_apath);
-            if ft.is_dir() {
-                child_dirs.push(child_apath.clone());
-            }
             children.push(LiveEntry::from_fs_metadata(child_apath, &metadata, target));
         }
 
@@ -354,20 +350,14 @@ impl Iter {
         // component of the name (which is all that's new) rather than the
         // whole apath.
 
-        // Names might come back from the fs in arbitrary order, but sort them by apath
-        // and remember to yield all of them and to visit new subdirectories.
-        //
-        // To get the right overall tree ordering, any new subdirectories discovered here should
-        // be visited together in apath order, but before any previously pending directories.
-        if !child_dirs.is_empty() {
-            child_dirs.sort_unstable();
-            self.dir_deque.reserve(child_dirs.len());
-            for child_dir_apath in child_dirs.into_iter().rev() {
-                self.dir_deque.push_front(child_dir_apath);
-            }
-        }
-
         children.sort_unstable_by(|x, y| x.apath.cmp(&y.apath));
+        // To get the right overall tree ordering, any new subdirectories
+        // discovered here should be visited together in apath order, but before
+        // any previously pending directories. In other words, in reverse order
+        // push them onto the front of the dir deque.
+        for idir in children.iter().filter(|e| e.kind == Kind::Dir).rev() {
+            self.dir_deque.push_front(idir.apath().clone())
+        }
         self.entry_deque.reserve(children.len());
         self.entry_deque.extend(children);
     }
