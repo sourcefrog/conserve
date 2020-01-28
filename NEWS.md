@@ -9,6 +9,9 @@
 * Changed `conserve tree size` and `conserve source size` to report in MB, not
   bytes, as used elsewhere in the UI.
 
+* Improved the speed of source tree iteration, and therefore the speed of
+  backups with many unchanged files.
+
 ## Conserve 0.6.1 2020-01-25
 
 * Improved performance on incremental backup, by only opening source files if

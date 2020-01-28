@@ -227,8 +227,12 @@ impl Iter {
     fn visit_next_directory(&mut self, parent_apath: &Apath) {
         // TODO: Rather than mutating self, return new vectors to append, so that
         // this function isn't too big?
+        //
+        // TODO: Perhaps reuse the child buffer in the Iter, which we know will
+        // now be empty? We have to be able to sort it, but perhaps a Vec in
+        // reverse order from which we pop would work well.
         self.report.increment("source.visited.directories", 1);
-        let mut children = Vec::<LiveEntry>::new();
+        let mut children = Vec::<(String, LiveEntry)>::new();
         let dir_path = relative_path(&self.root_path, parent_apath);
         let dir_iter = match fs::read_dir(&dir_path).with_context(|| errors::ListSourceTree {
             path: dir_path.clone(),
@@ -251,37 +255,35 @@ impl Iter {
                     continue;
                 }
             };
-            let mut child_apath = parent_apath.to_string();
+            let mut child_apath_str = parent_apath.to_string();
             // TODO: Specific Apath join method?
-            if child_apath != "/" {
-                child_apath.push('/');
+            if child_apath_str != "/" {
+                child_apath_str.push('/');
             }
-            {
-                let child_osstr = &dir_entry.file_name();
-                let child_name = match child_osstr.to_str() {
-                    Some(c) => c,
-                    None => {
-                        self.report.problem(&format!(
-                            "Can't decode filename {:?} in {:?}",
-                            child_osstr, dir_path,
-                        ));
-                        continue;
-                    }
-                };
-                child_apath.push_str(child_name);
-            }
+            let child_osstr = &dir_entry.file_name();
+            let child_name = match child_osstr.to_str() {
+                Some(c) => c,
+                None => {
+                    self.report.problem(&format!(
+                        "Can't decode filename {:?} in {:?}",
+                        child_osstr, dir_path,
+                    ));
+                    continue;
+                }
+            };
+            child_apath_str.push_str(child_name);
             let ft = match dir_entry.file_type() {
                 Ok(ft) => ft,
                 Err(e) => {
                     self.report.problem(&format!(
                         "Error getting type of {:?} during iteration: {}",
-                        child_apath, e
+                        child_apath_str, e
                     ));
                     continue;
                 }
             };
 
-            if self.excludes.is_match(&child_apath) {
+            if self.excludes.is_match(&child_apath_str) {
                 if ft.is_file() {
                     self.report.increment("skipped.excluded.files", 1);
                 } else if ft.is_dir() {
@@ -300,13 +302,13 @@ impl Iter {
                             // between listing the directory and looking at the contents.
                             self.report.problem(&format!(
                                 "File disappeared during iteration: {:?}: {}",
-                                child_apath, e
+                                child_apath_str, e
                             ));
                         }
                         _ => {
                             self.report.problem(&format!(
                                 "Failed to read source metadata from {:?}: {}",
-                                child_apath, e
+                                child_apath_str, e
                             ));
                             self.report.increment("source.error.metadata", 1);
                         }
@@ -323,7 +325,7 @@ impl Iter {
                     Err(e) => {
                         self.report.problem(&format!(
                             "Failed to read target of symlink {:?}: {}",
-                            child_apath, e
+                            child_apath_str, e
                         ));
                         continue;
                     }
@@ -333,7 +335,7 @@ impl Iter {
                     Err(e) => {
                         self.report.problem(&format!(
                             "Failed to decode target of symlink {:?}: {:?}",
-                            child_apath, e
+                            child_apath_str, e
                         ));
                         continue;
                     }
@@ -341,25 +343,21 @@ impl Iter {
             } else {
                 None
             };
-
-            let child_apath = Apath::from(child_apath);
-            children.push(LiveEntry::from_fs_metadata(child_apath, &metadata, target));
+            children.push((
+                child_name.to_string(),
+                LiveEntry::from_fs_metadata(child_apath_str.into(), &metadata, target),
+            ));
         }
-
-        // TODO: It could be a bit more efficient to sort by only the last
-        // component of the name (which is all that's new) rather than the
-        // whole apath.
-
-        children.sort_unstable_by(|x, y| x.apath.cmp(&y.apath));
+        children.sort_unstable_by(|a, b| a.0.cmp(&b.0));
         // To get the right overall tree ordering, any new subdirectories
         // discovered here should be visited together in apath order, but before
         // any previously pending directories. In other words, in reverse order
         // push them onto the front of the dir deque.
-        for idir in children.iter().filter(|e| e.kind == Kind::Dir).rev() {
-            self.dir_deque.push_front(idir.apath().clone())
+        for idir in children.iter().filter(|x| x.1.kind == Kind::Dir).rev() {
+            self.dir_deque.push_front(idir.1.apath().clone())
         }
         self.entry_deque.reserve(children.len());
-        self.entry_deque.extend(children);
+        self.entry_deque.extend(children.into_iter().map(|x| x.1));
     }
 }
 
