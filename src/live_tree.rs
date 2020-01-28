@@ -76,33 +76,7 @@ impl tree::ReadTree for LiveTree {
     ///
     /// The `Iter` has its own `Report` of how many directories and files were visited.
     fn iter_entries(&self, report: &Report) -> Result<Self::I> {
-        let root_metadata = fs::symlink_metadata(&self.path)
-            .with_context(|| errors::ListSourceTree {
-                path: self.path.clone(),
-            })
-            .map_err(|e| {
-                report.show_error(&e);
-                e
-            })?;
-        // Preload iter to return the root and then recurse into it.
-        let mut entry_deque = VecDeque::<LiveEntry>::new();
-        entry_deque.push_back(LiveEntry::from_fs_metadata(
-            Apath::from("/"),
-            &root_metadata,
-            None,
-        ));
-        // TODO: Consider the case where the root is not actually a directory?
-        // Should that be supported?
-        let mut dir_deque = VecDeque::<Apath>::new();
-        dir_deque.push_back("/".into());
-        Ok(Iter {
-            root_path: self.path.clone(),
-            entry_deque,
-            dir_deque,
-            report: report.clone(),
-            check_order: apath::CheckOrder::new(),
-            excludes: self.excludes.clone(),
-        })
+        Iter::new(&self.path, &self.excludes, report)
     }
 
     fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
@@ -214,6 +188,38 @@ pub struct Iter {
 }
 
 impl Iter {
+    /// Construct a new iter that will visit everything below this root path,
+    /// subject to some exclusions
+    fn new(root_path: &Path, excludes: &GlobSet, report: &Report) -> Result<Iter> {
+        let root_metadata = fs::symlink_metadata(&root_path)
+            .with_context(|| errors::ListSourceTree {
+                path: root_path.to_path_buf(),
+            })
+            .map_err(|e| {
+                report.show_error(&e);
+                e
+            })?;
+        // Preload iter to return the root and then recurse into it.
+        let mut entry_deque = VecDeque::<LiveEntry>::new();
+        entry_deque.push_back(LiveEntry::from_fs_metadata(
+            Apath::from("/"),
+            &root_metadata,
+            None,
+        ));
+        // TODO: Consider the case where the root is not actually a directory?
+        // Should that be supported?
+        let mut dir_deque = VecDeque::<Apath>::new();
+        dir_deque.push_back("/".into());
+        Ok(Iter {
+            root_path: root_path.to_path_buf(),
+            entry_deque,
+            dir_deque,
+            report: report.clone(),
+            check_order: apath::CheckOrder::new(),
+            excludes: excludes.clone(),
+        })
+    }
+
     /// Visit the next directory.
     ///
     /// Any errors occurring are logged but not returned; we'll continue to
