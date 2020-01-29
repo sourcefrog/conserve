@@ -2,7 +2,7 @@
 
 <https://github.com/sourcefrog/conserve/>
 
-![Rust](https://github.com/sourcefrog/conserve/workflows/Rust/badge.svg?branch=master)
+[![Rust](https://github.com/sourcefrog/conserve/workflows/Rust/badge.svg?branch=master)](https://github.com/sourcefrog/conserve/actions?query=workflow%3ARust)
 [![Linux build status](https://travis-ci.org/sourcefrog/conserve.svg?branch=master)](https://travis-ci.org/sourcefrog/conserve)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)
 [![crates.io](https://img.shields.io/crates/v/conserve.svg)](https://crates.io/crates/conserve)
