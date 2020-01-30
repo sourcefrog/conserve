@@ -24,8 +24,8 @@ pub trait UI: fmt::Debug {
     /// Show counters, eg as a progress bar.
     fn show_progress(&mut self, report: &Report);
 
-    /// Show a plain text message.
-    fn print(&mut self, s: &str);
+    /// Show a plain text message, followed by newline.
+    fn println(&mut self, s: &str);
 
     /// Print an error message.
     fn problem(&mut self, s: &str) -> Result<()>;
@@ -222,7 +222,7 @@ impl UI for TerminalUI {
         self.set_update_timestamp();
     }
 
-    fn print(&mut self, s: &str) {
+    fn println(&mut self, s: &str) {
         self.clear_progress();
         let t = &mut self.t;
         writeln!(t, "{}", s).unwrap();
@@ -279,7 +279,7 @@ impl PlainUI {
 impl super::UI for PlainUI {
     fn show_progress(&mut self, _report: &Report) {}
 
-    fn print(&mut self, s: &str) {
+    fn println(&mut self, s: &str) {
         println!("{}", s);
     }
 

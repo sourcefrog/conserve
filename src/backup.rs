@@ -79,7 +79,7 @@ impl tree::WriteTree for BackupWriter {
                 // TODO: In verbose mode, say if the file is changed, unchanged,
                 // etc, but without duplicating the filenames.
                 //
-                // self.report.print(&format!("unchanged file {}", apath));
+                // self.report.println(&format!("unchanged file {}", apath));
                 if self.block_dir.contains_all_blocks(&basis_entry.addrs) {
                     self.report.increment("file.unchanged", 1);
                     self.report.increment_size(
@@ -95,7 +95,7 @@ impl tree::WriteTree for BackupWriter {
                         "Some blocks of basis file {} are missing from the blockdir; writing them again", apath));
                 }
             } else {
-                // self.report.print(&format!("changed file {}", apath));
+                // self.report.println(&format!("changed file {}", apath));
             }
         }
         let addrs = if source_entry.size().map(|x| x > 0).unwrap_or(false) {

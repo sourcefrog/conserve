@@ -38,7 +38,7 @@ fn main() -> conserve::Result<()> {
 
     report.finish();
     if matches.is_present("stats") {
-        report.print(&format!("{}", report));
+        report.println(&format!("{}", report));
     }
     if let Err(ref e) = result {
         report.show_error(e);
@@ -296,7 +296,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
 fn init(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive_path = subm.value_of("archive").expect("'archive' arg not found");
     Archive::create(archive_path).and(Ok(()))?;
-    report.print(&format!("Created new archive in {}", archive_path));
+    report.println(&format!("Created new archive in {}", archive_path));
     Ok(())
 }
 
@@ -305,8 +305,8 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     let lt = live_tree_from_options(subm, report)?;
     let mut bw = BackupWriter::begin(&archive)?;
     copy_tree(&lt, &mut bw)?;
-    report.print("Backup complete.");
-    report.print(&report.borrow_counts().summary_for_backup());
+    report.println("Backup complete.");
+    report.println(&report.borrow_counts().summary_for_backup());
     Ok(())
 }
 
@@ -324,16 +324,16 @@ fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
             RightOnly => "right",
             Both => "both",
         };
-        report.print(&format!("{:<8} {}", ks, e.apath));
+        report.println(&format!("{:<8} {}", ks, e.apath));
     }
-    // report.print(&report.borrow_counts().summary_for_backup());
+    // report.println(&report.borrow_counts().summary_for_backup());
     Ok(())
 }
 
 fn validate(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     archive.validate()?;
-    report.print(&report.borrow_counts().summary_for_validate());
+    report.println(&report.borrow_counts().summary_for_validate());
     Ok(())
 }
 
@@ -358,7 +358,7 @@ fn source_ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn source_size(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source = live_tree_from_options(subm, report)?;
     report.set_phase("Measuring");
-    report.print(&conserve::bytes_to_human_mb(source.size()?.file_bytes));
+    report.println(&conserve::bytes_to_human_mb(source.size()?.file_bytes));
     Ok(())
 }
 
@@ -374,7 +374,7 @@ fn list_tree_contents<T: ReadTree>(tree: &T, report: &Report) -> Result<()> {
     // or bad buffering. Perhaps we can write to a BufferedWriter, making
     // sure that the progress bar is disabled.
     for entry in tree.iter_entries(report)? {
-        report.print(&entry.apath());
+        report.println(&entry.apath());
     }
     Ok(())
 }
@@ -388,8 +388,8 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
         RestoreTree::create(dest, report)
     }?;
     copy_tree(&st, &mut rt)?;
-    report.print("Restore complete.");
-    report.print(&report.borrow_counts().summary_for_restore());
+    report.println("Restore complete.");
+    report.println(&report.borrow_counts().summary_for_restore());
     Ok(())
 }
 
@@ -404,7 +404,7 @@ fn debug_block_list(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn debug_block_referenced(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), report)?;
     for h in archive.referenced_blocks()? {
-        report.print(&h);
+        report.println(&h);
     }
     Ok(())
 }
@@ -419,7 +419,7 @@ fn debug_index_dump(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn tree_size(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = stored_tree_from_options(subm, report)?;
     report.set_phase("Measuring");
-    report.print(&bytes_to_human_mb(st.size()?.file_bytes));
+    report.println(&bytes_to_human_mb(st.size()?.file_bytes));
     Ok(())
 }
 

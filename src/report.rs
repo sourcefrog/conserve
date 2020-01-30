@@ -203,7 +203,7 @@ impl Report {
     pub fn start_entry(&self, apath: &Apath) {
         // TODO: Leave cursor pending at the end of the line until it's finished?
         if self.print_filenames {
-            self.print(&format!("{}", apath));
+            self.println(&format!("{}", apath));
         }
         self.mut_counts().latest_filename = apath.to_string();
     }
@@ -217,8 +217,8 @@ impl Report {
         self.set_phase("");
     }
 
-    pub fn print(&self, s: &str) {
-        self.ui.lock().unwrap().print(s)
+    pub fn println(&self, s: &str) {
+        self.ui.lock().unwrap().println(s)
     }
 
     /// Report that a problem occurred.

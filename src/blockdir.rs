@@ -222,11 +222,11 @@ impl BlockDir {
         // TODO: Provide a progress bar that just works on counts, not bytes:
         // then we don't need to count the sizes in advance.
         report.set_phase("Count blocks");
-        report.print("Count blocks...");
+        report.println("Count blocks...");
         let bns: Vec<(String, u64)> = self.block_names_and_sizes(report)?.collect();
         let tot = bns.iter().map(|a| a.1).sum();
         report.set_total_work(tot);
-        report.print(&format!(
+        report.println(&format!(
             "Check {} in blocks...",
             crate::misc::bytes_to_human_mb(tot)
         ));
