@@ -50,3 +50,6 @@ blake2_simd_asm = ["blake2-rfc/simd_asm"]
 
 [lib]
 doctest = false
+
+[profile.release]
+debug = true
