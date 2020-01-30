@@ -5,7 +5,6 @@
 
 use std::cmp::Ordering;
 use std::fmt;
-use std::fs;
 use std::io;
 use std::iter::Peekable;
 use std::path::{Path, PathBuf};
@@ -361,8 +360,8 @@ impl IndexEntryIter {
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
         self.report.increment("index.hunk", 1);
-        let mut f = match fs::File::open(&path) {
-            Ok(f) => f,
+        let (comp_len, index_bytes) = match crate::compress::snappy::decompress_file(&path) {
+            Ok(x) => x,
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
                 // TODO: Cope with one hunk being missing, while there are still
                 // later-numbered hunks. This would require reading the whole
@@ -371,8 +370,6 @@ impl IndexEntryIter {
             }
             Err(e) => return Err(e).with_context(|| errors::ReadIndex { path }),
         };
-        let (comp_len, index_bytes) =
-            Snappy::decompress_read(&mut f).with_context(|| errors::ReadIndex { path })?;
         self.report.increment_size(
             "index",
             Sizes {

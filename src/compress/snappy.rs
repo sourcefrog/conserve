@@ -1,7 +1,8 @@
-// Copyright 2017, 2019 Martin Pool.
+// Copyright 2017, 2019, 2020 Martin Pool.
 
 /// Snappy compression.
 use std::io;
+use std::path::Path;
 
 use snap;
 
@@ -14,16 +15,13 @@ impl super::Compression for Snappy {
         w.write_all(&r)?;
         Ok(r.len())
     }
+}
 
-    fn decompress_read(r: &mut dyn io::Read) -> io::Result<(usize, Vec<u8>)> {
-        // Conserve files are never too large so can always be read entirely in to memory.
-        let mut compressed_buf = Vec::<u8>::with_capacity(10 << 20);
-        let compressed_len = r.read_to_end(&mut compressed_buf)?;
-
-        let mut decoder = snap::Decoder::new();
-        // TODO: Clean errors.
-        let decompressed = decoder.decompress_vec(&compressed_buf).unwrap();
-
-        Ok((compressed_len, decompressed))
-    }
+pub fn decompress_file<P: AsRef<Path>>(p: P) -> io::Result<(usize, Vec<u8>)> {
+    let buf = std::fs::read(p.as_ref())?;
+    // TODO: Pass back error from snap decoder.
+    Ok((
+        buf.len(),
+        snap::Decoder::new().decompress_vec(&buf).unwrap(),
+    ))
 }

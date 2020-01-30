@@ -7,5 +7,4 @@ pub mod snappy;
 
 pub trait Compression {
     fn compress_and_write(b: &[u8], w: &mut dyn io::Write) -> io::Result<usize>;
-    fn decompress_read(r: &mut dyn io::Read) -> io::Result<(usize, Vec<u8>)>;
 }
