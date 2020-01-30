@@ -101,13 +101,12 @@ impl BlockDir {
         let path = self.path_for_file(&hex_hash);
         let d = self.subdir_for(hex_hash);
         super::io::ensure_dir_exists(&d)?;
-        let tempf = tempfile::Builder::new()
+        let mut tempf = tempfile::Builder::new()
             .prefix(TMP_PREFIX)
             .tempfile_in(&d)?;
-        let mut bufw = io::BufWriter::new(tempf);
-        let comp_len = Snappy::compress_and_write(&in_buf, &mut bufw)?
-            .try_into().unwrap();
-        let tempf = bufw.into_inner().unwrap();
+        let comp_len = Snappy::compress_and_write(&in_buf, &mut tempf)?
+            .try_into()
+            .unwrap();
         // Use plain `persist` not `persist_noclobber` to avoid
         // calling `link` on Unix, which won't work on all filesystems.
         if let Err(e) = tempf.persist(&path) {
