@@ -11,6 +11,7 @@
 //!
 //! The structure is: archive > blockdir > subdir > file.
 
+use std::convert::TryInto;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
@@ -104,17 +105,15 @@ impl BlockDir {
             .prefix(TMP_PREFIX)
             .tempfile_in(&d)?;
         let mut bufw = io::BufWriter::new(tempf);
-        Snappy::compress_and_write(&in_buf, &mut bufw)?;
+        let comp_len = Snappy::compress_and_write(&in_buf, &mut bufw)?
+            .try_into().unwrap();
         let tempf = bufw.into_inner().unwrap();
-
-        // TODO: Count bytes rather than stat-ing.
-        let comp_len = tempf.as_file().metadata()?.len();
-
-        // Also use plain `persist` not `persist_noclobber` to avoid
+        // Use plain `persist` not `persist_noclobber` to avoid
         // calling `link` on Unix, which won't work on all filesystems.
         if let Err(e) = tempf.persist(&path) {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
-                // Suprising we saw this rather than detecting it above.
+                // Perhaps it was simultaneously created by another thread or process.
+                // This isn't really an error.
                 report.problem(&format!(
                     "Unexpected late detection of existing block {:?}",
                     hex_hash
