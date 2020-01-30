@@ -74,17 +74,17 @@ impl ShowArchive for VerboseVersionList {
                 .unwrap_or_default();
             if self.show_sizes {
                 let tree_mb = crate::misc::bytes_to_human_mb(
-                    StoredTree::open_version(archive, &band.id())?
+                    StoredTree::open_incomplete_version(archive, &band.id())?
                         .size()?
                         .file_bytes,
                 );
                 report.println(&format!(
-                    "{:<26} {:<10} {} {:>7} {:>10}",
+                    "{:<20} {:<10} {} {:>8} {:>14}",
                     band_id, is_complete_str, start_time_str, duration_str, tree_mb,
                 ));
             } else {
                 report.println(&format!(
-                    "{:<26} {:<10} {} {:>7}",
+                    "{:<20} {:<10} {} {:>8}",
                     band_id, is_complete_str, start_time_str, duration_str,
                 ));
             }
