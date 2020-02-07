@@ -173,7 +173,7 @@ dependencies = [
 
 [[package]]
 name = "conserve"
-version = "0.6.2"
+version = "0.6.2-pre"
 dependencies = [
  "assert_cmd 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "assert_fs 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
