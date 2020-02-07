@@ -1,61 +1,4 @@
-Conserve design
-===========
-
-Conserve is a backup system for Unix systems in today's world: especially, for
-backing up to either nearby local disks or in to cloud storage.
-
-Storage environment
--------------------
-
-Conserve makes limited assumptions about the archive storage, guided by what is
-commonly supported by cloud storage.
-
-- You can write whole files, but not update in place
-
-- Almost unlimited in size
-
-- Very long round trips
-
-- Fairly limited bandwidth relative to the amount of data to be
-  transmitted.
-
-- No filesystem metadata (ownership etc) can be stored directly; it must
-  be encoded
-
-- You can list directories (or, "list files starting with a certain prefix")
-
-- May or may not be case sensitive.
-
-- Can't detect whether an empty directory exists or not, and might not have a strong
-  concept of directories, perhaps only ordered names.
-
-- Can try to not overwrite files, but not guaranteed coherent.
-
-- Conserve can cache information onto the source machine's local disk, but of course
-  this cache may be lost or may need to be disabled.
-
-- Connection may be lost and the backup terminated at any point.
-
-- No guarantee of read-after-write consistency.  (In practice, perhaps several seconds
-  after writing the change will be visible.)
-
-Requirements
-------------
-
-- Data should still be recoverable even if there are bugs in this program,
-  or in other systems.
-
-- The formats should be very simple and if possible recoverable by hand.
-
-- Layers for Reed-Solomon encoding, encryption (plain gpg), compression
-
-- Fast random access to retrieve particular files or directories
-
-- Fast listing of what's in a particular layer of the archive
-
-- Backups ought to make incremental progress, even if they can never
-  complete a whole band in one run.
-
+# Conserve design
 
 Testing
 -------
@@ -152,16 +95,6 @@ Verification
 - Make sure all files can be read out with the intended hash.
 
 
-Block size tradeoffs
---------------------
-
-We have to do one roundtrip to the archive per block, so we don't want
-them to be too small.  It might be worse than one (if there's also a
-header file per block).
-
-I think it's good not to split files across blocks - but this does mean
-that blocks can grow arbitrarily large if you have large files.
-
 Backup
 ------
 
@@ -174,8 +107,6 @@ Build an index including references to these blocks.
 
 Incremental backups
 -------------------
-
-(not implmented yet)
 
 When there's a previous backup, we can avoid some work of hashing blocks, by
 looking at the previous index. If the file has the same mtime/ctime and length
