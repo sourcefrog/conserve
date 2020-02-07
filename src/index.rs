@@ -168,8 +168,11 @@ impl IndexBuilder {
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
     pub fn finish_hunk(&mut self, report: &Report) -> Result<()> {
-        // TODO: Don't write a new (empty) file if there are no entries queued.
-        // And add a test for this.
+        if self.entries.is_empty() {
+            return Ok(());
+        }
+
+        // TODO: Only make the directory on the first file in that dir.
         let path = &path_for_hunk(&self.dir, self.sequence);
 
         ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))
@@ -180,7 +183,6 @@ impl IndexBuilder {
         let mut af = AtomicFile::new(path).context(errors::WriteIndex { path })?;
         let compressed_len =
             Snappy::compress_and_write(&json, &mut af).context(errors::WriteIndex { path })?;
-
         af.close(report).context(errors::WriteIndex { path })?;
 
         report.increment_size(
@@ -611,5 +613,22 @@ mod tests {
         let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
         assert_eq!(it.advance_to(&Apath::from("/zz")), None);
         assert_eq!(it.next(), None);
+    }
+
+    /// Exactly fill the first hunk: there shouldn't be an empty second hunk.
+    ///
+    /// https://github.com/sourcefrog/conserve/issues/95
+    #[test]
+    fn no_final_empty_hunk() -> Result<()> {
+        let (testdir, mut ib, report) = scratch_indexbuilder();
+        for i in 0..MAX_ENTRIES_PER_HUNK {
+            add_an_entry(&mut ib, &format!("/{:0>10}", i));
+        }
+        ib.finish_hunk(&report)?;
+        // Think about, but don't actually add some files
+        ib.finish_hunk(&report)?;
+        let read_index = ReadIndex::new(&testdir.path());
+        assert_eq!(read_index.count_hunks()?, 1);
+        Ok(())
     }
 }
