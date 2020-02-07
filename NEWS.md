@@ -1,5 +1,7 @@
 # Conserve release history
 
+## UNRELEASED
+
 ## Conserve 0.6.2 2020-02-06
 
 * Added nanosecond precision to stored mtimes. The main benefit of this is
