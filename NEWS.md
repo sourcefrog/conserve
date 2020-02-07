@@ -1,6 +1,6 @@
 # Conserve release history
 
-## UNRELEASED
+## Conserve 0.6.2 2020-02-06
 
 * Added nanosecond precision to stored mtimes. The main benefit of this is
   more-precise detection of files that changed less than a second after
@@ -11,8 +11,11 @@
 
 * Improved the speed of source tree iteration, and therefore the speed of
   backups with many unchanged files.
-  
-* Add back `conserve versions --sizes`, but showing the size of the tree in each version.
+
+* Add back `conserve versions --sizes`, but showing the size of the tree
+  in each version.
+
+* Improved performance of backup.
 
 ## Conserve 0.6.1 2020-01-25
 
