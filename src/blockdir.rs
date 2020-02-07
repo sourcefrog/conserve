@@ -22,7 +22,6 @@ use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use tempfile;
 
 use crate::compress::snappy;
 use crate::*;

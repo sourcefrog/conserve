@@ -9,7 +9,6 @@ use std::io::Write as IoWrite;
 use std::time::Duration;
 use std::time::Instant;
 
-use atty;
 use crossterm::{cursor, queue, style, terminal};
 use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;

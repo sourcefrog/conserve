@@ -4,8 +4,6 @@
 use std::io;
 use std::path::Path;
 
-use snap;
-
 pub struct Snappy {}
 
 impl super::Compression for Snappy {
