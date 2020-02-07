@@ -19,6 +19,8 @@ use super::*;
 
 pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
 
+pub const HUNKS_PER_SUBDIR: u32 = 10_000;
+
 /// Description of one archived file.
 ///
 /// This struct is directly encoded/decoded to the json index file, and also can be constructed by
@@ -172,11 +174,11 @@ impl IndexBuilder {
             return Ok(());
         }
 
-        // TODO: Only make the directory on the first file in that dir.
         let path = &path_for_hunk(&self.dir, self.sequence);
-
-        ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))
-            .context(errors::WriteIndex { path })?;
+        if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
+            ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))
+                .context(errors::WriteIndex { path })?;
+        }
 
         let json = serde_json::to_vec(&self.entries).context(errors::SerializeJson { path })?;
         let uncompressed_len = json.len() as u64;
@@ -204,7 +206,7 @@ impl IndexBuilder {
 /// Return the subdirectory for a hunk numbered `hunk_number`.
 fn subdir_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
     let mut buf = dir.to_path_buf();
-    buf.push(format!("{:05}", hunk_number / 10000));
+    buf.push(format!("{:05}", hunk_number / HUNKS_PER_SUBDIR));
     buf
 }
 
