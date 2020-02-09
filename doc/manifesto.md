@@ -44,7 +44,7 @@ may be data loss in underlying storage. When problems occur, Conserve should not
 fail entirely.
 
 The program should not abort due to one missing or corrupt file, or other
-errors affcting a single file, on either read or write.
+errors affecting a single file, on either read or write.
 
 The format should not be brittle: if some data is lost due to a bug or a problem
 with underlying storage, it should still be possible to retrieve the rest of the
