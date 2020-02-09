@@ -1,8 +1,7 @@
-Versioning
-==========
+# Versioning
 
 Conserve software releases and formats are identified by the same `x.y.z`
-version timeline.  
+version timeline.
 
 ## Pre-1.0 releases
 
@@ -15,7 +14,7 @@ cross-version compatibility of formats, APIs, or commands.
 The archive includes the version of Conserve that initialized it.
 
 An archive with major version `x` can only be read by software with major
-version `x`: this is to allow support for old features to be removed.  
+version `x`: this is to allow support for old features to be removed.
 This implies
 that packages or installations of Conserve should allow concurrent installation
 of multiple major versions.
@@ -30,9 +29,11 @@ any z, zz.  Any command line accepted by one will be accepted by the other.
 
 ## APIs
 
-Post 1.0, Conserve's Rust API will be identical on patchlevels,
-forward-compatible on minor versions, and there is no guarantee of compatibility
-across major versions.
+At least prior to 1.0, there are no promises of stability for the API.
+
+I'm not sure if it's worthwhile to pay the price for this (in slowing
+down changes), as I don't expect any library clients other than the
+CLI. (Indeed, perhaps there should only be a binary target.)
 
 ## Command line
 
