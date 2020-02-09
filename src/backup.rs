@@ -267,6 +267,9 @@ mod tests {
         assert_eq!(bw.report.get_count("file.unchanged"), 1);
     }
 
+    // TODO: Try an incremental backup where the blocks of the previous
+    // version have somehow been lost. They should be written again.
+
     #[test]
     pub fn detect_minimal_mtime_change() {
         let af = ScratchArchive::new();
