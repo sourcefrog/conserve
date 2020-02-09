@@ -1,102 +1,6 @@
 # Conserve design
 
-Testing
--------
-
-- Effort testing
-
-- Side-effect free state machines for core algorithms so they can be
-  tested without doing real large work
-
-
-Write/write concurrency
------------------------
-
-Conserve is supposed to be run with just one process writing to destination archive at
-any time, obviously just from one source.  It is basically up to the user to
-configure the clients so this happens: to make sure that only one logical machine
-tries to write to one archive, and that only one backup process runs on that machine
-at any time.
-
-However, it is possible something will go wrong and we end up with an inadvertent
-dual-master situation.  Requirements for that case are:
-
- - Conserve should not damage the repository.
-
- - If possible, one writer should continue and write a full valid backup,
-   and all the others should terminate.
-
- - This situation is expected to be rare so detecting it should not impose a large
-   performance or complexity cost.
-
-There may be different cases depending when the race occurs:
-
- - both are starting a new stripe
-
- - both writing blocks within an existing strip
-
-Possible approaches (not mutually exclusive):
-
- 1. Write a lock file when active and remove it when done.  This is difficult
-    because of confusion about taking the lock without global consistency,
-    and the client may die holding its lock.
-
- 2. Name block files uniquely so that multiple writers don't conflict.  Not great
-    though because effort and space will be wasted making multiple backups.
-
- 3. Use deterministic names and detect if the file to be written already exists
-    (maybe writing it using a do-not-overwrite option, if the back end supports
-    that).  But, without global consistency, we're not guaranteed to detect
-    conflicts.
-
- 4. Check the most-recently-written file before starting.  If it's recent
-    (within say 20 minutes) and not from the same machine, or not from a
-    process we can see is dead, warn or pause or abort.
-
- 5. Keep a client-side lock file, on a filesystem that probably is coherent.
-    Store the pid and similar information to try to detect stale processes.
-    (Doesn't protect against multiple machines all thinking they should
-    write to the same archive, or eg having different home directories on the
-    same source.)
-
- 6. Just make sure each block can be read in isolation even they do come
-    from racing processes - minimal data dependencies between blocks.
-
-
-Read/write concurrency
-----------------------
-
-Logical readers are physically read-only, so any number can run without interfering
-with writers or with each other.
-
-Because the storage layer does not promise coherency readers will see data in
-approximately but not exactly the order it was written by the writer.  In practice
-this means that some files we might expect to be present may be missing.
-
-Perhaps, if a file is missing, we should wait a few seconds to see if it appears.
-
-But, the file may be permanently missing, perhaps because the writer crashed
-before the file was committed.
-
-So concurrency seems to be just a special case of readers being robust with
-incomplete or damaged archives.
-
-
-Verification
-------------
-
-- Check the contents of each block against hashes stored in the archive.
-
-- Check across different archives of the same source: in particular, is
-  what's stored in the cloud the same as what's in the local cache?
-  Even if the local cache only contains summary information not block
-  data?
-
-- Make sure all files can be read out with the intended hash.
-
-
-Backup
-------
+## Backup
 
 Backup is essentially: walk over the source tree, subject to exclusions. Trees
 are always walked in apath order.
@@ -105,166 +9,118 @@ For each file, hash every block, and store all their blocks.
 
 Build an index including references to these blocks.
 
-Incremental backups
--------------------
+### Incremental backups
 
 When there's a previous backup, we can avoid some work of hashing blocks, by
-looking at the previous index. If the file has the same mtime/ctime and length
-as in the previous tree, we can assume it has the same content, and just copy
-across the block hashes from the previous version. We should also check that
-those blocks do actually exist.
+looking at the previous index.
 
-The parallel-iteration code is similar to, or builds on, what is needed to
-implement diff.
+As for a non-incremental backup, we need to walk the tree in apath order,
+which is the same order they're stored into the index. We can also read the
+previous index in lock step.
 
-Continuing interrupted backups
-------------------------------
+If the file has the same mtime and length
+as in the previous tree, we can infer that it has the same content, and just copy
+across the block hashes from the previous version.
 
-(not implmented yet)
+We also check that
+those blocks do actually exist: they always should if they're referenced
+by the previous index, but if they don't then they'll be rewritten, using
+the file content.
 
-To continue with a band, we need to just find the last file completely
-stored, which is the last name of the last block footer present in this
-bound.
+## Validation
 
-It might also be worth checking that all the data blocks for the interrupted
-backup have actually been stored.
+`conserve validate ARCHIVE` checks various invariants of the archive
+format. As for other operations, if errors are found they are logged,
+but the process continues rather than stopping at the first problem.
 
-Random features
----------------
+Validation is intended to catch both Conserve bugs, and problems in
+lower level systems such as disk corruption.
 
-- How can we avoid every user needing to manually configure what to
-  exclude?  Perhaps the OS can ship suggested exclusion lists that match the
-  apps?
+Properties that are checked at present include:
 
-- Exclude files from future backups but don't mark them as deleted
+* There are no extraneous files in the archive directories.
+* Every data block can be decompressed.
+* The hash of the decompressed data in each block matches its filename.
+* Every index hunk can be decompressed and deserialized.
+* Index hunk numbers are consecutive.
+* Files in the index are ordered correctly.
+* The blocks, and region within the block, referenced by the index is present.
 
-- Eventually, rdiff compression only on large files
+## Testing
 
-- Prioritize some important files, rather than working in filesystem
-  order?  Or maybe have a top tier that's masked to include only some
-  important files.
+Conserve has typical Rust unit tests within each source file, and then two
+types of higher-level tests.
 
-- Stage blocks to go to the server locally; pipeline uploads.  Eventually,
-  completely pipelined everything: write all backups to local disk (if you
-  have space and configure it that way) and then move them up to the cloud
-  in the background.
+`blackbox.rs` tests the command-line interface by running it as a subprocess.
 
+`integration.rs` tests the library through its API. (The distinction between
+this and the unit tests is a bit blurry, and perhaps this should be removed.)
 
-UI
---
+Various Conserve components accumulate counters of how much work they've done,
+into the `Report`, and this is used to make assertions about, for example,
+how many files are read to do some task.
 
-Goals:
+## External concurrency
 
- * accumulate all actions so they can easily be compared to expected
-   results at the end of a test
+Conserve does not have an explicit lock file on either the client or
+the server. Instead, the format is safe to read while it is being written.
+Multiple concurrent writers are not recommended because the safety of
+this scenario depends on the backing filesystem, but it should generally
+be safe.
 
- * show them in nicely formatted text output, eg with indenting,
-   color or tabulation, not just log output
+Conserve's basic approach of writing files once and never deleting them
+makes this practical.
 
- * stream output rather than waiting for the whole command to finish
+The absence of a lock file gives some advantages. Stale lock files are likely ts
+be left behind if the program (or machine) abruptly stops, and detecting if
+they can safely be broken is difficult. Asking the user is not a good solution
+for scheduled backups, and even if a user is present they may not make the
+decision reliably correctly. Finally, filesystems with weak ordering
+guarantees, where concurrent writers are most complex, also make it hard to
+implement a lock file.
 
- * perhaps later support a gui
+### Write/write concurrency
 
- * ui interactions can be externalized onto pipes
+Conserve is intended to be run with only one task writing to the archive at
+a time, and it relies on the user to ensure this. (Typically it will be
+run manually or from a cron job to back up one machine periodically.)
 
- * show progress bars, which implies knowing when an operation starts
-   and ends and if possible how many items are to be processed
+However, if there ever are two simultaneous tasks, this must be safe.
 
- * simple inside the main application code
+At present there is only one command that changes an archive, and that is
+`backup`. `backup` writes a new index band and (almost always) writes new
+index blocks.
 
- * not too many special cases in the ui code
+When starting a backup,
+Conserve chooses a new band number, one greater than what already exists, then creates that directory and writes into it. There is
+conceivably a race here, where two writers choose the same band. Depending on
+the filesystem behavior, they should notice the band has already been created,
+and abort.
 
-Emit fairly abstracted events that can be mapped into a ui, or just
-emitted to stdout.  Maybe emit them as (ascii?) protobufs?
+Index blocks are written by atomically renaming them in to place. If the block
+already exists, the new version (with identical contents) is simpy discarded.
+So, concurrent writes of blocks are safe, and indeed can happen from multiple
+threads in the same process.
 
-Human strings are internationalized: this should be done strictly in
-the UI layer.  Debug/log strings can be emitted anywhere and don't need
-i18n.
+When expiry or purge commands are added they'll also need care.
 
-XXX: is it enough, perhaps, just to use logging? Perhaps that's the
-simplest thing that would work, for now, enough to do some testing?
-Open questions:
+An active backup writer can potentially be detected by looking for recent
+bands or index hunks, but this is not perfect.
 
- * Transmit the actual text to be shown to the user, or some kind of
-   symbol?  Text is enough to test it, but not so good for reformatting
-   things.
+### Read/write concurrency
 
+Conceivably, one task could try to restore from the archive while another
+is writing to it, although this sounds contrived.
 
-Alarms
-------
+Logical readers are physically read-only, so any number can run without interfering
+with writers or with each other.
 
-When Conserve hits something unexpected in the environment, the core code will
-signal an *alarm*, and then attempt to continue.  The alarms are structured
-and can be filtered.  The default handlers will try to balance safety
-vs completion, but they can be customized.  In particular, you can tell
-it to accept everything and try hard to continue, so you have the best chance
-of recovering something from a damaged backup.
+Because we don't assume perfectly consistent read-after-write ordering
+from the storage, it's possible that readers see index hunks before
+their data blocks are visible. This will give an error about that file's
+content being missing, but the restore can continue.
 
-This is somewhat similar to Python's warnings module, but a different
-implementation, because Python is so tied to the warnings being about code.
-
-Fields:
-
- - *area*: source, archive, band, block, restore
- - *condition*:
-   - missing
-   - ioerror
-   - denied: permissions error from the OS
-   - corrupt: protobuf deserialization failed, etc
-   - mismatch: hash is not what a higher-level object says it should be
-   - exists: a file to be written already exists
- - *filename*
- - *message* - only what can't be stored elsewhere
-
-Handling options:
- - abort
- - continue (with a warning)
- - ask (interactively; perhaps not very useful in a long backup)
- - suppress (with only a debug message)
-
-The default should probably (?) be to abort on almost everything, except perhaps
-not on source alarms.
-
-It should be possible to get a summary, and machine-readable details of alarms
-fired.
-
-
-Return codes and result reporting
----------------------------------
-
-It's bad if a backup aborts without storing anything because of a footling
-error: it may be some unimportant source file was unreadable and therefore
-nothing was stored.  On the other hand, it's also bad if the backup apparently
-succeeds when there are errors, because the file that was skipped might have
-actually been the most important one.
-
-Therefore there need to be concise and clear summary results, that can be
-read by humans and by scripts reading the output, and an overall one-byte
-summary in the return code.
-
-Possible return codes:
-
- - everything was ok (0)
-   - no alarms at all
-   - backup completed
-
- - backup completed with warnings:
-   - some source files couldn't be read?
-   - every source file that could be read has been stored
-
- - backup completed but with major warnings:
-   - some already stored data seems to be corrupt?
-
- - fatal error
-   - bad arguments, etc
-   - unexpected exception
-
-We also need to consider the diff, verify, validate cases:
-
- - some data is wrong or missing, but it may still be possible to restore
-   everything (eg a hash is wrong)
- - some data is wrong or missing so at least some files can't be restored
- - the source differs from the backup, in ways that might be accounted for by
-   changes since the date of the backup
- - the source differs from the backup, with those changes apparently dating
-   from before the backup was made
+The reader will observe an incomplete index, and this is handled jsut as if
+the backup had been interrupted and remained incomplete: the reader
+picks up at the same point in the previous index. (This last part is not
+yet implemented, though.)
