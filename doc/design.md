@@ -1,5 +1,9 @@
 # Conserve design
 
+Conserve's design is largely shaped by its
+[manifesto and requirements](manifesto.md) and [archive format](format.md), so
+read those first.
+
 ## Backup
 
 Backup is essentially: walk over the source tree, subject to exclusions. Trees
@@ -14,18 +18,17 @@ Build an index including references to these blocks.
 When there's a previous backup, we can avoid some work of hashing blocks, by
 looking at the previous index.
 
-As for a non-incremental backup, we need to walk the tree in apath order,
-which is the same order they're stored into the index. We can also read the
-previous index in lock step.
+As for a non-incremental backup, we need to walk the tree in apath order, which
+is the same order they're stored into the index. We can also read the previous
+index in lock step.
 
-If the file has the same mtime and length
-as in the previous tree, we can infer that it has the same content, and just copy
-across the block hashes from the previous version.
+If the file has the same mtime and length as in the previous tree, we can infer
+that it has the same content, and just copy across the block hashes from the
+previous version.
 
-We also check that
-those blocks do actually exist: they always should if they're referenced
-by the previous index, but if they don't then they'll be rewritten, using
-the file content.
+We also check that those blocks do actually exist: they always should if they're
+referenced by the previous index, but if they don't then they'll be rewritten,
+using the file content.
 
 ## Validation
 
@@ -91,8 +94,8 @@ At present there is only one command that changes an archive, and that is
 `backup`. `backup` writes a new index band and (almost always) writes new
 index blocks.
 
-When starting a backup,
-Conserve chooses a new band number, one greater than what already exists, then creates that directory and writes into it. There is
+When starting a backup, Conserve chooses a new band number, one greater than
+what already exists, then creates that directory and writes into it. There is
 conceivably a race here, where two writers choose the same band. Depending on
 the filesystem behavior, they should notice the band has already been created,
 and abort.
@@ -112,8 +115,8 @@ bands or index hunks, but this is not perfect.
 Conceivably, one task could try to restore from the archive while another
 is writing to it, although this sounds contrived.
 
-Logical readers are physically read-only, so any number can run without interfering
-with writers or with each other.
+Logical readers are physically read-only, so any number can run without
+interfering with writers or with each other.
 
 Because we don't assume perfectly consistent read-after-write ordering
 from the storage, it's possible that readers see index hunks before
