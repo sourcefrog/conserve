@@ -2,6 +2,9 @@
 
 ## UNRELEASED
 
+* Improved, updated, and corrected format and design documentation (in the `doc`
+  subdirectory of the source tree.)
+
 ## Conserve 0.6.2 2020-02-06
 
 * Added nanosecond precision to stored mtimes. The main benefit of this is
