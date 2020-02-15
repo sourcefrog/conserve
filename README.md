@@ -6,8 +6,8 @@
 [![Linux build status](https://travis-ci.org/sourcefrog/conserve.svg?branch=master)](https://travis-ci.org/sourcefrog/conserve)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)
 [![crates.io](https://img.shields.io/crates/v/conserve.svg)](https://crates.io/crates/conserve)
-[![Join the chat at https://gitter.im/sourcefrog/conserve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/sourcefrog/conserve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-![Maturity: Alpha](https://img.shields.io/badge/maturity-alpha-red.svg)
+![Maturity: Beta](https://img.shields.io/badge/maturity-beta-yellow.svg)
+<!-- [![Join the chat at https://gitter.im/sourcefrog/conserve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/sourcefrog/conserve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) -->
 
 Conserve's [guiding principles](doc/manifesto.md):
 
@@ -133,18 +133,17 @@ On nightly Rust only, you can enable a potential speed-up to the blake2 hashes w
 
 * [Archive format](doc/format.md)
 
+* [Design](doc/design.md)
+
 * [Release notes](NEWS.md)
-
-* [API docs](https://docs.rs/conserve/)
-
 
 ## Limitations
 
-Conserve is reasonable to use today, with regard to format and performance, but
-still pre-1.0.
+Conserve can reasonably be used for backups today: the format is stable, in my use it's reliable, and the basic features are
+complete.
 
-Be aware that Conserve is developed as a (very) part-time non-commercial
-project and there's no guarantee of support.
+Be aware that Conserve is developed as a part-time non-commercial project and
+there's no guarantee of support.
 
 Some other limitations:
 
