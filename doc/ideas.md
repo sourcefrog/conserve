@@ -98,6 +98,9 @@ the gc operation, or if the filesystem is not quite coherent.
   This might require a change from <https://docs.rs/globset/0.4.2/globset/> that
   we use at present.
 
+* How can we avoid every user needing to manually configure what to exclude?
+  Perhaps the OS can ship suggested exclusion lists that match the apps?
+
 ## Diff backup against source
 
 It'd be really nice to account for which changes might have been due to later
@@ -125,10 +128,10 @@ Perhaps run a named command (like `diff`) on files that differ.
 - x-bit
 - permissions, owner, group - maybe shouldn't be on by default?
 
-Backup with `O_NOATIME`?
-
 Being unable to set the group or owner should be a problem that's by default
 only a warning.
+
+## Backup with `O_NOATIME`?
 
 ## Partial restore
 
@@ -153,11 +156,6 @@ should resume interrupted backups, to avoid that effect.
 
 After doing this, it's safe for `restore` to choose the most recent band even if
 it's incomplete. Similarly `ls` etc.
-
-## Split across blocks
-
-- Store block hash, start, length, as distinct from the file's own hash
-- Insert block-splitting layer
 
 ## Robustness
 
@@ -254,35 +252,9 @@ Perhaps there should be an option for the base directory.
 - Test on GCS FUSE
 - For remote or slow storage, keep a local cache of which blocks are present?
 
-## Performance on large files
-
-Let's remember something about files we saw recently in the current band, or the
-previous band.
-
-If we see a file with the same size, let's see if it has the same hash. If it
-does, we know we can reuse all the same addresses, without needing to hash each
-block individually.
-
-This should be cheap because we have to hash every stored file, anyhow. It does
-mean waiting to do the per-file hashes, that could otherwise be started earlier,
-and it means reading the file twice, which might be a risk for correctness.
-Perhaps we'd have to hash the whole file twice, which'd be ugly.
-
-Alternatively: given the hash of the whole file, we could specifically find the
-address of the trailing short block, which would otherwise be duplicated. At the
-point we're trying to write it, we'll know the hash of the whole file, and the
-length of the short block. It must be (barring hash collisions) the same as the
-final block at the end of any other file with the same hash.
-
-This will do well on a tree containing multiple copies of a large file with a
-trailing short block, which is perhaps not a negligible case.
-
 ## Questionable features
 
 - Store inode numbers and attempt to restore hard links
 - Store file types other than file/dir/symlink
-
-* How can we avoid every user needing to manually configure what to exclude?
-  Perhaps the OS can ship suggested exclusion lists that match the apps?
 
 * Exclude files from future backups but don't mark them as deleted
