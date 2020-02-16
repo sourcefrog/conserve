@@ -284,12 +284,6 @@ impl BlockDir {
             .context(errors::ReadBlock { path })?
             .len())
     }
-
-    pub(crate) fn contains_all_blocks(&self, addrs: &[Address]) -> bool {
-        addrs
-            .iter()
-            .all(|a| self.contains(&a.hash).unwrap_or_default())
-    }
 }
 
 /// Manages storage into the BlockDir of any number of files.

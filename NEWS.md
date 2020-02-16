@@ -8,6 +8,18 @@
 - Improved index uncompressed size slightly, by omitting zero block offsets,
   which are common.
 
+- Improved performance of incremental backups, by removing check that blocks
+  referenced by the previous backup are still present. In one experiment of
+  writing a large tree with few changes to a moderately-slow USB drive, this
+  cuts overall elapsed time by a factor of about 7x!
+
+  The check is redundant unless the archive has somehow been corrupted: blocks
+  are always written out before the index hunk than references them.
+
+  The basic approach in Conserve is to assume, in commands other than
+  `validate`, that the archive is correctly formatted, and to avoid unnecessary
+  ad-hoc checks that this is true.
+
 ## Conserve 0.6.2 2020-02-06
 
 - Added nanosecond precision to stored mtimes. The main benefit of this is

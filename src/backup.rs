@@ -17,7 +17,6 @@ pub struct BackupWriter {
     index_builder: IndexBuilder,
     report: Report,
     store_files: StoreFiles,
-    block_dir: BlockDir,
 
     /// The index for the last stored band, used as hints for whether newly
     /// stored files have changed.
@@ -41,7 +40,6 @@ impl BackupWriter {
             index_builder,
             report: archive.report().clone(),
             store_files: StoreFiles::new(archive.block_dir().clone()),
-            block_dir: archive.block_dir().clone(),
             basis_index,
         })
     }
@@ -80,20 +78,19 @@ impl tree::WriteTree for BackupWriter {
                 // etc, but without duplicating the filenames.
                 //
                 // self.report.println(&format!("unchanged file {}", apath));
-                if self.block_dir.contains_all_blocks(&basis_entry.addrs) {
-                    self.report.increment("file.unchanged", 1);
-                    self.report.increment_size(
-                        "file.bytes",
-                        Sizes {
-                            uncompressed: source_entry.size().unwrap_or_default(),
-                            compressed: 0,
-                        },
-                    );
-                    return self.push_entry(basis_entry);
-                } else {
-                    self.report.problem(&format!(
-                        "Some blocks of basis file {} are missing from the blockdir; writing them again", apath));
-                }
+
+                // We can reasonably assume that the existing archive complies
+                // with the archive invariants, which include that all the
+                // blocks referenced by the index, are actually present.
+                self.report.increment("file.unchanged", 1);
+                self.report.increment_size(
+                    "file.bytes",
+                    Sizes {
+                        uncompressed: source_entry.size().unwrap_or_default(),
+                        compressed: 0,
+                    },
+                );
+                return self.push_entry(basis_entry);
             } else {
                 // self.report.println(&format!("changed file {}", apath));
             }
@@ -266,9 +263,6 @@ mod tests {
         assert_eq!(bw.report.get_count("file"), 2);
         assert_eq!(bw.report.get_count("file.unchanged"), 1);
     }
-
-    // TODO: Try an incremental backup where the blocks of the previous
-    // version have somehow been lost. They should be written again.
 
     #[test]
     pub fn detect_minimal_mtime_change() {
