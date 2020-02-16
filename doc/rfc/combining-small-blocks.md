@@ -53,7 +53,7 @@ archive disk space consumed.
 
 Define some sizes, such as: `BLOCK_SIZE = 1MiB`, `SMALL = 100kiB`. Files smaller
 than `SMALL` will be written into _combined blocks_ rather than individual
-blocks.
+blocks. (Perhaps 100kiB is too high, and the limit should be more like 10kiB?)
 
 ### Backup
 
@@ -62,9 +62,10 @@ hunk. Anything larger than `SMALL` is compressed into a set of independent
 blocks, as in Conserve 0.6.2.
 
 The total size of the small files is at most 1000 entries \* 100kiB, or ~100MB.
-(And this is the case where all the entries are small files and all are new:
-typically there will be some directories or larger files, or some small files
-unchanged from the previous tree, but source trees probably approach this case.)
+(This is the worst case, where all the entries are the largest possible small
+files, and all are new: typically there will be some directories or larger
+files, or some small files unchanged from the previous tree, or small files much
+less than 100kiB. But source may approach this case.)
 
 For an incremental backup, small files are treated the same as large files and
 the same as previously: if their size and mtime is the same as in the basis
@@ -123,7 +124,24 @@ from each.
 Also, when expiry is added, these blocks can't be deleted until no later version
 refers to them, so they may hang around for a long time.
 
-### Compression
+Therefore, `restore` may be slower for archives with long histories of small
+files. And expiry may free up relatively less space: in the worst case, it will
+free up no space at all, if there is just one file still present in the last
+tree, from all previous blocks.
+
+### Larger IOs and less file manipulation overhead
+
+Per byte stored, we'd expect to dispatch fewer system calls and fewer IOs, and
+so throughput during backup would be higher.
+
+### Better dictionary compression
+
+If many small files, perhaps text files, are written inside one block, there's
+an opportunity for Snappy (or other future block compression) to make use of
+repeated patterns across files, which isn't possible if they're stored
+separately.
+
+This would reinforce the space savings that come from avoiding smaller blocks.
 
 ### Format invariants and validation
 
@@ -144,3 +162,25 @@ read it, as in #96 and [this RFC](band-version-headers.md).)
 The system, with this feature, is more complex than without it. The changes to
 the data format are modest, but the changes to the algorithms to read and write
 it with good performance are somewhat significant.
+
+## Alternatives
+
+### Periodically write new blocks to enable GC
+
+Perhaps we could have an option to `backup` telling it not to refer to old
+combined blocks, to allow them to eventually be expired.
+
+Is there any way to automatically infer this should be done? We don't directly
+know how old a block is.
+
+### Repack during gc
+
+I would generally rather avoid this, but we could potentially rewrite both
+blocks and the index during gc to allow old blocks to be removed.
+
+(Indeed if doing this there is the potential for much larger compression into
+something like git pack files.)
+
+### Store combined blocks separately?
+
+I'm not sure of any specific benefit from keeping them separate.
