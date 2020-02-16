@@ -49,6 +49,8 @@ pub struct Address {
     pub hash: String,
 
     /// Position in this block where data begins.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "crate::misc::zero_u64")]
     pub start: u64,
 
     /// Length of this block to be used.

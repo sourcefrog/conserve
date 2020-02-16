@@ -47,7 +47,7 @@ pub struct IndexEntry {
     /// the time was set by something that didn't preserve them. In that case,
     /// skip serializing.
     #[serde(default)]
-    #[serde(skip_serializing_if = "is_zero")]
+    #[serde(skip_serializing_if = "crate::misc::zero_u32")]
     pub mtime_nanos: u32,
 
     /// For stored files, the blocks holding the file contents.
@@ -59,11 +59,6 @@ pub struct IndexEntry {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_zero(a: &u32) -> bool {
-    *a == 0
 }
 
 impl Entry for IndexEntry {
