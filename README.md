@@ -113,9 +113,6 @@ To install from a git checkout, run
 
     cargo install -f --path .
 
-Binaries for some platforms are available from
-<https://github.com/sourcefrog/conserve/releases>.
-
 [rust]: https://rustup.rs/
 [sourcefrog]: http://sourcefrog.net/
 
