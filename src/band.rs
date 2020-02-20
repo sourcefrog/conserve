@@ -27,6 +27,20 @@ static INDEX_DIR: &str = "i";
 static HEAD_FILENAME: &str = "BANDHEAD";
 static TAIL_FILENAME: &str = "BANDTAIL";
 
+/// Band format-compatibility. Bands written out by this program, can only be
+/// read correctly by versions equal or later than the stated version.
+pub const BAND_FORMAT_VERSION: &str = "0.6.3";
+
+fn band_version_requirement() -> semver::VersionReq {
+    semver::VersionReq::parse("<=0.6.3").unwrap()
+}
+
+fn band_version_supported(version: &str) -> bool {
+    semver::Version::parse(&version)
+        .map(|sv| band_version_requirement().matches(&sv))
+        .unwrap_or(false)
+}
+
 /// All backup data is stored in a band.
 #[derive(Debug)]
 pub struct Band {
@@ -37,7 +51,12 @@ pub struct Band {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Head {
+    /// Seconds since the Unix epoch when writing of this band began.
     start_time: i64,
+
+    /// Semver string for the minimum Conserve version to read this band
+    /// correctly.
+    band_format_version: Option<String>,
 }
 
 /// Format of the on-disk tail file.
@@ -72,6 +91,7 @@ impl Band {
         fs::create_dir(&new.index_dir_path).context(errors::CreateBand)?;
         let head = Head {
             start_time: Utc::now().timestamp(),
+            band_format_version: Some(BAND_FORMAT_VERSION.to_owned()),
         };
         jsonio::write_json_metadata_file(&new.head_path(), &head, archive.report())?;
         Ok(new)
@@ -88,7 +108,18 @@ impl Band {
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
         let new = Band::new(archive.path(), band_id.clone());
-        new.read_head(&archive.report())?; // Just check it can be read
+        let head = new.read_head(&archive.report())?;
+        if let Some(version) = head.band_format_version {
+            if !band_version_supported(&version) {
+                return Err(Error::UnsupportedBandVersion {
+                    path: new.path().into(),
+                    version,
+                });
+            }
+        } else {
+            // Unmarked, old bands, are accepted for now. In the next archive
+            // version, band version markers ought to become mandatory.
+        }
         Ok(new)
     }
 
@@ -206,8 +237,9 @@ mod tests {
     use std::fs;
 
     use chrono::Duration;
+    use serde_json::json;
 
-    use super::super::*;
+    use super::*;
     use crate::test_fixtures::ScratchArchive;
 
     #[test]
@@ -241,5 +273,25 @@ mod tests {
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)
         assert!(dur < Duration::seconds(5));
+    }
+
+    #[test]
+    fn unsupported_band_version() {
+        let af = ScratchArchive::new();
+        fs::create_dir(af.path().join("b0000")).unwrap();
+        let head = json!({
+            "start_time": 0,
+            "band_format_version": "0.8.8",
+        });
+        fs::write(
+            af.path().join("b0000").join(HEAD_FILENAME),
+            head.to_string(),
+        )
+        .unwrap();
+
+        let e = Band::open(&af, &BandId::zero());
+        assert!(e.is_err());
+        let e_str = e.unwrap_err().to_string();
+        assert!(e_str.contains("Band version \"0.8.8\" in"), e_str);
     }
 }

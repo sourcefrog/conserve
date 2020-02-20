@@ -20,6 +20,9 @@
   `validate`, that the archive is correctly formatted, and to avoid unnecessary
   ad-hoc checks that this is true.
 
+- Added a clean error message if Conserve is too old to read a band or index
+  within an otherwise-compatible archive. (#96)
+
 ## Conserve 0.6.2 2020-02-06
 
 - Added nanosecond precision to stored mtimes. The main benefit of this is

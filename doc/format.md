@@ -2,7 +2,7 @@
 
 ## Overview
 
-All the data written by Conserve is within an *archive*.
+All the data written by Conserve is within an _archive_.
 
 Schematically, data is contained as follows:
 
@@ -19,7 +19,7 @@ Schematically, data is contained as follows:
 
 The archive makes minimal assumptions about the filesystem it's stored on: in
 particular, it need not support case sensitivity, it need not store times or
-other metadata, and it need only support ASCII filenames.  It must supported
+other metadata, and it need only support ASCII filenames. It must supported
 nested subdirectories with a total path length up to 100 characters.
 
 Archive filesystems must allow many files per directory.
@@ -33,27 +33,32 @@ appear atomically complete.
 
 ## Archive
 
-A backup *archive* is a directory, containing an *archive header*, a *data block
-directory*, and any number of *band directories*.
+A backup _archive_ is a directory, containing an _archive header_, a _data block
+directory_, and any number of _band directories_.
 
 ### Archive header
 
-In the root directory of the archive there is a file called `CONSERVE`,
-which is contains a json dict, with no compression, with the following contents.
+In the root directory of the archive there is a file called `CONSERVE`, which is
+contains a json dict, with no compression, with the following contents.
 
     {"conserve_archive_version": "0.6"}
 
+For pre-1.0 versions of Conserve, increments in the minor version (the second
+component) may imply a new archive format, and they are not guaranteed to
+support older formats. That is to say, a build of Conserve from the 0.6 series
+can be used to read an 0.6 archive.
+
 See [versioning.md](versioning.md) for more on version compatibility.
-(For pre-1.0 versions of Conserve, older formats are described in the version
-of this file from the relevant release source tree.)
 
 ## Apaths
 
-Filenames in the archive are normalized to a format called an *apath*, which
+Filenames in the archive are normalized to a format called an _apath_, which
 defines a representation and an ordering.
 
 Apaths are the same regardless of source OS, although some Apaths might be
-impossible to write on certain filesystems. On filesystems that are case-insensitive, or that do Unicode normalization, multiple Apaths might identify the same file.
+impossible to write on certain filesystems. On filesystems that are
+case-insensitive, or that do Unicode normalization, multiple Apaths might
+identify the same file.
 
 Apaths are stored as UTF-8 byte strings.
 
@@ -102,7 +107,7 @@ subsequence of the index.
 
 ## Bands
 
-Within an archive, there are multiple *bands*, each describing the contents of a
+Within an archive, there are multiple _bands_, each describing the contents of a
 single version of the backup tree.
 
 Bands are identified by a name starting with `b` and followed by a sequence of
@@ -110,21 +115,20 @@ one or more integers, separated by dashes.
 
 Each band corresponds to a single version of the backup tree.
 
-In Conserve 0.6, only bands with a single integer, called a *top level band*,
-are generated or supported. Top level bands contain an index listing every
-entry present in that tree.  Top level bands are numbered
-sequentially from `b0000`.
+In Conserve 0.6, only bands with a single integer, called a _top level band_,
+are generated or supported. Top level bands contain an index listing every entry
+present in that tree. Top level bands are numbered sequentially from `b0000`.
 
-Bands that are not top-level are *child bands*, and their *parent band* is the
+Bands that are not top-level are _child bands_, and their _parent band_ is the
 band with the last component of their name removed. Child bands' index contains
 only the changes relative to their parent band's index. (Child bands are not
 implemented as of Conserve 0.6.)
 
-A band can be *complete*, while it is receiving data, or *incomplete* when
+A band can be _complete_, while it is receiving data, or _incomplete_ when
 everything from the source has been written. Bands may remain incomplete
 indefinitely, across multiple Conserve invocations, until they are finished.
-Once the band is completed, it will not be changed. A band is complete if
-its *band tail* file exists, and incomplete otherwise.
+Once the band is completed, it will not be changed. A band is complete if its
+_band tail_ file exists, and incomplete otherwise.
 
 Numbers in band indexes are zero-padded to four digits in each area, so that
 they will be grouped conveniently for humans looking at naively sorted listings
@@ -133,7 +137,7 @@ or on the transport returning any particular ordering; bands numbered over 9999
 are supported.)
 
 Bands are represented as a subdirectory within the archive directory, as `b`
-followed by the number.  All bands are in the top-level archive directory.
+followed by the number. All bands are in the top-level archive directory.
 
     my-archive/
       b0000/
@@ -146,12 +150,14 @@ followed by the number.  All bands are in the top-level archive directory.
 A band head is a file `BANDHEAD` containing an uncompressed json dictionary,
 within the band directory.
 
-The head file is written when the band is first opened and then it is
-not changed again.
+The head file is written when the band is first opened and then it is not
+changed again.
 
 The head file contains:
 
- - `start_time`: the Unix time, in seconds, when the band was started
+- `start_time`: The Unix time, in seconds, when the band was started.
+- `band_format_version`: The minimum program version to correctly read this
+  band.
 
 ### Band tail file
 
@@ -160,13 +166,13 @@ directory. It is the presence of this file that defines the band as complete.
 
 Band footer contains:
 
- - `end_time`: the Unix time, in seconds, that the band ended
+- `end_time`: the Unix time, in seconds, that the band ended
 
 ## Data block directory
 
 An archive contains a single data block directory, which stores the compressed
-body content of all files in the archive. This is the `d/` directory directly with in
-the archive directory.
+body content of all files in the archive. This is the `d/` directory directly
+with in the archive directory.
 
 ### Data blocks
 
@@ -175,11 +181,10 @@ Data blocks contain parts of the contents of stored files.
 One data block may contain data for a whole file, the concatenated text for
 several files, or part of a file.
 
-The writer can choose the data block size, except that both the uncompressed
-and compressed blocks must be <1GB, so they can reasonably fit in memory.
+The writer can choose the data block size, except that both the uncompressed and
+compressed blocks must be <1GB, so they can reasonably fit in memory.
 
-The name of the data block file is the BLAKE2 hash of the uncompressed
-contents.
+The name of the data block file is the BLAKE2 hash of the uncompressed contents.
 
 The blocks are spread across a single layer of subdirectories, where each
 subdirectory is the first three hex characters of the name of the contained
@@ -190,49 +195,47 @@ Data block are compressed in the Snappy format
 
 ## Index
 
-Conceptually, the index stores a list of *index entries* in apath order.
-Externally, the index is broken into several numbered *index hunk* files,
-each containing many index entries.
+Conceptually, the index stores a list of _index entries_ in apath order.
+Externally, the index is broken into several numbered _index hunk_ files, each
+containing many index entries.
 
 ### Index entries
 
-*Index entries* contain the name and metadata of a stored file, plus a
-reference to the data hunks holding its full text.
+_Index entries_ contain the name and metadata of a stored file, plus a reference
+to the data hunks holding its full text.
 
 An index entry is a json dict with keys
 
-   - `apath`: the apath of the file
-   - `mtime`: integer seconds past the Unix epoch
-   - `mtime_nanos`: (optional) fractional part of the mtime, as nanoseconds.
-   - `kind`: one of `"File"`, `"Dir"`, `"Symlink"`
-   - `addrs`: a list of tuples of:
-     - `hash`: data block hash: from the current or any
-       parent directory
-     - `start`: the offset within the uncompressed content of the
-       block for the start of this file
-     - `length`: the number of bytes of uncompressed data block
-       content to store in this file
-   - `target`: For symlinks, the string target of the symlink.
+- `apath`: the apath of the file
+- `mtime`: integer seconds past the Unix epoch
+- `mtime_nanos`: (optional) fractional part of the mtime, as nanoseconds.
+- `kind`: one of `"File"`, `"Dir"`, `"Symlink"`
+- `addrs`: a list of tuples of:
+  - `hash`: data block hash: from the current or any parent directory
+  - `start`: the offset within the uncompressed content of the block for the
+    start of this file
+  - `length`: the number of bytes of uncompressed data block content to store in
+    this file
+- `target`: For symlinks, the string target of the symlink.
 
-So, the length of any file is the sum of the `length` entries for all
-its `addrs`.
+So, the length of any file is the sum of the `length` entries for all its
+`addrs`.
 
 ### Index hunks
 
-Index hunks are named with decimal sequence numbers padded to 9 digits,
-starting at 0.
+Index hunks are named with decimal sequence numbers padded to 9 digits, starting
+at 0.
 
-Index hunks are stored in an `i/` subdirectory of the band, and then
-in a subdirectory for the sequence number divided by 10000 and
-padded to five digits.  So, the first block is `i/00000/000000000`.
+Index hunks are stored in an `i/` subdirectory of the band, and then in a
+subdirectory for the sequence number divided by 10000 and padded to five digits.
+So, the first block is `i/00000/000000000`.
 
 Index hunks are serialized as json and then Snappy compressed.
 
 An index hunk is a json list of index entries.
 
-Entries are sorted by apath both within each hunk, and across all
-hunks.
+Entries are sorted by apath both within each hunk, and across all hunks.
 
-The number of files described within a single index hunk file is
-arbitrary and may be chosen to control the number of outstanding data
-blocks or the length of the index hunk.
+The number of files described within a single index hunk file is arbitrary and
+may be chosen to control the number of outstanding data blocks or the length of
+the index hunk.

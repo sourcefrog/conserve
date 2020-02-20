@@ -60,7 +60,7 @@ pub fn version() -> &'static str {
     VERSION
 }
 
-/// Format-compatibility version, normally the first two components of the package version.
+/// Archive format-compatibility version, normally the first two components of the package version.
 ///
 /// (This might be older than the program version.)
 pub const ARCHIVE_VERSION: &str = "0.6";

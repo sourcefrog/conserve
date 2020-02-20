@@ -45,6 +45,14 @@ pub enum Error {
     ))]
     UnsupportedArchiveVersion { path: PathBuf, version: String },
 
+    #[snafu(display(
+        "Band version {:?} in {:?} is not supported by Conserve {}",
+        version,
+        path,
+        crate::version()
+    ))]
+    UnsupportedBandVersion { path: PathBuf, version: String },
+
     #[snafu(display("Destination directory not empty: {:?}", path))]
     DestinationNotEmpty { path: PathBuf },
 
