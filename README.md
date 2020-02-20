@@ -148,8 +148,7 @@ there's no guarantee of support.
 Some other limitations:
 
 * `conserve validate` checks some [but not all possible propertises of the archive][5].
-* `conserve diff` is also not implemented, but can be simulated by restoring to
-  a temporary directory and comparing that to the source.
+* `conserve diff` exists, [but is not yet very useful][21].
 * [The `conserve purge` command to trim the backup archive is not implemented][43],
   but the `b0123` band directories can be deleted directly.
 * [Permissions and ownership are not stored](https://github.com/sourcefrog/conserve/issues/46).
@@ -159,6 +158,7 @@ you should restore using the same version that you used to make the backup.
 
 [5]: https://github.com/sourcefrog/conserve/issues/5
 [8]: https://github.com/sourcefrog/conserve/issues/8
+[21]: https://github.com/sourcefrog/conserve/issues/21
 [32]: https://github.com/sourcefrog/conserve/issues/32
 [41]: https://github.com/sourcefrog/conserve/issues/41
 [42]:https://github.com/sourcefrog/conserve/issues/42
