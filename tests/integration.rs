@@ -20,7 +20,12 @@ pub fn simple_backup() {
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
     // TODO: Include a symlink only on Unix.
-    copy_tree(&srcdir.live_tree(), &mut BackupWriter::begin(&af).unwrap()).unwrap();
+    copy_tree(
+        &srcdir.live_tree(),
+        &mut BackupWriter::begin(&af).unwrap(),
+        &COPY_DEFAULT,
+    )
+    .unwrap();
     check_backup(&af, &af.report());
     check_restore(&af);
 }
@@ -37,7 +42,7 @@ pub fn simple_backup_with_excludes() {
     let excludes = excludes::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
     let lt = srcdir.live_tree().with_excludes(excludes);
     let mut bw = BackupWriter::begin(&af).unwrap();
-    copy_tree(&lt, &mut bw).unwrap();
+    copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
     check_backup(&af, &af.report());
     check_restore(&af);
     af.validate().unwrap();
@@ -100,7 +105,7 @@ fn check_restore(af: &ScratchArchive) {
     let archive = Archive::open(af.path(), &restore_report).unwrap();
     let mut restore_tree = RestoreTree::create(&restore_dir.path(), &restore_report).unwrap();
     let st = StoredTree::open_last(&archive).unwrap();
-    copy_tree(&st, &mut restore_tree).unwrap();
+    copy_tree(&st, &mut restore_tree, &COPY_DEFAULT).unwrap();
 
     let block_sizes = restore_report.get_size("block");
     assert!(
@@ -127,7 +132,7 @@ fn large_file() {
     tf.create_file_with_contents("large", &large_content.as_bytes());
     let report = af.report();
     let mut bw = BackupWriter::begin(&af).unwrap();
-    copy_tree(&tf.live_tree(), &mut bw).unwrap();
+    copy_tree(&tf.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
     assert_eq!(report.get_count("file"), 1);
     assert_eq!(report.get_count("file.large"), 1);
 
@@ -137,7 +142,7 @@ fn large_file() {
     let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
     let st = StoredTree::open_last(&restore_archive).unwrap();
     let mut rt = RestoreTree::create(rd.path(), &restore_report).unwrap();
-    copy_tree(&st, &mut rt).unwrap();
+    copy_tree(&st, &mut rt, &COPY_DEFAULT).unwrap();
 
     assert_eq!(report.get_count("file"), 1);
 
@@ -164,7 +169,7 @@ fn source_unreadable() {
     tf.make_file_unreadable("b_unreadable");
 
     let mut bw = BackupWriter::begin(&af).unwrap();
-    let r = copy_tree(&tf.live_tree(), &mut bw);
+    let r = copy_tree(&tf.live_tree(), &mut bw, &COPY_DEFAULT);
     r.unwrap();
 
     // TODO: On Windows change the ACL to make the file unreadable to the current user or to

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2017, 2018, 2019 Martin Pool.
+// Copyright 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Copy tree contents.
 
@@ -8,17 +8,30 @@ use snafu::ResultExt;
 
 use crate::*;
 
-const MEASURE_FIRST: bool = false;
+#[derive(Default, Clone, Debug)]
+pub struct CopyOptions {
+    pub print_filenames: bool,
+    pub measure_first: bool,
+}
+
+pub const COPY_DEFAULT: CopyOptions = CopyOptions {
+    print_filenames: false,
+    measure_first: false,
+};
 
 /// Copy files and other entries from one tree to another.
 ///
 /// Progress and problems are reported to the source's report.
-pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Result<()> {
+pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
+    source: &ST,
+    dest: &mut DT,
+    options: &CopyOptions,
+) -> Result<()> {
     let report = source.report();
     // This causes us to walk the source tree twice, which is probably an acceptable option
     // since it's nice to see realistic overall progress. We could keep all the entries
     // in memory, and maybe we should, but it might get unreasonably big.
-    if MEASURE_FIRST {
+    if options.measure_first {
         report.set_phase("Measure source tree");
         // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
         // again a second time? But, that'll potentially use memory proportional to tree size, which
@@ -28,7 +41,11 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(source: &ST, dest: &mut DT) -> Res
     }
     report.set_phase("Copying");
     for entry in source.iter_entries(&report)? {
-        report.start_entry(entry.apath());
+        let apath = entry.apath();
+        if options.print_filenames {
+            report.println(apath);
+        }
+        report.start_entry(apath);
         if let Err(e) = match entry.kind() {
             Kind::Dir => dest.copy_dir(&entry),
             Kind::File => dest.copy_file(&entry, source),

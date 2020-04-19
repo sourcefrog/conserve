@@ -144,7 +144,7 @@ mod tests {
         let lt = LiveTree::open(srcdir.path(), &Report::new()).unwrap();
         let mut bw = BackupWriter::begin(&af).unwrap();
         let report = af.report();
-        copy_tree(&lt, &mut bw).unwrap();
+        copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(0, report.get_count("file"));
         assert_eq!(1, report.get_count("symlink"));
@@ -189,7 +189,7 @@ mod tests {
             .unwrap()
             .with_excludes(excludes);
         let mut bw = BackupWriter::begin(&af).unwrap();
-        copy_tree(&lt, &mut bw).unwrap();
+        copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(1, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"));
@@ -211,7 +211,7 @@ mod tests {
         srcdir.create_file_with_contents("empty", &[]);
         let mut bw = BackupWriter::begin(&af).unwrap();
         let report = af.report();
-        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(0, report.get_count("block.write"));
         assert_eq!(1, report.get_count("file"), "file count");
@@ -238,7 +238,7 @@ mod tests {
 
         let mut bw = BackupWriter::begin(&af).unwrap();
         let report = af.report();
-        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(report.get_count("file"), 2);
         assert_eq!(report.get_count("file.unchanged"), 0);
@@ -247,7 +247,7 @@ mod tests {
         // both files are unchanged.
         let mut bw = BackupWriter::begin(&af).unwrap();
         bw.report = Report::new();
-        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(bw.report.get_count("file"), 2);
         assert_eq!(bw.report.get_count("file.unchanged"), 2);
@@ -258,7 +258,7 @@ mod tests {
 
         let mut bw = BackupWriter::begin(&af).unwrap();
         bw.report = Report::new();
-        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(bw.report.get_count("file"), 2);
         assert_eq!(bw.report.get_count("file.unchanged"), 1);
@@ -273,7 +273,7 @@ mod tests {
 
         let mut bw = BackupWriter::begin(&af).unwrap();
         let report = af.report();
-        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(report.get_count("file"), 2);
         assert_eq!(report.get_count("file.unchanged"), 0);
@@ -295,7 +295,7 @@ mod tests {
 
         let mut bw = BackupWriter::begin(&af).unwrap();
         bw.report = Report::new();
-        copy_tree(&srcdir.live_tree(), &mut bw).unwrap();
+        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(bw.report.get_count("file"), 2);
         assert_eq!(bw.report.get_count("file.unchanged"), 1);

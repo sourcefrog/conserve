@@ -37,7 +37,7 @@ pub use crate::bandid::BandId;
 pub use crate::blockdir::BlockDir;
 pub use crate::compress::snappy::Snappy;
 pub use crate::compress::Compression;
-pub use crate::copy_tree::copy_tree;
+pub use crate::copy_tree::{copy_tree, CopyOptions, COPY_DEFAULT};
 pub use crate::entry::{Entry, Kind};
 pub use crate::errors::*;
 pub use crate::index::{IndexBuilder, IndexEntry, ReadIndex};

@@ -201,10 +201,6 @@ impl Report {
 
     /// Report that processing started for a given entry.
     pub fn start_entry(&self, apath: &Apath) {
-        // TODO: Leave cursor pending at the end of the line until it's finished?
-        if self.print_filenames {
-            self.println(&format!("{}", apath));
-        }
         self.mut_counts().latest_filename = apath.to_string();
     }
 

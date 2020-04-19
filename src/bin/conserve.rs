@@ -304,7 +304,11 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     let lt = live_tree_from_options(subm, report)?;
     let mut bw = BackupWriter::begin(&archive)?;
-    copy_tree(&lt, &mut bw)?;
+    let opts = CopyOptions {
+        print_filenames: subm.is_present("v"),
+        ..CopyOptions::default()
+    };
+    copy_tree(&lt, &mut bw, &opts)?;
     report.println("Backup complete.");
     report.println(&report.borrow_counts().summary_for_backup());
     Ok(())
@@ -387,7 +391,11 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     } else {
         RestoreTree::create(dest, report)
     }?;
-    copy_tree(&st, &mut rt)?;
+    let opts = CopyOptions {
+        print_filenames: subm.is_present("v"),
+        ..CopyOptions::default()
+    };
+    copy_tree(&st, &mut rt, &opts)?;
     report.println("Restore complete.");
     report.println(&report.borrow_counts().summary_for_restore());
     Ok(())

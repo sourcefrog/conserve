@@ -138,7 +138,7 @@ mod tests {
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
         let mut rt = RestoreTree::create(destdir.path(), &restore_report).unwrap();
-        copy_tree(&st, &mut rt).unwrap();
+        copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
@@ -165,7 +165,7 @@ mod tests {
         let a = Archive::open(af.path(), &restore_report).unwrap();
         let st = StoredTree::open_version(&a, &BandId::new(&[0])).unwrap();
         let mut rt = RestoreTree::create(&destdir.path(), &restore_report).unwrap();
-        copy_tree(&st, &mut rt).unwrap();
+        copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
         // Does not have the 'hello2' file added in the second version.
         assert_eq!(2, restore_report.get_count("file"));
     }
@@ -193,7 +193,7 @@ mod tests {
         let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
         let mut rt = RestoreTree::create_overwrite(&destdir.path(), &restore_report).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
-        copy_tree(&st, &mut rt).unwrap();
+        copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
 
         assert_eq!(3, restore_report.get_count("file"));
         let dest = &destdir.path();
@@ -212,7 +212,7 @@ mod tests {
             .unwrap()
             .with_excludes(excludes::from_strings(&["/**/subfile"]).unwrap());
         let mut rt = RestoreTree::create_overwrite(&destdir.path(), &restore_report).unwrap();
-        copy_tree(&st, &mut rt).unwrap();
+        copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
 
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
