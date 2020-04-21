@@ -176,17 +176,6 @@ impl Report {
         *e += sizes;
     }
 
-    /// Merge the contents of `from_report` into `self`.
-    pub fn merge_from(&self, from_report: &Report) {
-        let from_counts = from_report.mut_counts();
-        for (name, value) in &from_counts.count {
-            self.increment(name, *value);
-        }
-        for (name, s) in &from_counts.sizes {
-            self.increment_size(name, s.clone());
-        }
-    }
-
     pub fn get_size(&self, counter_name: &str) -> Sizes {
         self.borrow_counts().get_size(counter_name)
     }
@@ -421,34 +410,6 @@ mod tests {
         assert_eq!(r.borrow_counts().get_count("block.read"), 1);
         r.increment("block.read", 10);
         assert_eq!(r.borrow_counts().get_count("block.read"), 11);
-    }
-
-    #[test]
-    pub fn merge_reports() {
-        let r1 = Report::new();
-        let r2 = Report::new();
-        r1.increment("block.write", 1);
-        r1.increment("block.corrupt", 2);
-        r2.increment("block.write", 1);
-        r2.increment("block.corrupt", 10);
-        r2.increment_size(
-            "block",
-            Sizes {
-                uncompressed: 300,
-                compressed: 100,
-            },
-        );
-        r1.merge_from(&r2);
-        let cs = r1.borrow_counts();
-        assert_eq!(cs.get_count("block.write"), 2);
-        assert_eq!(cs.get_count("block.corrupt"), 12);
-        assert_eq!(
-            cs.get_size("block"),
-            Sizes {
-                uncompressed: 300,
-                compressed: 100,
-            }
-        );
     }
 
     #[rustfmt::skip]
