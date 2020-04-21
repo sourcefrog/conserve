@@ -137,10 +137,6 @@ impl Report {
         }
     }
 
-    pub fn set_print_filenames(&mut self, p: bool) {
-        self.print_filenames = p;
-    }
-
     fn mut_counts(&self) -> MutexGuard<Counts> {
         self.counts.lock().unwrap()
     }

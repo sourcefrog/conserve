@@ -14,7 +14,7 @@ fn main() -> conserve::Result<()> {
     let ui_name = matches.value_of("ui").unwrap_or("auto");
     let no_progress = matches.is_present("no-progress");
     let ui = UI::by_name(ui_name, !no_progress).expect("Couldn't make UI");
-    let mut report = Report::with_ui(ui);
+    let report = Report::with_ui(ui);
 
     let (n, sm) = rollup_subcommands(&matches);
     let c = match n.as_str() {
@@ -33,7 +33,6 @@ fn main() -> conserve::Result<()> {
         "versions" => versions,
         _ => panic!("unimplemented command"),
     };
-    report.set_print_filenames(sm.is_present("v"));
     let result = c(sm, &report);
 
     report.finish();
