@@ -100,7 +100,6 @@ pub struct Counts {
 pub struct Report {
     counts: Arc<Mutex<Counts>>,
     ui: Arc<Mutex<Box<dyn UI + Send>>>,
-    print_filenames: bool,
 }
 
 /// Trees and Archives have a Report as general context for operations on them.
@@ -133,7 +132,6 @@ impl Report {
         Report {
             counts: Arc::new(Mutex::new(Counts::new())),
             ui: Arc::new(Mutex::new(ui_box)),
-            print_filenames: false,
         }
     }
 
