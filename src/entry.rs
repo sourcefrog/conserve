@@ -5,8 +5,7 @@
 //! stored tree or local tree.
 
 use std::fmt::Debug;
-#[allow(unused_imports)]
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
