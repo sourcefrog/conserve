@@ -111,14 +111,17 @@ impl TreeFixture {
         &self.root
     }
 
-    pub fn create_file(&self, relative_path: &str) {
-        self.create_file_with_contents(relative_path, b"contents");
+    /// Make a file in the tree, with arbitrary contents. Returns the full path.
+    pub fn create_file(&self, relative_path: &str) -> PathBuf {
+        self.create_file_with_contents(relative_path, b"contents")
     }
 
-    pub fn create_file_with_contents(&self, relative_path: &str, contents: &[u8]) {
+    /// Make a file in the tree, with given contents. Returns the full path.
+    pub fn create_file_with_contents(&self, relative_path: &str, contents: &[u8]) -> PathBuf {
         let full_path = self.root.join(relative_path);
         let mut f = fs::File::create(&full_path).unwrap();
         f.write_all(contents).unwrap();
+        full_path
     }
 
     pub fn create_dir(&self, relative_path: &str) {
