@@ -19,6 +19,13 @@ pub const COPY_DEFAULT: CopyOptions = CopyOptions {
     measure_first: false,
 };
 
+/// Statistics about a tree copy operation.
+#[derive(Default, Clone, Debug, Eq, PartialEq)]
+pub struct CopyStats {
+    /// Number of entries skipped because they're an
+    pub unknown_file_kind: u64,
+}
+
 /// Copy files and other entries from one tree to another.
 ///
 /// Progress and problems are reported to the source's report.
@@ -26,8 +33,9 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     source: &ST,
     dest: &mut DT,
     options: &CopyOptions,
-) -> Result<()> {
+) -> Result<CopyStats> {
     let report = source.report();
+    let mut stats = CopyStats::default();
     // This causes us to walk the source tree twice, which is probably an acceptable option
     // since it's nice to see realistic overall progress. We could keep all the entries
     // in memory, and maybe we should, but it might get unreasonably big.
@@ -51,6 +59,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
             Kind::File => dest.copy_file(&entry, source),
             Kind::Symlink => dest.copy_symlink(&entry),
             Kind::Unknown => {
+                stats.unknown_file_kind += 1;
                 // TODO: Perhaps eventually we could backup and restore pipes,
                 // sockets, etc. Or at least count them. For now, silently skip.
                 // https://github.com/sourcefrog/conserve/issues/82
@@ -63,5 +72,6 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         report.increment_work(entry.size().unwrap_or(0));
     }
     report.clear_phase();
-    dest.finish()
+    dest.finish()?;
+    Ok(stats)
 }
