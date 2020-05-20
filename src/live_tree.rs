@@ -458,4 +458,46 @@ mod tests {
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[1].apath, "/from");
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn mtime_before_epoch() {
+        // Like in <https://github.com/sourcefrog/conserve/issues/100>.
+        let tf = TreeFixture::new();
+        let file_path = tf.create_file("old_file");
+
+        // We can't use the utime crate here because it passes the time as a u64,
+        // even though the system's time_t is typically signed. libc doesn't have
+        // this problem.
+        let utimbuf = libc::utimbuf {
+            actime: -36000,
+            modtime: -36000,
+        };
+        let c_path = std::ffi::CString::new(file_path.to_str().unwrap().as_bytes()).unwrap();
+        unsafe {
+            // TODO: Move this to a patch to utime, or a fork, or local reimplementation.
+            assert_eq!(libc::utime(c_path.as_ptr(), &utimbuf), 0);
+        }
+
+        // Just for confirmation when debugging that it's actually in 1969.
+        std::process::Command::new("ls")
+            .arg("-l")
+            .arg(&tf.path())
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
+
+        let report = Report::new();
+        let lt = LiveTree::open(tf.path(), &report).unwrap();
+        let entries = lt.iter_entries(&report).unwrap().collect::<Vec<_>>();
+
+        assert_eq!(&entries[0].apath, "/");
+        assert_eq!(&entries[1].apath, "/old_file");
+        dbg!(&entries[1].mtime());
+
+        // This conversion panics in https://github.com/sourcefrog/conserve/issues/100 because it
+        // produces a negative Duration.
+        let _index_entry = IndexEntry::metadata_from(&entries[1]);
+    }
 }
