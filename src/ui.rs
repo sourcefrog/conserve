@@ -50,10 +50,12 @@ lazy_static! {
     static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState::default());
 }
 
+// TODO: Rather than a directly-called function, hook this into logging.
 pub fn println(s: &str) {
     UI_STATE.lock().unwrap().println(s);
 }
 
+// TODO: Rather than a directly-called function, hook this into logging.
 pub fn problem<S: AsRef<str>>(s: &S) {
     UI_STATE.lock().unwrap().problem(s.as_ref()).unwrap();
 }

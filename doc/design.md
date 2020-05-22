@@ -188,3 +188,6 @@ Rather than directly constructing progress bars, core library code should send
 messages to observer objects, passed in by the application. These can then be
 configured to either draw progress bars to the terminal, or do nothing, or do
 something else.
+
+Progess bars are drawn only for the small number of main loops that are expected
+to take a long time, and don't implicitly pop up due to IO.
