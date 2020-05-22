@@ -24,6 +24,8 @@ pub const COPY_DEFAULT: CopyOptions = CopyOptions {
 pub struct CopyStats {
     /// Number of entries skipped because they're an
     pub unknown_file_kind: u64,
+
+    pub file_totals: Sizes,
 }
 
 /// Copy files and other entries from one tree to another.
@@ -56,7 +58,9 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         report.start_entry(apath);
         if let Err(e) = match entry.kind() {
             Kind::Dir => dest.copy_dir(&entry),
-            Kind::File => dest.copy_file(&entry, source),
+            Kind::File => dest
+                .copy_file(&entry, source)
+                .map(|sizes| stats.file_totals += sizes),
             Kind::Symlink => dest.copy_symlink(&entry),
             Kind::Unknown => {
                 stats.unknown_file_kind += 1;

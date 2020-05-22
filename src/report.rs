@@ -167,15 +167,6 @@ impl Report {
         }
     }
 
-    pub fn increment_size(&self, counter_name: &str, sizes: Sizes) {
-        let mut counts = self.mut_counts();
-        let e = counts
-            .sizes
-            .get_mut(counter_name)
-            .expect("unregistered size counter");
-        *e += sizes;
-    }
-
     pub fn get_size(&self, counter_name: &str) -> Sizes {
         self.borrow_counts().get_size(counter_name)
     }

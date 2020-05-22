@@ -105,12 +105,15 @@ fn check_restore(af: &ScratchArchive) {
     let archive = Archive::open(af.path(), &restore_report).unwrap();
     let mut restore_tree = RestoreTree::create(&restore_dir.path(), &restore_report).unwrap();
     let st = StoredTree::open_last(&archive).unwrap();
-    copy_tree(&st, &mut restore_tree, &COPY_DEFAULT).unwrap();
-
-    let block_sizes = restore_report.get_size("block");
-    assert!(
-        block_sizes.uncompressed == 8 && block_sizes.compressed == 10,
-        format!("{:?}", block_sizes)
+    let copy_stats = copy_tree(&st, &mut restore_tree, &COPY_DEFAULT).unwrap();
+    assert_eq!(
+        copy_stats.file_totals,
+        Sizes {
+            uncompressed: 8,
+            // TODO: Compressed size isn't set properly when restoring, because it's
+            // lost by passing through a std::io::Read in ReadStoredFile.
+            compressed: 0,
+        }
     );
     let index_sizes = restore_report.get_size("index");
     // Can vary a bit depending on the lengths of the timestamps.

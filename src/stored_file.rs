@@ -36,16 +36,17 @@ impl StoredFile {
         // the content can't be loaded.
         // TODO: Arguably we don't need to actually load the chunks here; it's
         // enough to remember that all the blocks were loaded before.
+        // TODO: Give warnings and remember if there are any errors, but don't stop early.
         self.block_range()
             .unwrap()
             .into_par_iter()
-            .map(|i| {
-                let c = self.read_block(i)?;
-                self.report.increment_work(c.len() as u64);
-                Ok(())
+            .map(|hash| {
+                // Throw away content and counts, for now
+                self.read_block(hash).and(Ok(()))
             })
             .find_any(Result::is_err)
             .unwrap_or(Ok(()))
+        // TODO: Return sum of sizes.
     }
 
     /// Open a cursor on this file that implements `std::io::Read`.
@@ -65,7 +66,7 @@ impl ReadBlocks for StoredFile {
         Ok(self.addrs.len())
     }
 
-    fn read_block(&self, i: usize) -> Result<Vec<u8>> {
+    fn read_block(&self, i: usize) -> Result<(Vec<u8>, Sizes)> {
         self.block_dir.get(&self.addrs[i], &self.report)
     }
 }
@@ -102,7 +103,9 @@ impl std::io::Read for ReadStoredFile {
                 return Ok(s);
             } else if let Some(addr) = self.remaining_addrs.next() {
                 // TODO: Handle errors nicely, but they need to convert to std::io::Error.
-                self.buf = self.block_dir.get(&addr, &self.report).unwrap();
+                // TODO: Remember the sizes somewhere, maybe by changing this not to be
+                // std::io::Read.
+                self.buf = self.block_dir.get(&addr, &self.report).unwrap().0;
                 self.buf_cursor = 0;
             // TODO: Read directly into the caller's buffer, if it will fit. Requires changing
             // BlockDir::get to take a caller-provided buffer.

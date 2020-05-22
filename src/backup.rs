@@ -45,8 +45,8 @@ impl BackupWriter {
     }
 
     fn push_entry(&mut self, index_entry: IndexEntry) -> Result<()> {
-        self.index_builder.push(index_entry);
-        self.index_builder.maybe_flush(&self.report)?;
+        // TODO: Return or accumulate index sizes.
+        self.index_builder.push(index_entry, &self.report)?;
         Ok(())
     }
 }
@@ -60,11 +60,12 @@ impl tree::WriteTree for BackupWriter {
 
     fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         self.report.increment("dir", 1);
+        // TODO: Pass back index sizes
         self.push_entry(IndexEntry::metadata_from(source_entry))
     }
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(&mut self, source_entry: &R::Entry, from_tree: &R) -> Result<()> {
+    fn copy_file<R: ReadTree>(&mut self, source_entry: &R::Entry, from_tree: &R) -> Result<Sizes> {
         self.report.increment("file", 1);
         let apath = source_entry.apath();
         if let Some(basis_entry) = self
@@ -83,37 +84,27 @@ impl tree::WriteTree for BackupWriter {
                 // with the archive invariants, which include that all the
                 // blocks referenced by the index, are actually present.
                 self.report.increment("file.unchanged", 1);
-                self.report.increment_size(
-                    "file.bytes",
-                    Sizes {
-                        uncompressed: source_entry.size().unwrap_or_default(),
-                        compressed: 0,
-                    },
-                );
-                return self.push_entry(basis_entry);
+                self.push_entry(basis_entry)?;
+                return Ok(Sizes {
+                    uncompressed: source_entry.size().unwrap_or_default(),
+                    compressed: 0,
+                });
             } else {
                 // self.report.println(&format!("changed file {}", apath));
             }
         }
-        let addrs = if source_entry.size().map(|x| x > 0).unwrap_or(false) {
+        let (addrs, stored_sizes) = if source_entry.size().map(|x| x > 0).unwrap_or(false) {
             let content = &mut from_tree.file_contents(&source_entry)?;
             self.store_files
                 .store_file_content(&apath, content, &self.report)?
         } else {
-            Vec::new()
+            (Vec::new(), Sizes::default())
         };
-        let size = addrs.iter().map(|a| a.len).sum();
-        self.report.increment_size(
-            "file.bytes",
-            Sizes {
-                uncompressed: size,
-                compressed: 0,
-            },
-        );
         self.push_entry(IndexEntry {
             addrs,
             ..IndexEntry::metadata_from(source_entry)
-        })
+        })?;
+        Ok(stored_sizes)
     }
 
     fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<()> {

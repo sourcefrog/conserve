@@ -140,16 +140,16 @@ impl BlockDir {
     /// Read back the contents of a block, as a byte array.
     ///
     /// To read a whole file, use StoredFile instead.
-    pub fn get(&self, addr: &Address, report: &Report) -> Result<Vec<u8>> {
+    pub fn get(&self, addr: &Address, report: &Report) -> Result<(Vec<u8>, Sizes)> {
         if addr.start != 0 {
             unimplemented!();
         }
-        let decompressed = self.get_block_content(&addr.hash, report)?;
+        let (decompressed, sizes) = self.get_block_content(&addr.hash, report)?;
         // TODO: Accept addresses referring to only part of a block.
         if decompressed.len() != addr.len as usize {
             unimplemented!();
         }
-        Ok(decompressed)
+        Ok((decompressed, sizes))
     }
 
     /// Return a sorted vec of prefix subdirectories.
@@ -240,8 +240,10 @@ impl BlockDir {
     }
 
     fn validate_block(&self, hash: &str, report: &Report) -> Result<()> {
-        let de = self.get_block_content(&hash, report)?;
-        let actual_hash = hex::encode(blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &de).as_bytes());
+        let (decompressed_bytes, _sizes) = self.get_block_content(&hash, report)?;
+        let actual_hash = hex::encode(
+            blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed_bytes).as_bytes(),
+        );
         if actual_hash != *hash {
             let path = self.path_for_file(&hash);
             report.increment("block.misplaced", 1);
@@ -255,11 +257,11 @@ impl BlockDir {
     }
 
     /// Return the entire contents of the block.
-    pub fn get_block_content(&self, hash: &str, report: &Report) -> Result<Vec<u8>> {
+    pub fn get_block_content(&self, hash: &str, report: &Report) -> Result<(Vec<u8>, Sizes)> {
         // TODO: Probably this should return an iterator rather than pulling the
         // whole file in to memory immediately.
         let path = self.path_for_file(hash);
-        let (compressed_len, de) = snappy::decompress_file(&path)
+        let (compressed_len, decompressed_bytes) = snappy::decompress_file(&path)
             .context(errors::ReadBlock { path })
             .map_err(|e| {
                 report.increment("block.corrupt", 1);
@@ -267,14 +269,11 @@ impl BlockDir {
                 e
             })?;
         report.increment("block.read", 1);
-        report.increment_size(
-            "block",
-            Sizes {
-                uncompressed: de.len() as u64,
-                compressed: compressed_len as u64,
-            },
-        );
-        Ok(de)
+        let sizes = Sizes {
+            uncompressed: decompressed_bytes.len() as u64,
+            compressed: compressed_len as u64,
+        };
+        Ok((decompressed_bytes, sizes))
     }
 
     #[allow(dead_code)]
@@ -310,8 +309,9 @@ impl StoreFiles {
         apath: &Apath,
         from_file: &mut dyn Read,
         report: &Report,
-    ) -> Result<Vec<Address>> {
+    ) -> Result<(Vec<Address>, Sizes)> {
         let mut addresses = Vec::<Address>::with_capacity(1);
+        let mut sizes = Sizes::default();
         loop {
             // TODO: Possibly read repeatedly in case we get a short read and have room for more,
             // so that short reads don't lead to short blocks being stored.
@@ -327,7 +327,9 @@ impl StoreFiles {
             let block_data = &self.input_buf[..read_len];
             let block_hash: String = hash_bytes(block_data).unwrap();
             if self.block_dir.contains(&block_hash)? {
+                // TODO: Separate counter for size of the already-present blocks?
                 report.increment("block.already_present", 1);
+                sizes.uncompressed += read_len as u64;
             } else {
                 let comp_len = self
                     .block_dir
@@ -336,13 +338,8 @@ impl StoreFiles {
                         block_hash: block_hash.clone(),
                     })?;
                 report.increment("block.write", 1);
-                report.increment_size(
-                    "block",
-                    Sizes {
-                        compressed: comp_len,
-                        uncompressed: read_len as u64,
-                    },
-                );
+                sizes.compressed += comp_len;
+                sizes.uncompressed += read_len as u64;
             }
             addresses.push(Address {
                 hash: block_hash,
@@ -355,7 +352,7 @@ impl StoreFiles {
             1 => report.increment("file.medium", 1),
             _ => report.increment("file.large", 1),
         }
-        Ok(addresses)
+        Ok((addresses, sizes))
     }
 }
 
@@ -402,7 +399,7 @@ mod tests {
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
         let mut store = StoreFiles::new(block_dir.clone());
 
-        let addrs = store
+        let (addrs, sizes) = store
             .store_file_content(&Apath::from("/hello"), &mut example_file, &report)
             .unwrap();
 
@@ -429,8 +426,8 @@ mod tests {
 
         assert_eq!(report.get_count("block.already_present"), 0);
         assert_eq!(report.get_count("block.write"), 1);
-        let sizes = report.get_size("block");
         assert_eq!(sizes.uncompressed, 6);
+        assert_eq!(sizes.compressed, 8);
 
         // Will vary depending on compressor and we don't want to be too brittle.
         assert!(sizes.compressed <= 19, sizes.compressed);
@@ -438,11 +435,11 @@ mod tests {
         // Try to read back
         let read_report = Report::new();
         assert_eq!(read_report.get_count("block.read"), 0);
-        let back = block_dir.get(&addrs[0], &read_report).unwrap();
+        let (back, sizes) = block_dir.get(&addrs[0], &read_report).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
         assert_eq!(read_report.get_count("block.read"), 1);
         assert_eq!(
-            read_report.get_size("block"),
+            sizes,
             Sizes {
                 uncompressed: EXAMPLE_TEXT.len() as u64,
                 compressed: 8u64,
@@ -461,18 +458,28 @@ mod tests {
 
         let mut example_file = make_example_file();
         let mut store = StoreFiles::new(block_dir);
-        let addrs1 = store
+        let (addrs1, sizes1) = store
             .store_file_content(&Apath::from("/ello"), &mut example_file, &report)
             .unwrap();
         assert_eq!(report.get_count("block.already_present"), 0);
         assert_eq!(report.get_count("block.write"), 1);
+        assert_eq!(sizes1.uncompressed, 6);
+        assert_eq!(sizes1.compressed, 8);
 
         let mut example_file = make_example_file();
-        let addrs2 = store
+        let (addrs2, sizes2) = store
             .store_file_content(&Apath::from("/ello2"), &mut example_file, &report)
             .unwrap();
         assert_eq!(report.get_count("block.already_present"), 1);
         assert_eq!(report.get_count("block.write"), 1);
+        assert_eq!(
+            sizes2,
+            Sizes {
+                uncompressed: 6,
+                compressed: 0
+            },
+            "repeated write compresses to 0"
+        );
 
         assert_eq!(addrs1, addrs2);
     }
@@ -498,16 +505,14 @@ mod tests {
         tf.seek(SeekFrom::Start(0)).unwrap();
 
         let mut store = StoreFiles::new(block_dir.clone());
-        let addrs = store
+        let (addrs, sizes) = store
             .store_file_content(&Apath::from("/big"), &mut tf, &report)
             .unwrap();
         println!("Report after store: {}", report);
 
-        // Since the blocks are identical we should see them only stored once, and several
-        // blocks repeated.
-        assert_eq!(report.get_size("block").uncompressed, MAX_BLOCK_SIZE as u64);
+        assert_eq!(sizes.uncompressed, TOTAL_SIZE);
         // Should be very compressible
-        assert!(report.get_size("block").compressed < (MAX_BLOCK_SIZE as u64 / 10));
+        assert!(sizes.compressed < (MAX_BLOCK_SIZE as u64 / 10));
         assert_eq!(report.get_count("block.write"), 1);
         assert_eq!(
             report.get_count("block.already_present"),
@@ -517,9 +522,10 @@ mod tests {
         // 10x 2MB should be twenty blocks
         assert_eq!(addrs.len(), 20);
         for a in addrs {
-            let retr = block_dir.get(&a, &report).unwrap();
+            let (retr, block_sizes) = block_dir.get(&a, &report).unwrap();
             assert_eq!(retr.len(), MAX_BLOCK_SIZE as usize);
             assert!(retr.iter().all(|b| *b == 64u8));
+            assert_eq!(block_sizes.uncompressed, MAX_BLOCK_SIZE as u64);
         }
     }
 }
