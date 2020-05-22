@@ -177,7 +177,7 @@ impl IndexBuilder {
         let mut af = AtomicFile::new(path).context(errors::WriteIndex { path })?;
         let compressed_len =
             Snappy::compress_and_write(&json, &mut af).context(errors::WriteIndex { path })?;
-        af.close(report).context(errors::WriteIndex { path })?;
+        af.close().context(errors::WriteIndex { path })?;
 
         report.increment("index.hunk", 1);
         // Ready for the next hunk.

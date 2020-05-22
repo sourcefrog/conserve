@@ -54,7 +54,7 @@ impl ShowArchive for VerboseVersionList {
                     continue;
                 }
             };
-            let info = match band.get_info(archive.report()) {
+            let info = match band.get_info() {
                 Ok(info) => info,
                 Err(e) => {
                     report.problem(&format!("Failed to read band tail {:?}: {:?}", band_id, e));

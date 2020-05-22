@@ -82,7 +82,7 @@ impl tree::WriteTree for RestoreTree {
         // TODO: Read one block at a time: don't pull all the contents into memory.
         let content = &mut from_tree.file_contents(&source_entry)?;
         let bytes = std::io::copy(content, &mut af).with_context(ctx)?;
-        af.close(&self.report).context(errors::Restore { path })?;
+        af.close().context(errors::Restore { path })?;
         Ok(Sizes {
             uncompressed: bytes,
             compressed: 0,

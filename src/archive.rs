@@ -46,7 +46,7 @@ impl Archive {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
         let report = Report::new();
-        jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header, &report)?;
+        jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header)?;
         Ok(Archive {
             path: path.to_path_buf(),
             report,
@@ -64,7 +64,7 @@ impl Archive {
             file_exists(&header_path).context(errors::ReadMetadata { path })?,
             errors::NotAnArchive { path }
         );
-        let header: ArchiveHeader = jsonio::read_json_metadata_file(&header_path, &report)?;
+        let header: ArchiveHeader = jsonio::read_json_metadata_file(&header_path)?;
         ensure!(
             header.conserve_archive_version == ARCHIVE_VERSION,
             errors::UnsupportedArchiveVersion {

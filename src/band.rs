@@ -93,22 +93,22 @@ impl Band {
             start_time: Utc::now().timestamp(),
             band_format_version: Some(BAND_FORMAT_VERSION.to_owned()),
         };
-        jsonio::write_json_metadata_file(&new.head_path(), &head, archive.report())?;
+        jsonio::write_json_metadata_file(&new.head_path(), &head)?;
         Ok(new)
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(&self, report: &Report) -> Result<()> {
+    pub fn close(&self, _report: &Report) -> Result<()> {
         let tail = Tail {
             end_time: Utc::now().timestamp(),
         };
-        jsonio::write_json_metadata_file(&self.tail_path(), &tail, report)
+        jsonio::write_json_metadata_file(&self.tail_path(), &tail)
     }
 
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
         let new = Band::new(archive.path(), band_id.clone());
-        let head = new.read_head(&archive.report())?;
+        let head = new.read_head()?;
         if let Some(version) = head.band_format_version {
             if !band_version_supported(&version) {
                 return Err(Error::UnsupportedBandVersion {
@@ -174,20 +174,20 @@ impl Band {
         index::IndexEntryIter::open(&self.index_dir_path, report)
     }
 
-    fn read_head(&self, report: &Report) -> Result<Head> {
-        jsonio::read_json_metadata_file(&self.head_path(), &report)
+    fn read_head(&self) -> Result<Head> {
+        jsonio::read_json_metadata_file(&self.head_path())
     }
 
-    fn read_tail(&self, report: &Report) -> Result<Tail> {
-        jsonio::read_json_metadata_file(&self.tail_path(), &report)
+    fn read_tail(&self) -> Result<Tail> {
+        jsonio::read_json_metadata_file(&self.tail_path())
     }
 
     /// Return info about the state of this band.
-    pub fn get_info(&self, report: &Report) -> Result<Info> {
-        let head = self.read_head(&report)?;
+    pub fn get_info(&self) -> Result<Info> {
+        let head = self.read_head()?;
         let is_closed = self.is_closed()?;
         let end_time = if is_closed {
-            Some(Utc.timestamp(self.read_tail(&report)?.end_time, 0))
+            Some(Utc.timestamp(self.read_tail()?.end_time, 0))
         } else {
             None
         };
@@ -266,7 +266,7 @@ mod tests {
         assert!(band2.is_closed().unwrap());
 
         // Try get_info
-        let info = band2.get_info(&Report::new()).expect("get_info failed");
+        let info = band2.get_info().expect("get_info failed");
         assert_eq!(info.id.to_string(), "b0000");
         assert_eq!(info.is_closed, true);
         let dur = info.end_time.expect("info has an end_time") - info.start_time;
