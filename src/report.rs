@@ -21,7 +21,6 @@ use std::time::{Duration, Instant};
 
 use thousands::Separable;
 
-use super::ui;
 use super::ui::{compression_ratio, duration_to_hms, mbps_rate, PlainUI, UI};
 use super::*;
 
@@ -167,10 +166,6 @@ impl Report {
         }
     }
 
-    pub fn get_size(&self, counter_name: &str) -> Sizes {
-        self.borrow_counts().get_size(counter_name)
-    }
-
     pub fn get_count(&self, counter_name: &str) -> u64 {
         self.borrow_counts().get_count(counter_name)
     }
@@ -248,17 +243,6 @@ impl Display for Report {
         for (key, value) in &counts.count {
             if *value > 0 {
                 writeln!(f, "  {:<40} {:>9}", *key, *value)?;
-            }
-        }
-        writeln!(f, "Bytes (before and after compression):")?;
-        for (key, s) in &counts.sizes {
-            if s.uncompressed > 0 {
-                let ratio = ui::compression_ratio(s);
-                writeln!(
-                    f,
-                    "  {:<40} {:>9} {:>9} {:>9.1}x",
-                    *key, s.uncompressed, s.compressed, ratio
-                )?;
             }
         }
         Ok(())
@@ -391,7 +375,7 @@ impl Counts {
 
 #[cfg(test)]
 mod tests {
-    use super::{Report, Sizes};
+    use super::*;
 
     #[test]
     pub fn count() {
@@ -409,22 +393,12 @@ mod tests {
         let r1 = Report::new();
         r1.increment("block.write", 10);
         r1.increment("block.write", 5);
-        r1.increment_size(
-            "block",
-            Sizes {
-                uncompressed: 300,
-                compressed: 100,
-            },
-        );
-
         let formatted = format!("{}", r1);
         assert_eq!(
             formatted,
             "\
 Counts:
   block.write                                     15
-Bytes (before and after compression):
-  block                                          300       100       3.0x
 "
         );
     }

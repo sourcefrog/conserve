@@ -115,13 +115,7 @@ fn check_restore(af: &ScratchArchive) {
             compressed: 0,
         }
     );
-    let index_sizes = restore_report.get_size("index");
-    // Can vary a bit depending on the lengths of the timestamps.
-    assert!(
-        index_sizes.uncompressed <= 320,
-        "index_sizes.uncompressed on restore"
-    );
-    assert!(index_sizes.compressed <= 315);
+    // TODO: Check index stats.
     // TODO: Check what was restored.
 }
 
