@@ -98,7 +98,7 @@ impl Band {
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(&self, _report: &Report) -> Result<()> {
+    pub fn close(&self) -> Result<()> {
         let tail = Tail {
             end_time: Utc::now().timestamp(),
         };
@@ -245,7 +245,6 @@ mod tests {
     #[test]
     fn create_and_reopen_band() {
         let af = ScratchArchive::new();
-        let report = &Report::new();
         let band = Band::create(&af).unwrap();
         assert!(band.path().to_str().unwrap().ends_with("b0000"));
         assert!(fs::metadata(band.path()).unwrap().is_dir());
@@ -255,7 +254,7 @@ mod tests {
         assert_eq!(dir_names, ["i"]);
         assert!(!band.is_closed().unwrap());
 
-        band.close(report).unwrap();
+        band.close().unwrap();
         let (file_names, dir_names) = list_dir(band.path()).unwrap();
         assert_eq!(file_names, &["BANDHEAD", "BANDTAIL"]);
         assert_eq!(dir_names, ["i"]);

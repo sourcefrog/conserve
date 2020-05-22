@@ -54,7 +54,7 @@ impl BackupWriter {
 impl tree::WriteTree for BackupWriter {
     fn finish(&mut self) -> Result<()> {
         self.index_builder.finish_hunk(&self.report)?;
-        self.band.close(&self.report)?;
+        self.band.close()?;
         Ok(())
     }
 
