@@ -220,19 +220,20 @@ impl BlockDir {
         // directories of the right length.
         // TODO: Provide a progress bar that just works on counts, not bytes:
         // then we don't need to count the sizes in advance.
-        report.set_phase("Count blocks");
-        report.println("Count blocks...");
+        // let ui = report.lock_ui();
+        ui::println("Count blocks...");
         let bns: Vec<(String, u64)> = self.block_names_and_sizes(report)?.collect();
         let tot = bns.iter().map(|a| a.1).sum();
-        report.set_total_work(tot);
-        report.println(&format!(
+        ui::set_progress_phase(&"Count blocks");
+        ui::set_bytes_total(tot);
+        crate::ui::println(&format!(
             "Check {} in blocks...",
             crate::misc::bytes_to_human_mb(tot)
         ));
-        report.set_phase("Check block hashes");
+        ui::set_progress_phase(&"Check block hashes");
         bns.par_iter()
             .map(|(bn, bsize)| {
-                report.increment_work(*bsize);
+                ui::increment_bytes_done(*bsize);
                 self.validate_block(bn, report)
             })
             .try_for_each(|i| i)?;

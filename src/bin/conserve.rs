@@ -11,10 +11,7 @@ use conserve::*;
 
 fn main() -> conserve::Result<()> {
     let matches = make_clap().get_matches();
-    let ui_name = matches.value_of("ui").unwrap_or("auto");
-    let no_progress = matches.is_present("no-progress");
-    let ui = UI::by_name(ui_name, !no_progress).expect("Couldn't make UI");
-    let report = Report::with_ui(ui);
+    let report = Report::new();
 
     let (n, sm) = rollup_subcommands(&matches);
     let c = match n.as_str() {
@@ -35,9 +32,9 @@ fn main() -> conserve::Result<()> {
     };
     let result = c(sm, &report);
 
-    report.finish();
+    ui::clear_progress();
     if matches.is_present("stats") {
-        report.println(&format!("{}", report));
+        ui::println(&format!("{}", report));
     }
     if let Err(ref e) = result {
         report.show_error(e);
@@ -292,10 +289,10 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         )
 }
 
-fn init(subm: &ArgMatches, report: &Report) -> Result<()> {
+fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
     let archive_path = subm.value_of("archive").expect("'archive' arg not found");
     Archive::create(archive_path).and(Ok(()))?;
-    report.println(&format!("Created new archive in {}", archive_path));
+    ui::println(&format!("Created new archive in {}", archive_path));
     Ok(())
 }
 
@@ -308,8 +305,8 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
         ..CopyOptions::default()
     };
     copy_tree(&lt, &mut bw, &opts)?;
-    report.println("Backup complete.");
-    report.println(&report.borrow_counts().summary_for_backup());
+    ui::println("Backup complete.");
+    ui::println(&report.borrow_counts().summary_for_backup());
     Ok(())
 }
 
@@ -327,16 +324,16 @@ fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
             RightOnly => "right",
             Both => "both",
         };
-        report.println(&format!("{:<8} {}", ks, e.apath));
+        ui::println(&format!("{:<8} {}", ks, e.apath));
     }
-    // report.println(&report.borrow_counts().summary_for_backup());
+    // ui::println(&report.borrow_counts().summary_for_backup());
     Ok(())
 }
 
 fn validate(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
     archive.validate()?;
-    report.println(&report.borrow_counts().summary_for_validate());
+    ui::println(&report.borrow_counts().summary_for_validate());
     Ok(())
 }
 
@@ -360,8 +357,8 @@ fn source_ls(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn source_size(subm: &ArgMatches, report: &Report) -> Result<()> {
     let source = live_tree_from_options(subm, report)?;
-    report.set_phase("Measuring");
-    report.println(&conserve::bytes_to_human_mb(source.size()?.file_bytes));
+    ui::set_progress_phase(&"Measuring".to_string());
+    ui::println(&conserve::bytes_to_human_mb(source.size()?.file_bytes));
     Ok(())
 }
 
@@ -377,7 +374,7 @@ fn list_tree_contents<T: ReadTree>(tree: &T, report: &Report) -> Result<()> {
     // or bad buffering. Perhaps we can write to a BufferedWriter, making
     // sure that the progress bar is disabled.
     for entry in tree.iter_entries(report)? {
-        report.println(&entry.apath());
+        ui::println(&entry.apath());
     }
     Ok(())
 }
@@ -395,8 +392,8 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
         ..CopyOptions::default()
     };
     copy_tree(&st, &mut rt, &opts)?;
-    report.println("Restore complete.");
-    report.println(&report.borrow_counts().summary_for_restore());
+    ui::println("Restore complete.");
+    ui::println(&report.borrow_counts().summary_for_restore());
     Ok(())
 }
 
@@ -411,7 +408,7 @@ fn debug_block_list(subm: &ArgMatches, report: &Report) -> Result<()> {
 fn debug_block_referenced(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), report)?;
     for h in archive.referenced_blocks()? {
-        report.println(&h);
+        ui::println(&h);
     }
     Ok(())
 }
@@ -425,8 +422,8 @@ fn debug_index_dump(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn tree_size(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = stored_tree_from_options(subm, report)?;
-    report.set_phase("Measuring");
-    report.println(&bytes_to_human_mb(st.size()?.file_bytes));
+    ui::set_progress_phase(&"Measuring".to_owned());
+    ui::println(&bytes_to_human_mb(st.size()?.file_bytes));
     Ok(())
 }
 

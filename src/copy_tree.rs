@@ -43,7 +43,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     for entry in source.iter_entries(&report)? {
         let apath = entry.apath();
         if options.print_filenames {
-            report.println(apath);
+            crate::ui::println(apath);
         }
         report.start_entry(apath);
         if let Err(e) = match entry.kind() {

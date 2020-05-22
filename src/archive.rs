@@ -145,17 +145,17 @@ impl Archive {
     pub fn validate(&self) -> Result<()> {
         // Check there's no extra top-level contents.
         self.validate_archive_dir()?;
-        self.report.println("Check blockdir...");
+        ui::println("Check blockdir...");
         self.block_dir.validate(self.report())?;
         self.validate_bands()?;
 
         // TODO: Don't say "OK" if there were non-fatal problems.
-        self.report.println("Archive is OK.");
+        ui::println("Archive is OK.");
         Ok(())
     }
 
     fn validate_archive_dir(&self) -> Result<()> {
-        self.report.println("Check archive top-level directory...");
+        ui::println("Check archive top-level directory...");
         let (mut files, mut dirs) =
             list_dir(self.path()).context(errors::ReadMetadata { path: self.path() })?;
         remove_item(&mut files, &HEADER_FILENAME);
@@ -194,23 +194,25 @@ impl Archive {
     }
 
     fn validate_bands(&self) -> Result<()> {
-        self.report.println("Measure stored trees...");
-        self.report.set_phase("Measure stored trees");
-        self.report.set_total_work(0);
+        let mut ps = ProgressState::default();
+        use crate::ui::println;
+        println("Measure stored trees...");
+        ps.phase = "Measure stored trees...".into();
         let mut total_size: u64 = 0;
         for bid in self.list_bands()?.iter() {
             let b = StoredTree::open_incomplete_version(self, bid)?
                 .size()?
                 .file_bytes;
             total_size += b;
-            self.report.increment_work(b);
+            ps.bytes_done += b;
+            // lock_ui().show_progress(&ps);
         }
 
-        self.report.println(&format!(
-            "Check {} in stored files...",
-            crate::misc::bytes_to_human_mb(total_size)
-        ));
-        self.report.set_total_work(total_size);
+        // lock_ui().println(&format!(
+        //     "Check {} in stored files...",
+        //     crate::misc::bytes_to_human_mb(total_size)
+        // ));
+        ps.bytes_total = total_size;
         for bid in self.list_bands()?.iter() {
             let b = Band::open(self, bid)?;
             b.validate(&self.report)?;

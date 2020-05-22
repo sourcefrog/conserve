@@ -3,47 +3,115 @@
 
 //! Abstract user interface trait.
 
-use std::fmt;
 use std::fmt::Write;
 use std::io::Write as IoWrite;
+use std::sync::Mutex;
 use std::time::Duration;
 use std::time::Instant;
 
 use crossterm::{cursor, queue, style, terminal};
+use lazy_static::lazy_static;
 use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::report::{Report, Sizes};
+use crate::report::{Counts, Sizes};
 use crate::Result;
 
 const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 
-/// Display information about backup progress to the user in some way.
-pub trait UI: fmt::Debug {
-    /// Show counters, eg as a progress bar.
-    fn show_progress(&mut self, report: &Report);
+/// A terminal/text UI.
+///
+/// The same class is used whether or not we have a rich terminal,
+/// or just plain text output. (For example, output is redirected
+/// to a file, or the program's run with no tty.)
+struct UIState {
+    t: Box<std::io::Stdout>,
 
-    /// Show a plain text message, followed by newline.
-    fn println(&mut self, s: &str);
+    last_update: Option<Instant>,
 
-    /// Print an error message.
-    fn problem(&mut self, s: &str) -> Result<()>;
+    /// Is a progress bar currently on the screen?
+    progress_present: bool,
 
-    /// Clear up the UI before exiting.
-    fn finish(&mut self);
+    /// Should a progress bar be drawn?
+    progress_enabled: bool,
+
+    progress_state: ProgressState,
 }
 
-impl dyn UI {
-    /// Construct a UI by name.
-    ///
-    /// `ui_name` must be `"auto"`, `"plain"`, or `"color"`.
-    pub fn by_name(ui_name: &str, progress_bar: bool) -> Option<Box<dyn UI + Send>> {
-        if ui_name == "color" || (ui_name == "auto" && atty::is(atty::Stream::Stdout)) {
-            if let Some(ui) = TerminalUI::new(progress_bar) {
-                return Some(Box::new(ui));
-            }
+pub struct ProgressState {
+    pub phase: String,
+    start: Instant,
+    pub bytes_done: u64,
+    pub bytes_total: u64,
+    pub filename: String,
+}
+
+lazy_static! {
+    static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState::default());
+}
+
+pub fn println(s: &str) {
+    UI_STATE.lock().unwrap().println(s);
+}
+
+pub fn problem<S: AsRef<str>>(s: &S) {
+    UI_STATE.lock().unwrap().problem(s.as_ref()).unwrap();
+}
+
+pub fn set_progress_phase<S: ToString>(s: &S) {
+    let mut ui = UI_STATE.lock().unwrap();
+    ui.progress_state.phase = s.to_string();
+    ui.progress_state.bytes_done = 0;
+}
+
+pub fn set_bytes_total(bytes_total: u64) {
+    UI_STATE.lock().unwrap().progress_state.bytes_total = bytes_total
+}
+
+pub fn increment_bytes_done(b: u64) {
+    let mut ui = UI_STATE.lock().unwrap();
+    ui.progress_state.bytes_done += b;
+    ui.show_progress();
+}
+
+pub fn clear_progress() {
+    let mut ui = UI_STATE.lock().unwrap();
+    ui.clear_progress();
+}
+
+impl Default for UIState {
+    fn default() -> UIState {
+        UIState {
+            t: Box::new(std::io::stdout()),
+            last_update: None,
+            progress_present: false,
+            progress_enabled: false,
+            progress_state: ProgressState::default(),
         }
-        Some(Box::new(PlainUI::new()))
+    }
+}
+
+impl ProgressState {
+    pub fn from_counts(counts: &Counts) -> ProgressState {
+        ProgressState {
+            phase: counts.phase.clone(),
+            start: counts.start,
+            bytes_done: counts.total_work,
+            bytes_total: counts.total_work,
+            filename: counts.get_latest_filename().into(),
+        }
+    }
+}
+
+impl Default for ProgressState {
+    fn default() -> ProgressState {
+        ProgressState {
+            start: Instant::now(),
+            phase: String::new(),
+            filename: String::new(),
+            bytes_done: 0,
+            bytes_total: 0,
+        }
     }
 }
 
@@ -87,34 +155,7 @@ pub fn compression_ratio(s: &Sizes) -> f64 {
     }
 }
 
-/// A terminal/text UI.
-///
-/// The same class is used whether or not we have a rich terminal,
-/// or just plain text output. (For example, output is redirected
-/// to a file, or the program's run with no tty.)
-pub struct TerminalUI {
-    t: Box<std::io::Stderr>,
-
-    last_update: Option<Instant>,
-
-    /// Is a progress bar currently on the screen?
-    progress_present: bool,
-
-    /// Should a progress bar be drawn?
-    progress_enabled: bool,
-}
-
-impl TerminalUI {
-    /// Return a new TerminalUI or None if there isn't a suitable terminal.
-    pub fn new(progress_bar: bool) -> Option<TerminalUI> {
-        Some(TerminalUI {
-            t: Box::new(std::io::stderr()),
-            last_update: None,
-            progress_present: false,
-            progress_enabled: progress_bar,
-        })
-    }
-
+impl UIState {
     /// Return false if it's too soon after the progress bar was last drawn.
     fn can_update_yet(&mut self) -> bool {
         if let Some(last) = self.last_update {
@@ -144,10 +185,8 @@ impl TerminalUI {
     fn set_update_timestamp(&mut self) {
         self.last_update = Some(Instant::now());
     }
-}
 
-impl UI for TerminalUI {
-    fn show_progress(&mut self, report: &Report) {
+    fn show_progress(&mut self) {
         if !self.progress_enabled || !self.can_update_yet() {
             return;
         }
@@ -159,42 +198,38 @@ impl UI for TerminalUI {
 
         const SHOW_PERCENT: bool = true;
 
-        // TODO: Input size should really be the number of source bytes before
-        // block deduplication.
         let mut prefix = String::with_capacity(50);
         let mut message = String::with_capacity(200);
-        {
-            let counts = report.borrow_counts();
-            let elapsed = counts.elapsed_time();
-            let rate = mbps_rate(counts.done_work, elapsed);
-            if SHOW_PERCENT && counts.total_work > 0 {
-                write!(
-                    prefix,
-                    "{:>3}% ",
-                    100 * counts.done_work / counts.total_work
-                )
-                .unwrap();
-            }
-            write!(prefix, "{} ", duration_to_hms(elapsed)).unwrap();
+        let state = &self.progress_state;
+        let elapsed = state.start.elapsed();
+        let rate = mbps_rate(state.bytes_done, elapsed);
+        if SHOW_PERCENT && state.bytes_total > 0 {
             write!(
                 prefix,
-                "{:>15} ",
-                crate::misc::bytes_to_human_mb(counts.done_work),
+                "{:>3}% ",
+                100 * state.bytes_done / state.bytes_total
             )
             .unwrap();
-            // let block_sizes = counts.get_size("block");
-            // let comp_bytes = block_sizes.compressed;
-            // if comp_bytes > 0 {
-            //     write!(
-            //         pb_text,
-            //         "=> {:<8} ",
-            //         (block_sizes.compressed / MB).separate_with_commas(),
-            //     )
-            //     .unwrap();
-            // }
-            write!(prefix, "{:>8} MB/s ", (rate as u64).separate_with_commas(),).unwrap();
-            write!(message, "{} {}", counts.phase, counts.get_latest_filename()).unwrap();
-        };
+        }
+        write!(prefix, "{} ", duration_to_hms(elapsed)).unwrap();
+        write!(
+            prefix,
+            "{:>15} ",
+            crate::misc::bytes_to_human_mb(state.bytes_done),
+        )
+        .unwrap();
+        // let block_sizes = counts.get_size("block");
+        // let comp_bytes = block_sizes.compressed;
+        // if comp_bytes > 0 {
+        //     write!(
+        //         pb_text,
+        //         "=> {:<8} ",
+        //         (block_sizes.compressed / MB).separate_with_commas(),
+        //     )
+        //     .unwrap();
+        // }
+        write!(prefix, "{:>8} MB/s ", (rate as u64).separate_with_commas(),).unwrap();
+        write!(message, "{} {}", state.phase, state.filename).unwrap();
         let message_limit = w - prefix.len();
         let truncated_message = if message.len() < message_limit {
             message
@@ -230,6 +265,7 @@ impl UI for TerminalUI {
 
     fn problem(&mut self, s: &str) -> Result<()> {
         self.progress_present = false;
+        // TODO: Only clear the line if progress bar is already present?
         #[allow(deprecated)]
         queue!(
             self.t,
@@ -247,66 +283,15 @@ impl UI for TerminalUI {
         self.t.flush().expect("flush terminal output");
         Ok(())
     }
-
-    fn finish(&mut self) {
-        self.clear_progress();
-    }
-}
-
-impl fmt::Debug for TerminalUI {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("TerminalUI")
-            .field("last_update", &self.last_update)
-            .field("progress_present", &self.progress_present)
-            .finish()
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct PlainUI;
-
-/// A plain text UI that can be used when there is no terminal control.
-///
-/// Progress updates are just ignored.
-impl PlainUI {
-    /// Make a PlainUI.
-    pub fn new() -> PlainUI {
-        PlainUI {}
-    }
-}
-
-impl super::UI for PlainUI {
-    fn show_progress(&mut self, _report: &Report) {}
-
-    fn println(&mut self, s: &str) {
-        println!("{}", s);
-    }
-
-    fn problem(&mut self, s: &str) -> Result<()> {
-        println!("conserve error: {}", s);
-        Ok(())
-    }
-
-    fn finish(&mut self) {}
 }
 
 #[cfg(test)]
 mod tests {
-    use super::UI;
-    use crate::report::Sizes;
-
-    // TODO: Somehow test the type returned by `by_name`?
-    #[test]
-    pub fn by_name() {
-        // You must get some UI back from the default.
-        assert!(UI::by_name("auto", true).is_some());
-        // Plain UI should always be possible.
-        assert!(UI::by_name("plain", true).is_some());
-    }
+    use super::*;
 
     #[test]
     pub fn test_compression_ratio() {
-        let ratio = super::compression_ratio(&Sizes {
+        let ratio = compression_ratio(&Sizes {
             compressed: 2000,
             uncompressed: 4000,
         });

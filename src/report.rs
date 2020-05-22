@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 use thousands::Separable;
 
 use super::ui;
-use super::ui::{compression_ratio, duration_to_hms, mbps_rate, PlainUI, UI};
+use super::ui::{compression_ratio, duration_to_hms, mbps_rate};
 use super::*;
 
 const M: u64 = 1_000_000;
@@ -69,7 +69,7 @@ static KNOWN_SIZES: &[&str] = &["block", "file.bytes", "index"];
 pub struct Counts {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, Sizes>,
-    start: Instant,
+    pub start: Instant,
 
     /// Most recently started filename.
     latest_filename: String,
@@ -99,7 +99,6 @@ pub struct Counts {
 #[derive(Clone, Debug)]
 pub struct Report {
     counts: Arc<Mutex<Counts>>,
-    ui: Arc<Mutex<Box<dyn UI + Send>>>,
 }
 
 /// Trees and Archives have a Report as general context for operations on them.
@@ -124,14 +123,8 @@ impl<'a> AddAssign<&'a Sizes> for Sizes {
 impl Report {
     /// Default constructor with plain text UI.
     pub fn new() -> Report {
-        Report::with_ui(Box::new(PlainUI::new()))
-    }
-
-    /// Make a new report viewed by a given UI.
-    pub fn with_ui(ui_box: Box<dyn UI + Send>) -> Report {
         Report {
             counts: Arc::new(Mutex::new(Counts::new())),
-            ui: Arc::new(Mutex::new(ui_box)),
         }
     }
 
@@ -153,15 +146,6 @@ impl Report {
             *c += delta;
         } else {
             panic!("unregistered counter {:?}", counter_name);
-        }
-        self.show_progress();
-    }
-
-    /// Update the progress bars for the current counts, etc.
-    fn show_progress(&self) {
-        // If another thread is drawing the UI, don't wait, just skip it.
-        if let Ok(mut ui) = self.ui.try_lock() {
-            ui.show_progress(self);
         }
     }
 
@@ -196,10 +180,6 @@ impl Report {
         self.set_phase("");
     }
 
-    pub fn println(&self, s: &str) {
-        self.ui.lock().unwrap().println(s)
-    }
-
     /// Report that a problem occurred.
     ///
     /// Later this might also count or summarize them.
@@ -208,7 +188,8 @@ impl Report {
         // error.
         // <https://github.com/sourcefrog/conserve/issues/72>.
         self.mut_counts().error_count += 1;
-        self.ui.lock().unwrap().problem(s).unwrap();
+        // TODO: As an error
+        crate::ui::println(s);
     }
 
     /// Report that a non-fatal error occurred.
@@ -216,17 +197,12 @@ impl Report {
     /// The program will continue.
     pub fn show_error(&self, e: &dyn std::error::Error) {
         self.mut_counts().error_count += 1;
-        let mut ui = self.ui.lock().unwrap();
-        ui.problem(&e.to_string()).unwrap();
+        ui::problem(&e.to_string());
         let mut ce = e;
         while let Some(c) = ce.source() {
-            ui.problem(&format!("  caused by: {}", c)).unwrap();
+            ui::problem(&format!("  caused by: {}", c));
             ce = c;
         }
-    }
-
-    pub fn finish(&self) {
-        self.ui.lock().unwrap().finish()
     }
 
     /// Set the total expected work (in bytes); this also resets the amount of work done.

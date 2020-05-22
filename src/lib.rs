@@ -49,7 +49,7 @@ pub use crate::report::{HasReport, Report, Sizes};
 pub use crate::restore::RestoreTree;
 pub use crate::stored_tree::StoredTree;
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
-pub use crate::ui::UI;
+pub use crate::ui::{ProgressState};
 
 // Commonly-used external types.
 pub use globset::GlobSet;

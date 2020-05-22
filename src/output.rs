@@ -23,7 +23,7 @@ pub struct ShortVersionList {}
 impl ShowArchive for ShortVersionList {
     fn show_archive(&self, archive: &Archive) -> Result<()> {
         for band_id in archive.list_bands()? {
-            archive.report().println(&format!("{}", band_id));
+            ui::println(&format!("{}", band_id));
         }
         Ok(())
     }
@@ -78,12 +78,12 @@ impl ShowArchive for VerboseVersionList {
                         .size()?
                         .file_bytes,
                 );
-                report.println(&format!(
+                ui::println(&format!(
                     "{:<20} {:<10} {} {:>8} {:>14}",
                     band_id, is_complete_str, start_time_str, duration_str, tree_mb,
                 ));
             } else {
-                report.println(&format!(
+                ui::println(&format!(
                     "{:<20} {:<10} {} {:>8}",
                     band_id, is_complete_str, start_time_str, duration_str,
                 ));
@@ -113,7 +113,7 @@ impl<'a> ShowArchive for IndexDump<'a> {
             .collect::<Vec<IndexEntry>>();
         let output = serde_json::to_string_pretty(&index_entries)
             .context(errors::SerializeIndex { path: "-" })?;
-        report.println(&output);
+        ui::println(&output);
         Ok(())
     }
 }
