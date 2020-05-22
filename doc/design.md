@@ -123,7 +123,68 @@ from the storage, it's possible that readers see index hunks before
 their data blocks are visible. This will give an error about that file's
 content being missing, but the restore can continue.
 
-The reader will observe an incomplete index, and this is handled jsut as if
+The reader will observe an incomplete index, and this is handled just as if
 the backup had been interrupted and remained incomplete: the reader
 picks up at the same point in the previous index. (This last part is not
 yet implemented, though.)
+
+## UI, Progress, and Logging
+Conserve's user interface includes:
+
+* Initially parsing the command line and showing errors or help. This is fairly
+  simple and occurs before anything else, so need not be discussed any further.
+
+* Showing log messages and errors.
+
+* Showing progress bars or other indications.
+
+* Emitting content to stdout, such as file listings or file content.
+
+* (Later) Reading encryption passphrases. Or, potentially, getting other input
+  or confirmation from the user, but this will be limited.
+
+The library should support several modes of UI:
+
+1. Primarily, the text UI presented by the `conserve` binary, on a terminal that
+   allows cursor control.
+
+   In this case the terminal is inherently a global singleton across the
+   process, and all the different uses need to be coordinated. Most importantly,
+   log output must interleave with progress bars.
+
+2. Noninteractive text output, when there is no terminal. This should be similar
+   to the terminal, but with progress bars and interactive input turned off.
+
+3. Other applications embedding the conserve library, perhaps in a GUI or a web
+   service, that want to route messages, progress indications, and other
+   interactions through their own code. These applications conceivably have
+   multiple Conserve operations happening on different threads simultaneously,
+   and want to keep the output separate. (Although, this is in tension with Rust
+   logging's inherently-global concept.)
+
+4. When run from unit tests or library API tests, a singleton UI won't work,
+   because multiple tests run concurrently in different threads, and Rust
+   captures stdout from only the thread on which the test starts, and even then
+   in a limited way. (Tests that run the `conserve` binary as a subprocess have
+   more freedom, including running it on a pseudoterminal.)
+
+Log messages should be written through Rust's (fairly) standard `log` crate.
+Listeners for logs can be configured only globally and only once. There should
+be an option to write logs to a file, as well as to the terminal, and at a
+different level of detail.
+
+This implies:
+
+* The library will emit logs but will not by default configure any log targets,
+  so that applications can choose the target they want.
+
+* The terminal UI, when active, must provide a log target, so that log messages
+  can be interleaved with progress messages.
+
+* Since the terminal UI is a log target, it must be constructed just once near
+  program startup, and therefore it cannot be on during in-process tests.
+
+Rather than directly constructing progress bars, core library code should send
+messages to observer objects, passed in by the application. These can then be
+configured to either draw progress bars to the terminal, or do nothing, or do
+something else.
