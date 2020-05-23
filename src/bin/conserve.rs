@@ -47,9 +47,7 @@ fn main() -> conserve::Result<()> {
         // Avoid Rust redundantly printing the error.
         std::process::exit(1);
     }
-    if report.borrow_counts().error_count > 0 {
-        std::process::exit(1);
-    }
+    // TODO: If the operation had >0 non-fatal errors, return a non-zero exit code.
     result
 }
 

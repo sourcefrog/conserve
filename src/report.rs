@@ -82,9 +82,6 @@ pub struct Counts {
 
     /// Amount of work done so far, to indicate percentage completion.
     pub done_work: u64,
-
-    /// Number of errors observed.
-    pub error_count: u64,
 }
 
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
@@ -241,7 +238,6 @@ impl Counts {
             phase: String::new(),
             total_work: 0,
             done_work: 0,
-            error_count: 0,
         }
     }
 
