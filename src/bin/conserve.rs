@@ -12,6 +12,7 @@ use conserve::*;
 fn main() -> conserve::Result<()> {
     let matches = make_clap().get_matches();
     let report = Report::new();
+    ui::enable_progress(true);
 
     let (n, sm) = rollup_subcommands(&matches);
     let c = match n.as_str() {

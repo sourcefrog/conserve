@@ -101,6 +101,11 @@ pub fn clear_progress() {
     ui.clear_progress();
 }
 
+pub fn enable_progress(enabled: bool) {
+    let mut ui = UI_STATE.lock().unwrap();
+    ui.progress_enabled = enabled;
+}
+
 impl Default for UIState {
     fn default() -> UIState {
         UIState {
