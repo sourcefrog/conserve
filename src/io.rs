@@ -9,8 +9,6 @@ use std::io::prelude::*;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
-use super::*;
-
 pub struct AtomicFile {
     path: PathBuf,
     f: tempfile::NamedTempFile,
@@ -25,7 +23,7 @@ impl AtomicFile {
         })
     }
 
-    pub fn close(self, _report: &Report) -> std::io::Result<()> {
+    pub fn close(self) -> std::io::Result<()> {
         // We use `persist` rather than `persist_noclobber` here because the latter calls
         // `link` on Unix, and some filesystems don't support it.  That's probably fine
         // because the files being updated by this should never already exist, though

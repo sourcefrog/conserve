@@ -31,11 +31,7 @@ fn main() -> conserve::Result<()> {
         _ => panic!("unimplemented command"),
     };
     let result = c(sm, &report);
-
     ui::clear_progress();
-    if matches.is_present("stats") {
-        ui::println(&format!("{}", report));
-    }
     if let Err(ref e) = result {
         ui::show_error(e);
         // TODO: Perhaps always log the traceback to a log file.
@@ -118,11 +114,6 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             Arg::with_name("no-progress")
                 .long("no-progress")
                 .help("Hide progress bar"),
-        )
-        .arg(
-            Arg::with_name("stats")
-                .long("stats")
-                .help("Show stats about IO, timing, and compression"),
         )
         .subcommand(
             SubCommand::with_name("debug")
@@ -302,9 +293,9 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
         print_filenames: subm.is_present("v"),
         ..CopyOptions::default()
     };
-    copy_tree(&lt, &mut bw, &opts)?;
+    let copy_stats = copy_tree(&lt, &mut bw, &opts)?;
     ui::println("Backup complete.");
-    ui::println(&report.borrow_counts().summary_for_backup());
+    ui::println(&format!("{:#?}", copy_stats));
     Ok(())
 }
 
@@ -330,8 +321,8 @@ fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn validate(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    archive.validate()?;
-    ui::println(&report.borrow_counts().summary_for_validate());
+    let validate_stats = archive.validate()?;
+    ui::println(&format!("{:#?}", validate_stats));
     Ok(())
 }
 
@@ -389,9 +380,9 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
         print_filenames: subm.is_present("v"),
         ..CopyOptions::default()
     };
-    copy_tree(&st, &mut rt, &opts)?;
+    let copy_stats = copy_tree(&st, &mut rt, &opts)?;
     ui::println("Restore complete.");
-    ui::println(&report.borrow_counts().summary_for_restore());
+    ui::println(&format!("{:#?}", copy_stats));
     Ok(())
 }
 

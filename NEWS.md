@@ -23,6 +23,15 @@
 - Added a clean error message if Conserve is too old to read a band or index
   within an otherwise-compatible archive. (#96)
 
+- Removed global `--stats` option. Stats are always shown as info-level
+  messages.
+
+Various API and internal changes, including:
+
+- Removal of `Report` concept. Instead, operations return a type-specific
+  `Stats` describing the work that was done, messages are logged, and progress
+  bars are drawn through the `ui` module.
+
 ## Conserve 0.6.2 2020-02-06
 
 - Added nanosecond precision to stored mtimes. The main benefit of this is

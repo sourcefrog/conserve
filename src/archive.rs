@@ -36,6 +36,9 @@ struct ArchiveHeader {
     conserve_archive_version: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidateArchiveStats {}
+
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
     pub fn create<P: AsRef<Path>>(path: P) -> Result<Archive> {
@@ -46,7 +49,7 @@ impl Archive {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
         let report = Report::new();
-        jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header, &report)?;
+        jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header)?;
         Ok(Archive {
             path: path.to_path_buf(),
             report,
@@ -64,7 +67,7 @@ impl Archive {
             file_exists(&header_path).context(errors::ReadMetadata { path })?,
             errors::NotAnArchive { path }
         );
-        let header: ArchiveHeader = jsonio::read_json_metadata_file(&header_path, &report)?;
+        let header: ArchiveHeader = jsonio::read_json_metadata_file(&header_path)?;
         ensure!(
             header.conserve_archive_version == ARCHIVE_VERSION,
             errors::UnsupportedArchiveVersion {
@@ -142,7 +145,7 @@ impl Archive {
         Ok(hs)
     }
 
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> Result<ValidateArchiveStats> {
         // Check there's no extra top-level contents.
         self.validate_archive_dir()?;
         ui::println("Check blockdir...");
@@ -151,7 +154,7 @@ impl Archive {
 
         // TODO: Don't say "OK" if there were non-fatal problems.
         ui::println("Archive is OK.");
-        Ok(())
+        Ok(ValidateArchiveStats {})
     }
 
     fn validate_archive_dir(&self) -> Result<()> {

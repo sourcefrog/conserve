@@ -58,7 +58,11 @@ pub trait WriteTree {
     fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()>;
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(&mut self, entry: &R::Entry, from_tree: &R) -> Result<()>;
+    ///
+    /// Returns Sizes describing the compressed and uncompressed sizes copied.
+    // TODO: Use some better interface than IO::Read, that permits getting sizes
+    // from the source file when restoring.
+    fn copy_file<R: ReadTree>(&mut self, entry: &R::Entry, from_tree: &R) -> Result<Sizes>;
 }
 
 /// Read a file as a series of blocks of bytes.
@@ -74,7 +78,9 @@ pub trait ReadBlocks {
         Ok(0..self.num_blocks()?)
     }
 
-    fn read_block(&self, i: usize) -> Result<Vec<u8>>;
+    /// Read one block and return it as a byte vec. Also returns the compressed and uncompressed
+    /// sizes.
+    fn read_block(&self, i: usize) -> Result<(Vec<u8>, Sizes)>;
 }
 
 /// The measured size of a tree.

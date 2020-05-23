@@ -19,6 +19,25 @@ pub const COPY_DEFAULT: CopyOptions = CopyOptions {
     measure_first: false,
 };
 
+/// Statistics about a tree copy operation.
+#[derive(Default, Clone, Debug, Eq, PartialEq)]
+pub struct CopyStats {
+    /// Number of entries skipped because they're an
+    pub unknown_kind_count: u64,
+
+    pub dir_count: u64,
+    pub file_count: u64,
+    pub symlink_count: u64,
+
+    pub copies_failed: u64,
+
+    // TODO: Be clearer what this is measuring.
+    pub file_totals: Sizes,
+}
+
+// TODO: Summarize to an io::Write the contents of the CopyStats,
+// maybe differently for backup vs restore.
+
 /// Copy files and other entries from one tree to another.
 ///
 /// Progress and problems are reported to the source's report.
@@ -26,8 +45,9 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     source: &ST,
     dest: &mut DT,
     options: &CopyOptions,
-) -> Result<()> {
+) -> Result<CopyStats> {
     let report = source.report();
+    let mut stats = CopyStats::default();
     // This causes us to walk the source tree twice, which is probably an acceptable option
     // since it's nice to see realistic overall progress. We could keep all the entries
     // in memory, and maybe we should, but it might get unreasonably big.
@@ -46,10 +66,21 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         }
         ui::set_progress_file(entry.apath());
         if let Err(e) = match entry.kind() {
-            Kind::Dir => dest.copy_dir(&entry),
-            Kind::File => dest.copy_file(&entry, source),
-            Kind::Symlink => dest.copy_symlink(&entry),
+            Kind::Dir => {
+                stats.dir_count += 1;
+                dest.copy_dir(&entry)
+            }
+            Kind::File => {
+                stats.file_count += 1;
+                dest.copy_file(&entry, source)
+                    .map(|sizes| stats.file_totals += sizes)
+            }
+            Kind::Symlink => {
+                stats.symlink_count += 1;
+                dest.copy_symlink(&entry)
+            }
             Kind::Unknown => {
+                stats.unknown_kind_count += 1;
                 // TODO: Perhaps eventually we could backup and restore pipes,
                 // sockets, etc. Or at least count them. For now, silently skip.
                 // https://github.com/sourcefrog/conserve/issues/82
@@ -57,10 +88,12 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
             }
         } {
             ui::show_error(&e);
+            stats.copies_failed += 1;
             continue;
         }
         ui::increment_bytes_done(entry.size().unwrap_or(0));
     }
     ui::clear_progress();
-    dest.finish()
+    dest.finish()?;
+    Ok(stats)
 }

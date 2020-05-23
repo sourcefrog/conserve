@@ -228,17 +228,7 @@ impl UIState {
             crate::misc::bytes_to_human_mb(state.bytes_done),
         )
         .unwrap();
-        // let block_sizes = counts.get_size("block");
-        // let comp_bytes = block_sizes.compressed;
-        // if comp_bytes > 0 {
-        //     write!(
-        //         pb_text,
-        //         "=> {:<8} ",
-        //         (block_sizes.compressed / MB).separate_with_commas(),
-        //     )
-        //     .unwrap();
-        // }
-        write!(prefix, "{:>8} MB/s ", (rate as u64).separate_with_commas(),).unwrap();
+        write!(prefix, "{:>8} MB/s ", (rate as u64).separate_with_commas()).unwrap();
         write!(message, "{} {}", state.phase, state.filename).unwrap();
         let message_limit = w - prefix.len();
         let truncated_message = if message.len() < message_limit {

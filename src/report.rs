@@ -3,28 +3,17 @@
 
 //! Accumulate statistics about a Conserve operation.
 //!
-//! A report includes counters of events, and also sizes for files.
-//!
-//! Sizes can be reported in both compressed and uncompressed form.
+//! A report includes counters of events.
 //!
 //! By convention in this library when a Report is explicitly provided, it's the last parameter.
 //!
 //! When possible a Report is inherited from an `Archive` into the objects created from it.
 
 use std::collections::BTreeMap;
-use std::fmt;
-use std::fmt::{Display, Formatter};
 use std::ops::AddAssign;
 use std::sync::Arc;
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
-
-use thousands::Separable;
-
-use super::ui;
-use super::ui::{compression_ratio, duration_to_hms, mbps_rate};
-
-const M: u64 = 1_000_000;
 
 #[rustfmt::skip]
 static KNOWN_COUNTERS: &[&str] = &[
@@ -60,14 +49,11 @@ pub struct Sizes {
     pub uncompressed: u64,
 }
 
-static KNOWN_SIZES: &[&str] = &["block", "file.bytes", "index"];
-
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
 #[derive(Debug)]
 pub struct Counts {
     count: BTreeMap<&'static str, u64>,
-    sizes: BTreeMap<&'static str, Sizes>,
     pub start: Instant,
 }
 
@@ -133,19 +119,6 @@ impl Report {
         }
     }
 
-    pub fn increment_size(&self, counter_name: &str, sizes: Sizes) {
-        let mut counts = self.mut_counts();
-        let e = counts
-            .sizes
-            .get_mut(counter_name)
-            .expect("unregistered size counter");
-        *e += sizes;
-    }
-
-    pub fn get_size(&self, counter_name: &str) -> Sizes {
-        self.borrow_counts().get_size(counter_name)
-    }
-
     pub fn get_count(&self, counter_name: &str) -> u64 {
         self.borrow_counts().get_count(counter_name)
     }
@@ -157,44 +130,14 @@ impl Default for Report {
     }
 }
 
-// TODO: Maybe this should be on the Counts not the Report?
-impl Display for Report {
-    fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), fmt::Error> {
-        writeln!(f, "Counts:")?;
-        let counts = self.mut_counts();
-        for (key, value) in &counts.count {
-            if *value > 0 {
-                writeln!(f, "  {:<40} {:>9}", *key, *value)?;
-            }
-        }
-        writeln!(f, "Bytes (before and after compression):")?;
-        for (key, s) in &counts.sizes {
-            if s.uncompressed > 0 {
-                let ratio = ui::compression_ratio(s);
-                writeln!(
-                    f,
-                    "  {:<40} {:>9} {:>9} {:>9.1}x",
-                    *key, s.uncompressed, s.compressed, ratio
-                )?;
-            }
-        }
-        Ok(())
-    }
-}
-
 impl Counts {
     fn new() -> Counts {
         let mut count = BTreeMap::new();
         for counter_name in KNOWN_COUNTERS {
             count.insert(*counter_name, 0);
         }
-        let mut sizes = BTreeMap::new();
-        for counter_name in KNOWN_SIZES {
-            sizes.insert(*counter_name, Sizes::default());
-        }
         Counts {
             count,
-            sizes,
             start: Instant::now(),
         }
     }
@@ -207,99 +150,14 @@ impl Counts {
             .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
     }
 
-    /// Get size of data processed.
-    ///
-    /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
-    /// in bytes.
-    pub fn get_size(&self, counter_name: &str) -> Sizes {
-        *self
-            .sizes
-            .get(counter_name)
-            .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
-    }
-
     pub fn elapsed_time(&self) -> Duration {
         self.start.elapsed()
-    }
-
-    pub fn summary_for_restore(&self) -> String {
-        // TODO: Just "index" might not be a good counter name when we both
-        // read and write for incremental indexes.
-        format!(
-            "{:>12} MB   in {} files, {} directories, {} symlinks.\n\
-             {:>12} MB/s output rate.\n\
-             {:>12} MB   after deduplication.\n\
-             {:>12} MB   in {} blocks after {:.1}x compression.\n\
-             {:>12} MB   in {} compressed index hunks.\n\
-             {:>12}      elapsed.\n",
-            (self.get_size("file.bytes").uncompressed / M).separate_with_commas(),
-            self.get_count("file").separate_with_commas(),
-            self.get_count("dir").separate_with_commas(),
-            self.get_count("symlink").separate_with_commas(),
-            (mbps_rate(
-                self.get_size("file.bytes").uncompressed,
-                self.elapsed_time()
-            ) as u64)
-                .separate_with_commas(),
-            (self.get_size("block").uncompressed / M).separate_with_commas(),
-            (self.get_size("block").compressed / M).separate_with_commas(),
-            self.get_count("block.read").separate_with_commas(),
-            compression_ratio(&self.get_size("block")),
-            (self.get_size("index").compressed / M).separate_with_commas(),
-            self.get_count("index.hunk").separate_with_commas(),
-            duration_to_hms(self.elapsed_time()),
-        )
-    }
-
-    pub fn summary_for_backup(&self) -> String {
-        // TODO: Just "index" might not be a good counter name when we both
-        // read and write for incremental indexes.
-        format!(
-            "{:>12} MB   in {} files, {} directories, {} symlinks.\n\
-             {:>12}      files are unchanged.\n\
-             {:>12} MB/s input rate.\n\
-             {:>12} MB   after deduplication.\n\
-             {:>12} MB   in {} blocks after {:.1}x compression.\n\
-             {:>12} MB   in {} index hunks after {:.1}x compression.\n\
-             {:>12}      elapsed.\n",
-            (self.get_size("file.bytes").uncompressed / M).separate_with_commas(),
-            self.get_count("file").separate_with_commas(),
-            self.get_count("dir").separate_with_commas(),
-            self.get_count("symlink").separate_with_commas(),
-            self.get_count("file.unchanged").separate_with_commas(),
-            (mbps_rate(
-                self.get_size("file.bytes").uncompressed,
-                self.elapsed_time()
-            ) as u64)
-                .separate_with_commas(),
-            (self.get_size("block").uncompressed / M).separate_with_commas(),
-            (self.get_size("block").compressed / M).separate_with_commas(),
-            self.get_count("block.write").separate_with_commas(),
-            compression_ratio(&self.get_size("block")),
-            (self.get_size("index").compressed / M).separate_with_commas(),
-            self.get_count("index.hunk").separate_with_commas(),
-            compression_ratio(&self.get_size("index")),
-            duration_to_hms(self.elapsed_time()),
-        )
-    }
-
-    pub fn summary_for_validate(&self) -> String {
-        format!(
-            "{:>12} MB   in {} blocks.\n\
-             {:>12} MB/s block validation rate.\n\
-             {:>12}      elapsed.\n",
-            (self.get_size("block").uncompressed / M).separate_with_commas(),
-            self.get_count("block.read").separate_with_commas(),
-            (mbps_rate(self.get_size("block").uncompressed, self.elapsed_time()) as u64)
-                .separate_with_commas(),
-            duration_to_hms(self.elapsed_time()),
-        )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Report, Sizes};
+    use super::*;
 
     #[test]
     pub fn count() {
@@ -309,31 +167,5 @@ mod tests {
         assert_eq!(r.borrow_counts().get_count("block.read"), 1);
         r.increment("block.read", 10);
         assert_eq!(r.borrow_counts().get_count("block.read"), 11);
-    }
-
-    #[rustfmt::skip]
-    #[test]
-    pub fn display() {
-        let r1 = Report::new();
-        r1.increment("block.write", 10);
-        r1.increment("block.write", 5);
-        r1.increment_size(
-            "block",
-            Sizes {
-                uncompressed: 300,
-                compressed: 100,
-            },
-        );
-
-        let formatted = format!("{}", r1);
-        assert_eq!(
-            formatted,
-            "\
-Counts:
-  block.write                                     15
-Bytes (before and after compression):
-  block                                          300       100       3.0x
-"
-        );
     }
 }
