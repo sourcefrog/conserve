@@ -60,6 +60,19 @@ pub fn problem<S: AsRef<str>>(s: &S) {
     UI_STATE.lock().unwrap().problem(s.as_ref()).unwrap();
 }
 
+/// Report that a non-fatal error occurred.
+///
+/// The program will continue.
+pub fn show_error(e: &dyn std::error::Error) {
+    // TODO: Convert to logging.
+    problem(&e.to_string());
+    let mut ce = e;
+    while let Some(c) = ce.source() {
+        problem(&format!("  caused by: {}", c));
+        ce = c;
+    }
+}
+
 pub fn set_progress_phase<S: ToString>(s: &S) {
     let mut ui = UI_STATE.lock().unwrap();
     ui.progress_state.phase = s.to_string();

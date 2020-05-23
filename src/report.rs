@@ -180,19 +180,6 @@ impl Report {
         self.set_phase("");
     }
 
-    /// Report that a non-fatal error occurred.
-    ///
-    /// The program will continue.
-    pub fn show_error(&self, e: &dyn std::error::Error) {
-        self.mut_counts().error_count += 1;
-        ui::problem(&e.to_string());
-        let mut ce = e;
-        while let Some(c) = ce.source() {
-            ui::problem(&format!("  caused by: {}", c));
-            ce = c;
-        }
-    }
-
     /// Set the total expected work (in bytes); this also resets the amount of work done.
     pub fn set_total_work(&self, w: u64) {
         let mut c = self.mut_counts();

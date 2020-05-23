@@ -90,7 +90,7 @@ impl StoredTree {
             .map(|e| self.validate_one_entry(&e))
             .inspect(|e| {
                 if let Err(e) = e {
-                    report.show_error(e);
+                    ui::show_error(e);
                 }
             })
             .find_any(Result::is_err)

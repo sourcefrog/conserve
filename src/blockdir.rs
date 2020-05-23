@@ -258,7 +258,7 @@ impl BlockDir {
             .context(errors::ReadBlock { path })
             .map_err(|e| {
                 report.increment("block.corrupt", 1);
-                report.show_error(&e);
+                ui::show_error(&e);
                 e
             })?;
         report.increment("block.read", 1);

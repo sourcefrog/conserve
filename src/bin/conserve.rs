@@ -37,7 +37,7 @@ fn main() -> conserve::Result<()> {
         ui::println(&format!("{}", report));
     }
     if let Err(ref e) = result {
-        report.show_error(e);
+        ui::show_error(e);
         // TODO: Perhaps always log the traceback to a log file.
         if let Some(bt) = snafu::ErrorCompat::backtrace(e) {
             if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {

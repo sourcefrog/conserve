@@ -196,7 +196,7 @@ impl Iter {
                 path: root_path.to_path_buf(),
             })
             .map_err(|e| {
-                report.show_error(&e);
+                ui::show_error(&e);
                 e
             })?;
         // Preload iter to return the root and then recurse into it.

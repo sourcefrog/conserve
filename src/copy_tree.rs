@@ -57,7 +57,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
                 continue;
             }
         } {
-            report.show_error(&e);
+            ui::show_error(&e);
             continue;
         }
         report.increment_work(entry.size().unwrap_or(0));

@@ -342,7 +342,7 @@ impl IndexEntryIter {
     /// Returns true if a hunk was read; false at the end.
     fn refill_entry_buffer_or_warn(&mut self) -> bool {
         self.refill_entry_buffer().unwrap_or_else(|e| {
-            self.report.show_error(&e); // Continue to read next hunk.
+            ui::show_error(&e); // Continue to read next hunk.
             true
         })
     }
