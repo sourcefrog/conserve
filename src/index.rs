@@ -491,13 +491,18 @@ mod tests {
         add_an_entry(&mut ib, "/apple");
         add_an_entry(&mut ib, "/banana");
         ib.finish_hunk(&report).unwrap();
+        #[allow(clippy::redundant_clone)] // It's not redundant, because ib will be dropped.
+        let ib_dir = ib.dir.to_path_buf();
+        drop(ib);
 
-        // The first hunk exists.
-        let mut expected_path = ib.dir.to_path_buf();
-        expected_path.push("00000");
-        expected_path.push("000000000");
+        assert!(
+            std::fs::metadata(ib_dir.join("00000").join("000000000"))
+                .unwrap()
+                .is_file(),
+            "Index hunk file not found"
+        );
 
-        let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib_dir, &report).unwrap();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
