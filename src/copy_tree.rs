@@ -32,20 +32,19 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     // since it's nice to see realistic overall progress. We could keep all the entries
     // in memory, and maybe we should, but it might get unreasonably big.
     if options.measure_first {
-        report.set_phase("Measure source tree");
+        ui::set_progress_phase("Measure source tree");
         // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
         // again a second time? But, that'll potentially use memory proportional to tree size, which
         // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
         // deleted or changed while this is running.
-        report.set_total_work(source.size()?.file_bytes);
+        ui::set_bytes_total(source.size()?.file_bytes);
     }
-    report.set_phase("Copying");
+    ui::set_progress_phase("Copying");
     for entry in source.iter_entries(&report)? {
-        let apath = entry.apath();
         if options.print_filenames {
-            crate::ui::println(apath);
+            crate::ui::println(entry.apath());
         }
-        report.start_entry(apath);
+        ui::set_progress_file(entry.apath());
         if let Err(e) = match entry.kind() {
             Kind::Dir => dest.copy_dir(&entry),
             Kind::File => dest.copy_file(&entry, source),
@@ -60,8 +59,8 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
             ui::show_error(&e);
             continue;
         }
-        report.increment_work(entry.size().unwrap_or(0));
+        ui::increment_bytes_done(entry.size().unwrap_or(0));
     }
-    report.clear_phase();
+    ui::clear_progress();
     dest.finish()
 }

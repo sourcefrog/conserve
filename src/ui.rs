@@ -14,7 +14,7 @@ use lazy_static::lazy_static;
 use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::report::{Counts, Sizes};
+use crate::report::Sizes;
 use crate::Result;
 
 const PROGRESS_RATE_LIMIT_MS: u32 = 200;
@@ -73,10 +73,17 @@ pub fn show_error(e: &dyn std::error::Error) {
     }
 }
 
-pub fn set_progress_phase<S: ToString>(s: &S) {
+pub fn set_progress_phase(s: &str) {
     let mut ui = UI_STATE.lock().unwrap();
     ui.progress_state.phase = s.to_string();
     ui.progress_state.bytes_done = 0;
+    ui.show_progress();
+}
+
+pub fn set_progress_file(s: &str) {
+    let mut ui = UI_STATE.lock().unwrap();
+    ui.progress_state.filename = s.into();
+    ui.show_progress();
 }
 
 pub fn set_bytes_total(bytes_total: u64) {
@@ -102,18 +109,6 @@ impl Default for UIState {
             progress_present: false,
             progress_enabled: false,
             progress_state: ProgressState::default(),
-        }
-    }
-}
-
-impl ProgressState {
-    pub fn from_counts(counts: &Counts) -> ProgressState {
-        ProgressState {
-            phase: counts.phase.clone(),
-            start: counts.start,
-            bytes_done: counts.total_work,
-            bytes_total: counts.total_work,
-            filename: counts.get_latest_filename().into(),
         }
     }
 }

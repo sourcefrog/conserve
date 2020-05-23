@@ -23,7 +23,6 @@ use thousands::Separable;
 
 use super::ui;
 use super::ui::{compression_ratio, duration_to_hms, mbps_rate};
-use super::*;
 
 const M: u64 = 1_000_000;
 
@@ -70,18 +69,6 @@ pub struct Counts {
     count: BTreeMap<&'static str, u64>,
     sizes: BTreeMap<&'static str, Sizes>,
     pub start: Instant,
-
-    /// Most recently started filename.
-    latest_filename: String,
-
-    /// General phase of work.
-    pub phase: String,
-
-    /// Total estimated work to be done (task-specific units).
-    pub total_work: u64,
-
-    /// Amount of work done so far, to indicate percentage completion.
-    pub done_work: u64,
 }
 
 /// A Report is notified of problems or non-problematic events that occur while Conserve is
@@ -162,31 +149,6 @@ impl Report {
     pub fn get_count(&self, counter_name: &str) -> u64 {
         self.borrow_counts().get_count(counter_name)
     }
-
-    /// Report that processing started for a given entry.
-    pub fn start_entry(&self, apath: &Apath) {
-        self.mut_counts().latest_filename = apath.to_string();
-    }
-
-    /// Briefly describe the phase of work.
-    pub fn set_phase<S: Into<String>>(&self, phase: S) {
-        self.mut_counts().phase = phase.into();
-    }
-
-    pub fn clear_phase(&self) {
-        self.set_phase("");
-    }
-
-    /// Set the total expected work (in bytes); this also resets the amount of work done.
-    pub fn set_total_work(&self, w: u64) {
-        let mut c = self.mut_counts();
-        c.total_work = w;
-        c.done_work = 0;
-    }
-
-    pub fn increment_work(&self, w: u64) {
-        self.mut_counts().done_work += w;
-    }
 }
 
 impl Default for Report {
@@ -234,10 +196,6 @@ impl Counts {
             count,
             sizes,
             start: Instant::now(),
-            latest_filename: String::new(),
-            phase: String::new(),
-            total_work: 0,
-            done_work: 0,
         }
     }
 
@@ -262,10 +220,6 @@ impl Counts {
 
     pub fn elapsed_time(&self) -> Duration {
         self.start.elapsed()
-    }
-
-    pub fn get_latest_filename(&self) -> &str {
-        &self.latest_filename
     }
 
     pub fn summary_for_restore(&self) -> String {

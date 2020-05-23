@@ -41,7 +41,7 @@ impl StoredFile {
             .into_par_iter()
             .map(|i| {
                 let c = self.read_block(i)?;
-                self.report.increment_work(c.len() as u64);
+                ui::increment_bytes_done(c.len() as u64);
                 Ok(())
             })
             .find_any(Result::is_err)

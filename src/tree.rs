@@ -31,13 +31,12 @@ pub trait ReadTree: HasReport {
     ///
     /// This typically requires walking all entries, which may take a while.
     fn size(&self) -> Result<TreeSize> {
-        let report = self.report();
         let mut tot = 0u64;
         for e in self.iter_entries(self.report())? {
             // While just measuring size, ignore directories/files we can't stat.
             let s = e.size().unwrap_or(0);
             tot += s;
-            report.increment_work(s);
+            ui::increment_bytes_done(s);
         }
         Ok(TreeSize { file_bytes: tot })
     }

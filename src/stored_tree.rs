@@ -82,8 +82,7 @@ impl StoredTree {
     }
 
     pub fn validate(&self) -> Result<()> {
-        let report = self.report();
-        report.set_phase(format!("Check tree {}", self.band().id()));
+        ui::set_progress_phase(&format!("Check tree {}", self.band().id()));
         self.iter_entries(self.report())?
             .filter(|e| e.kind() == Kind::File)
             .par_bridge()
@@ -98,7 +97,7 @@ impl StoredTree {
     }
 
     fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {
-        self.report().start_entry(e.apath());
+        ui::set_progress_file(e.apath());
         self.open_stored_file(&e)?.validate()
     }
 
