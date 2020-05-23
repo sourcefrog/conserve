@@ -114,7 +114,7 @@ impl BlockDir {
             if e.error.kind() == io::ErrorKind::AlreadyExists {
                 // Perhaps it was simultaneously created by another thread or process.
                 // This isn't really an error.
-                report.problem(&format!(
+                ui::problem(&format!(
                     "Unexpected late detection of existing block {:?}",
                     hex_hash
                 ));
@@ -153,13 +153,13 @@ impl BlockDir {
     }
 
     /// Return a sorted vec of prefix subdirectories.
-    fn subdirs(&self, report: &Report) -> std::io::Result<Vec<String>> {
+    fn subdirs(&self) -> std::io::Result<Vec<String>> {
         // This doesn't check every invariant that should be true; that's the job of the validation
         // code.
         let (_fs, mut ds) = list_dir(&self.path)?;
         ds.retain(|dd| {
             if dd.len() != SUBDIR_NAME_CHARS {
-                report.problem(&format!(
+                ui::problem(&format!(
                     "unexpected subdirectory in blockdir {:?}: {:?}",
                     self, dd
                 ));
@@ -171,13 +171,10 @@ impl BlockDir {
         Ok(ds)
     }
 
-    fn iter_block_dir_entries(
-        &self,
-        report: &Report,
-    ) -> Result<impl Iterator<Item = std::fs::DirEntry>> {
+    fn iter_block_dir_entries(&self) -> Result<impl Iterator<Item = std::fs::DirEntry>> {
         let path = self.path.clone();
         let subdirs = self
-            .subdirs(report)
+            .subdirs()
             .with_context(|| errors::ListBlocks { path: path.clone() })?;
         Ok(subdirs.into_iter().flat_map(move |s| {
             // TODO: Avoid `unwrap`; send errors to the report.
@@ -195,18 +192,15 @@ impl BlockDir {
 
     /// Return an iterator through all the blocknames in the blockdir,
     /// in arbitrary order.
-    pub fn block_names(&self, report: &Report) -> Result<impl Iterator<Item = String>> {
+    pub fn block_names(&self) -> Result<impl Iterator<Item = String>> {
         Ok(self
-            .iter_block_dir_entries(report)?
+            .iter_block_dir_entries()?
             .map(|de| de.file_name().into_string().unwrap()))
     }
 
     /// Return an iterator of block names and sizes.
-    fn block_names_and_sizes(
-        &self,
-        report: &Report,
-    ) -> Result<impl Iterator<Item = (String, u64)>> {
-        Ok(self.iter_block_dir_entries(report)?.map(|de| {
+    fn block_names_and_sizes(&self) -> Result<impl Iterator<Item = (String, u64)>> {
+        Ok(self.iter_block_dir_entries()?.map(|de| {
             (
                 de.file_name().into_string().unwrap(),
                 de.metadata().unwrap().len(),
@@ -222,7 +216,7 @@ impl BlockDir {
         // then we don't need to count the sizes in advance.
         // let ui = report.lock_ui();
         ui::println("Count blocks...");
-        let bns: Vec<(String, u64)> = self.block_names_and_sizes(report)?.collect();
+        let bns: Vec<(String, u64)> = self.block_names_and_sizes()?.collect();
         let tot = bns.iter().map(|a| a.1).sum();
         ui::set_progress_phase(&"Count blocks");
         ui::set_bytes_total(tot);
@@ -246,7 +240,7 @@ impl BlockDir {
         if actual_hash != *hash {
             let path = self.path_for_file(&hash);
             report.increment("block.misplaced", 1);
-            report.problem(&format!(
+            ui::problem(&format!(
                 "Block file {:?} has actual decompressed hash {:?}",
                 path, actual_hash
             ));
@@ -414,10 +408,7 @@ mod tests {
 
         // Block should be the one block present in the list.
         assert_eq!(
-            block_dir
-                .block_names(&Report::new())
-                .unwrap()
-                .collect::<Vec<_>>(),
+            block_dir.block_names().unwrap().collect::<Vec<_>>(),
             &[EXAMPLE_BLOCK_HASH]
         );
 

@@ -379,8 +379,7 @@ impl IndexEntryIter {
         let entries: Vec<IndexEntry> = serde_json::from_slice(&index_bytes)
             .with_context(|| errors::DeserializeIndex { path })?;
         if entries.is_empty() {
-            self.report
-                .problem(&format!("Index hunk {:?} is empty", path));
+            ui::problem(&format!("Index hunk {:?} is empty", path));
         }
         // NOTE: Not updating 'skipped' counters; here. Questionable value.
         self.buffered_entries = entries.into_iter().peekable();

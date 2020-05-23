@@ -100,8 +100,7 @@ impl tree::WriteTree for RestoreTree {
             unix_fs::symlink(target, &path).context(errors::Restore { path })?;
         } else {
             // TODO: Treat as an error.
-            self.report
-                .problem(&format!("No target in symlink entry {}", entry.apath()));
+            ui::problem(&format!("No target in symlink entry {}", entry.apath()));
         }
         Ok(())
     }

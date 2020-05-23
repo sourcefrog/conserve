@@ -180,18 +180,6 @@ impl Report {
         self.set_phase("");
     }
 
-    /// Report that a problem occurred.
-    ///
-    /// Later this might also count or summarize them.
-    pub fn problem(&self, s: &str) {
-        // TODO: Convert callers to calling Report::warning passing a structured
-        // error.
-        // <https://github.com/sourcefrog/conserve/issues/72>.
-        self.mut_counts().error_count += 1;
-        // TODO: As an error
-        crate::ui::println(s);
-    }
-
     /// Report that a non-fatal error occurred.
     ///
     /// The program will continue.

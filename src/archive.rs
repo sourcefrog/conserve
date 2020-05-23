@@ -160,7 +160,7 @@ impl Archive {
             list_dir(self.path()).context(errors::ReadMetadata { path: self.path() })?;
         remove_item(&mut files, &HEADER_FILENAME);
         if !files.is_empty() {
-            self.report.problem(&format!(
+            ui::problem(&format!(
                 "Unexpected files in archive directory {:?}: {:?}",
                 self.path(),
                 files
@@ -173,7 +173,7 @@ impl Archive {
         for d in dirs.iter() {
             if let Ok(b) = BandId::from_string(&d) {
                 if bs.contains(&b) {
-                    self.report.problem(&format!(
+                    ui::problem(&format!(
                         "Duplicated band directory in {:?}: {:?}",
                         self.path(),
                         d
@@ -182,7 +182,7 @@ impl Archive {
                     bs.insert(b);
                 }
             } else {
-                self.report.problem(&format!(
+                ui::problem(&format!(
                     "Unexpected directory in {:?}: {:?}",
                     self.path(),
                     d
@@ -215,7 +215,7 @@ impl Archive {
         ps.bytes_total = total_size;
         for bid in self.list_bands()?.iter() {
             let b = Band::open(self, bid)?;
-            b.validate(&self.report)?;
+            b.validate()?;
 
             let st = StoredTree::open_incomplete_version(self, bid)?;
             st.validate()?;
@@ -279,7 +279,7 @@ mod tests {
             "Archive should have no bands yet"
         );
         assert!(af.referenced_blocks().unwrap().is_empty());
-        assert_eq!(af.block_dir.block_names(&af.report).unwrap().count(), 0);
+        assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 
     #[test]
@@ -303,6 +303,6 @@ mod tests {
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
         assert!(af.referenced_blocks().unwrap().is_empty());
-        assert_eq!(af.block_dir.block_names(&af.report).unwrap().count(), 0);
+        assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 }

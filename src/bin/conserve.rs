@@ -399,7 +399,7 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn debug_block_list(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    for b in archive.block_dir().block_names(report)? {
+    for b in archive.block_dir().block_names()? {
         println!("{}", b);
     }
     Ok(())

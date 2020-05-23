@@ -90,7 +90,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     );
     assert_eq!(
         af.block_dir()
-            .block_names(&af.report())
+            .block_names()
             .unwrap()
             .collect::<Vec<String>>(),
         vec![HELLO_HASH]

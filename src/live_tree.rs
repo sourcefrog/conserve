@@ -239,8 +239,7 @@ impl Iter {
         }) {
             Ok(i) => i,
             Err(e) => {
-                self.report
-                    .problem(&format!("Error reading directory {:?}: {}", &dir_path, e));
+                ui::problem(&format!("Error reading directory {:?}: {}", &dir_path, e));
                 return;
             }
         };
@@ -248,7 +247,7 @@ impl Iter {
             let dir_entry = match dir_entry {
                 Ok(dir_entry) => dir_entry,
                 Err(e) => {
-                    self.report.problem(&format!(
+                    ui::problem(&format!(
                         "Error reading next entry from directory {:?}: {}",
                         &dir_path, e
                     ));
@@ -264,7 +263,7 @@ impl Iter {
             let child_name = match child_osstr.to_str() {
                 Some(c) => c,
                 None => {
-                    self.report.problem(&format!(
+                    ui::problem(&format!(
                         "Can't decode filename {:?} in {:?}",
                         child_osstr, dir_path,
                     ));
@@ -275,7 +274,7 @@ impl Iter {
             let ft = match dir_entry.file_type() {
                 Ok(ft) => ft,
                 Err(e) => {
-                    self.report.problem(&format!(
+                    ui::problem(&format!(
                         "Error getting type of {:?} during iteration: {}",
                         child_apath_str, e
                     ));
@@ -300,13 +299,13 @@ impl Iter {
                         ErrorKind::NotFound => {
                             // Fairly harmless, and maybe not even worth logging. Just a race
                             // between listing the directory and looking at the contents.
-                            self.report.problem(&format!(
+                            ui::problem(&format!(
                                 "File disappeared during iteration: {:?}: {}",
                                 child_apath_str, e
                             ));
                         }
                         _ => {
-                            self.report.problem(&format!(
+                            ui::problem(&format!(
                                 "Failed to read source metadata from {:?}: {}",
                                 child_apath_str, e
                             ));
@@ -323,7 +322,7 @@ impl Iter {
                 let t = match dir_path.join(dir_entry.file_name()).read_link() {
                     Ok(t) => t,
                     Err(e) => {
-                        self.report.problem(&format!(
+                        ui::problem(&format!(
                             "Failed to read target of symlink {:?}: {}",
                             child_apath_str, e
                         ));
@@ -333,7 +332,7 @@ impl Iter {
                 match t.into_os_string().into_string() {
                     Ok(t) => Some(t),
                     Err(e) => {
-                        self.report.problem(&format!(
+                        ui::problem(&format!(
                             "Failed to decode target of symlink {:?}: {:?}",
                             child_apath_str, e
                         ));
