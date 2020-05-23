@@ -508,7 +508,6 @@ mod tests {
         let (addrs, sizes) = store
             .store_file_content(&Apath::from("/big"), &mut tf, &report)
             .unwrap();
-        println!("Report after store: {}", report);
 
         assert_eq!(sizes.uncompressed, TOTAL_SIZE);
         // Should be very compressible

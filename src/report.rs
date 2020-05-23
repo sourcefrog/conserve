@@ -10,8 +10,6 @@
 //! When possible a Report is inherited from an `Archive` into the objects created from it.
 
 use std::collections::BTreeMap;
-use std::fmt;
-use std::fmt::{Display, Formatter};
 use std::ops::AddAssign;
 use std::sync::Arc;
 use std::sync::{Mutex, MutexGuard};
@@ -226,20 +224,6 @@ impl Default for Report {
     }
 }
 
-// TODO: Maybe this should be on the Counts not the Report?
-impl Display for Report {
-    fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), fmt::Error> {
-        writeln!(f, "Counts:")?;
-        let counts = self.mut_counts();
-        for (key, value) in &counts.count {
-            if *value > 0 {
-                writeln!(f, "  {:<40} {:>9}", *key, *value)?;
-            }
-        }
-        Ok(())
-    }
-}
-
 impl Counts {
     fn new() -> Counts {
         let mut count = BTreeMap::new();
@@ -286,21 +270,5 @@ mod tests {
         assert_eq!(r.borrow_counts().get_count("block.read"), 1);
         r.increment("block.read", 10);
         assert_eq!(r.borrow_counts().get_count("block.read"), 11);
-    }
-
-    #[rustfmt::skip]
-    #[test]
-    pub fn display() {
-        let r1 = Report::new();
-        r1.increment("block.write", 10);
-        r1.increment("block.write", 5);
-        let formatted = format!("{}", r1);
-        assert_eq!(
-            formatted,
-            "\
-Counts:
-  block.write                                     15
-"
-        );
     }
 }
