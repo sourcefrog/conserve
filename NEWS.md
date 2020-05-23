@@ -23,6 +23,8 @@
 - Added a clean error message if Conserve is too old to read a band or index
   within an otherwise-compatible archive. (#96)
 
+- Removed global `--stats` option. Stats will be shown with `-v`.
+
 ## Conserve 0.6.2 2020-02-06
 
 - Added nanosecond precision to stored mtimes. The main benefit of this is

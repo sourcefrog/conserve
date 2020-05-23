@@ -36,9 +36,6 @@ fn main() -> conserve::Result<()> {
     let result = c(sm, &report);
 
     report.finish();
-    if matches.is_present("stats") {
-        report.println(&format!("{}", report));
-    }
     if let Err(ref e) = result {
         report.show_error(e);
         // TODO: Perhaps always log the traceback to a log file.
@@ -123,11 +120,6 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             Arg::with_name("no-progress")
                 .long("no-progress")
                 .help("Hide progress bar"),
-        )
-        .arg(
-            Arg::with_name("stats")
-                .long("stats")
-                .help("Show stats about IO, timing, and compression"),
         )
         .subcommand(
             SubCommand::with_name("debug")
