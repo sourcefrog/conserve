@@ -36,6 +36,9 @@ struct ArchiveHeader {
     conserve_archive_version: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidateArchiveStats {}
+
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
     pub fn create<P: AsRef<Path>>(path: P) -> Result<Archive> {
@@ -142,7 +145,7 @@ impl Archive {
         Ok(hs)
     }
 
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> Result<ValidateArchiveStats> {
         // Check there's no extra top-level contents.
         self.validate_archive_dir()?;
         self.report.println("Check blockdir...");
@@ -151,7 +154,7 @@ impl Archive {
 
         // TODO: Don't say "OK" if there were non-fatal problems.
         self.report.println("Archive is OK.");
-        Ok(())
+        Ok(ValidateArchiveStats {})
     }
 
     fn validate_archive_dir(&self) -> Result<()> {

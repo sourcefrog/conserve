@@ -3,9 +3,7 @@
 
 //! Accumulate statistics about a Conserve operation.
 //!
-//! A report includes counters of events, and also sizes for files.
-//!
-//! Sizes can be reported in both compressed and uncompressed form.
+//! A report includes counters of events.
 //!
 //! By convention in this library when a Report is explicitly provided, it's the last parameter.
 //!
@@ -19,12 +17,8 @@ use std::sync::Arc;
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use thousands::Separable;
-
-use super::ui::{compression_ratio, duration_to_hms, mbps_rate, PlainUI, UI};
+use super::ui::{PlainUI, UI};
 use super::*;
-
-const M: u64 = 1_000_000;
 
 #[rustfmt::skip]
 static KNOWN_COUNTERS: &[&str] = &[
@@ -60,14 +54,11 @@ pub struct Sizes {
     pub uncompressed: u64,
 }
 
-static KNOWN_SIZES: &[&str] = &["block", "file.bytes", "index"];
-
 /// Holds the actual counters, in an inner object that can be referenced by
 /// multiple Report values.
 #[derive(Debug)]
 pub struct Counts {
     count: BTreeMap<&'static str, u64>,
-    sizes: BTreeMap<&'static str, Sizes>,
     start: Instant,
 
     /// Most recently started filename.
@@ -255,13 +246,8 @@ impl Counts {
         for counter_name in KNOWN_COUNTERS {
             count.insert(*counter_name, 0);
         }
-        let mut sizes = BTreeMap::new();
-        for counter_name in KNOWN_SIZES {
-            sizes.insert(*counter_name, Sizes::default());
-        }
         Counts {
             count,
-            sizes,
             start: Instant::now(),
             latest_filename: String::new(),
             phase: String::new(),
@@ -279,97 +265,12 @@ impl Counts {
             .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
     }
 
-    /// Get size of data processed.
-    ///
-    /// For any size-counter name, returns a pair of (compressed, uncompressed) sizes,
-    /// in bytes.
-    pub fn get_size(&self, counter_name: &str) -> Sizes {
-        *self
-            .sizes
-            .get(counter_name)
-            .unwrap_or_else(|| panic!("unknown counter {:?}", counter_name))
-    }
-
     pub fn elapsed_time(&self) -> Duration {
         self.start.elapsed()
     }
 
     pub fn get_latest_filename(&self) -> &str {
         &self.latest_filename
-    }
-
-    pub fn summary_for_restore(&self) -> String {
-        // TODO: Just "index" might not be a good counter name when we both
-        // read and write for incremental indexes.
-        format!(
-            "{:>12} MB   in {} files, {} directories, {} symlinks.\n\
-             {:>12} MB/s output rate.\n\
-             {:>12} MB   after deduplication.\n\
-             {:>12} MB   in {} blocks after {:.1}x compression.\n\
-             {:>12} MB   in {} compressed index hunks.\n\
-             {:>12}      elapsed.\n",
-            (self.get_size("file.bytes").uncompressed / M).separate_with_commas(),
-            self.get_count("file").separate_with_commas(),
-            self.get_count("dir").separate_with_commas(),
-            self.get_count("symlink").separate_with_commas(),
-            (mbps_rate(
-                self.get_size("file.bytes").uncompressed,
-                self.elapsed_time()
-            ) as u64)
-                .separate_with_commas(),
-            (self.get_size("block").uncompressed / M).separate_with_commas(),
-            (self.get_size("block").compressed / M).separate_with_commas(),
-            self.get_count("block.read").separate_with_commas(),
-            compression_ratio(&self.get_size("block")),
-            (self.get_size("index").compressed / M).separate_with_commas(),
-            self.get_count("index.hunk").separate_with_commas(),
-            duration_to_hms(self.elapsed_time()),
-        )
-    }
-
-    pub fn summary_for_backup(&self) -> String {
-        // TODO: Just "index" might not be a good counter name when we both
-        // read and write for incremental indexes.
-        format!(
-            "{:>12} MB   in {} files, {} directories, {} symlinks.\n\
-             {:>12}      files are unchanged.\n\
-             {:>12} MB/s input rate.\n\
-             {:>12} MB   after deduplication.\n\
-             {:>12} MB   in {} blocks after {:.1}x compression.\n\
-             {:>12} MB   in {} index hunks after {:.1}x compression.\n\
-             {:>12}      elapsed.\n",
-            (self.get_size("file.bytes").uncompressed / M).separate_with_commas(),
-            self.get_count("file").separate_with_commas(),
-            self.get_count("dir").separate_with_commas(),
-            self.get_count("symlink").separate_with_commas(),
-            self.get_count("file.unchanged").separate_with_commas(),
-            (mbps_rate(
-                self.get_size("file.bytes").uncompressed,
-                self.elapsed_time()
-            ) as u64)
-                .separate_with_commas(),
-            (self.get_size("block").uncompressed / M).separate_with_commas(),
-            (self.get_size("block").compressed / M).separate_with_commas(),
-            self.get_count("block.write").separate_with_commas(),
-            compression_ratio(&self.get_size("block")),
-            (self.get_size("index").compressed / M).separate_with_commas(),
-            self.get_count("index.hunk").separate_with_commas(),
-            compression_ratio(&self.get_size("index")),
-            duration_to_hms(self.elapsed_time()),
-        )
-    }
-
-    pub fn summary_for_validate(&self) -> String {
-        format!(
-            "{:>12} MB   in {} blocks.\n\
-             {:>12} MB/s block validation rate.\n\
-             {:>12}      elapsed.\n",
-            (self.get_size("block").uncompressed / M).separate_with_commas(),
-            self.get_count("block.read").separate_with_commas(),
-            (mbps_rate(self.get_size("block").uncompressed, self.elapsed_time()) as u64)
-                .separate_with_commas(),
-            duration_to_hms(self.elapsed_time()),
-        )
     }
 }
 

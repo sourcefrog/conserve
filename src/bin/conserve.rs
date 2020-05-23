@@ -307,9 +307,9 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
         print_filenames: subm.is_present("v"),
         ..CopyOptions::default()
     };
-    copy_tree(&lt, &mut bw, &opts)?;
+    let copy_stats = copy_tree(&lt, &mut bw, &opts)?;
     report.println("Backup complete.");
-    report.println(&report.borrow_counts().summary_for_backup());
+    report.println(&format!("{:#?}", copy_stats));
     Ok(())
 }
 
@@ -335,8 +335,8 @@ fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn validate(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    archive.validate()?;
-    report.println(&report.borrow_counts().summary_for_validate());
+    let validate_stats = archive.validate()?;
+    report.println(&format!("{:#?}", validate_stats));
     Ok(())
 }
 
@@ -394,9 +394,9 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
         print_filenames: subm.is_present("v"),
         ..CopyOptions::default()
     };
-    copy_tree(&st, &mut rt, &opts)?;
+    let copy_stats = copy_tree(&st, &mut rt, &opts)?;
     report.println("Restore complete.");
-    report.println(&report.borrow_counts().summary_for_restore());
+    report.println(&format!("{:#?}", copy_stats));
     Ok(())
 }
 

@@ -136,11 +136,10 @@ mod tests {
         let mut bw = BackupWriter::begin(&af).unwrap();
         let report = af.report();
         let copy_stats = copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
-        assert_eq!(0, report.get_count("block.write"));
-        assert_eq!(0, report.get_count("file"));
-        assert_eq!(1, report.get_count("symlink"));
-        assert_eq!(0, report.get_count("skipped.unsupported_file_kind"));
-        assert_eq!(0, copy_stats.unknown_file_kind);
+        // assert_eq!(0, report.get_count("block.write"));
+        assert_eq!(0, copy_stats.file_count);
+        assert_eq!(1, copy_stats.symlink_count);
+        assert_eq!(0, copy_stats.unknown_kind_count);
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());

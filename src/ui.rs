@@ -182,16 +182,6 @@ impl UI for TerminalUI {
                 crate::misc::bytes_to_human_mb(counts.done_work),
             )
             .unwrap();
-            // let block_sizes = counts.get_size("block");
-            // let comp_bytes = block_sizes.compressed;
-            // if comp_bytes > 0 {
-            //     write!(
-            //         pb_text,
-            //         "=> {:<8} ",
-            //         (block_sizes.compressed / MB).separate_with_commas(),
-            //     )
-            //     .unwrap();
-            // }
             write!(prefix, "{:>8} MB/s ", (rate as u64).separate_with_commas(),).unwrap();
             write!(message, "{} {}", counts.phase, counts.get_latest_filename()).unwrap();
         };
