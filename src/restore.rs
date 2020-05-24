@@ -107,7 +107,7 @@ impl tree::WriteTree for RestoreTree {
     fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()> {
         // TODO: Add a test with a canned index containing a symlink, and expect
         // it cannot be restored on Windows and can be on Unix.
-        self.report.problem(&format!(
+        ui::problem(&format!(
             "Can't restore symlinks on non-Unix: {}",
             entry.apath()
         ));
