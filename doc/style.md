@@ -7,7 +7,8 @@
 Not all of the existing code is consistent in how it names things. Here is the
 new pattern.
 
-Things that read are `*Reader`: `IndexReader`, `BlockReader`. Things that write `*Writer`.
+Things that read are `*Reader`: `IndexReader`, `BlockReader`. Things that write
+`*Writer`.
 
 Counts of work done return `*Stats` particular to the type, for example
 `IndexWriterStats`. This may be returned from one-shot methods, or extracted
@@ -22,8 +23,7 @@ returns the corresponding `Reader` or `Writer`. Typically the first parameter is
 the corresponding parent object, except for the Archive or LocalTree, which can
 be constructed from a filename. (Although, in future, from a `Transport`.)
 
-To make a new one, `.create()`
-which returns a `Writer`.
+To make a new one, `.create()` which returns a `Writer`.
 
 TODO: Split `Band` into `BandReader` and `BandWriter`.
 
@@ -32,3 +32,8 @@ TODO: Unify `StoreFiles` into `BandWriter`, probably.
 ## Messages
 
 Error/log messages start with a capital but have no trailing period.
+
+## Stats
+
+Within stats objects, the last word of the name is the unit of measurement, eg
+`deduplicated_bytes`, `deduplicated_blocks`.

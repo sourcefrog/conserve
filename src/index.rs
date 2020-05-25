@@ -15,6 +15,7 @@ use globset::GlobSet;
 use snafu::ResultExt;
 
 use super::io::file_exists;
+use super::stats::IndexBuilderStats;
 use super::*;
 
 pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
@@ -130,11 +131,6 @@ pub struct IndexBuilder {
 
     /// Statistics about work done while writing this index.
     pub stats: IndexBuilderStats,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct IndexBuilderStats {
-    pub hunk_count: u64,
 }
 
 /// Accumulate and write out index entries into files in an index directory.
@@ -407,16 +403,14 @@ mod tests {
     }
 
     pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
-        ib.push(
-            IndexEntry {
-                apath: apath.into(),
-                mtime: 1_461_736_377,
-                mtime_nanos: 0,
-                kind: Kind::File,
-                addrs: vec![],
-                target: None,
-            },
-        )
+        ib.push(IndexEntry {
+            apath: apath.into(),
+            mtime: 1_461_736_377,
+            mtime_nanos: 0,
+            kind: Kind::File,
+            addrs: vec![],
+            target: None,
+        })
         .unwrap();
     }
 
@@ -444,28 +438,24 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_order() {
         let (_testdir, mut ib) = scratch_indexbuilder();
-        ib.push(
-            IndexEntry {
-                apath: "/zzz".into(),
-                mtime: 1_461_736_377,
-                mtime_nanos: 0,
+        ib.push(IndexEntry {
+            apath: "/zzz".into(),
+            mtime: 1_461_736_377,
+            mtime_nanos: 0,
 
-                kind: Kind::File,
-                addrs: vec![],
-                target: None,
-            },
-        )
+            kind: Kind::File,
+            addrs: vec![],
+            target: None,
+        })
         .unwrap();
-        ib.push(
-            IndexEntry {
-                apath: "aaa".into(),
-                mtime: 1_461_736_377,
-                mtime_nanos: 0,
-                kind: Kind::File,
-                addrs: vec![],
-                target: None,
-            },
-        )
+        ib.push(IndexEntry {
+            apath: "aaa".into(),
+            mtime: 1_461_736_377,
+            mtime_nanos: 0,
+            kind: Kind::File,
+            addrs: vec![],
+            target: None,
+        })
         .unwrap();
     }
 
@@ -473,16 +463,14 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_names() {
         let (_testdir, mut ib) = scratch_indexbuilder();
-        ib.push(
-            IndexEntry {
-                apath: "../escapecat".into(),
-                mtime: 1_461_736_377,
-                kind: Kind::File,
-                addrs: vec![],
-                mtime_nanos: 0,
-                target: None,
-            },
-        )
+        ib.push(IndexEntry {
+            apath: "../escapecat".into(),
+            mtime: 1_461_736_377,
+            kind: Kind::File,
+            addrs: vec![],
+            mtime_nanos: 0,
+            target: None,
+        })
         .unwrap();
     }
 

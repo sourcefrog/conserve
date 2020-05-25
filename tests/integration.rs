@@ -97,18 +97,12 @@ fn check_restore(af: &ScratchArchive) {
 
     let restore_report = Report::new();
     let archive = Archive::open(af.path(), &restore_report).unwrap();
-    let mut restore_tree = RestoreTree::create(&restore_dir.path(), &restore_report).unwrap();
+    let mut restore_tree = RestoreTree::create(&restore_dir.path()).unwrap();
     let st = StoredTree::open_last(&archive).unwrap();
     let copy_stats = copy_tree(&st, &mut restore_tree, &COPY_DEFAULT).unwrap();
-    assert_eq!(
-        copy_stats.file_totals,
-        Sizes {
-            uncompressed: 8,
-            // TODO: Compressed size isn't set properly when restoring, because it's
-            // lost by passing through a std::io::Read in ReadStoredFile.
-            compressed: 0,
-        }
-    );
+    assert_eq!(copy_stats.uncompressed_bytes, 8);
+    // TODO: Compressed size isn't set properly when restoring, because it's
+    // lost by passing through a std::io::Read in ReadStoredFile.
     // TODO: Check index stats.
     // TODO: Check what was restored.
 }
@@ -122,7 +116,7 @@ fn large_file() {
     let large_content = String::from("a sample large file\n").repeat(1_000_000);
     tf.create_file_with_contents("large", &large_content.as_bytes());
     let mut bw = BackupWriter::begin(&af).unwrap();
-    copy_tree(&tf.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+    let _stats = copy_tree(&tf.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
     // TODO: Examine stats from copy_tree.
 
     // Try to restore it
@@ -130,8 +124,8 @@ fn large_file() {
     let restore_report = Report::new();
     let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
     let st = StoredTree::open_last(&restore_archive).unwrap();
-    let mut rt = RestoreTree::create(rd.path(), &restore_report).unwrap();
-    copy_tree(&st, &mut rt, &COPY_DEFAULT).unwrap();
+    let mut rt = RestoreTree::create(rd.path()).unwrap();
+    let _stats = copy_tree(&st, &mut rt, &COPY_DEFAULT).unwrap();
     // TODO: Examine stats.
 
     let mut content = String::new();

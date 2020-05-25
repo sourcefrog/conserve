@@ -23,6 +23,7 @@ pub(crate) mod misc;
 pub mod output;
 pub mod report;
 mod restore;
+pub mod stats;
 mod stored_file;
 mod stored_tree;
 pub mod test_fixtures;
@@ -49,7 +50,7 @@ pub use crate::report::{HasReport, Report, Sizes};
 pub use crate::restore::RestoreTree;
 pub use crate::stored_tree::StoredTree;
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
-pub use crate::ui::{ProgressState};
+pub use crate::ui::ProgressState;
 
 // Commonly-used external types.
 pub use globset::GlobSet;

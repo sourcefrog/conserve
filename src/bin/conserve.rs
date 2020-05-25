@@ -373,9 +373,9 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     let dest = Path::new(subm.value_of("destination").unwrap());
     let st = stored_tree_from_options(subm, report)?;
     let mut rt = if subm.is_present("force-overwrite") {
-        RestoreTree::create_overwrite(dest, report)
+        RestoreTree::create_overwrite(dest)
     } else {
-        RestoreTree::create(dest, report)
+        RestoreTree::create(dest)
     }?;
     let opts = CopyOptions {
         print_filenames: subm.is_present("v"),

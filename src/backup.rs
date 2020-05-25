@@ -10,6 +10,7 @@ use snafu::ResultExt;
 use super::blockdir::StoreFiles;
 use super::*;
 use crate::index::IndexEntryIter;
+use crate::stats::CopyStats;
 
 /// Accepts files to write in the archive (in apath order.)
 pub struct BackupWriter {
@@ -20,19 +21,6 @@ pub struct BackupWriter {
     /// The index for the last stored band, used as hints for whether newly
     /// stored files have changed.
     basis_index: Option<IndexEntryIter>,
-
-    pub stats: BackupWriterStats,
-}
-
-#[derive(Default, Debug, Eq, PartialEq, Clone)]
-pub struct BackupWriterStats {
-    pub dir_count: usize,
-    pub files: usize,
-    pub files_unmodified: usize,
-    pub files_modified: usize,
-    pub files_new: usize,
-    pub symlink_count: usize,
-    pub index_builder_stats: crate::index::IndexBuilderStats,
 }
 
 impl BackupWriter {
@@ -52,7 +40,6 @@ impl BackupWriter {
             index_builder,
             store_files: StoreFiles::new(archive.block_dir().clone()),
             basis_index,
-            stats: BackupWriterStats::default(),
         })
     }
 
@@ -64,23 +51,27 @@ impl BackupWriter {
 }
 
 impl tree::WriteTree for BackupWriter {
-    fn finish(&mut self) -> Result<()> {
+    fn finish(&mut self) -> Result<CopyStats> {
         self.index_builder.finish_hunk()?;
         self.band.close()?;
-        self.stats.index_builder_stats = self.index_builder.stats.clone();
-        // TODO: Return stats at the end.
-        Ok(())
+        Ok(CopyStats {
+            index_builder_stats: self.index_builder.stats.clone(),
+            ..CopyStats::default()
+        })
     }
 
     fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
-        self.stats.dir_count += 1;
         // TODO: Pass back index sizes
         self.push_entry(IndexEntry::metadata_from(source_entry))
     }
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(&mut self, source_entry: &R::Entry, from_tree: &R) -> Result<Sizes> {
-        self.stats.files += 1;
+    fn copy_file<R: ReadTree>(
+        &mut self,
+        source_entry: &R::Entry,
+        from_tree: &R,
+    ) -> Result<CopyStats> {
+        let mut stats = CopyStats::default();
         let apath = source_entry.apath();
         if let Some(basis_entry) = self
             .basis_index
@@ -97,34 +88,28 @@ impl tree::WriteTree for BackupWriter {
                 // We can reasonably assume that the existing archive complies
                 // with the archive invariants, which include that all the
                 // blocks referenced by the index, are actually present.
-                self.stats.files_unmodified += 1;
+                stats.files_unmodified += 1;
                 self.push_entry(basis_entry)?;
-                return Ok(Sizes {
-                    uncompressed: source_entry.size().unwrap_or_default(),
-                    compressed: 0,
-                });
+                return Ok(stats);
             } else {
-                self.stats.files_modified += 1;
+                stats.files_modified += 1;
             }
         } else {
-            self.stats.files_new += 1;
+            stats.files_new += 1;
         }
-        let (addrs, stored_sizes) = if source_entry.size().map(|x| x > 0).unwrap_or(false) {
-            let content = &mut from_tree.file_contents(&source_entry)?;
-            self.store_files
-                .store_file_content(&apath, content, &Report::new())?
-        } else {
-            (Vec::new(), Sizes::default())
-        };
+        let content = &mut from_tree.file_contents(&source_entry)?;
+        // TODO: Don't read the whole file into memory, but especially don't do that and
+        // then downcast it to Read.
+        let (addrs, file_stats) = self.store_files.store_file_content(&apath, content)?;
+        stats += file_stats;
         self.push_entry(IndexEntry {
             addrs,
             ..IndexEntry::metadata_from(source_entry)
         })?;
-        Ok(stored_sizes)
+        Ok(stats)
     }
 
     fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
-        self.stats.symlink_count += 1;
         let target = source_entry.symlink_target().clone();
         assert!(target.is_some());
         self.push_entry(IndexEntry::metadata_from(source_entry))
@@ -145,9 +130,9 @@ mod tests {
         let lt = LiveTree::open(srcdir.path()).unwrap();
         let mut bw = BackupWriter::begin(&af).unwrap();
         let copy_stats = copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
-        assert_eq!(0, copy_stats.file_count);
-        assert_eq!(1, copy_stats.symlink_count);
-        assert_eq!(0, copy_stats.unknown_kind_count);
+        assert_eq!(0, copy_stats.files);
+        assert_eq!(1, copy_stats.symlinks);
+        assert_eq!(0, copy_stats.unknown_kind);
 
         let band_ids = af.list_bands().unwrap();
         assert_eq!(1, band_ids.len());
@@ -184,15 +169,14 @@ mod tests {
             .unwrap()
             .with_excludes(excludes);
         let mut bw = BackupWriter::begin(&af).unwrap();
-        copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
+        let stats = copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
 
-        let stats = &bw.stats;
-        // assert_eq!(1, report.get_count("block.write"));
+        assert_eq!(1, stats.written_blocks);
         assert_eq!(1, stats.files);
         assert_eq!(1, stats.files_new);
-        assert_eq!(2, stats.dir_count);
-        assert_eq!(0, stats.symlink_count);
-        // assert_eq!(0, report.get_count("skipped.unsupported_file_kind"));
+        assert_eq!(2, stats.directories);
+        assert_eq!(0, stats.symlinks);
+        assert_eq!(0, stats.unknown_kind);
     }
 
     #[test]
@@ -203,10 +187,10 @@ mod tests {
         let srcdir = TreeFixture::new();
         srcdir.create_file_with_contents("empty", &[]);
         let mut bw = BackupWriter::begin(&af).unwrap();
-        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
-        // assert_eq!(0, report.get_count("block.write"));
-        assert_eq!(1, bw.stats.files);
+        assert_eq!(1, stats.files);
+        assert_eq!(stats.written_blocks, 0);
 
         // Read back the empty file
         let st = StoredTree::open_last(&af).unwrap();
@@ -229,32 +213,32 @@ mod tests {
         srcdir.create_file("bbb");
 
         let mut bw = BackupWriter::begin(&af).unwrap();
-        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
-        assert_eq!(bw.stats.files, 2);
-        assert_eq!(bw.stats.files_new, 2);
-        assert_eq!(bw.stats.files_unmodified, 0);
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.files_new, 2);
+        assert_eq!(stats.files_unmodified, 0);
 
         // Make a second backup from the same tree, and we should see that
         // both files are unmodified.
         let mut bw = BackupWriter::begin(&af).unwrap();
-        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
-        assert_eq!(bw.stats.files, 2);
-        assert_eq!(bw.stats.files_new, 0);
-        assert_eq!(bw.stats.files_unmodified, 2);
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.files_new, 0);
+        assert_eq!(stats.files_unmodified, 2);
 
         // Change one of the files, and in a new backup it should be recognized
         // as unmodified.
         srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
         let mut bw = BackupWriter::begin(&af).unwrap();
-        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
-        assert_eq!(bw.stats.files, 2);
-        assert_eq!(bw.stats.files_new, 0);
-        assert_eq!(bw.stats.files_unmodified, 1);
-        assert_eq!(bw.stats.files_modified, 1);
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.files_new, 0);
+        assert_eq!(stats.files_unmodified, 1);
+        assert_eq!(stats.files_modified, 1);
     }
 
     #[test]
@@ -265,12 +249,12 @@ mod tests {
         srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
         let mut bw = BackupWriter::begin(&af).unwrap();
-        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
 
-        assert_eq!(bw.stats.files, 2);
-        assert_eq!(bw.stats.files_new, 2);
-        assert_eq!(bw.stats.files_unmodified, 0);
-        assert_eq!(bw.stats.files_modified, 0);
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.files_new, 2);
+        assert_eq!(stats.files_unmodified, 0);
+        assert_eq!(stats.files_modified, 0);
 
         // Spin until the file's mtime is visibly different to what it was before.
         let bpath = srcdir.path().join("bbb");
@@ -288,8 +272,8 @@ mod tests {
         }
 
         let mut bw = BackupWriter::begin(&af).unwrap();
-        copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
-        assert_eq!(bw.stats.files, 2);
-        assert_eq!(bw.stats.files_unmodified, 1);
+        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.files_unmodified, 1);
     }
 }

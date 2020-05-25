@@ -6,6 +6,7 @@
 #[allow(unused_imports)]
 use snafu::ResultExt;
 
+use crate::stats::CopyStats;
 use crate::*;
 
 #[derive(Default, Clone, Debug)]
@@ -18,25 +19,6 @@ pub const COPY_DEFAULT: CopyOptions = CopyOptions {
     print_filenames: false,
     measure_first: false,
 };
-
-/// Statistics about a tree copy operation.
-#[derive(Default, Clone, Debug, Eq, PartialEq)]
-pub struct CopyStats {
-    /// Number of entries skipped because they're an
-    pub unknown_kind_count: u64,
-
-    pub dir_count: u64,
-    pub file_count: u64,
-    pub symlink_count: u64,
-
-    pub copies_failed: u64,
-
-    // TODO: Be clearer what this is measuring.
-    pub file_totals: Sizes,
-}
-
-// TODO: Summarize to an io::Write the contents of the CopyStats,
-// maybe differently for backup vs restore.
 
 /// Copy files and other entries from one tree to another.
 pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
@@ -64,20 +46,19 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         ui::set_progress_file(entry.apath());
         if let Err(e) = match entry.kind() {
             Kind::Dir => {
-                stats.dir_count += 1;
+                stats.directories += 1;
                 dest.copy_dir(&entry)
             }
             Kind::File => {
-                stats.file_count += 1;
-                dest.copy_file(&entry, source)
-                    .map(|sizes| stats.file_totals += sizes)
+                stats.files += 1;
+                dest.copy_file(&entry, source).map(|s| stats += s)
             }
             Kind::Symlink => {
-                stats.symlink_count += 1;
+                stats.symlinks += 1;
                 dest.copy_symlink(&entry)
             }
             Kind::Unknown => {
-                stats.unknown_kind_count += 1;
+                stats.unknown_kind += 1;
                 // TODO: Perhaps eventually we could backup and restore pipes,
                 // sockets, etc. Or at least count them. For now, silently skip.
                 // https://github.com/sourcefrog/conserve/issues/82
@@ -85,7 +66,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
             }
         } {
             ui::show_error(&e);
-            stats.copies_failed += 1;
+            stats.errors += 1;
             continue;
         }
         ui::increment_bytes_done(entry.size().unwrap_or(0));

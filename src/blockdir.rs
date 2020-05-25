@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use crate::compress::snappy;
+use crate::stats::CopyStats;
 use crate::*;
 
 /// Use the maximum 64-byte hash.
@@ -99,12 +100,7 @@ impl BlockDir {
         self.subdir_for(hash_hex).join(hash_hex)
     }
 
-    fn compress_and_store(
-        &self,
-        in_buf: &[u8],
-        hex_hash: &str,
-        report: &Report,
-    ) -> std::io::Result<u64> {
+    fn compress_and_store(&self, in_buf: &[u8], hex_hash: &str) -> std::io::Result<u64> {
         // Note: When we come to support cloud storage, we should do one atomic write rather than
         // a write and rename.
         let path = self.path_for_file(&hex_hash);
@@ -126,7 +122,6 @@ impl BlockDir {
                     "Unexpected late detection of existing block {:?}",
                     hex_hash
                 ));
-                report.increment("block.already_present", 1);
                 e.file.close()?;
             } else {
                 return Err(e.error);
@@ -232,13 +227,17 @@ impl BlockDir {
             crate::misc::bytes_to_human_mb(tot)
         ));
         ui::set_progress_phase(&"Check block hashes");
-        // TODO: Accumulate counts from validation of individual blocks, 
+        // TODO: Accumulate counts from validation of individual blocks,
         // and count the total number that were unreadable or had the wrong hash.
-        let block_error_count = bns.par_iter()
+        let block_error_count = bns
+            .par_iter()
             .filter(|(block_hash, bsize)| {
                 ui::increment_bytes_done(*bsize);
                 self.get_block_content(&block_hash).is_err()
-            }).count().try_into().unwrap();
+            })
+            .count()
+            .try_into()
+            .unwrap();
         let block_read_count = bns.len().try_into().unwrap();
         Ok(ValidateBlockDirStats {
             block_error_count,
@@ -288,6 +287,8 @@ impl BlockDir {
 /// In future it will combine small files into aggregate blocks,
 /// and perhaps compress them in parallel.
 pub(crate) struct StoreFiles {
+    // TODO: Rename to FileWriter or similar? Perhaps doesn't need to be
+    // separate from BackupWriter.
     block_dir: BlockDir,
     input_buf: Vec<u8>,
 }
@@ -304,10 +305,9 @@ impl StoreFiles {
         &mut self,
         apath: &Apath,
         from_file: &mut dyn Read,
-        report: &Report,
-    ) -> Result<(Vec<Address>, Sizes)> {
+    ) -> Result<(Vec<Address>, CopyStats)> {
         let mut addresses = Vec::<Address>::with_capacity(1);
-        let mut sizes = Sizes::default();
+        let mut stats = CopyStats::default();
         loop {
             // TODO: Possibly read repeatedly in case we get a short read and have room for more,
             // so that short reads don't lead to short blocks being stored.
@@ -320,22 +320,22 @@ impl StoreFiles {
             if read_len == 0 {
                 break;
             }
+            stats.uncompressed_bytes += read_len as u64;
             let block_data = &self.input_buf[..read_len];
             let block_hash: String = hash_bytes(block_data).unwrap();
             if self.block_dir.contains(&block_hash)? {
                 // TODO: Separate counter for size of the already-present blocks?
-                report.increment("block.already_present", 1);
-                sizes.uncompressed += read_len as u64;
+                stats.deduplicated_blocks += 1;
+                stats.deduplicated_bytes += read_len as u64;
             } else {
                 let comp_len = self
                     .block_dir
-                    .compress_and_store(block_data, &block_hash, &report)
+                    .compress_and_store(block_data, &block_hash)
                     .with_context(|| errors::StoreBlock {
                         block_hash: block_hash.clone(),
                     })?;
-                report.increment("block.write", 1);
-                sizes.compressed += comp_len;
-                sizes.uncompressed += read_len as u64;
+                stats.written_blocks += 1;
+                stats.compressed_bytes += comp_len;
             }
             addresses.push(Address {
                 hash: block_hash,
@@ -344,11 +344,11 @@ impl StoreFiles {
             });
         }
         match addresses.len() {
-            0 => report.increment("file.empty", 1),
-            1 => report.increment("file.medium", 1),
-            _ => report.increment("file.large", 1),
+            0 => stats.empty_files += 1,
+            1 => stats.single_block_files += 1,
+            _ => stats.multi_block_files += 1,
         }
-        Ok((addresses, sizes))
+        Ok((addresses, stats))
     }
 }
 
@@ -388,15 +388,14 @@ mod tests {
     #[test]
     pub fn store_a_file() {
         let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
-        let report = Report::new();
         let (testdir, block_dir) = setup();
         let mut example_file = make_example_file();
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
         let mut store = StoreFiles::new(block_dir.clone());
 
-        let (addrs, sizes) = store
-            .store_file_content(&Apath::from("/hello"), &mut example_file, &report)
+        let (addrs, stats) = store
+            .store_file_content(&Apath::from("/hello"), &mut example_file)
             .unwrap();
 
         // Should be in one block, and as it's currently unsalted the hash is the same.
@@ -417,13 +416,13 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
 
-        assert_eq!(report.get_count("block.already_present"), 0);
-        assert_eq!(report.get_count("block.write"), 1);
-        assert_eq!(sizes.uncompressed, 6);
-        assert_eq!(sizes.compressed, 8);
+        assert_eq!(stats.deduplicated_blocks, 0);
+        assert_eq!(stats.written_blocks, 1);
+        assert_eq!(stats.uncompressed_bytes, 6);
+        assert_eq!(stats.compressed_bytes, 8);
 
         // Will vary depending on compressor and we don't want to be too brittle.
-        assert!(sizes.compressed <= 19, sizes.compressed);
+        assert!(stats.compressed_bytes <= 19, stats.compressed_bytes);
 
         // Try to read back
         let (back, sizes) = block_dir.get(&addrs[0]).unwrap();
@@ -442,33 +441,25 @@ mod tests {
 
     #[test]
     pub fn write_same_data_again() {
-        let report = Report::new();
         let (_testdir, block_dir) = setup();
 
         let mut example_file = make_example_file();
         let mut store = StoreFiles::new(block_dir);
-        let (addrs1, sizes1) = store
-            .store_file_content(&Apath::from("/ello"), &mut example_file, &report)
+        let (addrs1, stats) = store
+            .store_file_content(&Apath::from("/ello"), &mut example_file)
             .unwrap();
-        assert_eq!(report.get_count("block.already_present"), 0);
-        assert_eq!(report.get_count("block.write"), 1);
-        assert_eq!(sizes1.uncompressed, 6);
-        assert_eq!(sizes1.compressed, 8);
+        assert_eq!(stats.deduplicated_blocks, 0);
+        assert_eq!(stats.written_blocks, 1);
+        assert_eq!(stats.uncompressed_bytes, 6);
+        assert_eq!(stats.compressed_bytes, 8);
 
         let mut example_file = make_example_file();
-        let (addrs2, sizes2) = store
-            .store_file_content(&Apath::from("/ello2"), &mut example_file, &report)
+        let (addrs2, stats2) = store
+            .store_file_content(&Apath::from("/ello2"), &mut example_file)
             .unwrap();
-        assert_eq!(report.get_count("block.already_present"), 1);
-        assert_eq!(report.get_count("block.write"), 1);
-        assert_eq!(
-            sizes2,
-            Sizes {
-                uncompressed: 6,
-                compressed: 0
-            },
-            "repeated write compresses to 0"
-        );
+        assert_eq!(stats2.deduplicated_blocks, 1);
+        assert_eq!(stats2.written_blocks, 0);
+        assert_eq!(stats2.compressed_bytes, 0);
 
         assert_eq!(addrs1, addrs2);
     }
@@ -477,7 +468,6 @@ mod tests {
     // Large enough that it should break across blocks.
     pub fn large_file() {
         use super::MAX_BLOCK_SIZE;
-        let report = Report::new();
         let (_testdir, block_dir) = setup();
         let mut tf = NamedTempFile::new().unwrap();
         const N_CHUNKS: u64 = 10;
@@ -494,16 +484,16 @@ mod tests {
         tf.seek(SeekFrom::Start(0)).unwrap();
 
         let mut store = StoreFiles::new(block_dir.clone());
-        let (addrs, sizes) = store
-            .store_file_content(&Apath::from("/big"), &mut tf, &report)
+        let (addrs, stats) = store
+            .store_file_content(&Apath::from("/big"), &mut tf)
             .unwrap();
 
-        assert_eq!(sizes.uncompressed, TOTAL_SIZE);
+        assert_eq!(stats.uncompressed_bytes, TOTAL_SIZE);
         // Should be very compressible
-        assert!(sizes.compressed < (MAX_BLOCK_SIZE as u64 / 10));
-        assert_eq!(report.get_count("block.write"), 1);
+        assert!(stats.compressed_bytes < (MAX_BLOCK_SIZE as u64 / 10));
+        assert_eq!(stats.written_blocks, 1);
         assert_eq!(
-            report.get_count("block.already_present"),
+            stats.deduplicated_blocks as u64,
             TOTAL_SIZE / (MAX_BLOCK_SIZE as u64) - 1
         );
 
