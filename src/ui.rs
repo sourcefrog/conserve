@@ -4,6 +4,7 @@
 //! Abstract user interface trait.
 
 use std::fmt::Write;
+use std::io;
 use std::io::Write as IoWrite;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -20,13 +21,17 @@ use crate::Result;
 const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 
 /// A terminal/text UI.
-///
-/// The same class is used whether or not we have a rich terminal,
-/// or just plain text output. (For example, output is redirected
-/// to a file, or the program's run with no tty.)
+/// 
+/// This manages interleaving log-type messages (info and error), interleaved 
+/// with progress bars. 
+/// 
+/// Progress bars are only drawn when the application requests them with 
+/// `enable_progress` and the output destination is a tty that's capable
+/// of redrawing.
+/// 
+/// So this class also works when stdout is redirected to a file, in 
+/// which case it will get only messages and no progress bar junk.
 struct UIState {
-    t: Box<std::io::Stdout>,
-
     last_update: Option<Instant>,
 
     /// Is a progress bar currently on the screen?
@@ -107,13 +112,12 @@ pub fn clear_progress() {
 pub fn enable_progress(enabled: bool) {
     use crossterm::tty::IsTty;
     let mut ui = UI_STATE.lock().unwrap();
-    ui.progress_enabled = ui.t.is_tty() && enabled;
+    ui.progress_enabled = io::stdout().is_tty() && enabled;
 }
 
 impl Default for UIState {
     fn default() -> UIState {
         UIState {
-            t: Box::new(std::io::stdout()),
             last_update: None,
             progress_present: false,
             progress_enabled: false,
@@ -186,15 +190,15 @@ impl UIState {
     }
 
     fn clear_progress(&mut self) {
+        let mut stdout = io::stdout();
         if self.progress_present {
-            #[allow(deprecated)]
             queue!(
-                self.t,
+                stdout,
                 terminal::Clear(terminal::ClearType::CurrentLine),
                 cursor::MoveToColumn(0)
             )
             .unwrap();
-            self.t.flush().unwrap();
+            stdout.flush().unwrap();
             self.progress_present = false;
         }
         self.set_update_timestamp();
@@ -247,8 +251,9 @@ impl UIState {
                 .take(message_limit)
                 .collect::<String>()
         };
+        let mut stdout = io::stdout();
         queue!(
-            self.t,
+            stdout,
             cursor::Hide,
             cursor::MoveToColumn(0),
             style::SetForegroundColor(style::Color::Green),
@@ -259,23 +264,22 @@ impl UIState {
             cursor::Show,
         )
         .unwrap();
-        self.t.flush().unwrap();
+        stdout.flush().unwrap();
         self.progress_present = true;
         self.set_update_timestamp();
     }
 
     fn println(&mut self, s: &str) {
         self.clear_progress();
-        let t = &mut self.t;
-        writeln!(t, "{}", s).unwrap();
-        t.flush().unwrap();
+        println!("{}", s);
     }
 
     fn problem(&mut self, s: &str) -> Result<()> {
         self.progress_present = false;
         // TODO: Only clear the line if progress bar is already present?
+        let mut stdout = io::stdout();
         queue!(
-            self.t,
+            stdout,
             terminal::Clear(terminal::ClearType::CurrentLine),
             cursor::MoveToColumn(0),
             style::SetForegroundColor(style::Color::Red),
@@ -287,7 +291,7 @@ impl UIState {
             style::ResetColor,
         )
         .unwrap();
-        self.t.flush().expect("flush terminal output");
+        stdout.flush().expect("flush terminal output");
         Ok(())
     }
 }
