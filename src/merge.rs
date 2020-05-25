@@ -61,7 +61,7 @@ where
     type Item = MergedEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // TODO: Count into report?
+        // TODO: Stats about the merge.
         let ait = &mut self.ait;
         let bit = &mut self.bit;
         // Preload next-A and next-B, if they're not already

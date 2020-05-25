@@ -83,7 +83,7 @@ impl tree::WriteTree for BackupWriter {
                 // TODO: In verbose mode, say if the file is changed, unchanged,
                 // etc, but without duplicating the filenames.
                 //
-                // self.report.println(&format!("unchanged file {}", apath));
+                // ui::println(&format!("unchanged file {}", apath));
 
                 // We can reasonably assume that the existing archive complies
                 // with the archive invariants, which include that all the

@@ -95,8 +95,7 @@ fn check_restore(af: &ScratchArchive) {
     // TODO: Read back contents of that file.
     let restore_dir = TreeFixture::new();
 
-    let restore_report = Report::new();
-    let archive = Archive::open(af.path(), &restore_report).unwrap();
+    let archive = Archive::open(af.path()).unwrap();
     let mut restore_tree = RestoreTree::create(&restore_dir.path()).unwrap();
     let st = StoredTree::open_last(&archive).unwrap();
     let copy_stats = copy_tree(&st, &mut restore_tree, &COPY_DEFAULT).unwrap();
@@ -121,8 +120,7 @@ fn large_file() {
 
     // Try to restore it
     let rd = TempDir::new().unwrap();
-    let restore_report = Report::new();
-    let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
+    let restore_archive = Archive::open(af.path()).unwrap();
     let st = StoredTree::open_last(&restore_archive).unwrap();
     let mut rt = RestoreTree::create(rd.path()).unwrap();
     let _stats = copy_tree(&st, &mut rt, &COPY_DEFAULT).unwrap();

@@ -130,8 +130,7 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
 
-        let restore_report = Report::new();
-        let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
+        let restore_archive = Archive::open(af.path()).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
         let mut rt = RestoreTree::create(destdir.path()).unwrap();
         let stats = copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
@@ -158,8 +157,7 @@ mod tests {
         let af = ScratchArchive::new();
         af.store_two_versions();
         let destdir = TreeFixture::new();
-        let restore_report = Report::new();
-        let a = Archive::open(af.path(), &restore_report).unwrap();
+        let a = Archive::open(af.path()).unwrap();
         let st = StoredTree::open_version(&a, &BandId::new(&[0])).unwrap();
         let mut rt = RestoreTree::create(&destdir.path()).unwrap();
         let stats = copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
@@ -186,8 +184,7 @@ mod tests {
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
 
-        let restore_report = Report::new();
-        let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
+        let restore_archive = Archive::open(af.path()).unwrap();
         let mut rt = RestoreTree::create_overwrite(&destdir.path()).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
         let stats = copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
@@ -202,8 +199,7 @@ mod tests {
         let af = ScratchArchive::new();
         af.store_two_versions();
         let destdir = TreeFixture::new();
-        let restore_report = Report::new();
-        let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
+        let restore_archive = Archive::open(af.path()).unwrap();
         let st = StoredTree::open_last(&restore_archive)
             .unwrap()
             .with_excludes(excludes::from_strings(&["/**/subfile"]).unwrap());

@@ -11,7 +11,6 @@ use conserve::*;
 
 fn main() -> conserve::Result<()> {
     let matches = make_clap().get_matches();
-    let report = Report::new();
     ui::enable_progress(true);
 
     let (n, sm) = rollup_subcommands(&matches);
@@ -31,7 +30,7 @@ fn main() -> conserve::Result<()> {
         "versions" => versions,
         _ => panic!("unimplemented command"),
     };
-    let result = c(sm, &report);
+    let result = c(sm);
     ui::clear_progress();
     if let Err(ref e) = result {
         ui::show_error(e);
@@ -279,15 +278,15 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
         )
 }
 
-fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
+fn init(subm: &ArgMatches) -> Result<()> {
     let archive_path = subm.value_of("archive").expect("'archive' arg not found");
     Archive::create(archive_path).and(Ok(()))?;
     ui::println(&format!("Created new archive in {}", archive_path));
     Ok(())
 }
 
-fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
+fn backup(subm: &ArgMatches) -> Result<()> {
+    let archive = Archive::open(subm.value_of("archive").unwrap())?;
     let lt = live_tree_from_options(subm)?;
     let mut bw = BackupWriter::begin(&archive)?;
     let opts = CopyOptions {
@@ -300,12 +299,12 @@ fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     Ok(())
 }
 
-fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
+fn diff(subm: &ArgMatches) -> Result<()> {
     // TODO: Move this to a text-mode formatter library?
     // TODO: Consider whether the actual files have changed.
     // TODO: Summarize diff.
     // TODO: Optionally include unchanged files.
-    let st = stored_tree_from_options(subm, report)?;
+    let st = stored_tree_from_options(subm)?;
     let lt = live_tree_from_options(subm)?;
     for e in conserve::iter_merged_entries(&st, &lt)? {
         use MergedEntryKind::*;
@@ -316,20 +315,20 @@ fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
         };
         ui::println(&format!("{:<8} {}", ks, e.apath));
     }
-    // ui::println(&report.borrow_counts().summary_for_backup());
+    // TODO: Show stats.
     Ok(())
 }
 
-fn validate(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
+fn validate(subm: &ArgMatches) -> Result<()> {
+    let archive = Archive::open(subm.value_of("archive").unwrap())?;
     let validate_stats = archive.validate()?;
     ui::println(&format!("{:#?}", validate_stats));
     Ok(())
 }
 
-fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
+fn versions(subm: &ArgMatches) -> Result<()> {
     use conserve::output::ShowArchive;
-    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
+    let archive = Archive::open(subm.value_of("archive").unwrap())?;
     if subm.is_present("short") {
         output::ShortVersionList::default().show_archive(&archive)
     } else {
@@ -339,21 +338,21 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
     }
 }
 
-fn source_ls(subm: &ArgMatches, _report: &Report) -> Result<()> {
+fn source_ls(subm: &ArgMatches) -> Result<()> {
     let lt = live_tree_from_options(subm)?;
     list_tree_contents(&lt)?;
     Ok(())
 }
 
-fn source_size(subm: &ArgMatches, _report: &Report) -> Result<()> {
+fn source_size(subm: &ArgMatches) -> Result<()> {
     let source = live_tree_from_options(subm)?;
     ui::set_progress_phase(&"Measuring".to_string());
     ui::println(&conserve::bytes_to_human_mb(source.size()?.file_bytes));
     Ok(())
 }
 
-fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let st = stored_tree_from_options(subm, report)?;
+fn ls(subm: &ArgMatches) -> Result<()> {
+    let st = stored_tree_from_options(subm)?;
     list_tree_contents(&st)?;
     Ok(())
 }
@@ -369,9 +368,9 @@ fn list_tree_contents<T: ReadTree>(tree: &T) -> Result<()> {
     Ok(())
 }
 
-fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
+fn restore(subm: &ArgMatches) -> Result<()> {
     let dest = Path::new(subm.value_of("destination").unwrap());
-    let st = stored_tree_from_options(subm, report)?;
+    let st = stored_tree_from_options(subm)?;
     let mut rt = if subm.is_present("force-overwrite") {
         RestoreTree::create_overwrite(dest)
     } else {
@@ -387,38 +386,38 @@ fn restore(subm: &ArgMatches, report: &Report) -> Result<()> {
     Ok(())
 }
 
-fn debug_block_list(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
+fn debug_block_list(subm: &ArgMatches) -> Result<()> {
+    let archive = Archive::open(subm.value_of("archive").unwrap())?;
     for b in archive.block_dir().block_names()? {
         println!("{}", b);
     }
     Ok(())
 }
 
-fn debug_block_referenced(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let archive = Archive::open(subm.value_of("archive").unwrap(), report)?;
+fn debug_block_referenced(subm: &ArgMatches) -> Result<()> {
+    let archive = Archive::open(subm.value_of("archive").unwrap())?;
     for h in archive.referenced_blocks()? {
         ui::println(&h);
     }
     Ok(())
 }
 
-fn debug_index_dump(subm: &ArgMatches, report: &Report) -> Result<()> {
+fn debug_index_dump(subm: &ArgMatches) -> Result<()> {
     use conserve::output::ShowArchive;
-    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    let st = stored_tree_from_options(subm, report)?;
+    let archive = Archive::open(subm.value_of("archive").unwrap())?;
+    let st = stored_tree_from_options(subm)?;
     output::IndexDump::new(st.band()).show_archive(&archive)
 }
 
-fn tree_size(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let st = stored_tree_from_options(subm, report)?;
+fn tree_size(subm: &ArgMatches) -> Result<()> {
+    let st = stored_tree_from_options(subm)?;
     ui::set_progress_phase(&"Measuring".to_owned());
     ui::println(&bytes_to_human_mb(st.size()?.file_bytes));
     Ok(())
 }
 
-fn stored_tree_from_options(subm: &ArgMatches, report: &Report) -> Result<StoredTree> {
-    let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
+fn stored_tree_from_options(subm: &ArgMatches) -> Result<StoredTree> {
+    let archive = Archive::open(subm.value_of("archive").unwrap())?;
     let st = match band_id_from_option(subm)? {
         None => StoredTree::open_last(&archive),
         Some(ref b) => {

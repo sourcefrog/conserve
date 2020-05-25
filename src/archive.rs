@@ -25,9 +25,6 @@ pub struct Archive {
     /// Top-level directory for the archive.
     path: PathBuf,
 
-    /// Report for operations on this archive.
-    report: Report,
-
     /// Holds body content for all file versions.
     block_dir: BlockDir,
 }
@@ -46,11 +43,9 @@ impl Archive {
         let header = ArchiveHeader {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
-        let report = Report::new();
         jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header)?;
         Ok(Archive {
             path: path.to_path_buf(),
-            report,
             block_dir,
         })
     }
@@ -58,7 +53,7 @@ impl Archive {
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
-    pub fn open<P: AsRef<Path>>(path: P, report: &Report) -> Result<Archive> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Archive> {
         let path = path.as_ref();
         let header_path = path.join(HEADER_FILENAME);
         ensure!(
@@ -75,7 +70,6 @@ impl Archive {
         );
         Ok(Archive {
             path: path.to_path_buf(),
-            report: report.clone(),
             block_dir: BlockDir::new(&path.join(BLOCK_DIR)),
         })
     }
@@ -103,8 +97,7 @@ impl Archive {
                     band_ids.push(BandId::from_string(&n)?);
                 }
             }
-            // TODO: Log errors while reading the directory, but no Report
-            // is currently available here.
+            // TODO: Log errors while reading the directory.
         }
         band_ids.sort_unstable();
         Ok(band_ids)
@@ -225,13 +218,6 @@ impl Archive {
     }
 }
 
-impl HasReport for Archive {
-    /// Return the Report that counts operations on this Archive and objects descended from it.
-    fn report(&self) -> &Report {
-        &self.report
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -251,7 +237,7 @@ mod tests {
         assert!(arch.list_bands().unwrap().is_empty());
 
         // We can re-open it.
-        Archive::open(arch_path, &Report::new()).unwrap();
+        Archive::open(arch_path).unwrap();
         assert!(arch.list_bands().unwrap().is_empty());
         assert!(arch.last_complete_band().unwrap().is_none());
     }
