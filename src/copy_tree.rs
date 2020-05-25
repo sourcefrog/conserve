@@ -46,7 +46,6 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     dest: &mut DT,
     options: &CopyOptions,
 ) -> Result<CopyStats> {
-    let report = source.report();
     let mut stats = CopyStats::default();
     // This causes us to walk the source tree twice, which is probably an acceptable option
     // since it's nice to see realistic overall progress. We could keep all the entries
@@ -60,7 +59,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         ui::set_bytes_total(source.size()?.file_bytes);
     }
     ui::set_progress_phase("Copying");
-    for entry in source.iter_entries(&report)? {
+    for entry in source.iter_entries()? {
         if options.print_filenames {
             crate::ui::println(entry.apath());
         }

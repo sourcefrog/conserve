@@ -8,17 +8,17 @@ use std::ops::Range;
 use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
-pub trait ReadTree: HasReport {
+pub trait ReadTree {
     type Entry: Entry;
     type I: Iterator<Item = Self::Entry>;
     type R: std::io::Read;
 
     /// Iterate, in apath order, all the entries in this tree.
     ///
-    /// Errors reading individual paths or directories are sent to the report
-    /// but are not treated as fatal, and don't appear as Results in the
+    /// Errors reading individual paths or directories are sent to the UI and
+    /// counted, but are not treated as fatal, and don't appear as Results in the
     /// iterator.
-    fn iter_entries(&self, report: &Report) -> Result<Self::I>;
+    fn iter_entries(&self) -> Result<Self::I>;
 
     /// Read file contents as a `std::io::Read`.
     fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R>;
@@ -32,7 +32,7 @@ pub trait ReadTree: HasReport {
     /// This typically requires walking all entries, which may take a while.
     fn size(&self) -> Result<TreeSize> {
         let mut tot = 0u64;
-        for e in self.iter_entries(self.report())? {
+        for e in self.iter_entries()? {
             // While just measuring size, ignore directories/files we can't stat.
             let s = e.size().unwrap_or(0);
             tot += s;

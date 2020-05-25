@@ -77,6 +77,7 @@ pub struct Info {
     pub end_time: Option<DateTime<Utc>>,
 }
 
+// TODO: Maybe merge this with StoredTree? The distinction seems small.
 impl Band {
     /// Make a new band (and its on-disk directory).
     ///

@@ -177,7 +177,7 @@ mod tests {
 
         let report = af.report();
         let excludes = excludes::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
-        let lt = LiveTree::open(srcdir.path(), &report)
+        let lt = LiveTree::open(srcdir.path())
             .unwrap()
             .with_excludes(excludes);
         let mut bw = BackupWriter::begin(&af).unwrap();
@@ -188,10 +188,6 @@ mod tests {
         assert_eq!(2, report.get_count("dir"));
         assert_eq!(0, report.get_count("symlink"));
         assert_eq!(0, report.get_count("skipped.unsupported_file_kind"));
-
-        // These are turned off because current copy_tree walks the tree twice.
-        // assert_eq!(4, report.get_count("skipped.excluded.files"));
-        // assert_eq!(1, report.get_count("skipped.excluded.directories"));
     }
 
     #[test]
@@ -211,7 +207,7 @@ mod tests {
         // Read back the empty file
         let st = StoredTree::open_last(&af).unwrap();
         let empty_entry = st
-            .iter_entries(&af.report())
+            .iter_entries()
             .unwrap()
             .find(|ref i| &i.apath == "/empty")
             .expect("found one entry");

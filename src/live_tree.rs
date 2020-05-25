@@ -20,16 +20,14 @@ use super::*;
 #[derive(Clone)]
 pub struct LiveTree {
     path: PathBuf,
-    report: Report,
     excludes: GlobSet,
 }
 
 impl LiveTree {
-    pub fn open<P: AsRef<Path>>(path: P, report: &Report) -> Result<LiveTree> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<LiveTree> {
         // TODO: Maybe fail here if the root doesn't exist or isn't a directory?
         Ok(LiveTree {
             path: path.as_ref().to_path_buf(),
-            report: report.clone(),
             excludes: excludes::excludes_nothing(),
         })
     }
@@ -73,10 +71,8 @@ impl tree::ReadTree for LiveTree {
     /// is the defined order for files stored in an archive.  Within those files and
     /// child directories, visit them according to a sorted comparison by their UTF-8
     /// name.
-    ///
-    /// The `Iter` has its own `Report` of how many directories and files were visited.
-    fn iter_entries(&self, report: &Report) -> Result<Self::I> {
-        Iter::new(&self.path, &self.excludes, report)
+    fn iter_entries(&self) -> Result<Self::I> {
+        Iter::new(&self.path, &self.excludes)
     }
 
     fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
@@ -89,16 +85,7 @@ impl tree::ReadTree for LiveTree {
         // TODO: This stats the file and builds an entry about them, just to
         // throw it away. We could perhaps change the iter to optionally do
         // less work.
-
-        // Make a new report so it doesn't pollute the report for the actual
-        // backup work.
-        Ok(self.iter_entries(&Report::new())?.count() as u64)
-    }
-}
-
-impl HasReport for LiveTree {
-    fn report(&self) -> &Report {
-        &self.report
+        Ok(self.iter_entries()?.count() as u64)
     }
 }
 
@@ -177,20 +164,27 @@ pub struct Iter {
     /// should be returned.
     entry_deque: VecDeque<LiveEntry>,
 
-    /// Count of directories and files visited by this iterator.
-    report: Report,
-
     /// Check that emitted paths are in the right order.
     check_order: apath::CheckOrder,
 
     /// glob pattern to skip in iterator
     excludes: GlobSet,
+
+    stats: LiveTreeIterStats,
+}
+
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
+pub struct LiveTreeIterStats {
+    pub directories_visited: usize,
+    pub exclusions: usize,
+    pub metadata_error: usize,
+    pub entries_returned: usize,
 }
 
 impl Iter {
     /// Construct a new iter that will visit everything below this root path,
     /// subject to some exclusions
-    fn new(root_path: &Path, excludes: &GlobSet, report: &Report) -> Result<Iter> {
+    fn new(root_path: &Path, excludes: &GlobSet) -> Result<Iter> {
         let root_metadata = fs::symlink_metadata(&root_path)
             .with_context(|| errors::ListSourceTree {
                 path: root_path.to_path_buf(),
@@ -214,9 +208,9 @@ impl Iter {
             root_path: root_path.to_path_buf(),
             entry_deque,
             dir_deque,
-            report: report.clone(),
             check_order: apath::CheckOrder::new(),
             excludes: excludes.clone(),
+            stats: LiveTreeIterStats::default(),
         })
     }
 
@@ -231,7 +225,7 @@ impl Iter {
         // TODO: Perhaps reuse the child buffer in the Iter, which we know will
         // now be empty? We have to be able to sort it, but perhaps a Vec in
         // reverse order from which we pop would work well.
-        self.report.increment("source.visited.directories", 1);
+        self.stats.directories_visited += 1;
         let mut children = Vec::<(String, LiveEntry)>::new();
         let dir_path = relative_path(&self.root_path, parent_apath);
         let dir_iter = match fs::read_dir(&dir_path).with_context(|| errors::ListSourceTree {
@@ -283,13 +277,7 @@ impl Iter {
             };
 
             if self.excludes.is_match(&child_apath_str) {
-                if ft.is_file() {
-                    self.report.increment("skipped.excluded.files", 1);
-                } else if ft.is_dir() {
-                    self.report.increment("skipped.excluded.directories", 1);
-                } else if ft.is_symlink() {
-                    self.report.increment("skipped.excluded.symlinks", 1);
-                }
+                self.stats.exclusions += 1;
                 continue;
             }
             let metadata = match dir_entry.metadata() {
@@ -309,7 +297,7 @@ impl Iter {
                                 "Failed to read source metadata from {:?}: {}",
                                 child_apath_str, e
                             ));
-                            self.report.increment("source.error.metadata", 1);
+                            self.stats.metadata_error += 1;
                         }
                     };
                     continue;
@@ -375,7 +363,7 @@ impl Iterator for Iter {
         loop {
             if let Some(entry) = self.entry_deque.pop_front() {
                 // Have already found some entries, so just return the first.
-                self.report.increment("source.selected", 1);
+                self.stats.entries_returned += 1;
                 // Sanity check that all the returned paths are in correct order.
                 self.check_order.check(&entry.apath);
                 return Some(entry);
@@ -400,7 +388,7 @@ mod tests {
     #[test]
     fn open_tree() {
         let tf = TreeFixture::new();
-        let lt = LiveTree::open(tf.path(), &Report::new()).unwrap();
+        let lt = LiveTree::open(tf.path()).unwrap();
         assert_eq!(
             format!("{:?}", &lt),
             format!("LiveTree {{ path: {:?} }}", tf.path())
@@ -416,9 +404,8 @@ mod tests {
         tf.create_file("jam/apricot");
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
-        let report = Report::new();
-        let lt = LiveTree::open(tf.path(), &report).unwrap();
-        let mut source_iter = lt.iter_entries(&report).unwrap();
+        let lt = LiveTree::open(tf.path()).unwrap();
+        let mut source_iter = lt.iter_entries().unwrap();
         let result = source_iter.by_ref().collect::<Vec<_>>();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -434,8 +421,8 @@ mod tests {
         let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: SystemTime \{ [^)]* \}, size: Some\(8\), symlink_target: None \}"#).unwrap();
         assert!(re.is_match(&repr), repr);
 
-        assert_eq!(report.get_count("source.visited.directories"), 4);
-        assert_eq!(report.get_count("source.selected"), 7);
+        assert_eq!(source_iter.stats.directories_visited, 4);
+        assert_eq!(source_iter.stats.entries_returned, 7);
     }
 
     #[test]
@@ -448,14 +435,13 @@ mod tests {
         tf.create_file("baz/bar");
         tf.create_file("baz/bas");
         tf.create_file("baz/test");
-        let report = Report::new();
 
         let excludes = excludes::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
-        let lt = LiveTree::open(tf.path(), &report)
+        let lt = LiveTree::open(tf.path())
             .unwrap()
             .with_excludes(excludes);
-        let mut source_iter = lt.iter_entries(&report).unwrap();
+        let mut source_iter = lt.iter_entries().unwrap();
         let result = source_iter.by_ref().collect::<Vec<_>>();
 
         // First one is the root
@@ -464,23 +450,9 @@ mod tests {
         assert_eq!(&result[2].apath, "/baz/test");
         assert_eq!(result.len(), 3);
 
-        assert_eq!(
-            2,
-            report
-                .borrow_counts()
-                .get_count("source.visited.directories",)
-        );
-        assert_eq!(3, report.borrow_counts().get_count("source.selected"));
-        assert_eq!(
-            4,
-            report.borrow_counts().get_count("skipped.excluded.files")
-        );
-        assert_eq!(
-            1,
-            report
-                .borrow_counts()
-                .get_count("skipped.excluded.directories",)
-        );
+        assert_eq!(source_iter.stats.directories_visited, 2);
+        assert_eq!(source_iter.stats.entries_returned, 3);
+        assert_eq!(source_iter.stats.exclusions, 5);
     }
 
     #[cfg(unix)]
@@ -488,10 +460,9 @@ mod tests {
     fn symlinks() {
         let tf = TreeFixture::new();
         tf.create_symlink("from", "to");
-        let report = Report::new();
 
-        let lt = LiveTree::open(tf.path(), &report).unwrap();
-        let result = lt.iter_entries(&report).unwrap().collect::<Vec<_>>();
+        let lt = LiveTree::open(tf.path()).unwrap();
+        let result = lt.iter_entries().unwrap().collect::<Vec<_>>();
 
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[1].apath, "/from");

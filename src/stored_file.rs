@@ -15,17 +15,14 @@ pub struct StoredFile {
 
     /// All addresses for this file.
     addrs: Vec<blockdir::Address>,
-
-    report: Report,
 }
 
 impl StoredFile {
     /// Open a stored file.
-    pub fn open(block_dir: BlockDir, addrs: Vec<blockdir::Address>, report: &Report) -> StoredFile {
+    pub fn open(block_dir: BlockDir, addrs: Vec<blockdir::Address>) -> StoredFile {
         StoredFile {
             block_dir,
             addrs,
-            report: report.clone(),
         }
     }
 
@@ -57,7 +54,6 @@ impl StoredFile {
             buf: Vec::<u8>::new(),
             buf_cursor: 0,
             block_dir: self.block_dir,
-            report: self.report,
         }
     }
 }
@@ -87,7 +83,6 @@ pub struct ReadStoredFile {
     buf_cursor: usize,
 
     block_dir: BlockDir,
-    report: Report,
 }
 
 impl std::io::Read for ReadStoredFile {

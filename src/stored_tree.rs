@@ -83,7 +83,7 @@ impl StoredTree {
 
     pub fn validate(&self) -> Result<()> {
         ui::set_progress_phase(&format!("Check tree {}", self.band().id()));
-        self.iter_entries(self.report())?
+        self.iter_entries()?
             .filter(|e| e.kind() == Kind::File)
             .par_bridge()
             .map(|e| self.validate_one_entry(&e))
@@ -106,7 +106,6 @@ impl StoredTree {
         Ok(StoredFile::open(
             self.archive.block_dir().clone(),
             entry.addrs.clone(),
-            self.report(),
         ))
     }
 }
@@ -117,7 +116,7 @@ impl ReadTree for StoredTree {
     type Entry = IndexEntry;
 
     /// Return an iter of index entries in this stored tree.
-    fn iter_entries(&self, _report: &Report) -> Result<index::IndexEntryIter> {
+    fn iter_entries(&self) -> Result<index::IndexEntryIter> {
         Ok(self
             .band
             .iter_entries()?
@@ -130,12 +129,6 @@ impl ReadTree for StoredTree {
 
     fn estimate_count(&self) -> Result<u64> {
         self.band.index().estimate_entry_count()
-    }
-}
-
-impl HasReport for StoredTree {
-    fn report(&self) -> &Report {
-        self.archive.report()
     }
 }
 
@@ -155,7 +148,7 @@ mod test {
         assert_eq!(*st.band().id(), last_band_id);
 
         let names: Vec<String> = st
-            .iter_entries(&af.report())
+            .iter_entries()
             .unwrap()
             .map(|e| e.apath.into())
             .collect();

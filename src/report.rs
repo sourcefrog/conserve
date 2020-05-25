@@ -27,15 +27,7 @@ static KNOWN_COUNTERS: &[&str] = &[
     "backup.error.stat",
     "block.write",
     "block.already_present",
-    "index.hunk",
-    "source.error.metadata",
-    "source.selected",
     "skipped.unsupported_file_kind",
-    "source.visited.directories",
-    "skipped.excluded.directories",
-    "skipped.excluded.files",
-    "skipped.excluded.symlinks",
-    "skipped.excluded.unknown",
 ];
 
 /// Describes sizes of data read or written, with both the

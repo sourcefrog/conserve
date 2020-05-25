@@ -288,7 +288,7 @@ fn init(subm: &ArgMatches, _report: &Report) -> Result<()> {
 
 fn backup(subm: &ArgMatches, report: &Report) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap(), &report)?;
-    let lt = live_tree_from_options(subm, report)?;
+    let lt = live_tree_from_options(subm)?;
     let mut bw = BackupWriter::begin(&archive)?;
     let opts = CopyOptions {
         print_filenames: subm.is_present("v"),
@@ -306,8 +306,8 @@ fn diff(subm: &ArgMatches, report: &Report) -> Result<()> {
     // TODO: Summarize diff.
     // TODO: Optionally include unchanged files.
     let st = stored_tree_from_options(subm, report)?;
-    let lt = live_tree_from_options(subm, report)?;
-    for e in conserve::iter_merged_entries(&st, &lt, &report)? {
+    let lt = live_tree_from_options(subm)?;
+    for e in conserve::iter_merged_entries(&st, &lt)? {
         use MergedEntryKind::*;
         let ks = match e.kind {
             LeftOnly => "left",
@@ -339,14 +339,14 @@ fn versions(subm: &ArgMatches, report: &Report) -> Result<()> {
     }
 }
 
-fn source_ls(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let lt = live_tree_from_options(subm, report)?;
-    list_tree_contents(&lt, report)?;
+fn source_ls(subm: &ArgMatches, _report: &Report) -> Result<()> {
+    let lt = live_tree_from_options(subm)?;
+    list_tree_contents(&lt)?;
     Ok(())
 }
 
-fn source_size(subm: &ArgMatches, report: &Report) -> Result<()> {
-    let source = live_tree_from_options(subm, report)?;
+fn source_size(subm: &ArgMatches, _report: &Report) -> Result<()> {
+    let source = live_tree_from_options(subm)?;
     ui::set_progress_phase(&"Measuring".to_string());
     ui::println(&conserve::bytes_to_human_mb(source.size()?.file_bytes));
     Ok(())
@@ -354,16 +354,16 @@ fn source_size(subm: &ArgMatches, report: &Report) -> Result<()> {
 
 fn ls(subm: &ArgMatches, report: &Report) -> Result<()> {
     let st = stored_tree_from_options(subm, report)?;
-    list_tree_contents(&st, report)?;
+    list_tree_contents(&st)?;
     Ok(())
 }
 
-fn list_tree_contents<T: ReadTree>(tree: &T, report: &Report) -> Result<()> {
+fn list_tree_contents<T: ReadTree>(tree: &T) -> Result<()> {
     // TODO: Maybe should be a specific concept in the UI.
     // TODO: Perhaps writing them one at a time causes too much locking
     // or bad buffering. Perhaps we can write to a BufferedWriter, making
     // sure that the progress bar is disabled.
-    for entry in tree.iter_entries(report)? {
+    for entry in tree.iter_entries()? {
         ui::println(&entry.apath());
     }
     Ok(())
@@ -432,8 +432,8 @@ fn stored_tree_from_options(subm: &ArgMatches, report: &Report) -> Result<Stored
     Ok(st.with_excludes(excludes_from_option(subm)?))
 }
 
-fn live_tree_from_options(subm: &ArgMatches, report: &Report) -> Result<LiveTree> {
-    Ok(LiveTree::open(&subm.value_of("source").unwrap(), &report)?
+fn live_tree_from_options(subm: &ArgMatches) -> Result<LiveTree> {
+    Ok(LiveTree::open(&subm.value_of("source").unwrap())?
         .with_excludes(excludes_from_option(subm)?))
 }
 
