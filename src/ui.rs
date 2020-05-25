@@ -247,7 +247,6 @@ impl UIState {
                 .take(message_limit)
                 .collect::<String>()
         };
-        #[allow(deprecated)]
         queue!(
             self.t,
             cursor::Hide,
@@ -275,7 +274,6 @@ impl UIState {
     fn problem(&mut self, s: &str) -> Result<()> {
         self.progress_present = false;
         // TODO: Only clear the line if progress bar is already present?
-        #[allow(deprecated)]
         queue!(
             self.t,
             terminal::Clear(terminal::ClearType::CurrentLine),
