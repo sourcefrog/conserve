@@ -426,11 +426,8 @@ mod tests {
         assert!(sizes.compressed <= 19, sizes.compressed);
 
         // Try to read back
-        let read_report = Report::new();
-        assert_eq!(read_report.get_count("block.read"), 0);
         let (back, sizes) = block_dir.get(&addrs[0]).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
-        assert_eq!(read_report.get_count("block.read"), 1);
         assert_eq!(
             sizes,
             Sizes {

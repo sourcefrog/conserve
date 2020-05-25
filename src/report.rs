@@ -25,10 +25,7 @@ static KNOWN_COUNTERS: &[&str] = &[
     "file.unchanged",
     "symlink",
     "backup.error.stat",
-    "block.read",
     "block.write",
-    "block.corrupt",
-    "block.misplaced",
     "block.already_present",
     "index.hunk",
     "source.error.metadata",
@@ -152,20 +149,5 @@ impl Counts {
 
     pub fn elapsed_time(&self) -> Duration {
         self.start.elapsed()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    pub fn count() {
-        let r = Report::new();
-        assert_eq!(r.borrow_counts().get_count("block.read"), 0);
-        r.increment("block.read", 1);
-        assert_eq!(r.borrow_counts().get_count("block.read"), 1);
-        r.increment("block.read", 10);
-        assert_eq!(r.borrow_counts().get_count("block.read"), 11);
     }
 }
