@@ -15,6 +15,7 @@ use snafu::ResultExt;
 use globset::GlobSet;
 
 use super::*;
+use crate::stats::LiveTreeIterStats;
 
 /// A real tree on the filesystem, for use as a backup source or restore destination.
 #[derive(Clone)]
@@ -171,14 +172,6 @@ pub struct Iter {
     excludes: GlobSet,
 
     stats: LiveTreeIterStats,
-}
-
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct LiveTreeIterStats {
-    pub directories_visited: usize,
-    pub exclusions: usize,
-    pub metadata_error: usize,
-    pub entries_returned: usize,
 }
 
 impl Iter {
@@ -438,9 +431,7 @@ mod tests {
 
         let excludes = excludes::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
-        let lt = LiveTree::open(tf.path())
-            .unwrap()
-            .with_excludes(excludes);
+        let lt = LiveTree::open(tf.path()).unwrap().with_excludes(excludes);
         let mut source_iter = lt.iter_entries().unwrap();
         let result = source_iter.by_ref().collect::<Vec<_>>();
 

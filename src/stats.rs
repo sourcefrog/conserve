@@ -38,6 +38,14 @@ pub struct IndexBuilderStats {
     pub compressed_index_bytes: u64,
 }
 
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
+pub struct LiveTreeIterStats {
+    pub directories_visited: usize,
+    pub exclusions: usize,
+    pub metadata_error: usize,
+    pub entries_returned: usize,
+}
+
 #[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
 pub struct CopyStats {
     pub files: usize,
