@@ -17,11 +17,17 @@ pub fn bytes_to_human_mb(s: u64) -> String {
     s
 }
 
+/// True if `a` is zero.
+///
+/// This trivial function exists as a predicate for serde.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub(crate) fn zero_u32(a: &u32) -> bool {
     *a == 0
 }
 
+/// True if `a` is zero.
+///
+/// This trivial function exists as a predicate for serde.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub(crate) fn zero_u64(a: &u64) -> bool {
     *a == 0
