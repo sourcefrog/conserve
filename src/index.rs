@@ -244,8 +244,8 @@ impl ReadIndex {
     }
 
     /// Make an iterator that will return all entries in this band.
-    pub fn iter(&self, report: &Report) -> Result<IndexEntryIter> {
-        IndexEntryIter::open(&self.dir, report)
+    pub fn iter(&self) -> Result<IndexEntryIter> {
+        IndexEntryIter::open(&self.dir)
     }
 }
 
@@ -257,10 +257,15 @@ pub struct IndexEntryIter {
     /// returned to the client.
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
     next_hunk_number: u32,
-    pub report: Report,
     excludes: GlobSet,
     /// Sizes of index data read.
     index_sizes: Sizes,
+    pub stats: IndexEntryIterStats,
+}
+
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct IndexEntryIterStats {
+    pub hunks_read: u64,
 }
 
 impl fmt::Debug for IndexEntryIter {
@@ -268,7 +273,6 @@ impl fmt::Debug for IndexEntryIter {
         f.debug_struct("IndexEntryIter")
             .field("dir", &self.dir)
             .field("next_hunk_number", &self.next_hunk_number)
-            // .field("report", &self.report)
             // buffered_entries has no Debug itself
             .finish()
     }
@@ -295,14 +299,14 @@ impl IndexEntryIter {
     /// Create an iterator that will read all entires from an existing index.
     ///
     /// Prefer to use `Band::index_iter` instead.
-    pub fn open(index_dir: &Path, report: &Report) -> Result<IndexEntryIter> {
+    pub fn open(index_dir: &Path) -> Result<IndexEntryIter> {
         Ok(IndexEntryIter {
             dir: index_dir.to_path_buf(),
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             next_hunk_number: 0,
-            report: report.clone(),
             excludes: excludes::excludes_nothing(),
             index_sizes: Sizes::default(),
+            stats: IndexEntryIterStats::default(),
         })
     }
 
@@ -362,7 +366,7 @@ impl IndexEntryIter {
         let path = &path_for_hunk(&self.dir, self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
-        self.report.increment("index.hunk", 1);
+        self.stats.hunks_read += 1;
         let (comp_len, index_bytes) = match crate::compress::snappy::decompress_file(&path) {
             Ok(x) => x,
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
@@ -515,7 +519,7 @@ mod tests {
             "Index hunk file not found"
         );
 
-        let mut it = IndexEntryIter::open(&ib_dir, &Report::new()).unwrap();
+        let mut it = IndexEntryIter::open(&ib_dir).unwrap();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
@@ -534,7 +538,7 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk().unwrap();
 
-        let it = IndexEntryIter::open(&ib.dir, &Report::new()).unwrap();
+        let it = IndexEntryIter::open(&ib.dir).unwrap();
         assert_eq!(
             format!("{:?}", &it),
             format!(
@@ -576,7 +580,7 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         let excludes = excludes::from_strings(&["/fo*"]).unwrap();
-        let it = IndexEntryIter::open(&ib.dir, &Report::new())
+        let it = IndexEntryIter::open(&ib.dir)
             .unwrap()
             .with_excludes(excludes);
         assert_eq!(
@@ -606,26 +610,25 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         // Advance to /foo and read on from there.
-        let report = Report::new();
-        let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib.dir).unwrap();
         assert_eq!(it.advance_to(&Apath::from("/foo")).unwrap().apath, "/foo");
         assert_eq!(it.next().unwrap().apath, "/foobar");
         assert_eq!(it.next().unwrap().apath, "/g01");
 
         // Advance to before /g01
-        let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib.dir).unwrap();
         assert_eq!(it.advance_to(&Apath::from("/fxxx")), None);
         assert_eq!(it.next().unwrap().apath, "/g01");
         assert_eq!(it.next().unwrap().apath, "/g02");
 
         // Advance to before the first entry
-        let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib.dir).unwrap();
         assert_eq!(it.advance_to(&Apath::from("/aaaa")), None);
         assert_eq!(it.next().unwrap().apath, "/bar");
         assert_eq!(it.next().unwrap().apath, "/foo");
 
         // Advance to after the last entry
-        let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib.dir).unwrap();
         assert_eq!(it.advance_to(&Apath::from("/zz")), None);
         assert_eq!(it.next(), None);
     }
