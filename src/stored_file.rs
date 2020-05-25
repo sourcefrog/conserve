@@ -68,7 +68,7 @@ impl ReadBlocks for StoredFile {
     }
 
     fn read_block(&self, i: usize) -> Result<(Vec<u8>, Sizes)> {
-        self.block_dir.get(&self.addrs[i], &self.report)
+        self.block_dir.get(&self.addrs[i])
     }
 }
 
@@ -106,7 +106,7 @@ impl std::io::Read for ReadStoredFile {
                 // TODO: Handle errors nicely, but they need to convert to std::io::Error.
                 // TODO: Remember the sizes somewhere, maybe by changing this not to be
                 // std::io::Read.
-                self.buf = self.block_dir.get(&addr, &self.report).unwrap().0;
+                self.buf = self.block_dir.get(&addr).unwrap().0;
                 self.buf_cursor = 0;
             // TODO: Read directly into the caller's buffer, if it will fit. Requires changing
             // BlockDir::get to take a caller-provided buffer.

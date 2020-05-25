@@ -67,6 +67,12 @@ fn block_name_to_subdirectory(block_hash: &str) -> &str {
     &block_hash[..SUBDIR_NAME_CHARS]
 }
 
+#[derive(Clone, Default, Debug, Eq, PartialEq)]
+pub struct ValidateBlockDirStats {
+    pub block_hash_wrong: u64,
+    pub block_decompression_failed: u64,
+}
+
 impl BlockDir {
     /// Create a BlockDir accessing `path`, which must exist as a directory.
     pub fn new(path: &Path) -> BlockDir {
@@ -140,14 +146,14 @@ impl BlockDir {
     /// Read back the contents of a block, as a byte array.
     ///
     /// To read a whole file, use StoredFile instead.
-    pub fn get(&self, addr: &Address, report: &Report) -> Result<(Vec<u8>, Sizes)> {
+    pub fn get(&self, addr: &Address) -> Result<(Vec<u8>, Sizes)> {
         if addr.start != 0 {
-            unimplemented!();
+            todo!("Reading parts of blocks is not supported (or expected) yet");
         }
-        let (decompressed, sizes) = self.get_block_content(&addr.hash, report)?;
+        let (decompressed, sizes) = self.get_block_content(&addr.hash)?;
         // TODO: Accept addresses referring to only part of a block.
         if decompressed.len() != addr.len as usize {
-            unimplemented!();
+            todo!("Reading parts of blocks is not supported (or expected) yet");
         }
         Ok((decompressed, sizes))
     }
@@ -177,7 +183,7 @@ impl BlockDir {
             .subdirs()
             .with_context(|| errors::ListBlocks { path: path.clone() })?;
         Ok(subdirs.into_iter().flat_map(move |s| {
-            // TODO: Avoid `unwrap`; send errors to the report.
+            // TODO: Avoid `unwrap`.
             fs::read_dir(&path.join(s))
                 .unwrap()
                 .map(std::io::Result::unwrap)
@@ -208,13 +214,13 @@ impl BlockDir {
         }))
     }
 
-    /// Check format invariants of the BlockDir; report any problems to the Report.
-    pub fn validate(&self, report: &Report) -> Result<()> {
+    /// Check format invariants of the BlockDir.
+    pub fn validate(&self) -> Result<ValidateBlockDirStats> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Provide a progress bar that just works on counts, not bytes:
         // then we don't need to count the sizes in advance.
-        // let ui = report.lock_ui();
+        let stats = ValidateBlockDirStats::default();
         ui::println("Count blocks...");
         let bns: Vec<(String, u64)> = self.block_names_and_sizes()?.collect();
         let tot = bns.iter().map(|a| a.1).sum();
@@ -225,45 +231,50 @@ impl BlockDir {
             crate::misc::bytes_to_human_mb(tot)
         ));
         ui::set_progress_phase(&"Check block hashes");
+        // TODO: Accumulate counts from validation of individual blocks, 
+        // and count the total number that were unreadable or had the wrong hash.
         bns.par_iter()
             .map(|(bn, bsize)| {
                 ui::increment_bytes_done(*bsize);
-                self.validate_block(bn, report)
+                self.validate_block(bn)?;
+                Ok(())
             })
             .try_for_each(|i| i)?;
-        Ok(())
+        Ok(stats)
     }
 
-    fn validate_block(&self, hash: &str, report: &Report) -> Result<()> {
-        let (decompressed_bytes, _sizes) = self.get_block_content(&hash, report)?;
+    fn validate_block(&self, hash: &str) -> Result<ValidateBlockDirStats> {
+        let mut stats = ValidateBlockDirStats::default();
+        let (decompressed_bytes, _sizes) = self.get_block_content(&hash)?;
         let actual_hash = hex::encode(
             blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed_bytes).as_bytes(),
         );
         if actual_hash != *hash {
             let path = self.path_for_file(&hash);
-            report.increment("block.misplaced", 1);
+            stats.block_hash_wrong += 1;
             ui::problem(&format!(
                 "Block file {:?} has actual decompressed hash {:?}",
                 path, actual_hash
             ));
             return Err(Error::BlockCorrupt { path, actual_hash });
         }
-        Ok(())
+        Ok(stats)
     }
 
     /// Return the entire contents of the block.
-    pub fn get_block_content(&self, hash: &str, report: &Report) -> Result<(Vec<u8>, Sizes)> {
-        // TODO: Probably this should return an iterator rather than pulling the
-        // whole file in to memory immediately.
+    pub fn get_block_content(&self, hash: &str) -> Result<(Vec<u8>, Sizes)> {
+        // MAYBE: this should return an iterator rather than pulling the
+        // whole file in to memory immediately? But, generally the format assumes
+        // they will fit in memory, and then that's simpler.
+        // TODO: Check the hash here (not in validate_block) and return an error
+        // if it's wrong. Don't silently read back the wrong thing.
         let path = self.path_for_file(hash);
         let (compressed_len, decompressed_bytes) = snappy::decompress_file(&path)
             .context(errors::ReadBlock { path })
             .map_err(|e| {
-                report.increment("block.corrupt", 1);
                 ui::show_error(&e);
                 e
             })?;
-        report.increment("block.read", 1);
         let sizes = Sizes {
             uncompressed: decompressed_bytes.len() as u64,
             compressed: compressed_len as u64,
@@ -427,7 +438,7 @@ mod tests {
         // Try to read back
         let read_report = Report::new();
         assert_eq!(read_report.get_count("block.read"), 0);
-        let (back, sizes) = block_dir.get(&addrs[0], &read_report).unwrap();
+        let (back, sizes) = block_dir.get(&addrs[0]).unwrap();
         assert_eq!(back, EXAMPLE_TEXT);
         assert_eq!(read_report.get_count("block.read"), 1);
         assert_eq!(
@@ -438,9 +449,8 @@ mod tests {
             }
         );
 
-        // Validate
-        let validate_r = Report::new();
-        block_dir.validate(&validate_r).unwrap();
+        // TODO: Assertions about the stats.
+        let _validate_stats = block_dir.validate().unwrap();
     }
 
     #[test]
@@ -513,7 +523,7 @@ mod tests {
         // 10x 2MB should be twenty blocks
         assert_eq!(addrs.len(), 20);
         for a in addrs {
-            let (retr, block_sizes) = block_dir.get(&a, &report).unwrap();
+            let (retr, block_sizes) = block_dir.get(&a).unwrap();
             assert_eq!(retr.len(), MAX_BLOCK_SIZE as usize);
             assert!(retr.iter().all(|b| *b == 64u8));
             assert_eq!(block_sizes.uncompressed, MAX_BLOCK_SIZE as u64);

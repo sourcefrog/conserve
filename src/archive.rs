@@ -36,8 +36,10 @@ struct ArchiveHeader {
     conserve_archive_version: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ValidateArchiveStats {}
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ValidateArchiveStats {
+    pub block_dir_stats: crate::blockdir::ValidateBlockDirStats,
+}
 
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
@@ -149,12 +151,14 @@ impl Archive {
         // Check there's no extra top-level contents.
         self.validate_archive_dir()?;
         ui::println("Check blockdir...");
-        self.block_dir.validate(self.report())?;
+        let block_dir_stats = self.block_dir.validate()?;
         self.validate_bands()?;
 
         // TODO: Don't say "OK" if there were non-fatal problems.
         ui::println("Archive is OK.");
-        Ok(ValidateArchiveStats {})
+        Ok(ValidateArchiveStats {
+            block_dir_stats,
+        })
     }
 
     fn validate_archive_dir(&self) -> Result<()> {
