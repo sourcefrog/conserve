@@ -129,10 +129,10 @@ pub struct IndexBuilder {
     check_order: apath::CheckOrder,
 
     /// Statistics about work done while writing this index.
-    stats: IndexBuilderStats,
+    pub stats: IndexBuilderStats,
 }
 
-#[derive(Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct IndexBuilderStats {
     pub hunk_count: u64,
 }

@@ -94,5 +94,6 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     }
     ui::clear_progress();
     dest.finish()?;
+    // TODO: Copy back the stats from the BackupWriter.
     Ok(stats)
 }
