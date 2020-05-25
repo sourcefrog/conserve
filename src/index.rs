@@ -127,6 +127,14 @@ pub struct IndexBuilder {
     /// this is empty; at the start of a later hunk it's the last path from the previous
     /// hunk, and otherwise it's the last path from `entries`.
     check_order: apath::CheckOrder,
+
+    /// Statistics about work done while writing this index.
+    stats: IndexBuilderStats,
+}
+
+#[derive(Debug, Default, Eq, PartialEq)]
+pub struct IndexBuilderStats {
+    pub hunk_count: u64,
 }
 
 /// Accumulate and write out index entries into files in an index directory.
@@ -138,19 +146,20 @@ impl IndexBuilder {
             entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
             sequence: 0,
             check_order: apath::CheckOrder::new(),
+            stats: IndexBuilderStats::default(),
         }
     }
 
     /// Append an entry to the index.
     ///
     /// The new entry must sort after everything already written to the index.
-    pub fn push(&mut self, entry: IndexEntry, report: &Report) -> Result<Sizes> {
+    pub fn push(&mut self, entry: IndexEntry) -> Result<Sizes> {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
         self.check_order.check(&entry.apath);
         self.entries.push(entry);
         if self.entries.len() >= MAX_ENTRIES_PER_HUNK {
-            self.finish_hunk(report)
+            self.finish_hunk()
         } else {
             Ok(Sizes::default())
         }
@@ -161,7 +170,7 @@ impl IndexBuilder {
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the index to start receiving
     /// entries for the next hunk.
-    pub fn finish_hunk(&mut self, report: &Report) -> Result<Sizes> {
+    pub fn finish_hunk(&mut self) -> Result<Sizes> {
         if self.entries.is_empty() {
             return Ok(Sizes::default());
         }
@@ -179,7 +188,7 @@ impl IndexBuilder {
             Snappy::compress_and_write(&json, &mut af).context(errors::WriteIndex { path })?;
         af.close().context(errors::WriteIndex { path })?;
 
-        report.increment("index.hunk", 1);
+        self.stats.hunk_count += 1;
         // Ready for the next hunk.
         self.entries.clear();
         self.sequence += 1;
@@ -387,13 +396,13 @@ mod tests {
 
     use super::*;
 
-    pub fn scratch_indexbuilder() -> (TempDir, IndexBuilder, Report) {
+    pub fn scratch_indexbuilder() -> (TempDir, IndexBuilder) {
         let testdir = TempDir::new().unwrap();
         let ib = IndexBuilder::new(testdir.path());
-        (testdir, ib, Report::new())
+        (testdir, ib)
     }
 
-    pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str, report: &Report) {
+    pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
         ib.push(
             IndexEntry {
                 apath: apath.into(),
@@ -403,7 +412,6 @@ mod tests {
                 addrs: vec![],
                 target: None,
             },
-            report,
         )
         .unwrap();
     }
@@ -431,7 +439,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn index_builder_checks_order() {
-        let (_testdir, mut ib, report) = scratch_indexbuilder();
+        let (_testdir, mut ib) = scratch_indexbuilder();
         ib.push(
             IndexEntry {
                 apath: "/zzz".into(),
@@ -442,7 +450,6 @@ mod tests {
                 addrs: vec![],
                 target: None,
             },
-            &report,
         )
         .unwrap();
         ib.push(
@@ -454,7 +461,6 @@ mod tests {
                 addrs: vec![],
                 target: None,
             },
-            &report,
         )
         .unwrap();
     }
@@ -462,7 +468,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn index_builder_checks_names() {
-        let (_testdir, mut ib, report) = scratch_indexbuilder();
+        let (_testdir, mut ib) = scratch_indexbuilder();
         ib.push(
             IndexEntry {
                 apath: "../escapecat".into(),
@@ -472,7 +478,6 @@ mod tests {
                 mtime_nanos: 0,
                 target: None,
             },
-            &report,
         )
         .unwrap();
     }
@@ -495,10 +500,10 @@ mod tests {
 
     #[test]
     fn basic() {
-        let (_testdir, mut ib, report) = scratch_indexbuilder();
-        add_an_entry(&mut ib, "/apple", &report);
-        add_an_entry(&mut ib, "/banana", &report);
-        ib.finish_hunk(&report).unwrap();
+        let (_testdir, mut ib) = scratch_indexbuilder();
+        add_an_entry(&mut ib, "/apple");
+        add_an_entry(&mut ib, "/banana");
+        ib.finish_hunk().unwrap();
         #[allow(clippy::redundant_clone)] // It's not redundant, because ib will be dropped.
         let ib_dir = ib.dir.to_path_buf();
         drop(ib);
@@ -510,7 +515,7 @@ mod tests {
             "Index hunk file not found"
         );
 
-        let mut it = IndexEntryIter::open(&ib_dir, &report).unwrap();
+        let mut it = IndexEntryIter::open(&ib_dir, &Report::new()).unwrap();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
@@ -520,16 +525,16 @@ mod tests {
 
     #[test]
     fn multiple_hunks() {
-        let (_testdir, mut ib, report) = scratch_indexbuilder();
-        add_an_entry(&mut ib, "/1.1", &report);
-        add_an_entry(&mut ib, "/1.2", &report);
-        ib.finish_hunk(&report).unwrap();
+        let (_testdir, mut ib) = scratch_indexbuilder();
+        add_an_entry(&mut ib, "/1.1");
+        add_an_entry(&mut ib, "/1.2");
+        ib.finish_hunk().unwrap();
 
-        add_an_entry(&mut ib, "/2.1", &report);
-        add_an_entry(&mut ib, "/2.2", &report);
-        ib.finish_hunk(&report).unwrap();
+        add_an_entry(&mut ib, "/2.1");
+        add_an_entry(&mut ib, "/2.2");
+        ib.finish_hunk().unwrap();
 
-        let it = IndexEntryIter::open(&ib.dir, &report).unwrap();
+        let it = IndexEntryIter::open(&ib.dir, &Report::new()).unwrap();
         assert_eq!(
             format!("{:?}", &it),
             format!(
@@ -545,33 +550,33 @@ mod tests {
     #[test]
     #[should_panic]
     fn no_duplicate_paths() {
-        let (_testdir, mut ib, report) = scratch_indexbuilder();
-        add_an_entry(&mut ib, "/hello", &report);
-        add_an_entry(&mut ib, "/hello", &report);
+        let (_testdir, mut ib) = scratch_indexbuilder();
+        add_an_entry(&mut ib, "/hello");
+        add_an_entry(&mut ib, "/hello");
     }
 
     #[test]
     #[should_panic]
     fn no_duplicate_paths_across_hunks() {
-        let (_testdir, mut ib, report) = scratch_indexbuilder();
-        add_an_entry(&mut ib, "/hello", &report);
-        ib.finish_hunk(&report).unwrap();
+        let (_testdir, mut ib) = scratch_indexbuilder();
+        add_an_entry(&mut ib, "/hello");
+        ib.finish_hunk().unwrap();
 
         // Try to add an identically-named file within the next hunk and it should error,
         // because the IndexBuilder remembers the last file name written.
-        add_an_entry(&mut ib, "hello", &report);
+        add_an_entry(&mut ib, "hello");
     }
 
     #[test]
     fn excluded_entries() {
-        let (_testdir, mut ib, report) = scratch_indexbuilder();
-        add_an_entry(&mut ib, "/bar", &report);
-        add_an_entry(&mut ib, "/foo", &report);
-        add_an_entry(&mut ib, "/foobar", &report);
-        ib.finish_hunk(&report).unwrap();
+        let (_testdir, mut ib) = scratch_indexbuilder();
+        add_an_entry(&mut ib, "/bar");
+        add_an_entry(&mut ib, "/foo");
+        add_an_entry(&mut ib, "/foobar");
+        ib.finish_hunk().unwrap();
 
         let excludes = excludes::from_strings(&["/fo*"]).unwrap();
-        let it = IndexEntryIter::open(&ib.dir, &report)
+        let it = IndexEntryIter::open(&ib.dir, &Report::new())
             .unwrap()
             .with_excludes(excludes);
         assert_eq!(
@@ -588,19 +593,20 @@ mod tests {
 
     #[test]
     fn advance() {
-        let (_testdir, mut ib, report) = scratch_indexbuilder();
-        add_an_entry(&mut ib, "/bar", &report);
-        add_an_entry(&mut ib, "/foo", &report);
-        add_an_entry(&mut ib, "/foobar", &report);
-        ib.finish_hunk(&report).unwrap();
+        let (_testdir, mut ib) = scratch_indexbuilder();
+        add_an_entry(&mut ib, "/bar");
+        add_an_entry(&mut ib, "/foo");
+        add_an_entry(&mut ib, "/foobar");
+        ib.finish_hunk().unwrap();
 
         // Make multiple hunks to test traversal across hunks.
-        add_an_entry(&mut ib, "/g01", &report);
-        add_an_entry(&mut ib, "/g02", &report);
-        add_an_entry(&mut ib, "/g03", &report);
-        ib.finish_hunk(&report).unwrap();
+        add_an_entry(&mut ib, "/g01");
+        add_an_entry(&mut ib, "/g02");
+        add_an_entry(&mut ib, "/g03");
+        ib.finish_hunk().unwrap();
 
         // Advance to /foo and read on from there.
+        let report = Report::new();
         let mut it = IndexEntryIter::open(&ib.dir, &report).unwrap();
         assert_eq!(it.advance_to(&Apath::from("/foo")).unwrap().apath, "/foo");
         assert_eq!(it.next().unwrap().apath, "/foobar");
@@ -629,13 +635,13 @@ mod tests {
     /// https://github.com/sourcefrog/conserve/issues/95
     #[test]
     fn no_final_empty_hunk() -> Result<()> {
-        let (testdir, mut ib, report) = scratch_indexbuilder();
+        let (testdir, mut ib) = scratch_indexbuilder();
         for i in 0..MAX_ENTRIES_PER_HUNK {
-            add_an_entry(&mut ib, &format!("/{:0>10}", i), &report);
+            add_an_entry(&mut ib, &format!("/{:0>10}", i));
         }
-        ib.finish_hunk(&report)?;
+        ib.finish_hunk()?;
         // Think about, but don't actually add some files
-        ib.finish_hunk(&report)?;
+        ib.finish_hunk()?;
         let read_index = ReadIndex::new(&testdir.path());
         assert_eq!(read_index.count_hunks()?, 1);
         Ok(())

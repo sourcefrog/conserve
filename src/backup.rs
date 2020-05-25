@@ -46,15 +46,16 @@ impl BackupWriter {
 
     fn push_entry(&mut self, index_entry: IndexEntry) -> Result<()> {
         // TODO: Return or accumulate index sizes.
-        self.index_builder.push(index_entry, &self.report)?;
+        self.index_builder.push(index_entry)?;
         Ok(())
     }
 }
 
 impl tree::WriteTree for BackupWriter {
     fn finish(&mut self) -> Result<()> {
-        self.index_builder.finish_hunk(&self.report)?;
+        self.index_builder.finish_hunk()?;
         self.band.close()?;
+        // TODO: Return stats at the end.
         Ok(())
     }
 
