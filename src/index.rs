@@ -149,7 +149,7 @@ impl IndexBuilder {
     /// Append an entry to the index.
     ///
     /// The new entry must sort after everything already written to the index.
-    pub fn push(&mut self, entry: IndexEntry) -> Result<Sizes> {
+    pub(crate) fn push_entry(&mut self, entry: IndexEntry) -> Result<()> {
         // We do this check here rather than the Index constructor so that we
         // can still read invalid apaths...
         self.check_order.check(&entry.apath);
@@ -157,18 +157,18 @@ impl IndexBuilder {
         if self.entries.len() >= MAX_ENTRIES_PER_HUNK {
             self.finish_hunk()
         } else {
-            Ok(Sizes::default())
+            Ok(())
         }
     }
 
     /// Finish this hunk of the index.
     ///
     /// This writes all the currently queued entries into a new index file
-    /// in the band directory, and then clears the index to start receiving
+    /// in the band directory, and then clears the buffer to start receiving
     /// entries for the next hunk.
-    pub fn finish_hunk(&mut self) -> Result<Sizes> {
+    pub fn finish_hunk(&mut self) -> Result<()> {
         if self.entries.is_empty() {
-            return Ok(Sizes::default());
+            return Ok(());
         }
 
         let path = &path_for_hunk(&self.dir, self.sequence);
@@ -184,14 +184,13 @@ impl IndexBuilder {
             Snappy::compress_and_write(&json, &mut af).context(errors::WriteIndex { path })?;
         af.close().context(errors::WriteIndex { path })?;
 
-        self.stats.hunk_count += 1;
+        self.stats.index_hunks += 1;
+        self.stats.compressed_index_bytes += compressed_len as u64;
+        self.stats.uncompressed_index_bytes += uncompressed_len as u64;
         // Ready for the next hunk.
         self.entries.clear();
         self.sequence += 1;
-        Ok(Sizes {
-            uncompressed: uncompressed_len as u64,
-            compressed: compressed_len as u64,
-        })
+        Ok(())
     }
 }
 
@@ -254,8 +253,7 @@ pub struct IndexEntryIter {
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
     next_hunk_number: u32,
     excludes: GlobSet,
-    /// Sizes of index data read.
-    index_sizes: Sizes,
+
     pub stats: IndexEntryIterStats,
 }
 
@@ -296,7 +294,6 @@ impl IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             next_hunk_number: 0,
             excludes: excludes::excludes_nothing(),
-            index_sizes: Sizes::default(),
             stats: IndexEntryIterStats::default(),
         })
     }
@@ -357,7 +354,7 @@ impl IndexEntryIter {
         let path = &path_for_hunk(&self.dir, self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
-        self.stats.hunks_read += 1;
+        self.stats.index_hunks += 1;
         let (comp_len, index_bytes) = match crate::compress::snappy::decompress_file(&path) {
             Ok(x) => x,
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
@@ -368,10 +365,8 @@ impl IndexEntryIter {
             }
             Err(e) => return Err(e).with_context(|| errors::ReadIndex { path }),
         };
-        self.index_sizes += Sizes {
-            uncompressed: index_bytes.len() as u64,
-            compressed: comp_len as u64,
-        };
+        self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
+        self.stats.compressed_index_bytes += comp_len as u64;
         let entries: Vec<IndexEntry> = serde_json::from_slice(&index_bytes)
             .with_context(|| errors::DeserializeIndex { path })?;
         if entries.is_empty() {
@@ -398,7 +393,7 @@ mod tests {
     }
 
     pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
-        ib.push(IndexEntry {
+        ib.push_entry(IndexEntry {
             apath: apath.into(),
             mtime: 1_461_736_377,
             mtime_nanos: 0,
@@ -433,7 +428,7 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_order() {
         let (_testdir, mut ib) = scratch_indexbuilder();
-        ib.push(IndexEntry {
+        ib.push_entry(IndexEntry {
             apath: "/zzz".into(),
             mtime: 1_461_736_377,
             mtime_nanos: 0,
@@ -443,7 +438,7 @@ mod tests {
             target: None,
         })
         .unwrap();
-        ib.push(IndexEntry {
+        ib.push_entry(IndexEntry {
             apath: "aaa".into(),
             mtime: 1_461_736_377,
             mtime_nanos: 0,
@@ -458,7 +453,7 @@ mod tests {
     #[should_panic]
     fn index_builder_checks_names() {
         let (_testdir, mut ib) = scratch_indexbuilder();
-        ib.push(IndexEntry {
+        ib.push_entry(IndexEntry {
             apath: "../escapecat".into(),
             mtime: 1_461_736_377,
             kind: Kind::File,

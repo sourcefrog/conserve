@@ -45,7 +45,7 @@ impl BackupWriter {
 
     fn push_entry(&mut self, index_entry: IndexEntry) -> Result<()> {
         // TODO: Return or accumulate index sizes.
-        self.index_builder.push(index_entry)?;
+        self.index_builder.push_entry(index_entry)?;
         Ok(())
     }
 }

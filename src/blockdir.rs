@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use crate::compress::snappy;
-use crate::stats::{CopyStats, ValidateBlockDirStats};
+use crate::stats::{CopyStats, ValidateBlockDirStats, Sizes};
 use crate::*;
 
 /// Use the maximum 64-byte hash.

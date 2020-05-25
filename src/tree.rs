@@ -5,7 +5,7 @@
 
 use std::ops::Range;
 
-use crate::stats::CopyStats;
+use crate::stats::{CopyStats, Sizes};
 use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.

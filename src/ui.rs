@@ -15,21 +15,21 @@ use lazy_static::lazy_static;
 use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::report::Sizes;
+use crate::stats::Sizes;
 use crate::Result;
 
 const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 
 /// A terminal/text UI.
-/// 
-/// This manages interleaving log-type messages (info and error), interleaved 
-/// with progress bars. 
-/// 
-/// Progress bars are only drawn when the application requests them with 
+///
+/// This manages interleaving log-type messages (info and error), interleaved
+/// with progress bars.
+///
+/// Progress bars are only drawn when the application requests them with
 /// `enable_progress` and the output destination is a tty that's capable
 /// of redrawing.
-/// 
-/// So this class also works when stdout is redirected to a file, in 
+///
+/// So this class also works when stdout is redirected to a file, in
 /// which case it will get only messages and no progress bar junk.
 struct UIState {
     last_update: Option<Instant>,
@@ -107,7 +107,7 @@ pub fn clear_progress() {
 }
 
 /// Enable drawing progress bars, only if stdout is a tty.
-/// 
+///
 /// Progress bars are off by default.
 pub fn enable_progress(enabled: bool) {
     use crossterm::tty::IsTty;

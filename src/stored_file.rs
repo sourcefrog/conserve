@@ -3,6 +3,7 @@
 ///! Access a file stored in the archive.
 use rayon::prelude::*;
 
+use crate::stats::Sizes;
 use crate::*;
 
 /// Returns the contents of a file stored in the archive, as an iter of byte blocks.
@@ -20,10 +21,7 @@ pub struct StoredFile {
 impl StoredFile {
     /// Open a stored file.
     pub fn open(block_dir: BlockDir, addrs: Vec<blockdir::Address>) -> StoredFile {
-        StoredFile {
-            block_dir,
-            addrs,
-        }
+        StoredFile { block_dir, addrs }
     }
 
     /// Validate the stored file hash is as expected.

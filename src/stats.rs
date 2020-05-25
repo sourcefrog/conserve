@@ -3,6 +3,14 @@
 
 use derive_more::{Add, AddAssign};
 
+/// Describes sizes of data read or written, with both the
+/// compressed and uncompressed size.
+#[derive(Add, AddAssign, Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Sizes {
+    pub compressed: u64,
+    pub uncompressed: u64,
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ValidateArchiveStats {
     pub block_dir_stats: ValidateBlockDirStats,
@@ -18,7 +26,16 @@ pub struct ValidateBlockDirStats {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct IndexEntryIterStats {
-    pub hunks_read: u64,
+    pub index_hunks: u64,
+    pub uncompressed_index_bytes: u64,
+    pub compressed_index_bytes: u64,
+}
+
+#[derive(Add, AddAssign, Clone, Debug, Default, Eq, PartialEq)]
+pub struct IndexBuilderStats {
+    pub index_hunks: u64,
+    pub uncompressed_index_bytes: u64,
+    pub compressed_index_bytes: u64,
 }
 
 #[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
@@ -46,9 +63,4 @@ pub struct CopyStats {
     pub errors: usize,
 
     pub index_builder_stats: IndexBuilderStats,
-}
-
-#[derive(Add, AddAssign, Clone, Debug, Default, Eq, PartialEq)]
-pub struct IndexBuilderStats {
-    pub hunk_count: u64,
 }
