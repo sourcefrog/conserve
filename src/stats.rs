@@ -3,6 +3,24 @@
 
 use derive_more::{Add, AddAssign};
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ValidateArchiveStats {
+    pub block_dir_stats: ValidateBlockDirStats,
+}
+
+#[derive(Clone, Default, Debug, Eq, PartialEq)]
+pub struct ValidateBlockDirStats {
+    /// Number of blocks read.
+    pub block_read_count: u64,
+    /// Number of blocks that failed to read back.
+    pub block_error_count: u64,
+}
+
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct IndexEntryIterStats {
+    pub hunks_read: u64,
+}
+
 #[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
 pub struct CopyStats {
     pub files: usize,

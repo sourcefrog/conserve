@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use crate::compress::snappy;
-use crate::stats::CopyStats;
+use crate::stats::{CopyStats, ValidateBlockDirStats};
 use crate::*;
 
 /// Use the maximum 64-byte hash.
@@ -66,14 +66,6 @@ pub struct BlockDir {
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
     &block_hash[..SUBDIR_NAME_CHARS]
-}
-
-#[derive(Clone, Default, Debug, Eq, PartialEq)]
-pub struct ValidateBlockDirStats {
-    /// Number of blocks read.
-    pub block_read_count: u64,
-    /// Number of blocks that failed to read back.
-    pub block_error_count: u64,
 }
 
 impl BlockDir {

@@ -15,7 +15,7 @@ use globset::GlobSet;
 use snafu::ResultExt;
 
 use super::io::file_exists;
-use super::stats::IndexBuilderStats;
+use super::stats::{IndexBuilderStats, IndexEntryIterStats};
 use super::*;
 
 pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
@@ -257,11 +257,6 @@ pub struct IndexEntryIter {
     /// Sizes of index data read.
     index_sizes: Sizes,
     pub stats: IndexEntryIterStats,
-}
-
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct IndexEntryIterStats {
-    pub hunks_read: u64,
 }
 
 impl fmt::Debug for IndexEntryIter {

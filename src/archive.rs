@@ -14,6 +14,7 @@ use super::io::file_exists;
 use super::jsonio;
 use super::misc::remove_item;
 use super::*;
+use crate::stats::ValidateArchiveStats;
 
 const HEADER_FILENAME: &str = "CONSERVE";
 static BLOCK_DIR: &str = "d";
@@ -34,11 +35,6 @@ pub struct Archive {
 #[derive(Debug, Serialize, Deserialize)]
 struct ArchiveHeader {
     conserve_archive_version: String,
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct ValidateArchiveStats {
-    pub block_dir_stats: crate::blockdir::ValidateBlockDirStats,
 }
 
 impl Archive {
@@ -156,9 +152,7 @@ impl Archive {
 
         // TODO: Don't say "OK" if there were non-fatal problems.
         ui::println("Archive is OK.");
-        Ok(ValidateArchiveStats {
-            block_dir_stats,
-        })
+        Ok(ValidateArchiveStats { block_dir_stats })
     }
 
     fn validate_archive_dir(&self) -> Result<()> {
