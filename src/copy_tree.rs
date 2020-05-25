@@ -39,8 +39,6 @@ pub struct CopyStats {
 // maybe differently for backup vs restore.
 
 /// Copy files and other entries from one tree to another.
-///
-/// Progress and problems are reported to the source's report.
 pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     source: &ST,
     dest: &mut DT,

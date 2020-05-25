@@ -145,7 +145,7 @@ mod tests {
         let lt = LiveTree::open(srcdir.path()).unwrap();
         let mut bw = BackupWriter::begin(&af).unwrap();
         let copy_stats = copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
-        assert_eq!(0, copy_stats.files);
+        assert_eq!(0, copy_stats.file_count);
         assert_eq!(1, copy_stats.symlink_count);
         assert_eq!(0, copy_stats.unknown_kind_count);
 
@@ -156,10 +156,7 @@ mod tests {
         let band = Band::open(&af, &band_ids[0]).unwrap();
         assert!(band.is_closed().unwrap());
 
-        let index_entries = band
-            .iter_entries()
-            .unwrap()
-            .collect::<Vec<IndexEntry>>();
+        let index_entries = band.iter_entries().unwrap().collect::<Vec<IndexEntry>>();
         assert_eq!(2, index_entries.len());
 
         let e2 = &index_entries[1];
