@@ -170,7 +170,7 @@ impl Band {
     }
 
     /// Return an iterator through entries in this band.
-    pub fn iter_entries(&self, _report: &Report) -> Result<index::IndexEntryIter> {
+    pub fn iter_entries(&self) -> Result<index::IndexEntryIter> {
         index::IndexEntryIter::open(&self.index_dir_path)
     }
 

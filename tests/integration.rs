@@ -66,7 +66,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     assert!(band.is_closed().unwrap());
 
     let index_entries = band
-        .iter_entries(&report)
+        .iter_entries()
         .unwrap()
         .collect::<Vec<IndexEntry>>();
     assert_eq!(2, index_entries.len());

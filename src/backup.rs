@@ -30,7 +30,7 @@ impl BackupWriter {
     pub fn begin(archive: &Archive) -> Result<BackupWriter> {
         let basis_index = archive
             .last_complete_band()?
-            .map(|b| b.iter_entries(&archive.report()))
+            .map(|b| b.iter_entries())
             .transpose()?;
         // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;
