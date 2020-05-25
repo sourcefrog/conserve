@@ -125,6 +125,25 @@ backup had been interrupted and remained incomplete: the reader picks up at the
 same point in the previous index. (This last part is not yet implemented,
 though.)
 
+## Stats
+
+Many operations return Stats objects, declared in `conserve::stats`. These data
+structs contain counters of data transferred, work done, errors, etc, during
+operations.
+
+In particular, since Conserve does not return an `Err` on non-fatal errors, the
+stats objects are the main way to programmatically determine one or more has
+occurred.
+
+Stats objects can be used in either of two ways:
+
+1. Directly returned from a function. This is more like a functional style and
+   preferred when it can be cleanly done.
+
+2. Accumulated into an object and retrieved from the object when it's done. This
+   works better for iterators, and other cases where the caller might not be
+   ready to hold the counts themselves.
+
 ## UI, Progress, and Logging
 
 Conserve's user interface includes:
@@ -146,19 +165,16 @@ The library should support several modes of UI:
 1. Primarily, the text UI presented by the `conserve` binary, on a terminal that
    allows cursor control.
 
-   In this case the terminal is inherently a global singleton across the
-   process, and all the different uses need to be coordinated. Most importantly,
-   log output must interleave with progress bars.
+In this case the terminal is inherently a global singleton across the process,
+and all the different uses need to be coordinated. Most importantly, log output
+must interleave with progress bars.
 
 2. Noninteractive text output, when there is no terminal. This should be similar
    to the terminal, but with progress bars and interactive input turned off.
 
 3. Other applications embedding the conserve library, perhaps in a GUI or a web
    service, that want to route messages, progress indications, and other
-   interactions through their own code. These applications conceivably have
-   multiple Conserve operations happening on different threads simultaneously,
-   and want to keep the output separate. (Although, this is in tension with Rust
-   logging's inherently-global concept.)
+   interactions through their own code.
 
 4. When run from unit tests or library API tests, a singleton UI won't work,
    because multiple tests run concurrently in different threads, and Rust
@@ -166,12 +182,10 @@ The library should support several modes of UI:
    in a limited way. (Tests that run the `conserve` binary as a subprocess have
    more freedom, including running it on a pseudoterminal.)
 
-Log messages should be written through Rust's (fairly) standard `log` crate.
-Listeners for logs can be configured only globally and only once. There should
-be an option to write logs to a file, as well as to the terminal, and at a
-different level of detail.
-
-This implies:
+This is not implemented yet, but Conserve should migrate to using Rust's
+(fairly) standard `log` crate. Listeners for logs can be configured only
+globally and only once. There should be an option to write logs to a file, as
+well as to the terminal, and at a different level of detail. This implies:
 
 - The library will emit logs but will not by default configure any log targets,
   so that applications can choose the target they want.
@@ -181,11 +195,6 @@ This implies:
 
 - Since the terminal UI is a log target, it must be constructed just once near
   program startup, and therefore it cannot be on during in-process tests.
-
-Rather than directly constructing progress bars, core library code should send
-messages to observer objects, passed in by the application. These can then be
-configured to either draw progress bars to the terminal, or do nothing, or do
-something else.
 
 Progess bars are drawn only for the small number of main loops that are expected
 to take a long time, and don't implicitly pop up due to IO.
