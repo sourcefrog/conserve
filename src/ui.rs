@@ -101,9 +101,13 @@ pub fn clear_progress() {
     ui.clear_progress();
 }
 
+/// Enable drawing progress bars, only if stdout is a tty.
+/// 
+/// Progress bars are off by default.
 pub fn enable_progress(enabled: bool) {
+    use crossterm::tty::IsTty;
     let mut ui = UI_STATE.lock().unwrap();
-    ui.progress_enabled = enabled;
+    ui.progress_enabled = ui.t.is_tty() && enabled;
 }
 
 impl Default for UIState {
