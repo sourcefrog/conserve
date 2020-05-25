@@ -69,8 +69,10 @@ fn block_name_to_subdirectory(block_hash: &str) -> &str {
 
 #[derive(Clone, Default, Debug, Eq, PartialEq)]
 pub struct ValidateBlockDirStats {
-    pub block_hash_wrong: u64,
-    pub block_decompression_failed: u64,
+    /// Number of blocks read.
+    pub block_read_count: u64,
+    /// Number of blocks that failed to read back.
+    pub block_error_count: u64,
 }
 
 impl BlockDir {
@@ -220,7 +222,6 @@ impl BlockDir {
         // directories of the right length.
         // TODO: Provide a progress bar that just works on counts, not bytes:
         // then we don't need to count the sizes in advance.
-        let stats = ValidateBlockDirStats::default();
         ui::println("Count blocks...");
         let bns: Vec<(String, u64)> = self.block_names_and_sizes()?.collect();
         let tot = bns.iter().map(|a| a.1).sum();
@@ -233,48 +234,37 @@ impl BlockDir {
         ui::set_progress_phase(&"Check block hashes");
         // TODO: Accumulate counts from validation of individual blocks, 
         // and count the total number that were unreadable or had the wrong hash.
-        bns.par_iter()
-            .map(|(bn, bsize)| {
+        let block_error_count = bns.par_iter()
+            .filter(|(block_hash, bsize)| {
                 ui::increment_bytes_done(*bsize);
-                self.validate_block(bn)?;
-                Ok(())
-            })
-            .try_for_each(|i| i)?;
-        Ok(stats)
-    }
-
-    fn validate_block(&self, hash: &str) -> Result<ValidateBlockDirStats> {
-        let mut stats = ValidateBlockDirStats::default();
-        let (decompressed_bytes, _sizes) = self.get_block_content(&hash)?;
-        let actual_hash = hex::encode(
-            blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed_bytes).as_bytes(),
-        );
-        if actual_hash != *hash {
-            let path = self.path_for_file(&hash);
-            stats.block_hash_wrong += 1;
-            ui::problem(&format!(
-                "Block file {:?} has actual decompressed hash {:?}",
-                path, actual_hash
-            ));
-            return Err(Error::BlockCorrupt { path, actual_hash });
-        }
-        Ok(stats)
+                self.get_block_content(&block_hash).is_err()
+            }).count().try_into().unwrap();
+        let block_read_count = bns.len().try_into().unwrap();
+        Ok(ValidateBlockDirStats {
+            block_error_count,
+            block_read_count,
+        })
     }
 
     /// Return the entire contents of the block.
     pub fn get_block_content(&self, hash: &str) -> Result<(Vec<u8>, Sizes)> {
-        // MAYBE: this should return an iterator rather than pulling the
-        // whole file in to memory immediately? But, generally the format assumes
-        // they will fit in memory, and then that's simpler.
-        // TODO: Check the hash here (not in validate_block) and return an error
-        // if it's wrong. Don't silently read back the wrong thing.
         let path = self.path_for_file(hash);
         let (compressed_len, decompressed_bytes) = snappy::decompress_file(&path)
-            .context(errors::ReadBlock { path })
+            .context(errors::ReadBlock { path: path.clone() })
             .map_err(|e| {
                 ui::show_error(&e);
                 e
             })?;
+        let actual_hash = hex::encode(
+            blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed_bytes).as_bytes(),
+        );
+        if actual_hash != *hash {
+            ui::problem(&format!(
+                "Block file {:?} has actual decompressed hash {:?}",
+                &path, actual_hash
+            ));
+            return Err(Error::BlockCorrupt { path, actual_hash });
+        }
         let sizes = Sizes {
             uncompressed: decompressed_bytes.len() as u64,
             compressed: compressed_len as u64,
