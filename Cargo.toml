@@ -19,7 +19,6 @@ name = "conserve"
 test = false
 
 [dependencies]
-atty = "0.2.14"
 blake2-rfc = "0.2.18"
 chrono = "0.4.10"
 clap = "2.33.0"
