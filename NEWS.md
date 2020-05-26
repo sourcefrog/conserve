@@ -26,6 +26,10 @@
 - Removed global `--stats` option. Stats are always shown as info-level
   messages.
 
+Bug fixes:
+
+- Don't panic on timestamps on or before the Unix epoch. (#100)
+
 Various API and internal changes, including:
 
 - Removal of `Report` concept. Instead, operations return a type-specific
