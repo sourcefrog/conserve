@@ -23,7 +23,7 @@ pub const COPY_DEFAULT: CopyOptions = CopyOptions {
 /// Copy files and other entries from one tree to another.
 pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     source: &ST,
-    dest: &mut DT,
+    mut dest: DT,
     options: &CopyOptions,
 ) -> Result<CopyStats> {
     let mut stats = CopyStats::default();
@@ -72,7 +72,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         ui::increment_bytes_done(entry.size().unwrap_or(0));
     }
     ui::clear_progress();
-    dest.finish()?;
-    // TODO: Copy back the stats from the BackupWriter.
+    stats += dest.finish()?;
+    // TODO: Merge in stats from the tree iter and maybe the source tree?
     Ok(stats)
 }

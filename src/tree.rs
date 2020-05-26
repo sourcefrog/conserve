@@ -50,7 +50,7 @@ pub trait ReadTree {
 ///
 /// Entries must be written in Apath order, since that's a requirement of the index.
 pub trait WriteTree {
-    fn finish(&mut self) -> Result<CopyStats>;
+    fn finish(self) -> Result<CopyStats>;
 
     /// Copy a directory entry from a source tree to this tree.
     fn copy_dir<E: Entry>(&mut self, entry: &E) -> Result<()>;

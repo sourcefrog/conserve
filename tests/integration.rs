@@ -20,13 +20,14 @@ pub fn simple_backup() {
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
     // TODO: Include a symlink only on Unix.
-    copy_tree(
+    let copy_stats = copy_tree(
         &srcdir.live_tree(),
-        &mut BackupWriter::begin(&af).unwrap(),
+        BackupWriter::begin(&af).unwrap(),
         &COPY_DEFAULT,
     )
     .unwrap();
-    // TODO: Examine the stats.
+    assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
+    assert_eq!(copy_stats.files, 1);
     check_backup(&af);
     check_restore(&af);
 }
@@ -42,10 +43,16 @@ pub fn simple_backup_with_excludes() {
     // TODO: Include a symlink only on Unix.
     let excludes = excludes::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
     let lt = srcdir.live_tree().with_excludes(excludes);
-    let mut bw = BackupWriter::begin(&af).unwrap();
-    copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
+    let bw = BackupWriter::begin(&af).unwrap();
+    let copy_stats = copy_tree(&lt, bw, &COPY_DEFAULT).unwrap();
     check_backup(&af);
-    // TODO: Look at stats returned from the copy_tree operation.
+
+    assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
+    assert_eq!(copy_stats.files, 1);
+    // TODO: Check stats for the number of excluded entries.
+    assert!(copy_stats.index_builder_stats.compressed_index_bytes > 100);
+    assert!(copy_stats.index_builder_stats.uncompressed_index_bytes > 200);
+
     check_restore(&af);
     af.validate().unwrap();
 }
@@ -96,9 +103,9 @@ fn check_restore(af: &ScratchArchive) {
     let restore_dir = TreeFixture::new();
 
     let archive = Archive::open(af.path()).unwrap();
-    let mut restore_tree = RestoreTree::create(&restore_dir.path()).unwrap();
+    let restore_tree = RestoreTree::create(&restore_dir.path()).unwrap();
     let st = StoredTree::open_last(&archive).unwrap();
-    let copy_stats = copy_tree(&st, &mut restore_tree, &COPY_DEFAULT).unwrap();
+    let copy_stats = copy_tree(&st, restore_tree, &COPY_DEFAULT).unwrap();
     assert_eq!(copy_stats.uncompressed_bytes, 8);
     // TODO: Compressed size isn't set properly when restoring, because it's
     // lost by passing through a std::io::Read in ReadStoredFile.
@@ -114,16 +121,16 @@ fn large_file() {
     let tf = TreeFixture::new();
     let large_content = String::from("a sample large file\n").repeat(1_000_000);
     tf.create_file_with_contents("large", &large_content.as_bytes());
-    let mut bw = BackupWriter::begin(&af).unwrap();
-    let _stats = copy_tree(&tf.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+    let bw = BackupWriter::begin(&af).unwrap();
+    let _stats = copy_tree(&tf.live_tree(), bw, &COPY_DEFAULT).unwrap();
     // TODO: Examine stats from copy_tree.
 
     // Try to restore it
     let rd = TempDir::new().unwrap();
     let restore_archive = Archive::open(af.path()).unwrap();
     let st = StoredTree::open_last(&restore_archive).unwrap();
-    let mut rt = RestoreTree::create(rd.path()).unwrap();
-    let _stats = copy_tree(&st, &mut rt, &COPY_DEFAULT).unwrap();
+    let rt = RestoreTree::create(rd.path()).unwrap();
+    let _stats = copy_tree(&st, rt, &COPY_DEFAULT).unwrap();
     // TODO: Examine stats.
 
     let mut content = String::new();
@@ -147,8 +154,8 @@ fn source_unreadable() {
 
     tf.make_file_unreadable("b_unreadable");
 
-    let mut bw = BackupWriter::begin(&af).unwrap();
-    let r = copy_tree(&tf.live_tree(), &mut bw, &COPY_DEFAULT);
+    let bw = BackupWriter::begin(&af).unwrap();
+    let r = copy_tree(&tf.live_tree(), bw, &COPY_DEFAULT);
     r.unwrap();
 
     // TODO: On Windows change the ACL to make the file unreadable to the current user or to

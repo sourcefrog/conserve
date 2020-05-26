@@ -58,7 +58,7 @@ impl ScratchArchive {
         let lt = LiveTree::open(srcdir.path()).unwrap();
         copy_tree(
             &lt,
-            &mut BackupWriter::begin(&self).unwrap(),
+            BackupWriter::begin(&self).unwrap(),
             &CopyOptions::default(),
         )
         .unwrap();
@@ -66,7 +66,7 @@ impl ScratchArchive {
         srcdir.create_file("hello2");
         copy_tree(
             &lt,
-            &mut BackupWriter::begin(&self).unwrap(),
+            BackupWriter::begin(&self).unwrap(),
             &CopyOptions::default(),
         )
         .unwrap();

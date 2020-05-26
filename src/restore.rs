@@ -52,7 +52,7 @@ impl RestoreTree {
 }
 
 impl tree::WriteTree for RestoreTree {
-    fn finish(&mut self) -> Result<CopyStats> {
+    fn finish(self) -> Result<CopyStats> {
         // Live tree doesn't need to be finished.
         Ok(CopyStats::default())
     }
@@ -132,8 +132,8 @@ mod tests {
 
         let restore_archive = Archive::open(af.path()).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
-        let mut rt = RestoreTree::create(destdir.path()).unwrap();
-        let stats = copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
+        let rt = RestoreTree::create(destdir.path()).unwrap();
+        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
 
         assert_eq!(stats.files, 3);
 
@@ -159,8 +159,8 @@ mod tests {
         let destdir = TreeFixture::new();
         let a = Archive::open(af.path()).unwrap();
         let st = StoredTree::open_version(&a, &BandId::new(&[0])).unwrap();
-        let mut rt = RestoreTree::create(&destdir.path()).unwrap();
-        let stats = copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
+        let rt = RestoreTree::create(&destdir.path()).unwrap();
+        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
         // Does not have the 'hello2' file added in the second version.
         assert_eq!(stats.files, 2);
     }
@@ -185,9 +185,9 @@ mod tests {
         destdir.create_file("existing");
 
         let restore_archive = Archive::open(af.path()).unwrap();
-        let mut rt = RestoreTree::create_overwrite(&destdir.path()).unwrap();
+        let rt = RestoreTree::create_overwrite(&destdir.path()).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
-        let stats = copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
+        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
         assert_eq!(stats.files, 3);
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
@@ -203,8 +203,8 @@ mod tests {
         let st = StoredTree::open_last(&restore_archive)
             .unwrap()
             .with_excludes(excludes::from_strings(&["/**/subfile"]).unwrap());
-        let mut rt = RestoreTree::create_overwrite(&destdir.path()).unwrap();
-        let stats = copy_tree(&st, &mut rt, &CopyOptions::default()).unwrap();
+        let rt = RestoreTree::create_overwrite(&destdir.path()).unwrap();
+        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
 
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();

@@ -146,6 +146,11 @@ impl IndexBuilder {
         }
     }
 
+    pub fn finish(mut self) -> Result<IndexBuilderStats> {
+        self.finish_hunk()?;
+        Ok(self.stats)
+    }
+
     /// Append an entry to the index.
     ///
     /// The new entry must sort after everything already written to the index.
@@ -166,7 +171,7 @@ impl IndexBuilder {
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the buffer to start receiving
     /// entries for the next hunk.
-    pub fn finish_hunk(&mut self) -> Result<()> {
+    fn finish_hunk(&mut self) -> Result<()> {
         if self.entries.is_empty() {
             return Ok(());
         }

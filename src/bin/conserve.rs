@@ -288,12 +288,12 @@ fn init(subm: &ArgMatches) -> Result<()> {
 fn backup(subm: &ArgMatches) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap())?;
     let lt = live_tree_from_options(subm)?;
-    let mut bw = BackupWriter::begin(&archive)?;
+    let bw = BackupWriter::begin(&archive)?;
     let opts = CopyOptions {
         print_filenames: subm.is_present("v"),
         ..CopyOptions::default()
     };
-    let copy_stats = copy_tree(&lt, &mut bw, &opts)?;
+    let copy_stats = copy_tree(&lt, bw, &opts)?;
     ui::println("Backup complete.");
     ui::println(&format!("{:#?}", copy_stats));
     Ok(())
@@ -371,7 +371,7 @@ fn list_tree_contents<T: ReadTree>(tree: &T) -> Result<()> {
 fn restore(subm: &ArgMatches) -> Result<()> {
     let dest = Path::new(subm.value_of("destination").unwrap());
     let st = stored_tree_from_options(subm)?;
-    let mut rt = if subm.is_present("force-overwrite") {
+    let rt = if subm.is_present("force-overwrite") {
         RestoreTree::create_overwrite(dest)
     } else {
         RestoreTree::create(dest)
@@ -380,7 +380,7 @@ fn restore(subm: &ArgMatches) -> Result<()> {
         print_filenames: subm.is_present("v"),
         ..CopyOptions::default()
     };
-    let copy_stats = copy_tree(&st, &mut rt, &opts)?;
+    let copy_stats = copy_tree(&st, rt, &opts)?;
     ui::println("Restore complete.");
     ui::println(&format!("{:#?}", copy_stats));
     Ok(())

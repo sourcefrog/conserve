@@ -51,11 +51,11 @@ impl BackupWriter {
 }
 
 impl tree::WriteTree for BackupWriter {
-    fn finish(&mut self) -> Result<CopyStats> {
-        self.index_builder.finish_hunk()?;
+    fn finish(self) -> Result<CopyStats> {
+        let index_builder_stats = self.index_builder.finish()?;
         self.band.close()?;
         Ok(CopyStats {
-            index_builder_stats: self.index_builder.stats.clone(),
+            index_builder_stats,
             ..CopyStats::default()
         })
     }
@@ -128,8 +128,8 @@ mod tests {
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
         let lt = LiveTree::open(srcdir.path()).unwrap();
-        let mut bw = BackupWriter::begin(&af).unwrap();
-        let copy_stats = copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
+        let bw = BackupWriter::begin(&af).unwrap();
+        let copy_stats = copy_tree(&lt, bw, &COPY_DEFAULT).unwrap();
         assert_eq!(0, copy_stats.files);
         assert_eq!(1, copy_stats.symlinks);
         assert_eq!(0, copy_stats.unknown_kind);
@@ -168,8 +168,8 @@ mod tests {
         let lt = LiveTree::open(srcdir.path())
             .unwrap()
             .with_excludes(excludes);
-        let mut bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
+        let bw = BackupWriter::begin(&af).unwrap();
+        let stats = copy_tree(&lt, bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(1, stats.written_blocks);
         assert_eq!(1, stats.files);
@@ -186,8 +186,8 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_file_with_contents("empty", &[]);
-        let mut bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let bw = BackupWriter::begin(&af).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(1, stats.files);
         assert_eq!(stats.written_blocks, 0);
@@ -212,8 +212,8 @@ mod tests {
         srcdir.create_file("aaa");
         srcdir.create_file("bbb");
 
-        let mut bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let bw = BackupWriter::begin(&af).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(stats.files, 2);
         assert_eq!(stats.files_new, 2);
@@ -221,8 +221,8 @@ mod tests {
 
         // Make a second backup from the same tree, and we should see that
         // both files are unmodified.
-        let mut bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let bw = BackupWriter::begin(&af).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(stats.files, 2);
         assert_eq!(stats.files_new, 0);
@@ -232,8 +232,8 @@ mod tests {
         // as unmodified.
         srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
-        let mut bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let bw = BackupWriter::begin(&af).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(stats.files, 2);
         assert_eq!(stats.files_new, 0);
@@ -248,8 +248,8 @@ mod tests {
         srcdir.create_file("aaa");
         srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
-        let mut bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let bw = BackupWriter::begin(&af).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(stats.files, 2);
         assert_eq!(stats.files_new, 2);
@@ -271,8 +271,8 @@ mod tests {
             }
         }
 
-        let mut bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+        let bw = BackupWriter::begin(&af).unwrap();
+        let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
         assert_eq!(stats.files, 2);
         assert_eq!(stats.files_unmodified, 1);
     }
