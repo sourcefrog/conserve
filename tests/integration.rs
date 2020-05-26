@@ -26,7 +26,8 @@ pub fn simple_backup() {
         &COPY_DEFAULT,
     )
     .unwrap();
-    check_backup(&af, &af.report());
+    // TODO: Examine the stats.
+    check_backup(&af);
     check_restore(&af);
 }
 
@@ -43,17 +44,13 @@ pub fn simple_backup_with_excludes() {
     let lt = srcdir.live_tree().with_excludes(excludes);
     let mut bw = BackupWriter::begin(&af).unwrap();
     copy_tree(&lt, &mut bw, &COPY_DEFAULT).unwrap();
-    check_backup(&af, &af.report());
+    check_backup(&af);
+    // TODO: Look at stats returned from the copy_tree operation.
     check_restore(&af);
     af.validate().unwrap();
 }
 
-fn check_backup(af: &ScratchArchive, report: &Report) {
-    assert_eq!(1, report.get_count("block.write"));
-    assert_eq!(1, report.get_count("file"));
-    assert_eq!(1, report.get_count("dir"));
-    assert_eq!(0, report.get_count("skipped.unsupported_file_kind"));
-
+fn check_backup(af: &ScratchArchive) {
     let band_ids = af.list_bands().unwrap();
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
@@ -65,10 +62,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     let band = Band::open(&af, &band_ids[0]).unwrap();
     assert!(band.is_closed().unwrap());
 
-    let index_entries = band
-        .iter_entries(&report)
-        .unwrap()
-        .collect::<Vec<IndexEntry>>();
+    let index_entries = band.iter_entries().unwrap().collect::<Vec<IndexEntry>>();
     assert_eq!(2, index_entries.len());
 
     let root_entry = &index_entries[0];
@@ -90,7 +84,7 @@ fn check_backup(af: &ScratchArchive, report: &Report) {
     );
     assert_eq!(
         af.block_dir()
-            .block_names(&af.report())
+            .block_names()
             .unwrap()
             .collect::<Vec<String>>(),
         vec![HELLO_HASH]
@@ -101,24 +95,14 @@ fn check_restore(af: &ScratchArchive) {
     // TODO: Read back contents of that file.
     let restore_dir = TreeFixture::new();
 
-    let restore_report = Report::new();
-    let archive = Archive::open(af.path(), &restore_report).unwrap();
-    let mut restore_tree = RestoreTree::create(&restore_dir.path(), &restore_report).unwrap();
+    let archive = Archive::open(af.path()).unwrap();
+    let mut restore_tree = RestoreTree::create(&restore_dir.path()).unwrap();
     let st = StoredTree::open_last(&archive).unwrap();
-    copy_tree(&st, &mut restore_tree, &COPY_DEFAULT).unwrap();
-
-    let block_sizes = restore_report.get_size("block");
-    assert!(
-        block_sizes.uncompressed == 8 && block_sizes.compressed == 10,
-        format!("{:?}", block_sizes)
-    );
-    let index_sizes = restore_report.get_size("index");
-    // Can vary a bit depending on the lengths of the timestamps.
-    assert!(
-        index_sizes.uncompressed <= 320,
-        "index_sizes.uncompressed on restore"
-    );
-    assert!(index_sizes.compressed <= 315);
+    let copy_stats = copy_tree(&st, &mut restore_tree, &COPY_DEFAULT).unwrap();
+    assert_eq!(copy_stats.uncompressed_bytes, 8);
+    // TODO: Compressed size isn't set properly when restoring, because it's
+    // lost by passing through a std::io::Read in ReadStoredFile.
+    // TODO: Check index stats.
     // TODO: Check what was restored.
 }
 
@@ -130,23 +114,18 @@ fn large_file() {
     let tf = TreeFixture::new();
     let large_content = String::from("a sample large file\n").repeat(1_000_000);
     tf.create_file_with_contents("large", &large_content.as_bytes());
-    let report = af.report();
     let mut bw = BackupWriter::begin(&af).unwrap();
-    copy_tree(&tf.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
-    assert_eq!(report.get_count("file"), 1);
-    assert_eq!(report.get_count("file.large"), 1);
+    let _stats = copy_tree(&tf.live_tree(), &mut bw, &COPY_DEFAULT).unwrap();
+    // TODO: Examine stats from copy_tree.
 
     // Try to restore it
     let rd = TempDir::new().unwrap();
-    let restore_report = Report::new();
-    let restore_archive = Archive::open(af.path(), &restore_report).unwrap();
+    let restore_archive = Archive::open(af.path()).unwrap();
     let st = StoredTree::open_last(&restore_archive).unwrap();
-    let mut rt = RestoreTree::create(rd.path(), &restore_report).unwrap();
-    copy_tree(&st, &mut rt, &COPY_DEFAULT).unwrap();
+    let mut rt = RestoreTree::create(rd.path()).unwrap();
+    let _stats = copy_tree(&st, &mut rt, &COPY_DEFAULT).unwrap();
+    // TODO: Examine stats.
 
-    assert_eq!(report.get_count("file"), 1);
-
-    // TODO: Restore should also set file.large etc.
     let mut content = String::new();
     File::open(rd.path().join("large"))
         .unwrap()

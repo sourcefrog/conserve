@@ -5,20 +5,21 @@
 
 use std::ops::Range;
 
+use crate::stats::{CopyStats, Sizes};
 use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
-pub trait ReadTree: HasReport {
+pub trait ReadTree {
     type Entry: Entry;
     type I: Iterator<Item = Self::Entry>;
     type R: std::io::Read;
 
     /// Iterate, in apath order, all the entries in this tree.
     ///
-    /// Errors reading individual paths or directories are sent to the report
-    /// but are not treated as fatal, and don't appear as Results in the
+    /// Errors reading individual paths or directories are sent to the UI and
+    /// counted, but are not treated as fatal, and don't appear as Results in the
     /// iterator.
-    fn iter_entries(&self, report: &Report) -> Result<Self::I>;
+    fn iter_entries(&self) -> Result<Self::I>;
 
     /// Read file contents as a `std::io::Read`.
     fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R>;
@@ -31,13 +32,12 @@ pub trait ReadTree: HasReport {
     ///
     /// This typically requires walking all entries, which may take a while.
     fn size(&self) -> Result<TreeSize> {
-        let report = self.report();
         let mut tot = 0u64;
-        for e in self.iter_entries(self.report())? {
+        for e in self.iter_entries()? {
             // While just measuring size, ignore directories/files we can't stat.
             let s = e.size().unwrap_or(0);
             tot += s;
-            report.increment_work(s);
+            ui::increment_bytes_done(s);
         }
         Ok(TreeSize { file_bytes: tot })
     }
@@ -50,7 +50,7 @@ pub trait ReadTree: HasReport {
 ///
 /// Entries must be written in Apath order, since that's a requirement of the index.
 pub trait WriteTree {
-    fn finish(&mut self) -> Result<()>;
+    fn finish(&mut self) -> Result<CopyStats>;
 
     /// Copy a directory entry from a source tree to this tree.
     fn copy_dir<E: Entry>(&mut self, entry: &E) -> Result<()>;
@@ -59,7 +59,11 @@ pub trait WriteTree {
     fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()>;
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(&mut self, entry: &R::Entry, from_tree: &R) -> Result<()>;
+    ///
+    /// Returns Sizes describing the compressed and uncompressed sizes copied.
+    // TODO: Use some better interface than IO::Read, that permits getting sizes
+    // from the source file when restoring.
+    fn copy_file<R: ReadTree>(&mut self, entry: &R::Entry, from_tree: &R) -> Result<CopyStats>;
 }
 
 /// Read a file as a series of blocks of bytes.
@@ -75,7 +79,9 @@ pub trait ReadBlocks {
         Ok(0..self.num_blocks()?)
     }
 
-    fn read_block(&self, i: usize) -> Result<Vec<u8>>;
+    /// Read one block and return it as a byte vec. Also returns the compressed and uncompressed
+    /// sizes.
+    fn read_block(&self, i: usize) -> Result<(Vec<u8>, Sizes)>;
 }
 
 /// The measured size of a tree.

@@ -82,15 +82,14 @@ impl StoredTree {
     }
 
     pub fn validate(&self) -> Result<()> {
-        let report = self.report();
-        report.set_phase(format!("Check tree {}", self.band().id()));
-        self.iter_entries(self.report())?
+        ui::set_progress_phase(&format!("Check tree {}", self.band().id()));
+        self.iter_entries()?
             .filter(|e| e.kind() == Kind::File)
             .par_bridge()
             .map(|e| self.validate_one_entry(&e))
             .inspect(|e| {
                 if let Err(e) = e {
-                    report.problem(&e.to_string());
+                    ui::show_error(e);
                 }
             })
             .find_any(Result::is_err)
@@ -98,7 +97,7 @@ impl StoredTree {
     }
 
     fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {
-        self.report().start_entry(e.apath());
+        ui::set_progress_file(e.apath());
         self.open_stored_file(&e)?.validate()
     }
 
@@ -107,7 +106,6 @@ impl StoredTree {
         Ok(StoredFile::open(
             self.archive.block_dir().clone(),
             entry.addrs.clone(),
-            self.report(),
         ))
     }
 }
@@ -118,10 +116,10 @@ impl ReadTree for StoredTree {
     type Entry = IndexEntry;
 
     /// Return an iter of index entries in this stored tree.
-    fn iter_entries(&self, report: &Report) -> Result<index::IndexEntryIter> {
+    fn iter_entries(&self) -> Result<index::IndexEntryIter> {
         Ok(self
             .band
-            .iter_entries(report)?
+            .iter_entries()?
             .with_excludes(self.excludes.clone()))
     }
 
@@ -131,12 +129,6 @@ impl ReadTree for StoredTree {
 
     fn estimate_count(&self) -> Result<u64> {
         self.band.index().estimate_entry_count()
-    }
-}
-
-impl HasReport for StoredTree {
-    fn report(&self) -> &Report {
-        self.archive.report()
     }
 }
 
@@ -156,7 +148,7 @@ mod test {
         assert_eq!(*st.band().id(), last_band_id);
 
         let names: Vec<String> = st
-            .iter_entries(&af.report())
+            .iter_entries()
             .unwrap()
             .map(|e| e.apath.into())
             .collect();

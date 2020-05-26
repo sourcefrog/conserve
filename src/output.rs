@@ -23,7 +23,7 @@ pub struct ShortVersionList {}
 impl ShowArchive for ShortVersionList {
     fn show_archive(&self, archive: &Archive) -> Result<()> {
         for band_id in archive.list_bands()? {
-            archive.report().println(&format!("{}", band_id));
+            ui::println(&format!("{}", band_id));
         }
         Ok(())
     }
@@ -45,19 +45,18 @@ impl VerboseVersionList {
 
 impl ShowArchive for VerboseVersionList {
     fn show_archive(&self, archive: &Archive) -> Result<()> {
-        let report = archive.report();
         for band_id in archive.list_bands()? {
             let band = match Band::open(&archive, &band_id) {
                 Ok(band) => band,
                 Err(e) => {
-                    report.problem(&format!("Failed to open band {:?}: {:?}", band_id, e));
+                    ui::problem(&format!("Failed to open band {:?}: {:?}", band_id, e));
                     continue;
                 }
             };
-            let info = match band.get_info(archive.report()) {
+            let info = match band.get_info() {
                 Ok(info) => info,
                 Err(e) => {
-                    report.problem(&format!("Failed to read band tail {:?}: {:?}", band_id, e));
+                    ui::problem(&format!("Failed to read band tail {:?}: {:?}", band_id, e));
                     continue;
                 }
             };
@@ -78,12 +77,12 @@ impl ShowArchive for VerboseVersionList {
                         .size()?
                         .file_bytes,
                 );
-                report.println(&format!(
+                ui::println(&format!(
                     "{:<20} {:<10} {} {:>8} {:>14}",
                     band_id, is_complete_str, start_time_str, duration_str, tree_mb,
                 ));
             } else {
-                report.println(&format!(
+                ui::println(&format!(
                     "{:<20} {:<10} {} {:>8}",
                     band_id, is_complete_str, start_time_str, duration_str,
                 ));
@@ -105,15 +104,11 @@ impl<'a> IndexDump<'a> {
 }
 
 impl<'a> ShowArchive for IndexDump<'a> {
-    fn show_archive(&self, archive: &Archive) -> Result<()> {
-        let report = archive.report();
-        let index_entries = self
-            .band
-            .iter_entries(&report)?
-            .collect::<Vec<IndexEntry>>();
+    fn show_archive(&self, _archive: &Archive) -> Result<()> {
+        let index_entries = self.band.iter_entries()?.collect::<Vec<IndexEntry>>();
         let output = serde_json::to_string_pretty(&index_entries)
             .context(errors::SerializeIndex { path: "-" })?;
-        report.println(&output);
+        ui::println(&output);
         Ok(())
     }
 }

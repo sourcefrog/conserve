@@ -31,14 +31,14 @@ pub struct MergedEntry {
 ///
 /// Note that at present this only says whether files are absent from either
 /// side, not whether there is a content difference.
-pub fn iter_merged_entries<AT, BT>(a: &AT, b: &BT, report: &Report) -> Result<MergeTrees<AT, BT>>
+pub fn iter_merged_entries<AT, BT>(a: &AT, b: &BT) -> Result<MergeTrees<AT, BT>>
 where
     AT: ReadTree,
     BT: ReadTree,
 {
     Ok(MergeTrees {
-        ait: a.iter_entries(report)?,
-        bit: b.iter_entries(report)?,
+        ait: a.iter_entries()?,
+        bit: b.iter_entries()?,
         na: None,
         nb: None,
     })
@@ -61,7 +61,7 @@ where
     type Item = MergedEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // TODO: Count into report?
+        // TODO: Stats about the merge.
         let ait = &mut self.ait;
         let bit = &mut self.bit;
         // Preload next-A and next-B, if they're not already
@@ -132,9 +132,7 @@ mod tests {
     fn merge_entry_trees() {
         let ta = TreeFixture::new();
         let tb = TreeFixture::new();
-        let report = Report::new();
-
-        let di = iter_merged_entries(&ta.live_tree(), &tb.live_tree(), &report)
+        let di = iter_merged_entries(&ta.live_tree(), &tb.live_tree())
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(di.len(), 1);

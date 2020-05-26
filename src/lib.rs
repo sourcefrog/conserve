@@ -21,8 +21,8 @@ pub mod live_tree;
 mod merge;
 pub(crate) mod misc;
 pub mod output;
-pub mod report;
 mod restore;
+pub mod stats;
 mod stored_file;
 mod stored_tree;
 pub mod test_fixtures;
@@ -45,11 +45,10 @@ pub use crate::io::{ensure_dir_exists, list_dir, AtomicFile};
 pub use crate::live_tree::{LiveEntry, LiveTree};
 pub use crate::merge::{iter_merged_entries, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
-pub use crate::report::{HasReport, Report, Sizes};
 pub use crate::restore::RestoreTree;
 pub use crate::stored_tree::StoredTree;
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
-pub use crate::ui::UI;
+pub use crate::ui::ProgressState;
 
 // Commonly-used external types.
 pub use globset::GlobSet;

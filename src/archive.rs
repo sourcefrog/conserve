@@ -14,6 +14,7 @@ use super::io::file_exists;
 use super::jsonio;
 use super::misc::remove_item;
 use super::*;
+use crate::stats::ValidateArchiveStats;
 
 const HEADER_FILENAME: &str = "CONSERVE";
 static BLOCK_DIR: &str = "d";
@@ -23,9 +24,6 @@ static BLOCK_DIR: &str = "d";
 pub struct Archive {
     /// Top-level directory for the archive.
     path: PathBuf,
-
-    /// Report for operations on this archive.
-    report: Report,
 
     /// Holds body content for all file versions.
     block_dir: BlockDir,
@@ -45,11 +43,9 @@ impl Archive {
         let header = ArchiveHeader {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
-        let report = Report::new();
-        jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header, &report)?;
+        jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header)?;
         Ok(Archive {
             path: path.to_path_buf(),
-            report,
             block_dir,
         })
     }
@@ -57,14 +53,14 @@ impl Archive {
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
-    pub fn open<P: AsRef<Path>>(path: P, report: &Report) -> Result<Archive> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Archive> {
         let path = path.as_ref();
         let header_path = path.join(HEADER_FILENAME);
         ensure!(
             file_exists(&header_path).context(errors::ReadMetadata { path })?,
             errors::NotAnArchive { path }
         );
-        let header: ArchiveHeader = jsonio::read_json_metadata_file(&header_path, &report)?;
+        let header: ArchiveHeader = jsonio::read_json_metadata_file(&header_path)?;
         ensure!(
             header.conserve_archive_version == ARCHIVE_VERSION,
             errors::UnsupportedArchiveVersion {
@@ -74,7 +70,6 @@ impl Archive {
         );
         Ok(Archive {
             path: path.to_path_buf(),
-            report: report.clone(),
             block_dir: BlockDir::new(&path.join(BLOCK_DIR)),
         })
     }
@@ -102,8 +97,7 @@ impl Archive {
                     band_ids.push(BandId::from_string(&n)?);
                 }
             }
-            // TODO: Log errors while reading the directory, but no Report
-            // is currently available here.
+            // TODO: Log errors while reading the directory.
         }
         band_ids.sort_unstable();
         Ok(band_ids)
@@ -133,7 +127,7 @@ impl Archive {
         let mut hs = BTreeSet::<String>::new();
         for band_id in self.list_bands()? {
             let band = Band::open(&self, &band_id)?;
-            for ie in band.iter_entries(&self.report)? {
+            for ie in band.iter_entries()? {
                 for a in ie.addrs {
                     hs.insert(a.hash);
                 }
@@ -142,25 +136,25 @@ impl Archive {
         Ok(hs)
     }
 
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> Result<ValidateArchiveStats> {
         // Check there's no extra top-level contents.
         self.validate_archive_dir()?;
-        self.report.println("Check blockdir...");
-        self.block_dir.validate(self.report())?;
+        ui::println("Check blockdir...");
+        let block_dir_stats = self.block_dir.validate()?;
         self.validate_bands()?;
 
         // TODO: Don't say "OK" if there were non-fatal problems.
-        self.report.println("Archive is OK.");
-        Ok(())
+        ui::println("Archive is OK.");
+        Ok(ValidateArchiveStats { block_dir_stats })
     }
 
     fn validate_archive_dir(&self) -> Result<()> {
-        self.report.println("Check archive top-level directory...");
+        ui::println("Check archive top-level directory...");
         let (mut files, mut dirs) =
             list_dir(self.path()).context(errors::ReadMetadata { path: self.path() })?;
         remove_item(&mut files, &HEADER_FILENAME);
         if !files.is_empty() {
-            self.report.problem(&format!(
+            ui::problem(&format!(
                 "Unexpected files in archive directory {:?}: {:?}",
                 self.path(),
                 files
@@ -173,7 +167,7 @@ impl Archive {
         for d in dirs.iter() {
             if let Ok(b) = BandId::from_string(&d) {
                 if bs.contains(&b) {
-                    self.report.problem(&format!(
+                    ui::problem(&format!(
                         "Duplicated band directory in {:?}: {:?}",
                         self.path(),
                         d
@@ -182,7 +176,7 @@ impl Archive {
                     bs.insert(b);
                 }
             } else {
-                self.report.problem(&format!(
+                ui::problem(&format!(
                     "Unexpected directory in {:?}: {:?}",
                     self.path(),
                     d
@@ -194,38 +188,33 @@ impl Archive {
     }
 
     fn validate_bands(&self) -> Result<()> {
-        self.report.println("Measure stored trees...");
-        self.report.set_phase("Measure stored trees");
-        self.report.set_total_work(0);
+        let mut ps = ProgressState::default();
+        use crate::ui::println;
+        println("Measure stored trees...");
+        ps.phase = "Measure stored trees...".into();
         let mut total_size: u64 = 0;
         for bid in self.list_bands()?.iter() {
             let b = StoredTree::open_incomplete_version(self, bid)?
                 .size()?
                 .file_bytes;
             total_size += b;
-            self.report.increment_work(b);
+            ps.bytes_done += b;
+            // lock_ui().show_progress(&ps);
         }
 
-        self.report.println(&format!(
-            "Check {} in stored files...",
-            crate::misc::bytes_to_human_mb(total_size)
-        ));
-        self.report.set_total_work(total_size);
+        // lock_ui().println(&format!(
+        //     "Check {} in stored files...",
+        //     crate::misc::bytes_to_human_mb(total_size)
+        // ));
+        ps.bytes_total = total_size;
         for bid in self.list_bands()?.iter() {
             let b = Band::open(self, bid)?;
-            b.validate(&self.report)?;
+            b.validate()?;
 
             let st = StoredTree::open_incomplete_version(self, bid)?;
             st.validate()?;
         }
         Ok(())
-    }
-}
-
-impl HasReport for Archive {
-    /// Return the Report that counts operations on this Archive and objects descended from it.
-    fn report(&self) -> &Report {
-        &self.report
     }
 }
 
@@ -248,7 +237,7 @@ mod tests {
         assert!(arch.list_bands().unwrap().is_empty());
 
         // We can re-open it.
-        Archive::open(arch_path, &Report::new()).unwrap();
+        Archive::open(arch_path).unwrap();
         assert!(arch.list_bands().unwrap().is_empty());
         assert!(arch.last_complete_band().unwrap().is_none());
     }
@@ -277,7 +266,7 @@ mod tests {
             "Archive should have no bands yet"
         );
         assert!(af.referenced_blocks().unwrap().is_empty());
-        assert_eq!(af.block_dir.block_names(&af.report).unwrap().count(), 0);
+        assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 
     #[test]
@@ -301,6 +290,6 @@ mod tests {
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
         assert!(af.referenced_blocks().unwrap().is_empty());
-        assert_eq!(af.block_dir.block_names(&af.report).unwrap().count(), 0);
+        assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 }

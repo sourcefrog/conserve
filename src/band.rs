@@ -77,6 +77,7 @@ pub struct Info {
     pub end_time: Option<DateTime<Utc>>,
 }
 
+// TODO: Maybe merge this with StoredTree? The distinction seems small.
 impl Band {
     /// Make a new band (and its on-disk directory).
     ///
@@ -93,22 +94,22 @@ impl Band {
             start_time: Utc::now().timestamp(),
             band_format_version: Some(BAND_FORMAT_VERSION.to_owned()),
         };
-        jsonio::write_json_metadata_file(&new.head_path(), &head, archive.report())?;
+        jsonio::write_json_metadata_file(&new.head_path(), &head)?;
         Ok(new)
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(&self, report: &Report) -> Result<()> {
+    pub fn close(&self) -> Result<()> {
         let tail = Tail {
             end_time: Utc::now().timestamp(),
         };
-        jsonio::write_json_metadata_file(&self.tail_path(), &tail, report)
+        jsonio::write_json_metadata_file(&self.tail_path(), &tail)
     }
 
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
         let new = Band::new(archive.path(), band_id.clone());
-        let head = new.read_head(&archive.report())?;
+        let head = new.read_head()?;
         if let Some(version) = head.band_format_version {
             if !band_version_supported(&version) {
                 return Err(Error::UnsupportedBandVersion {
@@ -170,24 +171,24 @@ impl Band {
     }
 
     /// Return an iterator through entries in this band.
-    pub fn iter_entries(&self, report: &Report) -> Result<index::IndexEntryIter> {
-        index::IndexEntryIter::open(&self.index_dir_path, report)
+    pub fn iter_entries(&self) -> Result<index::IndexEntryIter> {
+        index::IndexEntryIter::open(&self.index_dir_path)
     }
 
-    fn read_head(&self, report: &Report) -> Result<Head> {
-        jsonio::read_json_metadata_file(&self.head_path(), &report)
+    fn read_head(&self) -> Result<Head> {
+        jsonio::read_json_metadata_file(&self.head_path())
     }
 
-    fn read_tail(&self, report: &Report) -> Result<Tail> {
-        jsonio::read_json_metadata_file(&self.tail_path(), &report)
+    fn read_tail(&self) -> Result<Tail> {
+        jsonio::read_json_metadata_file(&self.tail_path())
     }
 
     /// Return info about the state of this band.
-    pub fn get_info(&self, report: &Report) -> Result<Info> {
-        let head = self.read_head(&report)?;
+    pub fn get_info(&self) -> Result<Info> {
+        let head = self.read_head()?;
         let is_closed = self.is_closed()?;
         let end_time = if is_closed {
-            Some(Utc.timestamp(self.read_tail(&report)?.end_time, 0))
+            Some(Utc.timestamp(self.read_tail()?.end_time, 0))
         } else {
             None
         };
@@ -199,21 +200,16 @@ impl Band {
         })
     }
 
-    pub fn validate(&self, report: &Report) -> Result<()> {
-        self.validate_band_dir(report)?;
-        Ok(())
-    }
-
-    fn validate_band_dir(&self, report: &Report) -> Result<()> {
+    pub fn validate(&self) -> Result<()> {
         let (mut files, dirs) =
             list_dir(self.path()).context(errors::ReadMetadata { path: self.path() })?;
         if !files.contains(&HEAD_FILENAME.to_string()) {
-            report.problem(&format!("No band head file in {:?}", self.path()));
+            ui::problem(&format!("No band head file in {:?}", self.path()));
         }
         remove_item(&mut files, &HEAD_FILENAME);
         remove_item(&mut files, &TAIL_FILENAME);
         if !files.is_empty() {
-            report.problem(&format!(
+            ui::problem(&format!(
                 "Unexpected files in {:?}: {:?}",
                 self.path(),
                 files
@@ -221,7 +217,7 @@ impl Band {
         }
 
         if dirs != [INDEX_DIR.to_string()] {
-            report.problem(&format!(
+            ui::problem(&format!(
                 "Incongruous directories in {:?}: {:?}",
                 self.path(),
                 dirs
@@ -245,7 +241,6 @@ mod tests {
     #[test]
     fn create_and_reopen_band() {
         let af = ScratchArchive::new();
-        let report = &Report::new();
         let band = Band::create(&af).unwrap();
         assert!(band.path().to_str().unwrap().ends_with("b0000"));
         assert!(fs::metadata(band.path()).unwrap().is_dir());
@@ -255,7 +250,7 @@ mod tests {
         assert_eq!(dir_names, ["i"]);
         assert!(!band.is_closed().unwrap());
 
-        band.close(report).unwrap();
+        band.close().unwrap();
         let (file_names, dir_names) = list_dir(band.path()).unwrap();
         assert_eq!(file_names, &["BANDHEAD", "BANDTAIL"]);
         assert_eq!(dir_names, ["i"]);
@@ -266,7 +261,7 @@ mod tests {
         assert!(band2.is_closed().unwrap());
 
         // Try get_info
-        let info = band2.get_info(&Report::new()).expect("get_info failed");
+        let info = band2.get_info().expect("get_info failed");
         assert_eq!(info.id.to_string(), "b0000");
         assert_eq!(info.is_closed, true);
         let dur = info.end_time.expect("info has an end_time") - info.start_time;

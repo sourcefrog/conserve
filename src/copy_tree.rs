@@ -6,6 +6,7 @@
 #[allow(unused_imports)]
 use snafu::ResultExt;
 
+use crate::stats::CopyStats;
 use crate::*;
 
 #[derive(Default, Clone, Debug)]
@@ -20,48 +21,58 @@ pub const COPY_DEFAULT: CopyOptions = CopyOptions {
 };
 
 /// Copy files and other entries from one tree to another.
-///
-/// Progress and problems are reported to the source's report.
 pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     source: &ST,
     dest: &mut DT,
     options: &CopyOptions,
-) -> Result<()> {
-    let report = source.report();
+) -> Result<CopyStats> {
+    let mut stats = CopyStats::default();
     // This causes us to walk the source tree twice, which is probably an acceptable option
     // since it's nice to see realistic overall progress. We could keep all the entries
     // in memory, and maybe we should, but it might get unreasonably big.
     if options.measure_first {
-        report.set_phase("Measure source tree");
+        ui::set_progress_phase("Measure source tree");
         // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
         // again a second time? But, that'll potentially use memory proportional to tree size, which
         // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
         // deleted or changed while this is running.
-        report.set_total_work(source.size()?.file_bytes);
+        ui::set_bytes_total(source.size()?.file_bytes);
     }
-    report.set_phase("Copying");
-    for entry in source.iter_entries(&report)? {
-        let apath = entry.apath();
+    ui::set_progress_phase("Copying");
+    for entry in source.iter_entries()? {
         if options.print_filenames {
-            report.println(apath);
+            crate::ui::println(entry.apath());
         }
-        report.start_entry(apath);
+        ui::set_progress_file(entry.apath());
         if let Err(e) = match entry.kind() {
-            Kind::Dir => dest.copy_dir(&entry),
-            Kind::File => dest.copy_file(&entry, source),
-            Kind::Symlink => dest.copy_symlink(&entry),
+            Kind::Dir => {
+                stats.directories += 1;
+                dest.copy_dir(&entry)
+            }
+            Kind::File => {
+                stats.files += 1;
+                dest.copy_file(&entry, source).map(|s| stats += s)
+            }
+            Kind::Symlink => {
+                stats.symlinks += 1;
+                dest.copy_symlink(&entry)
+            }
             Kind::Unknown => {
+                stats.unknown_kind += 1;
                 // TODO: Perhaps eventually we could backup and restore pipes,
                 // sockets, etc. Or at least count them. For now, silently skip.
                 // https://github.com/sourcefrog/conserve/issues/82
                 continue;
             }
         } {
-            report.show_error(&e);
+            ui::show_error(&e);
+            stats.errors += 1;
             continue;
         }
-        report.increment_work(entry.size().unwrap_or(0));
+        ui::increment_bytes_done(entry.size().unwrap_or(0));
     }
-    report.clear_phase();
-    dest.finish()
+    ui::clear_progress();
+    dest.finish()?;
+    // TODO: Copy back the stats from the BackupWriter.
+    Ok(stats)
 }
