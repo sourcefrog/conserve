@@ -1,5 +1,8 @@
 # Conserve code style guide
 
+The style below is the current intention for Conserve. The actual code may lag
+behind.
+
 ## Naming
 
 <https://rust-lang.github.io/api-guidelines/naming.html>
@@ -35,5 +38,14 @@ Error/log messages start with a capital but have no trailing period.
 
 ## Stats
 
+All stats objects are in the `conserve::stats` module, so that they can more
+easily be kept consistent with each other.
+
 Within stats objects, the last word of the name is the unit of measurement, eg
 `deduplicated_bytes`, `deduplicated_blocks`.
+
+## Tests
+
+Tests for observable behavior of the public interface should be in the top-level
+`tests/` directory. Tests for private APIs, or that rely on private APIs to
+assess, are in unit test submodules.
