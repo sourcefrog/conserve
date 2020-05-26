@@ -69,12 +69,13 @@ pub fn problem<S: AsRef<str>>(s: &S) {
 /// The program will continue.
 pub fn show_error(e: &dyn std::error::Error) {
     // TODO: Convert to logging.
-    problem(&e.to_string());
-    let mut ce = e;
-    while let Some(c) = ce.source() {
-        problem(&format!("  caused by: {}", c));
-        ce = c;
+    let mut buf = e.to_string();
+    let mut cause = e;
+    while let Some(c) = cause.source() {
+        write!(&mut buf, "\n  caused by: {}", c).expect("Failed to format error cause");
+        cause = c;
     }
+    problem(&buf);
 }
 
 pub fn set_progress_phase(s: &str) {
