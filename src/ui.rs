@@ -16,7 +16,6 @@ use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::stats::Sizes;
-use crate::Result;
 
 const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 
@@ -62,7 +61,7 @@ pub fn println(s: &str) {
 
 // TODO: Rather than a directly-called function, hook this into logging.
 pub fn problem<S: AsRef<str>>(s: &S) {
-    UI_STATE.lock().unwrap().problem(s.as_ref()).unwrap();
+    UI_STATE.lock().unwrap().problem(s.as_ref())
 }
 
 /// Report that a non-fatal error occurred.
@@ -274,25 +273,22 @@ impl UIState {
         println!("{}", s);
     }
 
-    fn problem(&mut self, s: &str) -> Result<()> {
-        self.progress_present = false;
-        // TODO: Only clear the line if progress bar is already present?
-        let mut stdout = io::stdout();
-        queue!(
-            stdout,
-            terminal::Clear(terminal::ClearType::CurrentLine),
-            cursor::MoveToColumn(0),
-            style::SetForegroundColor(style::Color::Red),
-            style::SetAttribute(style::Attribute::Bold),
-            style::Print("conserve error: "),
-            style::SetAttribute(style::Attribute::Reset),
-            style::Print(s),
-            style::Print("\n"),
-            style::ResetColor,
-        )
-        .unwrap();
-        stdout.flush().expect("flush terminal output");
-        Ok(())
+    fn problem(&mut self, s: &str) {
+        self.clear_progress();
+        println!("conserve error: {}", s);
+        // Drawing this way makes messages leak from tests, for unclear reasons.
+
+        // queue!(
+        //     stdout,
+        //     style::SetForegroundColor(style::Color::Red),
+        //     style::SetAttribute(style::Attribute::Bold),
+        //     style::Print("conserve error: "),
+        //     style::SetAttribute(style::Attribute::Reset),
+        //     style::Print(s),
+        //     style::Print("\n"),
+        //     style::ResetColor,
+        // )
+        // .unwrap();
     }
 }
 
