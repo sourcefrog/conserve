@@ -166,21 +166,11 @@ fn source_unreadable() {
 ///
 /// Reproduction of <https://github.com/sourcefrog/conserve/issues/100>.
 #[test]
-#[should_panic] // #100 is not fixed yet
 fn mtime_before_epoch() {
     let tf = TreeFixture::new();
     let file_path = tf.create_file("old_file");
 
     utime::set_file_times(&file_path, -36000, -36000).expect("Failed to set file times");
-
-    // Just for confirmation when debugging that it's actually in 1969.
-    std::process::Command::new("ls")
-        .arg("-l")
-        .arg(&tf.path())
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let entries = lt.iter_entries().unwrap().collect::<Vec<_>>();
@@ -192,7 +182,4 @@ fn mtime_before_epoch() {
     let af = ScratchArchive::new();
     let bw = BackupWriter::begin(&af).unwrap();
     let _copy_stats = copy_tree(&lt, bw, &COPY_DEFAULT).unwrap();
-
-    // This conversion panics in https://github.com/sourcefrog/conserve/issues/100 because it
-    // produces a negative Duration.
 }

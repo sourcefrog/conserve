@@ -5,11 +5,11 @@
 //! stored tree or local tree.
 
 use std::fmt::Debug;
-use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
 use super::*;
+use crate::unix_time::UnixTime;
 
 /// Kind of file that can be stored in the archive.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -24,7 +24,7 @@ pub enum Kind {
 pub trait Entry: Debug + Eq + PartialEq {
     fn apath(&self) -> &Apath;
     fn kind(&self) -> Kind;
-    fn mtime(&self) -> SystemTime;
+    fn mtime(&self) -> UnixTime;
     fn size(&self) -> Option<u64>;
     fn symlink_target(&self) -> &Option<String>;
 

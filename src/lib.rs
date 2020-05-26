@@ -28,6 +28,7 @@ mod stored_tree;
 pub mod test_fixtures;
 mod tree;
 pub mod ui;
+pub mod unix_time;
 
 pub use crate::apath::Apath;
 pub use crate::archive::Archive;

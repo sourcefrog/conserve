@@ -8,7 +8,6 @@ use std::fmt;
 use std::io;
 use std::iter::Peekable;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::vec;
 
 use globset::GlobSet;
@@ -17,6 +16,7 @@ use snafu::ResultExt;
 use super::io::file_exists;
 use super::stats::{IndexBuilderStats, IndexEntryIterStats};
 use super::*;
+use crate::unix_time::UnixTime;
 
 pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
 
@@ -36,7 +36,7 @@ pub struct IndexEntry {
 
     /// File modification time, in whole seconds past the Unix epoch.
     #[serde(default)]
-    pub mtime: u64,
+    pub mtime: i64,
 
     /// Fractional nanoseconds for modification time.
     ///
@@ -74,8 +74,11 @@ impl Entry for IndexEntry {
     }
 
     #[inline]
-    fn mtime(&self) -> SystemTime {
-        UNIX_EPOCH + Duration::new(self.mtime, self.mtime_nanos)
+    fn mtime(&self) -> UnixTime {
+        UnixTime {
+            secs: self.mtime,
+            nanosecs: self.mtime_nanos,
+        }
     }
 
     /// Size of the file, if it is a file. None for directories and symlinks.
@@ -93,10 +96,7 @@ impl Entry for IndexEntry {
 impl IndexEntry {
     /// Copy the metadata, but not the body content, from another entry.
     pub(crate) fn metadata_from<E: Entry>(source: &E) -> IndexEntry {
-        let mtime_unix: Duration = source
-            .mtime()
-            .duration_since(UNIX_EPOCH)
-            .expect("Failed to convert to unix time");
+        let mtime = source.mtime();
         assert_eq!(
             source.symlink_target().is_some(),
             source.kind() == Kind::Symlink
@@ -106,8 +106,8 @@ impl IndexEntry {
             kind: source.kind(),
             addrs: Vec::new(),
             target: source.symlink_target().clone(),
-            mtime: mtime_unix.as_secs(),
-            mtime_nanos: mtime_unix.subsec_nanos(),
+            mtime: mtime.secs,
+            mtime_nanos: mtime.nanosecs,
         }
     }
 }

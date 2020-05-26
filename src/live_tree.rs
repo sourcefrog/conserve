@@ -8,7 +8,6 @@ use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 
 use snafu::ResultExt;
 
@@ -16,6 +15,7 @@ use globset::GlobSet;
 
 use super::*;
 use crate::stats::LiveTreeIterStats;
+use crate::unix_time::UnixTime;
 
 /// A real tree on the filesystem, for use as a backup source or restore destination.
 #[derive(Clone)]
@@ -50,7 +50,7 @@ impl LiveTree {
 pub struct LiveEntry {
     apath: Apath,
     kind: Kind,
-    mtime: SystemTime,
+    mtime: UnixTime,
     size: Option<u64>,
     symlink_target: Option<String>,
 }
@@ -107,7 +107,7 @@ impl Entry for LiveEntry {
         self.kind
     }
 
-    fn mtime(&self) -> SystemTime {
+    fn mtime(&self) -> UnixTime {
         self.mtime
     }
 
@@ -136,7 +136,10 @@ impl LiveEntry {
         } else {
             Kind::Unknown
         };
-        let mtime = metadata.modified().expect("Failed to get file mtime");
+        let mtime = metadata
+            .modified()
+            .expect("Failed to get file mtime")
+            .into();
         let size = if metadata.is_file() {
             Some(metadata.len())
         } else {
@@ -411,7 +414,7 @@ mod tests {
         assert_eq!(result.len(), 7);
 
         let repr = format!("{:?}", &result[6]);
-        let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: SystemTime \{ [^)]* \}, size: Some\(8\), symlink_target: None \}"#).unwrap();
+        let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: UnixTime \{ [^)]* \}, size: Some\(8\), symlink_target: None \}"#).unwrap();
         assert!(re.is_match(&repr), repr);
 
         assert_eq!(source_iter.stats.directories_visited, 4);
