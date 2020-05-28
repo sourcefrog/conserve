@@ -88,14 +88,14 @@ impl tree::WriteTree for BackupWriter {
                 // We can reasonably assume that the existing archive complies
                 // with the archive invariants, which include that all the
                 // blocks referenced by the index, are actually present.
-                stats.files_unmodified += 1;
+                stats.unmodified_files += 1;
                 self.push_entry(basis_entry)?;
                 return Ok(stats);
             } else {
-                stats.files_modified += 1;
+                stats.modified_files += 1;
             }
         } else {
-            stats.files_new += 1;
+            stats.new_files += 1;
         }
         let content = &mut from_tree.file_contents(&source_entry)?;
         // TODO: Don't read the whole file into memory, but especially don't do that and
@@ -173,7 +173,7 @@ mod tests {
 
         assert_eq!(1, stats.written_blocks);
         assert_eq!(1, stats.files);
-        assert_eq!(1, stats.files_new);
+        assert_eq!(1, stats.new_files);
         assert_eq!(2, stats.directories);
         assert_eq!(0, stats.symlinks);
         assert_eq!(0, stats.unknown_kind);
@@ -216,8 +216,8 @@ mod tests {
         let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(stats.files, 2);
-        assert_eq!(stats.files_new, 2);
-        assert_eq!(stats.files_unmodified, 0);
+        assert_eq!(stats.new_files, 2);
+        assert_eq!(stats.unmodified_files, 0);
 
         // Make a second backup from the same tree, and we should see that
         // both files are unmodified.
@@ -225,8 +225,8 @@ mod tests {
         let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(stats.files, 2);
-        assert_eq!(stats.files_new, 0);
-        assert_eq!(stats.files_unmodified, 2);
+        assert_eq!(stats.new_files, 0);
+        assert_eq!(stats.unmodified_files, 2);
 
         // Change one of the files, and in a new backup it should be recognized
         // as unmodified.
@@ -236,9 +236,9 @@ mod tests {
         let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(stats.files, 2);
-        assert_eq!(stats.files_new, 0);
-        assert_eq!(stats.files_unmodified, 1);
-        assert_eq!(stats.files_modified, 1);
+        assert_eq!(stats.new_files, 0);
+        assert_eq!(stats.unmodified_files, 1);
+        assert_eq!(stats.modified_files, 1);
     }
 
     #[test]
@@ -252,9 +252,9 @@ mod tests {
         let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
 
         assert_eq!(stats.files, 2);
-        assert_eq!(stats.files_new, 2);
-        assert_eq!(stats.files_unmodified, 0);
-        assert_eq!(stats.files_modified, 0);
+        assert_eq!(stats.new_files, 2);
+        assert_eq!(stats.unmodified_files, 0);
+        assert_eq!(stats.modified_files, 0);
 
         // Spin until the file's mtime is visibly different to what it was before.
         let bpath = srcdir.path().join("bbb");
@@ -274,6 +274,6 @@ mod tests {
         let bw = BackupWriter::begin(&af).unwrap();
         let stats = copy_tree(&srcdir.live_tree(), bw, &COPY_DEFAULT).unwrap();
         assert_eq!(stats.files, 2);
-        assert_eq!(stats.files_unmodified, 1);
+        assert_eq!(stats.unmodified_files, 1);
     }
 }
