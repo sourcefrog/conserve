@@ -183,6 +183,13 @@ impl CopyStats {
 
         writeln!(
             w,
+            "{:>12}      deduplicated data blocks:",
+            self.deduplicated_blocks.separate_with_commas(),
+        )
+        .unwrap();
+        writeln!(w, "{:>12} MB     saved", mb_string(self.deduplicated_bytes),).unwrap();
+        writeln!(
+            w,
             "{:>12}      new data blocks:",
             self.written_blocks.separate_with_commas(),
         )
@@ -190,14 +197,14 @@ impl CopyStats {
         writeln!(
             w,
             "{:>12} MB     uncompressed",
-            mb_string(self.deduplicated_bytes),
+            mb_string(self.uncompressed_bytes),
         )
         .unwrap();
         writeln!(
             w,
             "{:>12} MB     after {:.1}x compression",
             mb_string(self.compressed_bytes),
-            ratio(self.deduplicated_bytes, self.compressed_bytes)
+            ratio(self.uncompressed_bytes, self.compressed_bytes)
         )
         .unwrap();
 
