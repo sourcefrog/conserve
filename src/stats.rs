@@ -4,11 +4,11 @@
 use std::io;
 
 use derive_more::{Add, AddAssign};
+use thousands::Separable;
 
 use crate::Result;
 
 pub fn mb_string(s: u64) -> String {
-    use thousands::Separable;
     (s / 1_000_000).separate_with_commas()
 }
 
@@ -142,39 +142,88 @@ impl CopyStats {
     pub fn summarize_backup(&self, w: &mut dyn io::Write) {
         // Return a conserve::Result once direction conversion from io::Result is fixed,
         // maybe by switching to `anyhow`.
-        writeln!(w, "{:>12}    files:", self.files).unwrap();
-        writeln!(w, "{:>12}      modified files", self.modified_files).unwrap();
-        writeln!(w, "{:>12}      unmodified files", self.unmodified_files).unwrap();
-        writeln!(w, "{:>12}      new files", self.new_files).unwrap();
-        writeln!(w, "{:>12}    symlinks", self.symlinks).unwrap();
-        writeln!(w, "{:>12}    directories", self.directories).unwrap();
+        writeln!(w, "{:>12}      files:", self.files.separate_with_commas()).unwrap();
         writeln!(
             w,
-            "{:>12}    unknown file kind (skipped)",
-            self.unknown_kind
+            "{:>12}        unmodified files",
+            self.unmodified_files.separate_with_commas()
+        )
+        .unwrap();
+        writeln!(
+            w,
+            "{:>12}        modified files",
+            self.modified_files.separate_with_commas()
+        )
+        .unwrap();
+        writeln!(
+            w,
+            "{:>12}        new files",
+            self.new_files.separate_with_commas()
+        )
+        .unwrap();
+        writeln!(
+            w,
+            "{:>12}      symlinks",
+            self.symlinks.separate_with_commas()
+        )
+        .unwrap();
+        writeln!(
+            w,
+            "{:>12}      directories",
+            self.directories.separate_with_commas()
+        )
+        .unwrap();
+        writeln!(
+            w,
+            "{:>12}      special files skipped",
+            self.unknown_kind.separate_with_commas(),
         )
         .unwrap();
         writeln!(w).unwrap();
 
         writeln!(
             w,
-            "{:>12} MB in {} data blocks after {:.1}x compression",
+            "{:>12}      new data blocks:",
+            self.written_blocks.separate_with_commas(),
+        )
+        .unwrap();
+        writeln!(
+            w,
+            "{:>12} MB     uncompressed",
+            mb_string(self.deduplicated_bytes),
+        )
+        .unwrap();
+        writeln!(
+            w,
+            "{:>12} MB     after {:.1}x compression",
             mb_string(self.compressed_bytes),
-            self.written_blocks,
             ratio(self.deduplicated_bytes, self.compressed_bytes)
         )
         .unwrap();
+
+        writeln!(w).unwrap();
         let idx = &self.index_builder_stats;
         writeln!(
             w,
-            "{:>12} MB in {} index hunks after {:.1}x compression",
+            "{:>12}      new index hunks:",
+            idx.index_hunks.separate_with_commas(),
+        )
+        .unwrap();
+        writeln!(
+            w,
+            "{:>12} MB     uncompressed",
+            mb_string(idx.uncompressed_index_bytes),
+        )
+        .unwrap();
+        writeln!(
+            w,
+            "{:>12} MB     after {:.1}x compression",
             mb_string(idx.compressed_index_bytes),
-            idx.index_hunks,
             ratio(idx.uncompressed_index_bytes, idx.compressed_index_bytes),
         )
         .unwrap();
         writeln!(w).unwrap();
-        writeln!(w, "{:>12}    errors", self.errors).unwrap();
+        writeln!(w, "{:>12}      errors", self.errors.separate_with_commas()).unwrap();
 
         // format!(
         //     "{:>12} MB   in {} files, {} directories, {} symlinks.\n\
