@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use crate::compress::snappy;
-use crate::stats::{CopyStats, ValidateBlockDirStats, Sizes};
+use crate::stats::{CopyStats, Sizes, ValidateBlockDirStats};
 use crate::*;
 
 /// Use the maximum 64-byte hash.
@@ -136,15 +136,24 @@ impl BlockDir {
     ///
     /// To read a whole file, use StoredFile instead.
     pub fn get(&self, addr: &Address) -> Result<(Vec<u8>, Sizes)> {
+        let (mut decompressed, sizes) = self.get_block_content(&addr.hash)?;
+        let len = addr.len as usize;
+        let start = addr.start as usize;
+        if (start + len) > decompressed.len() {
+            // TODO: Error, not panic.
+            panic!(
+                "address {:?} extends beyond decompressed length {}",
+                addr,
+                decompressed.len(),
+            );
+        }
         if addr.start != 0 {
-            todo!("Reading parts of blocks is not supported (or expected) yet");
+            let trimmed = decompressed[start..(start + len)].to_owned();
+            Ok((trimmed, sizes))
+        } else {
+            decompressed.truncate(len);
+            Ok((decompressed, sizes))
         }
-        let (decompressed, sizes) = self.get_block_content(&addr.hash)?;
-        // TODO: Accept addresses referring to only part of a block.
-        if decompressed.len() != addr.len as usize {
-            todo!("Reading parts of blocks is not supported (or expected) yet");
-        }
-        Ok((decompressed, sizes))
     }
 
     /// Return a sorted vec of prefix subdirectories.
@@ -429,6 +438,36 @@ mod tests {
 
         // TODO: Assertions about the stats.
         let _validate_stats = block_dir.validate().unwrap();
+    }
+
+    #[test]
+    pub fn retrieve_partial_data() {
+        let (_testdir, block_dir) = setup();
+        let mut store_files = StoreFiles::new(block_dir.clone());
+        let (addrs, _stats) = store_files
+            .store_file_content(
+                &"/hello".into(),
+                &mut io::Cursor::new("0123456789abcdef".as_bytes()),
+            )
+            .unwrap();
+        assert_eq!(addrs.len(), 1);
+        let hash = addrs[0].hash.clone();
+        let first_half = Address {
+            start: 0,
+            len: 8,
+            hash,
+        };
+        let (first_half_content, _first_half_stats) = block_dir.get(&first_half).unwrap();
+        assert_eq!(first_half_content, "01234567".as_bytes());
+
+        let hash = addrs[0].hash.clone();
+        let second_half = Address {
+            start: 8,
+            len: 8,
+            hash,
+        };
+        let (second_half_content, _second_half_stats) = block_dir.get(&second_half).unwrap();
+        assert_eq!(second_half_content, "89abcdef".as_bytes());
     }
 
     #[test]
