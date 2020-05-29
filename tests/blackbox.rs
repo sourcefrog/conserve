@@ -172,7 +172,7 @@ both     /subdir
         .assert()
         .success()
         .stderr(is_empty())
-        .stdout(is_match(r"^b0000 *complete   20[-0-9T:+]+\s +0:\d+\n$").unwrap());
+        .stdout(is_match(r"^b0000 *complete   20\d\d-\d\d-\d\d \d\d:\d\d:\d\d +0:\d+\n$").unwrap());
     // TODO: Set a fake date when creating the archive and then we can check
     // the format of the output?
 
@@ -183,7 +183,10 @@ both     /subdir
         .assert()
         .success()
         .stderr(is_empty())
-        .stdout(is_match(r"^b0000 *complete   20[-0-9T:+]+\s +0:\d+ *0 MB\n$").unwrap());
+        .stdout(
+            is_match(r"^b0000 *complete   20\d\d-\d\d-\d\d \d\d:\d\d:\d\d +0:\d+ *0 MB\n$")
+                .unwrap(),
+        );
 
     main_binary()
         .arg("ls")

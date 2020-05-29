@@ -2,6 +2,8 @@
 
 ## UNRELEASED
 
+Improvements:
+
 - Improved, updated, and corrected format and design documentation (in the `doc`
   subdirectory of the source tree.)
 
@@ -25,6 +27,8 @@
 
 - Removed global `--stats` option. Stats are always shown as info-level
   messages.
+
+- Better ISO 8601 style timestamps in `conserve versions` output.
 
 Bug fixes:
 

@@ -65,7 +65,10 @@ impl ShowArchive for VerboseVersionList {
             } else {
                 "incomplete"
             };
-            let start_time_str = info.start_time.with_timezone(&Local).to_rfc3339();
+            let start_time_str = info
+                .start_time
+                .with_timezone(&Local)
+                .format(crate::TIMESTAMP_FORMAT);
             let duration_str = info
                 .end_time
                 .and_then(|et| (et - info.start_time).to_std().ok())

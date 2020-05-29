@@ -69,3 +69,6 @@ pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");
 
 /// Break blocks at this many uncompressed bytes.
 pub(crate) const MAX_BLOCK_SIZE: usize = 1 << 20;
+
+/// ISO timestamp, for https://docs.rs/chrono/0.4.11/chrono/format/strftime/.
+const TIMESTAMP_FORMAT: &str = "%F %T";
