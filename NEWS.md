@@ -1,14 +1,8 @@
 # Conserve release history
 
-## UNRELEASED
+## v0.6.3 UNRELEASED
 
-Improvements:
-
-- Improved, updated, and corrected format and design documentation (in the `doc`
-  subdirectory of the source tree.)
-
-- Improved index uncompressed size slightly, by omitting zero block offsets,
-  which are common.
+### Performance improvements
 
 - Improved performance of incremental backups, by removing check that blocks
   referenced by the previous backup are still present. In one experiment of
@@ -22,23 +16,46 @@ Improvements:
   `validate`, that the archive is correctly formatted, and to avoid unnecessary
   ad-hoc checks that this is true.
 
-- Added a clean error message if Conserve is too old to read a band or index
-  within an otherwise-compatible archive. (#96)
+### Behavior changes
 
 - Removed global `--stats` option. Stats are always shown as info-level
   messages.
 
 - Better ISO 8601 style timestamps in `conserve versions` output.
 
-Bug fixes:
+### Bugs fixed
 
-- Don't panic on timestamps on or before the Unix epoch. (#100)
+- Don't panic on timestamps on or before the Unix epoch in 1970. (#100)
 
-Various API and internal changes, including:
+- Correctly count index IO in the backup stats summary. (#87)
+
+### Documentation improved
+
+- Improved, updated, and corrected format and design documentation (in the `doc`
+  subdirectory of the source tree.)
+
+### Archive format changes
+
+- Conserve 0.6.3 uses the same 0.6 archive format, but backups it writes can
+  only be read by 0.6.3 and later.
+
+- Add a per-band minimum version (`BAND_FORMAT_VERSION`), allowing for future
+  additions to the format without requiring a whole new archive. This is stored
+  in `band_format_version` within the `BANDHEAD` file. Conserve gives a clean
+  error message if it can't read the per-band minimum version. (#96)
+
+- Improved index uncompressed size slightly, by omitting the data offset within
+  the block when it is zero, which is common.
+
+### API and internal changes
+
+Various, including:
 
 - Removal of `Report` concept. Instead, operations return a type-specific
   `Stats` describing the work that was done, messages are logged, and progress
   bars are drawn through the `ui` module.
+
+- New small code style guide.
 
 ## Conserve 0.6.2 2020-02-06
 
