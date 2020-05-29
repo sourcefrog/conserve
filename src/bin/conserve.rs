@@ -295,7 +295,8 @@ fn backup(subm: &ArgMatches) -> Result<()> {
     };
     let copy_stats = copy_tree(&lt, bw, &opts)?;
     ui::println("Backup complete.");
-    ui::println(&format!("{:#?}", copy_stats));
+    copy_stats.summarize_backup(&mut std::io::stdout());
+    // ui::println(&format!("{:#?}", copy_stats));
     Ok(())
 }
 
@@ -322,7 +323,8 @@ fn diff(subm: &ArgMatches) -> Result<()> {
 fn validate(subm: &ArgMatches) -> Result<()> {
     let archive = Archive::open(subm.value_of("archive").unwrap())?;
     let validate_stats = archive.validate()?;
-    ui::println(&format!("{:#?}", validate_stats));
+    // ui::println(&format!("{:#?}", validate_stats));
+    validate_stats.summarize(&mut std::io::stdout())?;
     Ok(())
 }
 
@@ -382,7 +384,8 @@ fn restore(subm: &ArgMatches) -> Result<()> {
     };
     let copy_stats = copy_tree(&st, rt, &opts)?;
     ui::println("Restore complete.");
-    ui::println(&format!("{:#?}", copy_stats));
+    copy_stats.summarize_restore(&mut std::io::stdout())?;
+    // ui::println(&format!("{:#?}", copy_stats));
     Ok(())
 }
 
