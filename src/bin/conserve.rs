@@ -87,6 +87,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .help("Exclude files that match the provided glob pattern")
     };
 
+
     fn incomplete_arg<'a, 'b>() -> Arg<'a, 'b> {
         Arg::with_name("incomplete")
             .help("Read from incomplete (truncated) version")
