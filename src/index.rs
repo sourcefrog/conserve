@@ -10,7 +10,6 @@ use std::iter::Peekable;
 use std::path::{Path, PathBuf};
 use std::vec;
 
-use anyhow::Context;
 use globset::GlobSet;
 
 use super::io::file_exists;
@@ -181,7 +180,10 @@ impl IndexBuilder {
             path: path.to_owned(),
             source,
         };
-        let json = serde_json::to_vec(&self.entries).context("Failed to serialize index hunk")?;
+        let json = serde_json::to_vec(&self.entries).map_err(|source| Error::SerializeIndex {
+            path: path.to_owned(),
+            source,
+        })?;
         let uncompressed_len = json.len() as u64;
         if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
             ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)).map_err(write_error)?;
@@ -372,8 +374,11 @@ impl IndexEntryIter {
         };
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
         self.stats.compressed_index_bytes += comp_len as u64;
-        let entries: Vec<IndexEntry> = serde_json::from_slice(&index_bytes)
-            .with_context(|| format!("Failed to deserialize index hunk from {:?}", path))?;
+        let entries: Vec<IndexEntry> =
+            serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeIndex {
+                path: path.to_owned(),
+                source,
+            })?;
         if entries.is_empty() {
             ui::problem(&format!("Index hunk {:?} is empty", path));
         }

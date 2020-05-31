@@ -6,8 +6,6 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
-
 use super::entry::Entry;
 use super::io::{directory_is_empty, ensure_dir_exists};
 use super::stats::CopyStats;
@@ -25,13 +23,10 @@ impl RestoreTree {
     /// The destination must either not yet exist, or be an empty directory.
     pub fn create<P: Into<PathBuf>>(path: P) -> Result<RestoreTree> {
         let path = path.into();
-        if ensure_dir_exists(&path)
-            .and_then(|()| directory_is_empty(&path))
-            .with_context(|| format!("Failed to create restore tree root: {:?}", path))?
-        {
-            Ok(RestoreTree { path })
-        } else {
-            return Err(Error::DestinationNotEmpty { path });
+        match ensure_dir_exists(&path).and_then(|()| directory_is_empty(&path)) {
+            Err(source) => Err(Error::Restore { path, source }),
+            Ok(true) => Ok(RestoreTree { path }),
+            Ok(false) => Err(Error::DestinationNotEmpty { path }),
         }
     }
 
@@ -85,9 +80,7 @@ impl tree::WriteTree for RestoreTree {
         };
         let mut af = AtomicFile::new(&path).map_err(restore_err)?;
         // TODO: Read one block at a time: don't pull all the contents into memory.
-        let content = &mut from_tree
-            .file_contents(&source_entry)
-            .context("Failed to read source of copy")?;
+        let content = &mut from_tree.file_contents(&source_entry)?;
         let bytes_copied = std::io::copy(content, &mut af).map_err(restore_err)?;
         af.close().map_err(restore_err)?;
         // TODO: Accumulate stats.
@@ -102,7 +95,7 @@ impl tree::WriteTree for RestoreTree {
         use std::os::unix::fs as unix_fs;
         if let Some(ref target) = entry.symlink_target() {
             let path = self.rooted_path(entry.apath());
-            unix_fs::symlink(target, &path).context("Failed to restore symlink")?;
+            unix_fs::symlink(target, &path).map_err(|source| Error::Restore { path, source })?;
         } else {
             // TODO: Treat as an error.
             ui::problem(&format!("No target in symlink entry {}", entry.apath()));

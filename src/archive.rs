@@ -7,7 +7,6 @@ use std::collections::BTreeSet;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Error;
@@ -38,15 +37,19 @@ struct ArchiveHeader {
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
     pub fn create(path: &Path) -> Result<Archive> {
-        let path = path.to_owned();
-        std::fs::create_dir(&path)
-            .with_context(|| format!("Failed to create archive directory in {:?}", path))?;
+        std::fs::create_dir(&path).map_err(|source| Error::CreateArchiveDirectory {
+            path: path.to_owned(),
+            source,
+        })?;
         let block_dir = BlockDir::create(&path.join(BLOCK_DIR))?;
         let header = ArchiveHeader {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
         jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header)?;
-        Ok(Archive { path, block_dir })
+        Ok(Archive {
+            path: path.to_owned(),
+            block_dir,
+        })
     }
 
     /// Open an existing archive.

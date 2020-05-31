@@ -9,7 +9,6 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
 use globset::GlobSet;
 
 use crate::stats::LiveTreeIterStats;
@@ -181,12 +180,7 @@ impl Iter {
     /// Construct a new iter that will visit everything below this root path,
     /// subject to some exclusions
     fn new(root_path: &Path, excludes: &GlobSet) -> Result<Iter> {
-        let root_metadata = fs::symlink_metadata(&root_path)
-            .with_context(|| format!("Failed to read metadata of root {:?}", root_path))
-            .map_err(|e| {
-                ui::show_anyhow_error(&e);
-                e
-            })?;
+        let root_metadata = fs::symlink_metadata(&root_path).map_err(Error::from)?;
         // Preload iter to return the root and then recurse into it.
         let mut entry_deque = VecDeque::<LiveEntry>::new();
         entry_deque.push_back(LiveEntry::from_fs_metadata(

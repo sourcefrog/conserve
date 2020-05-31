@@ -5,7 +5,8 @@
 
 use std::fmt;
 
-use crate::errors::*;
+use crate::errors::Error;
+use crate::Result;
 
 /// Identifier for a band within an archive, eg 'b0001' or 'b0001-0020'.
 ///

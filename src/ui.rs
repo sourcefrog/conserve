@@ -78,12 +78,6 @@ pub fn show_error(e: &dyn std::error::Error) {
     problem(&buf);
 }
 
-pub fn show_anyhow_error(e: &anyhow::Error) {
-    // Debug format includes the cause and backtrace.
-    // https://docs.rs/anyhow/1.0.31/anyhow/struct.Error.html#display-representations
-    problem(&format!("{:?}", e))
-}
-
 pub fn set_progress_phase(s: &str) {
     let mut ui = UI_STATE.lock().unwrap();
     ui.progress_state.phase = s.to_string();

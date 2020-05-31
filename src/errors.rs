@@ -151,13 +151,4 @@ pub enum Error {
         #[from]
         source: IOError,
     },
-
-    /// Generic string error.
-    #[error(transparent)]
-    Other {
-        #[from]
-        source: anyhow::Error,
-    },
 }
-
-pub type Result<T> = anyhow::Result<T, Error>;
