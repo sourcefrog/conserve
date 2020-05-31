@@ -10,8 +10,8 @@ use std::iter::Peekable;
 use std::path::{Path, PathBuf};
 use std::vec;
 
+use anyhow::Context;
 use globset::GlobSet;
-use snafu::ResultExt;
 
 use super::io::file_exists;
 use super::stats::{IndexBuilderStats, IndexEntryIterStats};
@@ -176,24 +176,24 @@ impl IndexBuilder {
             return Ok(());
         }
 
-        let path = &path_for_hunk(&self.dir, self.sequence);
-        if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
-            ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence))
-                .context(errors::WriteIndex { path })?;
-        }
-
-        let json = serde_json::to_vec(&self.entries).context(errors::SerializeJson { path })?;
+        let path = path_for_hunk(&self.dir, self.sequence);
+        let write_error = |source| Error::WriteIndex {
+            path: path.to_owned(),
+            source,
+        };
+        let json = serde_json::to_vec(&self.entries).context("Failed to serialize index hunk")?;
         let uncompressed_len = json.len() as u64;
-        let mut af = AtomicFile::new(path).context(errors::WriteIndex { path })?;
-        let compressed_len =
-            Snappy::compress_and_write(&json, &mut af).context(errors::WriteIndex { path })?;
-        af.close().context(errors::WriteIndex { path })?;
+        if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
+            ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)).map_err(write_error)?;
+        }
+        let mut af = AtomicFile::new(&path).map_err(write_error)?;
+        let compressed_len = Snappy::compress_and_write(&json, &mut af).map_err(write_error)?;
+        af.close().map_err(write_error)?;
 
         self.stats.index_hunks += 1;
         self.stats.compressed_index_bytes += compressed_len as u64;
         self.stats.uncompressed_index_bytes += uncompressed_len as u64;
-        // Ready for the next hunk.
-        self.entries.clear();
+        self.entries.clear(); // Ready for the next hunk.
         self.sequence += 1;
         Ok(())
     }
@@ -229,7 +229,7 @@ impl ReadIndex {
     pub fn count_hunks(&self) -> Result<u32> {
         for i in 0.. {
             let path = path_for_hunk(&self.dir, i);
-            if !file_exists(&path).context(errors::ReadIndex { path })? {
+            if !file_exists(&path).map_err(|source| Error::ReadIndex { source, path })? {
                 // If hunk 1 is missing, 1 hunks exists.
                 // TODO: Perhaps, list the directories and cope cleanly with
                 // one hunk being missing.
@@ -356,7 +356,7 @@ impl IndexEntryIter {
             self.buffered_entries.next().is_none(),
             "refill_entry_buffer called with non-empty buffer"
         );
-        let path = &path_for_hunk(&self.dir, self.next_hunk_number);
+        let path = path_for_hunk(&self.dir, self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
         self.stats.index_hunks += 1;
@@ -368,12 +368,12 @@ impl IndexEntryIter {
                 // list of hunks first.
                 return Ok(false);
             }
-            Err(e) => return Err(e).with_context(|| errors::ReadIndex { path }),
+            Err(source) => return Err(Error::ReadIndex { path, source }),
         };
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
         self.stats.compressed_index_bytes += comp_len as u64;
         let entries: Vec<IndexEntry> = serde_json::from_slice(&index_bytes)
-            .with_context(|| errors::DeserializeIndex { path })?;
+            .with_context(|| format!("Failed to deserialize index hunk from {:?}", path))?;
         if entries.is_empty() {
             ui::problem(&format!("Index hunk {:?} is empty", path));
         }

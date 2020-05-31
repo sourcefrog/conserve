@@ -7,14 +7,15 @@ use std::collections::BTreeSet;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use snafu::{ensure, ResultExt};
 
-use super::io::file_exists;
-use super::jsonio;
-use super::misc::remove_item;
-use super::*;
+use crate::errors::Error;
+use crate::io::file_exists;
+use crate::jsonio;
+use crate::misc::remove_item;
 use crate::stats::ValidateArchiveStats;
+use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
 static BLOCK_DIR: &str = "d";
@@ -36,38 +37,39 @@ struct ArchiveHeader {
 
 impl Archive {
     /// Make a new directory to hold an archive, and write the header.
-    pub fn create<P: AsRef<Path>>(path: P) -> Result<Archive> {
-        let path = path.as_ref();
-        std::fs::create_dir(&path).with_context(|| errors::CreateArchiveDirectory { path })?;
+    pub fn create(path: &Path) -> Result<Archive> {
+        let path = path.to_owned();
+        std::fs::create_dir(&path)
+            .with_context(|| format!("Failed to create archive directory in {:?}", path))?;
         let block_dir = BlockDir::create(&path.join(BLOCK_DIR))?;
         let header = ArchiveHeader {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
         jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header)?;
-        Ok(Archive {
-            path: path.to_path_buf(),
-            block_dir,
-        })
+        Ok(Archive { path, block_dir })
     }
 
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Archive> {
-        let path = path.as_ref();
+    pub fn open<P: Into<PathBuf>>(path: P) -> Result<Archive> {
+        let path: PathBuf = path.into();
         let header_path = path.join(HEADER_FILENAME);
-        ensure!(
-            file_exists(&header_path).context(errors::ReadMetadata { path })?,
-            errors::NotAnArchive { path }
-        );
+        if !file_exists(&header_path).map_err(|source| Error::ReadMetadata {
+            path: path.to_owned(),
+            source,
+        })? {
+            return Err(Error::NotAnArchive {
+                path: path.to_owned(),
+            });
+        }
         let header: ArchiveHeader = jsonio::read_json_metadata_file(&header_path)?;
-        ensure!(
-            header.conserve_archive_version == ARCHIVE_VERSION,
-            errors::UnsupportedArchiveVersion {
+        if header.conserve_archive_version != ARCHIVE_VERSION {
+            return Err(Error::UnsupportedArchiveVersion {
                 version: header.conserve_archive_version,
                 path,
-            }
-        );
+            });
+        }
         Ok(Archive {
             path: path.to_path_buf(),
             block_dir: BlockDir::new(&path.join(BLOCK_DIR)),
@@ -87,8 +89,9 @@ impl Archive {
     pub fn list_bands(&self) -> Result<Vec<BandId>> {
         let mut band_ids = Vec::<BandId>::new();
         for e in read_dir(self.path())
-            .with_context(|| errors::ListBands {
+            .map_err(|source| Error::ListBands {
                 path: self.path.clone(),
+                source,
             })?
             .filter_map(std::result::Result::ok)
         {
@@ -151,7 +154,10 @@ impl Archive {
     fn validate_archive_dir(&self) -> Result<()> {
         ui::println("Check archive top-level directory...");
         let (mut files, mut dirs) =
-            list_dir(self.path()).context(errors::ReadMetadata { path: self.path() })?;
+            list_dir(self.path()).map_err(|source| Error::ReadMetadata {
+                source,
+                path: self.path().to_owned(),
+            })?;
         remove_item(&mut files, &HEADER_FILENAME);
         if !files.is_empty() {
             ui::problem(&format!(
@@ -230,8 +236,8 @@ mod tests {
     #[test]
     fn create_then_open_archive() {
         let testdir = TempDir::new().unwrap();
-        let arch_path = &testdir.path().join("arch");
-        let arch = Archive::create(arch_path).unwrap();
+        let arch_path = testdir.path().join("arch");
+        let arch = Archive::create(&arch_path).unwrap();
 
         assert_eq!(arch.path(), arch_path.as_path());
         assert!(arch.list_bands().unwrap().is_empty());

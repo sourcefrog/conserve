@@ -8,8 +8,7 @@
 
 use super::*;
 
-use snafu::ResultExt;
-
+use anyhow::Context;
 use chrono::Local;
 
 /// Show something about an archive.
@@ -110,7 +109,7 @@ impl<'a> ShowArchive for IndexDump<'a> {
     fn show_archive(&self, _archive: &Archive) -> Result<()> {
         let index_entries = self.band.iter_entries()?.collect::<Vec<IndexEntry>>();
         let output = serde_json::to_string_pretty(&index_entries)
-            .context(errors::SerializeIndex { path: "-" })?;
+            .context(&"Failed to serialize json for dump")?;
         ui::println(&output);
         Ok(())
     }

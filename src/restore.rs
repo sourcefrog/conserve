@@ -6,7 +6,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use snafu::ResultExt;
+use anyhow::Context;
 
 use super::entry::Entry;
 use super::io::{directory_is_empty, ensure_dir_exists};
@@ -23,18 +23,15 @@ impl RestoreTree {
     /// Create a RestoreTree.
     ///
     /// The destination must either not yet exist, or be an empty directory.
-    pub fn create(path: &Path) -> Result<RestoreTree> {
+    pub fn create<P: Into<PathBuf>>(path: P) -> Result<RestoreTree> {
+        let path = path.into();
         if ensure_dir_exists(&path)
             .and_then(|()| directory_is_empty(&path))
-            .context(errors::Restore {
-                path: path.to_path_buf(),
-            })?
+            .with_context(|| format!("Failed to create restore tree root: {:?}", path))?
         {
-            Ok(RestoreTree {
-                path: path.to_path_buf(),
-            })
+            Ok(RestoreTree { path })
         } else {
-            errors::DestinationNotEmpty { path }.fail()
+            return Err(Error::DestinationNotEmpty { path });
         }
     }
 
@@ -61,8 +58,13 @@ impl tree::WriteTree for RestoreTree {
         let path = self.rooted_path(entry.apath());
         match fs::create_dir(&path) {
             Ok(()) => Ok(()),
-            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-            e => e.context(errors::Restore { path }),
+            Err(source) => {
+                if source.kind() == io::ErrorKind::AlreadyExists {
+                    Ok(())
+                } else {
+                    Err(Error::Restore { path, source })
+                }
+            }
         }
     }
 
@@ -77,12 +79,17 @@ impl tree::WriteTree for RestoreTree {
         // TODO: For restore, maybe not necessary to rename into place, and
         // we could just write directly.
         let path = self.rooted_path(source_entry.apath());
-        let ctx = || errors::Restore { path: path.clone() };
-        let mut af = AtomicFile::new(&path).with_context(ctx)?;
+        let restore_err = |source| Error::Restore {
+            path: path.clone(),
+            source,
+        };
+        let mut af = AtomicFile::new(&path).map_err(restore_err)?;
         // TODO: Read one block at a time: don't pull all the contents into memory.
-        let content = &mut from_tree.file_contents(&source_entry)?;
-        let bytes_copied = std::io::copy(content, &mut af).with_context(ctx)?;
-        af.close().context(errors::Restore { path })?;
+        let content = &mut from_tree
+            .file_contents(&source_entry)
+            .context("Failed to read source of copy")?;
+        let bytes_copied = std::io::copy(content, &mut af).map_err(restore_err)?;
+        af.close().map_err(restore_err)?;
         // TODO: Accumulate stats.
         Ok(CopyStats {
             uncompressed_bytes: bytes_copied,
@@ -95,7 +102,7 @@ impl tree::WriteTree for RestoreTree {
         use std::os::unix::fs as unix_fs;
         if let Some(ref target) = entry.symlink_target() {
             let path = self.rooted_path(entry.apath());
-            unix_fs::symlink(target, &path).context(errors::Restore { path })?;
+            unix_fs::symlink(target, &path).context("Failed to restore symlink")?;
         } else {
             // TODO: Treat as an error.
             ui::problem(&format!("No target in symlink entry {}", entry.apath()));
@@ -132,7 +139,7 @@ mod tests {
 
         let restore_archive = Archive::open(af.path()).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
-        let rt = RestoreTree::create(destdir.path()).unwrap();
+        let rt = RestoreTree::create(destdir.path().to_owned()).unwrap();
         let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
 
         assert_eq!(stats.files, 3);
@@ -159,7 +166,7 @@ mod tests {
         let destdir = TreeFixture::new();
         let a = Archive::open(af.path()).unwrap();
         let st = StoredTree::open_version(&a, &BandId::new(&[0])).unwrap();
-        let rt = RestoreTree::create(&destdir.path()).unwrap();
+        let rt = RestoreTree::create(destdir.path().to_owned()).unwrap();
         let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
         // Does not have the 'hello2' file added in the second version.
         assert_eq!(stats.files, 2);
@@ -171,7 +178,7 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
-        let restore_err_str = RestoreTree::create(&destdir.path())
+        let restore_err_str = RestoreTree::create(destdir.path().to_owned())
             .unwrap_err()
             .to_string();
         assert_that(&restore_err_str).contains(&"Destination directory not empty");
@@ -185,7 +192,7 @@ mod tests {
         destdir.create_file("existing");
 
         let restore_archive = Archive::open(af.path()).unwrap();
-        let rt = RestoreTree::create_overwrite(&destdir.path()).unwrap();
+        let rt = RestoreTree::create_overwrite(destdir.path()).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
         let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
         assert_eq!(stats.files, 3);
@@ -203,7 +210,7 @@ mod tests {
         let st = StoredTree::open_last(&restore_archive)
             .unwrap()
             .with_excludes(excludes::from_strings(&["/**/subfile"]).unwrap());
-        let rt = RestoreTree::create_overwrite(&destdir.path()).unwrap();
+        let rt = RestoreTree::create_overwrite(destdir.path()).unwrap();
         let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
 
         let dest = &destdir.path();

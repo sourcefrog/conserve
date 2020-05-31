@@ -3,9 +3,6 @@
 
 //! Copy tree contents.
 
-#[allow(unused_imports)]
-use snafu::ResultExt;
-
 use crate::stats::CopyStats;
 use crate::*;
 

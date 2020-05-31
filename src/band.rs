@@ -16,7 +16,6 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
 
 use super::io::file_exists;
 use super::jsonio;
@@ -88,8 +87,8 @@ impl Band {
             .map_or_else(BandId::zero, |b| b.next_sibling());
         let archive_dir = archive.path();
         let new = Band::new(archive_dir, new_band_id);
-        fs::create_dir(&new.path_buf).context(errors::CreateBand)?;
-        fs::create_dir(&new.index_dir_path).context(errors::CreateBand)?;
+        fs::create_dir(&new.path_buf).map_err(|source| Error::CreateBand { source })?;
+        fs::create_dir(&new.index_dir_path).map_err(|source| Error::CreateBand { source })?;
         let head = Head {
             start_time: Utc::now().timestamp(),
             band_format_version: Some(BAND_FORMAT_VERSION.to_owned()),
@@ -142,7 +141,7 @@ impl Band {
 
     pub fn is_closed(&self) -> Result<bool> {
         let path = self.tail_path();
-        file_exists(&path).context(errors::ReadMetadata { path })
+        file_exists(&path).map_err(|source| Error::ReadMetadata { path, source })
     }
 
     pub fn path(&self) -> &Path {
@@ -201,26 +200,27 @@ impl Band {
     }
 
     pub fn validate(&self) -> Result<()> {
-        let (mut files, dirs) =
-            list_dir(self.path()).context(errors::ReadMetadata { path: self.path() })?;
+        let path = self.path();
+        let (mut files, dirs) = list_dir(&path).map_err(|source| Error::ReadMetadata {
+            path: path.to_owned(),
+            source,
+        })?;
         if !files.contains(&HEAD_FILENAME.to_string()) {
-            ui::problem(&format!("No band head file in {:?}", self.path()));
+            // TODO: Count this problem.
+            ui::problem(&format!("No band head file in {:?}", path));
         }
         remove_item(&mut files, &HEAD_FILENAME);
         remove_item(&mut files, &TAIL_FILENAME);
         if !files.is_empty() {
-            ui::problem(&format!(
-                "Unexpected files in {:?}: {:?}",
-                self.path(),
-                files
-            ));
+            // TODO: Count this problem.
+            ui::problem(&format!("Unexpected files in {:?}: {:?}", path, files));
         }
 
         if dirs != [INDEX_DIR.to_string()] {
+            // TODO: Count this problem.
             ui::problem(&format!(
                 "Incongruous directories in {:?}: {:?}",
-                self.path(),
-                dirs
+                path, dirs
             ));
         }
 

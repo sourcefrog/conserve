@@ -101,6 +101,7 @@ pub fn list_dir(path: &Path) -> std::io::Result<(Vec<String>, Vec<String>)> {
         } else if entry_type.is_dir() {
             dir_names.push(entry_filename);
         } else {
+            // TODO: Don't panic, just warn?
             panic!("don't recognize file type of {:?}", entry_filename);
         }
     }

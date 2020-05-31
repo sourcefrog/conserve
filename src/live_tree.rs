@@ -9,13 +9,13 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use snafu::ResultExt;
-
+use anyhow::Context;
 use globset::GlobSet;
 
-use super::*;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_time::UnixTime;
+use crate::Result;
+use crate::*;
 
 /// A real tree on the filesystem, for use as a backup source or restore destination.
 #[derive(Clone)]
@@ -79,7 +79,7 @@ impl tree::ReadTree for LiveTree {
     fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
         assert_eq!(entry.kind(), Kind::File);
         let path = self.relative_path(&entry.apath);
-        fs::File::open(&path).context(errors::ReadSourceFile { path })
+        fs::File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
     }
 
     fn estimate_count(&self) -> Result<u64> {
@@ -182,11 +182,9 @@ impl Iter {
     /// subject to some exclusions
     fn new(root_path: &Path, excludes: &GlobSet) -> Result<Iter> {
         let root_metadata = fs::symlink_metadata(&root_path)
-            .with_context(|| errors::ListSourceTree {
-                path: root_path.to_path_buf(),
-            })
+            .with_context(|| format!("Failed to read metadata of root {:?}", root_path))
             .map_err(|e| {
-                ui::show_error(&e);
+                ui::show_anyhow_error(&e);
                 e
             })?;
         // Preload iter to return the root and then recurse into it.
@@ -224,9 +222,7 @@ impl Iter {
         self.stats.directories_visited += 1;
         let mut children = Vec::<(String, LiveEntry)>::new();
         let dir_path = relative_path(&self.root_path, parent_apath);
-        let dir_iter = match fs::read_dir(&dir_path).with_context(|| errors::ListSourceTree {
-            path: dir_path.clone(),
-        }) {
+        let dir_iter = match fs::read_dir(&dir_path) {
             Ok(i) => i,
             Err(e) => {
                 ui::problem(&format!("Error reading directory {:?}: {}", &dir_path, e));

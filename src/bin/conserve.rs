@@ -34,12 +34,12 @@ fn main() -> conserve::Result<()> {
     ui::clear_progress();
     if let Err(ref e) = result {
         ui::show_error(e);
-        // TODO: Perhaps always log the traceback to a log file.
-        if let Some(bt) = snafu::ErrorCompat::backtrace(e) {
-            if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {
-                println!("{}", bt);
-            }
-        }
+        // // TODO: Perhaps always log the traceback to a log file.
+        // if let Some(bt) = e.backtrace() {
+        //     if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {
+        //         println!("{}", bt);
+        //     }
+        // }
         // Avoid Rust redundantly printing the error.
         std::process::exit(1);
     }
@@ -279,9 +279,13 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
 }
 
 fn init(subm: &ArgMatches) -> Result<()> {
-    let archive_path = subm.value_of("archive").expect("'archive' arg not found");
-    Archive::create(archive_path).and(Ok(()))?;
-    ui::println(&format!("Created new archive in {}", archive_path));
+    let archive_path: std::path::PathBuf = subm
+        .value_of("archive")
+        .expect("'archive' arg not found")
+        .parse()
+        .expect("archive arg is not a path");
+    Archive::create(&archive_path).and(Ok(()))?;
+    ui::println(&format!("Created new archive in {:?}", archive_path));
     Ok(())
 }
 
