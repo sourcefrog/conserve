@@ -13,10 +13,10 @@ use std::vec;
 use globset::GlobSet;
 use snafu::ResultExt;
 
-use super::io::file_exists;
-use super::stats::{IndexBuilderStats, IndexEntryIterStats};
-use super::*;
+use crate::io::file_exists;
+use crate::stats::{IndexBuilderStats, IndexEntryIterStats};
 use crate::unix_time::UnixTime;
+use crate::*;
 
 pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
 

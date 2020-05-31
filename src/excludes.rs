@@ -7,7 +7,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use snafu::ResultExt;
 
-use super::*;
+use crate::*;
 
 pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();

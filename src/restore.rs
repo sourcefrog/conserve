@@ -8,10 +8,10 @@ use std::path::{Path, PathBuf};
 
 use snafu::ResultExt;
 
-use super::entry::Entry;
-use super::io::{directory_is_empty, ensure_dir_exists};
-use super::stats::CopyStats;
-use super::*;
+use crate::entry::Entry;
+use crate::io::{directory_is_empty, ensure_dir_exists};
+use crate::stats::CopyStats;
+use crate::*;
 
 /// A write-only tree on the filesystem, as a restore destination.
 #[derive(Debug)]

@@ -6,11 +6,11 @@
 //! These are objects that accept iterators of different types of content, and write it to a
 //! file (typically stdout).
 
-use super::*;
-
 use snafu::ResultExt;
 
 use chrono::Local;
+
+use crate::*;
 
 /// Show something about an archive.
 pub trait ShowArchive {

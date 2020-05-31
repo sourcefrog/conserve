@@ -8,8 +8,8 @@ use std::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
 
-use super::*;
 use crate::unix_time::UnixTime;
+use crate::*;
 
 /// Kind of file that can be stored in the archive.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -7,10 +7,10 @@
 #[allow(unused_imports)]
 use snafu::ResultExt;
 
-use super::blockdir::StoreFiles;
-use super::*;
+use crate::blockdir::StoreFiles;
 use crate::index::IndexEntryIter;
 use crate::stats::CopyStats;
+use crate::*;
 
 /// Accepts files to write in the archive (in apath order.)
 pub struct BackupWriter {

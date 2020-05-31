@@ -49,3 +49,14 @@ Within stats objects, the last word of the name is the unit of measurement, eg
 Tests for observable behavior of the public interface should be in the top-level
 `tests/` directory. Tests for private APIs, or that rely on private APIs to
 assess, are in unit test submodules.
+
+## Use statements
+
+Use `use crate::xyz` rather than `use super::xyz` to import other things from
+the Conserve implementation. (Either is valid and they seem just as good, but
+let's pick `crate` to be consisent.)
+
+Unit test submodules can do `use super::*`.
+
+Otherwise, avoid `use ...::*` except for libraries that specifically recommend
+it.

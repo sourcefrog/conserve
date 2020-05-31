@@ -10,11 +10,11 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use snafu::{ensure, ResultExt};
 
-use super::io::file_exists;
-use super::jsonio;
-use super::misc::remove_item;
-use super::*;
+use crate::io::file_exists;
+use crate::jsonio;
+use crate::misc::remove_item;
 use crate::stats::ValidateArchiveStats;
+use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
 static BLOCK_DIR: &str = "d";

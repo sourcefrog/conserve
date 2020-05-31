@@ -8,8 +8,8 @@ use std::path::Path;
 
 use snafu::ResultExt;
 
-use super::io::AtomicFile;
-use super::*;
+use crate::io::AtomicFile;
+use crate::*;
 
 pub fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T) -> Result<()> {
     let mut af = AtomicFile::new(path).context(errors::WriteMetadata { path })?;

@@ -13,9 +13,9 @@ use snafu::ResultExt;
 
 use globset::GlobSet;
 
-use super::*;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_time::UnixTime;
+use crate::*;
 
 /// A real tree on the filesystem, for use as a backup source or restore destination.
 #[derive(Clone)]

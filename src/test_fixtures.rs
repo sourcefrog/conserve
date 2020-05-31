@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use tempfile::TempDir;
 
-use super::*;
+use crate::*;
 
 /// A temporary archive, deleted when it goes out of scope.
 ///
