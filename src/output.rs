@@ -6,8 +6,6 @@
 //! These are objects that accept iterators of different types of content, and write it to a
 //! file (typically stdout).
 
-use snafu::ResultExt;
-
 use chrono::Local;
 
 use crate::*;
@@ -109,8 +107,12 @@ impl<'a> IndexDump<'a> {
 impl<'a> ShowArchive for IndexDump<'a> {
     fn show_archive(&self, _archive: &Archive) -> Result<()> {
         let index_entries = self.band.iter_entries()?.collect::<Vec<IndexEntry>>();
-        let output = serde_json::to_string_pretty(&index_entries)
-            .context(errors::SerializeIndex { path: "-" })?;
+        let output = serde_json::to_string_pretty(&index_entries).map_err(|source| {
+            Error::SerializeIndex {
+                path: "-".into(),
+                source,
+            }
+        })?;
         ui::println(&output);
         Ok(())
     }

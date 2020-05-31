@@ -140,8 +140,7 @@ impl CopyStats {
     }
 
     pub fn summarize_backup(&self, w: &mut dyn io::Write) {
-        // Return a conserve::Result once direction conversion from io::Result is fixed,
-        // maybe by switching to `anyhow`.
+        // TODO: Perhaps summarize to a string, or make this the Display impl.
         writeln!(w, "{:>12}      files:", self.files.separate_with_commas()).unwrap();
         writeln!(
             w,

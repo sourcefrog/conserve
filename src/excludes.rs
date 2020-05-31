@@ -5,18 +5,14 @@
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
 
-use snafu::ResultExt;
-
-use crate::*;
+use super::*;
 
 pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
     for i in excludes {
-        builder.add(Glob::new(i.as_ref()).with_context(|| errors::ParseGlob {
-            glob: i.as_ref().to_string(),
-        })?);
+        builder.add(Glob::new(i.as_ref()).map_err(|source| Error::ParseGlob { source })?);
     }
-    builder.build().context(errors::ParseGlob { glob: "" })
+    builder.build().map_err(Into::into)
 }
 
 pub fn excludes_nothing() -> GlobSet {

@@ -40,7 +40,7 @@ pub use crate::compress::snappy::Snappy;
 pub use crate::compress::Compression;
 pub use crate::copy_tree::{copy_tree, CopyOptions, COPY_DEFAULT};
 pub use crate::entry::{Entry, Kind};
-pub use crate::errors::*;
+pub use crate::errors::Error;
 pub use crate::index::{IndexBuilder, IndexEntry, ReadIndex};
 pub use crate::io::{ensure_dir_exists, list_dir, AtomicFile};
 pub use crate::live_tree::{LiveEntry, LiveTree};
@@ -53,6 +53,8 @@ pub use crate::ui::ProgressState;
 
 // Commonly-used external types.
 pub use globset::GlobSet;
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 

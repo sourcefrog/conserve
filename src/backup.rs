@@ -4,9 +4,6 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
-#[allow(unused_imports)]
-use snafu::ResultExt;
-
 use crate::blockdir::StoreFiles;
 use crate::index::IndexEntryIter;
 use crate::stats::CopyStats;

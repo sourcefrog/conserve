@@ -21,7 +21,6 @@ use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
 
 use crate::compress::snappy;
 use crate::stats::{CopyStats, Sizes, ValidateBlockDirStats};
@@ -78,7 +77,7 @@ impl BlockDir {
 
     /// Create a BlockDir directory and return an object accessing it.
     pub fn create(path: &Path) -> Result<BlockDir> {
-        fs::create_dir(path).context(errors::CreateBlockDir)?;
+        fs::create_dir(path).map_err(|source| Error::CreateBlockDir { source })?;
         Ok(BlockDir::new(path))
     }
 
@@ -128,7 +127,7 @@ impl BlockDir {
         match fs::metadata(&path) {
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
             Ok(_) => Ok(true),
-            Err(e) => Err(e).context(errors::ReadBlock { path }),
+            Err(e) => Err(e).map_err(|source| Error::ReadBlock { source, path }),
         }
     }
 
@@ -177,9 +176,10 @@ impl BlockDir {
 
     fn iter_block_dir_entries(&self) -> Result<impl Iterator<Item = std::fs::DirEntry>> {
         let path = self.path.clone();
-        let subdirs = self
-            .subdirs()
-            .with_context(|| errors::ListBlocks { path: path.clone() })?;
+        let subdirs = self.subdirs().map_err(|source| Error::ListBlocks {
+            source,
+            path: path.to_owned(),
+        })?;
         Ok(subdirs.into_iter().flat_map(move |s| {
             // TODO: Avoid `unwrap`.
             fs::read_dir(&path.join(s))
@@ -250,7 +250,10 @@ impl BlockDir {
     pub fn get_block_content(&self, hash: &str) -> Result<(Vec<u8>, Sizes)> {
         let path = self.path_for_file(hash);
         let (compressed_len, decompressed_bytes) = snappy::decompress_file(&path)
-            .context(errors::ReadBlock { path: path.clone() })
+            .map_err(|source| Error::ReadBlock {
+                source,
+                path: path.to_owned(),
+            })
             .map_err(|e| {
                 ui::show_error(&e);
                 e
@@ -276,7 +279,7 @@ impl BlockDir {
     fn compressed_block_size(&self, hash: &str) -> Result<u64> {
         let path = self.path_for_file(hash);
         Ok(fs::metadata(&path)
-            .context(errors::ReadBlock { path })?
+            .map_err(|source| Error::ReadBlock { path, source })?
             .len())
     }
 }
@@ -312,11 +315,14 @@ impl StoreFiles {
         loop {
             // TODO: Possibly read repeatedly in case we get a short read and have room for more,
             // so that short reads don't lead to short blocks being stored.
+            // TODO: Error should actually be an error about the source file?
+            // TODO: This shouldn't directly read from the source, it should take blocks in.
             let read_len =
                 from_file
                     .read(&mut self.input_buf)
-                    .with_context(|| errors::StoreFile {
-                        apath: apath.clone(),
+                    .map_err(|source| Error::StoreFile {
+                        apath: apath.to_owned(),
+                        source,
                     })?;
             if read_len == 0 {
                 break;
@@ -332,8 +338,9 @@ impl StoreFiles {
                 let comp_len = self
                     .block_dir
                     .compress_and_store(block_data, &block_hash)
-                    .with_context(|| errors::StoreBlock {
-                        block_hash: block_hash.clone(),
+                    .map_err(|source| Error::StoreBlock {
+                        block_hash: block_hash.to_owned(),
+                        source,
                     })?;
                 stats.written_blocks += 1;
                 stats.compressed_bytes += comp_len;

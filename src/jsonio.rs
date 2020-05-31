@@ -6,24 +6,36 @@
 use std::io::prelude::*;
 use std::path::Path;
 
-use snafu::ResultExt;
-
+use crate::errors::Error;
 use crate::io::AtomicFile;
-use crate::*;
+use crate::Result;
 
 pub fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T) -> Result<()> {
-    let mut af = AtomicFile::new(path).context(errors::WriteMetadata { path })?;
-    let mut s = serde_json::to_string(&obj).context(errors::SerializeJson { path })?;
+    let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::SerializeJson {
+        path: path.to_owned(),
+        source,
+    })?;
     s.push('\n');
-    af.write_all(s.as_bytes())
-        .context(errors::WriteMetadata { path })?;
-    af.close().context(errors::WriteMetadata { path })?;
-    Ok(())
+    AtomicFile::new(path)
+        .and_then(|mut af| {
+            af.write_all(s.as_bytes())?;
+            af.close()
+        })
+        .map_err(|source| Error::WriteMetadata {
+            path: path.to_owned(),
+            source,
+        })
 }
 
 pub fn read_json_metadata_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
-    let buf = std::fs::read_to_string(&path).context(errors::ReadMetadata { path })?;
-    serde_json::from_str(&buf).context(DeserializeJson { path })
+    let buf = std::fs::read_to_string(&path).map_err(|source| Error::ReadMetadata {
+        path: path.to_owned(),
+        source,
+    })?;
+    serde_json::from_str(&buf).map_err(|source| Error::DeserializeJson {
+        source,
+        path: path.to_owned(),
+    })
 }
 
 #[cfg(test)]

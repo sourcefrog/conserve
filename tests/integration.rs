@@ -129,7 +129,7 @@ fn large_file() {
     let rd = TempDir::new().unwrap();
     let restore_archive = Archive::open(af.path()).unwrap();
     let st = StoredTree::open_last(&restore_archive).unwrap();
-    let rt = RestoreTree::create(rd.path()).unwrap();
+    let rt = RestoreTree::create(rd.path().to_owned()).unwrap();
     let _stats = copy_tree(&st, rt, &COPY_DEFAULT).unwrap();
     // TODO: Examine stats.
 
