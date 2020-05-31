@@ -1,6 +1,6 @@
 # Conserve release history
 
-## v0.6.3 UNRELEASED
+## v0.6.3 2020-05-30
 
 ### Performance improvements
 
