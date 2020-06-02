@@ -191,7 +191,6 @@ impl Command {
                 exclude,
                 incomplete,
             } => {
-                // TODO: Move this to a text-mode formatter library?
                 // TODO: Consider whether the actual files have changed.
                 // TODO: Summarize diff.
                 // TODO: Optionally include unchanged files.
