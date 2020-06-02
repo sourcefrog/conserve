@@ -33,6 +33,7 @@ enum Command {
 
     Debug(Debug),
 
+    /// Compare a stored tree to a source directory.
     Diff {
         archive: PathBuf,
         source: PathBuf,
@@ -51,24 +52,13 @@ enum Command {
         archive: PathBuf,
     },
 
+    /// List files in a stored tree or source directory, with exclusions.
     Ls {
-        #[structopt(required_unless = "source")]
-        archive: Option<PathBuf>,
-
-        /// List files in a source directory rather than an archive.
-        #[structopt(long, short, conflicts_with = "archive", required_unless = "archive")]
-        source: Option<PathBuf>,
-
-        #[structopt(long, short, conflicts_with = "source")]
-        backup: Option<BandId>,
-        #[structopt(long, short)]
-        exclude: Vec<String>,
-
-        /// List the incomplete contents of an unfinished backup.
-        #[structopt(long, requires = "backup")]
-        incomplete: bool,
+        #[structopt(flatten)]
+        stos: StoredTreeOrSource,
     },
 
+    /// Copy a stored tree to a restore directory.
     Restore {
         archive: PathBuf,
         destination: PathBuf,
@@ -85,23 +75,10 @@ enum Command {
         incomplete: bool,
     },
 
+    /// Show the total size of files in a stored tree or source directory, with exclusions.
     Size {
-        #[structopt(required_unless = "source")]
-        archive: Option<PathBuf>,
-
-        /// List files in a source directory rather than an archive.
-        #[structopt(long, short, conflicts_with = "archive", required_unless = "archive")]
-        source: Option<PathBuf>,
-
-        #[structopt(long, short, conflicts_with = "source")]
-        backup: Option<BandId>,
-
-        #[structopt(long, short)]
-        exclude: Vec<String>,
-
-        /// Measure the incomplete contents of an unfinished backup.
-        #[structopt(long, requires = "backup")]
-        incomplete: bool,
+        #[structopt(flatten)]
+        stos: StoredTreeOrSource,
     },
 
     /// Check that an archive is internally consistent.
@@ -110,6 +87,7 @@ enum Command {
         archive: PathBuf,
     },
 
+    /// List backup versions in an archive.
     Versions {
         archive: PathBuf,
         /// Show only version names.
@@ -119,6 +97,26 @@ enum Command {
         #[structopt(long, short = "z", conflicts_with = "short")]
         sizes: bool,
     },
+}
+
+#[derive(Debug, StructOpt)]
+struct StoredTreeOrSource {
+    #[structopt(required_unless = "source")]
+    archive: Option<PathBuf>,
+
+    /// List files in a source directory rather than an archive.
+    #[structopt(long, short, conflicts_with = "archive", required_unless = "archive")]
+    source: Option<PathBuf>,
+
+    #[structopt(long, short, conflicts_with = "source")]
+    backup: Option<BandId>,
+
+    #[structopt(long, short)]
+    exclude: Vec<String>,
+
+    /// Measure the incomplete contents of an unfinished backup.
+    #[structopt(long, requires = "backup")]
+    incomplete: bool,
 }
 
 /// Show debugging information.
@@ -206,21 +204,20 @@ impl Command {
                 Archive::create(&archive)?;
                 ui::println(&format!("Created new archive in {:?}", &archive));
             }
-            Command::Ls {
-                archive,
-                source,
-                backup,
-                exclude,
-                incomplete,
-            } => {
-                if let Some(archive) = archive {
+            Command::Ls { stos } => {
+                if let Some(archive) = &stos.archive {
                     output::show_tree_names(
-                        &stored_tree_from_opt(archive, &backup, exclude, *incomplete)?,
+                        &stored_tree_from_opt(
+                            archive,
+                            &stos.backup,
+                            &stos.exclude,
+                            stos.incomplete,
+                        )?,
                         &mut stdout,
                     )?;
                 } else {
                     output::show_tree_names(
-                        &live_tree_from_opt(source.as_ref().unwrap(), exclude)?,
+                        &live_tree_from_opt(stos.source.as_ref().unwrap(), &stos.exclude)?,
                         &mut stdout,
                     )?;
                 }
@@ -248,20 +245,14 @@ impl Command {
                 ui::println("Restore complete.");
                 copy_stats.summarize_restore(&mut stdout)?;
             }
-            Command::Size {
-                archive,
-                backup,
-                source,
-                exclude,
-                incomplete,
-            } => {
+            Command::Size { ref stos } => {
                 ui::set_progress_phase(&"Measuring".to_string());
-                let size = if let Some(archive) = archive {
-                    stored_tree_from_opt(archive, backup, exclude, *incomplete)?
+                let size = if let Some(archive) = &stos.archive {
+                    stored_tree_from_opt(archive, &stos.backup, &stos.exclude, stos.incomplete)?
                         .size()?
                         .file_bytes
                 } else {
-                    live_tree_from_opt(source.as_ref().unwrap(), exclude)?
+                    live_tree_from_opt(stos.source.as_ref().unwrap(), &stos.exclude)?
                         .size()?
                         .file_bytes
                 };
