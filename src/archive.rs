@@ -100,7 +100,7 @@ impl Archive {
         {
             if let Ok(n) = e.file_name().into_string() {
                 if e.file_type().map(|ft| ft.is_dir()).unwrap_or(false) && n != BLOCK_DIR {
-                    band_ids.push(BandId::from_string(&n)?);
+                    band_ids.push(n.parse()?)
                 }
             }
             // TODO: Log errors while reading the directory.
@@ -174,7 +174,7 @@ impl Archive {
         dirs.sort();
         let mut bs = BTreeSet::<BandId>::new();
         for d in dirs.iter() {
-            if let Ok(b) = BandId::from_string(&d) {
+            if let Ok(b) = d.parse() {
                 if bs.contains(&b) {
                     ui::problem(&format!(
                         "Duplicated band directory in {:?}: {:?}",

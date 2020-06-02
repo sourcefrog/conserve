@@ -4,6 +4,7 @@
 //! Command-line entry point for Conserve backups.
 
 use std::path::Path;
+use std::str::FromStr;
 
 use clap::{crate_authors, App, AppSettings, Arg, ArgMatches, SubCommand};
 
@@ -444,10 +445,7 @@ fn live_tree_from_options(subm: &ArgMatches) -> Result<LiveTree> {
 }
 
 fn band_id_from_option(subm: &ArgMatches) -> Result<Option<BandId>> {
-    match subm.value_of("backup") {
-        Some(b) => Ok(Some(BandId::from_string(b)?)),
-        None => Ok(None),
-    }
+    subm.value_of("backup").map(BandId::from_str).transpose()
 }
 
 /// Make an exclusion globset from the `--exclude` option.

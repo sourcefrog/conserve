@@ -231,6 +231,7 @@ impl Band {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::str::FromStr;
 
     use chrono::Duration;
     use serde_json::json;
@@ -256,7 +257,7 @@ mod tests {
         assert_eq!(dir_names, ["i"]);
         assert!(band.is_closed().unwrap());
 
-        let band_id = BandId::from_string("b0000").unwrap();
+        let band_id = BandId::from_str("b0000").unwrap();
         let band2 = Band::open(&af, &band_id).expect("failed to open band");
         assert!(band2.is_closed().unwrap());
 

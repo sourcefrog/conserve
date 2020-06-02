@@ -4,9 +4,9 @@
 //! Bands are identified by a string like `b0001-0023`, represented by a `BandId` object.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::errors::Error;
-use crate::Result;
 
 /// Identifier for a band within an archive, eg 'b0001' or 'b0001-0020'.
 ///
@@ -37,9 +37,14 @@ impl BandId {
         next_seqs[self.seqs.len() - 1] += 1;
         BandId::new(&next_seqs)
     }
+}
+
+impl FromStr for BandId {
+    type Err = Error;
 
     /// Make a new BandId from a string form.
-    pub fn from_string(s: &str) -> Result<BandId> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        // TODO: Change this to .parse().
         let nope = || Err(Error::InvalidVersion { version: s.into() });
         if !s.starts_with('b') {
             return nope();
@@ -121,36 +126,33 @@ mod tests {
 
     #[test]
     fn from_string_detects_invalid() {
-        assert!(BandId::from_string("").is_err());
-        assert!(BandId::from_string("hello").is_err());
-        assert!(BandId::from_string("b").is_err());
-        assert!(BandId::from_string("b-").is_err());
-        assert!(BandId::from_string("b2-").is_err());
-        assert!(BandId::from_string("b-2").is_err());
-        assert!(BandId::from_string("b2-1-").is_err());
-        assert!(BandId::from_string("b2--1").is_err());
-        assert!(BandId::from_string("beta").is_err());
-        assert!(BandId::from_string("b-eta").is_err());
-        assert!(BandId::from_string("b-1eta").is_err());
-        assert!(BandId::from_string("b-1-eta").is_err());
+        assert!(BandId::from_str("").is_err());
+        assert!(BandId::from_str("hello").is_err());
+        assert!(BandId::from_str("b").is_err());
+        assert!(BandId::from_str("b-").is_err());
+        assert!(BandId::from_str("b2-").is_err());
+        assert!(BandId::from_str("b-2").is_err());
+        assert!(BandId::from_str("b2-1-").is_err());
+        assert!(BandId::from_str("b2--1").is_err());
+        assert!(BandId::from_str("beta").is_err());
+        assert!(BandId::from_str("b-eta").is_err());
+        assert!(BandId::from_str("b-1eta").is_err());
+        assert!(BandId::from_str("b-1-eta").is_err());
     }
 
     #[test]
     fn from_string_valid() {
-        assert_eq!(BandId::from_string("b0001").unwrap().to_string(), "b0001");
+        assert_eq!(BandId::from_str("b0001").unwrap().to_string(), "b0001");
+        assert_eq!(BandId::from_str("b123456").unwrap().to_string(), "b123456");
         assert_eq!(
-            BandId::from_string("b123456").unwrap().to_string(),
-            "b123456"
-        );
-        assert_eq!(
-            BandId::from_string("b0001-0100-0234").unwrap().to_string(),
+            BandId::from_str("b0001-0100-0234").unwrap().to_string(),
             "b0001-0100-0234"
         );
     }
 
     #[test]
     fn format() {
-        let a_bandid = BandId::from_string("b0001-0234").unwrap();
+        let a_bandid = BandId::from_str("b0001-0234").unwrap();
         assert_eq!(format!("{}", a_bandid), "b0001-0234");
         // Implements padding correctly
         assert_eq!(format!("{:<15}", a_bandid), "b0001-0234     ");
