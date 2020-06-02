@@ -180,10 +180,8 @@ impl IndexBuilder {
             path: path.to_owned(),
             source,
         };
-        let json = serde_json::to_vec(&self.entries).map_err(|source| Error::SerializeIndex {
-            path: path.to_owned(),
-            source,
-        })?;
+        let json =
+            serde_json::to_vec(&self.entries).map_err(|source| Error::SerializeIndex { source })?;
         let uncompressed_len = json.len() as u64;
         if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
             ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)).map_err(write_error)?;
