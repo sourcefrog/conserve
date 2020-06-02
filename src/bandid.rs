@@ -44,7 +44,6 @@ impl FromStr for BandId {
 
     /// Make a new BandId from a string form.
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        // TODO: Change this to .parse().
         let nope = || Err(Error::InvalidVersion { version: s.into() });
         if !s.starts_with('b') {
             return nope();

@@ -6,7 +6,7 @@
 //! These are objects that accept iterators of different types of content, and write it to a
 //! file (typically stdout).
 
-use std::io::Write;
+use std::io::{BufWriter, Write};
 
 use chrono::Local;
 
@@ -76,7 +76,33 @@ pub fn show_verbose_version_list(
 }
 
 pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
+    // TODO: Maybe use https://docs.serde.rs/serde/ser/trait.Serializer.html#method.collect_seq.
+    let bw = BufWriter::new(w);
     let index_entries: Vec<IndexEntry> = band.iter_entries()?.collect();
-    serde_json::ser::to_writer_pretty(w, &index_entries)
+    serde_json::ser::to_writer_pretty(bw, &index_entries)
         .map_err(|source| Error::SerializeIndex { source })
+}
+
+pub fn show_tree_names<T: ReadTree>(tree: &T, w: &mut dyn Write) -> Result<()> {
+    let mut bw = BufWriter::new(w);
+    for entry in tree.iter_entries()? {
+        writeln!(bw, "{}", entry.apath())?;
+    }
+    Ok(())
+}
+
+pub fn show_tree_diff(
+    iter: &mut dyn Iterator<Item = crate::merge::MergedEntry>,
+    w: &mut dyn Write,
+) -> Result<()> {
+    let mut bw = BufWriter::new(w);
+    for e in iter {
+        let ks = match e.kind {
+            MergedEntryKind::LeftOnly => "left",
+            MergedEntryKind::RightOnly => "right",
+            MergedEntryKind::Both => "both",
+        };
+        writeln!(bw, "{:<8} {}", ks, e.apath)?;
+    }
+    Ok(())
 }

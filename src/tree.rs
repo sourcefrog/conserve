@@ -10,6 +10,7 @@ use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
 pub trait ReadTree {
+    // TODO: Perhaps hide these and just return dyn objects?
     type Entry: Entry;
     type I: Iterator<Item = Self::Entry>;
     type R: std::io::Read;
@@ -22,6 +23,7 @@ pub trait ReadTree {
     fn iter_entries(&self) -> Result<Self::I>;
 
     /// Read file contents as a `std::io::Read`.
+    // TODO: Perhaps return an iter of blocks, instead.
     fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R>;
 
     /// Estimate the number of entries in the tree.

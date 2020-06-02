@@ -94,7 +94,7 @@ fn blackbox_backup() {
     src.create_dir("subdir");
 
     main_binary()
-        .args(&["source", "ls"])
+        .args(&["ls", "--source"])
         .arg(src.path())
         .assert()
         .success()
@@ -106,7 +106,7 @@ fn blackbox_backup() {
         );
 
     main_binary()
-        .args(&["source", "size"])
+        .args(&["size", "-s"])
         .arg(src.path())
         .assert()
         .success()
@@ -125,7 +125,7 @@ fn blackbox_backup() {
     // TODO: Now inspect the archive.
 
     main_binary()
-        .args(&["tree", "size"])
+        .args(&["size"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -156,7 +156,7 @@ both     /subdir
         .stdout("b0000\n");
 
     main_binary()
-        .args(&["debug", "block", "list"])
+        .args(&["debug", "blocks"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -165,6 +165,25 @@ both     /subdir
             "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3\
              a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7\n",
         );
+
+    main_binary()
+        .args(&["debug", "referenced"])
+        .arg(&arch_dir)
+        .assert()
+        .success()
+        .stderr(is_empty())
+        .stdout(
+            "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3\
+             a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7\n",
+        );
+
+    main_binary()
+        .args(&["debug", "index"])
+        .arg(&arch_dir)
+        .assert()
+        .success()
+        .stderr(is_empty());
+    // TODO: Deserialize index json, or somehow check it.
 
     main_binary()
         .arg("versions")

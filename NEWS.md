@@ -1,5 +1,33 @@
 # Conserve release history
 
+## v0.6.4 NOT RELEASED YET
+
+### Behavior changes
+
+Some rearrangements to the command-line grammar to make it more concise and
+consistent:
+
+- `conserve debug` commands are now briefer: `conserve debug index`, `conserve
+  debug referenced`, `conserve debug blocks`.
+
+- `conserve source ls DIR` is now `conserve ls --source DIR`.
+
+- `conserve source size DIR` is now `conserve size --source DIR`.
+
+- `conserve tree size` is now `conserve size`.
+
+- Obsolete global option `--ui` was removed.
+
+- The short option for `conserve versions --short` is now `-q`.
+
+- The short option for `conserve versions --sizes` is now `-z`.
+
+### Internal
+
+- Change to using structopt for option parsing.
+
+- Change to using thiserror for error enum construction.
+
 ## v0.6.3 2020-05-30
 
 ### Performance improvements
