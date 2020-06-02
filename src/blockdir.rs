@@ -218,6 +218,7 @@ impl BlockDir {
         // directories of the right length.
         // TODO: Provide a progress bar that just works on counts, not bytes:
         // then we don't need to count the sizes in advance.
+        // TODO: Test having a block with the right compression but the wrong contents.
         ui::println("Count blocks...");
         let bns: Vec<(String, u64)> = self.block_names_and_sizes()?.collect();
         let tot = bns.iter().map(|a| a.1).sum();
@@ -228,8 +229,6 @@ impl BlockDir {
             crate::misc::bytes_to_human_mb(tot)
         ));
         ui::set_progress_phase(&"Check block hashes");
-        // TODO: Accumulate counts from validation of individual blocks,
-        // and count the total number that were unreadable or had the wrong hash.
         let block_error_count = bns
             .par_iter()
             .filter(|(block_hash, bsize)| {

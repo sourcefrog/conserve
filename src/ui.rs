@@ -60,8 +60,8 @@ pub fn println(s: &str) {
 }
 
 // TODO: Rather than a directly-called function, hook this into logging.
-pub fn problem<S: AsRef<str>>(s: &S) {
-    UI_STATE.lock().unwrap().problem(s.as_ref())
+pub fn problem(s: &str) {
+    UI_STATE.lock().unwrap().problem(s.into())
 }
 
 /// Report that a non-fatal error occurred.
@@ -93,6 +93,10 @@ pub fn set_progress_file(s: &str) {
 
 pub fn set_bytes_total(bytes_total: u64) {
     UI_STATE.lock().unwrap().progress_state.bytes_total = bytes_total
+}
+
+pub fn clear_bytes_total() {
+    UI_STATE.lock().unwrap().progress_state.bytes_total = 0
 }
 
 pub fn increment_bytes_done(b: u64) {

@@ -143,18 +143,22 @@ impl Archive {
     }
 
     pub fn validate(&self) -> Result<ValidateArchiveStats> {
-        // Check there's no extra top-level contents.
-        self.validate_archive_dir()?;
+        let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
-        let block_dir_stats = self.block_dir.validate()?;
-        self.validate_bands()?;
+        stats.block_dir += self.block_dir.validate()?;
+        self.validate_bands(&mut stats)?;
 
-        // TODO: Don't say "OK" if there were non-fatal problems.
-        ui::println("Archive is OK.");
-        Ok(ValidateArchiveStats { block_dir_stats })
+        if stats.has_problems() {
+            ui::problem("Archive has some problems.");
+        } else {
+            ui::println("Archive is OK.");
+        }
+        Ok(stats)
     }
 
-    fn validate_archive_dir(&self) -> Result<()> {
+    fn validate_archive_dir(&self) -> Result<ValidateArchiveStats> {
+        // TODO: Tests for the problems detected here.
+        let mut stats = ValidateArchiveStats::default();
         ui::println("Check archive top-level directory...");
         let (mut files, mut dirs) =
             list_dir(self.path()).map_err(|source| Error::ReadMetadata {
@@ -163,19 +167,20 @@ impl Archive {
             })?;
         remove_item(&mut files, &HEADER_FILENAME);
         if !files.is_empty() {
+            stats.structure_problems += 1;
             ui::problem(&format!(
                 "Unexpected files in archive directory {:?}: {:?}",
                 self.path(),
                 files
             ));
         }
-
         remove_item(&mut dirs, &BLOCK_DIR);
         dirs.sort();
         let mut bs = BTreeSet::<BandId>::new();
         for d in dirs.iter() {
             if let Ok(b) = d.parse() {
                 if bs.contains(&b) {
+                    stats.structure_problems += 1;
                     ui::problem(&format!(
                         "Duplicated band directory in {:?}: {:?}",
                         self.path(),
@@ -185,6 +190,7 @@ impl Archive {
                     bs.insert(b);
                 }
             } else {
+                stats.structure_problems += 1;
                 ui::problem(&format!(
                     "Unexpected directory in {:?}: {:?}",
                     self.path(),
@@ -192,31 +198,19 @@ impl Archive {
                 ));
             }
         }
-
-        Ok(())
+        Ok(stats)
     }
 
-    fn validate_bands(&self) -> Result<()> {
-        let mut ps = ProgressState::default();
+    fn validate_bands(&self, _stats: &mut ValidateArchiveStats) -> Result<()> {
+        // TODO: Don't stop early on any errors in the steps below, but do count them.
+        // TODO: Better progress bars, that don't work by size but rather by
+        // count.
+        // TODO: Take in a dict of the known blocks and their decompressed lengths,
+        // and use that to more cheaply check if the index is OK.
         use crate::ui::println;
-        println("Measure stored trees...");
-        ps.phase = "Measure stored trees...".into();
-        let mut total_size: u64 = 0;
+        ui::clear_bytes_total();
         for bid in self.list_bands()?.iter() {
-            let b = StoredTree::open_incomplete_version(self, bid)?
-                .size()?
-                .file_bytes;
-            total_size += b;
-            ps.bytes_done += b;
-            // lock_ui().show_progress(&ps);
-        }
-
-        // lock_ui().println(&format!(
-        //     "Check {} in stored files...",
-        //     crate::misc::bytes_to_human_mb(total_size)
-        // ));
-        ps.bytes_total = total_size;
-        for bid in self.list_bands()?.iter() {
+            println(&format!("Check {}...", bid));
             let b = Band::open(self, bid)?;
             b.validate()?;
 

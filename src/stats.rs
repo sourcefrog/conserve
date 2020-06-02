@@ -29,9 +29,11 @@ pub struct Sizes {
     pub uncompressed: u64,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Add, AddAssign)]
 pub struct ValidateArchiveStats {
-    pub block_dir_stats: ValidateBlockDirStats,
+    /// Count of files in the wrong place.
+    pub structure_problems: u64,
+    pub block_dir: ValidateBlockDirStats,
 }
 
 impl ValidateArchiveStats {
@@ -48,9 +50,13 @@ impl ValidateArchiveStats {
         // )
         Ok(())
     }
+
+    pub fn has_problems(&self) -> bool {
+        self.block_dir.block_error_count > 0
+    }
 }
 
-#[derive(Clone, Default, Debug, Eq, PartialEq)]
+#[derive(Clone, Default, Debug, Eq, PartialEq, Add, AddAssign)]
 pub struct ValidateBlockDirStats {
     /// Number of blocks read.
     pub block_read_count: u64,
