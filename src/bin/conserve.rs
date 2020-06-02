@@ -334,14 +334,13 @@ fn validate(subm: &ArgMatches) -> Result<()> {
 }
 
 fn versions(subm: &ArgMatches) -> Result<()> {
-    use conserve::output::ShowArchive;
+    ui::enable_progress(false);
     let archive = Archive::open(subm.value_of("archive").unwrap())?;
+    let stdout = &mut std::io::stdout();
     if subm.is_present("short") {
-        output::ShortVersionList::default().show_archive(&archive)
+        output::show_brief_version_list(&archive, stdout)
     } else {
-        output::VerboseVersionList::default()
-            .show_sizes(subm.is_present("sizes"))
-            .show_archive(&archive)
+        output::show_verbose_version_list(&archive, subm.is_present("sizes"), stdout)
     }
 }
 
@@ -411,10 +410,8 @@ fn debug_block_referenced(subm: &ArgMatches) -> Result<()> {
 }
 
 fn debug_index_dump(subm: &ArgMatches) -> Result<()> {
-    use conserve::output::ShowArchive;
-    let archive = Archive::open(subm.value_of("archive").unwrap())?;
     let st = stored_tree_from_options(subm)?;
-    output::IndexDump::new(st.band()).show_archive(&archive)
+    output::show_index_json(st.band(), &mut std::io::stdout())
 }
 
 fn tree_size(subm: &ArgMatches) -> Result<()> {
