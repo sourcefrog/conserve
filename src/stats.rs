@@ -84,6 +84,7 @@ pub struct LiveTreeIterStats {
 pub struct CopyStats {
     // TODO: Have separate more-specific stats for backup and restore, and then
     // each can have a single Display method.
+    // TODO: Include source file bytes, including unmodified files.
     pub files: usize,
     pub symlinks: usize,
     pub directories: usize,
@@ -93,8 +94,9 @@ pub struct CopyStats {
     pub modified_files: usize,
     pub new_files: usize,
 
-    // TODO: Include source file bytes, including unmodified files.
+    /// Bytes that matched an existing block.
     pub deduplicated_bytes: u64,
+    /// Bytes that were stored as new blocks, before compression.
     pub uncompressed_bytes: u64,
     pub compressed_bytes: u64,
 

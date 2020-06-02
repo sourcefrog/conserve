@@ -327,7 +327,6 @@ impl StoreFiles {
             if read_len == 0 {
                 break;
             }
-            stats.uncompressed_bytes += read_len as u64;
             let block_data = &self.input_buf[..read_len];
             let block_hash: String = hash_bytes(block_data).unwrap();
             if self.block_dir.contains(&block_hash)? {
@@ -343,6 +342,7 @@ impl StoreFiles {
                         source,
                     })?;
                 stats.written_blocks += 1;
+                stats.uncompressed_bytes += read_len as u64;
                 stats.compressed_bytes += comp_len;
             }
             addresses.push(Address {
@@ -371,6 +371,8 @@ mod tests {
     use std::fs;
     use std::io::prelude::*;
     use std::io::SeekFrom;
+
+    use spectral::prelude::*;
     use tempfile::{NamedTempFile, TempDir};
 
     use super::*;
@@ -526,9 +528,10 @@ mod tests {
             .store_file_content(&Apath::from("/big"), &mut tf)
             .unwrap();
 
-        assert_eq!(stats.uncompressed_bytes, TOTAL_SIZE);
+        // Only one block needs to get compressed. The others are deduplicated.
+        assert_eq!(stats.uncompressed_bytes, MAX_BLOCK_SIZE as u64);
         // Should be very compressible
-        assert!(stats.compressed_bytes < (MAX_BLOCK_SIZE as u64 / 10));
+        assert_that!(stats.compressed_bytes).is_less_than(MAX_BLOCK_SIZE as u64 / 10);
         assert_eq!(stats.written_blocks, 1);
         assert_eq!(
             stats.deduplicated_blocks as u64,
