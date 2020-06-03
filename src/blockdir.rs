@@ -91,6 +91,7 @@ impl BlockDir {
         self.subdir_for(hash_hex).join(hash_hex)
     }
 
+    /// Returns the number of compressed bytes.
     fn compress_and_store(&self, in_buf: &[u8], hex_hash: &str) -> std::io::Result<u64> {
         // Note: When we come to support cloud storage, we should do one atomic write rather than
         // a write and rename.
