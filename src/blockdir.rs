@@ -247,6 +247,8 @@ impl BlockDir {
     }
 
     /// Return the entire contents of the block.
+    ///
+    /// Checks that the hash is correct with the contents.
     pub fn get_block_content(&self, hash: &str) -> Result<(Vec<u8>, Sizes)> {
         let path = self.path_for_file(hash);
         let (compressed_len, decompressed_bytes) = snappy::decompress_file(&path)
