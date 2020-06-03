@@ -191,7 +191,7 @@ subdirectory is the first three hex characters of the name of the contained
 block files.
 
 Data block are compressed in the Snappy format
-<https://github.com/google/snappy>.
+<https://github.com/google/snappy>: the 'raw' format without framing.
 
 ## Index
 
