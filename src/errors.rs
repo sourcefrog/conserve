@@ -148,4 +148,10 @@ pub enum Error {
         #[from]
         source: IOError,
     },
+
+    #[error(transparent)]
+    SnapCompressionError {
+        #[from]
+        source: snap::Error,
+    },
 }
