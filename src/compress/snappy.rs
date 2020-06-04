@@ -6,16 +6,29 @@ use std::path::Path;
 
 use crate::Result;
 
-pub struct Snappy {}
+/// Holds a reusable buffer for Snappy compression.
+#[derive(Default)]
+pub(crate) struct Compressor {
+    out_buf: Vec<u8>,
+}
 
-impl super::Compression for Snappy {
-    /// Returns the number of compressed bytes written.
-    fn compress_and_write(in_buf: &[u8], w: &mut dyn io::Write) -> io::Result<usize> {
-        // TODO: Try to reuse encoders.
-        let mut encoder = snap::raw::Encoder::new();
-        let r = encoder.compress_vec(in_buf)?;
-        w.write_all(&r)?;
-        Ok(r.len())
+impl Compressor {
+    pub fn new() -> Compressor {
+        Compressor::default()
+    }
+
+    /// Compress bytes into unframed Snappy data.
+    ///
+    /// Returns a slice referencing a buffer in this object, valid only
+    /// until the next call.
+    #[must_use]
+    pub fn compress(&mut self, input: &[u8]) -> Result<&[u8]> {
+        let max_len = snap::raw::max_compress_len(input.len());
+        if self.out_buf.len() < max_len {
+            self.out_buf.resize(max_len, 0u8);
+        }
+        let actual_len = snap::raw::Encoder::new().compress(input, &mut self.out_buf)?;
+        Ok(&self.out_buf[0..actual_len])
     }
 }
 
@@ -41,4 +54,24 @@ fn decompress_bytes(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
     let actual_len = snap::raw::Decoder::new().decompress(input, output)?;
     output.truncate(actual_len);
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn compressor() {
+        let mut compressor = Compressor::new();
+        assert_eq!(
+            compressor.compress(b"hello world").unwrap(),
+            b"\x0b(hello world"
+        );
+        assert_eq!(
+            compressor
+                .compress(b"hello world, hello world, hello world, hello world")
+                .unwrap(),
+            b"\x32\x30hello world, \x92\x0d\0"
+        );
+    }
 }

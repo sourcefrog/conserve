@@ -18,9 +18,6 @@ pub enum Error {
     #[error("Block file {path:?} corrupt; actual hash {actual_hash:?}")]
     BlockCorrupt { path: PathBuf, actual_hash: String },
 
-    #[error("Failed to store block {block_hash:?}")]
-    StoreBlock { block_hash: String, source: IOError },
-
     #[error("Failed to read block {path:?}")]
     ReadBlock { path: PathBuf, source: IOError },
 

@@ -5,12 +5,14 @@
 
 use std::cmp::Ordering;
 use std::io;
+use std::io::Write;
 use std::iter::Peekable;
 use std::path::{Path, PathBuf};
 use std::vec;
 
 use globset::GlobSet;
 
+use crate::compress::snappy::Compressor;
 use crate::io::file_exists;
 use crate::stats::{IndexBuilderStats, IndexEntryIterStats};
 use crate::unix_time::UnixTime;
@@ -111,7 +113,6 @@ impl IndexEntry {
 }
 
 /// Accumulates ordered changes to the index and streams them out to index files.
-#[derive(Debug)]
 pub struct IndexBuilder {
     /// The `i` directory within the band where all files for this index are written.
     dir: PathBuf,
@@ -129,6 +130,8 @@ pub struct IndexBuilder {
 
     /// Statistics about work done while writing this index.
     pub stats: IndexBuilderStats,
+
+    compressor: Compressor,
 }
 
 /// Accumulate and write out index entries into files in an index directory.
@@ -141,6 +144,7 @@ impl IndexBuilder {
             sequence: 0,
             check_order: apath::CheckOrder::new(),
             stats: IndexBuilderStats::default(),
+            compressor: Compressor::new(),
         }
     }
 
@@ -186,7 +190,9 @@ impl IndexBuilder {
             ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)).map_err(write_error)?;
         }
         let mut af = AtomicFile::new(&path).map_err(write_error)?;
-        let compressed_len = Snappy::compress_and_write(&json, &mut af).map_err(write_error)?;
+        let compressed_bytes = self.compressor.compress(&json)?;
+        let compressed_len = compressed_bytes.len();
+        af.write_all(compressed_bytes).map_err(write_error)?;
         af.close().map_err(write_error)?;
 
         self.stats.index_hunks += 1;

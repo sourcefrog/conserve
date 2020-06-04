@@ -1,10 +1,4 @@
-// Copyright 2017, 2019 Martin Pool.
+// Copyright 2017, 2019, 2020 Martin Pool.
 
-/// Abstracted compression algorithms.
-use std::io;
-
+/// Data compression algorithms.
 pub mod snappy;
-
-pub trait Compression {
-    fn compress_and_write(b: &[u8], w: &mut dyn io::Write) -> io::Result<usize>;
-}

@@ -23,6 +23,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::compress::snappy;
+use crate::compress::snappy::Compressor;
 use crate::stats::{CopyStats, Sizes, ValidateBlockDirStats};
 use crate::*;
 
@@ -92,7 +93,8 @@ impl BlockDir {
     }
 
     /// Returns the number of compressed bytes.
-    fn compress_and_store(&self, in_buf: &[u8], hex_hash: &str) -> std::io::Result<u64> {
+    fn compress_and_store(&mut self, in_buf: &[u8], hex_hash: &str) -> Result<u64> {
+        // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
         // Note: When we come to support cloud storage, we should do one atomic write rather than
         // a write and rename.
         let path = self.path_for_file(&hex_hash);
@@ -101,9 +103,10 @@ impl BlockDir {
         let mut tempf = tempfile::Builder::new()
             .prefix(TMP_PREFIX)
             .tempfile_in(&d)?;
-        let comp_len = Snappy::compress_and_write(&in_buf, &mut tempf)?
-            .try_into()
-            .unwrap();
+        let mut compressor = Compressor::new();
+        let compressed = compressor.compress(&in_buf)?;
+        let comp_len: u64 = compressed.len().try_into().unwrap();
+        tempf.write_all(compressed)?;
         // Use plain `persist` not `persist_noclobber` to avoid
         // calling `link` on Unix, which won't work on all filesystems.
         if let Err(e) = tempf.persist(&path) {
@@ -116,7 +119,7 @@ impl BlockDir {
                 ));
                 e.file.close()?;
             } else {
-                return Err(e.error);
+                return Err(e.error.into());
             }
         }
         Ok(comp_len)
@@ -336,13 +339,7 @@ impl StoreFiles {
                 stats.deduplicated_blocks += 1;
                 stats.deduplicated_bytes += read_len as u64;
             } else {
-                let comp_len = self
-                    .block_dir
-                    .compress_and_store(block_data, &block_hash)
-                    .map_err(|source| Error::StoreBlock {
-                        block_hash: block_hash.to_owned(),
-                        source,
-                    })?;
+                let comp_len = self.block_dir.compress_and_store(block_data, &block_hash)?;
                 stats.written_blocks += 1;
                 stats.uncompressed_bytes += read_len as u64;
                 stats.compressed_bytes += comp_len;
