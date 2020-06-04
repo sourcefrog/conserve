@@ -10,7 +10,6 @@ use crate::*;
 ///
 /// These can be constructed through `StoredTree::open_stored_file()` or more
 /// generically through `ReadTree::file_contents`.
-#[derive(Debug)]
 pub struct StoredFile {
     block_dir: BlockDir,
 
@@ -67,7 +66,6 @@ impl ReadBlocks for StoredFile {
 }
 
 /// Adapt a StoredFile to `std::io::Read`, which requires keeping a cursor position.
-#[derive(Debug)]
 pub struct ReadStoredFile {
     /// Block addresses remaining to be read.
     remaining_addrs: std::vec::IntoIter<blockdir::Address>,

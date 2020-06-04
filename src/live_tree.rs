@@ -4,7 +4,6 @@
 //! Find source files within a source directory, in apath order.
 
 use std::collections::vec_deque::VecDeque;
-use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -86,14 +85,6 @@ impl tree::ReadTree for LiveTree {
         // throw it away. We could perhaps change the iter to optionally do
         // less work.
         Ok(self.iter_entries()?.count() as u64)
-    }
-}
-
-impl fmt::Debug for LiveTree {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("LiveTree")
-            .field("path", &self.path)
-            .finish()
     }
 }
 
@@ -375,10 +366,7 @@ mod tests {
     fn open_tree() {
         let tf = TreeFixture::new();
         let lt = LiveTree::open(tf.path()).unwrap();
-        assert_eq!(
-            format!("{:?}", &lt),
-            format!("LiveTree {{ path: {:?} }}", tf.path())
-        );
+        assert_eq!(lt.path, tf.path());
     }
 
     #[test]

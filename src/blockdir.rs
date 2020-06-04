@@ -58,7 +58,7 @@ pub struct Address {
 }
 
 /// A readable, writable directory within a band holding data blocks.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct BlockDir {
     pub path: PathBuf,
 }
@@ -164,8 +164,8 @@ impl BlockDir {
         ds.retain(|dd| {
             if dd.len() != SUBDIR_NAME_CHARS {
                 ui::problem(&format!(
-                    "unexpected subdirectory in blockdir {:?}: {:?}",
-                    self, dd
+                    "Unexpected subdirectory in blockdir {:?}: {:?}",
+                    self.path, dd
                 ));
                 false
             } else {

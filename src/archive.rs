@@ -20,7 +20,7 @@ const HEADER_FILENAME: &str = "CONSERVE";
 static BLOCK_DIR: &str = "d";
 
 /// An archive holding backup material.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Archive {
     /// Top-level directory for the archive.
     path: PathBuf,

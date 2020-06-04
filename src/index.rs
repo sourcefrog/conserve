@@ -4,7 +4,6 @@
 //! Index lists the files in a band in the archive.
 
 use std::cmp::Ordering;
-use std::fmt;
 use std::io;
 use std::iter::Peekable;
 use std::path::{Path, PathBuf};
@@ -262,16 +261,6 @@ pub struct IndexEntryIter {
     pub stats: IndexEntryIterStats,
 }
 
-impl fmt::Debug for IndexEntryIter {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("IndexEntryIter")
-            .field("dir", &self.dir)
-            .field("next_hunk_number", &self.next_hunk_number)
-            // buffered_entries has no Debug itself
-            .finish()
-    }
-}
-
 impl Iterator for IndexEntryIter {
     type Item = IndexEntry;
 
@@ -525,14 +514,6 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         let it = IndexEntryIter::open(&ib.dir).unwrap();
-        assert_eq!(
-            format!("{:?}", &it),
-            format!(
-                "IndexEntryIter {{ dir: {:?}, next_hunk_number: 0 }}",
-                ib.dir
-            )
-        );
-
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
     }
@@ -569,13 +550,6 @@ mod tests {
         let it = IndexEntryIter::open(&ib.dir)
             .unwrap()
             .with_excludes(excludes);
-        assert_eq!(
-            format!("{:?}", &it),
-            format!(
-                "IndexEntryIter {{ dir: {:?}, next_hunk_number: 0 }}",
-                ib.dir
-            )
-        );
 
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/bar"]);
