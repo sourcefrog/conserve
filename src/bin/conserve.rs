@@ -281,7 +281,7 @@ impl Command {
 fn stored_tree_from_opt(
     archive: &Path,
     backup: &Option<BandId>,
-    exclude: &Vec<String>,
+    exclude: &[String],
     incomplete: bool,
 ) -> Result<StoredTree> {
     let archive = Archive::open(archive)?;
@@ -298,7 +298,7 @@ fn stored_tree_from_opt(
     Ok(st.with_excludes(excludes::from_strings(exclude)?))
 }
 
-fn live_tree_from_opt(source: &Path, exclude: &Vec<String>) -> Result<LiveTree> {
+fn live_tree_from_opt(source: &Path, exclude: &[String]) -> Result<LiveTree> {
     Ok(LiveTree::open(source)?.with_excludes(excludes::from_strings(exclude)?))
 }
 
