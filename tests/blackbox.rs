@@ -344,3 +344,25 @@ fn incomplete_version() {
         .stderr(is_empty())
         .stdout(is_empty());
 }
+
+#[test]
+fn exclude_option_ordering() {
+    // Regression caused by the move to structopt(?) in 7ddb02d0cf47467f1cccc2dcdedb005e8c4e3f25.
+    // See https://github.com/TeXitoi/structopt/issues/396.
+    let testdir = TempDir::new().unwrap();
+    let arch_dir = testdir.path().join("a");
+
+    // conserve init
+    main_binary().arg("init").arg(&arch_dir).assert().success();
+
+    let src = TreeFixture::new();
+    src.create_file("hello");
+    src.create_dir("subdir");
+
+    main_binary()
+        .args(&["backup", "--exclude", "**/target"])
+        .arg(&arch_dir)
+        .arg(&src.path())
+        .assert()
+        .success();
+}

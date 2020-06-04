@@ -27,7 +27,7 @@ enum Command {
         /// Print copied file names.
         #[structopt(long, short)]
         verbose: bool,
-        #[structopt(long, short)]
+        #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
     },
 
@@ -39,7 +39,7 @@ enum Command {
         source: PathBuf,
         #[structopt(long, short)]
         backup: Option<BandId>,
-        #[structopt(long, short)]
+        #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
         /// Compare to the incomplete contents of an unfinished backup.
         #[structopt(long, requires = "backup")]
@@ -68,7 +68,7 @@ enum Command {
         force_overwrite: bool,
         #[structopt(long, short)]
         verbose: bool,
-        #[structopt(long, short)]
+        #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
         /// Restore the incomplete contents of an unfinished backup.
         #[structopt(long, requires = "backup")]
@@ -111,7 +111,7 @@ struct StoredTreeOrSource {
     #[structopt(long, short, conflicts_with = "source")]
     backup: Option<BandId>,
 
-    #[structopt(long, short)]
+    #[structopt(long, short, number_of_values = 1)]
     exclude: Vec<String>,
 
     /// Measure the incomplete contents of an unfinished backup.
