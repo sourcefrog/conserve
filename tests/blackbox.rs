@@ -12,9 +12,6 @@ use escargot::CargoRun;
 use lazy_static::lazy_static;
 use predicates::prelude::*;
 
-use crate::predicate::path::{is_dir, is_file};
-use crate::predicate::str::{contains, is_empty, is_match, starts_with};
-
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
 lazy_static! {
@@ -37,8 +34,8 @@ fn blackbox_no_args() {
     run_conserve()
         .assert()
         .failure()
-        .stdout(is_empty())
-        .stderr(contains("USAGE:"));
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("USAGE:"));
 }
 
 #[test]
@@ -47,9 +44,11 @@ fn blackbox_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(contains("A robust backup tool"))
-        .stdout(contains("Copy source directory into an archive"))
-        .stderr(is_empty());
+        .stdout(predicate::str::contains("A robust backup tool"))
+        .stdout(predicate::str::contains(
+            "Copy source directory into an archive",
+        ))
+        .stderr(predicate::str::is_empty());
 }
 
 #[test]
@@ -63,7 +62,7 @@ fn clean_error_on_non_archive() {
         .arg(".")
         .assert()
         .failure()
-        .stdout(contains("Not a Conserve archive"));
+        .stdout(predicate::str::contains("Not a Conserve archive"));
 }
 
 #[test]
@@ -77,8 +76,8 @@ fn blackbox_backup() {
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty())
-        .stdout(starts_with("Created new archive"));
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with("Created new archive"));
 
     // New archive contains no versions.
     run_conserve()
@@ -86,8 +85,8 @@ fn blackbox_backup() {
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty())
-        .stdout(is_empty());
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::is_empty());
 
     let src = TreeFixture::new();
     src.create_file("hello");
@@ -98,7 +97,7 @@ fn blackbox_backup() {
         .arg(src.path())
         .assert()
         .success()
-        .stderr(is_empty())
+        .stderr(predicate::str::is_empty())
         .stdout(
             "/\n\
              /hello\n\
@@ -110,7 +109,7 @@ fn blackbox_backup() {
         .arg(src.path())
         .assert()
         .success()
-        .stderr(is_empty())
+        .stderr(predicate::str::is_empty())
         .stdout("0 MB\n"); // "contents"
 
     // backup
@@ -120,8 +119,8 @@ fn blackbox_backup() {
         .arg(&src.root)
         .assert()
         .success()
-        .stderr(is_empty())
-        .stdout(starts_with("Backup complete.\n"));
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with("Backup complete.\n"));
     // TODO: Now inspect the archive.
 
     run_conserve()
@@ -129,7 +128,7 @@ fn blackbox_backup() {
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty())
+        .stderr(predicate::str::is_empty())
         .stdout("0 MB\n"); // "contents"
 
     run_conserve()
@@ -138,7 +137,7 @@ fn blackbox_backup() {
         .arg(src.path())
         .assert()
         .success()
-        .stderr(is_empty())
+        .stderr(predicate::str::is_empty())
         .stdout(
             "\
 both     /
@@ -152,7 +151,7 @@ both     /subdir
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty())
+        .stderr(predicate::str::is_empty())
         .stdout("b0000\n");
 
     run_conserve()
@@ -160,7 +159,7 @@ both     /subdir
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty())
+        .stderr(predicate::str::is_empty())
         .stdout(
             "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3\
              a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7\n",
@@ -171,7 +170,7 @@ both     /subdir
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty())
+        .stderr(predicate::str::is_empty())
         .stdout(
             "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3\
              a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7\n",
@@ -182,7 +181,7 @@ both     /subdir
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty());
+        .stderr(predicate::str::is_empty());
     // TODO: Deserialize index json, or somehow check it.
 
     run_conserve()
@@ -190,8 +189,13 @@ both     /subdir
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty())
-        .stdout(is_match(r"^b0000 *complete   20\d\d-\d\d-\d\d \d\d:\d\d:\d\d +0:\d+\n$").unwrap());
+        .stderr(predicate::str::is_empty())
+        .stdout(
+            predicate::str::is_match(
+                r"^b0000 *complete   20\d\d-\d\d-\d\d \d\d:\d\d:\d\d +0:\d+\n$",
+            )
+            .unwrap(),
+        );
     // TODO: Set a fake date when creating the archive and then we can check
     // the format of the output?
 
@@ -201,10 +205,12 @@ both     /subdir
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty())
+        .stderr(predicate::str::is_empty())
         .stdout(
-            is_match(r"^b0000 *complete   20\d\d-\d\d-\d\d \d\d:\d\d:\d\d +0:\d+ *0 MB\n$")
-                .unwrap(),
+            predicate::str::is_match(
+                r"^b0000 *complete   20\d\d-\d\d-\d\d \d\d:\d\d:\d\d +0:\d+ *0 MB\n$",
+            )
+            .unwrap(),
         );
 
     run_conserve()
@@ -212,7 +218,7 @@ both     /subdir
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty())
+        .stderr(predicate::str::is_empty())
         .stdout(
             "/\n\
              /hello\n\
@@ -229,18 +235,20 @@ both     /subdir
         .arg(restore_dir.path())
         .assert()
         .success()
-        .stderr(is_empty())
-        .stdout(starts_with(
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with(
             "/\n\
              /hello\n\
              /subdir\n\
              Restore complete.\n",
         ));
 
-    restore_dir.child("subdir").assert(is_dir());
+    restore_dir
+        .child("subdir")
+        .assert(predicate::path::is_dir());
     restore_dir
         .child("hello")
-        .assert(is_file())
+        .assert(predicate::path::is_file())
         .assert("contents");
 
     // Try to restore again over the same directory: should decline.
@@ -251,7 +259,7 @@ both     /subdir
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stdout(contains("Destination directory not empty"));
+        .stdout(predicate::str::contains("Destination directory not empty"));
 
     // Restore with specified band id / backup version.
     {
@@ -272,8 +280,8 @@ both     /subdir
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(is_empty())
-        .stdout(contains("Archive is OK.\n"));
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::contains("Archive is OK.\n"));
 
     // TODO: Compare vs source tree.
 }
@@ -292,21 +300,21 @@ fn empty_archive() {
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stdout(contains("Archive has no bands"));
+        .stdout(predicate::str::contains("Archive has no bands"));
 
     run_conserve()
         .arg("ls")
         .arg(&adir)
         .assert()
         .failure()
-        .stdout(contains("Archive has no bands"));
+        .stdout(predicate::str::contains("Archive has no bands"));
 
     run_conserve()
         .arg("versions")
         .arg(&adir)
         .assert()
         .success()
-        .stdout(is_empty());
+        .stdout(predicate::str::is_empty());
 }
 
 /// Check behavior on an incomplete version.
@@ -323,9 +331,9 @@ fn incomplete_version() {
         .arg(af.path())
         .assert()
         .success()
-        .stderr(is_empty())
-        .stdout(contains("b0000"))
-        .stdout(contains("incomplete"));
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::contains("b0000"))
+        .stdout(predicate::str::contains("incomplete"));
 
     // ls fails on incomplete band
     run_conserve()
@@ -333,7 +341,7 @@ fn incomplete_version() {
         .arg(af.path())
         .assert()
         .failure()
-        .stdout(contains("Archive has no bands"));
+        .stdout(predicate::str::contains("Archive has no bands"));
 
     // ls --incomplete accurately says it has nothing
     run_conserve()
@@ -341,8 +349,8 @@ fn incomplete_version() {
         .arg(af.path())
         .assert()
         .success()
-        .stderr(is_empty())
-        .stdout(is_empty());
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::is_empty());
 }
 
 #[test]
