@@ -27,14 +27,14 @@ lazy_static! {
         .unwrap();
 }
 
-fn main_binary() -> Command {
+fn run_conserve() -> Command {
     CARGO_RUN.command()
 }
 
 #[test]
 fn blackbox_no_args() {
     // Run with no arguments, should fail with a usage message to stderr.
-    main_binary()
+    run_conserve()
         .assert()
         .failure()
         .stdout(is_empty())
@@ -43,7 +43,7 @@ fn blackbox_no_args() {
 
 #[test]
 fn blackbox_help() {
-    main_binary()
+    run_conserve()
         .arg("--help")
         .assert()
         .success()
@@ -57,7 +57,7 @@ fn clean_error_on_non_archive() {
     // Try to backup into a directory that is not an archive.
     let testdir = TempDir::new().unwrap();
     // TODO: Errors really should go to stderr not stdout.
-    main_binary()
+    run_conserve()
         .arg("backup")
         .arg(testdir.path())
         .arg(".")
@@ -72,7 +72,7 @@ fn blackbox_backup() {
     let arch_dir = testdir.path().join("a");
 
     // conserve init
-    main_binary()
+    run_conserve()
         .arg("init")
         .arg(&arch_dir)
         .assert()
@@ -81,7 +81,7 @@ fn blackbox_backup() {
         .stdout(starts_with("Created new archive"));
 
     // New archive contains no versions.
-    main_binary()
+    run_conserve()
         .arg("versions")
         .arg(&arch_dir)
         .assert()
@@ -93,7 +93,7 @@ fn blackbox_backup() {
     src.create_file("hello");
     src.create_dir("subdir");
 
-    main_binary()
+    run_conserve()
         .args(&["ls", "--source"])
         .arg(src.path())
         .assert()
@@ -105,7 +105,7 @@ fn blackbox_backup() {
              /subdir\n",
         );
 
-    main_binary()
+    run_conserve()
         .args(&["size", "-s"])
         .arg(src.path())
         .assert()
@@ -114,7 +114,7 @@ fn blackbox_backup() {
         .stdout("0 MB\n"); // "contents"
 
     // backup
-    main_binary()
+    run_conserve()
         .arg("backup")
         .arg(&arch_dir)
         .arg(&src.root)
@@ -124,7 +124,7 @@ fn blackbox_backup() {
         .stdout(starts_with("Backup complete.\n"));
     // TODO: Now inspect the archive.
 
-    main_binary()
+    run_conserve()
         .args(&["size"])
         .arg(&arch_dir)
         .assert()
@@ -132,7 +132,7 @@ fn blackbox_backup() {
         .stderr(is_empty())
         .stdout("0 MB\n"); // "contents"
 
-    main_binary()
+    run_conserve()
         .arg("diff")
         .arg(&arch_dir)
         .arg(src.path())
@@ -147,7 +147,7 @@ both     /subdir
 ",
         );
 
-    main_binary()
+    run_conserve()
         .args(&["versions", "--short"])
         .arg(&arch_dir)
         .assert()
@@ -155,7 +155,7 @@ both     /subdir
         .stderr(is_empty())
         .stdout("b0000\n");
 
-    main_binary()
+    run_conserve()
         .args(&["debug", "blocks"])
         .arg(&arch_dir)
         .assert()
@@ -166,7 +166,7 @@ both     /subdir
              a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7\n",
         );
 
-    main_binary()
+    run_conserve()
         .args(&["debug", "referenced"])
         .arg(&arch_dir)
         .assert()
@@ -177,7 +177,7 @@ both     /subdir
              a6ca6eee42d5896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7\n",
         );
 
-    main_binary()
+    run_conserve()
         .args(&["debug", "index"])
         .arg(&arch_dir)
         .assert()
@@ -185,7 +185,7 @@ both     /subdir
         .stderr(is_empty());
     // TODO: Deserialize index json, or somehow check it.
 
-    main_binary()
+    run_conserve()
         .arg("versions")
         .arg(&arch_dir)
         .assert()
@@ -195,7 +195,7 @@ both     /subdir
     // TODO: Set a fake date when creating the archive and then we can check
     // the format of the output?
 
-    main_binary()
+    run_conserve()
         .arg("versions")
         .arg("--sizes")
         .arg(&arch_dir)
@@ -207,7 +207,7 @@ both     /subdir
                 .unwrap(),
         );
 
-    main_binary()
+    run_conserve()
         .arg("ls")
         .arg(&arch_dir)
         .assert()
@@ -222,7 +222,7 @@ both     /subdir
     // TODO: Factor out comparison to expected tree.
     let restore_dir = TempDir::new().unwrap();
 
-    main_binary()
+    run_conserve()
         .arg("restore")
         .arg("-v")
         .arg(&arch_dir)
@@ -244,7 +244,7 @@ both     /subdir
         .assert("contents");
 
     // Try to restore again over the same directory: should decline.
-    main_binary()
+    run_conserve()
         .arg("restore")
         .arg("-v")
         .arg(&arch_dir)
@@ -257,7 +257,7 @@ both     /subdir
     {
         let restore_dir2 = TempDir::new().unwrap();
         // Try to restore again over the same directory: should decline.
-        main_binary()
+        run_conserve()
             .args(&["restore", "-b", "b0"])
             .arg(&arch_dir)
             .arg(restore_dir2.path())
@@ -267,7 +267,7 @@ both     /subdir
     }
 
     // Validate
-    main_binary()
+    run_conserve()
         .arg("validate")
         .arg(&arch_dir)
         .assert()
@@ -284,9 +284,9 @@ fn empty_archive() {
     let adir = tempdir.path().join("archive");
     let restore_dir = TempDir::new().unwrap();
 
-    main_binary().arg("init").arg(&adir).assert().success();
+    run_conserve().arg("init").arg(&adir).assert().success();
 
-    main_binary()
+    run_conserve()
         .arg("restore")
         .arg(&adir)
         .arg(restore_dir.path())
@@ -294,14 +294,14 @@ fn empty_archive() {
         .failure()
         .stdout(contains("Archive has no bands"));
 
-    main_binary()
+    run_conserve()
         .arg("ls")
         .arg(&adir)
         .assert()
         .failure()
         .stdout(contains("Archive has no bands"));
 
-    main_binary()
+    run_conserve()
         .arg("versions")
         .arg(&adir)
         .assert()
@@ -318,7 +318,7 @@ fn incomplete_version() {
     let af = ScratchArchive::new();
     af.setup_incomplete_empty_band();
 
-    main_binary()
+    run_conserve()
         .arg("versions")
         .arg(af.path())
         .assert()
@@ -328,7 +328,7 @@ fn incomplete_version() {
         .stdout(contains("incomplete"));
 
     // ls fails on incomplete band
-    main_binary()
+    run_conserve()
         .arg("ls")
         .arg(af.path())
         .assert()
@@ -336,7 +336,7 @@ fn incomplete_version() {
         .stdout(contains("Archive has no bands"));
 
     // ls --incomplete accurately says it has nothing
-    main_binary()
+    run_conserve()
         .args(&["ls", "-b", "b0", "--incomplete"])
         .arg(af.path())
         .assert()
@@ -353,13 +353,13 @@ fn exclude_option_ordering() {
     let arch_dir = testdir.path().join("a");
 
     // conserve init
-    main_binary().arg("init").arg(&arch_dir).assert().success();
+    run_conserve().arg("init").arg(&arch_dir).assert().success();
 
     let src = TreeFixture::new();
     src.create_file("hello");
     src.create_dir("subdir");
 
-    main_binary()
+    run_conserve()
         .args(&["backup", "--exclude", "**/target"])
         .arg(&arch_dir)
         .arg(&src.path())
