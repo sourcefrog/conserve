@@ -22,8 +22,7 @@ use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::compress::snappy;
-use crate::compress::snappy::Compressor;
+use crate::compress::snappy::{Compressor, Decompressor};
 use crate::stats::{CopyStats, Sizes, ValidateBlockDirStats};
 use crate::*;
 
@@ -253,16 +252,14 @@ impl BlockDir {
     ///
     /// Checks that the hash is correct with the contents.
     pub fn get_block_content(&self, hash: &str) -> Result<(Vec<u8>, Sizes)> {
+        // TODO: Reuse decompressor buffer.
+        let mut decompressor = Decompressor::new();
         let path = self.path_for_file(hash);
-        let (compressed_len, decompressed_bytes) = snappy::decompress_file(&path)
-            .map_err(|source| Error::ReadBlock {
-                source,
-                path: path.to_owned(),
-            })
-            .map_err(|e| {
-                ui::show_error(&e);
-                e
-            })?;
+        let compressed_bytes = std::fs::read(&path).map_err(|source| Error::ReadBlock {
+            source,
+            path: path.to_owned(),
+        })?;
+        let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = hex::encode(
             blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed_bytes).as_bytes(),
         );
@@ -275,9 +272,10 @@ impl BlockDir {
         }
         let sizes = Sizes {
             uncompressed: decompressed_bytes.len() as u64,
-            compressed: compressed_len as u64,
+            compressed: compressed_bytes.len() as u64,
         };
-        Ok((decompressed_bytes, sizes))
+        // TODO: Return the existing buffer; don't copy it.
+        Ok((decompressed_bytes.to_vec(), sizes))
     }
 
     #[allow(dead_code)]

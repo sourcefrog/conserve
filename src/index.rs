@@ -12,7 +12,7 @@ use std::vec;
 
 use globset::GlobSet;
 
-use crate::compress::snappy::Compressor;
+use crate::compress::snappy::{Compressor, Decompressor};
 use crate::io::file_exists;
 use crate::stats::{IndexBuilderStats, IndexEntryIterStats};
 use crate::unix_time::UnixTime;
@@ -263,7 +263,7 @@ pub struct IndexEntryIter {
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
     next_hunk_number: u32,
     excludes: GlobSet,
-
+    decompressor: Decompressor,
     pub stats: IndexEntryIterStats,
 }
 
@@ -295,6 +295,7 @@ impl IndexEntryIter {
             next_hunk_number: 0,
             excludes: excludes::excludes_nothing(),
             stats: IndexEntryIterStats::default(),
+            decompressor: Decompressor::new(),
         })
     }
 
@@ -355,7 +356,7 @@ impl IndexEntryIter {
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
         self.stats.index_hunks += 1;
-        let (comp_len, index_bytes) = match crate::compress::snappy::decompress_file(&path) {
+        let compr = match std::fs::read(&path) {
             Ok(x) => x,
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
                 // TODO: Cope with one hunk being missing, while there are still
@@ -365,8 +366,9 @@ impl IndexEntryIter {
             }
             Err(source) => return Err(Error::ReadIndex { path, source }),
         };
+        let index_bytes = self.decompressor.decompress(&compr)?;
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
-        self.stats.compressed_index_bytes += comp_len as u64;
+        self.stats.compressed_index_bytes += compr.len() as u64;
         let entries: Vec<IndexEntry> =
             serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeIndex {
                 path: path.to_owned(),
