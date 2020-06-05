@@ -60,6 +60,7 @@ impl<'a> From<&'a Apath> for &'a str {
 
 impl<'a> From<&'a str> for Apath {
     fn from(s: &'a str) -> Apath {
+        // TODO: Maybe make this try_from or parse.
         assert!(Apath::is_valid(s), "invalid apath: {:?}", s);
         Apath(s.to_string())
     }
@@ -67,6 +68,7 @@ impl<'a> From<&'a str> for Apath {
 
 impl From<String> for Apath {
     fn from(s: String) -> Apath {
+        // TODO: Maybe make this try_from or parse.
         assert!(Apath::is_valid(&s), "invalid apath: {:?}", s);
         Apath(s)
     }
