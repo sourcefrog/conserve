@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 use globset::GlobSet;
 
+use crate::kind::Kind;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_time::UnixTime;
 use crate::Result;
@@ -117,15 +118,6 @@ impl LiveEntry {
         symlink_target: Option<String>,
     ) -> LiveEntry {
         // TODO: Could we read the symlink target here, rather than in the caller?
-        let kind = if metadata.is_file() {
-            Kind::File
-        } else if metadata.is_dir() {
-            Kind::Dir
-        } else if metadata.file_type().is_symlink() {
-            Kind::Symlink
-        } else {
-            Kind::Unknown
-        };
         let mtime = metadata
             .modified()
             .expect("Failed to get file mtime")
@@ -137,7 +129,7 @@ impl LiveEntry {
         };
         LiveEntry {
             apath,
-            kind,
+            kind: metadata.file_type().into(),
             mtime,
             symlink_target,
             size,

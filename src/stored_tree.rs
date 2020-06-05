@@ -11,6 +11,7 @@
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 
+use crate::kind::Kind;
 use crate::stored_file::{ReadStoredFile, StoredFile};
 use crate::*;
 

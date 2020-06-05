@@ -14,6 +14,7 @@ use globset::GlobSet;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::io::file_exists;
+use crate::kind::Kind;
 use crate::stats::{IndexBuilderStats, IndexEntryIterStats};
 use crate::unix_time::UnixTime;
 use crate::*;

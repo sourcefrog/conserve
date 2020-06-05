@@ -23,7 +23,7 @@ pub trait ReadTree {
     fn iter_entries(&self) -> Result<Self::I>;
 
     /// Read file contents as a `std::io::Read`.
-    // TODO: Perhaps return an iter of blocks, instead.
+    // TODO: Remove this and use ReadBlocks or similar.
     fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R>;
 
     /// Estimate the number of entries in the tree.

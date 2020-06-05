@@ -6,6 +6,7 @@ use std::io::prelude::*;
 
 use tempfile::TempDir;
 
+use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;

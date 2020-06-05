@@ -115,7 +115,9 @@ impl tree::WriteTree for BackupWriter {
 
 #[cfg(test)]
 mod tests {
-    use super::super::*;
+    use super::*;
+
+    use crate::kind::Kind;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     #[cfg(unix)]

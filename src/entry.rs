@@ -6,20 +6,9 @@
 
 use std::fmt::Debug;
 
-use serde::{Deserialize, Serialize};
-
+use crate::kind::Kind;
 use crate::unix_time::UnixTime;
 use crate::*;
-
-/// Kind of file that can be stored in the archive.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Kind {
-    File,
-    Dir,
-    Symlink,
-    /// Unknown file observed in local tree. Shouldn't be stored.
-    Unknown,
-}
 
 pub trait Entry: Debug + Eq + PartialEq {
     fn apath(&self) -> &Apath;

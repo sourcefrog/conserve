@@ -3,6 +3,7 @@
 
 //! Copy tree contents.
 
+use crate::kind::Kind;
 use crate::stats::CopyStats;
 use crate::*;
 
