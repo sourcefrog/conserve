@@ -52,15 +52,14 @@ impl Decompressor {
         Decompressor::default()
     }
 
-    /// Decompressed unframed Snappy data, from a slice into a vec.
+    /// Decompressed unframed Snappy data.
     ///
-    /// On return, the length of the output vec is the length of uncompressed data.
+    /// Returns a slice pointing into a reusable object inside the Decompressor.
+    #[must_use]
     pub fn decompress(&mut self, input: &[u8]) -> Result<&[u8]> {
-        // This is currently unused, but will be needed to access archives not on the
-        // local filesystem.
-        let len = snap::raw::decompress_len(input)?;
-        if self.out_buf.len() < len {
-            self.out_buf.resize(len, 0u8);
+        let max_len = snap::raw::decompress_len(input)?;
+        if self.out_buf.len() < max_len {
+            self.out_buf.resize(max_len, 0u8);
         }
         let actual_len = self.decoder.decompress(input, &mut self.out_buf)?;
         Ok(&self.out_buf[..actual_len])
