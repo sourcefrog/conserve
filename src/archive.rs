@@ -4,16 +4,18 @@
 //! Archives holding backup material.
 
 use std::collections::BTreeSet;
-use std::fs::read_dir;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Error;
-use crate::io::file_exists;
 use crate::jsonio;
+use crate::kind::Kind;
 use crate::misc::remove_item;
 use crate::stats::ValidateArchiveStats;
+use crate::transport::local::LocalTransport;
+use crate::transport::TransportRead;
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -27,6 +29,8 @@ pub struct Archive {
 
     /// Holds body content for all file versions.
     block_dir: BlockDir,
+
+    transport: LocalTransport,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -49,6 +53,7 @@ impl Archive {
         Ok(Archive {
             path: path.to_owned(),
             block_dir,
+            transport: LocalTransport::new(path),
         })
     }
 
@@ -57,25 +62,33 @@ impl Archive {
     /// Checks that the header is correct.
     pub fn open<P: Into<PathBuf>>(path: P) -> Result<Archive> {
         let path: PathBuf = path.into();
-        let header_path = path.join(HEADER_FILENAME);
-        if !file_exists(&header_path).map_err(|source| Error::ReadMetadata {
-            path: path.to_owned(),
-            source,
-        })? {
-            return Err(Error::NotAnArchive {
-                path: path.to_owned(),
-            });
-        }
-        let header: ArchiveHeader = jsonio::read_json_metadata_file(&header_path)?;
+        let mut transport = LocalTransport::new(&path);
+        let header_json = transport.read_file(HEADER_FILENAME).map_err(|e| {
+            if e.kind() == ErrorKind::NotFound {
+                Error::NotAnArchive { path: path.clone() }
+            } else {
+                Error::ReadMetadata {
+                    path: path.clone(),
+                    source: e,
+                }
+            }
+        })?;
+        let header: ArchiveHeader =
+            serde_json::from_slice(&header_json).map_err(|source| Error::DeserializeJson {
+                source,
+                path: path.clone(),
+            })?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(Error::UnsupportedArchiveVersion {
                 version: header.conserve_archive_version,
-                path,
+                path: path.clone(),
             });
         }
+        let block_dir = BlockDir::new(&path.join(BLOCK_DIR));
         Ok(Archive {
-            path: path.to_path_buf(),
-            block_dir: BlockDir::new(&path.join(BLOCK_DIR)),
+            path,
+            block_dir,
+            transport,
         })
     }
 
@@ -91,19 +104,24 @@ impl Archive {
     /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_bands(&self) -> Result<Vec<BandId>> {
         let mut band_ids = Vec::<BandId>::new();
-        for e in read_dir(self.path())
+        for entry_r in self
+            .transport
+            .read_dir("")
             .map_err(|source| Error::ListBands {
                 path: self.path.clone(),
                 source,
             })?
-            .filter_map(std::result::Result::ok)
         {
-            if let Ok(n) = e.file_name().into_string() {
-                if e.file_type().map(|ft| ft.is_dir()).unwrap_or(false) && n != BLOCK_DIR {
-                    band_ids.push(n.parse()?)
+            match entry_r {
+                // TODO: Count errors into stats.
+                Err(e) => ui::problem(&format!("Error listing {:?}: {}", self.path, e)),
+                Ok(entry) => {
+                    let name = entry.name_tail();
+                    if entry.kind() == Kind::Dir && name != BLOCK_DIR {
+                        band_ids.push(name.parse()?)
+                    }
                 }
             }
-            // TODO: Log errors while reading the directory.
         }
         band_ids.sort_unstable();
         Ok(band_ids)
@@ -160,11 +178,36 @@ impl Archive {
         // TODO: Tests for the problems detected here.
         let mut stats = ValidateArchiveStats::default();
         ui::println("Check archive top-level directory...");
-        let (mut files, mut dirs) =
-            list_dir(self.path()).map_err(|source| Error::ReadMetadata {
+
+        let mut files: Vec<String> = Vec::new();
+        let mut dirs: Vec<String> = Vec::new();
+        for entry_result in self
+            .transport
+            .read_dir("")
+            .map_err(|source| Error::ReadMetadata {
                 source,
-                path: self.path().to_owned(),
-            })?;
+                path: self.path.to_owned(),
+            })?
+        {
+            match entry_result {
+                Ok(entry) => match entry.kind() {
+                    Kind::Dir => dirs.push(entry.name_tail().to_owned()),
+                    Kind::File => files.push(entry.name_tail().to_owned()),
+                    other_kind => {
+                        ui::problem(&format!(
+                            "Unexpected file kind in archive directory: {:?} of kind {:?}",
+                            entry.relpath(),
+                            other_kind
+                        ));
+                        stats.structure_problems += 1;
+                    }
+                },
+                Err(source) => {
+                    ui::problem(&format!("Error listing archive directory: {:?}", source));
+                    stats.io_errors += 1;
+                }
+            }
+        }
         remove_item(&mut files, &HEADER_FILENAME);
         if !files.is_empty() {
             stats.structure_problems += 1;
@@ -207,10 +250,9 @@ impl Archive {
         // count.
         // TODO: Take in a dict of the known blocks and their decompressed lengths,
         // and use that to more cheaply check if the index is OK.
-        use crate::ui::println;
         ui::clear_bytes_total();
         for bid in self.list_bands()?.iter() {
-            println(&format!("Check {}...", bid));
+            ui::println(&format!("Check {}...", bid));
             let b = Band::open(self, bid)?;
             b.validate()?;
 

@@ -13,7 +13,7 @@ use std::vec;
 use globset::GlobSet;
 
 use crate::compress::snappy::{Compressor, Decompressor};
-use crate::io::file_exists;
+use crate::io::{ensure_dir_exists, file_exists};
 use crate::kind::Kind;
 use crate::stats::{IndexBuilderStats, IndexEntryIterStats};
 use crate::unix_time::UnixTime;

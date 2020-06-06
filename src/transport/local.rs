@@ -42,7 +42,7 @@ impl Clone for LocalTransport {
 
 impl TransportRead for LocalTransport {
     fn read_dir(
-        &mut self,
+        &self,
         relpath: &str,
     ) -> io::Result<Box<dyn Iterator<Item = io::Result<TransportEntry>>>> {
         // Archives should never normally contain non-UTF-8 (or even non-ASCII) filenames, but
@@ -96,7 +96,7 @@ mod test {
         temp.child("subdir").create_dir_all().unwrap();
         temp.child("subdir").child("subfile").touch().unwrap();
 
-        let mut transport = LocalTransport::new(temp.path());
+        let transport = LocalTransport::new(temp.path());
         let mut root_list: Vec<_> = transport
             .read_dir(".")
             .unwrap()

@@ -31,7 +31,7 @@ pub trait TransportRead: Send + Clone {
     ///
     /// The result should not contain entries for "." and "..".
     fn read_dir(
-        &mut self,
+        &self,
         path: &str,
     ) -> io::Result<Box<dyn Iterator<Item = io::Result<TransportEntry>>>>;
 

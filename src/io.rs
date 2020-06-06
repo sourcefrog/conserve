@@ -59,7 +59,7 @@ impl DerefMut for AtomicFile {
     }
 }
 
-pub fn ensure_dir_exists(path: &Path) -> std::io::Result<()> {
+pub(crate) fn ensure_dir_exists(path: &Path) -> std::io::Result<()> {
     fs::create_dir(path).or_else(|e| {
         if e.kind() == io::ErrorKind::AlreadyExists {
             Ok(())
@@ -70,7 +70,7 @@ pub fn ensure_dir_exists(path: &Path) -> std::io::Result<()> {
 }
 
 /// True if path exists and is a file, false if does not exist, error otherwise.
-pub fn file_exists(path: &Path) -> std::io::Result<bool> {
+pub(crate) fn file_exists(path: &Path) -> std::io::Result<bool> {
     match fs::metadata(path) {
         Ok(metadata) => Ok(metadata.is_file()),
         Err(e) => match e.kind() {

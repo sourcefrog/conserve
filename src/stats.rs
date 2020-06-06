@@ -33,6 +33,7 @@ pub struct Sizes {
 pub struct ValidateArchiveStats {
     /// Count of files in the wrong place.
     pub structure_problems: u64,
+    pub io_errors: u64,
     pub block_dir: ValidateBlockDirStats,
 }
 

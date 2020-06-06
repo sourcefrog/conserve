@@ -42,7 +42,7 @@ pub use crate::copy_tree::{copy_tree, CopyOptions, COPY_DEFAULT};
 pub use crate::entry::Entry;
 pub use crate::errors::Error;
 pub use crate::index::{IndexBuilder, IndexEntry, ReadIndex};
-pub use crate::io::{ensure_dir_exists, list_dir, AtomicFile};
+pub use crate::io::{list_dir, AtomicFile};
 pub use crate::live_tree::{LiveEntry, LiveTree};
 pub use crate::merge::{iter_merged_entries, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
