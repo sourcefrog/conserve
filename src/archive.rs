@@ -102,7 +102,7 @@ impl Archive {
     }
 
     /// Returns a vector of band ids, in sorted order from first to last.
-    pub fn list_bands(&self) -> Result<Vec<BandId>> {
+    pub fn list_band_ids(&self) -> Result<Vec<BandId>> {
         let mut band_ids: Vec<BandId> = self.iter_band_ids_unsorted()?.collect();
         band_ids.sort_unstable();
         Ok(band_ids)
@@ -153,7 +153,7 @@ impl Archive {
 
     /// Return the last completely-written band id, if any.
     pub fn last_complete_band(&self) -> Result<Option<Band>> {
-        for id in self.list_bands()?.iter().rev() {
+        for id in self.list_band_ids()?.iter().rev() {
             let b = Band::open(self, &id)?;
             if b.is_closed()? {
                 return Ok(Some(b));
@@ -165,7 +165,7 @@ impl Archive {
     /// Return a sorted set containing all the blocks referenced by all bands.
     pub fn referenced_blocks(&self) -> Result<BTreeSet<String>> {
         let mut hs = BTreeSet::<String>::new();
-        for band_id in self.list_bands()? {
+        for band_id in self.list_band_ids()? {
             let band = Band::open(&self, &band_id)?;
             for ie in band.iter_entries()? {
                 for a in ie.addrs {
@@ -267,7 +267,7 @@ impl Archive {
         // TODO: Take in a dict of the known blocks and their decompressed lengths,
         // and use that to more cheaply check if the index is OK.
         ui::clear_bytes_total();
-        for bid in self.list_bands()?.iter() {
+        for bid in self.list_band_ids()?.iter() {
             ui::println(&format!("Check {}...", bid));
             let b = Band::open(self, bid)?;
             b.validate()?;
@@ -295,11 +295,11 @@ mod tests {
         let arch = Archive::create(&arch_path).unwrap();
 
         assert_eq!(arch.path(), arch_path.as_path());
-        assert!(arch.list_bands().unwrap().is_empty());
+        assert!(arch.list_band_ids().unwrap().is_empty());
 
         // We can re-open it.
         Archive::open(arch_path).unwrap();
-        assert!(arch.list_bands().unwrap().is_empty());
+        assert!(arch.list_band_ids().unwrap().is_empty());
         assert!(arch.last_complete_band().unwrap().is_none());
     }
 
@@ -339,13 +339,13 @@ mod tests {
         let (_file_names, dir_names) = list_dir(af.path()).unwrap();
         assert_eq!(dir_names, &["b0000", "d"]);
 
-        assert_eq!(af.list_bands().unwrap(), vec![BandId::new(&[0])]);
+        assert_eq!(af.list_band_ids().unwrap(), vec![BandId::new(&[0])]);
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[0])));
 
         // Try creating a second band.
         let _band2 = Band::create(&af).unwrap();
         assert_eq!(
-            af.list_bands().unwrap(),
+            af.list_band_ids().unwrap(),
             vec![BandId::new(&[0]), BandId::new(&[1])]
         );
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));

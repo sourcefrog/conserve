@@ -133,7 +133,7 @@ mod tests {
         assert_eq!(1, copy_stats.symlinks);
         assert_eq!(0, copy_stats.unknown_kind);
 
-        let band_ids = af.list_bands().unwrap();
+        let band_ids = af.list_band_ids().unwrap();
         assert_eq!(1, band_ids.len());
         assert_eq!("b0000", band_ids[0].to_string());
 

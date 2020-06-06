@@ -13,7 +13,7 @@ use chrono::Local;
 use crate::*;
 
 pub fn show_brief_version_list(archive: &Archive, w: &mut dyn Write) -> Result<()> {
-    for band_id in archive.list_bands()? {
+    for band_id in archive.list_band_ids()? {
         writeln!(w, "{}", band_id)?
     }
     Ok(())
@@ -24,7 +24,7 @@ pub fn show_verbose_version_list(
     show_sizes: bool,
     w: &mut dyn Write,
 ) -> Result<()> {
-    for band_id in archive.list_bands()? {
+    for band_id in archive.list_band_ids()? {
         let band = match Band::open(&archive, &band_id) {
             Ok(band) => band,
             Err(e) => {
