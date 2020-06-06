@@ -64,3 +64,24 @@ pub struct TransportEntry {
     relpath: String,
     kind: Kind,
 }
+
+impl TransportEntry {
+    /// Just the filename component of the name.
+    pub fn name_tail(&self) -> &str {
+        if let Some(last) = self.relpath.rsplit('/').next() {
+            debug_assert!(!last.is_empty());
+            last
+        } else {
+            &self.relpath
+        }
+    }
+
+    pub fn kind(&self) -> Kind {
+        self.kind
+    }
+
+    /// Returns the path relative to the transport root.
+    pub fn relpath(&self) -> &str {
+        &self.relpath
+    }
+}
