@@ -67,6 +67,10 @@ impl TransportRead for LocalTransport {
         File::open(&self.full_path(relpath))?.read_to_end(&mut self.read_buf)?;
         Ok(self.read_buf.as_slice())
     }
+
+    fn box_clone(&self) -> Box<dyn TransportRead> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(test)]
