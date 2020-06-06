@@ -11,14 +11,15 @@
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 
+use crate::blockdir::BlockDir;
 use crate::kind::Kind;
 use crate::stored_file::{ReadStoredFile, StoredFile};
 use crate::*;
 
 /// Read index and file contents for a version stored in the archive.
 pub struct StoredTree {
-    archive: Archive,
     band: Band,
+    block_dir: BlockDir,
     excludes: GlobSet,
 }
 
@@ -29,8 +30,8 @@ impl StoredTree {
             .last_complete_band()?
             .ok_or(errors::Error::ArchiveEmpty)?;
         Ok(StoredTree {
-            archive: archive.clone(),
             band,
+            block_dir: archive.block_dir().clone(),
             excludes: excludes::excludes_nothing(),
         })
     }
@@ -46,8 +47,8 @@ impl StoredTree {
             });
         }
         Ok(StoredTree {
-            archive: archive.clone(),
             band,
+            block_dir: archive.block_dir().clone(),
             excludes: excludes::excludes_nothing(),
         })
     }
@@ -59,8 +60,8 @@ impl StoredTree {
     pub fn open_incomplete_version(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
         let band = Band::open(archive, band_id)?;
         Ok(StoredTree {
-            archive: archive.clone(),
             band,
+            block_dir: archive.block_dir().clone(),
             excludes: excludes::excludes_nothing(),
         })
     }
@@ -71,10 +72,6 @@ impl StoredTree {
 
     pub fn band(&self) -> &Band {
         &self.band
-    }
-
-    pub fn archive(&self) -> &Archive {
-        &self.archive
     }
 
     pub fn is_closed(&self) -> Result<bool> {
@@ -104,7 +101,7 @@ impl StoredTree {
     /// Open a file stored within this tree.
     fn open_stored_file(&self, entry: &IndexEntry) -> Result<StoredFile> {
         Ok(StoredFile::open(
-            self.archive.block_dir().clone(),
+            self.block_dir.clone(),
             entry.addrs.clone(),
         ))
     }
