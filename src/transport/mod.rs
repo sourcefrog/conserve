@@ -1,9 +1,12 @@
 // Copyright 2020 Martin Pool.
 
 //! Filesystem abstraction to read and write local and remote archives.
+//!
+//! Transport operations return std::io::Result to reflect their narrower focus.
+
+use std::io;
 
 use crate::kind::Kind;
-use crate::Result;
 
 pub mod local;
 
@@ -27,13 +30,16 @@ pub trait TransportRead: Send + Clone {
     /// Returned entries are in arbitrary order and may be interleaved with errors.
     ///
     /// The result should not contain entries for "." and "..".
-    fn read_dir(&mut self, path: &str) -> Result<Box<dyn Iterator<Item = Result<TransportEntry>>>>;
+    fn read_dir(
+        &mut self,
+        path: &str,
+    ) -> io::Result<Box<dyn Iterator<Item = io::Result<TransportEntry>>>>;
 
     /// Get one complete file.
     ///
     /// Files in the archive are of bounded size, so it's OK to always read them entirely into
     /// memory, and this is simple to support on all implementations.
-    fn read_file(&mut self, path: &str) -> Result<&[u8]>;
+    fn read_file(&mut self, path: &str) -> io::Result<&[u8]>;
 }
 
 /// Facade to both read and write an archive.
@@ -42,13 +48,13 @@ pub trait TransportWrite: TransportRead {
     ///
     /// If the directory already exists, this should be an error, but if that's not supported
     /// by the underlying transport it may just succeed.
-    fn make_dir(&mut self, apath: &str) -> Result<()>;
+    fn make_dir(&mut self, apath: &str) -> io::Result<()>;
 
     /// Write a complete file.
     ///
     /// As much as possible, the file should be written atomically so that it is only visible with
     /// the complete content.
-    fn write_file(&mut self, apath: &str, content: &[u8]) -> Result<()>;
+    fn write_file(&mut self, apath: &str, content: &[u8]) -> io::Result<()>;
 }
 
 /// A directory entry read from a transport.
