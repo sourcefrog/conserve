@@ -103,36 +103,52 @@ impl Archive {
 
     /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_bands(&self) -> Result<Vec<BandId>> {
-        let mut band_ids = Vec::<BandId>::new();
-        for entry_r in self
+        let mut band_ids: Vec<BandId> = self.iter_band_ids_unsorted()?.collect();
+        band_ids.sort_unstable();
+        Ok(band_ids)
+    }
+
+    /// Return an iterator of valid band ids in this archive, in arbitrary order.
+    ///
+    /// Errors reading the archive directory are logged and discarded.
+    fn iter_band_ids_unsorted(&self) -> Result<impl Iterator<Item = BandId>> {
+        // TODO: Count errors and return stats?
+        Ok(self
             .transport
             .read_dir("")
             .map_err(|source| Error::ListBands {
                 path: self.path.clone(),
                 source,
             })?
-        {
-            match entry_r {
+            .filter_map(|entry_r| match entry_r {
                 // TODO: Count errors into stats.
-                Err(e) => ui::problem(&format!("Error listing {:?}: {}", self.path, e)),
+                Err(e) => {
+                    ui::problem(&format!("Error listing bands: {}", e));
+                    None
+                }
                 Ok(entry) => {
                     let name = entry.name_tail();
                     if entry.kind() == Kind::Dir && name != BLOCK_DIR {
-                        band_ids.push(name.parse()?)
+                        if let Ok(band_id) = name.parse() {
+                            Some(band_id)
+                        } else {
+                            ui::problem(&format!(
+                                "Unexpected directory {:?} in archive",
+                                entry.relpath()
+                            ));
+                            None
+                        }
+                    } else {
+                        None
                     }
                 }
-            }
-        }
-        band_ids.sort_unstable();
-        Ok(band_ids)
+            }))
     }
 
     /// Return the `BandId` of the highest-numbered band, or Ok(None) if there
     /// are no bands, or an Err if any occurred reading the directory.
     pub fn last_band_id(&self) -> Result<Option<BandId>> {
-        // TODO: Perhaps factor out an iter_bands_unsorted, common
-        // between this and list_bands.
-        Ok(self.list_bands()?.into_iter().last())
+        Ok(self.iter_band_ids_unsorted()?.max())
     }
 
     /// Return the last completely-written band id, if any.
