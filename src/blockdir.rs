@@ -266,10 +266,14 @@ impl BlockDir {
         // TODO: Reuse decompressor buffer.
         let mut decompressor = Decompressor::new();
         let path = self.path_for_file(hash);
-        let compressed_bytes = std::fs::read(&path).map_err(|source| Error::ReadBlock {
-            source,
-            path: path.to_owned(),
-        })?;
+        // TODO: Reuse read buffer.
+        let mut compressed_bytes = Vec::new();
+        self.transport
+            .read_file(&self.relpath(hash), &mut compressed_bytes)
+            .map_err(|source| Error::ReadBlock {
+                source,
+                path: path.to_owned(),
+            })?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = hex::encode(
             blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed_bytes).as_bytes(),
@@ -287,14 +291,6 @@ impl BlockDir {
         };
         // TODO: Return the existing buffer; don't copy it.
         Ok((decompressed_bytes.to_vec(), sizes))
-    }
-
-    #[allow(dead_code)]
-    fn compressed_block_size(&self, hash: &str) -> Result<u64> {
-        let path = self.path_for_file(hash);
-        Ok(fs::metadata(&path)
-            .map_err(|source| Error::ReadBlock { path, source })?
-            .len())
     }
 }
 
