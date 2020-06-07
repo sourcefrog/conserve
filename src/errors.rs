@@ -83,14 +83,14 @@ pub enum Error {
     WriteIndex { path: PathBuf, source: IOError },
 
     #[error("Failed to read index hunk {:?}", path)]
-    ReadIndex { path: PathBuf, source: IOError },
+    ReadIndex { path: String, source: IOError },
 
     #[error("Failed to serialize index")]
     SerializeIndex { source: serde_json::Error },
 
-    #[error("Failed to deserialize index hunk from {:?}", path)]
+    #[error("Failed to deserialize index hunk {:?}", path)]
     DeserializeIndex {
-        path: PathBuf,
+        path: String,
         source: serde_json::Error,
     },
 

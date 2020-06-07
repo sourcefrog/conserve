@@ -69,17 +69,6 @@ pub(crate) fn ensure_dir_exists(path: &Path) -> std::io::Result<()> {
     })
 }
 
-/// True if path exists and is a file, false if does not exist, error otherwise.
-pub(crate) fn file_exists(path: &Path) -> std::io::Result<bool> {
-    match fs::metadata(path) {
-        Ok(metadata) => Ok(metadata.is_file()),
-        Err(e) => match e.kind() {
-            io::ErrorKind::NotFound => Ok(false),
-            _ => Err(e),
-        },
-    }
-}
-
 /// True if a directory exists and is empty.
 pub fn directory_is_empty(path: &Path) -> std::io::Result<bool> {
     Ok(std::fs::read_dir(path)?.next().is_none())

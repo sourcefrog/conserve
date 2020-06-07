@@ -13,9 +13,11 @@ use std::vec;
 use globset::GlobSet;
 
 use crate::compress::snappy::{Compressor, Decompressor};
-use crate::io::{ensure_dir_exists, file_exists};
+use crate::io::ensure_dir_exists;
 use crate::kind::Kind;
 use crate::stats::{IndexBuilderStats, IndexEntryIterStats};
+use crate::transport::local::LocalTransport;
+use crate::transport::TransportRead;
 use crate::unix_time::UnixTime;
 use crate::*;
 
@@ -214,31 +216,46 @@ fn subdir_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
 
 /// Return the filename (in subdirectory) for a hunk.
 fn path_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
-    let mut buf = subdir_for_hunk(dir, hunk_number);
-    buf.push(format!("{:09}", hunk_number));
-    buf
+    dir.join(relpath_for_hunk(hunk_number))
+}
+
+/// Return the relative path for a hunk.
+fn relpath_for_hunk(hunk_number: u32) -> String {
+    format!("{:05}/{:09}", hunk_number / HUNKS_PER_SUBDIR, hunk_number)
 }
 
 #[derive(Debug, Clone)]
 pub struct IndexRead {
     dir: PathBuf,
+
+    /// Transport pointing to this index directory.
+    transport: Box<dyn TransportRead>,
 }
 
 impl IndexRead {
     pub fn new(dir: &Path) -> IndexRead {
         IndexRead {
             dir: dir.to_path_buf(),
+            transport: Box::new(LocalTransport::new(&dir)),
         }
     }
 
     /// Return the (1-based) number of index hunks in an index directory.
     pub fn count_hunks(&self) -> Result<u32> {
+        // TODO: Might be faster to list the directory than to probe for all of them.
+        // TODO: Perhaps, list the directories and cope cleanly with
+        // one hunk being missing.
         for i in 0.. {
-            let path = path_for_hunk(&self.dir, i);
-            if !file_exists(&path).map_err(|source| Error::ReadIndex { source, path })? {
+            let path = relpath_for_hunk(i);
+            if !self
+                .transport
+                .exists(&path)
+                .map_err(|source| Error::ReadIndex {
+                    source,
+                    path: path.into(),
+                })?
+            {
                 // If hunk 1 is missing, 1 hunks exists.
-                // TODO: Perhaps, list the directories and cope cleanly with
-                // one hunk being missing.
                 return Ok(i);
             }
         }
@@ -251,14 +268,20 @@ impl IndexRead {
 
     /// Make an iterator that will return all entries in this band.
     pub fn iter(&self) -> Result<IndexEntryIter> {
-        IndexEntryIter::open(&self.dir)
+        Ok(IndexEntryIter {
+            buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
+            next_hunk_number: 0,
+            excludes: excludes::excludes_nothing(),
+            stats: IndexEntryIterStats::default(),
+            decompressor: Decompressor::new(),
+            transport: self.transport.box_clone(),
+            compressed_buf: Vec::new(),
+        })
     }
 }
 
 /// Read out all the entries from a stored index, in apath order.
 pub struct IndexEntryIter {
-    /// The `i` directory within the band where all files for this index are written.
-    dir: PathBuf,
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
@@ -266,6 +289,9 @@ pub struct IndexEntryIter {
     excludes: GlobSet,
     decompressor: Decompressor,
     pub stats: IndexEntryIterStats,
+    /// The `i` directory within the band where all files for this index are written.
+    transport: Box<dyn TransportRead>,
+    compressed_buf: Vec<u8>,
 }
 
 impl Iterator for IndexEntryIter {
@@ -286,20 +312,6 @@ impl Iterator for IndexEntryIter {
 }
 
 impl IndexEntryIter {
-    /// Create an iterator that will read all entires from an existing index.
-    ///
-    /// Prefer to use `Band::index_iter` instead.
-    pub fn open(index_dir: &Path) -> Result<IndexEntryIter> {
-        Ok(IndexEntryIter {
-            dir: index_dir.to_path_buf(),
-            buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
-            next_hunk_number: 0,
-            excludes: excludes::excludes_nothing(),
-            stats: IndexEntryIterStats::default(),
-            decompressor: Decompressor::new(),
-        })
-    }
-
     /// Consume this iterator and return a new one with exclusions.
     pub fn with_excludes(self, excludes: globset::GlobSet) -> IndexEntryIter {
         IndexEntryIter { excludes, ..self }
@@ -353,26 +365,29 @@ impl IndexEntryIter {
             self.buffered_entries.next().is_none(),
             "refill_entry_buffer called with non-empty buffer"
         );
-        let path = path_for_hunk(&self.dir, self.next_hunk_number);
+        let path = &relpath_for_hunk(self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
         self.stats.index_hunks += 1;
-        let compr = match std::fs::read(&path) {
-            Ok(x) => x,
-            Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
+        if let Err(err) = self.transport.read_file(&path, &mut self.compressed_buf) {
+            if err.kind() == io::ErrorKind::NotFound {
                 // TODO: Cope with one hunk being missing, while there are still
                 // later-numbered hunks. This would require reading the whole
                 // list of hunks first.
                 return Ok(false);
+            } else {
+                return Err(Error::ReadIndex {
+                    path: path.clone(),
+                    source: err,
+                });
             }
-            Err(source) => return Err(Error::ReadIndex { path, source }),
         };
-        let index_bytes = self.decompressor.decompress(&compr)?;
+        self.stats.compressed_index_bytes += self.compressed_buf.len() as u64;
+        let index_bytes = self.decompressor.decompress(&self.compressed_buf)?;
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
-        self.stats.compressed_index_bytes += compr.len() as u64;
         let entries: Vec<IndexEntry> =
             serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeIndex {
-                path: path.to_owned(),
+                path: path.clone(),
                 source,
             })?;
         if entries.is_empty() {
@@ -503,7 +518,7 @@ mod tests {
             "Index hunk file not found"
         );
 
-        let mut it = IndexEntryIter::open(&ib_dir).unwrap();
+        let mut it = IndexRead::new(&ib_dir).iter().unwrap();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
@@ -522,7 +537,7 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk().unwrap();
 
-        let it = IndexEntryIter::open(&ib.dir).unwrap();
+        let it = IndexRead::new(&ib.dir).iter().unwrap();
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
     }
@@ -556,7 +571,8 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         let excludes = excludes::from_strings(&["/fo*"]).unwrap();
-        let it = IndexEntryIter::open(&ib.dir)
+        let it = IndexRead::new(&ib.dir)
+            .iter()
             .unwrap()
             .with_excludes(excludes);
 
@@ -579,25 +595,25 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         // Advance to /foo and read on from there.
-        let mut it = IndexEntryIter::open(&ib.dir).unwrap();
+        let mut it = IndexRead::new(&ib.dir).iter().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/foo")).unwrap().apath, "/foo");
         assert_eq!(it.next().unwrap().apath, "/foobar");
         assert_eq!(it.next().unwrap().apath, "/g01");
 
         // Advance to before /g01
-        let mut it = IndexEntryIter::open(&ib.dir).unwrap();
+        let mut it = IndexRead::new(&ib.dir).iter().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/fxxx")), None);
         assert_eq!(it.next().unwrap().apath, "/g01");
         assert_eq!(it.next().unwrap().apath, "/g02");
 
         // Advance to before the first entry
-        let mut it = IndexEntryIter::open(&ib.dir).unwrap();
+        let mut it = IndexRead::new(&ib.dir).iter().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/aaaa")), None);
         assert_eq!(it.next().unwrap().apath, "/bar");
         assert_eq!(it.next().unwrap().apath, "/foo");
 
         // Advance to after the last entry
-        let mut it = IndexEntryIter::open(&ib.dir).unwrap();
+        let mut it = IndexRead::new(&ib.dir).iter().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/zz")), None);
         assert_eq!(it.next(), None);
     }
