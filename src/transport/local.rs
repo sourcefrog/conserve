@@ -53,6 +53,7 @@ impl TransportRead for LocalTransport {
     }
 
     fn read_file(&self, relpath: &str, out_buf: &mut Vec<u8>) -> io::Result<()> {
+        out_buf.truncate(0);
         let len = File::open(&self.full_path(relpath))?.read_to_end(out_buf)?;
         out_buf.truncate(len);
         Ok(())
@@ -87,6 +88,22 @@ mod test {
         transport.read_file(&filename, &mut buf).unwrap();
         assert_eq!(buf, content.as_bytes());
 
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn read_with_non_empty_buffer() {
+        let mut buf = b"already has some stuff".to_vec();
+        let temp = assert_fs::TempDir::new().unwrap();
+        let desired = b"content from file";
+        let filename = "test.txt";
+        temp.child(filename).write_binary(desired).unwrap();
+        let transport = LocalTransport::new(temp.path());
+        transport.read_file(&filename, &mut buf).unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&buf),
+            String::from_utf8_lossy(desired)
+        );
         temp.close().unwrap();
     }
 
