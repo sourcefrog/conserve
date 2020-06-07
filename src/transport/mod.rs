@@ -72,4 +72,6 @@ pub struct DirEntry {
     /// Name of the file within the directory being listed.
     pub name: String,
     pub kind: Kind,
+    /// Size in bytes.
+    pub len: u64,
 }

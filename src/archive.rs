@@ -126,7 +126,7 @@ impl Archive {
                     ui::problem(&format!("Error listing bands: {}", e));
                     None
                 }
-                Ok(DirEntry { name, kind }) => {
+                Ok(DirEntry { name, kind, .. }) => {
                     if kind == Kind::Dir && name != BLOCK_DIR {
                         if let Ok(band_id) = name.parse() {
                             Some(band_id)
@@ -202,7 +202,7 @@ impl Archive {
             })?
         {
             match entry_result {
-                Ok(DirEntry { name, kind }) => match kind {
+                Ok(DirEntry { name, kind, .. }) => match kind {
                     Kind::Dir => dirs.push(name),
                     Kind::File => files.push(name),
                     other_kind => {

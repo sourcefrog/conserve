@@ -23,7 +23,10 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::compress::snappy::{Compressor, Decompressor};
+use crate::kind::Kind;
 use crate::stats::{CopyStats, Sizes, ValidateBlockDirStats};
+use crate::transport::local::LocalTransport;
+use crate::transport::{DirEntry, TransportRead};
 use crate::*;
 
 /// Use the maximum 64-byte hash.
@@ -61,6 +64,8 @@ pub struct Address {
 #[derive(Clone)]
 pub struct BlockDir {
     pub path: PathBuf,
+
+    transport: Box<dyn TransportRead>,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {
@@ -72,6 +77,7 @@ impl BlockDir {
     pub fn new(path: &Path) -> BlockDir {
         BlockDir {
             path: path.to_path_buf(),
+            transport: Box::new(LocalTransport::new(path)),
         }
     }
 
@@ -89,6 +95,11 @@ impl BlockDir {
     /// Return the full path for a file called `hex_hash`.
     fn path_for_file(&self, hash_hex: &str) -> PathBuf {
         self.subdir_for(hash_hex).join(hash_hex)
+    }
+
+    /// Return the transport-relative file for a given hash.
+    fn relpath(&self, hash_hex: &str) -> String {
+        format!("{}/{}", block_name_to_subdirectory(hash_hex), hash_hex)
     }
 
     /// Returns the number of compressed bytes.
@@ -126,12 +137,9 @@ impl BlockDir {
 
     /// True if the named block is present in this directory.
     pub fn contains(&self, hash: &str) -> Result<bool> {
-        let path = self.path_for_file(hash);
-        match fs::metadata(&path) {
-            Err(ref e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
-            Ok(_) => Ok(true),
-            Err(e) => Err(e).map_err(|source| Error::ReadBlock { source, path }),
-        }
+        self.transport
+            .exists(&self.relpath(hash))
+            .map_err(Error::from)
     }
 
     /// Read back the contents of a block, as a byte array.
@@ -158,61 +166,64 @@ impl BlockDir {
         }
     }
 
-    /// Return a sorted vec of prefix subdirectories.
-    fn subdirs(&self) -> std::io::Result<Vec<String>> {
-        // This doesn't check every invariant that should be true; that's the job of the validation
-        // code.
-        let (_fs, mut ds) = list_dir(&self.path)?;
-        ds.retain(|dd| {
-            if dd.len() != SUBDIR_NAME_CHARS {
-                ui::problem(&format!(
-                    "Unexpected subdirectory in blockdir {:?}: {:?}",
-                    self.path, dd
-                ));
-                false
-            } else {
-                true
-            }
-        });
-        Ok(ds)
+    /// Return an iterator of block subdirectories, in arbitrary order.
+    ///
+    /// Errors, other than failure to open the directory at all, are logged and discarded.
+    fn subdirs(&self) -> Result<impl Iterator<Item = String>> {
+        Ok(self
+            .transport
+            .read_dir("")
+            .map_err(|source| Error::ListBlocks {
+                source,
+                path: self.path.clone(),
+            })?
+            .filter_map(|entry_result| match entry_result {
+                Err(e) => {
+                    ui::problem(&format!("Error listing blockdir: {:?}", e));
+                    None
+                }
+                Ok(DirEntry { name, kind, .. }) => {
+                    if kind != Kind::Dir {
+                        None
+                    } else if name.len() != SUBDIR_NAME_CHARS {
+                        ui::problem(&format!("Unexpected subdirectory in blockdir: {:?}", name));
+                        None
+                    } else {
+                        Some(name)
+                    }
+                }
+            }))
     }
 
-    fn iter_block_dir_entries(&self) -> Result<impl Iterator<Item = std::fs::DirEntry>> {
-        let path = self.path.clone();
-        let subdirs = self.subdirs().map_err(|source| Error::ListBlocks {
-            source,
-            path: path.to_owned(),
-        })?;
-        Ok(subdirs.into_iter().flat_map(move |s| {
-            // TODO: Avoid `unwrap`.
-            fs::read_dir(&path.join(s))
-                .unwrap()
-                .map(std::io::Result::unwrap)
-                .filter(|entry| {
-                    let name = entry.file_name().into_string().unwrap();
-                    entry.file_type().unwrap().is_file()
-                        && !name.starts_with(TMP_PREFIX)
-                        && name.len() == BLOCKDIR_FILE_NAME_LEN
-                })
-        }))
+    fn iter_block_dir_entries(&self) -> Result<impl Iterator<Item = DirEntry>> {
+        let transport = self.transport.clone();
+        Ok(self
+            .subdirs()?
+            .map(move |subdir_name| transport.read_dir(&subdir_name))
+            .filter_map(|iter_or| {
+                if let Err(ref err) = iter_or {
+                    ui::problem(&format!("Error listing block directory: {:?}", &err));
+                }
+                iter_or.ok()
+            })
+            .flatten()
+            .filter_map(|iter_or| {
+                if let Err(ref err) = iter_or {
+                    ui::problem(&format!("Error listing block subdirectory: {:?}", &err));
+                }
+                iter_or.ok()
+            })
+            .filter(|DirEntry { name, kind, .. }| {
+                *kind == Kind::File
+                    && name.len() == BLOCKDIR_FILE_NAME_LEN
+                    && !name.starts_with(TMP_PREFIX)
+            }))
     }
 
     /// Return an iterator through all the blocknames in the blockdir,
     /// in arbitrary order.
     pub fn block_names(&self) -> Result<impl Iterator<Item = String>> {
-        Ok(self
-            .iter_block_dir_entries()?
-            .map(|de| de.file_name().into_string().unwrap()))
-    }
-
-    /// Return an iterator of block names and sizes.
-    fn block_names_and_sizes(&self) -> Result<impl Iterator<Item = (String, u64)>> {
-        Ok(self.iter_block_dir_entries()?.map(|de| {
-            (
-                de.file_name().into_string().unwrap(),
-                de.metadata().unwrap().len(),
-            )
-        }))
+        Ok(self.iter_block_dir_entries()?.map(|de| de.name))
     }
 
     /// Check format invariants of the BlockDir.
@@ -223,8 +234,8 @@ impl BlockDir {
         // then we don't need to count the sizes in advance.
         // TODO: Test having a block with the right compression but the wrong contents.
         ui::println("Count blocks...");
-        let bns: Vec<(String, u64)> = self.block_names_and_sizes()?.collect();
-        let tot = bns.iter().map(|a| a.1).sum();
+        let block_dir_entries: Vec<DirEntry> = self.iter_block_dir_entries()?.collect();
+        let tot = block_dir_entries.iter().map(|de| de.len).sum();
         ui::set_progress_phase(&"Count blocks");
         ui::set_bytes_total(tot);
         crate::ui::println(&format!(
@@ -232,16 +243,16 @@ impl BlockDir {
             crate::misc::bytes_to_human_mb(tot)
         ));
         ui::set_progress_phase(&"Check block hashes");
-        let block_error_count = bns
+        let block_error_count = block_dir_entries
             .par_iter()
-            .filter(|(block_hash, bsize)| {
-                ui::increment_bytes_done(*bsize);
-                self.get_block_content(&block_hash).is_err()
+            .filter(|de| {
+                ui::increment_bytes_done(de.len);
+                self.get_block_content(&de.name).is_err()
             })
             .count()
             .try_into()
             .unwrap();
-        let block_read_count = bns.len().try_into().unwrap();
+        let block_read_count = block_dir_entries.len().try_into().unwrap();
         Ok(ValidateBlockDirStats {
             block_error_count,
             block_read_count,

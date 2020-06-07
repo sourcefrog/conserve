@@ -52,9 +52,11 @@ impl TransportRead for LocalTransport {
         Ok(Box::new(self.full_path(&relpath).read_dir()?.map(
             move |i| {
                 i.and_then(|de| {
+                    let metadata = de.metadata()?;
                     Ok(DirEntry {
                         name: de.file_name().to_string_lossy().into(),
                         kind: de.file_type()?.into(),
+                        len: metadata.len(),
                     })
                 })
                 .map_err(|e| e.into())
@@ -102,7 +104,10 @@ mod test {
         let temp = assert_fs::TempDir::new().unwrap();
         temp.child("root file").touch().unwrap();
         temp.child("subdir").create_dir_all().unwrap();
-        temp.child("subdir").child("subfile").touch().unwrap();
+        temp.child("subdir")
+            .child("subfile")
+            .write_str("Morning coffee")
+            .unwrap();
 
         let transport = LocalTransport::new(temp.path());
         let mut root_list: Vec<_> = transport
@@ -118,15 +123,13 @@ mod test {
             DirEntry {
                 name: "root file".to_owned(),
                 kind: Kind::File,
+                len: 0,
             }
         );
-        assert_eq!(
-            root_list[1],
-            DirEntry {
-                name: "subdir".to_owned(),
-                kind: Kind::Dir,
-            }
-        );
+
+        // Len is unpredictable for directories, so check the other fields.
+        assert_eq!(root_list[1].name, "subdir");
+        assert_eq!(root_list[1].kind, Kind::Dir);
 
         assert_eq!(transport.exists("root file").unwrap(), true);
         assert_eq!(transport.exists("nuh-uh").unwrap(), false);
@@ -140,7 +143,8 @@ mod test {
             subdir_list,
             vec![DirEntry {
                 name: "subfile".to_owned(),
-                kind: Kind::File
+                kind: Kind::File,
+                len: 14,
             }]
         );
 
