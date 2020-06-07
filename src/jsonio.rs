@@ -10,7 +10,7 @@ use crate::errors::Error;
 use crate::io::AtomicFile;
 use crate::Result;
 
-pub fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T) -> Result<()> {
+pub(crate) fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T) -> Result<()> {
     let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::SerializeJson {
         path: path.to_owned(),
         source,
@@ -27,7 +27,7 @@ pub fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T) -> Re
         })
 }
 
-pub fn read_json_metadata_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
+pub(crate) fn read_json_metadata_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
     let buf = std::fs::read_to_string(&path).map_err(|source| Error::ReadMetadata {
         path: path.to_owned(),
         source,
