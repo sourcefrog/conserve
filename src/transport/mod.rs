@@ -42,6 +42,9 @@ pub trait TransportRead: Send {
     /// memory, and this is simple to support on all implementations.
     fn read_file(&mut self, path: &str) -> io::Result<&[u8]>;
 
+    /// Check if an entry exists.
+    fn exists(&self, path: &str) -> io::Result<bool>;
+
     fn box_clone(&self) -> Box<dyn TransportRead>;
 }
 

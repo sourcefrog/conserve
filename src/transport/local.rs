@@ -68,6 +68,10 @@ impl TransportRead for LocalTransport {
         Ok(self.read_buf.as_slice())
     }
 
+    fn exists(&self, relpath: &str) -> io::Result<bool> {
+        Ok(self.full_path(relpath).exists())
+    }
+
     fn box_clone(&self) -> Box<dyn TransportRead> {
         Box::new(self.clone())
     }
@@ -123,6 +127,9 @@ mod test {
                 kind: Kind::Dir,
             }
         );
+
+        assert_eq!(transport.exists("root file").unwrap(), true);
+        assert_eq!(transport.exists("nuh-uh").unwrap(), false);
 
         let subdir_list: Vec<_> = transport
             .read_dir("subdir")
