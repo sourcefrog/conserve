@@ -220,13 +220,13 @@ fn path_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
 }
 
 #[derive(Debug, Clone)]
-pub struct ReadIndex {
+pub struct IndexRead {
     dir: PathBuf,
 }
 
-impl ReadIndex {
-    pub fn new(dir: &Path) -> ReadIndex {
-        ReadIndex {
+impl IndexRead {
+    pub fn new(dir: &Path) -> IndexRead {
+        IndexRead {
             dir: dir.to_path_buf(),
         }
     }
@@ -614,7 +614,7 @@ mod tests {
         ib.finish_hunk()?;
         // Think about, but don't actually add some files
         ib.finish_hunk()?;
-        let read_index = ReadIndex::new(&testdir.path());
+        let read_index = IndexRead::new(&testdir.path());
         assert_eq!(read_index.count_hunks()?, 1);
         Ok(())
     }

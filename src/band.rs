@@ -172,8 +172,8 @@ impl Band {
     }
 
     /// Get read-only access to the index of this band.
-    pub fn index(&self) -> ReadIndex {
-        ReadIndex::new(&self.index_dir_path)
+    pub fn index(&self) -> IndexRead {
+        IndexRead::new(&self.index_dir_path)
     }
 
     /// Return an iterator through entries in this band.
