@@ -18,14 +18,13 @@ pub mod local;
 /// A transport has a root location, which will typically be the top directory of the Archive.
 /// Below that point everything is accessed with a relative path, expressed as a PathBuf.
 ///
-/// All Transports must be `Send`, so that new instances can be created within parallel
-/// threads. They need not be Sync.
+/// All Transports must be `Send + Sync`, so they can be passed across or shared across threads.
 ///
 /// TransportRead is object-safe so can be used as `dyn TransportRead`.
 ///
 /// Files in Conserve archives have bounded size and fit in memory so this does not need to
 /// support streaming or partial reads and writes.
-pub trait TransportRead: Send {
+pub trait TransportRead: Send + Sync {
     /// Read the contents of a directory under this transport, without recursing down.
     ///
     /// Returned entries are in arbitrary order and may be interleaved with errors.
@@ -42,6 +41,7 @@ pub trait TransportRead: Send {
     /// Check if an entry exists.
     fn exists(&self, path: &str) -> io::Result<bool>;
 
+    /// Clone this object into a new box.
     fn box_clone(&self) -> Box<dyn TransportRead>;
 }
 
