@@ -5,8 +5,10 @@
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
 use std::io;
+use std::path::Path;
 
 use crate::kind::Kind;
+use crate::Result;
 
 pub mod local;
 
@@ -48,6 +50,13 @@ pub trait TransportRead: Send + Sync + std::fmt::Debug {
 impl Clone for Box<dyn TransportRead> {
     fn clone(&self) -> Box<dyn TransportRead> {
         self.box_clone()
+    }
+}
+
+impl dyn TransportRead {
+    pub fn new(s: &str) -> Result<Box<dyn TransportRead>> {
+        // TODO: Recognize URL-style strings.
+        Ok(Box::new(local::LocalTransport::new(&Path::new(s))))
     }
 }
 

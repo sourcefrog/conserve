@@ -69,9 +69,10 @@ impl TransportRead for LocalTransport {
 
 #[cfg(test)]
 mod test {
+    use assert_fs::prelude::*;
+
     use super::*;
     use crate::kind::Kind;
-    use assert_fs::prelude::*;
 
     #[test]
     fn read_file() {
@@ -99,7 +100,7 @@ mod test {
             .write_str("Morning coffee")
             .unwrap();
 
-        let transport = LocalTransport::new(temp.path());
+        let transport = TransportRead::new(&temp.path().to_string_lossy()).unwrap();
         let mut root_list: Vec<_> = transport
             .read_dir(".")
             .unwrap()
