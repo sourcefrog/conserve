@@ -30,7 +30,7 @@ pub struct Archive {
     /// Holds body content for all file versions.
     block_dir: BlockDir,
 
-    transport: LocalTransport,
+    transport: Box<dyn TransportRead>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -53,7 +53,7 @@ impl Archive {
         Ok(Archive {
             path: path.to_owned(),
             block_dir,
-            transport: LocalTransport::new(path),
+            transport: Box::new(LocalTransport::new(path)),
         })
     }
 
@@ -62,7 +62,7 @@ impl Archive {
     /// Checks that the header is correct.
     pub fn open<P: Into<PathBuf>>(path: P) -> Result<Archive> {
         let path: PathBuf = path.into();
-        let mut transport = LocalTransport::new(&path);
+        let mut transport = Box::new(LocalTransport::new(&path));
         let header_json = transport.read_file(HEADER_FILENAME).map_err(|e| {
             if e.kind() == ErrorKind::NotFound {
                 Error::NotAnArchive { path: path.clone() }
