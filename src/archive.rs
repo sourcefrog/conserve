@@ -62,19 +62,22 @@ impl Archive {
     /// Checks that the header is correct.
     pub fn open<P: Into<PathBuf>>(path: P) -> Result<Archive> {
         let path: PathBuf = path.into();
-        let mut transport = Box::new(LocalTransport::new(&path));
-        let header_json = transport.read_file(HEADER_FILENAME).map_err(|e| {
-            if e.kind() == ErrorKind::NotFound {
-                Error::NotAnArchive { path: path.clone() }
-            } else {
-                Error::ReadMetadata {
-                    path: path.clone(),
-                    source: e,
+        let transport = Box::new(LocalTransport::new(&path));
+        let mut json_buf = Vec::new();
+        transport
+            .read_file(HEADER_FILENAME, &mut json_buf)
+            .map_err(|e| {
+                if e.kind() == ErrorKind::NotFound {
+                    Error::NotAnArchive { path: path.clone() }
+                } else {
+                    Error::ReadMetadata {
+                        path: path.clone(),
+                        source: e,
+                    }
                 }
-            }
-        })?;
+            })?;
         let header: ArchiveHeader =
-            serde_json::from_slice(&header_json).map_err(|source| Error::DeserializeJson {
+            serde_json::from_slice(&json_buf).map_err(|source| Error::DeserializeJson {
                 source,
                 path: path.clone(),
             })?;

@@ -32,11 +32,11 @@ pub trait TransportRead: Send + Sync {
     /// The result should not contain entries for "." and "..".
     fn read_dir(&self, path: &str) -> io::Result<Box<dyn Iterator<Item = io::Result<DirEntry>>>>;
 
-    /// Get one complete file.
+    /// Get one complete file into a caller-provided buffer.
     ///
     /// Files in the archive are of bounded size, so it's OK to always read them entirely into
     /// memory, and this is simple to support on all implementations.
-    fn read_file(&mut self, path: &str) -> io::Result<&[u8]>;
+    fn read_file(&self, path: &str, out_buf: &mut Vec<u8>) -> io::Result<()>;
 
     /// Check if an entry exists.
     fn exists(&self, path: &str) -> io::Result<bool>;

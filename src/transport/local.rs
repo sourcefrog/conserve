@@ -9,34 +9,22 @@ use std::path::{Path, PathBuf};
 
 use crate::transport::{DirEntry, TransportRead};
 
+#[derive(Clone, Debug)]
 pub struct LocalTransport {
     /// Root directory for this transport.
     root: PathBuf,
-
-    /// Reusable buffer for reading data.
-    read_buf: Vec<u8>,
 }
 
 impl LocalTransport {
     pub fn new(path: &Path) -> Self {
         LocalTransport {
             root: path.to_owned(),
-            read_buf: Vec::new(),
         }
     }
 
     pub fn full_path(&self, relpath: &str) -> PathBuf {
         debug_assert!(!relpath.contains("/../"), "path must not contain /../");
         self.root.join(relpath)
-    }
-}
-
-impl Clone for LocalTransport {
-    fn clone(&self) -> Self {
-        LocalTransport {
-            root: self.root.clone(),
-            read_buf: Vec::new(),
-        }
     }
 }
 
@@ -64,10 +52,10 @@ impl TransportRead for LocalTransport {
         )))
     }
 
-    fn read_file(&mut self, relpath: &str) -> io::Result<&[u8]> {
-        self.read_buf.truncate(0);
-        File::open(&self.full_path(relpath))?.read_to_end(&mut self.read_buf)?;
-        Ok(self.read_buf.as_slice())
+    fn read_file(&self, relpath: &str, out_buf: &mut Vec<u8>) -> io::Result<()> {
+        let len = File::open(&self.full_path(relpath))?.read_to_end(out_buf)?;
+        out_buf.truncate(len);
+        Ok(())
     }
 
     fn exists(&self, relpath: &str) -> io::Result<bool> {
@@ -93,8 +81,10 @@ mod test {
 
         temp.child(filename).write_str(content).unwrap();
 
-        let mut transport = LocalTransport::new(temp.path());
-        assert_eq!(transport.read_file(&filename).unwrap(), content.as_bytes());
+        let transport = LocalTransport::new(temp.path());
+        let mut buf = Vec::new();
+        transport.read_file(&filename, &mut buf).unwrap();
+        assert_eq!(buf, content.as_bytes());
 
         temp.close().unwrap();
     }
