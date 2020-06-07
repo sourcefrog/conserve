@@ -178,7 +178,7 @@ impl Band {
 
     /// Return an iterator through entries in this band.
     pub fn iter_entries(&self) -> Result<index::IndexEntryIter> {
-        self.index().iter()
+        self.index().iter_entries()
     }
 
     fn transport(&self) -> &dyn TransportRead {

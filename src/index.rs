@@ -226,8 +226,6 @@ fn relpath_for_hunk(hunk_number: u32) -> String {
 
 #[derive(Debug, Clone)]
 pub struct IndexRead {
-    dir: PathBuf,
-
     /// Transport pointing to this index directory.
     transport: Box<dyn TransportRead>,
 }
@@ -235,7 +233,6 @@ pub struct IndexRead {
 impl IndexRead {
     pub fn new(dir: &Path) -> IndexRead {
         IndexRead {
-            dir: dir.to_path_buf(),
             transport: Box::new(LocalTransport::new(&dir)),
         }
     }
@@ -267,7 +264,7 @@ impl IndexRead {
     }
 
     /// Make an iterator that will return all entries in this band.
-    pub fn iter(&self) -> Result<IndexEntryIter> {
+    pub fn iter_entries(&self) -> Result<IndexEntryIter> {
         Ok(IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             next_hunk_number: 0,
@@ -518,7 +515,7 @@ mod tests {
             "Index hunk file not found"
         );
 
-        let mut it = IndexRead::new(&ib_dir).iter().unwrap();
+        let mut it = IndexRead::new(&ib_dir).iter_entries().unwrap();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
@@ -537,7 +534,7 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk().unwrap();
 
-        let it = IndexRead::new(&ib.dir).iter().unwrap();
+        let it = IndexRead::new(&ib.dir).iter_entries().unwrap();
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
     }
@@ -572,7 +569,7 @@ mod tests {
 
         let excludes = excludes::from_strings(&["/fo*"]).unwrap();
         let it = IndexRead::new(&ib.dir)
-            .iter()
+            .iter_entries()
             .unwrap()
             .with_excludes(excludes);
 
@@ -595,25 +592,25 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         // Advance to /foo and read on from there.
-        let mut it = IndexRead::new(&ib.dir).iter().unwrap();
+        let mut it = IndexRead::new(&ib.dir).iter_entries().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/foo")).unwrap().apath, "/foo");
         assert_eq!(it.next().unwrap().apath, "/foobar");
         assert_eq!(it.next().unwrap().apath, "/g01");
 
         // Advance to before /g01
-        let mut it = IndexRead::new(&ib.dir).iter().unwrap();
+        let mut it = IndexRead::new(&ib.dir).iter_entries().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/fxxx")), None);
         assert_eq!(it.next().unwrap().apath, "/g01");
         assert_eq!(it.next().unwrap().apath, "/g02");
 
         // Advance to before the first entry
-        let mut it = IndexRead::new(&ib.dir).iter().unwrap();
+        let mut it = IndexRead::new(&ib.dir).iter_entries().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/aaaa")), None);
         assert_eq!(it.next().unwrap().apath, "/bar");
         assert_eq!(it.next().unwrap().apath, "/foo");
 
         // Advance to after the last entry
-        let mut it = IndexRead::new(&ib.dir).iter().unwrap();
+        let mut it = IndexRead::new(&ib.dir).iter_entries().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/zz")), None);
         assert_eq!(it.next(), None);
     }
