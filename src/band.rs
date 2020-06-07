@@ -17,9 +17,11 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::io::file_exists;
 use crate::jsonio;
+use crate::jsonio::read_json;
 use crate::misc::remove_item;
+use crate::transport::local::LocalTransport;
+use crate::transport::TransportRead;
 use crate::*;
 
 static INDEX_DIR: &str = "i";
@@ -45,7 +47,10 @@ fn band_version_supported(version: &str) -> bool {
 pub struct Band {
     id: BandId,
     path_buf: PathBuf,
-    pub index_dir_path: PathBuf,
+    index_dir_path: PathBuf,
+
+    /// Transport pointing to the archive directory.
+    transport: Box<dyn TransportRead>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -128,20 +133,22 @@ impl Band {
     /// Instead of creating the in-memory object you typically should either
     /// `create` or `open` the band corresponding to in-archive directory.
     fn new(archive_dir: &Path, id: BandId) -> Band {
+        // TODO: Take the Transport as a parameter.
         let mut path_buf = archive_dir.to_path_buf();
         path_buf.push(id.to_string());
         let mut index_dir_path = path_buf.clone();
         index_dir_path.push(INDEX_DIR);
+        let transport = Box::new(LocalTransport::new(&path_buf));
         Band {
             id,
             path_buf,
             index_dir_path,
+            transport,
         }
     }
 
     pub fn is_closed(&self) -> Result<bool> {
-        let path = self.tail_path();
-        file_exists(&path).map_err(|source| Error::ReadMetadata { path, source })
+        self.transport().exists(TAIL_FILENAME).map_err(Error::from)
     }
 
     pub fn path(&self) -> &Path {
@@ -174,12 +181,16 @@ impl Band {
         index::IndexEntryIter::open(&self.index_dir_path)
     }
 
+    fn transport(&self) -> &dyn TransportRead {
+        self.transport.as_ref()
+    }
+
     fn read_head(&self) -> Result<Head> {
-        jsonio::read_json_metadata_file(&self.head_path())
+        read_json(self.transport(), HEAD_FILENAME)
     }
 
     fn read_tail(&self) -> Result<Tail> {
-        jsonio::read_json_metadata_file(&self.tail_path())
+        read_json(self.transport(), TAIL_FILENAME)
     }
 
     /// Return info about the state of this band.
@@ -286,7 +297,6 @@ mod tests {
         .unwrap();
 
         let e = Band::open(&af, &BandId::zero());
-        assert!(e.is_err());
         let e_str = e.unwrap_err().to_string();
         assert!(e_str.contains("Band version \"0.8.8\" in"), e_str);
     }

@@ -30,19 +30,11 @@ pub(crate) fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T
         })
 }
 
-pub(crate) fn read_json_metadata_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
-    let buf = std::fs::read_to_string(&path).map_err(|source| Error::ReadMetadata {
-        path: path.to_owned(),
-        source,
-    })?;
-    serde_json::from_str(&buf).map_err(|source| Error::DeserializeJson {
-        source,
-        path: path.to_owned(),
-    })
-}
-
 /// Read and deserialize uncompressed json from a Transport.
-fn read_json<T: DeserializeOwned>(transport: &dyn TransportRead, path: &str) -> Result<T> {
+pub(crate) fn read_json<T>(transport: &dyn TransportRead, path: &str) -> Result<T>
+where
+    T: DeserializeOwned,
+{
     let mut buf = Vec::new();
     transport.read_file(path, &mut buf).map_err(Error::from)?;
     serde_json::from_slice(&buf).map_err(|source| Error::DeserializeJson {
@@ -57,7 +49,6 @@ mod tests {
     use assert_fs::prelude::*;
     use serde::{Deserialize, Serialize};
 
-    use crate::test_fixtures::TreeFixture;
     use crate::transport::local::LocalTransport;
 
     use super::*;
@@ -69,16 +60,18 @@ mod tests {
     }
 
     #[test]
-    pub fn read_write_json() {
-        let tree = TreeFixture::new();
+    pub fn write_json() {
+        let temp = assert_fs::TempDir::new().unwrap();
         let entry = TestContents {
             id: 42,
             weather: "cold".to_string(),
         };
-        let p = tree.path().join("test.json");
-        write_json_metadata_file(&p, &entry).unwrap();
-        let r: TestContents = read_json_metadata_file(&p).unwrap();
-        assert_eq!(r, entry);
+        let json_child = temp.child("test.json");
+        write_json_metadata_file(&json_child.path(), &entry).unwrap();
+
+        json_child.assert(concat!(r#"{"id":42,"weather":"cold"}"#, "\n"));
+
+        temp.close().unwrap();
     }
 
     #[test]
