@@ -7,7 +7,7 @@ use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
-use crate::transport::{TransportEntry, TransportRead};
+use crate::transport::{DirEntry, TransportRead};
 
 pub struct LocalTransport {
     /// Root directory for this transport.
@@ -44,7 +44,7 @@ impl TransportRead for LocalTransport {
     fn read_dir(
         &self,
         relpath: &str,
-    ) -> io::Result<Box<dyn Iterator<Item = io::Result<TransportEntry>>>> {
+    ) -> io::Result<Box<dyn Iterator<Item = io::Result<DirEntry>>>> {
         // Archives should never normally contain non-UTF-8 (or even non-ASCII) filenames, but
         // let's pass them back as lossy UTF-8 so they can be reported at a higher level, for
         // example during validation.
@@ -52,8 +52,8 @@ impl TransportRead for LocalTransport {
         Ok(Box::new(self.full_path(&relpath).read_dir()?.map(
             move |i| {
                 i.and_then(|de| {
-                    Ok(TransportEntry {
-                        relpath: format!("{}/{}", relpath, de.file_name().to_string_lossy()),
+                    Ok(DirEntry {
+                        name: de.file_name().to_string_lossy().into(),
                         kind: de.file_type()?.into(),
                     })
                 })
@@ -115,15 +115,15 @@ mod test {
 
         assert_eq!(
             root_list[0],
-            TransportEntry {
-                relpath: "./root file".to_owned(),
+            DirEntry {
+                name: "root file".to_owned(),
                 kind: Kind::File,
             }
         );
         assert_eq!(
             root_list[1],
-            TransportEntry {
-                relpath: "./subdir".to_owned(),
+            DirEntry {
+                name: "subdir".to_owned(),
                 kind: Kind::Dir,
             }
         );
@@ -138,8 +138,8 @@ mod test {
             .collect();
         assert_eq!(
             subdir_list,
-            vec![TransportEntry {
-                relpath: "subdir/subfile".to_owned(),
+            vec![DirEntry {
+                name: "subfile".to_owned(),
                 kind: Kind::File
             }]
         );

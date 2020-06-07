@@ -31,10 +31,7 @@ pub trait TransportRead: Send {
     /// Returned entries are in arbitrary order and may be interleaved with errors.
     ///
     /// The result should not contain entries for "." and "..".
-    fn read_dir(
-        &self,
-        path: &str,
-    ) -> io::Result<Box<dyn Iterator<Item = io::Result<TransportEntry>>>>;
+    fn read_dir(&self, path: &str) -> io::Result<Box<dyn Iterator<Item = io::Result<DirEntry>>>>;
 
     /// Get one complete file.
     ///
@@ -71,29 +68,8 @@ pub trait TransportWrite: TransportRead {
 
 /// A directory entry read from a transport.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct TransportEntry {
-    /// Path relative to the transport root.
-    relpath: String,
-    kind: Kind,
-}
-
-impl TransportEntry {
-    /// Just the filename component of the name.
-    pub fn name_tail(&self) -> &str {
-        if let Some(last) = self.relpath.rsplit('/').next() {
-            debug_assert!(!last.is_empty());
-            last
-        } else {
-            &self.relpath
-        }
-    }
-
-    pub fn kind(&self) -> Kind {
-        self.kind
-    }
-
-    /// Returns the path relative to the transport root.
-    pub fn relpath(&self) -> &str {
-        &self.relpath
-    }
+pub struct DirEntry {
+    /// Name of the file within the directory being listed.
+    pub name: String,
+    pub kind: Kind,
 }

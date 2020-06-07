@@ -15,7 +15,7 @@ use crate::kind::Kind;
 use crate::misc::remove_item;
 use crate::stats::ValidateArchiveStats;
 use crate::transport::local::LocalTransport;
-use crate::transport::TransportRead;
+use crate::transport::{DirEntry, TransportRead};
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -126,16 +126,12 @@ impl Archive {
                     ui::problem(&format!("Error listing bands: {}", e));
                     None
                 }
-                Ok(entry) => {
-                    let name = entry.name_tail();
-                    if entry.kind() == Kind::Dir && name != BLOCK_DIR {
+                Ok(DirEntry { name, kind }) => {
+                    if kind == Kind::Dir && name != BLOCK_DIR {
                         if let Ok(band_id) = name.parse() {
                             Some(band_id)
                         } else {
-                            ui::problem(&format!(
-                                "Unexpected directory {:?} in archive",
-                                entry.relpath()
-                            ));
+                            ui::problem(&format!("Unexpected directory {:?} in archive", name));
                             None
                         }
                     } else {
@@ -206,14 +202,13 @@ impl Archive {
             })?
         {
             match entry_result {
-                Ok(entry) => match entry.kind() {
-                    Kind::Dir => dirs.push(entry.name_tail().to_owned()),
-                    Kind::File => files.push(entry.name_tail().to_owned()),
+                Ok(DirEntry { name, kind }) => match kind {
+                    Kind::Dir => dirs.push(name),
+                    Kind::File => files.push(name),
                     other_kind => {
                         ui::problem(&format!(
                             "Unexpected file kind in archive directory: {:?} of kind {:?}",
-                            entry.relpath(),
-                            other_kind
+                            name, other_kind
                         ));
                         stats.structure_problems += 1;
                     }
