@@ -24,7 +24,7 @@ pub mod local;
 ///
 /// Files in Conserve archives have bounded size and fit in memory so this does not need to
 /// support streaming or partial reads and writes.
-pub trait TransportRead: Send + Sync {
+pub trait TransportRead: Send + Sync + std::fmt::Debug {
     /// Read the contents of a directory under this transport, without recursing down.
     ///
     /// Returned entries are in arbitrary order and may be interleaved with errors.
