@@ -87,6 +87,16 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .help("Exclude files that match the provided glob pattern")
     };
 
+    fn include_only_arg<'a, 'b>() -> Arg<'a, 'b> {
+        Arg::with_name("only")
+            .long("only")
+            .short("i")
+            .takes_value(true)
+            .multiple(true)
+            .number_of_values(1)
+            .value_name("GLOB")
+            .help("Include only files that match the provided glob pattern")
+    }
 
     fn incomplete_arg<'a, 'b>() -> Arg<'a, 'b> {
         Arg::with_name("incomplete")
@@ -189,6 +199,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             SubCommand::with_name("restore")
                 .display_order(3)
                 .about("Copy a backup tree out of an archive")
+                .arg(include_only_arg())
                 .arg(archive_arg())
                 .arg(backup_arg())
                 .arg(incomplete_arg())
@@ -373,6 +384,7 @@ fn list_tree_contents<T: ReadTree>(tree: &T) -> Result<()> {
 
 fn restore(subm: &ArgMatches) -> Result<()> {
     let dest = Path::new(subm.value_of("destination").unwrap());
+    let only_path = Path::new(subm.value_of("only").unwrap());
     let st = stored_tree_from_options(subm)?;
     let rt = if subm.is_present("force-overwrite") {
         RestoreTree::create_overwrite(dest)
