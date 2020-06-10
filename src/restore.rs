@@ -3,11 +3,13 @@
 //! Restore from the archive to the filesystem.
 
 use std::fs;
+use std::fs::File;
 use std::io;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::entry::Entry;
-use crate::io::{directory_is_empty, ensure_dir_exists, AtomicFile};
+use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::stats::CopyStats;
 use crate::*;
 
@@ -71,19 +73,17 @@ impl tree::WriteTree for RestoreTree {
     ) -> Result<CopyStats> {
         // TODO: Restore permissions.
         // TODO: Reset mtime: can probably use https://docs.rs/utime/0.2.2/utime/
-        // TODO: For restore, maybe not necessary to rename into place, and
-        // we could just write directly.
         let path = self.rooted_path(source_entry.apath());
         let restore_err = |source| Error::Restore {
             path: path.clone(),
             source,
         };
-        let mut af = AtomicFile::new(&path).map_err(restore_err)?;
+        let mut restore_file = File::create(&path).map_err(restore_err)?;
         // TODO: Read one block at a time: don't pull all the contents into memory.
         let content = &mut from_tree.file_contents(&source_entry)?;
-        let bytes_copied = std::io::copy(content, &mut af).map_err(restore_err)?;
-        af.close().map_err(restore_err)?;
-        // TODO: Accumulate stats.
+        let bytes_copied = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
+        restore_file.flush().map_err(restore_err)?;
+        // TODO: Accumulate more stats.
         Ok(CopyStats {
             uncompressed_bytes: bytes_copied,
             ..CopyStats::default()
