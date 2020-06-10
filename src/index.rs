@@ -15,7 +15,7 @@ use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
 use crate::stats::{IndexBuilderStats, IndexEntryIterStats};
 use crate::transport::local::LocalTransport;
-use crate::transport::{TransportRead, TransportWrite};
+use crate::transport::Transport;
 use crate::unix_time::UnixTime;
 use crate::*;
 
@@ -116,7 +116,7 @@ impl IndexEntry {
 /// Accumulates ordered changes to the index and streams them out to index files.
 pub struct IndexBuilder {
     /// The `i` directory within the band where all files for this index are written.
-    transport: Box<dyn TransportWrite>,
+    transport: Box<dyn Transport>,
 
     /// Currently queued entries to be written out.
     entries: Vec<IndexEntry>,
@@ -138,7 +138,7 @@ pub struct IndexBuilder {
 /// Accumulate and write out index entries into files in an index directory.
 impl IndexBuilder {
     /// Make a new builder that will write files into the given directory.
-    pub fn new(transport: Box<dyn TransportWrite>) -> IndexBuilder {
+    pub fn new(transport: Box<dyn Transport>) -> IndexBuilder {
         IndexBuilder {
             transport,
             entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
@@ -220,11 +220,11 @@ fn hunk_relpath(hunk_number: u32) -> String {
 #[derive(Debug, Clone)]
 pub struct IndexRead {
     /// Transport pointing to this index directory.
-    transport: Box<dyn TransportRead>,
+    transport: Box<dyn Transport>,
 }
 
 impl IndexRead {
-    pub(crate) fn open(transport: Box<dyn TransportRead>) -> IndexRead {
+    pub(crate) fn open(transport: Box<dyn Transport>) -> IndexRead {
         IndexRead { transport }
     }
 
@@ -282,7 +282,7 @@ pub struct IndexEntryIter {
     decompressor: Decompressor,
     pub stats: IndexEntryIterStats,
     /// The `i` directory within the band where all files for this index are written.
-    transport: Box<dyn TransportRead>,
+    transport: Box<dyn Transport>,
     compressed_buf: Vec<u8>,
 }
 

@@ -15,7 +15,7 @@ use crate::kind::Kind;
 use crate::misc::remove_item;
 use crate::stats::ValidateArchiveStats;
 use crate::transport::local::LocalTransport;
-use crate::transport::{DirEntry, TransportRead};
+use crate::transport::{DirEntry, Transport};
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -30,7 +30,7 @@ pub struct Archive {
     /// Holds body content for all file versions.
     block_dir: BlockDir,
 
-    transport: Box<dyn TransportRead>,
+    transport: Box<dyn Transport>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

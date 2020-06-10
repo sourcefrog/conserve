@@ -7,7 +7,7 @@ use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
-use crate::transport::{DirEntry, TransportRead, TransportWrite};
+use crate::transport::{DirEntry, Transport};
 
 #[derive(Clone, Debug)]
 pub struct LocalTransport {
@@ -28,7 +28,7 @@ impl LocalTransport {
     }
 }
 
-impl TransportRead for LocalTransport {
+impl Transport for LocalTransport {
     fn read_dir(
         &self,
         relpath: &str,
@@ -63,12 +63,10 @@ impl TransportRead for LocalTransport {
         Ok(self.full_path(relpath).exists())
     }
 
-    fn box_clone(&self) -> Box<dyn TransportRead> {
+    fn box_clone(&self) -> Box<dyn Transport> {
         Box::new(self.clone())
     }
-}
 
-impl TransportWrite for LocalTransport {
     fn create_dir(&mut self, relpath: &str) -> io::Result<()> {
         create_dir(self.full_path(&relpath)).or_else(|err| {
             if err.kind() == io::ErrorKind::AlreadyExists {
@@ -97,11 +95,7 @@ impl TransportWrite for LocalTransport {
         }
     }
 
-    fn box_clone_write(&self) -> Box<dyn TransportWrite> {
-        Box::new(self.clone())
-    }
-
-    fn sub_transport(&self, relpath: &str) -> Box<dyn TransportWrite> {
+    fn sub_transport(&self, relpath: &str) -> Box<dyn Transport> {
         Box::new(LocalTransport {
             root: self.root.join(relpath),
         })
@@ -158,7 +152,7 @@ mod test {
             .write_str("Morning coffee")
             .unwrap();
 
-        let transport = TransportRead::new(&temp.path().to_string_lossy()).unwrap();
+        let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
         let mut root_list: Vec<_> = transport
             .read_dir(".")
             .unwrap()
@@ -204,7 +198,7 @@ mod test {
     fn write_file() {
         // TODO: Maybe test some error cases of failing to write.
         let temp = assert_fs::TempDir::new().unwrap();
-        let mut transport = TransportWrite::new(&temp.path().to_string_lossy()).unwrap();
+        let mut transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
 
         transport.create_dir("subdir").unwrap();
         transport
@@ -222,7 +216,7 @@ mod test {
     #[test]
     fn create_existing_dir() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let mut transport = TransportWrite::new(&temp.path().to_string_lossy()).unwrap();
+        let mut transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
@@ -234,7 +228,7 @@ mod test {
     #[test]
     fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let mut transport = TransportWrite::new(&temp.path().to_string_lossy()).unwrap();
+        let mut transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();

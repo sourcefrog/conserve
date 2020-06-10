@@ -12,7 +12,7 @@ use crate::Result;
 
 pub mod local;
 
-/// Facade to read from an archive.
+/// Abstracted filesystem IO ta access an archive.
 ///
 /// This supports operations that are common across local filesystems, SFTP, and cloud storage, and
 /// that are intended to be sufficient to efficiently implement the Conserve format.
@@ -22,11 +22,9 @@ pub mod local;
 ///
 /// All Transports must be `Send + Sync`, so they can be passed across or shared across threads.
 ///
-/// TransportRead is object-safe so can be used as `dyn TransportRead`.
-///
 /// Files in Conserve archives have bounded size and fit in memory so this does not need to
 /// support streaming or partial reads and writes.
-pub trait TransportRead: Send + Sync + std::fmt::Debug {
+pub trait Transport: Send + Sync + std::fmt::Debug {
     /// Read the contents of a directory under this transport, without recursing down.
     ///
     /// Returned entries are in arbitrary order and may be interleaved with errors.
@@ -43,25 +41,6 @@ pub trait TransportRead: Send + Sync + std::fmt::Debug {
     /// Check if an entry exists.
     fn exists(&self, path: &str) -> io::Result<bool>;
 
-    /// Clone this object into a new box.
-    fn box_clone(&self) -> Box<dyn TransportRead>;
-}
-
-impl Clone for Box<dyn TransportRead> {
-    fn clone(&self) -> Box<dyn TransportRead> {
-        self.box_clone()
-    }
-}
-
-impl dyn TransportRead {
-    pub fn new(s: &str) -> Result<Box<dyn TransportRead>> {
-        // TODO: Recognize URL-style strings.
-        Ok(Box::new(local::LocalTransport::new(&Path::new(s))))
-    }
-}
-
-/// Facade to both read and write an archive.
-pub trait TransportWrite: TransportRead {
     /// Create a directory, if it does not exist.
     ///
     /// If the directory already exists, it's not an error.
@@ -78,21 +57,21 @@ pub trait TransportWrite: TransportRead {
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
     fn write_file(&mut self, relpath: &str, content: &[u8]) -> io::Result<()>;
 
-    /// Clone this object into a new box.
-    fn box_clone_write(&self) -> Box<dyn TransportWrite>;
-
     /// Make a new transport addressing a subdirectory.
-    fn sub_transport(&self, relpath: &str) -> Box<dyn TransportWrite>;
+    fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;
+
+    /// Clone this object into a new box.
+    fn box_clone(&self) -> Box<dyn Transport>;
 }
 
-impl Clone for Box<dyn TransportWrite> {
-    fn clone(&self) -> Box<dyn TransportWrite> {
-        self.box_clone_write()
+impl Clone for Box<dyn Transport> {
+    fn clone(&self) -> Box<dyn Transport> {
+        self.box_clone()
     }
 }
 
-impl dyn TransportWrite {
-    pub fn new(s: &str) -> Result<Box<dyn TransportWrite>> {
+impl dyn Transport {
+    pub fn new(s: &str) -> Result<Box<dyn Transport>> {
         // TODO: Recognize URL-style strings.
         Ok(Box::new(local::LocalTransport::new(&Path::new(s))))
     }

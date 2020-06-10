@@ -10,7 +10,7 @@ use serde::de::DeserializeOwned;
 
 use crate::errors::Error;
 use crate::io::AtomicFile;
-use crate::transport::{TransportRead, TransportWrite};
+use crate::transport::Transport;
 use crate::Result;
 
 pub(crate) fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T) -> Result<()> {
@@ -32,11 +32,7 @@ pub(crate) fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T
 
 /// Write uncompressed json to a file on a Transport.
 #[allow(unused)] // Will replace write_json_metadata_file
-pub(crate) fn write_json<T>(
-    transport: &mut dyn TransportWrite,
-    relpath: &str,
-    obj: &T,
-) -> Result<()>
+pub(crate) fn write_json<T>(transport: &mut dyn Transport, relpath: &str, obj: &T) -> Result<()>
 where
     T: serde::Serialize,
 {
@@ -54,7 +50,7 @@ where
 }
 
 /// Read and deserialize uncompressed json from a Transport.
-pub(crate) fn read_json<T>(transport: &dyn TransportRead, path: &str) -> Result<T>
+pub(crate) fn read_json<T>(transport: &dyn Transport, path: &str) -> Result<T>
 where
     T: DeserializeOwned,
 {

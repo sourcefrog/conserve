@@ -21,7 +21,7 @@ use crate::jsonio;
 use crate::jsonio::read_json;
 use crate::misc::remove_item;
 use crate::transport::local::LocalTransport;
-use crate::transport::TransportRead;
+use crate::transport::Transport;
 use crate::*;
 
 static INDEX_DIR: &str = "i";
@@ -50,7 +50,7 @@ pub struct Band {
     index_dir_path: PathBuf,
 
     /// Transport pointing to the archive directory.
-    transport: Box<dyn TransportRead>,
+    transport: Box<dyn Transport>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -181,7 +181,7 @@ impl Band {
         self.index().iter_entries()
     }
 
-    fn transport(&self) -> &dyn TransportRead {
+    fn transport(&self) -> &dyn Transport {
         self.transport.as_ref()
     }
 

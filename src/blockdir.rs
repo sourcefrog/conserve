@@ -25,7 +25,7 @@ use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
 use crate::stats::{CopyStats, Sizes, ValidateBlockDirStats};
 use crate::transport::local::LocalTransport;
-use crate::transport::{DirEntry, TransportWrite};
+use crate::transport::{DirEntry, Transport};
 use crate::*;
 
 /// Use the maximum 64-byte hash.
@@ -60,7 +60,7 @@ pub struct Address {
 /// A readable, writable directory within a band holding data blocks.
 #[derive(Clone)]
 pub struct BlockDir {
-    transport: Box<dyn TransportWrite>,
+    transport: Box<dyn Transport>,
 }
 
 /// Returns the transport-relative subdirectory name.
@@ -78,7 +78,7 @@ impl BlockDir {
         BlockDir::open(Box::new(LocalTransport::new(path)))
     }
 
-    pub fn open(transport: Box<dyn TransportWrite>) -> BlockDir {
+    pub fn open(transport: Box<dyn Transport>) -> BlockDir {
         BlockDir { transport }
     }
 
@@ -87,7 +87,7 @@ impl BlockDir {
         BlockDir::create(Box::new(LocalTransport::new(path)))
     }
 
-    pub fn create(mut transport: Box<dyn TransportWrite>) -> Result<BlockDir> {
+    pub fn create(mut transport: Box<dyn Transport>) -> Result<BlockDir> {
         transport
             .create_dir("")
             .map_err(|source| Error::CreateBlockDir { source })?;
