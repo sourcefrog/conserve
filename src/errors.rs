@@ -108,7 +108,7 @@ pub enum Error {
 
     #[error("Failed to write metadata file {:?}", path)]
     WriteMetadata {
-        path: PathBuf,
+        path: String,
         source: std::io::Error,
     },
 
@@ -120,7 +120,7 @@ pub enum Error {
 
     #[error("Failed to serialize json to {:?}", path)]
     SerializeJson {
-        path: PathBuf,
+        path: String,
         source: serde_json::Error,
     },
 

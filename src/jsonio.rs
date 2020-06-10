@@ -10,12 +10,12 @@ use serde::de::DeserializeOwned;
 
 use crate::errors::Error;
 use crate::io::AtomicFile;
-use crate::transport::TransportRead;
+use crate::transport::{TransportRead, TransportWrite};
 use crate::Result;
 
 pub(crate) fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T) -> Result<()> {
     let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::SerializeJson {
-        path: path.to_owned(),
+        path: path.to_string_lossy().to_string(),
         source,
     })?;
     s.push('\n');
@@ -25,7 +25,29 @@ pub(crate) fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T
             af.close()
         })
         .map_err(|source| Error::WriteMetadata {
-            path: path.to_owned(),
+            path: path.to_string_lossy().to_string(),
+            source,
+        })
+}
+
+/// Write uncompressed json to a file on a Transport.
+pub(crate) fn write_json<T>(
+    transport: &mut dyn TransportWrite,
+    relpath: &str,
+    obj: &T,
+) -> Result<()>
+where
+    T: serde::Serialize,
+{
+    let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::SerializeJson {
+        path: relpath.to_string(),
+        source,
+    })?;
+    s.push('\n');
+    transport
+        .write_file(relpath, s.as_bytes())
+        .map_err(|source| Error::WriteMetadata {
+            path: relpath.to_owned(),
             source,
         })
 }
@@ -54,13 +76,13 @@ mod tests {
     use super::*;
 
     #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
-    pub struct TestContents {
+    struct TestContents {
         pub id: u64,
         pub weather: String,
     }
 
     #[test]
-    pub fn write_json() {
+    fn write_json() {
         let temp = assert_fs::TempDir::new().unwrap();
         let entry = TestContents {
             id: 42,
@@ -69,6 +91,24 @@ mod tests {
         let json_child = temp.child("test.json");
         write_json_metadata_file(&json_child.path(), &entry).unwrap();
 
+        json_child.assert(concat!(r#"{"id":42,"weather":"cold"}"#, "\n"));
+
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn write_json_to_transport() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let entry = TestContents {
+            id: 42,
+            weather: "cold".to_string(),
+        };
+        let filename = "test.json";
+
+        let mut transport = LocalTransport::new(&temp.path());
+        super::write_json(&mut transport, filename, &entry).unwrap();
+
+        let json_child = temp.child("test.json");
         json_child.assert(concat!(r#"{"id":42,"weather":"cold"}"#, "\n"));
 
         temp.close().unwrap();
