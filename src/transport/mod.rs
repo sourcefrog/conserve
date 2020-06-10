@@ -80,6 +80,9 @@ pub trait TransportWrite: TransportRead {
 
     /// Clone this object into a new box.
     fn box_clone_write(&self) -> Box<dyn TransportWrite>;
+
+    /// Make a new transport addressing a subdirectory.
+    fn sub_transport(&self, relpath: &str) -> Box<dyn TransportWrite>;
 }
 
 impl Clone for Box<dyn TransportWrite> {

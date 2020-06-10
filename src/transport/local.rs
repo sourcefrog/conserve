@@ -100,6 +100,12 @@ impl TransportWrite for LocalTransport {
     fn box_clone_write(&self) -> Box<dyn TransportWrite> {
         Box::new(self.clone())
     }
+
+    fn sub_transport(&self, relpath: &str) -> Box<dyn TransportWrite> {
+        Box::new(LocalTransport {
+            root: self.root.join(relpath),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -221,6 +227,27 @@ mod test {
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
+
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn sub_transport() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let mut transport = TransportWrite::new(&temp.path().to_string_lossy()).unwrap();
+
+        transport.create_dir("aaa").unwrap();
+        transport.create_dir("aaa/bbb").unwrap();
+
+        let sub_transport = transport.sub_transport("aaa");
+        let sub_list: Vec<DirEntry> = sub_transport
+            .read_dir("")
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+
+        assert_eq!(sub_list.len(), 1);
+        assert_eq!(sub_list[0].name, "bbb");
 
         temp.close().unwrap();
     }
