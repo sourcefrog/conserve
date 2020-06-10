@@ -63,13 +63,14 @@ pub struct BlockDir {
     transport: Box<dyn TransportWrite>,
 }
 
-fn block_name_to_subdirectory(block_hash: &str) -> &str {
+/// Returns the transport-relative subdirectory name.
+fn subdir_relpath(block_hash: &str) -> &str {
     &block_hash[..SUBDIR_NAME_CHARS]
 }
 
 /// Return the transport-relative file for a given hash.
-fn relpath(hash_hex: &str) -> String {
-    format!("{}/{}", block_name_to_subdirectory(hash_hex), hash_hex)
+fn block_relpath(hash_hex: &str) -> String {
+    format!("{}/{}", subdir_relpath(hash_hex), hash_hex)
 }
 
 impl BlockDir {
@@ -100,10 +101,9 @@ impl BlockDir {
         let mut compressor = Compressor::new();
         let compressed = compressor.compress(&in_buf)?;
         let comp_len: u64 = compressed.len().try_into().unwrap();
+        self.transport.create_dir(subdir_relpath(hex_hash))?;
         self.transport
-            .create_dir(block_name_to_subdirectory(hex_hash))?;
-        self.transport
-            .write_file(&relpath(hex_hash), compressed)
+            .write_file(&block_relpath(hex_hash), compressed)
             .or_else(|io_err| {
                 if io_err.kind() == io::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
@@ -124,7 +124,9 @@ impl BlockDir {
 
     /// True if the named block is present in this directory.
     pub fn contains(&self, hash: &str) -> Result<bool> {
-        self.transport.exists(&relpath(hash)).map_err(Error::from)
+        self.transport
+            .exists(&block_relpath(hash))
+            .map_err(Error::from)
     }
 
     /// Read back the contents of a block, as a byte array.
@@ -248,9 +250,9 @@ impl BlockDir {
         // TODO: Reuse read buffer.
         let mut decompressor = Decompressor::new();
         let mut compressed_bytes = Vec::new();
-        let relpath = relpath(hash);
+        let block_relpath = block_relpath(hash);
         self.transport
-            .read_file(&relpath, &mut compressed_bytes)
+            .read_file(&block_relpath, &mut compressed_bytes)
             .map_err(|source| Error::ReadBlock {
                 source,
                 hash: hash.to_owned(),
@@ -262,7 +264,7 @@ impl BlockDir {
         if actual_hash != *hash {
             ui::problem(&format!(
                 "Block file {:?} has actual decompressed hash {:?}",
-                &relpath, actual_hash
+                &block_relpath, actual_hash
             ));
             return Err(Error::BlockCorrupt {
                 hash: hash.to_owned(),
