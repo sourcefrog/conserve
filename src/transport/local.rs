@@ -76,7 +76,9 @@ impl TransportWrite for LocalTransport {
     fn write_file(&mut self, relpath: &str, content: &[u8]) -> io::Result<()> {
         let full_path = self.full_path(relpath);
         let dir = full_path.parent().unwrap();
-        let mut temp = tempfile::Builder::new().prefix("tmp").tempfile_in(dir)?;
+        let mut temp = tempfile::Builder::new()
+            .prefix(crate::TMP_PREFIX)
+            .tempfile_in(dir)?;
         if let Err(err) = temp.write_all(content) {
             let _ = temp.close();
             return Err(err);

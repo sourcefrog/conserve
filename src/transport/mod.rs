@@ -75,6 +75,8 @@ pub trait TransportWrite: TransportRead {
     /// As much as possible, the file should be written atomically so that it is only visible with
     /// the complete content. On a local filesystem the content is written to a temporary file and
     /// then renamed.
+    ///
+    /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
     fn write_file(&mut self, relpath: &str, content: &[u8]) -> io::Result<()>;
 }
 

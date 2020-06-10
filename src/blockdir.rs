@@ -37,8 +37,6 @@ const BLOCKDIR_FILE_NAME_LEN: usize = BLAKE_HASH_SIZE_BYTES * 2;
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
 
-const TMP_PREFIX: &str = "tmp";
-
 /// The unique identifier for a block: its hexadecimal `BLAKE2b` hash.
 pub type BlockHash = String;
 
@@ -111,7 +109,7 @@ impl BlockDir {
         let d = self.subdir_for(hex_hash);
         super::io::ensure_dir_exists(&d)?;
         let mut tempf = tempfile::Builder::new()
-            .prefix(TMP_PREFIX)
+            .prefix(crate::TMP_PREFIX)
             .tempfile_in(&d)?;
         let mut compressor = Compressor::new();
         let compressed = compressor.compress(&in_buf)?;

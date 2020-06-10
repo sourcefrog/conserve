@@ -74,3 +74,6 @@ pub(crate) const MAX_BLOCK_SIZE: usize = 1 << 20;
 
 /// ISO timestamp, for https://docs.rs/chrono/0.4.11/chrono/format/strftime/.
 const TIMESTAMP_FORMAT: &str = "%F %T";
+
+/// Temporary files in the archive have this prefix.
+const TMP_PREFIX: &str = "tmp";
