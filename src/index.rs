@@ -224,10 +224,12 @@ pub struct IndexRead {
 }
 
 impl IndexRead {
-    pub fn new(dir: &Path) -> IndexRead {
-        IndexRead {
-            transport: Box::new(LocalTransport::new(&dir)),
-        }
+    pub(crate) fn open(transport: Box<dyn TransportRead>) -> IndexRead {
+        IndexRead { transport }
+    }
+
+    pub(crate) fn open_path(path: &Path) -> IndexRead {
+        IndexRead::open(Box::new(LocalTransport::new(path)))
     }
 
     /// Return the (1-based) number of index hunks in an index directory.
@@ -493,7 +495,9 @@ mod tests {
             "Index hunk file not found"
         );
 
-        let mut it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
+        let mut it = IndexRead::open_path(&testdir.path())
+            .iter_entries()
+            .unwrap();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
@@ -512,7 +516,9 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk().unwrap();
 
-        let it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
+        let it = IndexRead::open_path(&testdir.path())
+            .iter_entries()
+            .unwrap();
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
     }
@@ -546,7 +552,7 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         let excludes = excludes::from_strings(&["/fo*"]).unwrap();
-        let it = IndexRead::new(&testdir.path())
+        let it = IndexRead::open_path(&testdir.path())
             .iter_entries()
             .unwrap()
             .with_excludes(excludes);
@@ -570,25 +576,33 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         // Advance to /foo and read on from there.
-        let mut it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
+        let mut it = IndexRead::open_path(&testdir.path())
+            .iter_entries()
+            .unwrap();
         assert_eq!(it.advance_to(&Apath::from("/foo")).unwrap().apath, "/foo");
         assert_eq!(it.next().unwrap().apath, "/foobar");
         assert_eq!(it.next().unwrap().apath, "/g01");
 
         // Advance to before /g01
-        let mut it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
+        let mut it = IndexRead::open_path(&testdir.path())
+            .iter_entries()
+            .unwrap();
         assert_eq!(it.advance_to(&Apath::from("/fxxx")), None);
         assert_eq!(it.next().unwrap().apath, "/g01");
         assert_eq!(it.next().unwrap().apath, "/g02");
 
         // Advance to before the first entry
-        let mut it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
+        let mut it = IndexRead::open_path(&testdir.path())
+            .iter_entries()
+            .unwrap();
         assert_eq!(it.advance_to(&Apath::from("/aaaa")), None);
         assert_eq!(it.next().unwrap().apath, "/bar");
         assert_eq!(it.next().unwrap().apath, "/foo");
 
         // Advance to after the last entry
-        let mut it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
+        let mut it = IndexRead::open_path(&testdir.path())
+            .iter_entries()
+            .unwrap();
         assert_eq!(it.advance_to(&Apath::from("/zz")), None);
         assert_eq!(it.next(), None);
     }
@@ -605,7 +619,7 @@ mod tests {
         ib.finish_hunk()?;
         // Think about, but don't actually add some files
         ib.finish_hunk()?;
-        let read_index = IndexRead::new(&testdir.path());
+        let read_index = IndexRead::open_path(&testdir.path());
         assert_eq!(read_index.count_hunks()?, 1);
         Ok(())
     }
