@@ -62,12 +62,11 @@ impl dyn TransportRead {
 
 /// Facade to both read and write an archive.
 pub trait TransportWrite: TransportRead {
-    /// Create a directory.
+    /// Create a directory, if it does not exist.
     ///
-    /// If the directory already exists, this should be an error, but if that's not supported
-    /// by the underlying transport it may just succeed.
+    /// If the directory already exists, it's not an error.
     ///
-    /// It's not necessary or desirde that this create missing parent directories.
+    /// This function does not create missing parent directories.
     fn create_dir(&mut self, relpath: &str) -> io::Result<()>;
 
     /// Write a complete file.

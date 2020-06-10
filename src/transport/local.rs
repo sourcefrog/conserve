@@ -70,7 +70,13 @@ impl TransportRead for LocalTransport {
 
 impl TransportWrite for LocalTransport {
     fn create_dir(&mut self, relpath: &str) -> io::Result<()> {
-        create_dir(self.full_path(&relpath))
+        create_dir(self.full_path(&relpath)).or_else(|err| {
+            if err.kind() == io::ErrorKind::AlreadyExists {
+                Ok(())
+            } else {
+                Err(err)
+            }
+        })
     }
 
     fn write_file(&mut self, relpath: &str, content: &[u8]) -> io::Result<()> {
@@ -203,5 +209,19 @@ mod test {
         temp.child("subdir")
             .child("subfile")
             .assert("Must I paint you a picture?");
+
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn create_existing_dir() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let mut transport = TransportWrite::new(&temp.path().to_string_lossy()).unwrap();
+
+        transport.create_dir("aaa").unwrap();
+        transport.create_dir("aaa").unwrap();
+        transport.create_dir("aaa").unwrap();
+
+        temp.close().unwrap();
     }
 }
