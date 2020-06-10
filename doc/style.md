@@ -21,12 +21,15 @@ Objects that need to be explicitly finished (to write a tail file or to flush)
 have a `.finish()` method, which should consume the object. If the object has
 accumulating stats, they are returned from `finalize()`.
 
-To open an existing object, call `.open()` on the class, and this constructs and
+To open an existing object, call `::open()` on the class, and this constructs and
 returns the corresponding `Reader` or `Writer`. Typically the first parameter is
 the corresponding parent object, except for the Archive or LocalTree, which can
 be constructed from a filename. (Although, in future, from a `Transport`.)
 
-To make a new one, `.create()` which returns a `Writer`.
+To make a new one, `::create()` which returns a `Writer`.
+
+Versions that take a `Path` rather than a `Transport` should be called
+`open_path` and `create_path`.
 
 TODO: Split `Band` into `BandReader` and `BandWriter`.
 

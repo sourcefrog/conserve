@@ -45,7 +45,7 @@ impl Archive {
             path: path.to_owned(),
             source,
         })?;
-        let block_dir = BlockDir::create(&path.join(BLOCK_DIR))?;
+        let block_dir = BlockDir::create_path(&path.join(BLOCK_DIR))?;
         let header = ArchiveHeader {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
@@ -87,7 +87,7 @@ impl Archive {
                 path: path.clone(),
             });
         }
-        let block_dir = BlockDir::new(&path.join(BLOCK_DIR));
+        let block_dir = BlockDir::open_path(&path.join(BLOCK_DIR));
         Ok(Archive {
             path,
             block_dir,

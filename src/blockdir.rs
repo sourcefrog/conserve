@@ -74,21 +74,20 @@ fn block_relpath(hash_hex: &str) -> String {
 }
 
 impl BlockDir {
-    /// Create a BlockDir accessing `path`, which must exist as a directory.
-    pub fn new(path: &Path) -> BlockDir {
-        BlockDir::open_on_transport(Box::new(LocalTransport::new(path)))
+    pub fn open_path(path: &Path) -> BlockDir {
+        BlockDir::open(Box::new(LocalTransport::new(path)))
     }
 
-    pub fn open_on_transport(transport: Box<dyn TransportWrite>) -> BlockDir {
+    pub fn open(transport: Box<dyn TransportWrite>) -> BlockDir {
         BlockDir { transport }
     }
 
     /// Create a BlockDir directory and return an object accessing it.
-    pub fn create(path: &Path) -> Result<BlockDir> {
-        BlockDir::create_on_transport(Box::new(LocalTransport::new(path)))
+    pub fn create_path(path: &Path) -> Result<BlockDir> {
+        BlockDir::create(Box::new(LocalTransport::new(path)))
     }
 
-    pub fn create_on_transport(mut transport: Box<dyn TransportWrite>) -> Result<BlockDir> {
+    pub fn create(mut transport: Box<dyn TransportWrite>) -> Result<BlockDir> {
         transport
             .create_dir("")
             .map_err(|source| Error::CreateBlockDir { source })?;
@@ -381,7 +380,7 @@ mod tests {
 
     fn setup() -> (TempDir, BlockDir) {
         let testdir = TempDir::new().unwrap();
-        let block_dir = BlockDir::new(testdir.path());
+        let block_dir = BlockDir::create_path(testdir.path()).unwrap();
         (testdir, block_dir)
     }
 
