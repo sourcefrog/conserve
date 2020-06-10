@@ -145,19 +145,18 @@ impl BlockDir {
     /// Read back the contents of a block, as a byte array.
     ///
     /// To read a whole file, use StoredFile instead.
-    pub fn get(&self, addr: &Address) -> Result<(Vec<u8>, Sizes)> {
-        let (mut decompressed, sizes) = self.get_block_content(&addr.hash)?;
-        let len = addr.len as usize;
-        let start = addr.start as usize;
-        if (start + len) > decompressed.len() {
-            // TODO: Error, not panic.
-            panic!(
-                "address {:?} extends beyond decompressed length {}",
-                addr,
-                decompressed.len(),
-            );
+    pub fn get(&self, address: &Address) -> Result<(Vec<u8>, Sizes)> {
+        let (mut decompressed, sizes) = self.get_block_content(&address.hash)?;
+        let len = address.len as usize;
+        let start = address.start as usize;
+        let actual_len = decompressed.len();
+        if (start + len) > actual_len {
+            return Err(Error::AddressTooLong {
+                address: address.to_owned(),
+                actual_len,
+            });
         }
-        if addr.start != 0 {
+        if start != 0 {
             let trimmed = decompressed[start..(start + len)].to_owned();
             Ok((trimmed, sizes))
         } else {
@@ -454,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    pub fn retrieve_partial_data() {
+    fn retrieve_partial_data() {
         let (_testdir, block_dir) = setup();
         let mut store_files = StoreFiles::new(block_dir.clone());
         let (addrs, _stats) = store_files
@@ -481,6 +480,52 @@ mod tests {
         };
         let (second_half_content, _second_half_stats) = block_dir.get(&second_half).unwrap();
         assert_eq!(second_half_content, "89abcdef".as_bytes());
+    }
+
+    #[test]
+    fn invalid_addresses() {
+        let (_testdir, block_dir) = setup();
+        let mut store_files = StoreFiles::new(block_dir.clone());
+        let (addrs, _stats) = store_files
+            .store_file_content(
+                &"/hello".into(),
+                &mut io::Cursor::new("0123456789abcdef".as_bytes()),
+            )
+            .unwrap();
+        assert_eq!(addrs.len(), 1);
+
+        // Address with start point too high.
+        let hash = addrs[0].hash.clone();
+        let starts_too_late = Address {
+            hash: hash.clone(),
+            start: 16,
+            len: 2,
+        };
+        let result = block_dir.get(&starts_too_late);
+        assert_eq!(
+            &result.err().unwrap().to_string(),
+            &format!(
+                "Address {{ hash: {:?}, start: 16, len: 2 }} \
+                   extends beyond decompressed block length 16",
+                hash
+            )
+        );
+
+        // Address with length too long.
+        let too_long = Address {
+            hash: hash.clone(),
+            start: 10,
+            len: 10,
+        };
+        let result = block_dir.get(&too_long);
+        assert_eq!(
+            &result.err().unwrap().to_string(),
+            &format!(
+                "Address {{ hash: {:?}, start: 10, len: 10 }} \
+                   extends beyond decompressed block length 16",
+                hash
+            )
+        );
     }
 
     #[test]

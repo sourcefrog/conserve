@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+use crate::blockdir::Address;
 use crate::*;
 
 type IOError = std::io::Error;
@@ -14,9 +15,11 @@ type IOError = std::io::Error;
 /// Conserve specific error.
 #[derive(Debug, Error)]
 pub enum Error {
-    // TODO: Add messages and perhaps more fields to all of these.
     #[error("Block file {path:?} corrupt; actual hash {actual_hash:?}")]
     BlockCorrupt { path: PathBuf, actual_hash: String },
+
+    #[error("{address:?} extends beyond decompressed block length {actual_len:?}")]
+    AddressTooLong { address: Address, actual_len: usize },
 
     #[error("Failed to read block {path:?}")]
     ReadBlock { path: PathBuf, source: IOError },
