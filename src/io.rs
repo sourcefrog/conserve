@@ -9,7 +9,7 @@ use std::io::prelude::*;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
-pub struct AtomicFile {
+pub(crate) struct AtomicFile {
     path: PathBuf,
     f: tempfile::NamedTempFile,
 }

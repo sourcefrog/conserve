@@ -7,7 +7,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::entry::Entry;
-use crate::io::{directory_is_empty, ensure_dir_exists};
+use crate::io::{directory_is_empty, ensure_dir_exists, AtomicFile};
 use crate::stats::CopyStats;
 use crate::*;
 
