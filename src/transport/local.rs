@@ -2,12 +2,12 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::fs::File;
+use std::fs::{create_dir, File};
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
-use crate::transport::{DirEntry, TransportRead};
+use crate::transport::{DirEntry, TransportRead, TransportWrite};
 
 #[derive(Clone, Debug)]
 pub struct LocalTransport {
@@ -68,9 +68,32 @@ impl TransportRead for LocalTransport {
     }
 }
 
+impl TransportWrite for LocalTransport {
+    fn create_dir(&mut self, relpath: &str) -> io::Result<()> {
+        create_dir(self.full_path(&relpath))
+    }
+
+    fn write_file(&mut self, relpath: &str, content: &[u8]) -> io::Result<()> {
+        let full_path = self.full_path(relpath);
+        let dir = full_path.parent().unwrap();
+        let mut temp = tempfile::Builder::new().prefix("tmp").tempfile_in(dir)?;
+        if let Err(err) = temp.write_all(content) {
+            let _ = temp.close();
+            return Err(err);
+        }
+        if let Err(persist_error) = temp.persist(&full_path) {
+            let _ = persist_error.file.close()?;
+            Err(persist_error.error)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use assert_fs::prelude::*;
+    use predicates::prelude::*;
 
     use super::*;
     use crate::kind::Kind;
@@ -157,5 +180,22 @@ mod test {
         );
 
         temp.close().unwrap();
+    }
+
+    #[test]
+    fn write_file() {
+        // TODO: Maybe test some error cases of failing to write.
+        let temp = assert_fs::TempDir::new().unwrap();
+        let mut transport = TransportWrite::new(&temp.path().to_string_lossy()).unwrap();
+
+        transport.create_dir("subdir").unwrap();
+        transport
+            .write_file("subdir/subfile", b"Must I paint you a picture?")
+            .unwrap();
+
+        temp.child("subdir").assert(predicate::path::is_dir());
+        temp.child("subdir")
+            .child("subfile")
+            .assert("Must I paint you a picture?");
     }
 }

@@ -66,13 +66,23 @@ pub trait TransportWrite: TransportRead {
     ///
     /// If the directory already exists, this should be an error, but if that's not supported
     /// by the underlying transport it may just succeed.
-    fn make_dir(&mut self, apath: &str) -> io::Result<()>;
+    ///
+    /// It's not necessary or desirde that this create missing parent directories.
+    fn create_dir(&mut self, relpath: &str) -> io::Result<()>;
 
     /// Write a complete file.
     ///
     /// As much as possible, the file should be written atomically so that it is only visible with
-    /// the complete content.
-    fn write_file(&mut self, apath: &str, content: &[u8]) -> io::Result<()>;
+    /// the complete content. On a local filesystem the content is written to a temporary file and
+    /// then renamed.
+    fn write_file(&mut self, relpath: &str, content: &[u8]) -> io::Result<()>;
+}
+
+impl dyn TransportWrite {
+    pub fn new(s: &str) -> Result<Box<dyn TransportWrite>> {
+        // TODO: Recognize URL-style strings.
+        Ok(Box::new(local::LocalTransport::new(&Path::new(s))))
+    }
 }
 
 /// A directory entry read from a transport.
