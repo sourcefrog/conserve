@@ -12,10 +12,9 @@
 //! The structure is: archive > blockdir > subdir > file.
 
 use std::convert::TryInto;
-use std::fs;
 use std::io;
 use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
@@ -61,8 +60,6 @@ pub struct Address {
 /// A readable, writable directory within a band holding data blocks.
 #[derive(Clone)]
 pub struct BlockDir {
-    pub path: PathBuf,
-
     transport: Box<dyn TransportWrite>,
 }
 
@@ -70,74 +67,64 @@ fn block_name_to_subdirectory(block_hash: &str) -> &str {
     &block_hash[..SUBDIR_NAME_CHARS]
 }
 
+/// Return the transport-relative file for a given hash.
+fn relpath(hash_hex: &str) -> String {
+    format!("{}/{}", block_name_to_subdirectory(hash_hex), hash_hex)
+}
+
 impl BlockDir {
     /// Create a BlockDir accessing `path`, which must exist as a directory.
     pub fn new(path: &Path) -> BlockDir {
-        BlockDir {
-            path: path.to_path_buf(),
-            transport: Box::new(LocalTransport::new(path)),
-        }
+        BlockDir::open_on_transport(Box::new(LocalTransport::new(path)))
+    }
+
+    pub fn open_on_transport(transport: Box<dyn TransportWrite>) -> BlockDir {
+        BlockDir { transport }
     }
 
     /// Create a BlockDir directory and return an object accessing it.
     pub fn create(path: &Path) -> Result<BlockDir> {
-        fs::create_dir(path).map_err(|source| Error::CreateBlockDir { source })?;
-        Ok(BlockDir::new(path))
+        BlockDir::create_on_transport(Box::new(LocalTransport::new(path)))
     }
 
-    /// Return the subdirectory in which we'd put a file called `hash_hex`.
-    fn subdir_for(&self, hash_hex: &str) -> PathBuf {
-        self.path.join(block_name_to_subdirectory(hash_hex))
-    }
-
-    /// Return the full path for a file called `hex_hash`.
-    fn path_for_file(&self, hash_hex: &str) -> PathBuf {
-        self.subdir_for(hash_hex).join(hash_hex)
-    }
-
-    /// Return the transport-relative file for a given hash.
-    fn relpath(&self, hash_hex: &str) -> String {
-        format!("{}/{}", block_name_to_subdirectory(hash_hex), hash_hex)
+    pub fn create_on_transport(mut transport: Box<dyn TransportWrite>) -> Result<BlockDir> {
+        transport
+            .create_dir("")
+            .map_err(|source| Error::CreateBlockDir { source })?;
+        Ok(BlockDir { transport })
     }
 
     /// Returns the number of compressed bytes.
     fn compress_and_store(&mut self, in_buf: &[u8], hex_hash: &str) -> Result<u64> {
         // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
-        // Note: When we come to support cloud storage, we should do one atomic write rather than
-        // a write and rename.
-        let path = self.path_for_file(&hex_hash);
-        let d = self.subdir_for(hex_hash);
-        super::io::ensure_dir_exists(&d)?;
-        let mut tempf = tempfile::Builder::new()
-            .prefix(crate::TMP_PREFIX)
-            .tempfile_in(&d)?;
         let mut compressor = Compressor::new();
         let compressed = compressor.compress(&in_buf)?;
         let comp_len: u64 = compressed.len().try_into().unwrap();
-        tempf.write_all(compressed)?;
-        // Use plain `persist` not `persist_noclobber` to avoid
-        // calling `link` on Unix, which won't work on all filesystems.
-        if let Err(e) = tempf.persist(&path) {
-            if e.error.kind() == io::ErrorKind::AlreadyExists {
-                // Perhaps it was simultaneously created by another thread or process.
-                // This isn't really an error.
-                ui::problem(&format!(
-                    "Unexpected late detection of existing block {:?}",
-                    hex_hash
-                ));
-                e.file.close()?;
-            } else {
-                return Err(e.error.into());
-            }
-        }
+        self.transport
+            .create_dir(block_name_to_subdirectory(hex_hash))?;
+        self.transport
+            .write_file(&relpath(hex_hash), compressed)
+            .or_else(|io_err| {
+                if io_err.kind() == io::ErrorKind::AlreadyExists {
+                    // Perhaps it was simultaneously created by another thread or process.
+                    ui::problem(&format!(
+                        "Unexpected late detection of existing block {:?}",
+                        hex_hash
+                    ));
+                    Ok(())
+                } else {
+                    Err(Error::WriteBlock {
+                        hash: hex_hash.to_owned(),
+                        source: io_err,
+                    })
+                }
+            })?;
         Ok(comp_len)
     }
 
     /// True if the named block is present in this directory.
     pub fn contains(&self, hash: &str) -> Result<bool> {
-        self.transport
-            .exists(&self.relpath(hash))
-            .map_err(Error::from)
+        self.transport.exists(&relpath(hash)).map_err(Error::from)
     }
 
     /// Read back the contents of a block, as a byte array.
@@ -170,10 +157,7 @@ impl BlockDir {
         Ok(self
             .transport
             .read_dir("")
-            .map_err(|source| Error::ListBlocks {
-                source,
-                path: self.path.clone(),
-            })?
+            .map_err(|source| Error::ListBlocks { source })?
             .filter_map(|entry_result| match entry_result {
                 Err(e) => {
                     ui::problem(&format!("Error listing blockdir: {:?}", e));
@@ -261,15 +245,15 @@ impl BlockDir {
     /// Checks that the hash is correct with the contents.
     pub fn get_block_content(&self, hash: &str) -> Result<(Vec<u8>, Sizes)> {
         // TODO: Reuse decompressor buffer.
-        let mut decompressor = Decompressor::new();
-        let path = self.path_for_file(hash);
         // TODO: Reuse read buffer.
+        let mut decompressor = Decompressor::new();
         let mut compressed_bytes = Vec::new();
+        let relpath = relpath(hash);
         self.transport
-            .read_file(&self.relpath(hash), &mut compressed_bytes)
+            .read_file(&relpath, &mut compressed_bytes)
             .map_err(|source| Error::ReadBlock {
                 source,
-                path: path.to_owned(),
+                hash: hash.to_owned(),
             })?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = hex::encode(
@@ -278,15 +262,18 @@ impl BlockDir {
         if actual_hash != *hash {
             ui::problem(&format!(
                 "Block file {:?} has actual decompressed hash {:?}",
-                &path, actual_hash
+                &relpath, actual_hash
             ));
-            return Err(Error::BlockCorrupt { path, actual_hash });
+            return Err(Error::BlockCorrupt {
+                hash: hash.to_owned(),
+                actual_hash,
+            });
         }
         let sizes = Sizes {
             uncompressed: decompressed_bytes.len() as u64,
             compressed: compressed_bytes.len() as u64,
         };
-        // TODO: Return the existing buffer; don't copy it.
+        // TODO: Return the output buffer, or take the buffer from the caller: don't copy it here.
         Ok((decompressed_bytes.to_vec(), sizes))
     }
 }

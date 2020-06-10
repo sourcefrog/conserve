@@ -15,17 +15,20 @@ type IOError = std::io::Error;
 /// Conserve specific error.
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Block file {path:?} corrupt; actual hash {actual_hash:?}")]
-    BlockCorrupt { path: PathBuf, actual_hash: String },
+    #[error("Block file {hash:?} corrupt; actual hash {actual_hash:?}")]
+    BlockCorrupt { hash: String, actual_hash: String },
 
     #[error("{address:?} extends beyond decompressed block length {actual_len:?}")]
     AddressTooLong { address: Address, actual_len: usize },
 
-    #[error("Failed to read block {path:?}")]
-    ReadBlock { path: PathBuf, source: IOError },
+    #[error("Failed to write block {hash:?}")]
+    WriteBlock { hash: String, source: IOError },
 
-    #[error("Failed to list block files in {:?}", path)]
-    ListBlocks { path: PathBuf, source: IOError },
+    #[error("Failed to read block {hash:?}")]
+    ReadBlock { hash: String, source: IOError },
+
+    #[error("Failed to list block files")]
+    ListBlocks { source: IOError },
 
     #[error("Not a Conserve archive: {:?}", path)]
     NotAnArchive { path: PathBuf },
