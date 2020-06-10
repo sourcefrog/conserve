@@ -2,7 +2,7 @@
 // Copyright 2017, 2018, 2019, 2020 Martin Pool.
 
 //! Copy tree contents.
-
+use std::cmp::{Ord, Ordering};
 #[allow(unused_imports)]
 use snafu::ResultExt;
 
@@ -40,6 +40,47 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     }
     ui::set_progress_phase("Copying");
     for entry in source.iter_entries()? {
+        let target = "DataScienceatHome";
+
+        // let found = entry.apath().eq("/DataScienceatHome");
+        // println!("{:?} == {:?} {:?}", entry.apath(), target, found);
+        
+        // let ordering = entry.apath().cmp(&target);
+        // println!("ordering: {:?}", ordering);
+
+        let subtree: Vec<&str> = entry.apath().split('/').collect();
+        println!("subtree is {:?}", subtree[1]);
+        let to_be_copied = subtree[1].eq(target);
+        println!("to be copied: {:?}", to_be_copied);
+
+        // if found {
+        //     let tree = Apath::from(entry.apath().to_owned());
+        //     println!("\ntree: {:?}", tree)
+        
+        //     // match entry.apath().cmp(&target) {
+
+        //     //     // Ordering::Equal => {
+        //     //     //     found = true;
+        //     //     //     println!("\nDEBUG {:?} target={:?} found={:?}\n", 
+        //     //     //     entry.apath(), Apath::from(target), found); 
+    
+        //     //     //     // target = Apath::from(target);
+                    
+        //     //     // },
+                
+        //     //     Ordering::Greater => {
+        //     //         println!("\n entry: {:?} target: {:?} \n", 
+        //     //         entry.apath(), target); 
+        //     //     },
+
+        //     //     _ => {}
+        //     // }
+
+        // }
+
+        
+
+
         if options.print_filenames {
             crate::ui::println(entry.apath());
         }
