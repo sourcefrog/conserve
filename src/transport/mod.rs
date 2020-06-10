@@ -78,6 +78,15 @@ pub trait TransportWrite: TransportRead {
     ///
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
     fn write_file(&mut self, relpath: &str, content: &[u8]) -> io::Result<()>;
+
+    /// Clone this object into a new box.
+    fn box_clone_write(&self) -> Box<dyn TransportWrite>;
+}
+
+impl Clone for Box<dyn TransportWrite> {
+    fn clone(&self) -> Box<dyn TransportWrite> {
+        self.box_clone_write()
+    }
 }
 
 impl dyn TransportWrite {

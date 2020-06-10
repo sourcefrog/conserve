@@ -26,7 +26,7 @@ use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
 use crate::stats::{CopyStats, Sizes, ValidateBlockDirStats};
 use crate::transport::local::LocalTransport;
-use crate::transport::{DirEntry, TransportRead};
+use crate::transport::{DirEntry, TransportWrite};
 use crate::*;
 
 /// Use the maximum 64-byte hash.
@@ -63,7 +63,7 @@ pub struct Address {
 pub struct BlockDir {
     pub path: PathBuf,
 
-    transport: Box<dyn TransportRead>,
+    transport: Box<dyn TransportWrite>,
 }
 
 fn block_name_to_subdirectory(block_hash: &str) -> &str {

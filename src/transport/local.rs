@@ -90,6 +90,10 @@ impl TransportWrite for LocalTransport {
             Ok(())
         }
     }
+
+    fn box_clone_write(&self) -> Box<dyn TransportWrite> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(test)]
