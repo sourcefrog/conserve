@@ -86,7 +86,7 @@ pub enum Error {
     },
 
     #[error("Failed to write index hunk {:?}", path)]
-    WriteIndex { path: PathBuf, source: IOError },
+    WriteIndex { path: String, source: IOError },
 
     #[error("Failed to read index hunk {:?}", path)]
     ReadIndex { path: String, source: IOError },

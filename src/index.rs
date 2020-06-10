@@ -5,19 +5,17 @@
 
 use std::cmp::Ordering;
 use std::io;
-use std::io::Write;
 use std::iter::Peekable;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::vec;
 
 use globset::GlobSet;
 
 use crate::compress::snappy::{Compressor, Decompressor};
-use crate::io::ensure_dir_exists;
 use crate::kind::Kind;
 use crate::stats::{IndexBuilderStats, IndexEntryIterStats};
 use crate::transport::local::LocalTransport;
-use crate::transport::TransportRead;
+use crate::transport::{TransportRead, TransportWrite};
 use crate::unix_time::UnixTime;
 use crate::*;
 
@@ -118,7 +116,7 @@ impl IndexEntry {
 /// Accumulates ordered changes to the index and streams them out to index files.
 pub struct IndexBuilder {
     /// The `i` directory within the band where all files for this index are written.
-    dir: PathBuf,
+    transport: Box<dyn TransportWrite>,
 
     /// Currently queued entries to be written out.
     entries: Vec<IndexEntry>,
@@ -140,9 +138,9 @@ pub struct IndexBuilder {
 /// Accumulate and write out index entries into files in an index directory.
 impl IndexBuilder {
     /// Make a new builder that will write files into the given directory.
-    pub fn new(dir: &Path) -> IndexBuilder {
+    pub fn new(transport: Box<dyn TransportWrite>) -> IndexBuilder {
         IndexBuilder {
-            dir: dir.to_path_buf(),
+            transport,
             entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
             sequence: 0,
             check_order: apath::CheckOrder::new(),
@@ -181,22 +179,24 @@ impl IndexBuilder {
             return Ok(());
         }
 
-        let path = path_for_hunk(&self.dir, self.sequence);
+        let relpath = hunk_relpath(self.sequence);
         let write_error = |source| Error::WriteIndex {
-            path: path.to_owned(),
+            path: relpath.clone(),
             source,
         };
         let json =
             serde_json::to_vec(&self.entries).map_err(|source| Error::SerializeIndex { source })?;
         let uncompressed_len = json.len() as u64;
         if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
-            ensure_dir_exists(&subdir_for_hunk(&self.dir, self.sequence)).map_err(write_error)?;
+            self.transport
+                .create_dir(&subdir_relpath(self.sequence))
+                .map_err(write_error)?;
         }
-        let mut af = AtomicFile::new(&path).map_err(write_error)?;
         let compressed_bytes = self.compressor.compress(&json)?;
         let compressed_len = compressed_bytes.len();
-        af.write_all(compressed_bytes).map_err(write_error)?;
-        af.close().map_err(write_error)?;
+        self.transport
+            .write_file(&relpath, compressed_bytes)
+            .map_err(write_error)?;
 
         self.stats.index_hunks += 1;
         self.stats.compressed_index_bytes += compressed_len as u64;
@@ -207,20 +207,13 @@ impl IndexBuilder {
     }
 }
 
-/// Return the subdirectory for a hunk numbered `hunk_number`.
-fn subdir_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
-    let mut buf = dir.to_path_buf();
-    buf.push(format!("{:05}", hunk_number / HUNKS_PER_SUBDIR));
-    buf
-}
-
-/// Return the filename (in subdirectory) for a hunk.
-fn path_for_hunk(dir: &Path, hunk_number: u32) -> PathBuf {
-    dir.join(relpath_for_hunk(hunk_number))
+/// Return the transport-relative path for a subdirectory.
+fn subdir_relpath(hunk_number: u32) -> String {
+    format!("{:05}", hunk_number / HUNKS_PER_SUBDIR)
 }
 
 /// Return the relative path for a hunk.
-fn relpath_for_hunk(hunk_number: u32) -> String {
+fn hunk_relpath(hunk_number: u32) -> String {
     format!("{:05}/{:09}", hunk_number / HUNKS_PER_SUBDIR, hunk_number)
 }
 
@@ -243,7 +236,7 @@ impl IndexRead {
         // TODO: Perhaps, list the directories and cope cleanly with
         // one hunk being missing.
         for i in 0.. {
-            let path = relpath_for_hunk(i);
+            let path = hunk_relpath(i);
             if !self
                 .transport
                 .exists(&path)
@@ -362,7 +355,7 @@ impl IndexEntryIter {
             self.buffered_entries.next().is_none(),
             "refill_entry_buffer called with non-empty buffer"
         );
-        let path = &relpath_for_hunk(self.next_hunk_number);
+        let path = &hunk_relpath(self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
         self.stats.index_hunks += 1;
@@ -398,15 +391,13 @@ impl IndexEntryIter {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use tempfile::TempDir;
 
     use super::*;
 
     pub fn scratch_indexbuilder() -> (TempDir, IndexBuilder) {
         let testdir = TempDir::new().unwrap();
-        let ib = IndexBuilder::new(testdir.path());
+        let ib = IndexBuilder::new(Box::new(LocalTransport::new(testdir.path())));
         (testdir, ib)
     }
 
@@ -484,38 +475,25 @@ mod tests {
 
     #[test]
     fn path_for_hunk() {
-        let index_dir = Path::new("/foo");
-        let hunk_path = super::path_for_hunk(index_dir, 0);
-        assert_eq!(file_name_as_str(&hunk_path), "000000000");
-        assert_eq!(last_dir_name_as_str(&hunk_path), "00000");
-    }
-
-    fn file_name_as_str(p: &Path) -> &str {
-        p.file_name().unwrap().to_str().unwrap()
-    }
-
-    fn last_dir_name_as_str(p: &Path) -> &str {
-        p.parent().unwrap().file_name().unwrap().to_str().unwrap()
+        assert_eq!(super::hunk_relpath(0), "00000/000000000");
     }
 
     #[test]
     fn basic() {
-        let (_testdir, mut ib) = scratch_indexbuilder();
+        let (testdir, mut ib) = scratch_indexbuilder();
         add_an_entry(&mut ib, "/apple");
         add_an_entry(&mut ib, "/banana");
         ib.finish_hunk().unwrap();
-        #[allow(clippy::redundant_clone)] // It's not redundant, because ib will be dropped.
-        let ib_dir = ib.dir.to_path_buf();
         drop(ib);
 
         assert!(
-            std::fs::metadata(ib_dir.join("00000").join("000000000"))
+            std::fs::metadata(testdir.path().join("00000").join("000000000"))
                 .unwrap()
                 .is_file(),
             "Index hunk file not found"
         );
 
-        let mut it = IndexRead::new(&ib_dir).iter_entries().unwrap();
+        let mut it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
@@ -525,7 +503,7 @@ mod tests {
 
     #[test]
     fn multiple_hunks() {
-        let (_testdir, mut ib) = scratch_indexbuilder();
+        let (testdir, mut ib) = scratch_indexbuilder();
         add_an_entry(&mut ib, "/1.1");
         add_an_entry(&mut ib, "/1.2");
         ib.finish_hunk().unwrap();
@@ -534,7 +512,7 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk().unwrap();
 
-        let it = IndexRead::new(&ib.dir).iter_entries().unwrap();
+        let it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
     }
@@ -561,14 +539,14 @@ mod tests {
 
     #[test]
     fn excluded_entries() {
-        let (_testdir, mut ib) = scratch_indexbuilder();
+        let (testdir, mut ib) = scratch_indexbuilder();
         add_an_entry(&mut ib, "/bar");
         add_an_entry(&mut ib, "/foo");
         add_an_entry(&mut ib, "/foobar");
         ib.finish_hunk().unwrap();
 
         let excludes = excludes::from_strings(&["/fo*"]).unwrap();
-        let it = IndexRead::new(&ib.dir)
+        let it = IndexRead::new(&testdir.path())
             .iter_entries()
             .unwrap()
             .with_excludes(excludes);
@@ -579,7 +557,7 @@ mod tests {
 
     #[test]
     fn advance() {
-        let (_testdir, mut ib) = scratch_indexbuilder();
+        let (testdir, mut ib) = scratch_indexbuilder();
         add_an_entry(&mut ib, "/bar");
         add_an_entry(&mut ib, "/foo");
         add_an_entry(&mut ib, "/foobar");
@@ -592,25 +570,25 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         // Advance to /foo and read on from there.
-        let mut it = IndexRead::new(&ib.dir).iter_entries().unwrap();
+        let mut it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/foo")).unwrap().apath, "/foo");
         assert_eq!(it.next().unwrap().apath, "/foobar");
         assert_eq!(it.next().unwrap().apath, "/g01");
 
         // Advance to before /g01
-        let mut it = IndexRead::new(&ib.dir).iter_entries().unwrap();
+        let mut it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/fxxx")), None);
         assert_eq!(it.next().unwrap().apath, "/g01");
         assert_eq!(it.next().unwrap().apath, "/g02");
 
         // Advance to before the first entry
-        let mut it = IndexRead::new(&ib.dir).iter_entries().unwrap();
+        let mut it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/aaaa")), None);
         assert_eq!(it.next().unwrap().apath, "/bar");
         assert_eq!(it.next().unwrap().apath, "/foo");
 
         // Advance to after the last entry
-        let mut it = IndexRead::new(&ib.dir).iter_entries().unwrap();
+        let mut it = IndexRead::new(&testdir.path()).iter_entries().unwrap();
         assert_eq!(it.advance_to(&Apath::from("/zz")), None);
         assert_eq!(it.next(), None);
     }

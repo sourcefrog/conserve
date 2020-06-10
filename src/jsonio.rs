@@ -31,6 +31,7 @@ pub(crate) fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T
 }
 
 /// Write uncompressed json to a file on a Transport.
+#[allow(unused)] // Will replace write_json_metadata_file
 pub(crate) fn write_json<T>(
     transport: &mut dyn TransportWrite,
     relpath: &str,

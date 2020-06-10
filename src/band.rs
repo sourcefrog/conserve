@@ -168,7 +168,7 @@ impl Band {
     }
 
     pub fn index_builder(&self) -> IndexBuilder {
-        IndexBuilder::new(&self.index_dir_path)
+        IndexBuilder::new(Box::new(LocalTransport::new(&self.index_dir_path)))
     }
 
     /// Get read-only access to the index of this band.
