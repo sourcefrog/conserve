@@ -317,7 +317,6 @@ impl IndexEntryIter {
     pub fn advance_to(&mut self, apath: &Apath) -> Option<IndexEntry> {
         // This takes some care because we don't want to consume the entry
         // that tells us we went too far.
-        println!("from advance_to {:?}", apath);
 
         loop {
 

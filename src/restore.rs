@@ -59,7 +59,7 @@ impl tree::WriteTree for RestoreTree {
 
     fn copy_dir<E: Entry>(&mut self, entry: &E) -> Result<()> {
         let path = self.rooted_path(entry.apath());
-        match fs::create_dir(&path) {
+        match fs::create_dir_all(&path) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
             e => e.context(errors::Restore { path }),

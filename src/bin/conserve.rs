@@ -385,16 +385,22 @@ fn list_tree_contents<T: ReadTree>(tree: &T) -> Result<()> {
 fn restore(subm: &ArgMatches) -> Result<()> {
     let dest = Path::new(subm.value_of("destination").unwrap());
     let only_path = Path::new(subm.value_of("only").unwrap());
+
     let st = stored_tree_from_options(subm)?;
     let rt = if subm.is_present("force-overwrite") {
         RestoreTree::create_overwrite(dest)
     } else {
         RestoreTree::create(dest)
     }?;
+    
+    let restore_only = only_path.display().to_string();
+
     let opts = CopyOptions {
         print_filenames: subm.is_present("v"),
+        restore_only: restore_only,
         ..CopyOptions::default()
     };
+
     let copy_stats = copy_tree(&st, rt, &opts)?;
     ui::println("Restore complete.");
     copy_stats.summarize_restore(&mut std::io::stdout())?;
