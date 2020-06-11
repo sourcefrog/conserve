@@ -95,6 +95,7 @@ fn make_clap<'a, 'b>() -> clap::App<'a, 'b> {
             .multiple(true)
             .number_of_values(1)
             .value_name("GLOB")
+            .required(false)
             .help("Include only files that match the provided glob pattern")
     }
 
@@ -384,7 +385,8 @@ fn list_tree_contents<T: ReadTree>(tree: &T) -> Result<()> {
 
 fn restore(subm: &ArgMatches) -> Result<()> {
     let dest = Path::new(subm.value_of("destination").unwrap());
-    let only_path = Path::new(subm.value_of("only").unwrap());
+    // let only_path = Path::new(subm.value_of("only").unwrap());
+    let only_path = Path::new(subm.value_of("only").unwrap_or("/"));
 
     let st = stored_tree_from_options(subm)?;
     let rt = if subm.is_present("force-overwrite") {
