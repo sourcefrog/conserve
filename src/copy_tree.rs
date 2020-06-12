@@ -52,7 +52,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         let mut to_be_copied: bool = false;
         
         match target.as_ref() {
-            "/" => to_be_copied = true,
+            "" => to_be_copied = true,
             _ => {
                 // Take the top path from target and match it with entry (accept all subpaths)
                 if subtree.len() > target_tree.len() {
