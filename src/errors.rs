@@ -30,8 +30,8 @@ pub enum Error {
     #[error("Failed to list block files")]
     ListBlocks { source: IOError },
 
-    #[error("Not a Conserve archive: {:?}", path)]
-    NotAnArchive { path: PathBuf },
+    #[error("Not a Conserve archive")]
+    NotAnArchive {},
 
     #[error("Failed to read archive header from {:?}", path)]
     ReadArchiveHeader {
@@ -40,12 +40,11 @@ pub enum Error {
     },
 
     #[error(
-        "Archive version {:?} in {:?} is not supported by Conserve {}",
+        "Archive version {:?} is not supported by Conserve {}",
         version,
-        path,
         crate::version()
     )]
-    UnsupportedArchiveVersion { path: PathBuf, version: String },
+    UnsupportedArchiveVersion { version: String },
 
     #[error(
         "Band version {version:?} in {band_id} is not supported by Conserve {}",
@@ -68,11 +67,8 @@ pub enum Error {
     #[error("Failed to create block directory")]
     CreateBlockDir { source: std::io::Error },
 
-    #[error("Failed to create archive directory {:?}", path)]
-    CreateArchiveDirectory {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    #[error("Failed to create archive directory")]
+    CreateArchiveDirectory { source: std::io::Error },
 
     #[error("Band {} is incomplete", band_id)]
     BandIncomplete { band_id: BandId },
@@ -100,7 +96,7 @@ pub enum Error {
 
     #[error("Failed to read metadata file {:?}", path)]
     ReadMetadata {
-        path: PathBuf,
+        path: String,
         source: std::io::Error,
     },
 
@@ -122,11 +118,8 @@ pub enum Error {
         source: serde_json::Error,
     },
 
-    #[error("Failed to list bands in {:?}", path)]
-    ListBands {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    #[error("Failed to list bands")]
+    ListBands { source: std::io::Error },
 
     #[error("Failed to read source file {:?}", path)]
     ReadSourceFile {

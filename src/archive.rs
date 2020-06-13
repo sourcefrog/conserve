@@ -5,11 +5,12 @@
 
 use std::collections::BTreeSet;
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Error;
+use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
 use crate::stats::ValidateArchiveStats;
@@ -23,9 +24,6 @@ static BLOCK_DIR: &str = "d";
 /// An archive holding backup material.
 #[derive(Clone)]
 pub struct Archive {
-    /// Top-level directory for the archive.
-    path: PathBuf,
-
     /// Holds body content for all file versions.
     block_dir: BlockDir,
 
@@ -38,57 +36,56 @@ struct ArchiveHeader {
 }
 
 impl Archive {
-    /// Make a new directory to hold an archive, and write the header.
-    pub fn create(path: &Path) -> Result<Archive> {
-        std::fs::create_dir(&path).map_err(|source| Error::CreateArchiveDirectory {
-            path: path.to_owned(),
-            source,
-        })?;
-        let block_dir = BlockDir::create_path(&path.join(BLOCK_DIR))?;
-        let header = ArchiveHeader {
-            conserve_archive_version: String::from(ARCHIVE_VERSION),
-        };
-        jsonio::write_json_metadata_file(&path.join(HEADER_FILENAME), &header)?;
+    /// Make a new archive in a local direcotry.
+    pub fn create_path(path: &Path) -> Result<Archive> {
+        Archive::create(Box::new(LocalTransport::new(path)))
+    }
+
+    /// Make a new archive in a new directory accessed by a Transport.
+    pub fn create(transport: Box<dyn Transport>) -> Result<Archive> {
+        transport
+            .create_dir("")
+            .map_err(|source| Error::CreateArchiveDirectory { source })?;
+        let block_dir = BlockDir::create(transport.sub_transport(BLOCK_DIR))?;
+        write_json(
+            &transport,
+            HEADER_FILENAME,
+            &ArchiveHeader {
+                conserve_archive_version: String::from(ARCHIVE_VERSION),
+            },
+        )?;
         Ok(Archive {
-            path: path.to_owned(),
             block_dir,
-            transport: Box::new(LocalTransport::new(path)),
+            transport,
         })
     }
 
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
-    pub fn open<P: Into<PathBuf>>(path: P) -> Result<Archive> {
-        let path: PathBuf = path.into();
-        let transport = Box::new(LocalTransport::new(&path));
-        let mut json_buf = Vec::new();
-        transport
-            .read_file(HEADER_FILENAME, &mut json_buf)
-            .map_err(|e| {
-                if e.kind() == ErrorKind::NotFound {
-                    Error::NotAnArchive { path: path.clone() }
-                } else {
-                    Error::ReadMetadata {
-                        path: path.clone(),
-                        source: e,
-                    }
-                }
-            })?;
+    pub fn open_path(path: &Path) -> Result<Archive> {
+        Archive::open(Box::new(LocalTransport::new(path)))
+    }
+
+    pub fn open(transport: Box<dyn Transport>) -> Result<Archive> {
         let header: ArchiveHeader =
-            serde_json::from_slice(&json_buf).map_err(|source| Error::DeserializeJson {
-                source,
-                path: path.clone(),
+            read_json(&transport, HEADER_FILENAME).map_err(|err| match err {
+                Error::IOError { source } => match source.kind() {
+                    ErrorKind::NotFound => Error::NotAnArchive {},
+                    _ => Error::ReadMetadata {
+                        path: HEADER_FILENAME.to_owned(),
+                        source,
+                    },
+                },
+                other => other,
             })?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(Error::UnsupportedArchiveVersion {
                 version: header.conserve_archive_version,
-                path: path.clone(),
             });
         }
-        let block_dir = BlockDir::open_path(&path.join(BLOCK_DIR));
+        let block_dir = BlockDir::open(transport.sub_transport(BLOCK_DIR));
         Ok(Archive {
-            path,
             block_dir,
             transport,
         })
@@ -98,16 +95,15 @@ impl Archive {
         &self.block_dir
     }
 
-    /// Returns the top-level directory for the archive.
-    pub fn path(&self) -> &Path {
-        self.path.as_path()
-    }
-
     /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_band_ids(&self) -> Result<Vec<BandId>> {
         let mut band_ids: Vec<BandId> = self.iter_band_ids_unsorted()?.collect();
         band_ids.sort_unstable();
         Ok(band_ids)
+    }
+
+    pub(crate) fn transport(&self) -> &dyn Transport {
+        self.transport.as_ref()
     }
 
     /// Return an iterator of valid band ids in this archive, in arbitrary order.
@@ -118,10 +114,7 @@ impl Archive {
         Ok(self
             .transport
             .iter_dir_entries("")
-            .map_err(|source| Error::ListBands {
-                path: self.path.clone(),
-                source,
-            })?
+            .map_err(|source| Error::ListBands { source })?
             .filter_map(|entry_r| match entry_r {
                 // TODO: Count errors into stats.
                 Err(e) => {
@@ -195,13 +188,10 @@ impl Archive {
 
         let mut files: Vec<String> = Vec::new();
         let mut dirs: Vec<String> = Vec::new();
-        for entry_result in
-            self.transport
-                .iter_dir_entries("")
-                .map_err(|source| Error::ReadMetadata {
-                    source,
-                    path: self.path.to_owned(),
-                })?
+        for entry_result in self
+            .transport
+            .iter_dir_entries("")
+            .map_err(|source| Error::ListBands { source })?
         {
             match entry_result {
                 Ok(DirEntry { name, kind, .. }) => match kind {
@@ -226,8 +216,7 @@ impl Archive {
             stats.structure_problems += 1;
             ui::problem(&format!(
                 "Unexpected files in archive directory {:?}: {:?}",
-                self.path(),
-                files
+                self.transport, files
             ));
         }
         remove_item(&mut dirs, &BLOCK_DIR);
@@ -239,8 +228,7 @@ impl Archive {
                     stats.structure_problems += 1;
                     ui::problem(&format!(
                         "Duplicated band directory in {:?}: {:?}",
-                        self.path(),
-                        d
+                        self.transport, d
                     ));
                 } else {
                     bs.insert(b);
@@ -249,8 +237,7 @@ impl Archive {
                 stats.structure_problems += 1;
                 ui::problem(&format!(
                     "Unexpected directory in {:?}: {:?}",
-                    self.path(),
-                    d
+                    self.transport, d
                 ));
             }
         }
@@ -291,13 +278,12 @@ mod tests {
     fn create_then_open_archive() {
         let testdir = TempDir::new().unwrap();
         let arch_path = testdir.path().join("arch");
-        let arch = Archive::create(&arch_path).unwrap();
+        let arch = Archive::create_path(&arch_path).unwrap();
 
-        assert_eq!(arch.path(), arch_path.as_path());
         assert!(arch.list_band_ids().unwrap().is_empty());
 
         // We can re-open it.
-        Archive::open(arch_path).unwrap();
+        Archive::open_path(&arch_path).unwrap();
         assert!(arch.list_band_ids().unwrap().is_empty());
         assert!(arch.last_complete_band().unwrap().is_none());
     }

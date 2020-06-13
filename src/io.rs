@@ -5,59 +5,7 @@
 
 use std::fs;
 use std::io;
-use std::io::prelude::*;
-use std::ops::{Deref, DerefMut};
-use std::path::{Path, PathBuf};
-
-pub(crate) struct AtomicFile {
-    path: PathBuf,
-    f: tempfile::NamedTempFile,
-}
-
-impl AtomicFile {
-    pub fn new(path: &Path) -> std::io::Result<AtomicFile> {
-        let dir = path.parent().unwrap();
-        Ok(AtomicFile {
-            path: path.to_path_buf(),
-            f: tempfile::Builder::new().prefix("tmp").tempfile_in(dir)?,
-        })
-    }
-
-    pub fn close(self) -> std::io::Result<()> {
-        // We use `persist` rather than `persist_noclobber` here because the latter calls
-        // `link` on Unix, and some filesystems don't support it.  That's probably fine
-        // because the files being updated by this should never already exist, though
-        // it does mean we won't detect unexpected cases where it does.
-        self.f
-            .persist(&self.path)
-            .and(Ok(()))
-            .or_else(|e| Err(e.error))
-    }
-}
-
-impl Write for AtomicFile {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.f.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.f.flush()
-    }
-}
-
-impl Deref for AtomicFile {
-    type Target = fs::File;
-
-    fn deref(&self) -> &Self::Target {
-        self.f.as_file()
-    }
-}
-
-impl DerefMut for AtomicFile {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.f.as_file_mut()
-    }
-}
+use std::path::Path;
 
 pub(crate) fn ensure_dir_exists(path: &Path) -> std::io::Result<()> {
     fs::create_dir(path).or_else(|e| {

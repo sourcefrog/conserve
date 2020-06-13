@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
-use crate::transport::local::LocalTransport;
 use crate::transport::{ListDirNames, Transport};
 use crate::*;
 
@@ -84,9 +83,7 @@ impl Band {
         let band_id = archive
             .last_band_id()?
             .map_or_else(BandId::zero, |b| b.next_sibling());
-        let transport: Box<dyn Transport> = Box::new(LocalTransport::new(
-            &archive.path().join(&band_id.to_string()),
-        ));
+        let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
         transport
             .create_dir("")
             .and_then(|()| transport.create_dir(INDEX_DIR))
@@ -112,9 +109,7 @@ impl Band {
 
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
-        let transport: Box<dyn Transport> = Box::new(LocalTransport::new(
-            &archive.path().join(&band_id.to_string()),
-        ));
+        let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
         let new = Band {
             band_id: band_id.to_owned(),
             transport,

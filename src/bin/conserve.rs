@@ -153,7 +153,7 @@ impl Command {
                 verbose,
                 exclude,
             } => {
-                let archive = Archive::open(archive)?;
+                let archive = Archive::open_path(archive)?;
                 let lt = LiveTree::open(source)?.with_excludes(excludes::from_strings(exclude)?);
                 let bw = BackupWriter::begin(&archive)?;
                 let opts = CopyOptions {
@@ -166,7 +166,7 @@ impl Command {
             }
             Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open(archive)?.block_dir().block_names()? {
+                for hash in Archive::open_path(archive)?.block_dir().block_names()? {
                     writeln!(bw, "{}", hash)?;
                 }
             }
@@ -180,7 +180,7 @@ impl Command {
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open(archive)?.referenced_blocks()? {
+                for hash in Archive::open_path(archive)?.referenced_blocks()? {
                     writeln!(bw, "{}", hash)?;
                 }
             }
@@ -200,7 +200,7 @@ impl Command {
                 output::show_tree_diff(&mut conserve::iter_merged_entries(&st, &lt)?, &mut stdout)?;
             }
             Command::Init { archive } => {
-                Archive::create(&archive)?;
+                Archive::create_path(&archive)?;
                 ui::println(&format!("Created new archive in {:?}", &archive));
             }
             Command::Ls { stos } => {
@@ -257,16 +257,16 @@ impl Command {
                 };
                 ui::println(&conserve::bytes_to_human_mb(size));
             }
-            Command::Validate { archive } => {
-                Archive::open(archive)?.validate()?.summarize(&mut stdout)?
-            }
+            Command::Validate { archive } => Archive::open_path(archive)?
+                .validate()?
+                .summarize(&mut stdout)?,
             Command::Versions {
                 archive,
                 short,
                 sizes,
             } => {
                 ui::enable_progress(false);
-                let archive = Archive::open(archive)?;
+                let archive = Archive::open_path(archive)?;
                 if *short {
                     output::show_brief_version_list(&archive, &mut stdout)?;
                 } else {
@@ -284,7 +284,7 @@ fn stored_tree_from_opt(
     exclude: &[String],
     incomplete: bool,
 ) -> Result<StoredTree> {
-    let archive = Archive::open(archive)?;
+    let archive = Archive::open_path(archive)?;
     let st = match backup {
         None => StoredTree::open_last(&archive)?,
         Some(b) => {

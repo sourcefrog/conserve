@@ -18,28 +18,26 @@ use crate::*;
 ///
 /// The ScratchArchive can be treated as an Archive.
 pub struct ScratchArchive {
-    _tempdir: TempDir, // held only for cleanup
+    #[allow(dead_code)]
+    tempdir: TempDir, // held only for cleanup
     archive: Archive,
+    archive_path: PathBuf,
 }
 
 impl ScratchArchive {
     pub fn new() -> ScratchArchive {
         let tempdir = TempDir::new().unwrap();
-        let arch_dir = tempdir.path().join("archive");
-        let archive = Archive::create(&arch_dir).unwrap();
+        let archive_path = tempdir.path().join("archive");
+        let archive = Archive::create_path(&archive_path).unwrap();
         ScratchArchive {
-            _tempdir: tempdir,
+            tempdir,
             archive,
+            archive_path,
         }
     }
 
     pub fn path(&self) -> &Path {
-        self.archive.path()
-    }
-
-    #[allow(unused)]
-    pub fn archive_dir_str(&self) -> &str {
-        self.archive.path().to_str().unwrap()
+        &self.archive_path
     }
 
     pub fn setup_incomplete_empty_band(&self) {

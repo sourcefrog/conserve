@@ -3,32 +3,11 @@
 
 //! Read and write JSON files.
 
-use std::io::prelude::*;
-use std::path::Path;
-
 use serde::de::DeserializeOwned;
 
 use crate::errors::Error;
-use crate::io::AtomicFile;
 use crate::transport::Transport;
 use crate::Result;
-
-pub(crate) fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T) -> Result<()> {
-    let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::SerializeJson {
-        path: path.to_string_lossy().to_string(),
-        source,
-    })?;
-    s.push('\n');
-    AtomicFile::new(path)
-        .and_then(|mut af| {
-            af.write_all(s.as_bytes())?;
-            af.close()
-        })
-        .map_err(|source| Error::WriteMetadata {
-            path: path.to_string_lossy().to_string(),
-            source,
-        })
-}
 
 /// Write uncompressed json to a file on a Transport.
 pub(crate) fn write_json<T, TR>(transport: &TR, relpath: &str, obj: &T) -> Result<()>
@@ -81,21 +60,6 @@ mod tests {
     struct TestContents {
         pub id: u64,
         pub weather: String,
-    }
-
-    #[test]
-    fn write_json() {
-        let temp = assert_fs::TempDir::new().unwrap();
-        let entry = TestContents {
-            id: 42,
-            weather: "cold".to_string(),
-        };
-        let json_child = temp.child("test.json");
-        write_json_metadata_file(&json_child.path(), &entry).unwrap();
-
-        json_child.assert(concat!(r#"{"id":42,"weather":"cold"}"#, "\n"));
-
-        temp.close().unwrap();
     }
 
     #[test]

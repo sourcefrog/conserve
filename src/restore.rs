@@ -130,7 +130,7 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
 
-        let restore_archive = Archive::open(af.path()).unwrap();
+        let restore_archive = Archive::open_path(&af.path()).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
         let rt = RestoreTree::create(destdir.path().to_owned()).unwrap();
         let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
@@ -157,7 +157,7 @@ mod tests {
         let af = ScratchArchive::new();
         af.store_two_versions();
         let destdir = TreeFixture::new();
-        let a = Archive::open(af.path()).unwrap();
+        let a = Archive::open_path(af.path()).unwrap();
         let st = StoredTree::open_version(&a, &BandId::new(&[0])).unwrap();
         let rt = RestoreTree::create(destdir.path().to_owned()).unwrap();
         let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
@@ -184,7 +184,7 @@ mod tests {
         let destdir = TreeFixture::new();
         destdir.create_file("existing");
 
-        let restore_archive = Archive::open(af.path()).unwrap();
+        let restore_archive = Archive::open_path(af.path()).unwrap();
         let rt = RestoreTree::create_overwrite(destdir.path()).unwrap();
         let st = StoredTree::open_last(&restore_archive).unwrap();
         let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
@@ -199,7 +199,7 @@ mod tests {
         let af = ScratchArchive::new();
         af.store_two_versions();
         let destdir = TreeFixture::new();
-        let restore_archive = Archive::open(af.path()).unwrap();
+        let restore_archive = Archive::open_path(af.path()).unwrap();
         let st = StoredTree::open_last(&restore_archive)
             .unwrap()
             .with_excludes(excludes::from_strings(&["/**/subfile"]).unwrap());
