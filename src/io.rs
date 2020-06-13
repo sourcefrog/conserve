@@ -70,7 +70,7 @@ pub(crate) fn ensure_dir_exists(path: &Path) -> std::io::Result<()> {
 }
 
 /// True if a directory exists and is empty.
-pub fn directory_is_empty(path: &Path) -> std::io::Result<bool> {
+pub(crate) fn directory_is_empty(path: &Path) -> std::io::Result<bool> {
     Ok(std::fs::read_dir(path)?.next().is_none())
 }
 
@@ -78,7 +78,9 @@ pub fn directory_is_empty(path: &Path) -> std::io::Result<bool> {
 ///
 /// Returns a list of filenames and a list of directory names respectively, forced to UTF-8, and
 /// sorted naively as UTF-8.
+#[cfg(test)]
 pub fn list_dir(path: &Path) -> std::io::Result<(Vec<String>, Vec<String>)> {
+    // TODO: Replace use of this in tests by assert_fs.
     let mut file_names = Vec::<String>::new();
     let mut dir_names = Vec::<String>::new();
     for entry in fs::read_dir(path)? {
@@ -97,10 +99,4 @@ pub fn list_dir(path: &Path) -> std::io::Result<(Vec<String>, Vec<String>)> {
     file_names.sort_unstable();
     dir_names.sort_unstable();
     Ok((file_names, dir_names))
-}
-
-#[cfg(test)]
-mod tests {
-    // TODO: Somehow test the error cases.
-    // TODO: Specific test for write_compressed_bytes.
 }

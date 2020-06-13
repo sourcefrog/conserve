@@ -48,12 +48,10 @@ pub enum Error {
     UnsupportedArchiveVersion { path: PathBuf, version: String },
 
     #[error(
-        "Band version {:?} in {:?} is not supported by Conserve {}",
-        version,
-        path,
+        "Band version {version:?} in {band_id} is not supported by Conserve {}",
         crate::version()
     )]
-    UnsupportedBandVersion { path: PathBuf, version: String },
+    UnsupportedBandVersion { band_id: BandId, version: String },
 
     #[error("Destination directory not empty: {:?}", path)]
     DestinationNotEmpty { path: PathBuf },

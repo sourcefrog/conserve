@@ -31,10 +31,10 @@ pub(crate) fn write_json_metadata_file<T: serde::Serialize>(path: &Path, obj: &T
 }
 
 /// Write uncompressed json to a file on a Transport.
-#[allow(unused)] // Will replace write_json_metadata_file
-pub(crate) fn write_json<T>(transport: &mut dyn Transport, relpath: &str, obj: &T) -> Result<()>
+pub(crate) fn write_json<T, TR>(transport: &TR, relpath: &str, obj: &T) -> Result<()>
 where
     T: serde::Serialize,
+    TR: AsRef<dyn Transport>,
 {
     let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::SerializeJson {
         path: relpath.to_string(),
@@ -42,6 +42,7 @@ where
     })?;
     s.push('\n');
     transport
+        .as_ref()
         .write_file(relpath, s.as_bytes())
         .map_err(|source| Error::WriteMetadata {
             path: relpath.to_owned(),
@@ -50,12 +51,16 @@ where
 }
 
 /// Read and deserialize uncompressed json from a Transport.
-pub(crate) fn read_json<T>(transport: &dyn Transport, path: &str) -> Result<T>
+pub(crate) fn read_json<T, TR>(transport: &TR, path: &str) -> Result<T>
 where
     T: DeserializeOwned,
+    TR: AsRef<dyn Transport>,
 {
     let mut buf = Vec::new();
-    transport.read_file(path, &mut buf).map_err(Error::from)?;
+    transport
+        .as_ref()
+        .read_file(path, &mut buf)
+        .map_err(Error::from)?;
     serde_json::from_slice(&buf).map_err(|source| Error::DeserializeJson {
         source,
         path: path.into(),

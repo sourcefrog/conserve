@@ -30,7 +30,29 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// Returned entries are in arbitrary order and may be interleaved with errors.
     ///
     /// The result should not contain entries for "." and "..".
-    fn read_dir(&self, path: &str) -> io::Result<Box<dyn Iterator<Item = io::Result<DirEntry>>>>;
+    fn iter_dir_entries(
+        &self,
+        path: &str,
+    ) -> io::Result<Box<dyn Iterator<Item = io::Result<DirEntry>>>>;
+
+    /// As a convenience, read all filenames from the directory into vecs of
+    /// dirs and files.
+    ///
+    /// Any error during iteration causes overall failure.
+    fn list_dir_names(&self, relpath: &str) -> io::Result<ListDirNames> {
+        let mut names = ListDirNames::default();
+        for dir_entry in self.iter_dir_entries(relpath)? {
+            let dir_entry = dir_entry?;
+            match dir_entry.kind {
+                Kind::Dir => names.dirs.push(dir_entry.name),
+                Kind::File => names.files.push(dir_entry.name),
+                _ => (),
+            }
+        }
+        names.files.sort_unstable();
+        names.dirs.sort_unstable();
+        Ok(names)
+    }
 
     /// Get one complete file into a caller-provided buffer.
     ///
@@ -46,7 +68,7 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// If the directory already exists, it's not an error.
     ///
     /// This function does not create missing parent directories.
-    fn create_dir(&mut self, relpath: &str) -> io::Result<()>;
+    fn create_dir(&self, relpath: &str) -> io::Result<()>;
 
     /// Write a complete file.
     ///
@@ -55,7 +77,7 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// then renamed.
     ///
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
-    fn write_file(&mut self, relpath: &str, content: &[u8]) -> io::Result<()>;
+    fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()>;
 
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;
@@ -85,4 +107,40 @@ pub struct DirEntry {
     pub kind: Kind,
     /// Size in bytes.
     pub len: u64,
+}
+
+/// A list of all the files and directories in a directory.
+#[derive(Debug, Default, Eq, PartialEq)]
+pub struct ListDirNames {
+    pub files: Vec<String>,
+    pub dirs: Vec<String>,
+}
+
+#[cfg(test)]
+mod test {
+    use assert_fs::prelude::*;
+
+    use super::*;
+    use crate::transport::local::LocalTransport;
+
+    #[test]
+    fn list_dir_names() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        temp.child("a dir").create_dir_all().unwrap();
+        temp.child("a file").touch().unwrap();
+        temp.child("another file").touch().unwrap();
+
+        let transport = LocalTransport::new(&temp.path());
+
+        let content = transport.list_dir_names("").unwrap();
+        assert_eq!(
+            content,
+            ListDirNames {
+                files: vec!["a file".to_owned(), "another file".to_owned()],
+                dirs: vec!["a dir".to_owned()],
+            }
+        );
+
+        temp.close().unwrap();
+    }
 }

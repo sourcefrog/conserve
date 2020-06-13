@@ -29,7 +29,7 @@ impl LocalTransport {
 }
 
 impl Transport for LocalTransport {
-    fn read_dir(
+    fn iter_dir_entries(
         &self,
         relpath: &str,
     ) -> io::Result<Box<dyn Iterator<Item = io::Result<DirEntry>>>> {
@@ -67,7 +67,7 @@ impl Transport for LocalTransport {
         Box::new(self.clone())
     }
 
-    fn create_dir(&mut self, relpath: &str) -> io::Result<()> {
+    fn create_dir(&self, relpath: &str) -> io::Result<()> {
         create_dir(self.full_path(&relpath)).or_else(|err| {
             if err.kind() == io::ErrorKind::AlreadyExists {
                 Ok(())
@@ -77,7 +77,7 @@ impl Transport for LocalTransport {
         })
     }
 
-    fn write_file(&mut self, relpath: &str, content: &[u8]) -> io::Result<()> {
+    fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()> {
         let full_path = self.full_path(relpath);
         let dir = full_path.parent().unwrap();
         let mut temp = tempfile::Builder::new()
@@ -99,6 +99,12 @@ impl Transport for LocalTransport {
         Box::new(LocalTransport {
             root: self.root.join(relpath),
         })
+    }
+}
+
+impl AsRef<dyn Transport> for LocalTransport {
+    fn as_ref(&self) -> &(dyn Transport + 'static) {
+        self
     }
 }
 
@@ -154,7 +160,7 @@ mod test {
 
         let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
         let mut root_list: Vec<_> = transport
-            .read_dir(".")
+            .iter_dir_entries(".")
             .unwrap()
             .map(io::Result::unwrap)
             .collect();
@@ -178,7 +184,7 @@ mod test {
         assert_eq!(transport.exists("nuh-uh").unwrap(), false);
 
         let subdir_list: Vec<_> = transport
-            .read_dir("subdir")
+            .iter_dir_entries("subdir")
             .unwrap()
             .map(io::Result::unwrap)
             .collect();
@@ -198,7 +204,7 @@ mod test {
     fn write_file() {
         // TODO: Maybe test some error cases of failing to write.
         let temp = assert_fs::TempDir::new().unwrap();
-        let mut transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
+        let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
 
         transport.create_dir("subdir").unwrap();
         transport
@@ -216,7 +222,7 @@ mod test {
     #[test]
     fn create_existing_dir() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let mut transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
+        let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
@@ -228,14 +234,14 @@ mod test {
     #[test]
     fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let mut transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
+        let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();
 
         let sub_transport = transport.sub_transport("aaa");
         let sub_list: Vec<DirEntry> = sub_transport
-            .read_dir("")
+            .iter_dir_entries("")
             .unwrap()
             .map(Result::unwrap)
             .collect();

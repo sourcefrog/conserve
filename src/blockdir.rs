@@ -87,7 +87,7 @@ impl BlockDir {
         BlockDir::create(Box::new(LocalTransport::new(path)))
     }
 
-    pub fn create(mut transport: Box<dyn Transport>) -> Result<BlockDir> {
+    pub fn create(transport: Box<dyn Transport>) -> Result<BlockDir> {
         transport
             .create_dir("")
             .map_err(|source| Error::CreateBlockDir { source })?;
@@ -157,7 +157,7 @@ impl BlockDir {
     fn subdirs(&self) -> Result<impl Iterator<Item = String>> {
         Ok(self
             .transport
-            .read_dir("")
+            .iter_dir_entries("")
             .map_err(|source| Error::ListBlocks { source })?
             .filter_map(|entry_result| match entry_result {
                 Err(e) => {
@@ -181,7 +181,7 @@ impl BlockDir {
         let transport = self.transport.clone();
         Ok(self
             .subdirs()?
-            .map(move |subdir_name| transport.read_dir(&subdir_name))
+            .map(move |subdir_name| transport.iter_dir_entries(&subdir_name))
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
                     ui::problem(&format!("Error listing block directory: {:?}", &err));

@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Error;
-use crate::jsonio;
 use crate::kind::Kind;
 use crate::misc::remove_item;
 use crate::stats::ValidateArchiveStats;
@@ -118,7 +117,7 @@ impl Archive {
         // TODO: Count errors and return stats?
         Ok(self
             .transport
-            .read_dir("")
+            .iter_dir_entries("")
             .map_err(|source| Error::ListBands {
                 path: self.path.clone(),
                 source,
@@ -196,13 +195,13 @@ impl Archive {
 
         let mut files: Vec<String> = Vec::new();
         let mut dirs: Vec<String> = Vec::new();
-        for entry_result in self
-            .transport
-            .read_dir("")
-            .map_err(|source| Error::ReadMetadata {
-                source,
-                path: self.path.to_owned(),
-            })?
+        for entry_result in
+            self.transport
+                .iter_dir_entries("")
+                .map_err(|source| Error::ReadMetadata {
+                    source,
+                    path: self.path.to_owned(),
+                })?
         {
             match entry_result {
                 Ok(DirEntry { name, kind, .. }) => match kind {
@@ -283,8 +282,10 @@ mod tests {
     use std::io::Read;
     use tempfile::TempDir;
 
-    use super::*;
+    use crate::io::list_dir;
     use crate::test_fixtures::ScratchArchive;
+
+    use super::*;
 
     #[test]
     fn create_then_open_archive() {

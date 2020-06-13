@@ -224,12 +224,13 @@ pub struct IndexRead {
 }
 
 impl IndexRead {
-    pub(crate) fn open(transport: Box<dyn Transport>) -> IndexRead {
-        IndexRead { transport }
-    }
-
+    #[allow(unused)]
     pub(crate) fn open_path(path: &Path) -> IndexRead {
         IndexRead::open(Box::new(LocalTransport::new(path)))
+    }
+
+    pub(crate) fn open(transport: Box<dyn Transport>) -> IndexRead {
+        IndexRead { transport }
     }
 
     /// Return the (1-based) number of index hunks in an index directory.
@@ -395,15 +396,16 @@ impl IndexEntryIter {
 mod tests {
     use tempfile::TempDir;
 
+    use super::transport::local::LocalTransport;
     use super::*;
 
-    pub fn scratch_indexbuilder() -> (TempDir, IndexBuilder) {
+    fn scratch_indexbuilder() -> (TempDir, IndexBuilder) {
         let testdir = TempDir::new().unwrap();
         let ib = IndexBuilder::new(Box::new(LocalTransport::new(testdir.path())));
         (testdir, ib)
     }
 
-    pub fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
+    fn add_an_entry(ib: &mut IndexBuilder, apath: &str) {
         ib.push_entry(IndexEntry {
             apath: apath.into(),
             mtime: 1_461_736_377,

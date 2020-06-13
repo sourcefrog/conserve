@@ -11,17 +11,13 @@
 //! To read a consistent tree possibly composed from several incremental backups, use
 //! StoredTree rather than the Band itself.
 
-use std::fs;
-use std::path::{Path, PathBuf};
-
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::jsonio;
-use crate::jsonio::read_json;
+use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
 use crate::transport::local::LocalTransport;
-use crate::transport::Transport;
+use crate::transport::{ListDirNames, Transport};
 use crate::*;
 
 static INDEX_DIR: &str = "i";
@@ -42,12 +38,10 @@ fn band_version_supported(version: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// All backup data is stored in a band.
+/// Each backup makes a new `band` containing an index directory.
 #[derive(Debug)]
 pub struct Band {
-    id: BandId,
-    path_buf: PathBuf,
-    index_dir_path: PathBuf,
+    band_id: BandId,
 
     /// Transport pointing to the archive directory.
     transport: Box<dyn Transport>,
@@ -87,37 +81,49 @@ impl Band {
     ///
     /// The Band gets the next id after those that already exist.
     pub fn create(archive: &Archive) -> Result<Band> {
-        let new_band_id = archive
+        let band_id = archive
             .last_band_id()?
             .map_or_else(BandId::zero, |b| b.next_sibling());
-        let archive_dir = archive.path();
-        let new = Band::new(archive_dir, new_band_id);
-        fs::create_dir(&new.path_buf).map_err(|source| Error::CreateBand { source })?;
-        fs::create_dir(&new.index_dir_path).map_err(|source| Error::CreateBand { source })?;
+        let transport: Box<dyn Transport> = Box::new(LocalTransport::new(
+            &archive.path().join(&band_id.to_string()),
+        ));
+        transport
+            .create_dir("")
+            .and_then(|()| transport.create_dir(INDEX_DIR))
+            .map_err(|source| Error::CreateBand { source })?;
         let head = Head {
             start_time: Utc::now().timestamp(),
             band_format_version: Some(BAND_FORMAT_VERSION.to_owned()),
         };
-        jsonio::write_json_metadata_file(&new.head_path(), &head)?;
-        Ok(new)
+        write_json(&transport, HEAD_FILENAME, &head)?;
+        Ok(Band { band_id, transport })
     }
 
     /// Mark this band closed: no more blocks should be written after this.
     pub fn close(&self) -> Result<()> {
-        let tail = Tail {
-            end_time: Utc::now().timestamp(),
-        };
-        jsonio::write_json_metadata_file(&self.tail_path(), &tail)
+        write_json(
+            &self.transport,
+            TAIL_FILENAME,
+            &Tail {
+                end_time: Utc::now().timestamp(),
+            },
+        )
     }
 
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
-        let new = Band::new(archive.path(), band_id.clone());
+        let transport: Box<dyn Transport> = Box::new(LocalTransport::new(
+            &archive.path().join(&band_id.to_string()),
+        ));
+        let new = Band {
+            band_id: band_id.to_owned(),
+            transport,
+        };
         let head = new.read_head()?;
         if let Some(version) = head.band_format_version {
             if !band_version_supported(&version) {
                 return Err(Error::UnsupportedBandVersion {
-                    path: new.path().into(),
+                    band_id: band_id.to_owned(),
                     version,
                 });
             }
@@ -128,52 +134,21 @@ impl Band {
         Ok(new)
     }
 
-    /// Create a new in-memory Band object.
-    ///
-    /// Instead of creating the in-memory object you typically should either
-    /// `create` or `open` the band corresponding to in-archive directory.
-    fn new(archive_dir: &Path, id: BandId) -> Band {
-        // TODO: Take the Transport as a parameter.
-        let mut path_buf = archive_dir.to_path_buf();
-        path_buf.push(id.to_string());
-        let mut index_dir_path = path_buf.clone();
-        index_dir_path.push(INDEX_DIR);
-        let transport = Box::new(LocalTransport::new(&path_buf));
-        Band {
-            id,
-            path_buf,
-            index_dir_path,
-            transport,
-        }
-    }
-
     pub fn is_closed(&self) -> Result<bool> {
-        self.transport().exists(TAIL_FILENAME).map_err(Error::from)
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path_buf
+        self.transport.exists(TAIL_FILENAME).map_err(Error::from)
     }
 
     pub fn id(&self) -> &BandId {
-        &self.id
-    }
-
-    fn head_path(&self) -> PathBuf {
-        self.path_buf.join(HEAD_FILENAME)
-    }
-
-    fn tail_path(&self) -> PathBuf {
-        self.path_buf.join(TAIL_FILENAME)
+        &self.band_id
     }
 
     pub fn index_builder(&self) -> IndexBuilder {
-        IndexBuilder::new(Box::new(LocalTransport::new(&self.index_dir_path)))
+        IndexBuilder::new(self.transport.sub_transport(INDEX_DIR))
     }
 
     /// Get read-only access to the index of this band.
     pub fn index(&self) -> IndexRead {
-        IndexRead::open_path(&self.index_dir_path)
+        IndexRead::open(self.transport.sub_transport(INDEX_DIR))
     }
 
     /// Return an iterator through entries in this band.
@@ -181,16 +156,12 @@ impl Band {
         self.index().iter_entries()
     }
 
-    fn transport(&self) -> &dyn Transport {
-        self.transport.as_ref()
-    }
-
     fn read_head(&self) -> Result<Head> {
-        read_json(self.transport(), HEAD_FILENAME)
+        read_json(&self.transport, HEAD_FILENAME)
     }
 
     fn read_tail(&self) -> Result<Tail> {
-        read_json(self.transport(), TAIL_FILENAME)
+        read_json(&self.transport, TAIL_FILENAME)
     }
 
     /// Return info about the state of this band.
@@ -203,7 +174,7 @@ impl Band {
             None
         };
         Ok(Info {
-            id: self.id.clone(),
+            id: self.band_id.clone(),
             is_closed,
             start_time: Utc.timestamp(head.start_time, 0),
             end_time,
@@ -211,27 +182,28 @@ impl Band {
     }
 
     pub fn validate(&self) -> Result<()> {
-        let path = self.path();
-        let (mut files, dirs) = list_dir(&path).map_err(|source| Error::ReadMetadata {
-            path: path.to_owned(),
-            source,
-        })?;
+        let ListDirNames { mut files, dirs } =
+            self.transport.list_dir_names("").map_err(Error::from)?;
         if !files.contains(&HEAD_FILENAME.to_string()) {
             // TODO: Count this problem.
-            ui::problem(&format!("No band head file in {:?}", path));
+            ui::problem(&format!("No band head file in {:?}", self.transport));
         }
         remove_item(&mut files, &HEAD_FILENAME);
         remove_item(&mut files, &TAIL_FILENAME);
+
         if !files.is_empty() {
             // TODO: Count this problem.
-            ui::problem(&format!("Unexpected files in {:?}: {:?}", path, files));
+            ui::problem(&format!(
+                "Unexpected files in band directory {:?}: {:?}",
+                self.transport, files
+            ));
         }
 
         if dirs != [INDEX_DIR.to_string()] {
             // TODO: Count this problem.
             ui::problem(&format!(
-                "Incongruous directories in {:?}: {:?}",
-                path, dirs
+                "Incongruous directories in band directory {:?}: {:?}",
+                self.transport, dirs
             ));
         }
 
@@ -247,23 +219,26 @@ mod tests {
     use chrono::Duration;
     use serde_json::json;
 
-    use super::*;
+    use crate::io::list_dir;
     use crate::test_fixtures::ScratchArchive;
+
+    use super::*;
 
     #[test]
     fn create_and_reopen_band() {
         let af = ScratchArchive::new();
         let band = Band::create(&af).unwrap();
-        assert!(band.path().to_str().unwrap().ends_with("b0000"));
-        assert!(fs::metadata(band.path()).unwrap().is_dir());
 
-        let (file_names, dir_names) = list_dir(band.path()).unwrap();
+        let band_dir = af.path().join("b0000");
+        assert!(fs::metadata(&band_dir).unwrap().is_dir());
+
+        let (file_names, dir_names) = list_dir(&band_dir).unwrap();
         assert_eq!(file_names, &["BANDHEAD"]);
         assert_eq!(dir_names, ["i"]);
         assert!(!band.is_closed().unwrap());
 
         band.close().unwrap();
-        let (file_names, dir_names) = list_dir(band.path()).unwrap();
+        let (file_names, dir_names) = list_dir(&band_dir).unwrap();
         assert_eq!(file_names, &["BANDHEAD", "BANDTAIL"]);
         assert_eq!(dir_names, ["i"]);
         assert!(band.is_closed().unwrap());
