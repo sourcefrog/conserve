@@ -5,7 +5,7 @@
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::kind::Kind;
 use crate::Result;
@@ -114,6 +114,32 @@ pub struct DirEntry {
 pub struct ListDirNames {
     pub files: Vec<String>,
     pub dirs: Vec<String>,
+}
+
+/// A path or other URL-like specification of a directory that can be opened as a transport.
+#[derive(Debug, Eq, PartialEq)]
+pub enum Location {
+    /// A local directory.
+    Local(PathBuf),
+}
+
+impl Location {
+    /// Open a Transport that can read and write this location.
+    ///
+    /// The location need not already exist.
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    /// use conserve::transport::Location;
+    ///
+    /// let location = Location::Local("/backup".to_owned().into());
+    /// let transport = location.open().unwrap();
+    /// ```
+    pub fn open(&self) -> Result<Box<dyn Transport>> {
+        match self {
+            Location::Local(pathbuf) => Ok(Box::new(local::LocalTransport::new(&pathbuf))),
+        }
+    }
 }
 
 #[cfg(test)]
