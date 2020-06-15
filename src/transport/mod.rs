@@ -159,9 +159,9 @@ mod test {
         let transport = LocalTransport::new(&temp.path());
 
         let ListDirNames { mut files, dirs } = transport.list_dir_names("").unwrap();
-        assert_eq!(dirs, vec!["a dir".to_owned()]);
-        files.sort_unstable();
-        assert_eq!(files, vec!["a file".to_owned(), "another file".to_owned()]);
+        assert_eq!(dirs, ["a dir"]);
+        files.sort();
+        assert_eq!(files, ["a file", "another file"]);
 
         temp.close().unwrap();
     }
