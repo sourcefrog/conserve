@@ -24,9 +24,14 @@ consistent:
 
 ### Internal
 
-- Change to using structopt for option parsing.
+- Change to using [structopt](https://docs.rs/structopt/) for option parsing.
 
-- Change to using thiserror for error enum construction.
+- Change to using [thiserror](https://docs.rs/thiserror/) for error enum
+  construction.
+
+- Added a new `Transport` trait, abstracting the IO options for the Archive so
+  that Conserve can in future also access archives over SFTP or in cloud
+  storage.
 
 ## v0.6.3 2020-05-30
 
