@@ -74,13 +74,10 @@ impl Archive {
     pub fn open(transport: Box<dyn Transport>) -> Result<Archive> {
         let header: ArchiveHeader =
             read_json(&transport, HEADER_FILENAME).map_err(|err| match err {
-                Error::IOError { source } => match source.kind() {
-                    ErrorKind::NotFound => Error::NotAnArchive {},
-                    _ => Error::ReadMetadata {
-                        path: HEADER_FILENAME.to_owned(),
-                        source,
-                    },
-                },
+                Error::IOError { source } if source.kind() == ErrorKind::NotFound => {
+                    Error::NotAnArchive {}
+                }
+                Error::IOError { source } => Error::ReadArchiveHeader { source },
                 other => other,
             })?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
@@ -114,30 +111,16 @@ impl Archive {
     ///
     /// Errors reading the archive directory are logged and discarded.
     fn iter_band_ids_unsorted(&self) -> Result<impl Iterator<Item = BandId>> {
-        // TODO: Count errors and return stats?
+        // This doesn't check for extraneous files or directories, which should be a weird rare
+        // problem. Validate does.
         Ok(self
             .transport
-            .iter_dir_entries("")
+            .list_dir_names("")
             .map_err(|source| Error::ListBands { source })?
-            .filter_map(|entry_r| match entry_r {
-                // TODO: Count errors into stats.
-                Err(e) => {
-                    ui::problem(&format!("Error listing bands: {}", e));
-                    None
-                }
-                Ok(DirEntry { name, kind, .. }) => {
-                    if kind == Kind::Dir && name != BLOCK_DIR {
-                        if let Ok(band_id) = name.parse() {
-                            Some(band_id)
-                        } else {
-                            ui::problem(&format!("Unexpected directory {:?} in archive", name));
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-            }))
+            .dirs
+            .into_iter()
+            .filter(|dir_name| dir_name != BLOCK_DIR)
+            .filter_map(|dir_name| dir_name.parse().ok()))
     }
 
     /// Return the `BandId` of the highest-numbered band, or Ok(None) if there

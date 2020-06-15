@@ -33,11 +33,8 @@ pub enum Error {
     #[error("Not a Conserve archive")]
     NotAnArchive {},
 
-    #[error("Failed to read archive header from {:?}", path)]
-    ReadArchiveHeader {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    #[error("Failed to read archive header")]
+    ReadArchiveHeader { source: std::io::Error },
 
     #[error(
         "Archive version {:?} is not supported by Conserve {}",
@@ -95,12 +92,6 @@ pub enum Error {
     DeserializeIndex {
         path: String,
         source: serde_json::Error,
-    },
-
-    #[error("Failed to read metadata file {:?}", path)]
-    ReadMetadata {
-        path: String,
-        source: std::io::Error,
     },
 
     #[error("Failed to write metadata file {:?}", path)]
