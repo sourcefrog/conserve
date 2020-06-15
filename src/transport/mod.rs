@@ -6,7 +6,9 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
+use crate::errors::Error;
 use crate::kind::Kind;
 use crate::Result;
 
@@ -117,6 +119,16 @@ pub struct ListDirNames {
 }
 
 /// A path or other URL-like specification of a directory that can be opened as a transport.
+///
+/// Locations can be parsed from strings. At present the only supported form is an absolute
+/// or relative filename.
+/// ```
+/// use std::str::FromStr;
+/// use conserve::transport::Location;
+///
+/// let location: Location = Location::from_str("/backup/example").unwrap();
+/// let transport = location.open();
+/// ```
 #[derive(Debug, Eq, PartialEq)]
 pub enum Location {
     /// A local directory.
@@ -139,6 +151,15 @@ impl Location {
         match self {
             Location::Local(pathbuf) => Ok(Box::new(local::LocalTransport::new(&pathbuf))),
         }
+    }
+}
+
+impl FromStr for Location {
+    type Err = Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        // Eventually can specifically recognize url or sftp style forms here.
+        Ok(Location::Local(s.into()))
     }
 }
 
