@@ -46,6 +46,10 @@ impl Archive {
         transport
             .create_dir("")
             .map_err(|source| Error::CreateArchiveDirectory { source })?;
+        let names = transport.list_dir_names("").map_err(Error::from)?;
+        if !names.files.is_empty() || !names.dirs.is_empty() {
+            return Err(Error::NewArchiveDirectoryNotEmpty);
+        }
         let block_dir = BlockDir::create(transport.sub_transport(BLOCK_DIR))?;
         write_json(
             &transport,
@@ -268,8 +272,9 @@ mod tests {
     use std::fs;
     use std::io::Read;
 
+    use assert_fs::prelude::*;
+    use assert_fs::TempDir;
     use spectral::prelude::*;
-    use tempfile::TempDir;
 
     use crate::test_fixtures::ScratchArchive;
 
@@ -287,6 +292,22 @@ mod tests {
         Archive::open_path(&arch_path).unwrap();
         assert!(arch.list_band_ids().unwrap().is_empty());
         assert!(arch.last_complete_band().unwrap().is_none());
+    }
+
+    #[test]
+    fn fails_on_non_empty_directory() {
+        let temp = TempDir::new().unwrap();
+
+        temp.child("i am already here").touch().unwrap();
+
+        let result = Archive::create_path(&temp.path());
+        assert!(result.is_err());
+        if let Err(Error::NewArchiveDirectoryNotEmpty) = result {
+        } else {
+            panic!("expected an error for a non-empty new archive directory")
+        }
+
+        temp.close().unwrap();
     }
 
     /// A new archive contains just one header file.

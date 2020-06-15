@@ -58,6 +58,9 @@ pub enum Error {
     #[error("Archive has no bands")]
     ArchiveEmpty,
 
+    #[error("Directory for new archive is not empty")]
+    NewArchiveDirectoryNotEmpty,
+
     #[error("Invalid backup version number {:?}", version)]
     InvalidVersion { version: String },
 
