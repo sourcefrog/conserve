@@ -213,8 +213,8 @@ mod tests {
 
     use chrono::Duration;
     use serde_json::json;
+    use spectral::prelude::*;
 
-    use crate::io::list_dir;
     use crate::test_fixtures::ScratchArchive;
 
     use super::*;
@@ -225,21 +225,20 @@ mod tests {
         let band = Band::create(&af).unwrap();
 
         let band_dir = af.path().join("b0000");
-        assert!(fs::metadata(&band_dir).unwrap().is_dir());
+        assert_that(&band_dir).is_a_directory();
 
-        let (file_names, dir_names) = list_dir(&band_dir).unwrap();
-        assert_eq!(file_names, &["BANDHEAD"]);
-        assert_eq!(dir_names, ["i"]);
+        assert_that(&band_dir.join("BANDHEAD")).is_a_file();
+        assert_that(&band_dir.join("BANDTAIL")).does_not_exist();
+        assert_that(&band_dir.join("i")).is_a_directory();
+
         assert!(!band.is_closed().unwrap());
 
         band.close().unwrap();
-        let (file_names, dir_names) = list_dir(&band_dir).unwrap();
-        assert_eq!(file_names, &["BANDHEAD", "BANDTAIL"]);
-        assert_eq!(dir_names, ["i"]);
+        assert_that(&band_dir.join("BANDTAIL")).is_a_file();
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_str("b0000").unwrap();
-        let band2 = Band::open(&af, &band_id).expect("failed to open band");
+        let band2 = Band::open(&af, &band_id).expect("failed to re-open band");
         assert!(band2.is_closed().unwrap());
 
         // Try get_info
