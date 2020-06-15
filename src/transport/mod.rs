@@ -38,6 +38,8 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// As a convenience, read all filenames from the directory into vecs of
     /// dirs and files.
     ///
+    /// Names are in the arbitrary order that they're returned from the transport.
+    ///
     /// Any error during iteration causes overall failure.
     fn list_dir_names(&self, relpath: &str) -> io::Result<ListDirNames> {
         let mut names = ListDirNames::default();
@@ -49,8 +51,6 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
                 _ => (),
             }
         }
-        names.files.sort_unstable();
-        names.dirs.sort_unstable();
         Ok(names)
     }
 
@@ -158,14 +158,10 @@ mod test {
 
         let transport = LocalTransport::new(&temp.path());
 
-        let content = transport.list_dir_names("").unwrap();
-        assert_eq!(
-            content,
-            ListDirNames {
-                files: vec!["a file".to_owned(), "another file".to_owned()],
-                dirs: vec!["a dir".to_owned()],
-            }
-        );
+        let ListDirNames { mut files, dirs } = transport.list_dir_names("").unwrap();
+        assert_eq!(dirs, vec!["a dir".to_owned()]);
+        files.sort_unstable();
+        assert_eq!(files, vec!["a file".to_owned(), "another file".to_owned()]);
 
         temp.close().unwrap();
     }
