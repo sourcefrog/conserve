@@ -22,7 +22,7 @@ const HEADER_FILENAME: &str = "CONSERVE";
 static BLOCK_DIR: &str = "d";
 
 /// An archive holding backup material.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Archive {
     /// Holds body content for all file versions.
     block_dir: BlockDir,

@@ -58,7 +58,7 @@ pub struct Address {
 }
 
 /// A readable, writable directory within a band holding data blocks.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BlockDir {
     transport: Box<dyn Transport>,
 }
