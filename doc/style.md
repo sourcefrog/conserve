@@ -53,7 +53,11 @@ Tests for observable behavior of the public interface should be in the top-level
 `tests/` directory. Tests for private APIs, or that rely on private APIs to
 assess, are in unit test submodules.
 
-## Use statements
+Tests that need a source tree can build it using `assert_fs` or make use of the
+example trees under `testdata/tree/`. Note that the git checkout (or Cargo
+build tree) won't have deterministic permissions or mtimes.
+
+## `use` statements
 
 Use `use crate::xyz` rather than `use super::xyz` to import other things from
 the Conserve implementation. (Either is valid and they seem just as good, but
