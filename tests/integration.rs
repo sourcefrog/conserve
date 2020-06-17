@@ -6,6 +6,7 @@ use std::io::prelude::*;
 
 use tempfile::TempDir;
 
+use conserve::copy_tree::CopyOptions;
 use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
@@ -24,7 +25,7 @@ pub fn simple_backup() {
     let copy_stats = copy_tree(
         &srcdir.live_tree(),
         BackupWriter::begin(&af).unwrap(),
-        &COPY_DEFAULT,
+        &CopyOptions::default(),
     )
     .unwrap();
     assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
@@ -45,7 +46,7 @@ pub fn simple_backup_with_excludes() {
     let excludes = excludes::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
     let lt = srcdir.live_tree().with_excludes(excludes);
     let bw = BackupWriter::begin(&af).unwrap();
-    let copy_stats = copy_tree(&lt, bw, &COPY_DEFAULT).unwrap();
+    let copy_stats = copy_tree(&lt, bw, &CopyOptions::default()).unwrap();
     check_backup(&af);
 
     assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
@@ -106,7 +107,7 @@ fn check_restore(af: &ScratchArchive) {
     let archive = Archive::open_path(af.path()).unwrap();
     let restore_tree = RestoreTree::create(&restore_dir.path()).unwrap();
     let st = StoredTree::open_last(&archive).unwrap();
-    let copy_stats = copy_tree(&st, restore_tree, &COPY_DEFAULT).unwrap();
+    let copy_stats = copy_tree(&st, restore_tree, &CopyOptions::default()).unwrap();
     assert_eq!(copy_stats.uncompressed_bytes, 8);
     // TODO: Compressed size isn't set properly when restoring, because it's
     // lost by passing through a std::io::Read in ReadStoredFile.
@@ -123,7 +124,7 @@ fn large_file() {
     let large_content = String::from("a sample large file\n").repeat(1_000_000);
     tf.create_file_with_contents("large", &large_content.as_bytes());
     let bw = BackupWriter::begin(&af).unwrap();
-    let _stats = copy_tree(&tf.live_tree(), bw, &COPY_DEFAULT).unwrap();
+    let _stats = copy_tree(&tf.live_tree(), bw, &CopyOptions::default()).unwrap();
     // TODO: Examine stats from copy_tree.
 
     // Try to restore it
@@ -131,7 +132,7 @@ fn large_file() {
     let restore_archive = Archive::open_path(af.path()).unwrap();
     let st = StoredTree::open_last(&restore_archive).unwrap();
     let rt = RestoreTree::create(rd.path().to_owned()).unwrap();
-    let _stats = copy_tree(&st, rt, &COPY_DEFAULT).unwrap();
+    let _stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
     // TODO: Examine stats.
 
     let mut content = String::new();
@@ -156,7 +157,7 @@ fn source_unreadable() {
     tf.make_file_unreadable("b_unreadable");
 
     let bw = BackupWriter::begin(&af).unwrap();
-    let r = copy_tree(&tf.live_tree(), bw, &COPY_DEFAULT);
+    let r = copy_tree(&tf.live_tree(), bw, &CopyOptions::default());
     r.unwrap();
 
     // TODO: On Windows change the ACL to make the file unreadable to the current user or to
@@ -182,5 +183,5 @@ fn mtime_before_epoch() {
 
     let af = ScratchArchive::new();
     let bw = BackupWriter::begin(&af).unwrap();
-    let _copy_stats = copy_tree(&lt, bw, &COPY_DEFAULT).unwrap();
+    let _copy_stats = copy_tree(&lt, bw, &CopyOptions::default()).unwrap();
 }

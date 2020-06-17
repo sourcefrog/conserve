@@ -13,11 +13,6 @@ pub struct CopyOptions {
     pub measure_first: bool,
 }
 
-pub const COPY_DEFAULT: CopyOptions = CopyOptions {
-    print_filenames: false,
-    measure_first: false,
-};
-
 /// Copy files and other entries from one tree to another.
 pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     source: &ST,

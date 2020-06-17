@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use structopt::StructOpt;
 
+use crate::copy_tree::CopyOptions;
 use conserve::ReadTree;
 use conserve::*;
 

@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 
 use tempfile::TempDir;
 
+use crate::copy_tree::CopyOptions;
 use crate::*;
 
 /// A temporary archive, deleted when it goes out of scope.

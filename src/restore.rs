@@ -122,6 +122,7 @@ mod tests {
     use spectral::prelude::*;
 
     use super::super::*;
+    use crate::copy_tree::CopyOptions;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     #[test]
