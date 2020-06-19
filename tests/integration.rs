@@ -1,12 +1,14 @@
 // Copyright 2015, 2016, 2017, 2019, 2020 Martin Pool.
 
 /// Test Conserve through its public API.
+use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 
-use tempfile::TempDir;
+use assert_fs::prelude::*;
+use assert_fs::TempDir;
+use spectral::prelude::*;
 
-use conserve::backup::BackupOptions;
 use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
@@ -287,6 +289,12 @@ pub fn empty_file_uses_zero_blocks() {
     let mut s = String::new();
     assert_eq!(sf.read_to_string(&mut s).unwrap(), 0);
     assert_eq!(s.len(), 0);
+
+    // Restore it
+    let dest = TempDir::new().unwrap();
+    af.restore(&dest.path(), &RestoreOptions::default())
+        .expect("restore");
+    dest.child("empty").assert("");
 }
 
 #[test]
@@ -356,4 +364,103 @@ pub fn detect_minimal_mtime_change() {
     let stats = af.backup(&srcdir.path(), &options).unwrap();
     assert_eq!(stats.files, 2);
     assert_eq!(stats.unmodified_files, 1);
+}
+
+#[test]
+pub fn simple_restore() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+    let destdir = TreeFixture::new();
+
+    let options = RestoreOptions::default();
+    let restore_archive = Archive::open_path(&af.path()).unwrap();
+    let stats = restore_archive
+        .restore(&destdir.path(), &options)
+        .expect("restore");
+
+    assert_eq!(stats.files, 3);
+
+    let dest = &destdir.path();
+    assert_that(&dest.join("hello").as_path()).is_a_file();
+    assert_that(&dest.join("hello2")).is_a_file();
+    assert_that(&dest.join("subdir").as_path()).is_a_directory();
+    assert_that(&dest.join("subdir").join("subfile").as_path()).is_a_file();
+    if SYMLINKS_SUPPORTED {
+        let dest = fs::read_link(&dest.join("link")).unwrap();
+        assert_eq!(dest.to_string_lossy(), "target");
+    }
+
+    // TODO: Test restore empty file.
+    // TODO: Test file contents are as expected.
+}
+
+#[test]
+fn restore_specified_band() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+    let destdir = TreeFixture::new();
+    let archive = Archive::open_path(af.path()).unwrap();
+    let band_id = BandId::new(&[0]);
+    let options = RestoreOptions {
+        band_selection: BandSelectionPolicy::Specified(band_id),
+        ..RestoreOptions::default()
+    };
+    let stats = archive.restore(&destdir.path(), &options).expect("restore");
+    // Does not have the 'hello2' file added in the second version.
+    assert_eq!(stats.files, 2);
+}
+
+#[test]
+pub fn decline_to_overwrite() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+    let destdir = TreeFixture::new();
+    destdir.create_file("existing");
+    let restore_err_str = RestoreTree::create(destdir.path().to_owned())
+        .unwrap_err()
+        .to_string();
+    assert_that(&restore_err_str).contains(&"Destination directory not empty");
+}
+
+#[test]
+pub fn forced_overwrite() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+    let destdir = TreeFixture::new();
+    destdir.create_file("existing");
+
+    let restore_archive = Archive::open_path(af.path()).unwrap();
+    let options = RestoreOptions {
+        overwrite: true,
+        ..RestoreOptions::default()
+    };
+    let stats = restore_archive
+        .restore(&destdir.path(), &options)
+        .expect("restore");
+    assert_eq!(stats.files, 3);
+    let dest = &destdir.path();
+    assert_that(&dest.join("hello").as_path()).is_a_file();
+    assert_that(&dest.join("existing").as_path()).is_a_file();
+}
+
+#[test]
+pub fn exclude_files() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+    let destdir = TreeFixture::new();
+    let restore_archive = Archive::open_path(af.path()).unwrap();
+    let options = RestoreOptions {
+        overwrite: true,
+        excludes: excludes::from_strings(&["/**/subfile"]).unwrap(),
+        ..RestoreOptions::default()
+    };
+    let stats = restore_archive
+        .restore(&destdir.path(), &options)
+        .expect("restore");
+
+    let dest = &destdir.path();
+    assert_that(&dest.join("hello").as_path()).is_a_file();
+    assert_that(&dest.join("hello2")).is_a_file();
+    assert_that(&dest.join("subdir").as_path()).is_a_directory();
+    assert_eq!(stats.files, 2);
 }
