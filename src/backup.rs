@@ -4,10 +4,31 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
+use globset::GlobSet;
+
 use crate::blockdir::StoreFiles;
 use crate::index::IndexEntryIter;
 use crate::stats::CopyStats;
 use crate::*;
+
+/// Configuration of how to make a backup.
+#[derive(Debug)]
+pub struct BackupOptions {
+    /// Print filenames to the UI as they're copied.
+    pub print_filenames: bool,
+
+    /// Exclude these globs from the backup.
+    pub excludes: GlobSet,
+}
+
+impl Default for BackupOptions {
+    fn default() -> Self {
+        BackupOptions {
+            print_filenames: false,
+            excludes: GlobSet::empty(),
+        }
+    }
+}
 
 /// Accepts files to write in the archive (in apath order.)
 pub struct BackupWriter {
@@ -117,7 +138,6 @@ impl tree::WriteTree for BackupWriter {
 mod tests {
     use super::*;
 
-    use crate::copy_tree::CopyOptions;
     use crate::kind::Kind;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
@@ -127,9 +147,10 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_symlink("symlink", "/a/broken/destination");
-        let lt = LiveTree::open(srcdir.path()).unwrap();
-        let bw = BackupWriter::begin(&af).unwrap();
-        let copy_stats = copy_tree(&lt, bw, &CopyOptions::default()).unwrap();
+        let copy_stats = af
+            .backup(&srcdir.path(), &BackupOptions::default())
+            .expect("backup");
+
         assert_eq!(0, copy_stats.files);
         assert_eq!(1, copy_stats.symlinks);
         assert_eq!(0, copy_stats.unknown_kind);
@@ -165,11 +186,11 @@ mod tests {
         srcdir.create_file("bar");
 
         let excludes = excludes::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
-        let lt = LiveTree::open(srcdir.path())
-            .unwrap()
-            .with_excludes(excludes);
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&lt, bw, &CopyOptions::default()).unwrap();
+        let options = BackupOptions {
+            excludes,
+            print_filenames: false,
+        };
+        let stats = af.backup(&srcdir.path(), &options).expect("backup");
 
         assert_eq!(1, stats.written_blocks);
         assert_eq!(1, stats.files);
@@ -178,7 +199,6 @@ mod tests {
         assert_eq!(0, stats.symlinks);
         assert_eq!(0, stats.unknown_kind);
     }
-
     #[test]
     pub fn empty_file_uses_zero_blocks() {
         use std::io::Read;
@@ -186,8 +206,9 @@ mod tests {
         let af = ScratchArchive::new();
         let srcdir = TreeFixture::new();
         srcdir.create_file_with_contents("empty", &[]);
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
+        let stats = af
+            .backup(&srcdir.path(), &BackupOptions::default())
+            .unwrap();
 
         assert_eq!(1, stats.files);
         assert_eq!(stats.written_blocks, 0);
@@ -212,8 +233,8 @@ mod tests {
         srcdir.create_file("aaa");
         srcdir.create_file("bbb");
 
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
+        let options = BackupOptions::default();
+        let stats = af.backup(&srcdir.path(), &options).unwrap();
 
         assert_eq!(stats.files, 2);
         assert_eq!(stats.new_files, 2);
@@ -221,8 +242,7 @@ mod tests {
 
         // Make a second backup from the same tree, and we should see that
         // both files are unmodified.
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
+        let stats = af.backup(&srcdir.path(), &options).unwrap();
 
         assert_eq!(stats.files, 2);
         assert_eq!(stats.new_files, 0);
@@ -232,8 +252,7 @@ mod tests {
         // as unmodified.
         srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
+        let stats = af.backup(&srcdir.path(), &options).unwrap();
 
         assert_eq!(stats.files, 2);
         assert_eq!(stats.new_files, 0);
@@ -248,8 +267,8 @@ mod tests {
         srcdir.create_file("aaa");
         srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
+        let options = BackupOptions::default();
+        let stats = af.backup(&srcdir.path(), &options).unwrap();
 
         assert_eq!(stats.files, 2);
         assert_eq!(stats.new_files, 2);
@@ -271,8 +290,7 @@ mod tests {
             }
         }
 
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
+        let stats = af.backup(&srcdir.path(), &options).unwrap();
         assert_eq!(stats.files, 2);
         assert_eq!(stats.unmodified_files, 1);
     }

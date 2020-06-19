@@ -6,6 +6,7 @@ use std::io::prelude::*;
 
 use tempfile::TempDir;
 
+use conserve::backup::BackupOptions;
 use conserve::copy_tree::CopyOptions;
 use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
@@ -22,12 +23,9 @@ pub fn simple_backup() {
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
     // TODO: Include a symlink only on Unix.
-    let copy_stats = copy_tree(
-        &srcdir.live_tree(),
-        BackupWriter::begin(&af).unwrap(),
-        &CopyOptions::default(),
-    )
-    .unwrap();
+    let copy_stats = af
+        .backup(&srcdir.path(), &BackupOptions::default())
+        .expect("backup");
     assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
     assert_eq!(copy_stats.files, 1);
     check_backup(&af);
@@ -44,9 +42,12 @@ pub fn simple_backup_with_excludes() {
     srcdir.create_file("baz");
     // TODO: Include a symlink only on Unix.
     let excludes = excludes::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
-    let lt = srcdir.live_tree().with_excludes(excludes);
-    let bw = BackupWriter::begin(&af).unwrap();
-    let copy_stats = copy_tree(&lt, bw, &CopyOptions::default()).unwrap();
+    let options = BackupOptions {
+        excludes,
+        ..BackupOptions::default()
+    };
+    let copy_stats = af.backup(&srcdir.path(), &options).expect("backup");
+
     check_backup(&af);
 
     assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
@@ -121,11 +122,19 @@ fn large_file() {
     let af = ScratchArchive::new();
 
     let tf = TreeFixture::new();
-    let large_content = String::from("a sample large file\n").repeat(1_000_000);
+    let large_content = String::from("abcd").repeat(1 << 20);
     tf.create_file_with_contents("large", &large_content.as_bytes());
-    let bw = BackupWriter::begin(&af).unwrap();
-    let _stats = copy_tree(&tf.live_tree(), bw, &CopyOptions::default()).unwrap();
-    // TODO: Examine stats from copy_tree.
+    let copy_stats = af
+        .backup(&tf.path(), &BackupOptions::default())
+        .expect("backup");
+    assert_eq!(copy_stats.new_files, 1);
+    // First 1MB should be new; remainder should be deduplicated.
+    assert_eq!(copy_stats.uncompressed_bytes, 1 << 20);
+    assert_eq!(copy_stats.written_blocks, 1);
+    assert_eq!(copy_stats.deduplicated_bytes, 3 << 20);
+    assert_eq!(copy_stats.deduplicated_blocks, 3);
+    assert_eq!(copy_stats.errors, 0);
+    assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
 
     // Try to restore it
     let rd = TempDir::new().unwrap();
@@ -156,9 +165,12 @@ fn source_unreadable() {
 
     tf.make_file_unreadable("b_unreadable");
 
-    let bw = BackupWriter::begin(&af).unwrap();
-    let r = copy_tree(&tf.live_tree(), bw, &CopyOptions::default());
-    r.unwrap();
+    let stats = af
+        .backup(&tf.path(), &BackupOptions::default())
+        .expect("backup");
+    assert_eq!(stats.errors, 1);
+    assert_eq!(stats.new_files, 2);
+    assert_eq!(stats.files, 3);
 
     // TODO: On Windows change the ACL to make the file unreadable to the current user or to
     // everyone.
@@ -182,6 +194,6 @@ fn mtime_before_epoch() {
     dbg!(&entries[1].mtime());
 
     let af = ScratchArchive::new();
-    let bw = BackupWriter::begin(&af).unwrap();
-    let _copy_stats = copy_tree(&lt, bw, &CopyOptions::default()).unwrap();
+    af.backup(&tf.path(), &BackupOptions::default())
+        .expect("backup shouldn't crash on before-epoch mtimes");
 }

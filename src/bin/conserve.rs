@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 
 use structopt::StructOpt;
 
-use crate::copy_tree::CopyOptions;
+use conserve::backup::BackupOptions;
+use conserve::copy_tree::CopyOptions;
 use conserve::ReadTree;
 use conserve::*;
 
@@ -154,14 +155,11 @@ impl Command {
                 verbose,
                 exclude,
             } => {
-                let archive = Archive::open_path(archive)?;
-                let lt = LiveTree::open(source)?.with_excludes(excludes::from_strings(exclude)?);
-                let bw = BackupWriter::begin(&archive)?;
-                let opts = CopyOptions {
+                let options = BackupOptions {
                     print_filenames: *verbose,
-                    ..CopyOptions::default()
+                    excludes: excludes::from_strings(exclude)?,
                 };
-                let copy_stats = copy_tree(&lt, bw, &opts)?;
+                let copy_stats = Archive::open_path(archive)?.backup(source, &options)?;
                 ui::println("Backup complete.");
                 copy_stats.summarize_backup(&mut stdout);
             }

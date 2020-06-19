@@ -22,10 +22,11 @@ use copy_dir::copy_dir;
 use predicates::prelude::*;
 
 use conserve::archive::Archive;
+use conserve::backup::BackupOptions;
 use conserve::bandid::BandId;
 use conserve::copy_tree::{copy_tree, CopyOptions};
 use conserve::restore::RestoreTree;
-use conserve::{BackupWriter, LiveTree, StoredTree};
+use conserve::StoredTree;
 
 const ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.2", "0.6.3"];
 
@@ -97,13 +98,13 @@ fn restore_old_archive() {
 #[test]
 fn restore_modify_backup() {
     for ver in ARCHIVE_VERSIONS {
-        let dest = TempDir::new().unwrap();
-        println!("restore {} to {:?}", ver, dest.path());
+        let working_tree = TempDir::new().unwrap();
+        println!("restore {} to {:?}", ver, working_tree.path());
 
         let archive = open_old_archive(ver, "minimal-1");
         // TODO(#123): Simpler backup/restore APIs.
         let st = StoredTree::open_last(&archive).expect("open last tree");
-        let rt = RestoreTree::create(&dest.path()).expect("RestoreTree::create");
+        let rt = RestoreTree::create(&working_tree.path()).expect("RestoreTree::create");
 
         let _copy_stats = copy_tree(&st, rt, &CopyOptions::default()).expect("copy_tree");
 
@@ -114,17 +115,20 @@ fn restore_modify_backup() {
         let new_archive_path = new_archive_temp.path().join("archive");
         copy_dir(stored_archive_path, &new_archive_path).expect("copy archive tree");
 
-        dest.child("empty").touch().expect("Create empty file");
+        working_tree
+            .child("empty")
+            .touch()
+            .expect("Create empty file");
         fs::write(
-            dest.path().join("subdir").join("subfile"),
+            working_tree.path().join("subdir").join("subfile"),
             "I REALLY like Rust\n",
         )
         .expect("overwrite file");
 
         let new_archive = Archive::open_path(&new_archive_path).expect("Open new archive");
-        let lt = LiveTree::open(dest.path()).expect("Open modified tree");
-        let bw = BackupWriter::begin(&new_archive).expect("Start backup");
-        let backup_stats = copy_tree(&lt, bw, &CopyOptions::default()).expect("Copy modified tree");
+        let backup_stats = new_archive
+            .backup(&working_tree.path(), &BackupOptions::default())
+            .expect("Backup modified tree");
 
         assert_eq!(backup_stats.files, 3);
         // unmodified_files should be 0, but the unchanged file is s not defected as unmodified,
@@ -147,7 +151,7 @@ fn restore_modify_backup() {
         assert_eq!(backup_stats.written_blocks, 1);
         assert_eq!(backup_stats.errors, 0);
 
-        dest.close().expect("Cleanup destination");
+        working_tree.close().expect("Cleanup working tree");
         new_archive_temp.close().expect("Cleanup copied archive");
     }
 }

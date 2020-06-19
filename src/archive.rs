@@ -9,11 +9,13 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::backup::BackupOptions;
+use crate::copy_tree::CopyOptions;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
-use crate::stats::ValidateArchiveStats;
+use crate::stats::{CopyStats, ValidateArchiveStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -90,6 +92,22 @@ impl Archive {
             block_dir,
             transport,
         })
+    }
+
+    /// Backup a source directory into a new band in the archive.
+    ///
+    /// Returns statistics about what was copied.
+    pub fn backup(&self, source_path: &Path, options: &BackupOptions) -> Result<CopyStats> {
+        let live_tree = LiveTree::open(source_path)?.with_excludes(options.excludes.clone());
+        let writer = BackupWriter::begin(self)?;
+        copy_tree(
+            &live_tree,
+            writer,
+            &CopyOptions {
+                print_filenames: options.print_filenames,
+                measure_first: false,
+            },
+        )
     }
 
     pub fn block_dir(&self) -> &BlockDir {

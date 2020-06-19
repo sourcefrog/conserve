@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use tempfile::TempDir;
 
-use crate::copy_tree::CopyOptions;
+use crate::backup::BackupOptions;
 use crate::*;
 
 /// A temporary archive, deleted when it goes out of scope.
@@ -54,21 +54,11 @@ impl ScratchArchive {
             srcdir.create_symlink("link", "target");
         }
 
-        let lt = LiveTree::open(srcdir.path()).unwrap();
-        copy_tree(
-            &lt,
-            BackupWriter::begin(&self).unwrap(),
-            &CopyOptions::default(),
-        )
-        .unwrap();
+        let options = &BackupOptions::default();
+        self.archive.backup(&srcdir.path(), &options).unwrap();
 
         srcdir.create_file("hello2");
-        copy_tree(
-            &lt,
-            BackupWriter::begin(&self).unwrap(),
-            &CopyOptions::default(),
-        )
-        .unwrap();
+        self.archive.backup(&srcdir.path(), &options).unwrap();
     }
 }
 

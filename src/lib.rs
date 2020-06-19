@@ -5,7 +5,7 @@
 // Conserve implementation modules.
 mod apath;
 pub mod archive;
-mod backup;
+pub mod backup;
 mod band;
 pub mod bandid;
 mod blockdir;
