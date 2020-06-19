@@ -206,6 +206,14 @@ impl Band {
     }
 }
 
+/// Describes how to select a band from an archive.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum BandSelectionPolicy {
+    LatestClosed,
+    Latest,
+    Specified(BandId),
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;

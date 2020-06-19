@@ -110,6 +110,22 @@ impl Archive {
         )
     }
 
+    /// Restore a selected version, or by default the latest, to a destination directory.
+    pub fn restore(&self, destination_path: &Path, options: &RestoreOptions) -> Result<CopyStats> {
+        let st = self.open_stored_tree(&options.band_selection)?;
+        let st = st.with_excludes(options.excludes.clone());
+        let rt = if options.overwrite {
+            RestoreTree::create_overwrite(destination_path)
+        } else {
+            RestoreTree::create(destination_path)
+        }?;
+        let opts = CopyOptions {
+            print_filenames: options.print_filenames,
+            ..CopyOptions::default()
+        };
+        copy_tree(&st, rt, &opts)
+    }
+
     pub fn block_dir(&self) -> &BlockDir {
         &self.block_dir
     }
@@ -123,6 +139,18 @@ impl Archive {
 
     pub(crate) fn transport(&self) -> &dyn Transport {
         self.transport.as_ref()
+    }
+
+    pub fn open_stored_tree(&self, band_selection: &BandSelectionPolicy) -> Result<StoredTree> {
+        use crate::band::BandSelectionPolicy::*;
+        Ok(match band_selection {
+            Specified(band_id) => StoredTree::open_incomplete_version(self, &band_id)?,
+            LatestClosed => StoredTree::open_last(self)?,
+            Latest => StoredTree::open_incomplete_version(
+                self,
+                &self.last_band_id()?.ok_or(Error::ArchiveEmpty)?,
+            )?,
+        })
     }
 
     /// Return an iterator of valid band ids in this archive, in arbitrary order.

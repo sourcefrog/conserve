@@ -7,7 +7,6 @@ use std::io::prelude::*;
 use tempfile::TempDir;
 
 use conserve::backup::BackupOptions;
-use conserve::copy_tree::CopyOptions;
 use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
@@ -29,7 +28,15 @@ pub fn simple_backup() {
     assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
     assert_eq!(copy_stats.files, 1);
     check_backup(&af);
-    check_restore(&af);
+
+    let restore_dir = TempDir::new().unwrap();
+
+    let archive = Archive::open_path(af.path()).unwrap();
+    let copy_stats = archive
+        .restore(&restore_dir.path(), &RestoreOptions::default())
+        .expect("restore");
+
+    assert_eq!(copy_stats.uncompressed_bytes, 8);
 }
 
 #[test]
@@ -56,7 +63,20 @@ pub fn simple_backup_with_excludes() {
     assert!(copy_stats.index_builder_stats.compressed_index_bytes > 100);
     assert!(copy_stats.index_builder_stats.uncompressed_index_bytes > 200);
 
-    check_restore(&af);
+    let restore_dir = TempDir::new().unwrap();
+
+    let archive = Archive::open_path(af.path()).unwrap();
+    let copy_stats = archive
+        .restore(&restore_dir.path(), &RestoreOptions::default())
+        .expect("restore");
+
+    assert_eq!(copy_stats.uncompressed_bytes, 8);
+    // TODO: Read back contents of that file.
+    // TODO: Compressed size isn't set properly when restoring, because it's
+    // lost by passing through a std::io::Read in ReadStoredFile.
+    // TODO: Check index stats.
+    // TODO: Check what was restored.
+
     af.validate().unwrap();
 }
 
@@ -130,21 +150,6 @@ fn check_backup(af: &ScratchArchive) {
     );
 }
 
-fn check_restore(af: &ScratchArchive) {
-    // TODO: Read back contents of that file.
-    let restore_dir = TreeFixture::new();
-
-    let archive = Archive::open_path(af.path()).unwrap();
-    let restore_tree = RestoreTree::create(&restore_dir.path()).unwrap();
-    let st = StoredTree::open_last(&archive).unwrap();
-    let copy_stats = copy_tree(&st, restore_tree, &CopyOptions::default()).unwrap();
-    assert_eq!(copy_stats.uncompressed_bytes, 8);
-    // TODO: Compressed size isn't set properly when restoring, because it's
-    // lost by passing through a std::io::Read in ReadStoredFile.
-    // TODO: Check index stats.
-    // TODO: Check what was restored.
-}
-
 /// Store and retrieve large files.
 #[test]
 fn large_file() {
@@ -168,9 +173,9 @@ fn large_file() {
     // Try to restore it
     let rd = TempDir::new().unwrap();
     let restore_archive = Archive::open_path(af.path()).unwrap();
-    let st = StoredTree::open_last(&restore_archive).unwrap();
-    let rt = RestoreTree::create(rd.path().to_owned()).unwrap();
-    let _stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
+    let _stats = restore_archive
+        .restore(rd.path(), &RestoreOptions::default())
+        .expect("restore");
     // TODO: Examine stats.
 
     let mut content = String::new();

@@ -8,10 +8,35 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use globset::GlobSet;
+
+use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
+use crate::excludes;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::stats::CopyStats;
 use crate::*;
+
+/// Description of how to restore a tree.
+#[derive(Debug)]
+pub struct RestoreOptions {
+    pub print_filenames: bool,
+    pub excludes: GlobSet,
+    pub overwrite: bool,
+    // The band to select, or by default the last complete one.
+    pub band_selection: BandSelectionPolicy,
+}
+
+impl Default for RestoreOptions {
+    fn default() -> Self {
+        RestoreOptions {
+            print_filenames: false,
+            overwrite: false,
+            band_selection: BandSelectionPolicy::LatestClosed,
+            excludes: excludes::excludes_nothing(),
+        }
+    }
+}
 
 /// A write-only tree on the filesystem, as a restore destination.
 #[derive(Debug)]
@@ -121,9 +146,8 @@ mod tests {
 
     use spectral::prelude::*;
 
-    use super::super::*;
-    use crate::copy_tree::CopyOptions;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
+    use crate::*;
 
     #[test]
     pub fn simple_restore() {
@@ -131,10 +155,11 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
 
+        let options = RestoreOptions::default();
         let restore_archive = Archive::open_path(&af.path()).unwrap();
-        let st = StoredTree::open_last(&restore_archive).unwrap();
-        let rt = RestoreTree::create(destdir.path().to_owned()).unwrap();
-        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
+        let stats = restore_archive
+            .restore(&destdir.path(), &options)
+            .expect("restore");
 
         assert_eq!(stats.files, 3);
 
@@ -158,10 +183,13 @@ mod tests {
         let af = ScratchArchive::new();
         af.store_two_versions();
         let destdir = TreeFixture::new();
-        let a = Archive::open_path(af.path()).unwrap();
-        let st = StoredTree::open_version(&a, &BandId::new(&[0])).unwrap();
-        let rt = RestoreTree::create(destdir.path().to_owned()).unwrap();
-        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
+        let archive = Archive::open_path(af.path()).unwrap();
+        let band_id = BandId::new(&[0]);
+        let options = RestoreOptions {
+            band_selection: BandSelectionPolicy::Specified(band_id),
+            ..RestoreOptions::default()
+        };
+        let stats = archive.restore(&destdir.path(), &options).expect("restore");
         // Does not have the 'hello2' file added in the second version.
         assert_eq!(stats.files, 2);
     }
@@ -186,9 +214,13 @@ mod tests {
         destdir.create_file("existing");
 
         let restore_archive = Archive::open_path(af.path()).unwrap();
-        let rt = RestoreTree::create_overwrite(destdir.path()).unwrap();
-        let st = StoredTree::open_last(&restore_archive).unwrap();
-        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
+        let options = RestoreOptions {
+            overwrite: true,
+            ..RestoreOptions::default()
+        };
+        let stats = restore_archive
+            .restore(&destdir.path(), &options)
+            .expect("restore");
         assert_eq!(stats.files, 3);
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();
@@ -201,11 +233,14 @@ mod tests {
         af.store_two_versions();
         let destdir = TreeFixture::new();
         let restore_archive = Archive::open_path(af.path()).unwrap();
-        let st = StoredTree::open_last(&restore_archive)
-            .unwrap()
-            .with_excludes(excludes::from_strings(&["/**/subfile"]).unwrap());
-        let rt = RestoreTree::create_overwrite(destdir.path()).unwrap();
-        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
+        let options = RestoreOptions {
+            overwrite: true,
+            excludes: excludes::from_strings(&["/**/subfile"]).unwrap(),
+            ..RestoreOptions::default()
+        };
+        let stats = restore_archive
+            .restore(&destdir.path(), &options)
+            .expect("restore");
 
         let dest = &destdir.path();
         assert_that(&dest.join("hello").as_path()).is_a_file();

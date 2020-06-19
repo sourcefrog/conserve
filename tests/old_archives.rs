@@ -21,12 +21,7 @@ use assert_fs::TempDir;
 use copy_dir::copy_dir;
 use predicates::prelude::*;
 
-use conserve::archive::Archive;
-use conserve::backup::BackupOptions;
-use conserve::bandid::BandId;
-use conserve::copy_tree::{copy_tree, CopyOptions};
-use conserve::restore::RestoreTree;
-use conserve::StoredTree;
+use conserve::*;
 
 const ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.2", "0.6.3"];
 
@@ -75,17 +70,15 @@ fn restore_old_archive() {
         println!("restore {} to {:?}", ver, dest.path());
 
         let archive = open_old_archive(ver, "minimal-1");
-        // TODO(#123): Simpler backup/restore APIs.
-        let st = StoredTree::open_last(&archive).expect("open last tree");
-        let rt = RestoreTree::create(&dest.path()).expect("RestoreTree::create");
+        let restore_stats = archive
+            .restore(&dest.path(), &RestoreOptions::default())
+            .expect("restore");
 
-        let copy_stats = copy_tree(&st, rt, &CopyOptions::default()).expect("copy_tree");
-
-        assert_eq!(copy_stats.files, 2);
-        assert_eq!(copy_stats.symlinks, 0);
-        assert_eq!(copy_stats.directories, 2);
-        assert_eq!(copy_stats.errors, 0);
-        assert_eq!(copy_stats.empty_files, 0);
+        assert_eq!(restore_stats.files, 2);
+        assert_eq!(restore_stats.symlinks, 0);
+        assert_eq!(restore_stats.directories, 2);
+        assert_eq!(restore_stats.errors, 0);
+        assert_eq!(restore_stats.empty_files, 0);
 
         dest.child("hello").assert("hello world\n");
         dest.child("subdir").assert(predicate::path::is_dir());
@@ -102,11 +95,9 @@ fn restore_modify_backup() {
         println!("restore {} to {:?}", ver, working_tree.path());
 
         let archive = open_old_archive(ver, "minimal-1");
-        // TODO(#123): Simpler backup/restore APIs.
-        let st = StoredTree::open_last(&archive).expect("open last tree");
-        let rt = RestoreTree::create(&working_tree.path()).expect("RestoreTree::create");
-
-        let _copy_stats = copy_tree(&st, rt, &CopyOptions::default()).expect("copy_tree");
+        archive
+            .restore(&working_tree.path(), &RestoreOptions::default())
+            .expect("restore");
 
         // Write back into a new copy of the archive, without modifying the
         // testdata in the source tree.
