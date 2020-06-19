@@ -15,7 +15,8 @@ pub struct CopyOptions {
 
 /// Copy files and other entries from one tree to another.
 ///
-/// NOTE: Although this is public, it's suggested to use `Archive::backup` if possible.
+/// NOTE: Although this is public, it's suggested to use `Archive::backup` or `Archive::restore` if
+/// possible, as they're higher-level APIs.
 pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     source: &ST,
     mut dest: DT,
