@@ -37,7 +37,7 @@ consistent:
   compatible versions. (At present, everything from the 0.6 series that 
   changed the format.)
 
-- New simpler `Archive::backup` public API.
+- New simpler `Archive::backup` and `Archive::restore` public APIs.
 
 ## v0.6.3 2020-05-30
 
