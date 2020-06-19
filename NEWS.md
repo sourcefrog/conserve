@@ -33,6 +33,10 @@ consistent:
   that Conserve can in future also access archives over SFTP or in cloud
   storage.
 
+- Add tests that Conserve can read and write archives written by older 
+  compatible versions. (At present, everything from the 0.6 series that 
+  changed the format.)
+
 ## v0.6.3 2020-05-30
 
 ### Performance improvements

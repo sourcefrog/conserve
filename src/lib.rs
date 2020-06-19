@@ -4,10 +4,10 @@
 
 // Conserve implementation modules.
 mod apath;
-mod archive;
+pub mod archive;
 mod backup;
 mod band;
-mod bandid;
+pub mod bandid;
 mod blockdir;
 pub mod compress;
 pub mod copy_tree;
@@ -22,7 +22,7 @@ pub mod live_tree;
 mod merge;
 pub(crate) mod misc;
 pub mod output;
-mod restore;
+pub mod restore;
 pub mod stats;
 mod stored_file;
 mod stored_tree;
