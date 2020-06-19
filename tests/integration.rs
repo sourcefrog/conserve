@@ -1,6 +1,7 @@
 // Copyright 2015, 2016, 2017, 2019, 2020 Martin Pool.
 
-/// Test Conserve through its public API.
+//! Test Conserve through its public API.
+
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
@@ -294,6 +295,7 @@ pub fn empty_file_uses_zero_blocks() {
     let dest = TempDir::new().unwrap();
     af.restore(&dest.path(), &RestoreOptions::default())
         .expect("restore");
+    // TODO: Check restore stats.
     dest.child("empty").assert("");
 }
 
@@ -390,7 +392,6 @@ pub fn simple_restore() {
         assert_eq!(dest.to_string_lossy(), "target");
     }
 
-    // TODO: Test restore empty file.
     // TODO: Test file contents are as expected.
 }
 
