@@ -23,8 +23,9 @@ use predicates::prelude::*;
 
 use conserve::archive::Archive;
 use conserve::bandid::BandId;
+use conserve::copy_tree::{copy_tree, CopyOptions};
 use conserve::restore::RestoreTree;
-use conserve::{copy_tree, BackupWriter, CopyOptions, LiveTree, StoredTree};
+use conserve::{BackupWriter, LiveTree, StoredTree};
 
 const ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.2", "0.6.3"];
 
