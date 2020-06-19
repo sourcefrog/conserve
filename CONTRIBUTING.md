@@ -1,9 +1,8 @@
 # Contributing to Conserve
 
-Contributions are very welcome.
+Contributions are welcome.
 
-If your change is nontrivial please talk to me in a bug about the approach
-before writing lots of code.
+If your change is nontrivial please talk to me in a bug about the concept and approach before writing lots of code.
 
 By sending patches or pull requests, you consent for your code to be licensed
 under the existing Conserve licence, the GNU GPL v2.
@@ -83,3 +82,15 @@ Existing snapshots should generally never be changed.
 
 New features that depend on new archive fields should be tested against old
 archive snapshots to ensure they are handled gracefully.
+
+## Git hooks
+
+A git pre-commit hook is provided in the `githooks` directory of the repo. Git
+doesn't activate hooks by default for good security reasons.
+
+You can optionally install it so that git will check the tests pass before
+committing, by
+
+    cp githooks/pre-commit .git/hooks/
+
+(There's no Windows equivalent yet, but it could be ported.)

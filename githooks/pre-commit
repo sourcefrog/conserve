@@ -1,0 +1,10 @@
+#! /bin/sh -ex
+
+# Copy this to .git/hooks/pre-commit to activate
+
+git stash -q --keep-index -m "Stash before pre-commit test"
+cargo test
+RESULT=$?
+git stash pop -q
+exit $RESULT
+
