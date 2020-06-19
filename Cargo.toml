@@ -46,6 +46,7 @@ version = "1.0.111"
 [dev-dependencies]
 assert_cmd = "1.0.1"
 assert_fs = "1.0.0"
+copy_dir = "0.1.2"
 escargot = "0.5.0"
 lazy_static = "1.4.0"
 libc = "0.2.71"
