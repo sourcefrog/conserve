@@ -83,7 +83,8 @@ pub struct Info {
     pub index_hunk_count: Option<u64>,
 }
 
-// TODO: Maybe merge this with StoredTree? The distinction seems small.
+// TODO: Maybe merge Band with StoredTree and/or with the Index classes? The distinction seems
+// small.
 impl Band {
     /// Make a new band (and its on-disk directory).
     ///
