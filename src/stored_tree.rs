@@ -147,11 +147,7 @@ mod test {
 
         assert_eq!(*st.band().id(), last_band_id);
 
-        let names: Vec<String> = st
-            .iter_entries()
-            .unwrap()
-            .map(|e| e.apath.into())
-            .collect();
+        let names: Vec<String> = st.iter_entries().unwrap().map(|e| e.apath.into()).collect();
         let expected = if SYMLINKS_SUPPORTED {
             vec![
                 "/",

@@ -392,7 +392,7 @@ fn restore(subm: &ArgMatches) -> Result<()> {
     } else {
         RestoreTree::create(dest)
     }?;
-    
+
     let only_subtree = only_path.display().to_string();
 
     let opts = CopyOptions {

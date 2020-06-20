@@ -27,7 +27,6 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     mut dest: DT,
     options: &CopyOptions,
 ) -> Result<CopyStats> {
-
     let mut stats = CopyStats::default();
     // This causes us to walk the source tree twice, which is probably an acceptable option
     // since it's nice to see realistic overall progress. We could keep all the entries
@@ -52,16 +51,16 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         // let _: Vec<&str> = entry.is_prefix_of('/');
 
         let mut to_be_copied: bool = false;
-        
+
         match target.as_ref() {
             "" => to_be_copied = true,
             _ => {
                 // Take the top path from target and match it with entry (accept all subpaths)
                 if subtree.len() > target_tree.len() {
-                    let mut matched: usize = 0;                    
+                    let mut matched: usize = 0;
                     for (i, _) in target_tree.iter().enumerate() {
-                        if target_tree[i].eq(subtree[i+1]) {
-                            matched = matched + 1; 
+                        if target_tree[i].eq(subtree[i + 1]) {
+                            matched = matched + 1;
                         }
                     }
                     to_be_copied = matched == target_tree.len();

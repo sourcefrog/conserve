@@ -319,7 +319,6 @@ impl IndexEntryIter {
         // that tells us we went too far.
 
         loop {
-
             if let Some(cand) = self.buffered_entries.peek() {
                 match cand.apath.cmp(apath) {
                     Ordering::Less => {
