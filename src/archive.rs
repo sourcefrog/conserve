@@ -15,7 +15,7 @@ use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
-use crate::stats::{CopyStats, ValidateArchiveStats};
+use crate::stats::{CopyStats, ValidateStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -200,7 +200,7 @@ impl Archive {
         Ok(hs)
     }
 
-    pub fn validate(&self) -> Result<ValidateArchiveStats> {
+    pub fn validate(&self) -> Result<ValidateStats> {
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
         stats.block_dir += self.block_dir.validate()?;
@@ -214,9 +214,9 @@ impl Archive {
         Ok(stats)
     }
 
-    fn validate_archive_dir(&self) -> Result<ValidateArchiveStats> {
+    fn validate_archive_dir(&self) -> Result<ValidateStats> {
         // TODO: Tests for the problems detected here.
-        let mut stats = ValidateArchiveStats::default();
+        let mut stats = ValidateStats::default();
         ui::println("Check archive top-level directory...");
 
         let mut files: Vec<String> = Vec::new();
@@ -277,7 +277,7 @@ impl Archive {
         Ok(stats)
     }
 
-    fn validate_bands(&self, _stats: &mut ValidateArchiveStats) -> Result<()> {
+    fn validate_bands(&self, _stats: &mut ValidateStats) -> Result<()> {
         // TODO: Don't stop early on any errors in the steps below, but do count them.
         // TODO: Better progress bars, that don't work by size but rather by
         // count.
