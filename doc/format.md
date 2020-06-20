@@ -166,7 +166,9 @@ directory. It is the presence of this file that defines the band as complete.
 
 Band footer contains:
 
-- `end_time`: the Unix time, in seconds, that the band ended
+- `end_time`: The Unix time, in seconds, that the band ended.
+- `index_hunk_count`: The number of index hunks that should be present for this
+  band. (Since 0.6.4.)
 
 ## Data block directory
 

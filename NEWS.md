@@ -39,6 +39,13 @@ consistent:
 
 - New simpler `Archive::backup` and `Archive::restore` public APIs.
 
+### Archive format changes
+
+Conserve 0.6.4 uses the same 0.6 archive version, with one compatible addition:
+
+- BANDTAIL files contain an additional `index_hunk_count` to enable `conserve
+  validate` to check that no hunks are missing.
+
 ## v0.6.3 2020-05-30
 
 ### Performance improvements

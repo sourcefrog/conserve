@@ -43,7 +43,7 @@ pub fn simple_backup() {
 }
 
 #[test]
-pub fn simple_backup_with_excludes() {
+pub fn simple_backup_with_excludes() -> Result<()> {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
@@ -69,6 +69,14 @@ pub fn simple_backup_with_excludes() {
     let restore_dir = TempDir::new().unwrap();
 
     let archive = Archive::open_path(af.path()).unwrap();
+
+    let band = Band::open(&archive, &BandId::zero()).unwrap();
+    let band_info = band.get_info()?;
+    assert_eq!(band_info.index_hunk_count, Some(1));
+    assert_eq!(band_info.id, BandId::zero());
+    assert_eq!(band_info.is_closed, true);
+    assert!(band_info.end_time.is_some());
+
     let copy_stats = archive
         .restore(&restore_dir.path(), &RestoreOptions::default())
         .expect("restore");
@@ -81,6 +89,7 @@ pub fn simple_backup_with_excludes() {
     // TODO: Check what was restored.
 
     af.validate().unwrap();
+    Ok(())
 }
 
 #[test]

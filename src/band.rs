@@ -59,7 +59,13 @@ struct Head {
 /// Format of the on-disk tail file.
 #[derive(Debug, Serialize, Deserialize)]
 struct Tail {
+    /// Seconds since the Unix epoch when the band was closed.
     end_time: i64,
+
+    /// Number of index hunks in this band, to enable validation that none are missing.
+    ///
+    /// Present from 0.6.4 onwards.
+    index_hunk_count: Option<u64>,
 }
 
 /// Readonly summary info about a band, from `Band::get_info`.
@@ -72,6 +78,9 @@ pub struct Info {
 
     /// Time this band was completed, if it is complete.
     pub end_time: Option<DateTime<Utc>>,
+
+    /// Number of hunks present in the index, if that is known.
+    pub index_hunk_count: Option<u64>,
 }
 
 // TODO: Maybe merge this with StoredTree? The distinction seems small.
@@ -97,12 +106,13 @@ impl Band {
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(&self) -> Result<()> {
+    pub fn close(&self, index_hunk_count: u64) -> Result<()> {
         write_json(
             &self.transport,
             TAIL_FILENAME,
             &Tail {
                 end_time: Utc::now().timestamp(),
+                index_hunk_count: Some(index_hunk_count),
             },
         )
     }
@@ -155,24 +165,27 @@ impl Band {
         read_json(&self.transport, HEAD_FILENAME)
     }
 
-    fn read_tail(&self) -> Result<Tail> {
-        read_json(&self.transport, TAIL_FILENAME)
+    fn read_tail(&self) -> Result<Option<Tail>> {
+        if self.transport.exists(TAIL_FILENAME).map_err(Error::from)? {
+            Ok(Some(read_json(&self.transport, TAIL_FILENAME)?))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Return info about the state of this band.
     pub fn get_info(&self) -> Result<Info> {
         let head = self.read_head()?;
         let is_closed = self.is_closed()?;
-        let end_time = if is_closed {
-            Some(Utc.timestamp(self.read_tail()?.end_time, 0))
-        } else {
-            None
-        };
+        let tail_option = self.read_tail()?;
         Ok(Info {
             id: self.band_id.clone(),
             is_closed,
             start_time: Utc.timestamp(head.start_time, 0),
-            end_time,
+            end_time: tail_option
+                .as_ref()
+                .map(|tail| Utc.timestamp(tail.end_time, 0)),
+            index_hunk_count: tail_option.as_ref().and_then(|tail| tail.index_hunk_count),
         })
     }
 
@@ -241,7 +254,7 @@ mod tests {
 
         assert!(!band.is_closed().unwrap());
 
-        band.close().unwrap();
+        band.close(0).unwrap();
         assert_that(&band_dir.join("BANDTAIL")).is_a_file();
         assert!(band.is_closed().unwrap());
 
@@ -253,6 +266,7 @@ mod tests {
         let info = band2.get_info().expect("get_info failed");
         assert_eq!(info.id.to_string(), "b0000");
         assert_eq!(info.is_closed, true);
+        assert_eq!(info.index_hunk_count, Some(0));
         let dur = info.end_time.expect("info has an end_time") - info.start_time;
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)

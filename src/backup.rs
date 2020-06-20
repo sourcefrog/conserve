@@ -71,7 +71,7 @@ impl BackupWriter {
 impl tree::WriteTree for BackupWriter {
     fn finish(self) -> Result<CopyStats> {
         let index_builder_stats = self.index_builder.finish()?;
-        self.band.close()?;
+        self.band.close(index_builder_stats.index_hunks)?;
         Ok(CopyStats {
             index_builder_stats,
             ..CopyStats::default()
