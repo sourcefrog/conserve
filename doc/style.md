@@ -63,7 +63,11 @@ Use `use crate::xyz` rather than `use super::xyz` to import other things from
 the Conserve implementation. (Either is valid and they seem just as good, but
 let's pick `crate` to be consisent.)
 
-Unit test submodules can do `use super::*`.
+Conserve implementation code and integration tests can say `use crate::*` to
+include every re-exported symbol, although this isn't recommended for external
+clients.
+
+Unit test submodules should say `use super::*`.
 
 Otherwise, avoid `use ...::*` except for libraries that specifically recommend
 it.

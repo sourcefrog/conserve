@@ -4,10 +4,31 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
+use globset::GlobSet;
+
 use crate::blockdir::StoreFiles;
 use crate::index::IndexEntryIter;
 use crate::stats::CopyStats;
 use crate::*;
+
+/// Configuration of how to make a backup.
+#[derive(Debug)]
+pub struct BackupOptions {
+    /// Print filenames to the UI as they're copied.
+    pub print_filenames: bool,
+
+    /// Exclude these globs from the backup.
+    pub excludes: GlobSet,
+}
+
+impl Default for BackupOptions {
+    fn default() -> Self {
+        BackupOptions {
+            print_filenames: false,
+            excludes: GlobSet::empty(),
+        }
+    }
+}
 
 /// Accepts files to write in the archive (in apath order.)
 pub struct BackupWriter {
@@ -110,170 +131,5 @@ impl tree::WriteTree for BackupWriter {
         let target = source_entry.symlink_target().clone();
         assert!(target.is_some());
         self.push_entry(IndexEntry::metadata_from(source_entry))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::copy_tree::CopyOptions;
-    use crate::kind::Kind;
-    use crate::test_fixtures::{ScratchArchive, TreeFixture};
-
-    #[cfg(unix)]
-    #[test]
-    pub fn symlink() {
-        let af = ScratchArchive::new();
-        let srcdir = TreeFixture::new();
-        srcdir.create_symlink("symlink", "/a/broken/destination");
-        let lt = LiveTree::open(srcdir.path()).unwrap();
-        let bw = BackupWriter::begin(&af).unwrap();
-        let copy_stats = copy_tree(&lt, bw, &CopyOptions::default()).unwrap();
-        assert_eq!(0, copy_stats.files);
-        assert_eq!(1, copy_stats.symlinks);
-        assert_eq!(0, copy_stats.unknown_kind);
-
-        let band_ids = af.list_band_ids().unwrap();
-        assert_eq!(1, band_ids.len());
-        assert_eq!("b0000", band_ids[0].to_string());
-
-        let band = Band::open(&af, &band_ids[0]).unwrap();
-        assert!(band.is_closed().unwrap());
-
-        let index_entries = band.iter_entries().unwrap().collect::<Vec<IndexEntry>>();
-        assert_eq!(2, index_entries.len());
-
-        let e2 = &index_entries[1];
-        assert_eq!(e2.kind(), Kind::Symlink);
-        assert_eq!(&e2.apath, "/symlink");
-        assert_eq!(e2.target.as_ref().unwrap(), "/a/broken/destination");
-    }
-
-    #[test]
-    pub fn excludes() {
-        let af = ScratchArchive::new();
-        let srcdir = TreeFixture::new();
-
-        srcdir.create_dir("test");
-        srcdir.create_dir("foooooo");
-        srcdir.create_file("foo");
-        srcdir.create_file("fooBar");
-        srcdir.create_file("foooooo/test");
-        srcdir.create_file("test/baz");
-        srcdir.create_file("baz");
-        srcdir.create_file("bar");
-
-        let excludes = excludes::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
-        let lt = LiveTree::open(srcdir.path())
-            .unwrap()
-            .with_excludes(excludes);
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&lt, bw, &CopyOptions::default()).unwrap();
-
-        assert_eq!(1, stats.written_blocks);
-        assert_eq!(1, stats.files);
-        assert_eq!(1, stats.new_files);
-        assert_eq!(2, stats.directories);
-        assert_eq!(0, stats.symlinks);
-        assert_eq!(0, stats.unknown_kind);
-    }
-
-    #[test]
-    pub fn empty_file_uses_zero_blocks() {
-        use std::io::Read;
-
-        let af = ScratchArchive::new();
-        let srcdir = TreeFixture::new();
-        srcdir.create_file_with_contents("empty", &[]);
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
-
-        assert_eq!(1, stats.files);
-        assert_eq!(stats.written_blocks, 0);
-
-        // Read back the empty file
-        let st = StoredTree::open_last(&af).unwrap();
-        let empty_entry = st
-            .iter_entries()
-            .unwrap()
-            .find(|ref i| &i.apath == "/empty")
-            .expect("found one entry");
-        let mut sf = st.file_contents(&empty_entry).unwrap();
-        let mut s = String::new();
-        assert_eq!(sf.read_to_string(&mut s).unwrap(), 0);
-        assert_eq!(s.len(), 0);
-    }
-
-    #[test]
-    pub fn detect_unmodified() {
-        let af = ScratchArchive::new();
-        let srcdir = TreeFixture::new();
-        srcdir.create_file("aaa");
-        srcdir.create_file("bbb");
-
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
-
-        assert_eq!(stats.files, 2);
-        assert_eq!(stats.new_files, 2);
-        assert_eq!(stats.unmodified_files, 0);
-
-        // Make a second backup from the same tree, and we should see that
-        // both files are unmodified.
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
-
-        assert_eq!(stats.files, 2);
-        assert_eq!(stats.new_files, 0);
-        assert_eq!(stats.unmodified_files, 2);
-
-        // Change one of the files, and in a new backup it should be recognized
-        // as unmodified.
-        srcdir.create_file_with_contents("bbb", b"longer content for bbb");
-
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
-
-        assert_eq!(stats.files, 2);
-        assert_eq!(stats.new_files, 0);
-        assert_eq!(stats.unmodified_files, 1);
-        assert_eq!(stats.modified_files, 1);
-    }
-
-    #[test]
-    pub fn detect_minimal_mtime_change() {
-        let af = ScratchArchive::new();
-        let srcdir = TreeFixture::new();
-        srcdir.create_file("aaa");
-        srcdir.create_file_with_contents("bbb", b"longer content for bbb");
-
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
-
-        assert_eq!(stats.files, 2);
-        assert_eq!(stats.new_files, 2);
-        assert_eq!(stats.unmodified_files, 0);
-        assert_eq!(stats.modified_files, 0);
-
-        // Spin until the file's mtime is visibly different to what it was before.
-        let bpath = srcdir.path().join("bbb");
-        let orig_mtime = std::fs::metadata(&bpath).unwrap().modified().unwrap();
-        loop {
-            // Sleep a little while, so that even on systems with less than
-            // nanosecond filesystem time resolution we can still see this is later.
-            std::thread::sleep(std::time::Duration::from_millis(50));
-            // Change one of the files, keeping the same length. If the mtime
-            // changed, even fractionally, we should see the file was changed.
-            srcdir.create_file_with_contents("bbb", b"woofer content for bbb");
-            if std::fs::metadata(&bpath).unwrap().modified().unwrap() != orig_mtime {
-                break;
-            }
-        }
-
-        let bw = BackupWriter::begin(&af).unwrap();
-        let stats = copy_tree(&srcdir.live_tree(), bw, &CopyOptions::default()).unwrap();
-        assert_eq!(stats.files, 2);
-        assert_eq!(stats.unmodified_files, 1);
     }
 }

@@ -8,8 +8,9 @@ use std::path::{Path, PathBuf};
 
 use structopt::StructOpt;
 
-use crate::copy_tree::CopyOptions;
+use conserve::backup::BackupOptions;
 use conserve::ReadTree;
+use conserve::RestoreOptions;
 use conserve::*;
 
 #[derive(Debug, StructOpt)]
@@ -154,14 +155,11 @@ impl Command {
                 verbose,
                 exclude,
             } => {
-                let archive = Archive::open_path(archive)?;
-                let lt = LiveTree::open(source)?.with_excludes(excludes::from_strings(exclude)?);
-                let bw = BackupWriter::begin(&archive)?;
-                let opts = CopyOptions {
+                let options = BackupOptions {
                     print_filenames: *verbose,
-                    ..CopyOptions::default()
+                    excludes: excludes::from_strings(exclude)?,
                 };
-                let copy_stats = copy_tree(&lt, bw, &opts)?;
+                let copy_stats = Archive::open_path(archive)?.backup(source, &options)?;
                 ui::println("Backup complete.");
                 copy_stats.summarize_backup(&mut stdout);
             }
@@ -231,17 +229,15 @@ impl Command {
                 exclude,
                 incomplete,
             } => {
-                let st = stored_tree_from_opt(archive, &backup, exclude, *incomplete)?;
-                let rt = if *force_overwrite {
-                    RestoreTree::create_overwrite(destination)
-                } else {
-                    RestoreTree::create(destination)
-                }?;
-                let opts = CopyOptions {
+                let band_selection = band_selection_policy_from_opt(backup, *incomplete);
+                let archive = Archive::open_path(archive)?;
+                let options = RestoreOptions {
                     print_filenames: *verbose,
-                    ..CopyOptions::default()
+                    excludes: excludes::from_strings(exclude)?,
+                    band_selection,
+                    overwrite: *force_overwrite,
                 };
-                let copy_stats = copy_tree(&st, rt, &opts)?;
+                let copy_stats = archive.restore(&destination, &options)?;
                 ui::println("Restore complete.");
                 copy_stats.summarize_restore(&mut stdout)?;
             }
@@ -286,17 +282,23 @@ fn stored_tree_from_opt(
     incomplete: bool,
 ) -> Result<StoredTree> {
     let archive = Archive::open_path(archive)?;
-    let st = match backup {
-        None => StoredTree::open_last(&archive)?,
-        Some(b) => {
-            if incomplete {
-                StoredTree::open_incomplete_version(&archive, b)?
-            } else {
-                StoredTree::open_version(&archive, b)?
-            }
-        }
-    };
-    Ok(st.with_excludes(excludes::from_strings(exclude)?))
+    let policy = band_selection_policy_from_opt(backup, incomplete);
+    Ok(archive
+        .open_stored_tree(&policy)?
+        .with_excludes(excludes::from_strings(exclude)?))
+}
+
+fn band_selection_policy_from_opt(
+    backup: &Option<BandId>,
+    incomplete: bool,
+) -> BandSelectionPolicy {
+    if let Some(band_id) = backup {
+        BandSelectionPolicy::Specified(band_id.clone())
+    } else if incomplete {
+        BandSelectionPolicy::Latest
+    } else {
+        BandSelectionPolicy::LatestClosed
+    }
 }
 
 fn live_tree_from_opt(source: &Path, exclude: &[String]) -> Result<LiveTree> {

@@ -9,11 +9,13 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::backup::BackupOptions;
+use crate::copy_tree::CopyOptions;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
-use crate::stats::ValidateArchiveStats;
+use crate::stats::{CopyStats, ValidateArchiveStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -92,6 +94,38 @@ impl Archive {
         })
     }
 
+    /// Backup a source directory into a new band in the archive.
+    ///
+    /// Returns statistics about what was copied.
+    pub fn backup(&self, source_path: &Path, options: &BackupOptions) -> Result<CopyStats> {
+        let live_tree = LiveTree::open(source_path)?.with_excludes(options.excludes.clone());
+        let writer = BackupWriter::begin(self)?;
+        copy_tree(
+            &live_tree,
+            writer,
+            &CopyOptions {
+                print_filenames: options.print_filenames,
+                measure_first: false,
+            },
+        )
+    }
+
+    /// Restore a selected version, or by default the latest, to a destination directory.
+    pub fn restore(&self, destination_path: &Path, options: &RestoreOptions) -> Result<CopyStats> {
+        let st = self.open_stored_tree(&options.band_selection)?;
+        let st = st.with_excludes(options.excludes.clone());
+        let rt = if options.overwrite {
+            RestoreTree::create_overwrite(destination_path)
+        } else {
+            RestoreTree::create(destination_path)
+        }?;
+        let opts = CopyOptions {
+            print_filenames: options.print_filenames,
+            ..CopyOptions::default()
+        };
+        copy_tree(&st, rt, &opts)
+    }
+
     pub fn block_dir(&self) -> &BlockDir {
         &self.block_dir
     }
@@ -105,6 +139,18 @@ impl Archive {
 
     pub(crate) fn transport(&self) -> &dyn Transport {
         self.transport.as_ref()
+    }
+
+    pub fn open_stored_tree(&self, band_selection: &BandSelectionPolicy) -> Result<StoredTree> {
+        use crate::band::BandSelectionPolicy::*;
+        Ok(match band_selection {
+            Specified(band_id) => StoredTree::open_incomplete_version(self, &band_id)?,
+            LatestClosed => StoredTree::open_last(self)?,
+            Latest => StoredTree::open_incomplete_version(
+                self,
+                &self.last_band_id()?.ok_or(Error::ArchiveEmpty)?,
+            )?,
+        })
     }
 
     /// Return an iterator of valid band ids in this archive, in arbitrary order.

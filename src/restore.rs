@@ -8,10 +8,35 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use globset::GlobSet;
+
+use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
+use crate::excludes;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::stats::CopyStats;
 use crate::*;
+
+/// Description of how to restore a tree.
+#[derive(Debug)]
+pub struct RestoreOptions {
+    pub print_filenames: bool,
+    pub excludes: GlobSet,
+    pub overwrite: bool,
+    // The band to select, or by default the last complete one.
+    pub band_selection: BandSelectionPolicy,
+}
+
+impl Default for RestoreOptions {
+    fn default() -> Self {
+        RestoreOptions {
+            print_filenames: false,
+            overwrite: false,
+            band_selection: BandSelectionPolicy::LatestClosed,
+            excludes: excludes::excludes_nothing(),
+        }
+    }
+}
 
 /// A write-only tree on the filesystem, as a restore destination.
 #[derive(Debug)]
@@ -112,105 +137,5 @@ impl tree::WriteTree for RestoreTree {
             entry.apath()
         ));
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs;
-
-    use spectral::prelude::*;
-
-    use super::super::*;
-    use crate::copy_tree::CopyOptions;
-    use crate::test_fixtures::{ScratchArchive, TreeFixture};
-
-    #[test]
-    pub fn simple_restore() {
-        let af = ScratchArchive::new();
-        af.store_two_versions();
-        let destdir = TreeFixture::new();
-
-        let restore_archive = Archive::open_path(&af.path()).unwrap();
-        let st = StoredTree::open_last(&restore_archive).unwrap();
-        let rt = RestoreTree::create(destdir.path().to_owned()).unwrap();
-        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
-
-        assert_eq!(stats.files, 3);
-
-        let dest = &destdir.path();
-        assert_that(&dest.join("hello").as_path()).is_a_file();
-        assert_that(&dest.join("hello2")).is_a_file();
-        assert_that(&dest.join("subdir").as_path()).is_a_directory();
-        assert_that(&dest.join("subdir").join("subfile").as_path()).is_a_file();
-        if SYMLINKS_SUPPORTED {
-            let dest = fs::read_link(&dest.join("link")).unwrap();
-            assert_eq!(dest.to_string_lossy(), "target");
-        }
-
-        // TODO: Test restore empty file.
-        // TODO: Test file contents are as expected.
-        // TODO: Test restore of larger files.
-    }
-
-    #[test]
-    fn restore_named_band() {
-        let af = ScratchArchive::new();
-        af.store_two_versions();
-        let destdir = TreeFixture::new();
-        let a = Archive::open_path(af.path()).unwrap();
-        let st = StoredTree::open_version(&a, &BandId::new(&[0])).unwrap();
-        let rt = RestoreTree::create(destdir.path().to_owned()).unwrap();
-        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
-        // Does not have the 'hello2' file added in the second version.
-        assert_eq!(stats.files, 2);
-    }
-
-    #[test]
-    pub fn decline_to_overwrite() {
-        let af = ScratchArchive::new();
-        af.store_two_versions();
-        let destdir = TreeFixture::new();
-        destdir.create_file("existing");
-        let restore_err_str = RestoreTree::create(destdir.path().to_owned())
-            .unwrap_err()
-            .to_string();
-        assert_that(&restore_err_str).contains(&"Destination directory not empty");
-    }
-
-    #[test]
-    pub fn forced_overwrite() {
-        let af = ScratchArchive::new();
-        af.store_two_versions();
-        let destdir = TreeFixture::new();
-        destdir.create_file("existing");
-
-        let restore_archive = Archive::open_path(af.path()).unwrap();
-        let rt = RestoreTree::create_overwrite(destdir.path()).unwrap();
-        let st = StoredTree::open_last(&restore_archive).unwrap();
-        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
-        assert_eq!(stats.files, 3);
-        let dest = &destdir.path();
-        assert_that(&dest.join("hello").as_path()).is_a_file();
-        assert_that(&dest.join("existing").as_path()).is_a_file();
-    }
-
-    #[test]
-    pub fn exclude_files() {
-        let af = ScratchArchive::new();
-        af.store_two_versions();
-        let destdir = TreeFixture::new();
-        let restore_archive = Archive::open_path(af.path()).unwrap();
-        let st = StoredTree::open_last(&restore_archive)
-            .unwrap()
-            .with_excludes(excludes::from_strings(&["/**/subfile"]).unwrap());
-        let rt = RestoreTree::create_overwrite(destdir.path()).unwrap();
-        let stats = copy_tree(&st, rt, &CopyOptions::default()).unwrap();
-
-        let dest = &destdir.path();
-        assert_that(&dest.join("hello").as_path()).is_a_file();
-        assert_that(&dest.join("hello2")).is_a_file();
-        assert_that(&dest.join("subdir").as_path()).is_a_directory();
-        assert_eq!(stats.files, 2);
     }
 }
