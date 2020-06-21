@@ -91,33 +91,33 @@ impl StoredTree {
             .iter_entries()?
             .par_bridge()
             .filter(|entry| entry.kind() == Kind::File)
-            .flat_map(move |entry| {
-                let addrs = entry.addrs.clone();
-                addrs
-                    .into_par_iter()
-                    .map(move |addr| (entry.apath.clone(), addr))
-            })
-            .filter(|(apath, addr)| {
-                if let Some(block_len) = block_lens.get(&addr.hash) {
-                    // Present, but the address is out of range.
-                    if (addr.start + addr.len) > (*block_len as u64) {
-                        ui::problem(&format!(
+            .map(move |entry| {
+                entry
+                    .addrs
+                    .iter()
+                    .filter(|addr| {
+                        if let Some(block_len) = block_lens.get(&addr.hash) {
+                            // Present, but the address is out of range.
+                            if (addr.start + addr.len) > (*block_len as u64) {
+                                ui::problem(&format!(
                             "Address {:?} in {:?} in {:?} extends beyond compressed data length {}",
-                            addr, apath, band_id, block_len
+                            addr, entry.apath, band_id, block_len
                         ));
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    ui::problem(&format!(
-                        "Address {:?} in {:?} in {:?} points to missing block",
-                        apath, band_id, addr
-                    ));
-                    true
-                }
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            ui::problem(&format!(
+                                "Address {:?} in {:?} in {:?} points to missing block",
+                                entry.apath, band_id, addr
+                            ));
+                            true
+                        }
+                    })
+                    .count()
             })
-            .count();
+            .sum();
         Ok(())
     }
 
