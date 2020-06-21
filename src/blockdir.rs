@@ -276,8 +276,7 @@ impl BlockDir {
             uncompressed: decompressed_bytes.len() as u64,
             compressed: compressed_bytes.len() as u64,
         };
-        // TODO: Return the output buffer, or take the buffer from the caller: don't copy it here.
-        Ok((decompressed_bytes.to_vec(), sizes))
+        Ok((decompressor.take_buffer(), sizes))
     }
 }
 

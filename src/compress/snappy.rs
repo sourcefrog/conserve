@@ -45,6 +45,7 @@ impl Default for Compressor {
 pub(crate) struct Decompressor {
     out_buf: Vec<u8>,
     decoder: Decoder,
+    last_len: usize,
 }
 
 impl Decompressor {
@@ -62,7 +63,15 @@ impl Decompressor {
             self.out_buf.resize(max_len, 0u8);
         }
         let actual_len = self.decoder.decompress(input, &mut self.out_buf)?;
+        self.last_len = actual_len;
         Ok(&self.out_buf[..actual_len])
+    }
+
+    /// Deconstruct this Decompressor and return its buffer with the latest contents.
+    pub fn take_buffer(self) -> Vec<u8> {
+        let Decompressor { mut out_buf, .. } = self;
+        out_buf.truncate(self.last_len);
+        out_buf
     }
 }
 
