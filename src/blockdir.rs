@@ -230,7 +230,8 @@ impl BlockDir {
         ));
         ui::set_progress_phase(&"Check block hashes");
         // Make a vec of Some(usize) if the block could be read, or None if it failed.
-        let results: Vec<Option<(String, usize)>> = block_dir_entries
+        let mut results: Vec<Option<(String, usize)>> = Vec::new();
+        block_dir_entries
             .par_iter()
             .map(|de| {
                 ui::increment_bytes_done(de.len);
@@ -238,7 +239,7 @@ impl BlockDir {
                     .map(|(bytes, _sizes)| (de.name.clone(), bytes.len()))
                     .ok()
             })
-            .collect();
+            .collect_into_vec(&mut results);
         stats.block_error_count += results.iter().filter(|o| o.is_none()).count();
         let len_map: HashMap<BlockHash, usize> = results
             .into_iter()
