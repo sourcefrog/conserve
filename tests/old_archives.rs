@@ -59,6 +59,7 @@ fn validate_archive() {
         assert_eq!(stats.structure_problems, 0);
         assert_eq!(stats.io_errors, 0);
         assert_eq!(stats.block_error_count, 0);
+        assert!(!stats.has_problems());
     }
 }
 
