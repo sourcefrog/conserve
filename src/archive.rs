@@ -4,7 +4,7 @@
 //! Archives holding backup material.
 
 use std::collections::BTreeSet;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::ErrorKind;
 use std::path::Path;
 
@@ -187,18 +187,24 @@ impl Archive {
         Ok(None)
     }
 
-    /// Return a sorted set containing all the blocks referenced by all bands.
-    pub fn referenced_blocks(&self) -> Result<BTreeSet<String>> {
-        let mut hs = BTreeSet::<String>::new();
-        for band_id in self.list_band_ids()? {
-            let band = Band::open(&self, &band_id)?;
-            for ie in band.iter_entries()? {
-                for a in ie.addrs {
-                    hs.insert(a.hash);
+    /// Returns an unsorted iterator of all blocks referenced by all bands.
+    pub fn referenced_blocks(&self) -> Result<impl Iterator<Item = String>> {
+        let archive = self.clone();
+        let mut hs = HashSet::<String>::new();
+        Ok(self
+            .iter_band_ids_unsorted()?
+            .map(move |band_id| Band::open(&archive, &band_id).expect("Failed to open band"))
+            .flat_map(|band| band.iter_entries().expect("Failed to iter entries"))
+            .flat_map(|entry| entry.addrs)
+            .map(|addrs| addrs.hash)
+            .filter(move |hash| {
+                if hs.contains(hash) {
+                    false
+                } else {
+                    hs.insert(hash.clone());
+                    true
                 }
-            }
-        }
-        Ok(hs)
+            }))
     }
 
     pub fn validate(&self) -> Result<ValidateStats> {
@@ -368,7 +374,7 @@ mod tests {
             af.last_complete_band().unwrap().is_none(),
             "Archive should have no bands yet"
         );
-        assert!(af.referenced_blocks().unwrap().is_empty());
+        assert_eq!(af.referenced_blocks().unwrap().count(), 0);
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 
@@ -395,7 +401,7 @@ mod tests {
         );
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
-        assert!(af.referenced_blocks().unwrap().is_empty());
+        assert_eq!(af.referenced_blocks().unwrap().count(), 0);
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 }
