@@ -44,6 +44,12 @@ impl Apath {
         }
         true
     }
+
+    pub fn is_prefix_of(a: &str) -> Vec<&str> {
+        let subtree: Vec<&str> = a.split('/').collect();
+        subtree
+    }
+    
 }
 
 impl From<Apath> for String {

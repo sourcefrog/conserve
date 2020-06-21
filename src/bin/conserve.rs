@@ -72,6 +72,8 @@ enum Command {
         verbose: bool,
         #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
+        #[structopt(long="only", short="i", number_of_values = 1)]
+        include_only: Option<String>,
         /// Restore the incomplete contents of an unfinished backup.
         #[structopt(long, requires = "backup")]
         incomplete: bool,
@@ -233,19 +235,32 @@ impl Command {
                 verbose,
                 force_overwrite,
                 exclude,
+                include_only,
                 incomplete,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup, *incomplete);
                 let archive = Archive::open_path(archive)?;
+                
+                
+                let include_only = match include_only {
+                    None => "/",
+                    Some(path) => path
+                };
+
                 let options = RestoreOptions {
                     print_filenames: *verbose,
                     excludes: excludes::from_strings(exclude)?,
+                    include_only: Apath::from(include_only),
                     band_selection,
                     overwrite: *force_overwrite,
                 };
+
+
                 let copy_stats = archive.restore(&destination, &options)?;
                 ui::println("Restore complete.");
                 copy_stats.summarize_restore(&mut stdout)?;
+            
+            
             }
             Command::Size { ref stos } => {
                 ui::set_progress_phase(&"Measuring".to_string());
