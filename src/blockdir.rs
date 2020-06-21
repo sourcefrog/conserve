@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::stats::{CopyStats, Sizes, ValidateBlockDirStats};
+use crate::stats::{CopyStats, Sizes, ValidateStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -209,7 +209,7 @@ impl BlockDir {
     }
 
     /// Check format invariants of the BlockDir.
-    pub fn validate(&self) -> Result<ValidateBlockDirStats> {
+    pub fn validate(&self, stats: &mut ValidateStats) -> Result<()> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Provide a progress bar that just works on counts, not bytes:
@@ -225,20 +225,15 @@ impl BlockDir {
             crate::misc::bytes_to_human_mb(tot)
         ));
         ui::set_progress_phase(&"Check block hashes");
-        let block_error_count = block_dir_entries
+        stats.block_error_count += block_dir_entries
             .par_iter()
             .filter(|de| {
                 ui::increment_bytes_done(de.len);
                 self.get_block_content(&de.name).is_err()
             })
-            .count()
-            .try_into()
-            .unwrap();
-        let block_read_count = block_dir_entries.len().try_into().unwrap();
-        Ok(ValidateBlockDirStats {
-            block_error_count,
-            block_read_count,
-        })
+            .count() as u64;
+        stats.block_read_count = block_dir_entries.len().try_into().unwrap();
+        Ok(())
     }
 
     /// Return the entire contents of the block.
@@ -434,8 +429,11 @@ mod tests {
             }
         );
 
-        // TODO: Assertions about the stats.
-        let _validate_stats = block_dir.validate().unwrap();
+        let mut stats = ValidateStats::default();
+        block_dir.validate(&mut stats).unwrap();
+        assert_eq!(stats.io_errors, 0);
+        assert_eq!(stats.block_error_count, 0);
+        assert_eq!(stats.block_read_count, 1);
     }
 
     #[test]

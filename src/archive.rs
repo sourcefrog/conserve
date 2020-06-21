@@ -203,7 +203,7 @@ impl Archive {
     pub fn validate(&self) -> Result<ValidateStats> {
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
-        stats.block_dir += self.block_dir.validate()?;
+        self.block_dir.validate(&mut stats)?;
         self.validate_bands(&mut stats)?;
 
         if stats.has_problems() {
