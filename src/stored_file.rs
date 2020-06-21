@@ -1,8 +1,6 @@
 // Copyright 2017, 2018, 2019 Martin Pool.
 
 ///! Access a file stored in the archive.
-use rayon::prelude::*;
-
 use crate::stats::Sizes;
 use crate::*;
 
@@ -21,27 +19,6 @@ impl StoredFile {
     /// Open a stored file.
     pub fn open(block_dir: BlockDir, addrs: Vec<blockdir::Address>) -> StoredFile {
         StoredFile { block_dir, addrs }
-    }
-
-    /// Validate the stored file hash is as expected.
-    pub(crate) fn validate(&self) -> Result<()> {
-        // TODO: Perhaps the file should know its apath and hold its entry.
-        // TODO: Give a more specific message including the band and apath, if
-        // the content can't be loaded.
-        // TODO: Arguably we don't need to actually load the chunks here; it's
-        // enough to remember that all the blocks were loaded before.
-        // TODO: Give warnings and remember if there are any errors, but don't stop early.
-        self.block_range()
-            .unwrap()
-            .into_par_iter()
-            .map(|i| {
-                let (_content, sizes) = self.read_block(i)?;
-                ui::increment_bytes_done(sizes.uncompressed);
-                Ok(())
-            })
-            .find_any(Result::is_err)
-            .unwrap_or(Ok(()))
-        // TODO: Return sum of sizes.
     }
 
     /// Open a cursor on this file that implements `std::io::Read`.

@@ -38,7 +38,8 @@ pub struct ValidateStats {
     /// Number of blocks read.
     pub block_read_count: u64,
     /// Number of blocks that failed to read back.
-    pub block_error_count: u64,
+    pub block_error_count: usize,
+    pub block_missing_count: usize,
 }
 
 impl ValidateStats {

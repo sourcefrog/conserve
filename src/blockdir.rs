@@ -11,6 +11,7 @@
 //!
 //! The structure is: archive > blockdir > subdir > file.
 
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io;
 use std::io::prelude::*;
@@ -209,7 +210,10 @@ impl BlockDir {
     }
 
     /// Check format invariants of the BlockDir.
-    pub fn validate(&self, stats: &mut ValidateStats) -> Result<()> {
+    ///
+    /// Return a dict describing which blocks are present, and the length of their uncompressed
+    /// data.
+    pub fn validate(&self, stats: &mut ValidateStats) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Provide a progress bar that just works on counts, not bytes:
@@ -225,15 +229,23 @@ impl BlockDir {
             crate::misc::bytes_to_human_mb(tot)
         ));
         ui::set_progress_phase(&"Check block hashes");
-        stats.block_error_count += block_dir_entries
+        // Make a vec of Some(usize) if the block could be read, or None if it failed.
+        let results: Vec<Option<(String, usize)>> = block_dir_entries
             .par_iter()
-            .filter(|de| {
+            .map(|de| {
                 ui::increment_bytes_done(de.len);
-                self.get_block_content(&de.name).is_err()
+                self.get_block_content(&de.name)
+                    .map(|(bytes, _sizes)| (de.name.clone(), bytes.len()))
+                    .ok()
             })
-            .count() as u64;
+            .collect();
+        stats.block_error_count += results.iter().filter(|o| o.is_none()).count();
+        let len_map: HashMap<BlockHash, usize> = results
+            .into_iter()
+            .filter_map(std::convert::identity)
+            .collect();
         stats.block_read_count = block_dir_entries.len().try_into().unwrap();
-        Ok(())
+        Ok(len_map)
     }
 
     /// Return the entire contents of the block.

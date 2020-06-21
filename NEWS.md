@@ -2,6 +2,12 @@
 
 ## v0.6.4 NOT RELEASED YET
 
+### Performance improvements
+
+`conserve validate` is now significantly faster. Conserve remembers which
+blocks have been validated and what their uncompressed length is, and uses this
+when checking that file index entries are valid.
+
 ### Behavior changes
 
 Some rearrangements to the command-line grammar to make it more concise and
