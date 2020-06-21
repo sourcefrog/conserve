@@ -44,11 +44,10 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         // Check if this entry is selected for copy
         let subtree: Vec<&str> = entry.apath().split('/').collect();
         // let _: Vec<&str> = entry.is_prefix_of('/');
-
         let mut to_be_copied: bool = false;
 
         match target.as_ref() {
-            "" => to_be_copied = true,
+            "/" => to_be_copied = true,
             _ => {
                 // Take the top path from target and match it with entry (accept all subpaths)
                 let mut matched: usize = 0;
