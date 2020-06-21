@@ -49,7 +49,6 @@ impl Apath {
         let subtree: Vec<&str> = a.split('/').collect();
         subtree
     }
-    
 }
 
 impl From<Apath> for String {

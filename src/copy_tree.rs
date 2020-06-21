@@ -11,7 +11,7 @@ use crate::*;
 pub struct CopyOptions {
     pub print_filenames: bool,
     pub measure_first: bool,
-    pub only_subtree: String
+    pub only_subtree: String,
 }
 
 /// Copy files and other entries from one tree to another.
@@ -35,7 +35,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         // deleted or changed while this is running.
         ui::set_bytes_total(source.size()?.file_bytes);
     }
-    
+
     let target = &options.only_subtree;
     let target_tree: Vec<&str> = target.split('/').collect();
 
@@ -43,8 +43,8 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     for entry in source.iter_entries()? {
         // Check if this entry is selected for copy
         let subtree: Vec<&str> = entry.apath().split('/').collect();
-        // let _: Vec<&str> = entry.is_prefix_of('/'); 
-        
+        // let _: Vec<&str> = entry.is_prefix_of('/');
+
         let mut to_be_copied: bool = false;
 
         match target.as_ref() {
@@ -53,14 +53,13 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
                 // Take the top path from target and match it with entry (accept all subpaths)
                 let mut matched: usize = 0;
                 if subtree.len() >= target_tree.len() {
-                for (i, _) in target_tree.iter().enumerate() {
-                    if target_tree[i].eq(subtree[i]) {
-                        matched = matched + 1;
+                    for (i, _) in target_tree.iter().enumerate() {
+                        if target_tree[i].eq(subtree[i]) {
+                            matched = matched + 1;
+                        }
                     }
+                    to_be_copied = matched == target_tree.len();
                 }
-                to_be_copied = matched == target_tree.len();
-            }
-            
             }
         }
 
@@ -89,8 +88,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
                     // https://github.com/sourcefrog/conserve/issues/82
                     continue;
                 }
-            }
-            {
+            } {
                 ui::show_error(&e);
                 stats.errors += 1;
                 continue;
