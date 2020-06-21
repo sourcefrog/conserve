@@ -85,26 +85,35 @@ impl StoredTree {
         block_lens: &HashMap<String, usize>,
         stats: &mut ValidateStats,
     ) -> Result<()> {
+        let band_id = self.band().id();
         ui::set_progress_phase(&format!("Check tree {}", self.band().id()));
         stats.block_missing_count = self
             .iter_entries()?
             .par_bridge()
             .filter(|entry| entry.kind() == Kind::File)
-            .flat_map(|entry| entry.addrs)
-            .filter(|addr| {
+            .flat_map(move |entry| {
+                let addrs = entry.addrs.clone();
+                addrs
+                    .into_par_iter()
+                    .map(move |addr| (entry.apath.clone(), addr))
+            })
+            .filter(|(apath, addr)| {
                 if let Some(block_len) = block_lens.get(&addr.hash) {
                     // Present, but the address is out of range.
                     if (addr.start + addr.len) > (*block_len as u64) {
                         ui::problem(&format!(
-                            "Address {:?} extends beyond compressed data length {}",
-                            addr, block_len
+                            "Address {:?} in {:?} in {:?} extends beyond compressed data length {}",
+                            addr, apath, band_id, block_len
                         ));
                         true
                     } else {
                         false
                     }
                 } else {
-                    ui::problem(&format!("Address {:?} points to missing block", addr));
+                    ui::problem(&format!(
+                        "Address {:?} in {:?} in {:?} points to missing block",
+                        apath, band_id, addr
+                    ));
                     true
                 }
             })
