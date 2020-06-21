@@ -26,7 +26,7 @@ use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
 use crate::stats::{CopyStats, Sizes, ValidateStats};
 use crate::transport::local::LocalTransport;
-use crate::transport::{DirEntry, Transport};
+use crate::transport::{DirEntry, ListDirNames, Transport};
 use crate::*;
 
 /// Use the maximum 64-byte hash.
@@ -155,33 +155,27 @@ impl BlockDir {
     /// Return an iterator of block subdirectories, in arbitrary order.
     ///
     /// Errors, other than failure to open the directory at all, are logged and discarded.
-    fn subdirs(&self) -> Result<impl Iterator<Item = String>> {
-        Ok(self
-            .transport
-            .iter_dir_entries("")
-            .map_err(|source| Error::ListBlocks { source })?
-            .filter_map(|entry_result| match entry_result {
-                Err(e) => {
-                    ui::problem(&format!("Error listing blockdir: {:?}", e));
-                    None
-                }
-                Ok(DirEntry { name, kind, .. }) => {
-                    if kind != Kind::Dir {
-                        None
-                    } else if name.len() != SUBDIR_NAME_CHARS {
-                        ui::problem(&format!("Unexpected subdirectory in blockdir: {:?}", name));
-                        None
-                    } else {
-                        Some(name)
-                    }
-                }
-            }))
+    fn subdirs(&self) -> Result<Vec<String>> {
+        let ListDirNames { mut dirs, .. } = self.transport.list_dir_names("")?;
+        dirs.retain(|dirname| {
+            if dirname.len() == SUBDIR_NAME_CHARS {
+                true
+            } else {
+                ui::problem(&format!(
+                    "Unexpected subdirectory in blockdir: {:?}",
+                    dirname
+                ));
+                false
+            }
+        });
+        Ok(dirs)
     }
 
     fn iter_block_dir_entries(&self) -> Result<impl Iterator<Item = DirEntry>> {
         let transport = self.transport.clone();
         Ok(self
             .subdirs()?
+            .into_iter()
             .map(move |subdir_name| transport.iter_dir_entries(&subdir_name))
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
