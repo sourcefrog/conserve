@@ -6,7 +6,7 @@ use std::io;
 use derive_more::{Add, AddAssign};
 use thousands::Separable;
 
-use crate::Result;
+use crate::*;
 
 pub fn mb_string(s: u64) -> String {
     (s / 1_000_000).separate_with_commas()
@@ -38,7 +38,7 @@ pub struct ValidateStats {
 }
 
 impl ValidateStats {
-    pub fn summarize(&self, _to_write: &mut dyn io::Write) -> Result<()> {
+    pub fn summarize(&self, write: &mut dyn io::Write) -> Result<()> {
         // format!(
         //     "{:>12} MB   in {} blocks.\n\
         //      {:>12} MB/s block validation rate.\n\
@@ -49,7 +49,7 @@ impl ValidateStats {
         //         .separate_with_commas(),
         //     duration_to_hms(self.elapsed_time()),
         // )
-        Ok(())
+        writeln!(write, "{:#?}", self).map_err(Error::from)
     }
 
     pub fn has_problems(&self) -> bool {
