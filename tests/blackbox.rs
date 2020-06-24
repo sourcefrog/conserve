@@ -388,3 +388,12 @@ fn exclude_option_ordering() {
         .assert()
         .success();
 }
+
+#[test]
+fn validate_non_fatal_problems_nonzero_result() {
+    run_conserve()
+        .args(&["validate", "testdata/damaged/missing-block/"])
+        .assert()
+        .stdout(predicate::str::contains("Archive has some problems."))
+        .code(2);
+}

@@ -145,8 +145,14 @@ enum Debug {
     Referenced { archive: PathBuf },
 }
 
+enum ExitCode {
+    Ok = 0,
+    Failed = 1,
+    PartialCorruption = 2,
+}
+
 impl Command {
-    fn run(&self) -> Result<()> {
+    fn run(&self) -> Result<ExitCode> {
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -254,9 +260,13 @@ impl Command {
                 };
                 ui::println(&conserve::bytes_to_human_mb(size));
             }
-            Command::Validate { archive } => Archive::open_path(archive)?
-                .validate()?
-                .summarize(&mut stdout)?,
+            Command::Validate { archive } => {
+                let stats = Archive::open_path(archive)?.validate()?;
+                stats.summarize(&mut stdout)?;
+                if stats.has_problems() {
+                    return Ok(ExitCode::PartialCorruption);
+                }
+            }
             Command::Versions {
                 archive,
                 short,
@@ -271,7 +281,7 @@ impl Command {
                 }
             }
         }
-        Ok(())
+        Ok(ExitCode::Ok)
     }
 }
 
@@ -305,35 +315,22 @@ fn live_tree_from_opt(source: &Path, exclude: &[String]) -> Result<LiveTree> {
     Ok(LiveTree::open(source)?.with_excludes(excludes::from_strings(exclude)?))
 }
 
-// fn read_tree_from_options(
-//     archive: Option<&Path>,
-//     backup: Option<&BandId>,
-//     source: Option<&Path>,
-// ) -> Result<Box<dyn ReadTree>> {
-//     // TODO: Maybe move to ReadTree?
-//     if let Some(archive) = archive {
-//         stored_tree_from_opt(archive, &backup)
-//     } else {
-//         LiveTree::open(source.expect("source must be set if archive is not"))
-//     }
-//     // TODO: Excludes
-//     // .with_excludes(excludes_from_option(subm)?))
-// }
-
 fn main() {
     ui::enable_progress(true);
     let result = Command::from_args().run();
     ui::clear_progress();
-    if let Err(ref e) = result {
-        ui::show_error(e);
-        // // TODO: Perhaps always log the traceback to a log file.
-        // if let Some(bt) = e.backtrace() {
-        //     if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {
-        //         println!("{}", bt);
-        //     }
-        // }
-        // Avoid Rust redundantly printing the error.
-        std::process::exit(1);
+    match result {
+        Err(ref e) => {
+            ui::show_error(e);
+            // // TODO: Perhaps always log the traceback to a log file.
+            // if let Some(bt) = e.backtrace() {
+            //     if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {
+            //         println!("{}", bt);
+            //     }
+            // }
+            // Avoid Rust redundantly printing the error.
+            std::process::exit(ExitCode::Failed as i32)
+        }
+        Ok(code) => std::process::exit(code as i32),
     }
-    // TODO: If the operation had >0 non-fatal errors, return a non-zero exit code.
 }
