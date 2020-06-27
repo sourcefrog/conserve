@@ -4,6 +4,7 @@
 //! Archives holding backup material.
 
 use std::collections::BTreeSet;
+use std::collections::{HashMap, HashSet};
 use std::io::ErrorKind;
 use std::path::Path;
 
@@ -186,25 +187,31 @@ impl Archive {
         Ok(None)
     }
 
-    /// Return a sorted set containing all the blocks referenced by all bands.
-    pub fn referenced_blocks(&self) -> Result<BTreeSet<String>> {
-        let mut hs = BTreeSet::<String>::new();
-        for band_id in self.list_band_ids()? {
-            let band = Band::open(&self, &band_id)?;
-            for ie in band.iter_entries()? {
-                for a in ie.addrs {
-                    hs.insert(a.hash);
+    /// Returns an unsorted iterator of all blocks referenced by all bands.
+    pub fn referenced_blocks(&self) -> Result<impl Iterator<Item = String>> {
+        let archive = self.clone();
+        let mut hs = HashSet::<String>::new();
+        Ok(self
+            .iter_band_ids_unsorted()?
+            .map(move |band_id| Band::open(&archive, &band_id).expect("Failed to open band"))
+            .flat_map(|band| band.iter_entries().expect("Failed to iter entries"))
+            .flat_map(|entry| entry.addrs)
+            .map(|addrs| addrs.hash)
+            .filter(move |hash| {
+                if hs.contains(hash) {
+                    false
+                } else {
+                    hs.insert(hash.clone());
+                    true
                 }
-            }
-        }
-        Ok(hs)
+            }))
     }
 
     pub fn validate(&self) -> Result<ValidateStats> {
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
-        stats.block_dir += self.block_dir.validate()?;
-        self.validate_bands(&mut stats)?;
+        let block_lens: HashMap<String, usize> = self.block_dir.validate(&mut stats)?;
+        self.validate_bands(&block_lens, &mut stats)?;
 
         if stats.has_problems() {
             ui::problem("Archive has some problems.");
@@ -277,7 +284,11 @@ impl Archive {
         Ok(stats)
     }
 
-    fn validate_bands(&self, _stats: &mut ValidateStats) -> Result<()> {
+    fn validate_bands(
+        &self,
+        block_lens: &HashMap<String, usize>,
+        stats: &mut ValidateStats,
+    ) -> Result<()> {
         // TODO: Don't stop early on any errors in the steps below, but do count them.
         // TODO: Better progress bars, that don't work by size but rather by
         // count.
@@ -290,7 +301,7 @@ impl Archive {
             b.validate()?;
 
             let st = StoredTree::open_incomplete_version(self, bid)?;
-            st.validate()?;
+            st.validate(block_lens, stats)?;
         }
         Ok(())
     }
@@ -363,7 +374,7 @@ mod tests {
             af.last_complete_band().unwrap().is_none(),
             "Archive should have no bands yet"
         );
-        assert!(af.referenced_blocks().unwrap().is_empty());
+        assert_eq!(af.referenced_blocks().unwrap().count(), 0);
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 
@@ -390,7 +401,7 @@ mod tests {
         );
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
-        assert!(af.referenced_blocks().unwrap().is_empty());
+        assert_eq!(af.referenced_blocks().unwrap().count(), 0);
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 }

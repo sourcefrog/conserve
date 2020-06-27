@@ -11,6 +11,7 @@
 //!
 //! The structure is: archive > blockdir > subdir > file.
 
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io;
 use std::io::prelude::*;
@@ -23,9 +24,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::stats::{CopyStats, Sizes, ValidateBlockDirStats};
+use crate::stats::{CopyStats, Sizes, ValidateStats};
 use crate::transport::local::LocalTransport;
-use crate::transport::{DirEntry, Transport};
+use crate::transport::{DirEntry, ListDirNames, Transport};
 use crate::*;
 
 /// Use the maximum 64-byte hash.
@@ -154,33 +155,27 @@ impl BlockDir {
     /// Return an iterator of block subdirectories, in arbitrary order.
     ///
     /// Errors, other than failure to open the directory at all, are logged and discarded.
-    fn subdirs(&self) -> Result<impl Iterator<Item = String>> {
-        Ok(self
-            .transport
-            .iter_dir_entries("")
-            .map_err(|source| Error::ListBlocks { source })?
-            .filter_map(|entry_result| match entry_result {
-                Err(e) => {
-                    ui::problem(&format!("Error listing blockdir: {:?}", e));
-                    None
-                }
-                Ok(DirEntry { name, kind, .. }) => {
-                    if kind != Kind::Dir {
-                        None
-                    } else if name.len() != SUBDIR_NAME_CHARS {
-                        ui::problem(&format!("Unexpected subdirectory in blockdir: {:?}", name));
-                        None
-                    } else {
-                        Some(name)
-                    }
-                }
-            }))
+    fn subdirs(&self) -> Result<Vec<String>> {
+        let ListDirNames { mut dirs, .. } = self.transport.list_dir_names("")?;
+        dirs.retain(|dirname| {
+            if dirname.len() == SUBDIR_NAME_CHARS {
+                true
+            } else {
+                ui::problem(&format!(
+                    "Unexpected subdirectory in blockdir: {:?}",
+                    dirname
+                ));
+                false
+            }
+        });
+        Ok(dirs)
     }
 
     fn iter_block_dir_entries(&self) -> Result<impl Iterator<Item = DirEntry>> {
         let transport = self.transport.clone();
         Ok(self
             .subdirs()?
+            .into_iter()
             .map(move |subdir_name| transport.iter_dir_entries(&subdir_name))
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
@@ -209,7 +204,10 @@ impl BlockDir {
     }
 
     /// Check format invariants of the BlockDir.
-    pub fn validate(&self) -> Result<ValidateBlockDirStats> {
+    ///
+    /// Return a dict describing which blocks are present, and the length of their uncompressed
+    /// data.
+    pub fn validate(&self, stats: &mut ValidateStats) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Provide a progress bar that just works on counts, not bytes:
@@ -225,20 +223,24 @@ impl BlockDir {
             crate::misc::bytes_to_human_mb(tot)
         ));
         ui::set_progress_phase(&"Check block hashes");
-        let block_error_count = block_dir_entries
+        // Make a vec of Some(usize) if the block could be read, or None if it failed.
+        let mut results: Vec<Option<(String, usize)>> = Vec::new();
+        block_dir_entries
             .par_iter()
-            .filter(|de| {
+            .map(|de| {
                 ui::increment_bytes_done(de.len);
-                self.get_block_content(&de.name).is_err()
+                self.get_block_content(&de.name)
+                    .map(|(bytes, _sizes)| (de.name.clone(), bytes.len()))
+                    .ok()
             })
-            .count()
-            .try_into()
-            .unwrap();
-        let block_read_count = block_dir_entries.len().try_into().unwrap();
-        Ok(ValidateBlockDirStats {
-            block_error_count,
-            block_read_count,
-        })
+            .collect_into_vec(&mut results);
+        stats.block_error_count += results.iter().filter(|o| o.is_none()).count();
+        let len_map: HashMap<BlockHash, usize> = results
+            .into_iter()
+            .filter_map(std::convert::identity)
+            .collect();
+        stats.block_read_count = block_dir_entries.len().try_into().unwrap();
+        Ok(len_map)
     }
 
     /// Return the entire contents of the block.
@@ -434,8 +436,11 @@ mod tests {
             }
         );
 
-        // TODO: Assertions about the stats.
-        let _validate_stats = block_dir.validate().unwrap();
+        let mut stats = ValidateStats::default();
+        block_dir.validate(&mut stats).unwrap();
+        assert_eq!(stats.io_errors, 0);
+        assert_eq!(stats.block_error_count, 0);
+        assert_eq!(stats.block_read_count, 1);
     }
 
     #[test]

@@ -8,6 +8,8 @@
 //! across incremental backups, hiding from the caller that data may be distributed across
 //! multiple index files, bands, and blocks.
 
+use std::collections::HashMap;
+
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 
@@ -78,24 +80,36 @@ impl StoredTree {
         self.band.is_closed()
     }
 
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(
+        &self,
+        block_lens: &HashMap<String, usize>,
+        stats: &mut ValidateStats,
+    ) -> Result<()> {
         ui::set_progress_phase(&format!("Check tree {}", self.band().id()));
-        self.iter_entries()?
-            .filter(|e| e.kind() == Kind::File)
+        stats.block_missing_count = self
+            .iter_entries()?
             .par_bridge()
-            .map(|e| self.validate_one_entry(&e))
-            .inspect(|e| {
-                if let Err(e) = e {
-                    ui::show_error(e);
+            .filter(|entry| entry.kind() == Kind::File)
+            .flat_map(|entry| entry.addrs)
+            .filter(|addr| {
+                if let Some(block_len) = block_lens.get(&addr.hash) {
+                    // Present, but the address is out of range.
+                    if (addr.start + addr.len) > (*block_len as u64) {
+                        ui::problem(&format!(
+                            "Address {:?} extends beyond compressed data length {}",
+                            addr, block_len
+                        ));
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    ui::problem(&format!("Address {:?} points to missing block", addr));
+                    true
                 }
             })
-            .find_any(Result::is_err)
-            .unwrap_or(Ok(()))
-    }
-
-    fn validate_one_entry(&self, e: &IndexEntry) -> Result<()> {
-        ui::set_progress_file(e.apath());
-        self.open_stored_file(&e)?.validate()
+            .count();
+        Ok(())
     }
 
     /// Open a file stored within this tree.

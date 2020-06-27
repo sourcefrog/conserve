@@ -6,7 +6,7 @@ use std::io;
 use derive_more::{Add, AddAssign};
 use thousands::Separable;
 
-use crate::Result;
+use crate::*;
 
 pub fn mb_string(s: u64) -> String {
     (s / 1_000_000).separate_with_commas()
@@ -34,11 +34,16 @@ pub struct ValidateStats {
     /// Count of files in the wrong place.
     pub structure_problems: u64,
     pub io_errors: u64,
-    pub block_dir: ValidateBlockDirStats,
+
+    /// Number of blocks read.
+    pub block_read_count: u64,
+    /// Number of blocks that failed to read back.
+    pub block_error_count: usize,
+    pub block_missing_count: usize,
 }
 
 impl ValidateStats {
-    pub fn summarize(&self, _to_write: &mut dyn io::Write) -> Result<()> {
+    pub fn summarize(&self, write: &mut dyn io::Write) -> Result<()> {
         // format!(
         //     "{:>12} MB   in {} blocks.\n\
         //      {:>12} MB/s block validation rate.\n\
@@ -49,20 +54,12 @@ impl ValidateStats {
         //         .separate_with_commas(),
         //     duration_to_hms(self.elapsed_time()),
         // )
-        Ok(())
+        writeln!(write, "{:#?}", self).map_err(Error::from)
     }
 
     pub fn has_problems(&self) -> bool {
-        self.block_dir.block_error_count > 0
+        self.block_error_count > 0 || self.io_errors > 0
     }
-}
-
-#[derive(Clone, Default, Debug, Eq, PartialEq, Add, AddAssign)]
-pub struct ValidateBlockDirStats {
-    /// Number of blocks read.
-    pub block_read_count: u64,
-    /// Number of blocks that failed to read back.
-    pub block_error_count: u64,
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]

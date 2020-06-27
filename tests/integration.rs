@@ -88,7 +88,8 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     // TODO: Check index stats.
     // TODO: Check what was restored.
 
-    af.validate().unwrap();
+    let validate_stats = af.validate().unwrap();
+    assert!(!validate_stats.has_problems());
     Ok(())
 }
 
