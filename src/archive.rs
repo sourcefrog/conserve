@@ -201,11 +201,23 @@ impl Archive {
         Ok(hs)
     }
 
-    pub fn validate(&self) -> Result<ValidateStats> {
+    pub fn validate(&self, observer: &mut dyn ValidateObserver) -> Result<ValidateStats> {
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
         let block_lens: HashMap<String, usize> = self.block_dir.validate(&mut stats)?;
-        self.validate_bands(&block_lens, &mut stats)?;
+
+        // TODO: Don't stop early on any errors in the steps below, but do count them.
+        // TODO: Better progress bars, that don't work by size but rather by
+        // count.
+        ui::clear_bytes_total();
+        for bid in self.list_band_ids()?.iter() {
+            ui::println(&format!("Check {}...", bid));
+            let b = Band::open(self, bid)?;
+            b.validate()?;
+
+            let st = StoredTree::open_incomplete_version(self, bid)?;
+            st.validate(&block_lens, observer, &mut stats)?;
+        }
 
         if stats.has_problems() {
             ui::problem("Archive has some problems.");
@@ -276,28 +288,6 @@ impl Archive {
             }
         }
         Ok(stats)
-    }
-
-    fn validate_bands(
-        &self,
-        block_lens: &HashMap<String, usize>,
-        stats: &mut ValidateStats,
-    ) -> Result<()> {
-        // TODO: Don't stop early on any errors in the steps below, but do count them.
-        // TODO: Better progress bars, that don't work by size but rather by
-        // count.
-        // TODO: Take in a dict of the known blocks and their decompressed lengths,
-        // and use that to more cheaply check if the index is OK.
-        ui::clear_bytes_total();
-        for bid in self.list_band_ids()?.iter() {
-            ui::println(&format!("Check {}...", bid));
-            let b = Band::open(self, bid)?;
-            b.validate()?;
-
-            let st = StoredTree::open_incomplete_version(self, bid)?;
-            st.validate(block_lens, stats)?;
-        }
-        Ok(())
     }
 }
 

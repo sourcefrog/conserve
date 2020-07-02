@@ -9,8 +9,6 @@ use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
 use conserve::backup::BackupOptions;
-use conserve::ReadTree;
-use conserve::RestoreOptions;
 use conserve::*;
 
 #[derive(Debug, StructOpt)]
@@ -261,7 +259,8 @@ impl Command {
                 ui::println(&conserve::bytes_to_human_mb(size));
             }
             Command::Validate { archive } => {
-                let stats = Archive::open_path(archive)?.validate()?;
+                let stats =
+                    Archive::open_path(archive)?.validate(&mut ValidateUiObserver::default())?;
                 stats.summarize(&mut stdout)?;
                 if stats.has_problems() {
                     return Ok(ExitCode::PartialCorruption);

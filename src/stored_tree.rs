@@ -10,9 +10,6 @@
 
 use std::collections::HashMap;
 
-use rayon::iter::ParallelBridge;
-use rayon::prelude::*;
-
 use crate::blockdir::BlockDir;
 use crate::kind::Kind;
 use crate::stored_file::{ReadStoredFile, StoredFile};
@@ -83,35 +80,38 @@ impl StoredTree {
     pub fn validate(
         &self,
         block_lens: &HashMap<String, usize>,
+        observer: &mut dyn ValidateObserver,
         stats: &mut ValidateStats,
     ) -> Result<()> {
         let band_id = self.band().id();
         ui::set_progress_phase(&format!("Check tree {}", self.band().id()));
         stats.block_missing_count = self
             .iter_entries()?
-            .par_bridge()
             .filter(|entry| entry.kind() == Kind::File)
             .map(move |entry| {
                 entry
                     .addrs
                     .iter()
                     .filter(|addr| {
-                        if let Some(block_len) = block_lens.get(&addr.hash) {
+                        if let Some(block_len) = block_lens.get(&addr.hash).copied() {
                             // Present, but the address is out of range.
-                            if (addr.start + addr.len) > (*block_len as u64) {
-                                ui::problem(&format!(
-                            "Address {:?} in {:?} in {:?} extends beyond compressed data length {}",
-                            addr, entry.apath, band_id, block_len
-                        ));
+                            if (addr.start + addr.len) > (block_len as u64) {
+                                observer.error(Error::AddressTooLongInFile {
+                                    address: (*addr).clone(),
+                                    apath: entry.apath.clone(),
+                                    band_id: band_id.clone(),
+                                    block_len,
+                                });
                                 true
                             } else {
                                 false
                             }
                         } else {
-                            ui::problem(&format!(
-                                "Address {:?} in {:?} in {:?} points to missing block",
-                                entry.apath, band_id, addr
-                            ));
+                            observer.error(Error::BlockMissingInFile {
+                                address: (*addr).clone(),
+                                apath: entry.apath.clone(),
+                                band_id: band_id.clone(),
+                            });
                             true
                         }
                     })

@@ -20,6 +20,7 @@ use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use copy_dir::copy_dir;
 use predicates::prelude::*;
+use spectral::prelude::*;
 
 use conserve::*;
 
@@ -55,11 +56,13 @@ fn validate_archive() {
         println!("validate {}", ver);
         let archive = open_old_archive(ver, "minimal-1");
 
-        let stats = archive.validate().expect("validate archive");
+        let mut observer = ValidateCollectObserver::default();
+        let stats = archive.validate(&mut observer).expect("validate archive");
         assert_eq!(stats.structure_problems, 0);
         assert_eq!(stats.io_errors, 0);
         assert_eq!(stats.block_error_count, 0);
         assert!(!stats.has_problems());
+        assert_that(&observer.errors).is_empty();
     }
 }
 

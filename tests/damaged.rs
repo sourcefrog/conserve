@@ -21,7 +21,8 @@ use conserve::*;
 fn missing_block() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
 
-    let validate_stats = archive.validate()?;
+    let mut observer = conserve::observer::ValidateCollectObserver::default();
+    let validate_stats = archive.validate(&mut observer)?;
     assert_eq!(validate_stats.has_problems(), true);
     assert_eq!(validate_stats.block_missing_count, 1);
     Ok(())

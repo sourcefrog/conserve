@@ -21,6 +21,21 @@ pub enum Error {
     #[error("{address:?} extends beyond decompressed block length {actual_len:?}")]
     AddressTooLong { address: Address, actual_len: usize },
 
+    #[error("{address:?} in {apath} in {band_id} extends beyond decompressed block length {block_len:?}")]
+    AddressTooLongInFile {
+        address: Address,
+        apath: Apath,
+        band_id: BandId,
+        block_len: usize,
+    },
+
+    #[error("{address:?} in {apath} in {band_id} references missing block")]
+    BlockMissingInFile {
+        address: Address,
+        apath: Apath,
+        band_id: BandId,
+    },
+
     #[error("Failed to write block {hash:?}")]
     WriteBlock { hash: String, source: IOError },
 

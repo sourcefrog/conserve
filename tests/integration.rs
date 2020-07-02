@@ -80,7 +80,9 @@ pub fn simple_backup_with_excludes() {
     // TODO: Check index stats.
     // TODO: Check what was restored.
 
-    let validate_stats = af.validate().unwrap();
+    let mut observer = ValidateCollectObserver::default();
+    let validate_stats = af.validate(&mut observer).unwrap();
+    assert_that(&observer.errors).is_empty();
     assert!(!validate_stats.has_problems());
 }
 
