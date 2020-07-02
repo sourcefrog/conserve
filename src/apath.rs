@@ -23,6 +23,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// Equal strings are equivalent to equal apaths, but the ordering is not the same as
 /// string ordering.
+///
+/// Apaths must start with `/` and not end with `/` unless they have length 1.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Apath(String);
 
@@ -45,9 +47,29 @@ impl Apath {
         true
     }
 
-    pub fn is_prefix_of(a: &str) -> Vec<&str> {
-        let subtree: Vec<&str> = a.split('/').collect();
-        subtree
+    /// True if self is a parent directory of, or equal to, `a`.
+    ///
+    /// ```
+    /// use conserve::Apath;
+    /// use std::ops::Not;
+    ///
+    /// assert!(Apath::from("/").is_prefix_of(&Apath::from("/stuff")));
+    /// assert!(Apath::from("/").is_prefix_of(&Apath::from("/")));
+    /// assert!(Apath::from("/stuff").is_prefix_of(&Apath::from("/stuff/file")));
+    /// assert!(Apath::from("/stuff/file").is_prefix_of(&Apath::from("/stuff")).not());
+    /// assert!(Apath::from("/this").is_prefix_of(&Apath::from("/that")).not());
+    /// assert!(Apath::from("/this").is_prefix_of(&Apath::from("/that/other")).not());
+    /// ```
+    pub fn is_prefix_of(&self, a: &Apath) -> bool {
+        let len = self.0.len();
+        match len.cmp(&a.0.len()) {
+            Ordering::Greater => false,
+            Ordering::Equal => self.0 == a.0,
+            Ordering::Less => {
+                a.0.starts_with(&self.0)
+                    && (self.0.ends_with('/') || a.0.chars().nth(self.0.len()) == Some('/'))
+            }
+        }
     }
 }
 
