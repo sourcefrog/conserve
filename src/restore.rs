@@ -22,7 +22,8 @@ use crate::*;
 pub struct RestoreOptions {
     pub print_filenames: bool,
     pub excludes: GlobSet,
-    pub include_only: Apath,
+    /// Restore only this subdirectory.
+    pub only_subtree: Option<Apath>,
     pub overwrite: bool,
     // The band to select, or by default the last complete one.
     pub band_selection: BandSelectionPolicy,
@@ -35,7 +36,7 @@ impl Default for RestoreOptions {
             overwrite: false,
             band_selection: BandSelectionPolicy::LatestClosed,
             excludes: excludes::excludes_nothing(),
-            include_only: Apath::from("/"),
+            only_subtree: None,
         }
     }
 }
