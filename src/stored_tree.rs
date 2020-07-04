@@ -143,6 +143,19 @@ impl ReadTree for StoredTree {
             .with_excludes(self.excludes.clone()))
     }
 
+    fn iter_subtree_entries(
+        &self,
+        subtree: &Apath,
+    ) -> Result<Box<dyn Iterator<Item = IndexEntry>>> {
+        // TODO: Advance in the index to the requested directory, and stop immediately when it's
+        // done.
+        let subtree = subtree.to_owned();
+        Ok(Box::new(
+            self.iter_entries()?
+                .filter(move |entry| subtree.is_prefix_of(entry.apath())),
+        ))
+    }
+
     fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R> {
         Ok(self.open_stored_file(entry)?.into_read())
     }
@@ -154,6 +167,8 @@ impl ReadTree for StoredTree {
 
 #[cfg(test)]
 mod test {
+    use std::path::Path;
+
     use super::super::test_fixtures::*;
     use super::super::*;
 
@@ -187,5 +202,19 @@ mod test {
     pub fn cant_open_no_versions() {
         let af = ScratchArchive::new();
         assert!(StoredTree::open_last(&af).is_err());
+    }
+
+    #[test]
+    fn iter_subtree_entries() {
+        let archive = Archive::open_path(Path::new("testdata/archive/v0.6.3/minimal-1/")).unwrap();
+        let st = StoredTree::open_last(&archive).unwrap();
+
+        let names: Vec<String> = st
+            .iter_subtree_entries(&"/subdir".into())
+            .unwrap()
+            .map(|entry| entry.apath.into())
+            .collect();
+
+        assert_eq!(names.as_slice(), ["/subdir", "/subdir/subfile"]);
     }
 }
