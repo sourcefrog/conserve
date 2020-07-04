@@ -28,6 +28,5 @@ jobs:
           path-to-lcov: ${{ steps.coverage.outputs.report }}
       - uses: codecov/codecov-action@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ steps.coverage.outputs.report }}
 
