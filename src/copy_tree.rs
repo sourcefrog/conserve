@@ -11,6 +11,7 @@ use crate::*;
 pub struct CopyOptions {
     pub print_filenames: bool,
     pub measure_first: bool,
+    /// Copy only this subtree from the source.
     pub only_subtree: Option<Apath>,
 }
 
@@ -37,16 +38,11 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     }
 
     ui::set_progress_phase("Copying");
-    for entry in source.iter_entries()? {
-        // TODO: This could be done faster by building an iterator that walks only the selected
-        // subtree. On restore, it can skip ahead to the relevant index hunk, and know immediately
-        // when it's done.
-        if let Some(only_subtree) = options.only_subtree.as_ref() {
-            if !only_subtree.is_prefix_of(entry.apath()) {
-                continue;
-            }
-        }
-
+    let entry_iter: Box<dyn Iterator<Item = ST::Entry>> = match &options.only_subtree {
+        None => Box::new(source.iter_entries()?),
+        Some(subtree) => source.iter_subtree_entries(subtree)?,
+    };
+    for entry in entry_iter {
         if options.print_filenames {
             crate::ui::println(entry.apath());
         }
