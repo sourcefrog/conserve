@@ -51,7 +51,6 @@ escargot = "0.5.0"
 lazy_static = "1.4.0"
 libc = "0.2.71"
 predicates = "1.0.4"
-spectral = "0.6.0"
 
 [features]
 blake2_simd_asm = ["blake2-rfc/simd_asm"]

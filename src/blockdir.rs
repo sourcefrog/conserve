@@ -362,7 +362,6 @@ mod tests {
     use std::io::prelude::*;
     use std::io::SeekFrom;
 
-    use spectral::prelude::*;
     use tempfile::{NamedTempFile, TempDir};
 
     use super::*;
@@ -570,7 +569,7 @@ mod tests {
         // Only one block needs to get compressed. The others are deduplicated.
         assert_eq!(stats.uncompressed_bytes, MAX_BLOCK_SIZE as u64);
         // Should be very compressible
-        assert_that!(stats.compressed_bytes).is_less_than(MAX_BLOCK_SIZE as u64 / 10);
+        assert!(stats.compressed_bytes < (MAX_BLOCK_SIZE as u64 / 10));
         assert_eq!(stats.written_blocks, 1);
         assert_eq!(
             stats.deduplicated_blocks as u64,

@@ -316,7 +316,6 @@ mod tests {
 
     use assert_fs::prelude::*;
     use assert_fs::TempDir;
-    use spectral::prelude::*;
 
     use crate::test_fixtures::ScratchArchive;
 
@@ -358,9 +357,9 @@ mod tests {
     fn empty_archive() {
         let af = ScratchArchive::new();
 
-        assert_that(&af.path()).is_a_directory();
-        assert_that(&af.path().join("CONSERVE")).is_a_file();
-        assert_that(&af.path().join("d")).is_a_directory();
+        assert!(af.path().is_dir());
+        assert!(af.path().join("CONSERVE").is_file());
+        assert!(af.path().join("d").is_dir());
 
         let header_path = af.path().join("CONSERVE");
         let mut header_file = fs::File::open(&header_path).unwrap();
@@ -383,14 +382,14 @@ mod tests {
     #[test]
     fn create_bands() {
         let af = ScratchArchive::new();
-        assert_that(&af.path().join("d")).is_a_directory();
+        assert!(af.path().join("d").is_dir());
 
         // Make one band
         let _band1 = Band::create(&af).unwrap();
         let band_path = af.path().join("b0000");
-        assert_that(&band_path).is_a_directory();
-        assert_that(&band_path.join("BANDHEAD")).is_a_file();
-        assert_that(&band_path.join("i")).is_a_directory();
+        assert!(band_path.is_dir());
+        assert!(band_path.join("BANDHEAD").is_file());
+        assert!(band_path.join("i").is_dir());
 
         assert_eq!(af.list_band_ids().unwrap(), vec![BandId::new(&[0])]);
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[0])));

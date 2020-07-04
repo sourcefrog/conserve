@@ -8,7 +8,6 @@ use std::io::prelude::*;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use spectral::prelude::*;
 
 use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
@@ -379,7 +378,7 @@ pub fn detect_minimal_mtime_change() {
 }
 
 #[test]
-pub fn simple_restore() {
+fn simple_restore() {
     let af = ScratchArchive::new();
     af.store_two_versions();
     let destdir = TreeFixture::new();
@@ -393,10 +392,10 @@ pub fn simple_restore() {
     assert_eq!(stats.files, 3);
 
     let dest = &destdir.path();
-    assert_that(&dest.join("hello").as_path()).is_a_file();
-    assert_that(&dest.join("hello2")).is_a_file();
-    assert_that(&dest.join("subdir").as_path()).is_a_directory();
-    assert_that(&dest.join("subdir").join("subfile").as_path()).is_a_file();
+    assert!(dest.join("hello").is_file());
+    assert!(dest.join("hello2").is_file());
+    assert!(dest.join("subdir").is_dir());
+    assert!(dest.join("subdir").join("subfile").is_file());
     if SYMLINKS_SUPPORTED {
         let dest = fs::read_link(&dest.join("link")).unwrap();
         assert_eq!(dest.to_string_lossy(), "target");
@@ -430,7 +429,7 @@ pub fn decline_to_overwrite() {
     let restore_err_str = RestoreTree::create(destdir.path().to_owned())
         .unwrap_err()
         .to_string();
-    assert_that(&restore_err_str).contains(&"Destination directory not empty");
+    assert!(restore_err_str.contains("Destination directory not empty"));
 }
 
 #[test]
@@ -450,12 +449,12 @@ pub fn forced_overwrite() {
         .expect("restore");
     assert_eq!(stats.files, 3);
     let dest = &destdir.path();
-    assert_that(&dest.join("hello").as_path()).is_a_file();
-    assert_that(&dest.join("existing").as_path()).is_a_file();
+    assert!(dest.join("hello").is_file());
+    assert!(dest.join("existing").is_file());
 }
 
 #[test]
-pub fn exclude_files() {
+fn exclude_files() {
     let af = ScratchArchive::new();
     af.store_two_versions();
     let destdir = TreeFixture::new();
@@ -470,8 +469,8 @@ pub fn exclude_files() {
         .expect("restore");
 
     let dest = &destdir.path();
-    assert_that(&dest.join("hello").as_path()).is_a_file();
-    assert_that(&dest.join("hello2")).is_a_file();
-    assert_that(&dest.join("subdir").as_path()).is_a_directory();
+    assert!(dest.join("hello").is_file());
+    assert!(dest.join("hello2").is_file());
+    assert!(dest.join("subdir").is_dir());
     assert_eq!(stats.files, 2);
 }

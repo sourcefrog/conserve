@@ -235,7 +235,6 @@ mod tests {
 
     use chrono::Duration;
     use serde_json::json;
-    use spectral::prelude::*;
 
     use crate::test_fixtures::ScratchArchive;
 
@@ -247,16 +246,16 @@ mod tests {
         let band = Band::create(&af).unwrap();
 
         let band_dir = af.path().join("b0000");
-        assert_that(&band_dir).is_a_directory();
+        assert!(band_dir.is_dir());
 
-        assert_that(&band_dir.join("BANDHEAD")).is_a_file();
-        assert_that(&band_dir.join("BANDTAIL")).does_not_exist();
-        assert_that(&band_dir.join("i")).is_a_directory();
+        assert!(band_dir.join("BANDHEAD").is_file());
+        assert!(!band_dir.join("BANDTAIL").exists());
+        assert!(band_dir.join("i").is_dir());
 
         assert!(!band.is_closed().unwrap());
 
         band.close(0).unwrap();
-        assert_that(&band_dir.join("BANDTAIL")).is_a_file();
+        assert!(band_dir.join("BANDTAIL").is_file());
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_str("b0000").unwrap();

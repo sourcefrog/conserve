@@ -12,7 +12,6 @@ use assert_fs::TempDir;
 use escargot::CargoRun;
 use lazy_static::lazy_static;
 use predicates::prelude::*;
-use spectral::prelude::*;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
@@ -91,7 +90,7 @@ fn blackbox_backup() {
         .stdout(predicate::str::is_empty());
 
     let src: PathBuf = "./testdata/tree/minimal".into();
-    assert_that(&src).is_a_directory();
+    assert!(src.is_dir());
 
     run_conserve()
         .args(&["ls", "--source"])
