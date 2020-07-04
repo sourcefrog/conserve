@@ -75,6 +75,15 @@ impl tree::ReadTree for LiveTree {
         Iter::new(&self.path, &self.excludes)
     }
 
+    fn iter_subtree_entries(&self, subtree: &Apath) -> Result<Box<dyn Iterator<Item = LiveEntry>>> {
+        // TODO: Just skip directly to the requested directory, and stop when it's done.
+        let subtree = subtree.to_owned();
+        Ok(Box::new(
+            self.iter_entries()?
+                .filter(move |entry| subtree.is_prefix_of(entry.apath())),
+        ))
+    }
+
     fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
         assert_eq!(entry.kind(), Kind::File);
         let path = self.relative_path(&entry.apath);
@@ -430,5 +439,25 @@ mod tests {
 
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[1].apath, "/from");
+    }
+
+    #[test]
+    fn iter_subtree_entries() {
+        let tf = TreeFixture::new();
+        tf.create_file("in base");
+        tf.create_dir("subdir");
+        tf.create_file("subdir/a");
+        tf.create_file("subdir/b");
+        tf.create_file("zzz");
+
+        let lt = LiveTree::open(tf.path()).unwrap();
+
+        let names: Vec<String> = lt
+            .iter_subtree_entries(&"/subdir".into())
+            .unwrap()
+            .map(|entry| entry.apath.into())
+            .collect();
+
+        assert_eq!(names.as_slice(), ["/subdir", "/subdir/a", "/subdir/b"]);
     }
 }

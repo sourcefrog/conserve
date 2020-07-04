@@ -22,6 +22,15 @@ pub trait ReadTree {
     /// iterator.
     fn iter_entries(&self) -> Result<Self::I>;
 
+    /// Iterate, in apath order, the entries from a subtree.
+    ///
+    /// The provided implementation iterates and filters all entries, but implementations
+    /// may be able to do better.
+    fn iter_subtree_entries(
+        &self,
+        subtree: &Apath,
+    ) -> Result<Box<dyn Iterator<Item = Self::Entry>>>;
+
     /// Read file contents as a `std::io::Read`.
     // TODO: Remove this and use ReadBlocks or similar.
     fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R>;

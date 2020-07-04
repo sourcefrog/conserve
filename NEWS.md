@@ -2,6 +2,11 @@
 
 ## v0.6.4 NOT RELEASED YET
 
+### Features
+
+* New `conserve restore --only SUBTREE` option restores only one subtree of the
+  archive.  Thanks to Francesco Gadaleta.
+
 ### Performance improvements
 
 `conserve validate` is now significantly faster. Conserve remembers which

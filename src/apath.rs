@@ -13,6 +13,7 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::path::Path;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +24,16 @@ use serde::{Deserialize, Serialize};
 ///
 /// Equal strings are equivalent to equal apaths, but the ordering is not the same as
 /// string ordering.
+///
+/// Apaths must start with `/` and not end with `/` unless they have length 1.
+///
+/// ```
+/// use std::str::FromStr;
+/// use conserve::apath::Apath;
+///
+/// let apath: Apath = "/something".parse().unwrap();
+/// assert_eq!(apath.to_string(), "/something");
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Apath(String);
 
@@ -44,6 +55,52 @@ impl Apath {
         }
         true
     }
+
+    /// True if self is a parent directory of, or equal to, `a`.
+    ///
+    /// ```
+    /// use conserve::Apath;
+    /// use std::ops::Not;
+    ///
+    /// assert!(Apath::from("/").is_prefix_of(&Apath::from("/stuff")));
+    /// assert!(Apath::from("/").is_prefix_of(&Apath::from("/")));
+    /// assert!(Apath::from("/stuff").is_prefix_of(&Apath::from("/stuff/file")));
+    /// assert!(Apath::from("/stuff/file").is_prefix_of(&Apath::from("/stuff")).not());
+    /// assert!(Apath::from("/this").is_prefix_of(&Apath::from("/that")).not());
+    /// assert!(Apath::from("/this").is_prefix_of(&Apath::from("/that/other")).not());
+    /// ```
+    pub fn is_prefix_of(&self, a: &Apath) -> bool {
+        let len = self.0.len();
+        match len.cmp(&a.0.len()) {
+            Ordering::Greater => false,
+            Ordering::Equal => self.0 == a.0,
+            Ordering::Less => {
+                a.0.starts_with(&self.0)
+                    && (self.0.ends_with('/') || a.0.chars().nth(self.0.len()) == Some('/'))
+            }
+        }
+    }
+}
+
+impl FromStr for Apath {
+    type Err = ApathParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if !Apath::is_valid(s) {
+            Err(ApathParseError {})
+        } else {
+            Ok(Apath(s.to_owned()))
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ApathParseError {}
+
+impl fmt::Display for ApathParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid apath: must have an initial slash and no ..")
+    }
 }
 
 impl From<Apath> for String {
@@ -60,7 +117,6 @@ impl<'a> From<&'a Apath> for &'a str {
 
 impl<'a> From<&'a str> for Apath {
     fn from(s: &'a str) -> Apath {
-        // TODO: Maybe make this try_from or parse.
         assert!(Apath::is_valid(s), "invalid apath: {:?}", s);
         Apath(s.to_string())
     }
@@ -68,7 +124,6 @@ impl<'a> From<&'a str> for Apath {
 
 impl From<String> for Apath {
     fn from(s: String) -> Apath {
-        // TODO: Maybe make this try_from or parse.
         assert!(Apath::is_valid(&s), "invalid apath: {:?}", s);
         Apath(s)
     }

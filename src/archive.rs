@@ -107,6 +107,7 @@ impl Archive {
             &CopyOptions {
                 print_filenames: options.print_filenames,
                 measure_first: false,
+                ..CopyOptions::default()
             },
         )
     }
@@ -122,6 +123,7 @@ impl Archive {
         }?;
         let opts = CopyOptions {
             print_filenames: options.print_filenames,
+            only_subtree: options.only_subtree.clone(),
             ..CopyOptions::default()
         };
         copy_tree(&st, rt, &opts)

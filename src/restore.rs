@@ -22,6 +22,8 @@ use crate::*;
 pub struct RestoreOptions {
     pub print_filenames: bool,
     pub excludes: GlobSet,
+    /// Restore only this subdirectory.
+    pub only_subtree: Option<Apath>,
     pub overwrite: bool,
     // The band to select, or by default the last complete one.
     pub band_selection: BandSelectionPolicy,
@@ -34,6 +36,7 @@ impl Default for RestoreOptions {
             overwrite: false,
             band_selection: BandSelectionPolicy::LatestClosed,
             excludes: excludes::excludes_nothing(),
+            only_subtree: None,
         }
     }
 }
@@ -78,7 +81,7 @@ impl tree::WriteTree for RestoreTree {
 
     fn copy_dir<E: Entry>(&mut self, entry: &E) -> Result<()> {
         let path = self.rooted_path(entry.apath());
-        match fs::create_dir(&path) {
+        match fs::create_dir_all(&path) {
             Ok(()) => Ok(()),
             Err(source) => {
                 if source.kind() == io::ErrorKind::AlreadyExists {

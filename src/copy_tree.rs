@@ -11,6 +11,8 @@ use crate::*;
 pub struct CopyOptions {
     pub print_filenames: bool,
     pub measure_first: bool,
+    /// Copy only this subtree from the source.
+    pub only_subtree: Option<Apath>,
 }
 
 /// Copy files and other entries from one tree to another.
@@ -34,8 +36,13 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         // deleted or changed while this is running.
         ui::set_bytes_total(source.size()?.file_bytes);
     }
+
     ui::set_progress_phase("Copying");
-    for entry in source.iter_entries()? {
+    let entry_iter: Box<dyn Iterator<Item = ST::Entry>> = match &options.only_subtree {
+        None => Box::new(source.iter_entries()?),
+        Some(subtree) => source.iter_subtree_entries(subtree)?,
+    };
+    for entry in entry_iter {
         if options.print_filenames {
             crate::ui::println(entry.apath());
         }
