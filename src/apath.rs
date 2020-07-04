@@ -167,11 +167,13 @@ impl PartialOrd for Apath {
 }
 
 /// Observe Apaths and assert that they're visited in the correct order.
+// GRCOV_EXCLUDE_START
 #[derive(Debug)]
 pub struct CheckOrder {
     /// The last-seen filename, to enforce ordering.
     last_apath: Option<Apath>,
 }
+// GRCOV_EXCLUDE_STOP
 
 impl CheckOrder {
     pub fn new() -> CheckOrder {
@@ -213,9 +215,7 @@ mod tests {
             "/hello\0",
         ];
         for v in invalid_cases.iter() {
-            if Apath::is_valid(v) {
-                panic!("{:?} incorrectly marked valid", v);
-            }
+            assert!(!Apath::is_valid(v), "{:?} incorrectly marked valid", v);
         }
     }
 
@@ -251,9 +251,7 @@ mod tests {
             "/b/b/b/{zz}",
         ];
         for (i, a) in ordered.iter().enumerate() {
-            if !Apath::is_valid(a) {
-                panic!("{:?} incorrectly marked invalid", a);
-            }
+            assert!(Apath::is_valid(a), "{:?} incorrectly marked invalid", a);
             let ap = Apath::from(*a);
             // Check it can be formatted
             assert_eq!(format!("{}", ap), *a);
@@ -261,12 +259,11 @@ mod tests {
                 let expected_order = i.cmp(&j);
                 let bp = Apath::from(*b);
                 let r = ap.cmp(&bp);
-                if r != expected_order {
-                    panic!(
-                        "cmp({:?}, {:?}): returned {:?} expected {:?}",
-                        ap, bp, r, expected_order
-                    );
-                }
+                assert_eq!(
+                    r, expected_order,
+                    "cmp({:?}, {:?}): returned {:?} expected {:?}", // GRCOV_EXCLUDE
+                    ap, bp, r, expected_order
+                );
             }
         }
     }

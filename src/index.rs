@@ -27,6 +27,7 @@ pub const HUNKS_PER_SUBDIR: u32 = 10_000;
 ///
 /// This struct is directly encoded/decoded to the json index file, and also can be constructed by
 /// stat-ing (but not reading) a live file.
+// GRCOV_EXCLUDE_START
 #[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct IndexEntry {
     /// Path of this entry relative to the base of the backup, in `apath` form.
@@ -62,6 +63,7 @@ pub struct IndexEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
 }
+// GRCOV_EXCLUDE_STOP
 
 impl Entry for IndexEntry {
     /// Return apath relative to the top of the tree.
