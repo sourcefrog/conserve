@@ -397,3 +397,26 @@ fn validate_non_fatal_problems_nonzero_result() {
         .stdout(predicate::str::contains("Archive has some problems."))
         .code(2);
 }
+
+#[test]
+fn restore_only_subtree() {
+    let dest = TempDir::new().unwrap();
+    run_conserve()
+        .args(&[
+            "restore",
+            "testdata/archive/v0.6.3/minimal-1/",
+            "--only",
+            "/subdir",
+        ])
+        .arg(&dest.path())
+        .assert()
+        .success();
+
+    dest.child("hello").assert(predicate::path::missing());
+    dest.child("subdir").assert(predicate::path::is_dir());
+    dest.child("subdir")
+        .child("subfile")
+        .assert("I like Rust\n");
+
+    dest.close().unwrap();
+}
