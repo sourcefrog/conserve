@@ -58,7 +58,7 @@ impl ValidateStats {
     }
 
     pub fn has_problems(&self) -> bool {
-        self.block_error_count > 0 || self.io_errors > 0
+        self.block_error_count > 0 || self.io_errors > 0 || self.block_missing_count > 0
     }
 }
 
