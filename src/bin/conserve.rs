@@ -310,7 +310,7 @@ fn stored_tree_from_opt(
     let archive = Archive::open_path(archive)?;
     let policy = band_selection_policy_from_opt(backup, incomplete);
     Ok(archive
-        .open_stored_tree(&policy)?
+        .open_stored_tree(policy)?
         .with_excludes(excludes::from_strings(exclude)?))
 }
 

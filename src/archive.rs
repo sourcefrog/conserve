@@ -124,7 +124,7 @@ impl Archive {
 
     /// Restore a selected version, or by default the latest, to a destination directory.
     pub fn restore(&self, destination_path: &Path, options: &RestoreOptions) -> Result<CopyStats> {
-        let st = self.open_stored_tree(&options.band_selection)?;
+        let st = self.open_stored_tree(options.band_selection.clone())?;
         let st = st.with_excludes(options.excludes.clone());
         let rt = if options.overwrite {
             RestoreTree::create_overwrite(destination_path)
@@ -154,16 +154,19 @@ impl Archive {
         self.transport.as_ref()
     }
 
-    pub fn open_stored_tree(&self, band_selection: &BandSelectionPolicy) -> Result<StoredTree> {
-        use crate::band::BandSelectionPolicy::*;
-        Ok(match band_selection {
-            Specified(band_id) => StoredTree::open_incomplete_version(self, &band_id)?,
-            LatestClosed => StoredTree::open_last(self)?,
-            Latest => StoredTree::open_incomplete_version(
-                self,
-                &self.last_band_id()?.ok_or(Error::ArchiveEmpty)?,
-            )?,
-        })
+    pub fn resolve_band_id(&self, band_selection: BandSelectionPolicy) -> Result<BandId> {
+        match band_selection {
+            BandSelectionPolicy::LatestClosed => self
+                .last_complete_band()?
+                .map(|band| band.id().clone())
+                .ok_or(Error::ArchiveEmpty),
+            BandSelectionPolicy::Specified(band_id) => Ok(band_id),
+            BandSelectionPolicy::Latest => self.last_band_id()?.ok_or(Error::ArchiveEmpty),
+        }
+    }
+
+    pub fn open_stored_tree(&self, band_selection: BandSelectionPolicy) -> Result<StoredTree> {
+        StoredTree::open(self, &self.resolve_band_id(band_selection)?)
     }
 
     /// Return an iterator of valid band ids in this archive, in arbitrary order.
@@ -307,12 +310,12 @@ impl Archive {
         // TODO: Take in a dict of the known blocks and their decompressed lengths,
         // and use that to more cheaply check if the index is OK.
         ui::clear_bytes_total();
-        for bid in self.list_band_ids()?.iter() {
+        for bid in self.list_band_ids()?.into_iter() {
             ui::println(&format!("Check {}...", bid));
-            let b = Band::open(self, bid)?;
+            let b = Band::open(self, &bid)?;
             b.validate()?;
 
-            let st = StoredTree::open_incomplete_version(self, bid)?;
+            let st = self.open_stored_tree(BandSelectionPolicy::Specified(bid))?;
             st.validate(block_lens, stats)?;
         }
         Ok(())

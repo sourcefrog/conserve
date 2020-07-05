@@ -37,6 +37,17 @@ static TAIL_FILENAME: &str = "BANDTAIL";
 /// read correctly by versions equal or later than the stated version.
 pub const BAND_FORMAT_VERSION: &str = "0.6.3";
 
+/// Describes how to select a band from an archive.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum BandSelectionPolicy {
+    /// Open the latest complete band.
+    LatestClosed,
+    /// Open the latest band, regardless of whether it's complete.
+    Latest,
+    /// Open the band with the specified id.
+    Specified(BandId),
+}
+
 fn band_version_requirement() -> semver::VersionReq {
     semver::VersionReq::parse("<=0.6.3").unwrap()
 }
@@ -228,14 +239,6 @@ impl Band {
 
         Ok(())
     }
-}
-
-/// Describes how to select a band from an archive.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum BandSelectionPolicy {
-    LatestClosed,
-    Latest,
-    Specified(BandId),
 }
 
 #[cfg(test)]

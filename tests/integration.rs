@@ -299,7 +299,7 @@ pub fn empty_file_uses_zero_blocks() {
     assert_eq!(stats.written_blocks, 0);
 
     // Read back the empty file
-    let st = StoredTree::open_last(&af).unwrap();
+    let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
     let empty_entry = st
         .iter_entries()
         .unwrap()

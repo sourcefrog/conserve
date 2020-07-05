@@ -36,43 +36,9 @@ pub struct StoredTree {
 }
 
 impl StoredTree {
-    /// Open the last complete version in the archive.
-    pub fn open_last(archive: &Archive) -> Result<StoredTree> {
-        let band = archive
-            .last_complete_band()?
-            .ok_or(errors::Error::ArchiveEmpty)?;
+    pub(crate) fn open(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
         Ok(StoredTree {
-            band,
-            block_dir: archive.block_dir().clone(),
-            excludes: excludes::excludes_nothing(),
-        })
-    }
-
-    /// Open a specified version.
-    ///
-    /// It's an error if it's not complete.
-    pub fn open_version(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
-        let band = Band::open(archive, band_id)?;
-        if !band.is_closed()? {
-            return Err(Error::BandIncomplete {
-                band_id: band_id.clone(),
-            });
-        }
-        Ok(StoredTree {
-            band,
-            block_dir: archive.block_dir().clone(),
-            excludes: excludes::excludes_nothing(),
-        })
-    }
-
-    /// Open a specified version.
-    ///
-    /// This function allows opening incomplete versions, which might contain only a partial copy
-    /// of the source tree, or maybe nothing at all.
-    pub fn open_incomplete_version(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
-        let band = Band::open(archive, band_id)?;
-        Ok(StoredTree {
-            band,
+            band: Band::open(archive, band_id)?,
             block_dir: archive.block_dir().clone(),
             excludes: excludes::excludes_nothing(),
         })
@@ -188,7 +154,7 @@ mod test {
         af.store_two_versions();
 
         let last_band_id = af.last_band_id().unwrap().unwrap();
-        let st = StoredTree::open_last(&af).unwrap();
+        let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
 
         assert_eq!(*st.band().id(), last_band_id);
 
@@ -211,13 +177,19 @@ mod test {
     #[test]
     pub fn cant_open_no_versions() {
         let af = ScratchArchive::new();
-        assert!(StoredTree::open_last(&af).is_err());
+        match af.open_stored_tree(BandSelectionPolicy::Latest) {
+            Err(Error::ArchiveEmpty) => (),
+            Err(other) => panic!("unexpected result {:?}", other),
+            Ok(_) => panic!("unexpected success"),
+        }
     }
 
     #[test]
     fn iter_subtree_entries() {
         let archive = Archive::open_path(Path::new("testdata/archive/v0.6.3/minimal-1/")).unwrap();
-        let st = StoredTree::open_last(&archive).unwrap();
+        let st = archive
+            .open_stored_tree(BandSelectionPolicy::Latest)
+            .unwrap();
 
         let names: Vec<String> = st
             .iter_subtree_entries(&"/subdir".into())

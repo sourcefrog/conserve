@@ -65,7 +65,8 @@ pub fn show_verbose_version_list(
             .unwrap_or_default();
         if show_sizes {
             let tree_mb = crate::misc::bytes_to_human_mb(
-                StoredTree::open_incomplete_version(archive, &band.id())?
+                archive
+                    .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))?
                     .size()?
                     .file_bytes,
             );
