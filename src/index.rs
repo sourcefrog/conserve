@@ -276,13 +276,7 @@ impl IndexRead {
         Ok(IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             excludes: excludes::excludes_nothing(),
-            hunk_iter: IndexHunkIter {
-                stats: IndexReadStats::default(),
-                compressed_buf: Vec::new(),
-                decompressor: Decompressor::new(),
-                next_hunk_number: 0,
-                transport: self.transport.box_clone(),
-            },
+            hunk_iter: IndexHunkIter::open(self.transport.box_clone()),
         })
     }
 }
@@ -322,6 +316,16 @@ impl Iterator for IndexHunkIter {
 }
 
 impl IndexHunkIter {
+    pub(crate) fn open(transport: Box<dyn Transport>) -> IndexHunkIter {
+        IndexHunkIter {
+            stats: IndexReadStats::default(),
+            compressed_buf: Vec::new(),
+            decompressor: Decompressor::new(),
+            next_hunk_number: 0,
+            transport,
+        }
+    }
+
     fn read_next_hunk(&mut self) -> Result<Option<Vec<IndexEntry>>> {
         let path = &hunk_relpath(self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
@@ -567,6 +571,25 @@ mod tests {
             .unwrap();
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
+
+        // Read it out as hunks.
+        let hunkit = IndexHunkIter::open(Box::new(LocalTransport::new(&testdir.path())));
+        let hunks: Vec<Vec<IndexEntry>> = hunkit.collect();
+        assert_eq!(hunks.len(), 2);
+        assert_eq!(
+            hunks[0]
+                .iter()
+                .map(|entry| entry.apath())
+                .collect::<Vec<_>>(),
+            vec!["/1.1", "/1.2"]
+        );
+        assert_eq!(
+            hunks[1]
+                .iter()
+                .map(|entry| entry.apath())
+                .collect::<Vec<_>>(),
+            vec!["/2.1", "/2.2"]
+        );
     }
 
     #[test]
