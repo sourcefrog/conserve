@@ -23,7 +23,7 @@ use globset::GlobSet;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::stats::{IndexBuilderStats, IndexEntryIterStats};
+use crate::stats::{IndexBuilderStats, IndexReadStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
 use crate::unix_time::UnixTime;
@@ -275,13 +275,84 @@ impl IndexRead {
     pub fn iter_entries(&self) -> Result<IndexEntryIter> {
         Ok(IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
-            next_hunk_number: 0,
             excludes: excludes::excludes_nothing(),
-            stats: IndexEntryIterStats::default(),
-            decompressor: Decompressor::new(),
-            transport: self.transport.box_clone(),
-            compressed_buf: Vec::new(),
+            hunk_iter: IndexHunkIter {
+                stats: IndexReadStats::default(),
+                compressed_buf: Vec::new(),
+                decompressor: Decompressor::new(),
+                next_hunk_number: 0,
+                transport: self.transport.box_clone(),
+            },
         })
+    }
+}
+
+/// Read hunks of entries from a stored index, in apath order.
+///
+/// Each returned item is a vec of (typically up to a thousand) index entries.
+pub struct IndexHunkIter {
+    next_hunk_number: u32,
+    /// The `i` directory within the band where all files for this index are written.
+    transport: Box<dyn Transport>,
+    decompressor: Decompressor,
+    compressed_buf: Vec<u8>,
+    pub stats: IndexReadStats,
+}
+
+impl Iterator for IndexHunkIter {
+    type Item = Vec<IndexEntry>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let hunk_number = self.next_hunk_number;
+            match self.read_next_hunk() {
+                Ok(None) => return None,
+                Ok(Some(entries)) => return Some(entries),
+                Err(err) => {
+                    self.stats.errors += 1;
+                    ui::problem(&format!(
+                        "Error reading index hunk {:?}: {:?} ",
+                        hunk_number, err
+                    ));
+                    continue;
+                }
+            }
+        }
+    }
+}
+
+impl IndexHunkIter {
+    fn read_next_hunk(&mut self) -> Result<Option<Vec<IndexEntry>>> {
+        let path = &hunk_relpath(self.next_hunk_number);
+        // Whether we succeed or fail, don't try to read this hunk again.
+        self.next_hunk_number += 1;
+        if let Err(err) = self.transport.read_file(&path, &mut self.compressed_buf) {
+            if err.kind() == io::ErrorKind::NotFound {
+                // TODO: Cope with one hunk being missing, while there are still
+                // later-numbered hunks. This would require reading the whole
+                // list of hunks first.
+                return Ok(None);
+            } else {
+                return Err(Error::ReadIndex {
+                    path: path.clone(),
+                    source: err,
+                });
+            }
+        }
+        self.stats.index_hunks += 1;
+        self.stats.compressed_index_bytes += self.compressed_buf.len() as u64;
+        let index_bytes = self.decompressor.decompress(&self.compressed_buf)?;
+        self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
+        let entries: Vec<IndexEntry> =
+            serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeIndex {
+                path: path.clone(),
+                source,
+            })?;
+        if entries.is_empty() {
+            ui::problem(&format!("Index hunk {:?} is empty", path));
+            // It's legal, it's just weird - and it can be produced by some old Conserve versions.
+        }
+        Ok(Some(entries))
     }
 }
 
@@ -290,13 +361,9 @@ pub struct IndexEntryIter {
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
-    next_hunk_number: u32,
     excludes: GlobSet,
-    decompressor: Decompressor,
-    pub stats: IndexEntryIterStats,
     /// The `i` directory within the band where all files for this index are written.
-    transport: Box<dyn Transport>,
-    compressed_buf: Vec<u8>,
+    hunk_iter: IndexHunkIter,
 }
 
 impl Iterator for IndexEntryIter {
@@ -352,55 +419,20 @@ impl IndexEntryIter {
         }
     }
 
-    /// Refill entry buffer, converting errors to warnings.
-    ///
-    /// Returns true if a hunk was read; false at the end.
-    fn refill_entry_buffer_or_warn(&mut self) -> bool {
-        self.refill_entry_buffer().unwrap_or_else(|e| {
-            ui::show_error(&e); // Continue to read next hunk.
-            true
-        })
-    }
-
     /// Read another hunk file and put it into buffered_entries.
     ///
     /// Returns true if another hunk could be found, otherwise false.
-    fn refill_entry_buffer(&mut self) -> Result<bool> {
+    fn refill_entry_buffer_or_warn(&mut self) -> bool {
         assert!(
             self.buffered_entries.next().is_none(),
             "refill_entry_buffer called with non-empty buffer"
         );
-        let path = &hunk_relpath(self.next_hunk_number);
-        // Whether we succeed or fail, don't try to read this hunk again.
-        self.next_hunk_number += 1;
-        self.stats.index_hunks += 1;
-        if let Err(err) = self.transport.read_file(&path, &mut self.compressed_buf) {
-            if err.kind() == io::ErrorKind::NotFound {
-                // TODO: Cope with one hunk being missing, while there are still
-                // later-numbered hunks. This would require reading the whole
-                // list of hunks first.
-                return Ok(false);
-            } else {
-                return Err(Error::ReadIndex {
-                    path: path.clone(),
-                    source: err,
-                });
-            }
-        };
-        self.stats.compressed_index_bytes += self.compressed_buf.len() as u64;
-        let index_bytes = self.decompressor.decompress(&self.compressed_buf)?;
-        self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
-        let entries: Vec<IndexEntry> =
-            serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeIndex {
-                path: path.clone(),
-                source,
-            })?;
-        if entries.is_empty() {
-            ui::problem(&format!("Index hunk {:?} is empty", path));
+        if let Some(new_entries) = self.hunk_iter.next() {
+            self.buffered_entries = new_entries.into_iter().peekable();
+            true
+        } else {
+            false
         }
-        // NOTE: Not updating 'skipped' counters; here. Questionable value.
-        self.buffered_entries = entries.into_iter().peekable();
-        Ok(true)
     }
 }
 

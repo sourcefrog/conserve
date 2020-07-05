@@ -73,10 +73,11 @@ impl ValidateStats {
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct IndexEntryIterStats {
-    pub index_hunks: u64,
+pub struct IndexReadStats {
+    pub index_hunks: usize,
     pub uncompressed_index_bytes: u64,
     pub compressed_index_bytes: u64,
+    pub errors: usize,
 }
 
 #[derive(Add, AddAssign, Clone, Debug, Default, Eq, PartialEq)]
