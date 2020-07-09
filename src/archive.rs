@@ -257,7 +257,7 @@ impl Archive {
                             "Unexpected file kind in archive directory: {:?} of kind {:?}",
                             name, other_kind
                         ));
-                        stats.structure_problems += 1;
+                        stats.unexpected_files += 1;
                     }
                 },
                 Err(source) => {
@@ -268,7 +268,7 @@ impl Archive {
         }
         remove_item(&mut files, &HEADER_FILENAME);
         if !files.is_empty() {
-            stats.structure_problems += 1;
+            stats.unexpected_files += 1;
             ui::problem(&format!(
                 "Unexpected files in archive directory {:?}: {:?}",
                 self.transport, files
@@ -313,7 +313,7 @@ impl Archive {
         for bid in self.list_band_ids()?.into_iter() {
             ui::println(&format!("Check {}...", bid));
             let b = Band::open(self, &bid)?;
-            b.validate()?;
+            b.validate(stats)?;
 
             let st = self.open_stored_tree(BandSelectionPolicy::Specified(bid))?;
             st.validate(block_lens, stats)?;

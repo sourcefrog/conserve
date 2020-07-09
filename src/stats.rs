@@ -42,8 +42,11 @@ pub struct Sizes {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Add, AddAssign)]
 pub struct ValidateStats {
     /// Count of files in the wrong place.
-    pub structure_problems: u64,
-    pub io_errors: u64,
+    pub structure_problems: usize,
+    pub io_errors: usize,
+    /// Count of files not expected to be in the archive.
+    pub unexpected_files: usize,
+    pub missing_band_heads: usize,
 
     /// Number of blocks read.
     pub block_read_count: u64,

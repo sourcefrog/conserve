@@ -211,30 +211,30 @@ impl Band {
         })
     }
 
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self, stats: &mut ValidateStats) -> Result<()> {
         let ListDirNames { mut files, dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
         if !files.contains(&HEAD_FILENAME.to_string()) {
-            // TODO: Count this problem.
             ui::problem(&format!("No band head file in {:?}", self.transport));
+            stats.missing_band_heads += 1;
         }
         remove_item(&mut files, &HEAD_FILENAME);
         remove_item(&mut files, &TAIL_FILENAME);
 
         if !files.is_empty() {
-            // TODO: Count this problem.
             ui::problem(&format!(
                 "Unexpected files in band directory {:?}: {:?}",
                 self.transport, files
             ));
+            stats.unexpected_files += 1;
         }
 
         if dirs != [INDEX_DIR.to_string()] {
-            // TODO: Count this problem.
             ui::problem(&format!(
                 "Incongruous directories in band directory {:?}: {:?}",
                 self.transport, dirs
             ));
+            stats.unexpected_files += 1;
         }
 
         Ok(())
