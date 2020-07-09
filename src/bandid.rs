@@ -47,6 +47,29 @@ impl BandId {
         next_seqs[self.seqs.len() - 1] += 1;
         BandId::new(&next_seqs)
     }
+
+    /// Return the previous band, unless this is zero.
+    ///
+    /// This is only a calculation on the band id, and the band may not be present.
+    ///
+    /// Currently only implemented for top-level bands.
+    ///
+    /// ```
+    /// use conserve::BandId;
+    ///
+    /// assert_eq!(BandId::zero().previous(), None);
+    /// assert_eq!(BandId::zero().next_sibling().previous(), BandId::zero());
+    /// ```
+    pub fn previous(&self) -> Option<BandId> {
+        if self.seqs.len() != 1 {
+            unimplemented!("BandId::previous only supported on len 1")
+        }
+        if self.seqs[0] == 0 {
+            None
+        } else {
+            Some(BandId::new(&[self.seqs[0] - 1]))
+        }
+    }
 }
 
 impl FromStr for BandId {
