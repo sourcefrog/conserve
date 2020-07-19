@@ -456,10 +456,7 @@ mod tests {
         let (_testdir, block_dir) = setup();
         let mut store_files = StoreFiles::new(block_dir.clone());
         let (addrs, _stats) = store_files
-            .store_file_content(
-                &"/hello".into(),
-                &mut io::Cursor::new("0123456789abcdef".as_bytes()),
-            )
+            .store_file_content(&"/hello".into(), &mut io::Cursor::new(b"0123456789abcdef"))
             .unwrap();
         assert_eq!(addrs.len(), 1);
         let hash = addrs[0].hash.clone();
@@ -469,7 +466,7 @@ mod tests {
             hash,
         };
         let (first_half_content, _first_half_stats) = block_dir.get(&first_half).unwrap();
-        assert_eq!(first_half_content, "01234567".as_bytes());
+        assert_eq!(first_half_content, b"01234567");
 
         let hash = addrs[0].hash.clone();
         let second_half = Address {
@@ -478,7 +475,7 @@ mod tests {
             hash,
         };
         let (second_half_content, _second_half_stats) = block_dir.get(&second_half).unwrap();
-        assert_eq!(second_half_content, "89abcdef".as_bytes());
+        assert_eq!(second_half_content, b"89abcdef");
     }
 
     #[test]
@@ -486,10 +483,7 @@ mod tests {
         let (_testdir, block_dir) = setup();
         let mut store_files = StoreFiles::new(block_dir.clone());
         let (addrs, _stats) = store_files
-            .store_file_content(
-                &"/hello".into(),
-                &mut io::Cursor::new("0123456789abcdef".as_bytes()),
-            )
+            .store_file_content(&"/hello".into(), &mut io::Cursor::new(b"0123456789abcdef"))
             .unwrap();
         assert_eq!(addrs.len(), 1);
 
