@@ -255,10 +255,7 @@ impl IndexRead {
             if !self
                 .transport
                 .exists(&path)
-                .map_err(|source| Error::ReadIndex {
-                    source,
-                    path: path.into(),
-                })?
+                .map_err(|source| Error::ReadIndex { source, path })?
             {
                 // If hunk 1 is missing, 1 hunks exists.
                 return Ok(i);

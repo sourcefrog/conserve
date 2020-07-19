@@ -71,7 +71,7 @@ pub fn println(s: &str) {
 
 // TODO: Rather than a directly-called function, hook this into logging.
 pub fn problem(s: &str) {
-    UI_STATE.lock().unwrap().problem(s.into())
+    UI_STATE.lock().unwrap().problem(s)
 }
 
 /// Report that a non-fatal error occurred.

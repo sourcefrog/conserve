@@ -58,7 +58,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use assert_fs;
     use assert_fs::prelude::*;
     use serde::{Deserialize, Serialize};
 
@@ -81,8 +80,8 @@ mod tests {
         };
         let filename = "test.json";
 
-        let mut transport = LocalTransport::new(&temp.path());
-        super::write_json(&mut transport, filename, &entry).unwrap();
+        let transport = LocalTransport::new(&temp.path());
+        super::write_json(&transport, filename, &entry).unwrap();
 
         let json_child = temp.child("test.json");
         json_child.assert(concat!(r#"{"id":42,"weather":"cold"}"#, "\n"));

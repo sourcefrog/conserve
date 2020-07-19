@@ -157,10 +157,7 @@ fn check_backup(af: &ScratchArchive) {
     assert!(file_entry.mtime > 0);
 
     assert_eq!(
-        af.referenced_blocks()
-            .unwrap()
-            .into_iter()
-            .collect::<Vec<String>>(),
+        af.referenced_blocks().unwrap().collect::<Vec<String>>(),
         vec![HELLO_HASH]
     );
     assert_eq!(

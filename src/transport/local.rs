@@ -57,7 +57,6 @@ impl Transport for LocalTransport {
                         len: metadata.len(),
                     })
                 })
-                .map_err(|e| e.into())
             },
         )))
     }
