@@ -31,7 +31,6 @@ impl Compressor {
     ///
     /// Returns a slice referencing a buffer in this object, valid only
     /// until the next call.
-    #[must_use]
     pub fn compress(&mut self, input: &[u8]) -> Result<&[u8]> {
         let max_len = snap::raw::max_compress_len(input.len());
         if self.out_buf.len() < max_len {
@@ -66,7 +65,6 @@ impl Decompressor {
     /// Decompressed unframed Snappy data.
     ///
     /// Returns a slice pointing into a reusable object inside the Decompressor.
-    #[must_use]
     pub fn decompress(&mut self, input: &[u8]) -> Result<&[u8]> {
         let max_len = snap::raw::decompress_len(input)?;
         if self.out_buf.len() < max_len {
