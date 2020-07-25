@@ -13,7 +13,7 @@
 //! Conserve backup system.
 
 // Conserve implementation modules.
-mod apath;
+pub mod apath;
 pub mod archive;
 pub mod backup;
 mod band;
@@ -54,6 +54,7 @@ pub use crate::copy_tree::copy_tree;
 pub use crate::entry::Entry;
 pub use crate::errors::Error;
 pub use crate::index::{IndexBuilder, IndexEntry, IndexRead};
+pub use crate::kind::Kind;
 pub use crate::live_tree::{LiveEntry, LiveTree};
 pub use crate::merge::{iter_merged_entries, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
@@ -89,3 +90,5 @@ const TIMESTAMP_FORMAT: &str = "%F %T";
 
 /// Temporary files in the archive have this prefix.
 const TMP_PREFIX: &str = "tmp";
+static BAND_HEAD_FILENAME: &str = "BANDHEAD";
+static BAND_TAIL_FILENAME: &str = "BANDTAIL";

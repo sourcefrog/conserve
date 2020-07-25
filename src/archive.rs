@@ -143,6 +143,26 @@ impl Archive {
         &self.block_dir
     }
 
+    pub fn band_exists(&self, band_id: &BandId) -> Result<bool> {
+        self.transport
+            .exists(&format!(
+                "{}/{}",
+                band_id.to_string(),
+                crate::BAND_HEAD_FILENAME
+            ))
+            .map_err(Error::from)
+    }
+
+    pub fn band_is_closed(&self, band_id: &BandId) -> Result<bool> {
+        self.transport
+            .exists(&format!(
+                "{}/{}",
+                band_id.to_string(),
+                crate::BAND_TAIL_FILENAME
+            ))
+            .map_err(Error::from)
+    }
+
     /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_band_ids(&self) -> Result<Vec<BandId>> {
         let mut band_ids: Vec<BandId> = self.iter_band_ids_unsorted()?.collect();
