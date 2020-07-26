@@ -13,8 +13,7 @@
 
 //! Archives holding backup material.
 
-use std::collections::BTreeSet;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use std::io::ErrorKind;
 use std::path::Path;
 
@@ -202,24 +201,16 @@ impl Archive {
         Ok(None)
     }
 
-    /// Returns an unsorted iterator of all blocks referenced by all bands.
-    pub fn referenced_blocks(&self) -> Result<impl Iterator<Item = String>> {
+    /// Returns all blocks referenced by all bands.
+    pub fn referenced_blocks(&self) -> Result<BTreeSet<String>> {
         let archive = self.clone();
-        let mut hs = HashSet::<String>::new();
         Ok(self
             .iter_band_ids_unsorted()?
             .map(move |band_id| Band::open(&archive, &band_id).expect("Failed to open band"))
             .flat_map(|band| band.iter_entries().expect("Failed to iter entries"))
             .flat_map(|entry| entry.addrs)
             .map(|addrs| addrs.hash)
-            .filter(move |hash| {
-                if hs.contains(hash) {
-                    false
-                } else {
-                    hs.insert(hash.clone());
-                    true
-                }
-            }))
+            .collect())
     }
 
     pub fn validate(&self) -> Result<ValidateStats> {
@@ -388,7 +379,7 @@ mod tests {
             af.last_complete_band().unwrap().is_none(),
             "Archive should have no bands yet"
         );
-        assert_eq!(af.referenced_blocks().unwrap().count(), 0);
+        assert_eq!(af.referenced_blocks().unwrap().iter().count(), 0);
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 
@@ -415,7 +406,7 @@ mod tests {
         );
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
-        assert_eq!(af.referenced_blocks().unwrap().count(), 0);
+        assert_eq!(af.referenced_blocks().unwrap().len(), 0);
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 }
