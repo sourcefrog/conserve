@@ -273,8 +273,20 @@ impl IndexRead {
         Ok(IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             excludes: excludes::excludes_nothing(),
-            hunk_iter: IndexHunkIter::open(self.transport.box_clone()),
+            hunk_iter: self.iter_hunks(),
         })
+    }
+
+    /// Make an iterator that returns hunks of entries from this index.
+    pub fn iter_hunks(&self) -> IndexHunkIter {
+        IndexHunkIter {
+            next_hunk_number: 0,
+            transport: self.transport.box_clone(),
+            decompressor: Decompressor::new(),
+            compressed_buf: Vec::new(),
+            stats: IndexReadStats::default(),
+            after: None,
+        }
     }
 }
 
@@ -288,6 +300,8 @@ pub struct IndexHunkIter {
     decompressor: Decompressor,
     compressed_buf: Vec<u8>,
     pub stats: IndexReadStats,
+    /// If set, yield only entries ordered after this apath.
+    after: Option<Apath>,
 }
 
 impl Iterator for IndexHunkIter {
@@ -296,9 +310,9 @@ impl Iterator for IndexHunkIter {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let hunk_number = self.next_hunk_number;
-            match self.read_next_hunk() {
+            let entries = match self.read_next_hunk() {
                 Ok(None) => return None,
-                Ok(Some(entries)) => return Some(entries),
+                Ok(Some(entries)) => entries,
                 Err(err) => {
                     self.stats.errors += 1;
                     ui::problem(&format!(
@@ -307,19 +321,38 @@ impl Iterator for IndexHunkIter {
                     ));
                     continue;
                 }
+            };
+            if let Some(ref after) = self.after {
+                if let Some(last) = entries.last() {
+                    if last.apath <= *after {
+                        continue;
+                    }
+                }
+                if let Some(first) = entries.first() {
+                    if first.apath > *after {
+                        self.after = None; // don't need to look again
+                        return Some(entries);
+                    }
+                }
+                let idx = match entries.binary_search_by_key(&after, |entry| &entry.apath) {
+                    Ok(idx) => idx + 1, // after the point it was found
+                    Err(idx) => idx,    // from the point it would have been
+                };
+                return Some(Vec::from(&entries[idx..]));
+            }
+            if !entries.is_empty() {
+                return Some(entries);
             }
         }
     }
 }
 
 impl IndexHunkIter {
-    pub(crate) fn open(transport: Box<dyn Transport>) -> IndexHunkIter {
+    /// Advance self so that it returns only entries with apaths ordered after `apath`.
+    pub fn advance_to_after(self, apath: &Apath) -> Self {
         IndexHunkIter {
-            stats: IndexReadStats::default(),
-            compressed_buf: Vec::new(),
-            decompressor: Decompressor::new(),
-            next_hunk_number: 0,
-            transport,
+            after: Some(apath.clone()),
+            ..self
         }
     }
 
@@ -563,15 +596,13 @@ mod tests {
         add_an_entry(&mut ib, "/2.2");
         ib.finish_hunk().unwrap();
 
-        let it = IndexRead::open_path(&testdir.path())
-            .iter_entries()
-            .unwrap();
+        let index_read = IndexRead::open_path(&testdir.path());
+        let it = index_read.iter_entries().unwrap();
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
 
         // Read it out as hunks.
-        let hunkit = IndexHunkIter::open(Box::new(LocalTransport::new(&testdir.path())));
-        let hunks: Vec<Vec<IndexEntry>> = hunkit.collect();
+        let hunks: Vec<Vec<IndexEntry>> = index_read.iter_hunks().collect();
         assert_eq!(hunks.len(), 2);
         assert_eq!(
             hunks[0]
@@ -587,6 +618,91 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["/2.1", "/2.2"]
         );
+    }
+
+    #[test]
+    fn iter_hunks_advance_to_after() {
+        let (testdir, mut ib) = scratch_indexbuilder();
+        add_an_entry(&mut ib, "/1.1");
+        add_an_entry(&mut ib, "/1.2");
+        ib.finish_hunk().unwrap();
+
+        add_an_entry(&mut ib, "/2.1");
+        add_an_entry(&mut ib, "/2.2");
+        ib.finish_hunk().unwrap();
+
+        let index_read = IndexRead::open_path(&testdir.path());
+        let names: Vec<String> = index_read
+            .iter_hunks()
+            .advance_to_after(&"/".into())
+            .flatten()
+            .map(|entry| entry.apath.into())
+            .collect();
+        assert_eq!(names, ["/1.1", "/1.2", "/2.1", "/2.2"]);
+
+        let names: Vec<String> = index_read
+            .iter_hunks()
+            .advance_to_after(&"/subdir".into())
+            .flatten()
+            .map(|entry| entry.apath.into())
+            .collect();
+        assert!(names.is_empty());
+
+        let names: Vec<String> = index_read
+            .iter_hunks()
+            .advance_to_after(&"/1.1".into())
+            .flatten()
+            .map(|entry| entry.apath.into())
+            .collect();
+        assert_eq!(names, ["/1.2", "/2.1", "/2.2"]);
+
+        let names: Vec<String> = index_read
+            .iter_hunks()
+            .advance_to_after(&"/1.1.1".into())
+            .flatten()
+            .map(|entry| entry.apath.into())
+            .collect();
+        assert_eq!(names, ["/1.2", "/2.1", "/2.2"]);
+
+        let names: Vec<String> = index_read
+            .iter_hunks()
+            .advance_to_after(&"/1.2".into())
+            .flatten()
+            .map(|entry| entry.apath.into())
+            .collect();
+        assert_eq!(names, ["/2.1", "/2.2"]);
+
+        let names: Vec<String> = index_read
+            .iter_hunks()
+            .advance_to_after(&"/1.3".into())
+            .flatten()
+            .map(|entry| entry.apath.into())
+            .collect();
+        assert_eq!(names, ["/2.1", "/2.2"]);
+
+        let names: Vec<String> = index_read
+            .iter_hunks()
+            .advance_to_after(&"/2.0".into())
+            .flatten()
+            .map(|entry| entry.apath.into())
+            .collect();
+        assert_eq!(names, ["/2.1", "/2.2"]);
+
+        let names: Vec<String> = index_read
+            .iter_hunks()
+            .advance_to_after(&"/2.1".into())
+            .flatten()
+            .map(|entry| entry.apath.into())
+            .collect();
+        assert_eq!(names, ["/2.2"]);
+
+        let names: Vec<String> = index_read
+            .iter_hunks()
+            .advance_to_after(&"/2.2".into())
+            .flatten()
+            .map(|entry| entry.apath.into())
+            .collect();
+        assert_eq!(names, [] as [&str; 0]);
     }
 
     #[test]
