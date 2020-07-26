@@ -22,7 +22,6 @@ use crate::*;
 pub trait ReadTree {
     // TODO: Perhaps hide these and just return dyn objects?
     type Entry: Entry;
-    type I: Iterator<Item = Self::Entry>;
     type R: std::io::Read;
 
     /// Iterate, in apath order, all the entries in this tree.
@@ -30,7 +29,7 @@ pub trait ReadTree {
     /// Errors reading individual paths or directories are sent to the UI and
     /// counted, but are not treated as fatal, and don't appear as Results in the
     /// iterator.
-    fn iter_entries(&self) -> Result<Self::I>;
+    fn iter_entries(&self) -> Result<Box<dyn Iterator<Item = Self::Entry>>>;
 
     /// Iterate, in apath order, the entries from a subtree.
     ///

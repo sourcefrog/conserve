@@ -246,8 +246,8 @@ impl Archive {
     pub fn validate(&self) -> Result<ValidateStats> {
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
-        let block_lens: HashMap<String, usize> = self.block_dir.validate(&mut stats)?;
-        self.validate_bands(&block_lens, &mut stats)?;
+        let block_lengths: HashMap<String, usize> = self.block_dir.validate(&mut stats)?;
+        self.validate_bands(&block_lengths, &mut stats)?;
 
         if stats.has_problems() {
             ui::problem("Archive has some problems.");
@@ -322,7 +322,7 @@ impl Archive {
 
     fn validate_bands(
         &self,
-        block_lens: &HashMap<String, usize>,
+        block_lengths: &HashMap<String, usize>,
         stats: &mut ValidateStats,
     ) -> Result<()> {
         // TODO: Don't stop early on any errors in the steps below, but do count them.
@@ -337,7 +337,7 @@ impl Archive {
             b.validate(stats)?;
 
             let st = self.open_stored_tree(BandSelectionPolicy::Specified(bid))?;
-            st.validate(block_lens, stats)?;
+            st.validate(block_lengths, stats)?;
         }
         Ok(())
     }
