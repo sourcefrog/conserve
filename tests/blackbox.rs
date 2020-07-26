@@ -342,8 +342,7 @@ fn empty_archive() {
 
 /// Check behavior on an incomplete version.
 ///
-/// Commands that read from the archive should by default decline, unless given
-/// `--incomplete`.
+/// The `--incomplete` option is no longer needed.
 #[test]
 fn incomplete_version() {
     let af = ScratchArchive::new();
@@ -358,22 +357,8 @@ fn incomplete_version() {
         .stdout(predicate::str::contains("b0000"))
         .stdout(predicate::str::contains("incomplete"));
 
-    // ls fails on incomplete band
-    run_conserve()
-        .arg("ls")
-        .arg(af.path())
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("Archive has no bands"));
-
-    // ls --incomplete accurately says it has nothing
-    run_conserve()
-        .args(&["ls", "-b", "b0", "--incomplete"])
-        .arg(af.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::is_empty());
+    // ls succeeds on an incomplete band
+    run_conserve().arg("ls").arg(af.path()).assert().success();
 }
 
 #[test]

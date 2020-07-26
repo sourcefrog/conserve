@@ -53,9 +53,6 @@ enum Command {
         backup: Option<BandId>,
         #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
-        /// Compare to the incomplete contents of an unfinished backup.
-        #[structopt(long, requires = "backup")]
-        incomplete: bool,
     },
 
     /// Create a new archive.
@@ -84,9 +81,6 @@ enum Command {
         exclude: Vec<String>,
         #[structopt(long = "only", short = "i", number_of_values = 1)]
         only_subtree: Option<Apath>,
-        /// Restore the incomplete contents of an unfinished backup.
-        #[structopt(long, requires = "backup")]
-        incomplete: bool,
     },
 
     /// Show the total size of files in a stored tree or source directory, with exclusions.
@@ -127,10 +121,6 @@ struct StoredTreeOrSource {
 
     #[structopt(long, short, number_of_values = 1)]
     exclude: Vec<String>,
-
-    /// Measure the incomplete contents of an unfinished backup.
-    #[structopt(long, requires = "backup")]
-    incomplete: bool,
 }
 
 /// Show debugging information.
@@ -144,10 +134,6 @@ enum Debug {
         /// Backup version number.
         #[structopt(long, short)]
         backup: Option<BandId>,
-
-        /// List the incomplete contents of an unfinished backup.
-        #[structopt(long, requires = "backup")]
-        incomplete: bool,
     },
 
     /// List all blocks.
@@ -187,12 +173,8 @@ impl Command {
                     writeln!(bw, "{}", hash)?;
                 }
             }
-            Command::Debug(Debug::Index {
-                archive,
-                backup,
-                incomplete,
-            }) => {
-                let st = stored_tree_from_opt(archive, &backup, &Vec::new(), *incomplete)?;
+            Command::Debug(Debug::Index { archive, backup }) => {
+                let st = stored_tree_from_opt(archive, &backup, &Vec::new())?;
                 output::show_index_json(&st.band(), &mut stdout)?;
             }
             Command::Debug(Debug::Referenced { archive }) => {
@@ -206,13 +188,12 @@ impl Command {
                 source,
                 backup,
                 exclude,
-                incomplete,
             } => {
                 // TODO: Consider whether the actual files have changed.
                 // TODO: Summarize diff.
                 // TODO: Optionally include unchanged files.
                 let excludes = excludes::from_strings(exclude)?;
-                let st = stored_tree_from_opt(archive, backup, exclude, *incomplete)?;
+                let st = stored_tree_from_opt(archive, backup, exclude)?;
                 let lt = LiveTree::open(source)?.with_excludes(excludes);
                 output::show_tree_diff(&mut conserve::iter_merged_entries(&st, &lt)?, &mut stdout)?;
             }
@@ -223,12 +204,7 @@ impl Command {
             Command::Ls { stos } => {
                 if let Some(archive) = &stos.archive {
                     output::show_tree_names(
-                        &stored_tree_from_opt(
-                            archive,
-                            &stos.backup,
-                            &stos.exclude,
-                            stos.incomplete,
-                        )?,
+                        &stored_tree_from_opt(archive, &stos.backup, &stos.exclude)?,
                         &mut stdout,
                     )?;
                 } else {
@@ -246,9 +222,8 @@ impl Command {
                 force_overwrite,
                 exclude,
                 only_subtree,
-                incomplete,
             } => {
-                let band_selection = band_selection_policy_from_opt(backup, *incomplete);
+                let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open_path(archive)?;
 
                 let options = RestoreOptions {
@@ -266,7 +241,7 @@ impl Command {
             Command::Size { ref stos } => {
                 ui::set_progress_phase(&"Measuring".to_string());
                 let size = if let Some(archive) = &stos.archive {
-                    stored_tree_from_opt(archive, &stos.backup, &stos.exclude, stos.incomplete)?
+                    stored_tree_from_opt(archive, &stos.backup, &stos.exclude)?
                         .size()?
                         .file_bytes
                 } else {
@@ -305,25 +280,19 @@ fn stored_tree_from_opt(
     archive: &Path,
     backup: &Option<BandId>,
     exclude: &[String],
-    incomplete: bool,
 ) -> Result<StoredTree> {
     let archive = Archive::open_path(archive)?;
-    let policy = band_selection_policy_from_opt(backup, incomplete);
+    let policy = band_selection_policy_from_opt(backup);
     Ok(archive
         .open_stored_tree(policy)?
         .with_excludes(excludes::from_strings(exclude)?))
 }
 
-fn band_selection_policy_from_opt(
-    backup: &Option<BandId>,
-    incomplete: bool,
-) -> BandSelectionPolicy {
+fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolicy {
     if let Some(band_id) = backup {
         BandSelectionPolicy::Specified(band_id.clone())
-    } else if incomplete {
-        BandSelectionPolicy::Latest
     } else {
-        BandSelectionPolicy::LatestClosed
+        BandSelectionPolicy::Latest
     }
 }
 
