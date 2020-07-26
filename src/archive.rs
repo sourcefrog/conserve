@@ -27,6 +27,7 @@ use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
 use crate::stats::{CopyStats, ValidateStats};
+use crate::stitch::IterStitchedIndexHunks;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -339,6 +340,17 @@ impl Archive {
             st.validate(block_lens, stats)?;
         }
         Ok(())
+    }
+
+    /// Return an iterator that reconstructs the most complete available index for a possibly-incomplete band.
+    ///
+    /// If the band is complete, this is simply the band's index.
+    ///
+    /// If it's incomplete, it stitches together the index by picking up at the same point in the previous
+    /// band, continuing backwards recursively until either there are no more previous indexes, or a complete
+    /// index is found.
+    pub fn iter_stitched_index_hunks(&self, band_id: &BandId) -> IterStitchedIndexHunks {
+        IterStitchedIndexHunks::new(self, band_id)
     }
 }
 

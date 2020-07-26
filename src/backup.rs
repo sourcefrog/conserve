@@ -74,7 +74,7 @@ impl BackupWriter {
     /// Push a new entry into the backup's IndexBuilder.
     ///
     /// This is public only to facilitate testing.
-    pub fn push_entry(&mut self, index_entry: IndexEntry) -> Result<()> {
+    pub(crate) fn push_entry(&mut self, index_entry: IndexEntry) -> Result<()> {
         // TODO: Return or accumulate index sizes.
         self.index_builder.push_entry(index_entry)?;
         Ok(())

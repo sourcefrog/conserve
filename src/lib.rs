@@ -34,6 +34,7 @@ pub(crate) mod misc;
 pub mod output;
 pub mod restore;
 pub mod stats;
+mod stitch;
 mod stored_file;
 mod stored_tree;
 pub mod test_fixtures;
