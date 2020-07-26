@@ -1,25 +1,31 @@
 # Conserve release history
 
+## v0.6.5 NOT RELEASED YET
+
+### Features
+
+- New `conserve debug unreferenced ARCHIVE` lists unreferenced blocks.
+
 ## v0.6.4 2020-07-04
 
 ### Features
 
-* New `conserve restore --only SUBTREE` option restores only one subtree of the
-  archive.  Thanks to Francesco Gadaleta.
+- New `conserve restore --only SUBTREE` option restores only one subtree of the
+  archive. Thanks to Francesco Gadaleta.
 
 ### Performance improvements
 
-`conserve validate` is now significantly faster. Conserve remembers which
-blocks have been validated and what their uncompressed length is, and uses this
-when checking that file index entries are valid.
+`conserve validate` is now significantly faster. Conserve remembers which blocks
+have been validated and what their uncompressed length is, and uses this when
+checking that file index entries are valid.
 
 ### Behavior changes
 
 Some rearrangements to the command-line grammar to make it more concise and
 consistent:
 
-- `conserve debug` commands are now briefer: `conserve debug index`, `conserve
-  debug referenced`, `conserve debug blocks`.
+- `conserve debug` commands are now briefer: `conserve debug index`,
+  `conserve debug referenced`, `conserve debug blocks`.
 
 - `conserve source ls DIR` is now `conserve ls --source DIR`.
 
@@ -44,9 +50,9 @@ consistent:
   that Conserve can in future also access archives over SFTP or in cloud
   storage.
 
-- Add tests that Conserve can read and write archives written by older 
-  compatible versions. (At present, everything from the 0.6 series that 
-  changed the format.)
+- Add tests that Conserve can read and write archives written by older
+  compatible versions. (At present, everything from the 0.6 series that changed
+  the format.)
 
 - New simpler `Archive::backup` and `Archive::restore` public APIs.
 
@@ -54,8 +60,8 @@ consistent:
 
 Conserve 0.6.4 uses the same 0.6 archive version, with one compatible addition:
 
-- BANDTAIL files contain an additional `index_hunk_count` to enable `conserve
-  validate` to check that no hunks are missing.
+- BANDTAIL files contain an additional `index_hunk_count` to enable
+  `conserve validate` to check that no hunks are missing.
 
 ## v0.6.3 2020-05-30
 

@@ -213,6 +213,17 @@ impl Archive {
             .collect())
     }
 
+    /// Returns an iterator of blocks that are present and referenced by no index.
+    pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = String>> {
+        ui::println("Find referenced blocks...");
+        let referenced = self.referenced_blocks()?;
+        ui::println("Find present blocks...");
+        Ok(self
+            .block_dir()
+            .block_names()?
+            .filter(move |hash| !referenced.contains(hash)))
+    }
+
     pub fn validate(&self) -> Result<ValidateStats> {
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");

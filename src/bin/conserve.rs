@@ -155,6 +155,9 @@ enum Debug {
 
     /// List all blocks referenced by any band.
     Referenced { archive: PathBuf },
+
+    /// List garbage blocks referenced by no band.
+    Unreferenced { archive: PathBuf },
 }
 
 enum ExitCode {
@@ -198,6 +201,12 @@ impl Command {
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open_path(archive)?.referenced_blocks()? {
+                    writeln!(bw, "{}", hash)?;
+                }
+            }
+            Command::Debug(Debug::Unreferenced { archive }) => {
+                let mut bw = BufWriter::new(stdout);
+                for hash in Archive::open_path(archive)?.unreferenced_blocks()? {
                     writeln!(bw, "{}", hash)?;
                 }
             }

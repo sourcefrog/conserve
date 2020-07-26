@@ -194,6 +194,17 @@ both     /subdir/subfile
         .stdout(predicate::function(is_expected_blocks));
 
     run_conserve()
+        .args(&["debug", "unreferenced"])
+        .arg(&arch_dir)
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(concat!(
+            "Find referenced blocks...\n",
+            "Find present blocks...\n"
+        ));
+
+    run_conserve()
         .args(&["debug", "index"])
         .arg(&arch_dir)
         .assert()

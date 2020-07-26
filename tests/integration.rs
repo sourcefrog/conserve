@@ -170,6 +170,7 @@ fn check_backup(af: &ScratchArchive) {
             .collect::<Vec<String>>(),
         vec![HELLO_HASH]
     );
+    assert_eq!(af.unreferenced_blocks().unwrap().count(), 0);
 }
 
 /// Store and retrieve large files.
