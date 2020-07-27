@@ -233,7 +233,7 @@ impl PartialOrd for Apath {
 
 /// Observe Apaths and assert that they're visited in the correct order.
 // GRCOV_EXCLUDE_START
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CheckOrder {
     /// The last-seen filename, to enforce ordering.
     last_apath: Option<Apath>,

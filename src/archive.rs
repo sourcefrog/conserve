@@ -26,6 +26,7 @@ use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
 use crate::stats::{CopyStats, ValidateStats};
+use crate::stitch::IterStitchedIndexHunks;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -142,6 +143,26 @@ impl Archive {
         &self.block_dir
     }
 
+    pub fn band_exists(&self, band_id: &BandId) -> Result<bool> {
+        self.transport
+            .exists(&format!(
+                "{}/{}",
+                band_id.to_string(),
+                crate::BAND_HEAD_FILENAME
+            ))
+            .map_err(Error::from)
+    }
+
+    pub fn band_is_closed(&self, band_id: &BandId) -> Result<bool> {
+        self.transport
+            .exists(&format!(
+                "{}/{}",
+                band_id.to_string(),
+                crate::BAND_TAIL_FILENAME
+            ))
+            .map_err(Error::from)
+    }
+
     /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_band_ids(&self) -> Result<Vec<BandId>> {
         let mut band_ids: Vec<BandId> = self.iter_band_ids_unsorted()?.collect();
@@ -227,8 +248,8 @@ impl Archive {
     pub fn validate(&self) -> Result<ValidateStats> {
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
-        let block_lens: HashMap<String, usize> = self.block_dir.validate(&mut stats)?;
-        self.validate_bands(&block_lens, &mut stats)?;
+        let block_lengths: HashMap<String, usize> = self.block_dir.validate(&mut stats)?;
+        self.validate_bands(&block_lengths, &mut stats)?;
 
         if stats.has_problems() {
             ui::problem("Archive has some problems.");
@@ -303,7 +324,7 @@ impl Archive {
 
     fn validate_bands(
         &self,
-        block_lens: &HashMap<String, usize>,
+        block_lengths: &HashMap<String, usize>,
         stats: &mut ValidateStats,
     ) -> Result<()> {
         // TODO: Don't stop early on any errors in the steps below, but do count them.
@@ -318,9 +339,20 @@ impl Archive {
             b.validate(stats)?;
 
             let st = self.open_stored_tree(BandSelectionPolicy::Specified(bid))?;
-            st.validate(block_lens, stats)?;
+            st.validate(block_lengths, stats)?;
         }
         Ok(())
+    }
+
+    /// Return an iterator that reconstructs the most complete available index for a possibly-incomplete band.
+    ///
+    /// If the band is complete, this is simply the band's index.
+    ///
+    /// If it's incomplete, it stitches together the index by picking up at the same point in the previous
+    /// band, continuing backwards recursively until either there are no more previous indexes, or a complete
+    /// index is found.
+    pub fn iter_stitched_index_hunks(&self, band_id: &BandId) -> IterStitchedIndexHunks {
+        IterStitchedIndexHunks::new(self, band_id)
     }
 }
 

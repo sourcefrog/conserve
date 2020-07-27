@@ -6,6 +6,15 @@
 
 - New `conserve debug unreferenced ARCHIVE` lists unreferenced blocks.
 
+- Conserve now "stitches" together incomplete backups with the previous index.
+  This means that restoring from a backup that did not complete will give the
+  most complete available copy of the tree at that point in time.
+
+### Behavior changes
+
+- The `--incomplete` option, to read the partial tree from an interrupted
+  backup, is no longer needed and has been removed.
+
 ## v0.6.4 2020-07-04
 
 ### Features

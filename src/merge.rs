@@ -55,8 +55,8 @@ where
 }
 
 pub struct MergeTrees<AT: ReadTree, BT: ReadTree> {
-    ait: AT::I,
-    bit: BT::I,
+    ait: Box<dyn Iterator<Item = AT::Entry>>,
+    bit: Box<dyn Iterator<Item = BT::Entry>>,
 
     // Read in advance entries from A and B.
     na: Option<AT::Entry>,

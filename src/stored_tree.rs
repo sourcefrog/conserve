@@ -20,9 +20,6 @@
 
 use std::collections::HashMap;
 
-use rayon::iter::ParallelBridge;
-use rayon::prelude::*;
-
 use crate::blockdir::BlockDir;
 use crate::kind::Kind;
 use crate::stored_file::{ReadStoredFile, StoredFile};
@@ -31,6 +28,7 @@ use crate::*;
 /// Read index and file contents for a version stored in the archive.
 pub struct StoredTree {
     band: Band,
+    archive: Archive,
     block_dir: BlockDir,
     excludes: GlobSet,
 }
@@ -41,6 +39,7 @@ impl StoredTree {
             band: Band::open(archive, band_id)?,
             block_dir: archive.block_dir().clone(),
             excludes: excludes::excludes_nothing(),
+            archive: archive.clone(),
         })
     }
 
@@ -58,21 +57,20 @@ impl StoredTree {
 
     pub fn validate(
         &self,
-        block_lens: &HashMap<String, usize>,
+        block_lengths: &HashMap<String, usize>,
         stats: &mut ValidateStats,
     ) -> Result<()> {
         let band_id = self.band().id();
         ui::set_progress_phase(&format!("Check tree {}", self.band().id()));
         stats.block_missing_count = self
             .iter_entries()?
-            .par_bridge()
             .filter(|entry| entry.kind() == Kind::File)
             .map(move |entry| {
                 entry
                     .addrs
                     .iter()
                     .filter(|addr| {
-                        if let Some(block_len) = block_lens.get(&addr.hash) {
+                        if let Some(block_len) = block_lengths.get(&addr.hash) {
                             // Present, but the address is out of range.
                             if (addr.start + addr.len) > (*block_len as u64) {
                                 ui::problem(&format!(
@@ -107,16 +105,18 @@ impl StoredTree {
 }
 
 impl ReadTree for StoredTree {
-    type I = index::IndexEntryIter;
     type R = ReadStoredFile;
     type Entry = IndexEntry;
 
     /// Return an iter of index entries in this stored tree.
-    fn iter_entries(&self) -> Result<index::IndexEntryIter> {
-        Ok(self
-            .band
-            .iter_entries()?
-            .with_excludes(self.excludes.clone()))
+    fn iter_entries(&self) -> Result<Box<dyn Iterator<Item = index::IndexEntry>>> {
+        let excludes = self.excludes.clone();
+        Ok(Box::new(
+            self.archive
+                .iter_stitched_index_hunks(self.band.id())
+                .flatten()
+                .filter(move |entry| !excludes.is_match(&entry.apath)),
+        ))
     }
 
     fn iter_subtree_entries(

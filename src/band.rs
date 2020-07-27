@@ -30,8 +30,6 @@ use crate::transport::{ListDirNames, Transport};
 use crate::*;
 
 static INDEX_DIR: &str = "i";
-static HEAD_FILENAME: &str = "BANDHEAD";
-static TAIL_FILENAME: &str = "BANDTAIL";
 
 /// Band format-compatibility. Bands written out by this program, can only be
 /// read correctly by versions equal or later than the stated version.
@@ -123,7 +121,7 @@ impl Band {
             start_time: Utc::now().timestamp(),
             band_format_version: Some(BAND_FORMAT_VERSION.to_owned()),
         };
-        write_json(&transport, HEAD_FILENAME, &head)?;
+        write_json(&transport, BAND_HEAD_FILENAME, &head)?;
         Ok(Band { band_id, transport })
     }
 
@@ -131,7 +129,7 @@ impl Band {
     pub fn close(&self, index_hunk_count: u64) -> Result<()> {
         write_json(
             &self.transport,
-            TAIL_FILENAME,
+            BAND_TAIL_FILENAME,
             &Tail {
                 end_time: Utc::now().timestamp(),
                 index_hunk_count: Some(index_hunk_count),
@@ -162,7 +160,9 @@ impl Band {
     }
 
     pub fn is_closed(&self) -> Result<bool> {
-        self.transport.exists(TAIL_FILENAME).map_err(Error::from)
+        self.transport
+            .exists(BAND_TAIL_FILENAME)
+            .map_err(Error::from)
     }
 
     pub fn id(&self) -> &BandId {
@@ -184,12 +184,16 @@ impl Band {
     }
 
     fn read_head(&self) -> Result<Head> {
-        read_json(&self.transport, HEAD_FILENAME)
+        read_json(&self.transport, BAND_HEAD_FILENAME)
     }
 
     fn read_tail(&self) -> Result<Option<Tail>> {
-        if self.transport.exists(TAIL_FILENAME).map_err(Error::from)? {
-            Ok(Some(read_json(&self.transport, TAIL_FILENAME)?))
+        if self
+            .transport
+            .exists(BAND_TAIL_FILENAME)
+            .map_err(Error::from)?
+        {
+            Ok(Some(read_json(&self.transport, BAND_TAIL_FILENAME)?))
         } else {
             Ok(None)
         }
@@ -214,12 +218,12 @@ impl Band {
     pub fn validate(&self, stats: &mut ValidateStats) -> Result<()> {
         let ListDirNames { mut files, dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
-        if !files.contains(&HEAD_FILENAME.to_string()) {
+        if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
             ui::problem(&format!("No band head file in {:?}", self.transport));
             stats.missing_band_heads += 1;
         }
-        remove_item(&mut files, &HEAD_FILENAME);
-        remove_item(&mut files, &TAIL_FILENAME);
+        remove_item(&mut files, &BAND_HEAD_FILENAME);
+        remove_item(&mut files, &BAND_TAIL_FILENAME);
 
         if !files.is_empty() {
             ui::problem(&format!(
@@ -295,7 +299,7 @@ mod tests {
             "band_format_version": "0.8.8",
         });
         fs::write(
-            af.path().join("b0000").join(HEAD_FILENAME),
+            af.path().join("b0000").join(BAND_HEAD_FILENAME),
             head.to_string(),
         )
         .unwrap();

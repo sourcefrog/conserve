@@ -44,6 +44,9 @@ pub fn simple_backup() {
     let restore_dir = TempDir::new().unwrap();
 
     let archive = Archive::open_path(af.path()).unwrap();
+    assert_eq!(archive.band_exists(&BandId::zero()).unwrap(), true);
+    assert_eq!(archive.band_is_closed(&BandId::zero()).unwrap(), true);
+    assert_eq!(archive.band_exists(&BandId::new(&[1])).unwrap(), false);
     let copy_stats = archive
         .restore(&restore_dir.path(), &RestoreOptions::default())
         .expect("restore");
