@@ -120,6 +120,15 @@ mod test {
         }
     }
 
+    fn simple_ls(archive: &Archive, band_id: &BandId) -> String {
+        let strs: Vec<String> = archive
+            .iter_stitched_index_hunks(band_id)
+            .flatten()
+            .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
+            .collect();
+        strs.join(" ")
+    }
+
     #[test]
     fn stitch_index() -> Result<()> {
         let af = ScratchArchive::new();
@@ -130,7 +139,10 @@ mod test {
         // * b1 is complete and contains symlinks 0, 1, 2, 3 all with target 'b1'.
         // * b2 is incomplete and contains symlinks 0, 2, with target 'b2'. 1 has been deleted, and 3
         //   we don't know about, so will assume is carried over.
-        // * b3 is incomplete and contains symlink 0, 00, with target 'b3'. As in b2, 1 is not present
+        // * b3 has been deleted
+        // * b4 exists but has no hunks.
+        // * b5 is incomplete and contains symlink 0, 00, with target 'b5'.
+        //   1 was deleted in b2, 2 is carried over from b2,
         //   and 3 is carried over from b1.
 
         let band = Band::create(&af)?;
@@ -140,7 +152,6 @@ mod test {
         ib.push_entry(symlink("/1", "b0"))?;
         ib.flush()?;
         ib.push_entry(symlink("/2", "b0"))?;
-        ib.push_entry(symlink("/3", "b0"))?;
         // Flush this hunk but leave the band incomplete.
         let stats = ib.finish()?;
         assert_eq!(stats.index_hunks, 2);
@@ -171,20 +182,39 @@ mod test {
         // b3
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0003");
+
+        // b4
+        let band = Band::create(&af)?;
+        assert_eq!(band.id().to_string(), "b0004");
+
+        // b5
+        let band = Band::create(&af)?;
+        assert_eq!(band.id().to_string(), "b0005");
         let mut ib = band.index_builder();
-        ib.push_entry(symlink("/0", "b3"))?;
-        ib.push_entry(symlink("/00", "b3"))?;
+        ib.push_entry(symlink("/0", "b5"))?;
+        ib.push_entry(symlink("/00", "b5"))?;
         let stats = ib.finish()?;
         assert_eq!(stats.index_hunks, 1);
         // incomplete
 
+        std::fs::remove_dir_all(&af.path().join("b0003"))?;
+
         let archive = Archive::open_path(&af.path())?;
-        let b0_apaths_targets: Vec<String> = archive
-            .iter_stitched_index_hunks(&BandId::new(&[0]))
-            .flatten()
-            .map(|entry| format!("{} {}", &entry.apath, entry.target.expect("Not a symlink")))
-            .collect();
-        assert_eq!(b0_apaths_targets, ["/0 b0", "/1 b0", "/2 b0", "/3 b0"]);
+        assert_eq!(simple_ls(&archive, &BandId::new(&[0])), "/0:b0 /1:b0 /2:b0");
+
+        assert_eq!(
+            simple_ls(&archive, &BandId::new(&[1])),
+            "/0:b1 /1:b1 /2:b1 /3:b1"
+        );
+
+        assert_eq!(simple_ls(&archive, &BandId::new(&[2])), "/0:b2 /2:b2 /3:b1");
+
+        assert_eq!(simple_ls(&archive, &BandId::new(&[4])), "/0:b2 /2:b2 /3:b1");
+
+        assert_eq!(
+            simple_ls(&archive, &BandId::new(&[5])),
+            "/0:b5 /00:b5 /2:b2 /3:b1"
+        );
 
         Ok(())
     }
