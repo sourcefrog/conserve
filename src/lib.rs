@@ -19,6 +19,7 @@ pub mod backup;
 mod band;
 pub mod bandid;
 mod blockdir;
+pub mod blockhash;
 pub mod compress;
 pub mod copy_tree;
 mod entry;
@@ -91,5 +92,12 @@ const TIMESTAMP_FORMAT: &str = "%F %T";
 
 /// Temporary files in the archive have this prefix.
 const TMP_PREFIX: &str = "tmp";
+
+/// Metadata file in the band directory.
 static BAND_HEAD_FILENAME: &str = "BANDHEAD";
+
+/// Metadata file in the band directory, for closed bands.
 static BAND_TAIL_FILENAME: &str = "BANDTAIL";
+
+/// Length of the binary content hash.
+pub(crate) const BLAKE_HASH_SIZE_BYTES: usize = 64;

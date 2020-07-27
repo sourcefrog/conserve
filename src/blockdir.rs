@@ -39,10 +39,7 @@ use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
 use crate::*;
 
-/// Use the maximum 64-byte hash.
-pub const BLAKE_HASH_SIZE_BYTES: usize = 64;
-
-const BLOCKDIR_FILE_NAME_LEN: usize = BLAKE_HASH_SIZE_BYTES * 2;
+const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
 
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
