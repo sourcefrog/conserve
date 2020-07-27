@@ -57,6 +57,7 @@ blake2_simd_asm = ["blake2-rfc/simd_asm"]
 debug_clap = ["structopt/debug"]
 
 [lib]
-doctest = false
+doctest = true
+
 [profile.release]
 debug = true
