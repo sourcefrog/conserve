@@ -5,7 +5,9 @@ export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Co
 export RUSTDOCFLAGS="-Cpanic=abort"
 # cargo +nightly clean
 cargo +nightly test
-grcov ./target/debug/ -s . -t html --llvm --branch --ignore-not-existing \
+grcov ./target/debug/ -s . -t html --llvm --branch \
+  --ignore '../*' \
+  --ignore-not-existing \
   --excl-start GRCOV_EXCLUDE_START \
   --excl-stop GRCOV_EXCLUDE_STOP \
   --excl-line GRCOV_EXCLUDE \
