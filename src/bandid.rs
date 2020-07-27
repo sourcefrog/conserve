@@ -58,7 +58,8 @@ impl BandId {
     /// use conserve::BandId;
     ///
     /// assert_eq!(BandId::zero().previous(), None);
-    /// assert_eq!(BandId::zero().next_sibling().previous(), BandId::zero());
+    /// assert_eq!(BandId::zero().next_sibling().previous(),
+    ///     Some(BandId::zero()));
     /// ```
     pub fn previous(&self) -> Option<BandId> {
         if self.seqs.len() != 1 {
