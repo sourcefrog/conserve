@@ -138,32 +138,35 @@ mod test {
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b0"))?;
         ib.push_entry(symlink("/1", "b0"))?;
+        ib.flush()?;
         ib.push_entry(symlink("/2", "b0"))?;
         ib.push_entry(symlink("/3", "b0"))?;
         // Flush this hunk but leave the band incomplete.
         let stats = ib.finish()?;
-        assert_eq!(stats.index_hunks, 1);
+        assert_eq!(stats.index_hunks, 2);
 
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0001");
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b1"))?;
         ib.push_entry(symlink("/1", "b1"))?;
+        ib.flush()?;
         ib.push_entry(symlink("/2", "b1"))?;
         ib.push_entry(symlink("/3", "b1"))?;
         let stats = ib.finish()?;
-        assert_eq!(stats.index_hunks, 1);
-        band.close(1)?;
+        assert_eq!(stats.index_hunks, 2);
+        band.close(2)?;
 
         // b2
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0002");
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b2"))?;
+        ib.flush()?;
         ib.push_entry(symlink("/2", "b2"))?;
         // incomplete
         let stats = ib.finish()?;
-        assert_eq!(stats.index_hunks, 1);
+        assert_eq!(stats.index_hunks, 2);
 
         // b3
         let band = Band::create(&af)?;

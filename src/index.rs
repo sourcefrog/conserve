@@ -181,6 +181,10 @@ impl IndexBuilder {
         }
     }
 
+    pub fn flush(&mut self) -> Result<()> {
+        self.finish_hunk()
+    }
+
     /// Finish this hunk of the index.
     ///
     /// This writes all the currently queued entries into a new index file
