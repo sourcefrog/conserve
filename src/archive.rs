@@ -237,14 +237,15 @@ impl Archive {
             .map(move |(_i, band_id)| Band::open(&archive, &band_id).expect("Failed to open band"))
             .flat_map(|band| band.iter_entries().expect("Failed to iter entries"))
             .flat_map(|entry| entry.addrs)
-            .map(|addrs| addrs.hash)
+            .map(|addr| addr.hash)
             .collect())
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
     pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         let referenced = self.referenced_blocks()?;
-        ui::println("Find present blocks...");
+        let mut progress = ProgressBar::default();
+        progress.set_phase("Find present blocks...".to_owned());
         Ok(self
             .block_dir()
             .block_names()?
@@ -254,8 +255,8 @@ impl Archive {
     pub fn validate(&self) -> Result<ValidateStats> {
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
-        let block_lens: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
-        self.validate_bands(&block_lens, &mut stats)?;
+        let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
+        self.validate_bands(&block_lengths, &mut stats)?;
 
         if stats.has_problems() {
             ui::problem("Archive has some problems.");

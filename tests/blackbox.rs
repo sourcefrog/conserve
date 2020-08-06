@@ -198,11 +198,8 @@ both     /subdir/subfile
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(concat!(
-            "Find referenced blocks...\n",
-            "Find present blocks...\n"
-        ));
+        .stderr("")
+        .stdout("");
 
     run_conserve()
         .args(&["debug", "index"])
