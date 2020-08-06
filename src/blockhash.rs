@@ -16,6 +16,7 @@
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Display;
+use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
 use serde::Serialize;
@@ -97,3 +98,9 @@ impl PartialEq for BlockHash2 {
 }
 
 impl Eq for BlockHash2 {}
+
+impl Hash for BlockHash2 {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.bin.hash(state);
+    }
+}
