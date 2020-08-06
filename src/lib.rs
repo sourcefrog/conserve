@@ -52,6 +52,7 @@ pub use crate::band::Band;
 pub use crate::band::BandSelectionPolicy;
 pub use crate::bandid::BandId;
 pub use crate::blockdir::BlockDir;
+pub use crate::blockhash::BlockHash;
 pub use crate::copy_tree::copy_tree;
 pub use crate::entry::Entry;
 pub use crate::errors::Error;

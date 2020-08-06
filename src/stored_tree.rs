@@ -57,7 +57,7 @@ impl StoredTree {
 
     pub fn validate(
         &self,
-        block_lengths: &HashMap<String, usize>,
+        block_lengths: &HashMap<BlockHash, usize>,
         stats: &mut ValidateStats,
     ) -> Result<()> {
         let band_id = self.band().id();
@@ -70,7 +70,7 @@ impl StoredTree {
                     .addrs
                     .iter()
                     .filter(|addr| {
-                        if let Some(block_len) = block_lengths.get(&addr.hash) {
+                        if let Some(block_len) = block_lengths.get(&addr.hash.parse().unwrap()) {
                             // Present, but the address is out of range.
                             if (addr.start + addr.len) > (*block_len as u64) {
                                 ui::problem(&format!(

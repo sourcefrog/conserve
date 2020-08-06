@@ -20,6 +20,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::backup::BackupOptions;
+use crate::blockhash::BlockHash;
 use crate::copy_tree::CopyOptions;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
@@ -248,8 +249,8 @@ impl Archive {
     pub fn validate(&self) -> Result<ValidateStats> {
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
-        let block_lengths: HashMap<String, usize> = self.block_dir.validate(&mut stats)?;
-        self.validate_bands(&block_lengths, &mut stats)?;
+        let block_lens: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
+        self.validate_bands(&block_lens, &mut stats)?;
 
         if stats.has_problems() {
             ui::problem("Archive has some problems.");
@@ -324,7 +325,7 @@ impl Archive {
 
     fn validate_bands(
         &self,
-        block_lengths: &HashMap<String, usize>,
+        block_lengths: &HashMap<BlockHash, usize>,
         stats: &mut ValidateStats,
     ) -> Result<()> {
         // TODO: Don't stop early on any errors in the steps below, but do count them.

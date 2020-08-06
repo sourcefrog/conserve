@@ -31,14 +31,14 @@ use crate::*;
 ///
 /// ```
 /// use std::str::FromStr;
-/// use conserve::blockhash::BlockHash2;
+/// use conserve::blockhash::BlockHash;
 ///
 /// let hex_hash = concat!(
 ///     "00000000000000000000000000000000",
 ///     "00000000000000000000000000000000",
 ///     "00000000000000000000000000000000",
 ///     "00000000000000000000000000000000",);
-/// let hash = BlockHash2::from_str(hex_hash)
+/// let hash = BlockHash::from_str(hex_hash)
 ///     .unwrap();
 /// let hash2 = hash.clone();
 /// assert_eq!(hash2.to_string(), hex_hash);
@@ -46,7 +46,7 @@ use crate::*;
 #[derive(Clone, Serialize)]
 #[serde(into = "String")]
 #[serde(try_from = "&str")]
-pub struct BlockHash2 {
+pub struct BlockHash {
     /// Binary hash.
     bin: [u8; BLAKE_HASH_SIZE_BYTES],
 }
@@ -54,7 +54,7 @@ pub struct BlockHash2 {
 #[derive(Debug)]
 pub struct BlockHashParseError {}
 
-impl FromStr for BlockHash2 {
+impl FromStr for BlockHash {
     type Err = BlockHashParseError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -64,51 +64,51 @@ impl FromStr for BlockHash2 {
         let mut bin = [0; BLAKE_HASH_SIZE_BYTES];
         hex::decode_to_slice(s, &mut bin)
             .or(Err(BlockHashParseError {}))
-            .and(Ok(BlockHash2 { bin }))
+            .and(Ok(BlockHash { bin }))
     }
 }
 
-impl Display for BlockHash2 {
+impl Display for BlockHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(&self.bin[..]))
     }
 }
 
-impl From<BlockHash2> for String {
-    fn from(hash: BlockHash2) -> String {
+impl From<BlockHash> for String {
+    fn from(hash: BlockHash) -> String {
         hex::encode(&hash.bin[..])
     }
 }
 
-impl From<Blake2bResult> for BlockHash2 {
-    fn from(hash: Blake2bResult) -> BlockHash2 {
+impl From<Blake2bResult> for BlockHash {
+    fn from(hash: Blake2bResult) -> BlockHash {
         let mut bin = [0; BLAKE_HASH_SIZE_BYTES];
         bin.copy_from_slice(hash.as_bytes());
-        BlockHash2 { bin }
+        BlockHash { bin }
     }
 }
 
-impl Ord for BlockHash2 {
+impl Ord for BlockHash {
     fn cmp(&self, other: &Self) -> Ordering {
         self.bin.cmp(&other.bin)
     }
 }
 
-impl PartialOrd for BlockHash2 {
+impl PartialOrd for BlockHash {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.bin.cmp(&other.bin))
     }
 }
 
-impl PartialEq for BlockHash2 {
+impl PartialEq for BlockHash {
     fn eq(&self, other: &Self) -> bool {
         self.bin[..] == other.bin[..]
     }
 }
 
-impl Eq for BlockHash2 {}
+impl Eq for BlockHash {}
 
-impl Hash for BlockHash2 {
+impl Hash for BlockHash {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.bin.hash(state);
     }

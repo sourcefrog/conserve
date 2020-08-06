@@ -32,6 +32,7 @@ use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
 use crate::stats::{CopyStats, Sizes, ValidateStats};
@@ -43,9 +44,6 @@ const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
 
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
-
-/// The unique identifier for a block: its hexadecimal `BLAKE2b` hash.
-pub type BlockHash = String;
 
 /// Points to some compressed data inside the block dir.
 ///
@@ -77,8 +75,9 @@ fn subdir_relpath(block_hash: &str) -> &str {
 }
 
 /// Return the transport-relative file for a given hash.
-fn block_relpath(hash_hex: &str) -> String {
-    format!("{}/{}", subdir_relpath(hash_hex), hash_hex)
+fn block_relpath(hash: &BlockHash) -> String {
+    let hash_hex = hash.to_string();
+    format!("{}/{}", subdir_relpath(&hash_hex), hash_hex)
 }
 
 impl BlockDir {
@@ -103,14 +102,16 @@ impl BlockDir {
     }
 
     /// Returns the number of compressed bytes.
-    fn compress_and_store(&mut self, in_buf: &[u8], hex_hash: &str) -> Result<u64> {
+    fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
         // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
         let mut compressor = Compressor::new();
         let compressed = compressor.compress(&in_buf)?;
         let comp_len: u64 = compressed.len().try_into().unwrap();
-        self.transport.create_dir(subdir_relpath(hex_hash))?;
+        let hex_hash = hash.to_string();
+        let relpath = block_relpath(hash);
+        self.transport.create_dir(subdir_relpath(&hex_hash))?;
         self.transport
-            .write_file(&block_relpath(hex_hash), compressed)
+            .write_file(&relpath, compressed)
             .or_else(|io_err| {
                 if io_err.kind() == io::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
@@ -121,7 +122,7 @@ impl BlockDir {
                     Ok(())
                 } else {
                     Err(Error::WriteBlock {
-                        hash: hex_hash.to_owned(),
+                        hash: hex_hash,
                         source: io_err,
                     })
                 }
@@ -130,7 +131,7 @@ impl BlockDir {
     }
 
     /// True if the named block is present in this directory.
-    pub fn contains(&self, hash: &str) -> Result<bool> {
+    pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
         self.transport
             .exists(&block_relpath(hash))
             .map_err(Error::from)
@@ -140,7 +141,7 @@ impl BlockDir {
     ///
     /// To read a whole file, use StoredFile instead.
     pub fn get(&self, address: &Address) -> Result<(Vec<u8>, Sizes)> {
-        let (mut decompressed, sizes) = self.get_block_content(&address.hash)?;
+        let (mut decompressed, sizes) = self.get_block_content(&address.hash.parse().unwrap())?;
         let len = address.len as usize;
         let start = address.start as usize;
         let actual_len = decompressed.len();
@@ -231,13 +232,15 @@ impl BlockDir {
         ));
         ui::set_progress_phase(&"Check block hashes");
         // Make a vec of Some(usize) if the block could be read, or None if it failed.
-        let mut results: Vec<Option<(String, usize)>> = Vec::new();
+        let mut results: Vec<Option<(BlockHash, usize)>> = Vec::new();
         block_dir_entries
             .par_iter()
             .map(|de| {
+                // TODO: Don't panic here.
+                let hash = de.name.parse().unwrap();
                 ui::increment_bytes_done(de.len);
-                self.get_block_content(&de.name)
-                    .map(|(bytes, _sizes)| (de.name.clone(), bytes.len()))
+                self.get_block_content(&hash)
+                    .map(|(bytes, _sizes)| (hash, bytes.len()))
                     .ok()
             })
             .collect_into_vec(&mut results);
@@ -253,7 +256,7 @@ impl BlockDir {
     /// Return the entire contents of the block.
     ///
     /// Checks that the hash is correct with the contents.
-    pub fn get_block_content(&self, hash: &str) -> Result<(Vec<u8>, Sizes)> {
+    pub fn get_block_content(&self, hash: &BlockHash) -> Result<(Vec<u8>, Sizes)> {
         // TODO: Reuse decompressor buffer.
         // TODO: Reuse read buffer.
         let mut decompressor = Decompressor::new();
@@ -263,20 +266,22 @@ impl BlockDir {
             .read_file(&block_relpath, &mut compressed_bytes)
             .map_err(|source| Error::ReadBlock {
                 source,
-                hash: hash.to_owned(),
+                hash: hash.to_string(),
             })?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
-        let actual_hash = hex::encode(
-            blake2b::blake2b(BLAKE_HASH_SIZE_BYTES, &[], &decompressed_bytes).as_bytes(),
-        );
+        let actual_hash = BlockHash::from(blake2b::blake2b(
+            BLAKE_HASH_SIZE_BYTES,
+            &[],
+            &decompressed_bytes,
+        ));
         if actual_hash != *hash {
             ui::problem(&format!(
-                "Block file {:?} has actual decompressed hash {:?}",
+                "Block file {:?} has actual decompressed hash {}",
                 &block_relpath, actual_hash
             ));
             return Err(Error::BlockCorrupt {
-                hash: hash.to_owned(),
-                actual_hash,
+                hash: hash.to_string(),
+                actual_hash: actual_hash.to_string(),
             });
         }
         let sizes = Sizes {
@@ -331,7 +336,7 @@ impl StoreFiles {
                 break;
             }
             let block_data = &self.input_buf[..read_len];
-            let block_hash: String = hash_bytes(block_data).unwrap();
+            let block_hash = hash_bytes(block_data)?;
             if self.block_dir.contains(&block_hash)? {
                 // TODO: Separate counter for size of the already-present blocks?
                 stats.deduplicated_blocks += 1;
@@ -343,7 +348,7 @@ impl StoreFiles {
                 stats.compressed_bytes += comp_len;
             }
             addresses.push(Address {
-                hash: block_hash,
+                hash: block_hash.to_string(),
                 start: 0,
                 len: read_len as u64,
             });
@@ -360,7 +365,7 @@ impl StoreFiles {
 fn hash_bytes(in_buf: &[u8]) -> Result<BlockHash> {
     let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
     hasher.update(in_buf);
-    Ok(hex::encode(hasher.finalize().as_bytes()))
+    Ok(BlockHash::from(hasher.finalize()))
 }
 
 #[cfg(test)]
@@ -393,7 +398,7 @@ mod tests {
 
     #[test]
     pub fn store_a_file() {
-        let expected_hash = EXAMPLE_BLOCK_HASH.to_string();
+        let expected_hash = EXAMPLE_BLOCK_HASH.to_string().parse().unwrap();
         let (testdir, block_dir) = setup();
         let mut example_file = make_example_file();
 
