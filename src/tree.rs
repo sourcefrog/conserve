@@ -52,12 +52,15 @@ pub trait ReadTree {
     ///
     /// This typically requires walking all entries, which may take a while.
     fn size(&self) -> Result<TreeSize> {
+        let mut progress = ProgressBar::default();
+        progress.set_phase("Measuring".to_owned());
         let mut tot = 0u64;
         for e in self.iter_entries()? {
             // While just measuring size, ignore directories/files we can't stat.
-            let s = e.size().unwrap_or(0);
-            tot += s;
-            ui::increment_bytes_done(s);
+            if let Some(bytes) = e.size() {
+                tot += bytes;
+                progress.increment_bytes_done(bytes);
+            }
         }
         Ok(TreeSize { file_bytes: tot })
     }

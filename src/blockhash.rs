@@ -74,10 +74,8 @@ impl FromStr for BlockHash {
         }
         let mut bin = [0; BLAKE_HASH_SIZE_BYTES];
         hex::decode_to_slice(s, &mut bin)
-            .or_else(|_| {
-                Err(BlockHashParseError {
-                    rejected_string: s.to_owned(),
-                })
+            .map_err(|_| BlockHashParseError {
+                rejected_string: s.to_owned(),
             })
             .and(Ok(BlockHash { bin }))
     }

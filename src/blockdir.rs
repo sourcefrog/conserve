@@ -31,6 +31,7 @@ use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use thousands::Separable;
 
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
@@ -222,14 +223,30 @@ impl BlockDir {
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
         ui::println("Count blocks...");
-        ui::set_progress_phase(&"Count blocks");
-        let blocks: Vec<BlockHash> = self.block_names()?.collect();
-        crate::ui::println(&format!("Check {} blocks...", blocks.len()));
+        let mut progress = ProgressBar::default();
+        progress.set_phase("Count blocks".to_owned());
+        // TODO: Progress while counting...
+        let blocks: Vec<BlockHash> = self
+            .block_names()?
+            .enumerate()
+            .inspect(|(i, _hash)| {
+                if i % 100 == 0 {
+                    progress.set_work_done(*i as u64)
+                }
+            })
+            .map(|(_i, hash)| hash)
+            .collect();
+        crate::ui::println(&format!(
+            "Check {} blocks...",
+            blocks.len().separate_with_commas()
+        ));
+        progress.set_total_work(blocks.len() as u64);
         stats.block_read_count = blocks.len().try_into().unwrap();
-        ui::set_progress_phase(&"Check block hashes");
+        progress.set_phase("Check block hashes".to_owned());
         // Make a vec of Some(usize) if the block could be read, or None if it
         // failed, where the usize gives the uncompressed data size.
         let mut results: Vec<Option<(BlockHash, usize)>> = Vec::new();
+        // TODO: Progress during parallel traversal.
         blocks
             .into_par_iter()
             .map(|hash| {

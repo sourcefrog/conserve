@@ -20,12 +20,11 @@ use std::sync::Mutex;
 use std::time::Duration;
 use std::time::Instant;
 
-use crossterm::{cursor, queue, style, terminal};
+use crossterm::{cursor, queue, terminal};
 use lazy_static::lazy_static;
-use thousands::Separable;
-use unicode_segmentation::UnicodeSegmentation;
 
 use crate::stats::Sizes;
+use crate::ProgressBar;
 
 const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 
@@ -40,7 +39,7 @@ const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 ///
 /// So this class also works when stdout is redirected to a file, in
 /// which case it will get only messages and no progress bar junk.
-struct UIState {
+pub(crate) struct UIState {
     last_update: Option<Instant>,
 
     /// Is a progress bar currently on the screen?
@@ -48,16 +47,6 @@ struct UIState {
 
     /// Should a progress bar be drawn?
     progress_enabled: bool,
-
-    progress_state: ProgressState,
-}
-
-pub struct ProgressState {
-    pub phase: String,
-    start: Instant,
-    pub bytes_done: u64,
-    pub bytes_total: u64,
-    pub filename: String,
 }
 
 lazy_static! {
@@ -66,12 +55,20 @@ lazy_static! {
 
 // TODO: Rather than a directly-called function, hook this into logging.
 pub fn println(s: &str) {
-    UI_STATE.lock().unwrap().println(s);
+    with_locked_ui(|ui| ui.println(s))
 }
 
 // TODO: Rather than a directly-called function, hook this into logging.
 pub fn problem(s: &str) {
-    UI_STATE.lock().unwrap().problem(s)
+    with_locked_ui(|ui| ui.problem(s));
+}
+
+pub(crate) fn with_locked_ui<F>(mut cb: F)
+where
+    F: FnMut(&mut UIState),
+{
+    use std::ops::DerefMut;
+    cb(UI_STATE.lock().unwrap().deref_mut())
 }
 
 /// Report that a non-fatal error occurred.
@@ -86,38 +83,6 @@ pub fn show_error(e: &dyn std::error::Error) {
         cause = c;
     }
     problem(&buf);
-}
-
-pub fn set_progress_phase(s: &str) {
-    let mut ui = UI_STATE.lock().unwrap();
-    ui.progress_state.phase = s.to_string();
-    ui.progress_state.bytes_done = 0;
-    ui.show_progress();
-}
-
-pub fn set_progress_file(s: &str) {
-    let mut ui = UI_STATE.lock().unwrap();
-    ui.progress_state.filename = s.into();
-    ui.show_progress();
-}
-
-pub fn set_bytes_total(bytes_total: u64) {
-    UI_STATE.lock().unwrap().progress_state.bytes_total = bytes_total
-}
-
-pub fn clear_bytes_total() {
-    UI_STATE.lock().unwrap().progress_state.bytes_total = 0
-}
-
-pub fn increment_bytes_done(b: u64) {
-    let mut ui = UI_STATE.lock().unwrap();
-    ui.progress_state.bytes_done += b;
-    ui.show_progress();
-}
-
-pub fn clear_progress() {
-    let mut ui = UI_STATE.lock().unwrap();
-    ui.clear_progress();
 }
 
 /// Enable drawing progress bars, only if stdout is a tty.
@@ -135,19 +100,6 @@ impl Default for UIState {
             last_update: None,
             progress_present: false,
             progress_enabled: false,
-            progress_state: ProgressState::default(),
-        }
-    }
-}
-
-impl Default for ProgressState {
-    fn default() -> ProgressState {
-        ProgressState {
-            start: Instant::now(),
-            phase: String::new(),
-            filename: String::new(),
-            bytes_done: 0,
-            bytes_total: 0,
         }
     }
 }
@@ -203,7 +155,7 @@ impl UIState {
         }
     }
 
-    fn clear_progress(&mut self) {
+    pub(crate) fn clear_progress(&mut self) {
         let mut stdout = io::stdout();
         if self.progress_present {
             queue!(
@@ -223,67 +175,21 @@ impl UIState {
         self.last_update = Some(Instant::now());
     }
 
-    fn show_progress(&mut self) {
+    pub(crate) fn draw_progress_bar(&mut self, bar: &ProgressBar) {
         if !self.progress_enabled || !self.can_update_yet() {
             return;
         }
-        let w = if let Ok((w, _)) = terminal::size() {
-            w as usize
+        let width = if let Ok((width, _)) = terminal::size() {
+            width as usize
         } else {
             return;
         };
-
-        const SHOW_PERCENT: bool = true;
-
-        let mut prefix = String::with_capacity(50);
-        let mut message = String::with_capacity(200);
-        let state = &self.progress_state;
-        let elapsed = state.start.elapsed();
-        let rate = mbps_rate(state.bytes_done, elapsed);
-        if SHOW_PERCENT && state.bytes_total > 0 {
-            write!(
-                prefix,
-                "{:>3}% ",
-                100 * state.bytes_done / state.bytes_total
-            )
-            .unwrap();
-        }
-        write!(prefix, "{} ", duration_to_hms(elapsed)).unwrap();
-        write!(
-            prefix,
-            "{:>15} ",
-            crate::misc::bytes_to_human_mb(state.bytes_done),
-        )
-        .unwrap();
-        write!(prefix, "{:>8} MB/s ", (rate as u64).separate_with_commas()).unwrap();
-        write!(message, "{} {}", state.phase, state.filename).unwrap();
-        let message_limit = w - prefix.len();
-        let truncated_message = if message.len() < message_limit {
-            message
-        } else {
-            UnicodeSegmentation::graphemes(message.as_str(), true)
-                .take(message_limit)
-                .collect::<String>()
-        };
-        let mut stdout = io::stdout();
-        queue!(
-            stdout,
-            cursor::Hide,
-            cursor::MoveToColumn(0),
-            style::SetForegroundColor(style::Color::Green),
-            style::Print(prefix),
-            style::ResetColor,
-            style::Print(truncated_message),
-            terminal::Clear(terminal::ClearType::UntilNewLine),
-            cursor::Show,
-        )
-        .unwrap();
-        stdout.flush().unwrap();
+        bar.draw(&mut io::stdout(), width);
         self.progress_present = true;
         self.set_update_timestamp();
     }
 
-    fn println(&mut self, s: &str) {
+    pub(crate) fn println(&mut self, s: &str) {
         self.clear_progress();
         println!("{}", s);
     }

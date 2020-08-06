@@ -226,9 +226,15 @@ impl Archive {
     /// Returns all blocks referenced by all bands.
     pub fn referenced_blocks(&self) -> Result<BTreeSet<BlockHash>> {
         let archive = self.clone();
-        Ok(self
-            .iter_band_ids_unsorted()?
-            .map(move |band_id| Band::open(&archive, &band_id).expect("Failed to open band"))
+        let mut progress = ProgressBar::default();
+        progress.set_phase("Find referenced blocks...".to_owned());
+        let band_ids = self.list_band_ids()?;
+        let num_bands = band_ids.len();
+        Ok(band_ids
+            .into_iter()
+            .enumerate()
+            .inspect(|(i, _)| progress.set_fraction(*i, num_bands))
+            .map(move |(_i, band_id)| Band::open(&archive, &band_id).expect("Failed to open band"))
             .flat_map(|band| band.iter_entries().expect("Failed to iter entries"))
             .flat_map(|entry| entry.addrs)
             .map(|addrs| addrs.hash)
@@ -237,7 +243,6 @@ impl Archive {
 
     /// Returns an iterator of blocks that are present and referenced by no index.
     pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        ui::println("Find referenced blocks...");
         let referenced = self.referenced_blocks()?;
         ui::println("Find present blocks...");
         Ok(self
@@ -333,14 +338,17 @@ impl Archive {
         // count.
         // TODO: Take in a dict of the known blocks and their decompressed lengths,
         // and use that to more cheaply check if the index is OK.
-        ui::clear_bytes_total();
-        for bid in self.list_band_ids()?.into_iter() {
-            ui::println(&format!("Check {}...", bid));
+        ui::println("Check indexes...");
+        let mut progress_bar = ProgressBar::default();
+        let band_ids = self.list_band_ids()?;
+        let num_bands = band_ids.len();
+        for (i, bid) in band_ids.into_iter().enumerate() {
+            progress_bar.set_fraction(i, num_bands);
             let b = Band::open(self, &bid)?;
             b.validate(stats)?;
 
             let st = self.open_stored_tree(BandSelectionPolicy::Specified(bid))?;
-            st.validate(block_lengths, stats)?;
+            st.validate(block_lengths, &mut progress_bar, stats)?;
         }
         Ok(())
     }

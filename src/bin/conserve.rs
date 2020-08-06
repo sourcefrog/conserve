@@ -248,7 +248,6 @@ impl Command {
                 copy_stats.summarize_restore(&mut stdout)?;
             }
             Command::Size { ref stos } => {
-                ui::set_progress_phase(&"Measuring".to_string());
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup, &stos.exclude)?
                         .size()?
@@ -312,7 +311,6 @@ fn live_tree_from_opt(source: &Path, exclude: &[String]) -> Result<LiveTree> {
 fn main() {
     ui::enable_progress(true);
     let result = Command::from_args().run();
-    ui::clear_progress();
     match result {
         Err(ref e) => {
             ui::show_error(e);

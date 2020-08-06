@@ -33,6 +33,7 @@ pub mod live_tree;
 mod merge;
 pub(crate) mod misc;
 pub mod output;
+mod progress;
 pub mod restore;
 pub mod stats;
 mod stitch;
@@ -61,11 +62,11 @@ pub use crate::kind::Kind;
 pub use crate::live_tree::{LiveEntry, LiveTree};
 pub use crate::merge::{iter_merged_entries, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
+pub use crate::progress::ProgressBar;
 pub use crate::restore::{RestoreOptions, RestoreTree};
 pub use crate::stats::ValidateStats;
 pub use crate::stored_tree::StoredTree;
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
-pub use crate::ui::ProgressState;
 
 // Commonly-used external types.
 pub use globset::GlobSet;
