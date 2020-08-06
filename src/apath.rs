@@ -241,6 +241,7 @@ pub struct CheckOrder {
 // GRCOV_EXCLUDE_STOP
 
 impl CheckOrder {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> CheckOrder {
         CheckOrder { last_apath: None }
     }
