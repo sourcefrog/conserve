@@ -91,6 +91,9 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
     fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()>;
 
+    /// Get metadata about a file.
+    fn metadata(&self, relpath: &str) -> io::Result<Metadata>;
+
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;
 
@@ -116,8 +119,14 @@ impl dyn Transport {
 pub struct DirEntry {
     /// Name of the file within the directory being listed.
     pub name: String,
+    /// Kind of file.
     pub kind: Kind,
-    /// Size in bytes.
+}
+
+/// Stat metadata about a file in a transport.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Metadata {
+    /// File length.
     pub len: u64,
 }
 

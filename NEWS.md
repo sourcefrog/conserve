@@ -1,5 +1,13 @@
 # Conserve release history
 
+## v0.6.6 NOT RELEASED YET
+
+### Performance
+
+- `validate` and other operations that list all blocks no longer `lstat` them,
+  which can be a significant performance improvement on some kernels or
+  filesystems.
+
 ## v0.6.5 2020-07-26
 
 ### Features

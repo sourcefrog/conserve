@@ -17,7 +17,7 @@ use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
-use crate::transport::{DirEntry, Transport};
+use crate::transport::{DirEntry, Metadata, Transport};
 
 #[derive(Clone, Debug)]
 pub struct LocalTransport {
@@ -50,11 +50,9 @@ impl Transport for LocalTransport {
         Ok(Box::new(self.full_path(&relpath).read_dir()?.map(
             move |i| {
                 i.and_then(|de| {
-                    let metadata = de.metadata()?;
                     Ok(DirEntry {
                         name: de.file_name().to_string_lossy().into(),
                         kind: de.file_type()?.into(),
-                        len: metadata.len(),
                     })
                 })
             },
@@ -109,6 +107,11 @@ impl Transport for LocalTransport {
             root: self.root.join(relpath),
         })
     }
+
+    fn metadata(&self, relpath: &str) -> io::Result<Metadata> {
+        let fsmeta = self.root.join(relpath).metadata()?;
+        Ok(Metadata { len: fsmeta.len() })
+    }
 }
 
 impl AsRef<dyn Transport> for LocalTransport {
@@ -139,6 +142,19 @@ mod test {
         assert_eq!(buf, content.as_bytes());
 
         temp.close().unwrap();
+    }
+
+    #[test]
+    fn read_metadata() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let content: &str = "the ribs of the disaster";
+        let filename = "poem.txt";
+        temp.child(filename).write_str(content).unwrap();
+
+        let transport = LocalTransport::new(temp.path());
+
+        assert_eq!(transport.metadata(&filename).unwrap(), Metadata { len: 24 });
+        assert!(transport.metadata("nopoem").is_err());
     }
 
     #[test]
@@ -181,7 +197,6 @@ mod test {
             DirEntry {
                 name: "root file".to_owned(),
                 kind: Kind::File,
-                len: 0,
             }
         );
 
@@ -202,7 +217,6 @@ mod test {
             vec![DirEntry {
                 name: "subfile".to_owned(),
                 kind: Kind::File,
-                len: 14,
             }]
         );
 

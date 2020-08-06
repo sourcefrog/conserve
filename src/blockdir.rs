@@ -220,27 +220,19 @@ impl BlockDir {
     pub fn validate(&self, stats: &mut ValidateStats) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
-        // TODO: Provide a progress bar that just works on counts, not bytes:
-        // then we don't need to count the sizes in advance.
         // TODO: Test having a block with the right compression but the wrong contents.
         ui::println("Count blocks...");
-        let block_dir_entries: Vec<DirEntry> = self.iter_block_dir_entries()?.collect();
-        let tot = block_dir_entries.iter().map(|de| de.len).sum();
         ui::set_progress_phase(&"Count blocks");
-        ui::set_bytes_total(tot);
-        crate::ui::println(&format!(
-            "Check {} in blocks...",
-            crate::misc::bytes_to_human_mb(tot)
-        ));
+        let blocks: Vec<BlockHash> = self.block_names()?.collect();
+        crate::ui::println(&format!("Check {} blocks...", blocks.len()));
+        stats.block_read_count = blocks.len().try_into().unwrap();
         ui::set_progress_phase(&"Check block hashes");
-        // Make a vec of Some(usize) if the block could be read, or None if it failed.
+        // Make a vec of Some(usize) if the block could be read, or None if it
+        // failed, where the usize gives the uncompressed data size.
         let mut results: Vec<Option<(BlockHash, usize)>> = Vec::new();
-        block_dir_entries
-            .par_iter()
-            .map(|de| {
-                // TODO: Don't panic here.
-                let hash = de.name.parse().unwrap();
-                ui::increment_bytes_done(de.len);
+        blocks
+            .into_par_iter()
+            .map(|hash| {
                 self.get_block_content(&hash)
                     .map(|(bytes, _sizes)| (hash, bytes.len()))
                     .ok()
@@ -251,7 +243,6 @@ impl BlockDir {
             .into_iter()
             .filter_map(std::convert::identity)
             .collect();
-        stats.block_read_count = block_dir_entries.len().try_into().unwrap();
         Ok(len_map)
     }
 
