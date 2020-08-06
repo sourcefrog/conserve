@@ -70,7 +70,7 @@ impl StoredTree {
                     .addrs
                     .iter()
                     .filter(|addr| {
-                        if let Some(block_len) = block_lengths.get(&addr.hash.parse().unwrap()) {
+                        if let Some(block_len) = block_lengths.get(&addr.hash) {
                             // Present, but the address is out of range.
                             if (addr.start + addr.len) > (*block_len as u64) {
                                 ui::problem(&format!(

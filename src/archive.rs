@@ -224,7 +224,7 @@ impl Archive {
     }
 
     /// Returns all blocks referenced by all bands.
-    pub fn referenced_blocks(&self) -> Result<BTreeSet<String>> {
+    pub fn referenced_blocks(&self) -> Result<BTreeSet<BlockHash>> {
         let archive = self.clone();
         Ok(self
             .iter_band_ids_unsorted()?
@@ -236,7 +236,7 @@ impl Archive {
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
-    pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = String>> {
+    pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         ui::println("Find referenced blocks...");
         let referenced = self.referenced_blocks()?;
         ui::println("Find present blocks...");

@@ -51,8 +51,8 @@ const SUBDIR_NAME_CHARS: usize = 3;
 /// and what (pre-compression) length.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Address {
-    /// ID of the block storing this info (in future, salted.)
-    pub hash: String,
+    /// Hash of the block storing this info.
+    pub hash: BlockHash,
 
     /// Position in this block where data begins.
     #[serde(default)]
@@ -141,7 +141,7 @@ impl BlockDir {
     ///
     /// To read a whole file, use StoredFile instead.
     pub fn get(&self, address: &Address) -> Result<(Vec<u8>, Sizes)> {
-        let (mut decompressed, sizes) = self.get_block_content(&address.hash.parse().unwrap())?;
+        let (mut decompressed, sizes) = self.get_block_content(&address.hash)?;
         let len = address.len as usize;
         let start = address.start as usize;
         let actual_len = decompressed.len();
@@ -207,8 +207,10 @@ impl BlockDir {
 
     /// Return an iterator through all the blocknames in the blockdir,
     /// in arbitrary order.
-    pub fn block_names(&self) -> Result<impl Iterator<Item = String>> {
-        Ok(self.iter_block_dir_entries()?.map(|de| de.name))
+    pub fn block_names(&self) -> Result<impl Iterator<Item = BlockHash>> {
+        Ok(self
+            .iter_block_dir_entries()?
+            .filter_map(|de| de.name.parse().ok()))
     }
 
     /// Check format invariants of the BlockDir.
@@ -336,19 +338,19 @@ impl StoreFiles {
                 break;
             }
             let block_data = &self.input_buf[..read_len];
-            let block_hash = hash_bytes(block_data)?;
-            if self.block_dir.contains(&block_hash)? {
+            let hash = hash_bytes(block_data)?;
+            if self.block_dir.contains(&hash)? {
                 // TODO: Separate counter for size of the already-present blocks?
                 stats.deduplicated_blocks += 1;
                 stats.deduplicated_bytes += read_len as u64;
             } else {
-                let comp_len = self.block_dir.compress_and_store(block_data, &block_hash)?;
+                let comp_len = self.block_dir.compress_and_store(block_data, &hash)?;
                 stats.written_blocks += 1;
                 stats.uncompressed_bytes += read_len as u64;
                 stats.compressed_bytes += comp_len;
             }
             addresses.push(Address {
-                hash: block_hash.to_string(),
+                hash,
                 start: 0,
                 len: read_len as u64,
             });
@@ -412,13 +414,12 @@ mod tests {
         // Should be in one block, and as it's currently unsalted the hash is the same.
         assert_eq!(1, addrs.len());
         assert_eq!(0, addrs[0].start);
-        assert_eq!(EXAMPLE_BLOCK_HASH, addrs[0].hash);
+        assert_eq!(addrs[0].hash, expected_hash);
 
         // Block should be the one block present in the list.
-        assert_eq!(
-            block_dir.block_names().unwrap().collect::<Vec<_>>(),
-            &[EXAMPLE_BLOCK_HASH]
-        );
+        let present_blocks = block_dir.block_names().unwrap().collect::<Vec<_>>();
+        assert_eq!(present_blocks.len(), 1);
+        assert_eq!(present_blocks[0], expected_hash);
 
         // Subdirectory and file should exist
         let expected_file = testdir.path().join("66a").join(EXAMPLE_BLOCK_HASH);

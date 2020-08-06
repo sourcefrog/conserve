@@ -20,9 +20,11 @@ fn unreferenced_blocks() {
     let af = ScratchArchive::new();
     let tf = TreeFixture::new();
     tf.create_file("hello");
-    const CONTENT_HASH: &str =
+    let content_hash: BlockHash =
         "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
-        896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7";
+        896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7"
+            .parse()
+            .unwrap();
 
     let _copy_stats = af
         .backup(&tf.path(), &BackupOptions::default())
@@ -31,6 +33,6 @@ fn unreferenced_blocks() {
     // Delete the band and index
     std::fs::remove_dir_all(af.path().join("b0000")).unwrap();
 
-    let unreferenced: Vec<String> = af.unreferenced_blocks().unwrap().collect();
-    assert_eq!(unreferenced, [CONTENT_HASH]);
+    let unreferenced: Vec<BlockHash> = af.unreferenced_blocks().unwrap().collect();
+    assert_eq!(unreferenced, [content_hash]);
 }

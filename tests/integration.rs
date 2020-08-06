@@ -163,6 +163,7 @@ fn check_backup(af: &ScratchArchive) {
         af.referenced_blocks()
             .unwrap()
             .into_iter()
+            .map(|h| h.to_string())
             .collect::<Vec<String>>(),
         vec![HELLO_HASH]
     );
@@ -170,6 +171,7 @@ fn check_backup(af: &ScratchArchive) {
         af.block_dir()
             .block_names()
             .unwrap()
+            .map(|h| h.to_string())
             .collect::<Vec<String>>(),
         vec![HELLO_HASH]
     );

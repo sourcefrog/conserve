@@ -14,13 +14,14 @@
 //! Block hash address type.
 
 use std::cmp::Ordering;
+use std::convert::TryFrom;
 use std::fmt;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
 use blake2_rfc::blake2b::Blake2bResult;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::*;
 
@@ -43,7 +44,7 @@ use crate::*;
 /// let hash2 = hash.clone();
 /// assert_eq!(hash2.to_string(), hex_hash);
 /// ```
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(into = "String")]
 #[serde(try_from = "&str")]
 pub struct BlockHash {
@@ -52,19 +53,45 @@ pub struct BlockHash {
 }
 
 #[derive(Debug)]
-pub struct BlockHashParseError {}
+pub struct BlockHashParseError {
+    rejected_string: String,
+}
+
+impl Display for BlockHashParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Failed to parse hash string: {:?}", self.rejected_string)
+    }
+}
 
 impl FromStr for BlockHash {
     type Err = BlockHashParseError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         if s.len() != BLAKE_HASH_SIZE_BYTES * 2 {
-            return Err(BlockHashParseError {});
+            return Err(BlockHashParseError {
+                rejected_string: s.to_owned(),
+            });
         }
         let mut bin = [0; BLAKE_HASH_SIZE_BYTES];
         hex::decode_to_slice(s, &mut bin)
-            .or(Err(BlockHashParseError {}))
+            .or(Err(BlockHashParseError {
+                rejected_string: s.to_owned(),
+            }))
             .and(Ok(BlockHash { bin }))
+    }
+}
+
+impl TryFrom<&str> for BlockHash {
+    type Error = BlockHashParseError;
+
+    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
+        BlockHash::from_str(s)
+    }
+}
+
+impl Debug for BlockHash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
