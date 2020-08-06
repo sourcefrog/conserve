@@ -19,6 +19,7 @@ use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
+use blake2_rfc::blake2b::Blake2bResult;
 use serde::Serialize;
 
 use crate::*;
@@ -76,6 +77,14 @@ impl Display for BlockHash2 {
 impl From<BlockHash2> for String {
     fn from(hash: BlockHash2) -> String {
         hex::encode(&hash.bin[..])
+    }
+}
+
+impl From<Blake2bResult> for BlockHash2 {
+    fn from(hash: Blake2bResult) -> BlockHash2 {
+        let mut bin = [0; BLAKE_HASH_SIZE_BYTES];
+        bin.copy_from_slice(hash.as_bytes());
+        BlockHash2 { bin }
     }
 }
 
