@@ -225,7 +225,6 @@ impl BlockDir {
         ui::println("Count blocks...");
         let mut progress = ProgressBar::default();
         progress.set_phase("Count blocks".to_owned());
-        // TODO: Progress while counting...
         let blocks: Vec<BlockHash> = self
             .block_names()?
             .enumerate()
