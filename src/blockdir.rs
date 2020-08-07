@@ -223,14 +223,14 @@ impl BlockDir {
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
         ui::println("Count blocks...");
-        let mut progress = ProgressBar::default();
-        progress.set_phase("Count blocks".to_owned());
+        let mut progress_bar = ProgressBar::default();
+        progress_bar.set_phase("Count blocks".to_owned());
         let blocks: Vec<BlockHash> = self
             .block_names()?
             .enumerate()
             .inspect(|(i, _hash)| {
                 if i % 100 == 0 {
-                    progress.set_work_done(*i as u64)
+                    progress_bar.set_work_done(*i as u64)
                 }
             })
             .map(|(_i, hash)| hash)
@@ -239,9 +239,9 @@ impl BlockDir {
             "Check {} blocks...",
             blocks.len().separate_with_commas()
         ));
-        progress.set_total_work(blocks.len() as u64);
+        progress_bar.set_total_work(blocks.len() as u64);
         stats.block_read_count = blocks.len().try_into().unwrap();
-        progress.set_phase("Check block hashes".to_owned());
+        progress_bar.set_phase("Check block hashes".to_owned());
         // Make a vec of Some(usize) if the block could be read, or None if it
         // failed, where the usize gives the uncompressed data size.
         let mut results: Vec<Option<(BlockHash, usize)>> = Vec::new();

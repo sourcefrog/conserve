@@ -8,7 +8,9 @@ behind.
 <https://rust-lang.github.io/api-guidelines/naming.html>
 
 Not all of the existing code is consistent in how it names things. Here is the
-new pattern.
+intended pattern for new or updated code.
+
+### Types
 
 Things that read are `*Reader`: `IndexReader`, `BlockReader`. Things that write
 `*Writer`.
@@ -17,23 +19,35 @@ Counts of work done return `*Stats` particular to the type, for example
 `IndexWriterStats`. This may be returned from one-shot methods, or extracted
 from the object by its `finish` method.
 
+TODO: Split `Band` into `BandReader` and `BandWriter`.
+
+TODO: Unify `StoreFiles` into `BandWriter`, probably.
+
+### Functions
+
 Objects that need to be explicitly finished (to write a tail file or to flush)
 have a `.finish()` method, which should consume the object. If the object has
 accumulating stats, they are returned from `finalize()`.
 
-To open an existing object, call `::open()` on the class, and this constructs and
-returns the corresponding `Reader` or `Writer`. Typically the first parameter is
-the corresponding parent object, except for the Archive or LocalTree, which can
-be constructed from a filename. (Although, in future, from a `Transport`.)
+To open an existing object, call `::open()` on the class, and this constructs
+and returns the corresponding `Reader` or `Writer`. Typically the first
+parameter is the corresponding parent object, except for the Archive or
+LocalTree, which can be constructed from a filename. (Although, in future, from
+a `Transport`.)
 
 To make a new one, `::create()` which returns a `Writer`.
 
 Versions that take a `Path` rather than a `Transport` should be called
 `open_path` and `create_path`.
 
-TODO: Split `Band` into `BandReader` and `BandWriter`.
+### Variables
 
-TODO: Unify `StoreFiles` into `BandWriter`, probably.
+Local variables (not in a closure) that hold a "major" object should have a
+snake-case name corresponding to the type name. For example,
+
+```rust
+    let mut progress_bar = ProgressBar::new();
+```
 
 ## Messages
 
@@ -54,8 +68,8 @@ Tests for observable behavior of the public interface should be in the top-level
 assess, are in unit test submodules.
 
 Tests that need a source tree can build it using `assert_fs` or make use of the
-example trees under `testdata/tree/`. Note that the git checkout (or Cargo
-build tree) won't have deterministic permissions or mtimes.
+example trees under `testdata/tree/`. Note that the git checkout (or Cargo build
+tree) won't have deterministic permissions or mtimes.
 
 ## `use` statements
 

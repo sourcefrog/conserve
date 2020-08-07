@@ -226,14 +226,14 @@ impl Archive {
     /// Returns all blocks referenced by all bands.
     pub fn referenced_blocks(&self) -> Result<BTreeSet<BlockHash>> {
         let archive = self.clone();
-        let mut progress = ProgressBar::default();
-        progress.set_phase("Find referenced blocks...".to_owned());
+        let mut progress_bar = ProgressBar::default();
+        progress_bar.set_phase("Find referenced blocks...".to_owned());
         let band_ids = self.list_band_ids()?;
         let num_bands = band_ids.len();
         Ok(band_ids
             .into_iter()
             .enumerate()
-            .inspect(|(i, _)| progress.set_fraction(*i, num_bands))
+            .inspect(|(i, _)| progress_bar.set_fraction(*i, num_bands))
             .map(move |(_i, band_id)| Band::open(&archive, &band_id).expect("Failed to open band"))
             .flat_map(|band| band.iter_entries().expect("Failed to iter entries"))
             .flat_map(|entry| entry.addrs)
@@ -244,8 +244,8 @@ impl Archive {
     /// Returns an iterator of blocks that are present and referenced by no index.
     pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         let referenced = self.referenced_blocks()?;
-        let mut progress = ProgressBar::default();
-        progress.set_phase("Find present blocks...".to_owned());
+        let mut progress_bar = ProgressBar::default();
+        progress_bar.set_phase("Find present blocks...".to_owned());
         Ok(self
             .block_dir()
             .block_names()?
