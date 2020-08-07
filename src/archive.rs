@@ -335,10 +335,6 @@ impl Archive {
         stats: &mut ValidateStats,
     ) -> Result<()> {
         // TODO: Don't stop early on any errors in the steps below, but do count them.
-        // TODO: Better progress bars, that don't work by size but rather by
-        // count.
-        // TODO: Take in a dict of the known blocks and their decompressed lengths,
-        // and use that to more cheaply check if the index is OK.
         ui::println("Check indexes...");
         let mut progress_bar = ProgressBar::default();
         let band_ids = self.list_band_ids()?;
