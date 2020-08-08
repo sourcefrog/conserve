@@ -1,0 +1,7 @@
+# Rust coverage measurement is a bit imprecise, so be generous in what counts as a
+# failure.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
