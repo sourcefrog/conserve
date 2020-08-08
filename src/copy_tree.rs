@@ -35,7 +35,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     options: &CopyOptions,
 ) -> Result<CopyStats> {
     let mut stats = CopyStats::default();
-    let mut progress_bar = ProgressBar::default();
+    let mut progress_bar = ProgressBar::new();
     // This causes us to walk the source tree twice, which is probably an acceptable option
     // since it's nice to see realistic overall progress. We could keep all the entries
     // in memory, and maybe we should, but it might get unreasonably big.

@@ -226,7 +226,7 @@ impl Archive {
     /// Returns all blocks referenced by all bands.
     pub fn referenced_blocks(&self) -> Result<BTreeSet<BlockHash>> {
         let archive = self.clone();
-        let mut progress_bar = ProgressBar::default();
+        let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Find referenced blocks...".to_owned());
         let band_ids = self.list_band_ids()?;
         let num_bands = band_ids.len();
@@ -244,7 +244,7 @@ impl Archive {
     /// Returns an iterator of blocks that are present and referenced by no index.
     pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         let referenced = self.referenced_blocks()?;
-        let mut progress_bar = ProgressBar::default();
+        let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Find present blocks...".to_owned());
         Ok(self
             .block_dir()
@@ -336,7 +336,7 @@ impl Archive {
     ) -> Result<()> {
         // TODO: Don't stop early on any errors in the steps below, but do count them.
         ui::println("Check indexes...");
-        let mut progress_bar = ProgressBar::default();
+        let mut progress_bar = ProgressBar::new();
         let band_ids = self.list_band_ids()?;
         let num_bands = band_ids.len();
         for (i, band_id) in band_ids.into_iter().enumerate() {

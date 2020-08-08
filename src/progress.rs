@@ -41,6 +41,10 @@ pub struct ProgressBar {
 }
 
 impl ProgressBar {
+    pub fn new() -> ProgressBar {
+        ProgressBar::default()
+    }
+
     pub fn set_phase(&mut self, phase: String) {
         self.phase = phase;
         self.maybe_redraw();

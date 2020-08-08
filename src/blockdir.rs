@@ -224,7 +224,7 @@ impl BlockDir {
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
         ui::println("Count blocks...");
-        let mut progress_bar = ProgressBar::default();
+        let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Count blocks".to_owned());
         let blocks: Vec<BlockHash> = self
             .block_names()?
