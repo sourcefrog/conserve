@@ -12,6 +12,7 @@
 
 //! Access to an archive on the local filesystem.
 
+use std::convert::TryInto;
 use std::fs::{create_dir, File};
 use std::io;
 use std::io::prelude::*;
@@ -61,8 +62,13 @@ impl Transport for LocalTransport {
 
     fn read_file(&self, relpath: &str, out_buf: &mut Vec<u8>) -> io::Result<()> {
         out_buf.truncate(0);
-        let len = File::open(&self.full_path(relpath))?.read_to_end(out_buf)?;
-        out_buf.truncate(len);
+        // read_to_end reads in gradually increasing parts, but here we can probably read one large
+        // buffer.
+        let mut file = File::open(&self.full_path(relpath))?;
+        let prefetch_len: usize = file.metadata()?.len().try_into().unwrap();
+        out_buf.resize(prefetch_len, 0);
+        let actual_len = file.read(out_buf)?;
+        out_buf.truncate(actual_len);
         Ok(())
     }
 
