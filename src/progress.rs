@@ -16,6 +16,7 @@
 use std::fmt::Write;
 
 use crossterm::{cursor, queue, style, terminal};
+use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::ui::with_locked_ui;
@@ -27,8 +28,8 @@ pub struct ProgressBar {
     /// The filename currently being processed.
     filename: String,
     // TODO: Elapsed time.
-    total_work: u64,
-    work_done: u64,
+    total_work: usize,
+    work_done: usize,
     bytes_done: u64,
     bytes_total: u64,
     percent: Option<f64>,
@@ -50,12 +51,17 @@ impl ProgressBar {
         self.maybe_redraw();
     }
 
-    pub fn set_total_work(&mut self, total_work: u64) {
+    pub fn set_total_work(&mut self, total_work: usize) {
         self.total_work = total_work
     }
 
-    pub fn increment_work_done(&mut self, inc: u64) {
+    pub fn increment_work_done(&mut self, inc: usize) {
         self.set_work_done(self.work_done + inc)
+    }
+
+    pub fn set_work_done(&mut self, work_done: usize) {
+        self.work_done = work_done;
+        self.maybe_redraw();
     }
 
     pub fn set_bytes_done(&mut self, bytes: u64) {
@@ -70,11 +76,6 @@ impl ProgressBar {
 
     pub fn increment_bytes_done(&mut self, bytes: u64) {
         self.set_bytes_done(self.bytes_done + bytes)
-    }
-
-    pub fn set_work_done(&mut self, work_done: u64) {
-        self.work_done = work_done;
-        self.maybe_redraw();
     }
 
     pub fn set_percent(&mut self, percent: f64) {
@@ -99,11 +100,20 @@ impl ProgressBar {
         }
         if self.total_work > 0 {
             if self.work_done > 0 {
-                write!(prefix, "{}/{} ", self.work_done, self.total_work).unwrap();
+                write!(
+                    prefix,
+                    "{}/{} ",
+                    self.work_done.separate_with_commas(),
+                    self.total_work.separate_with_commas()
+                )
+                .unwrap();
             } else {
-                write!(prefix, "{} ", self.total_work).unwrap();
+                write!(prefix, "{} ", self.total_work.separate_with_commas()).unwrap();
             }
+        } else if self.work_done > 0 {
+            write!(prefix, "{} ", self.work_done.separate_with_commas()).unwrap();
         }
+
         if self.bytes_done > 0 {
             write!(
                 prefix,

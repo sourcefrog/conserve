@@ -339,13 +339,14 @@ impl Archive {
         let mut progress_bar = ProgressBar::default();
         let band_ids = self.list_band_ids()?;
         let num_bands = band_ids.len();
-        for (i, bid) in band_ids.into_iter().enumerate() {
+        for (i, band_id) in band_ids.into_iter().enumerate() {
             progress_bar.set_fraction(i, num_bands);
-            let b = Band::open(self, &bid)?;
+            progress_bar.set_phase(format!("Check tree {}", band_id));
+            let b = Band::open(self, &band_id)?;
             b.validate(stats)?;
 
-            let st = self.open_stored_tree(BandSelectionPolicy::Specified(bid))?;
-            st.validate(block_lengths, &mut progress_bar, stats)?;
+            let st = self.open_stored_tree(BandSelectionPolicy::Specified(band_id))?;
+            st.validate(block_lengths, stats)?;
         }
         Ok(())
     }

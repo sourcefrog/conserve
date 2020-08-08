@@ -26,6 +26,7 @@ use std::convert::TryInto;
 use std::io;
 use std::io::prelude::*;
 use std::path::Path;
+use std::sync::Mutex;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
@@ -230,7 +231,7 @@ impl BlockDir {
             .enumerate()
             .inspect(|(i, _hash)| {
                 if i % 100 == 0 {
-                    progress_bar.set_work_done(*i as u64)
+                    progress_bar.set_work_done(*i)
                 }
             })
             .map(|(_i, hash)| hash)
@@ -239,19 +240,25 @@ impl BlockDir {
             "Check {} blocks...",
             blocks.len().separate_with_commas()
         ));
-        progress_bar.set_total_work(blocks.len() as u64);
+        progress_bar.set_total_work(blocks.len());
         stats.block_read_count = blocks.len().try_into().unwrap();
+        let block_count = blocks.len();
         progress_bar.set_phase("Check block hashes".to_owned());
+        progress_bar.set_total_work(block_count);
+        progress_bar.set_work_done(0);
+        let progress_bar_mutex = Mutex::new(progress_bar);
         // Make a vec of Some(usize) if the block could be read, or None if it
         // failed, where the usize gives the uncompressed data size.
         let mut results: Vec<Option<(BlockHash, usize)>> = Vec::new();
-        // TODO: Progress during parallel traversal.
         blocks
             .into_par_iter()
             .map(|hash| {
-                self.get_block_content(&hash)
+                let r = self
+                    .get_block_content(&hash)
                     .map(|(bytes, _sizes)| (hash, bytes.len()))
-                    .ok()
+                    .ok();
+                progress_bar_mutex.lock().unwrap().increment_work_done(1);
+                r
             })
             .collect_into_vec(&mut results);
         stats.block_error_count += results.iter().filter(|o| o.is_none()).count();

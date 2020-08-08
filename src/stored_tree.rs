@@ -58,18 +58,13 @@ impl StoredTree {
     pub fn validate(
         &self,
         block_lengths: &HashMap<BlockHash, usize>,
-        progress_bar: &mut ProgressBar,
         stats: &mut ValidateStats,
     ) -> Result<()> {
         let band_id = self.band().id();
-        progress_bar.set_phase(format!("Check tree {}", self.band().id()));
-        for (i, entry) in self
+        for entry in self
             .iter_entries()?
-            .enumerate()
-            .filter(|(_, entry)| entry.kind() == Kind::File)
+            .filter(|entry| entry.kind() == Kind::File)
         {
-            progress_bar.set_filename(entry.apath.to_string());
-            progress_bar.set_work_done(i as u64);
             for addr in entry.addrs {
                 if let Some(block_len) = block_lengths.get(&addr.hash) {
                     // Present, but the address is out of range.
