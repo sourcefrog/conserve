@@ -18,15 +18,12 @@ use std::io;
 use std::io::Write as IoWrite;
 use std::sync::Mutex;
 use std::time::Duration;
-use std::time::Instant;
 
 use crossterm::{cursor, queue, terminal};
 use lazy_static::lazy_static;
 
 use crate::stats::Sizes;
 use crate::ProgressBar;
-
-const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 
 /// A terminal/text UI.
 ///
@@ -40,8 +37,6 @@ const PROGRESS_RATE_LIMIT_MS: u32 = 200;
 /// So this class also works when stdout is redirected to a file, in
 /// which case it will get only messages and no progress bar junk.
 pub(crate) struct UIState {
-    last_update: Option<Instant>,
-
     /// Is a progress bar currently on the screen?
     progress_present: bool,
 
@@ -97,7 +92,6 @@ pub fn enable_progress(enabled: bool) {
 impl Default for UIState {
     fn default() -> UIState {
         UIState {
-            last_update: None,
             progress_present: false,
             progress_enabled: false,
         }
@@ -145,16 +139,6 @@ pub fn compression_ratio(s: &Sizes) -> f64 {
 }
 
 impl UIState {
-    /// Return false if it's too soon after the progress bar was last drawn.
-    fn can_update_yet(&mut self) -> bool {
-        if let Some(last) = self.last_update {
-            let e = last.elapsed();
-            e.as_secs() > 1 || e.subsec_millis() > PROGRESS_RATE_LIMIT_MS
-        } else {
-            true
-        }
-    }
-
     pub(crate) fn clear_progress(&mut self) {
         let mut stdout = io::stdout();
         if self.progress_present {
@@ -167,16 +151,10 @@ impl UIState {
             stdout.flush().unwrap();
             self.progress_present = false;
         }
-        self.set_update_timestamp();
-    }
-
-    /// Remember that the ui was just updated, for the sake of throttling.
-    fn set_update_timestamp(&mut self) {
-        self.last_update = Some(Instant::now());
     }
 
     pub(crate) fn draw_progress_bar(&mut self, bar: &ProgressBar) {
-        if !self.progress_enabled || !self.can_update_yet() {
+        if !self.progress_enabled {
             return;
         }
         let width = if let Ok((width, _)) = terminal::size() {
@@ -186,7 +164,6 @@ impl UIState {
         };
         bar.draw(&mut io::stdout(), width);
         self.progress_present = true;
-        self.set_update_timestamp();
     }
 
     pub(crate) fn println(&mut self, s: &str) {

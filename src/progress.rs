@@ -14,12 +14,15 @@
 //! Progress bars.
 
 use std::fmt::Write;
+use std::time::{Duration, Instant};
 
 use crossterm::{cursor, queue, style, terminal};
 use thousands::Separable;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::ui::with_locked_ui;
+
+const PROGRESS_RATE_LIMIT: Duration = Duration::from_millis(200);
 
 /// A progress bar, created from the UI.
 #[derive(Default)]
@@ -33,11 +36,10 @@ pub struct ProgressBar {
     bytes_done: u64,
     bytes_total: u64,
     percent: Option<f64>,
-    // TODO: Total work, done work, for percentages.
+
+    /// The time this bar was last drawn on the screen, if it ever was.
+    last_drawn: Option<Instant>,
     // TODO: Total bytes, done bytes, for rate.
-    // TODO: Maybe the UI should remember the progress bar state and redraw it
-    // after printing a message or some other interruption? Or, maybe not, maybe
-    // it's better to wait until there's another tick.
 }
 
 impl ProgressBar {
@@ -93,7 +95,13 @@ impl ProgressBar {
         }
     }
 
-    fn maybe_redraw(&self) {
+    fn maybe_redraw(&mut self) {
+        if let Some(last) = self.last_drawn {
+            if last.elapsed() < PROGRESS_RATE_LIMIT {
+                return;
+            }
+        }
+        self.last_drawn = Some(Instant::now());
         with_locked_ui(|ui| ui.draw_progress_bar(self));
     }
 
