@@ -8,6 +8,11 @@
   which can be a significant performance improvement on some kernels or
   filesystems.
 
+## Features
+
+- Better progress bars, especially for `validate`, including an estimated time
+  to completion.
+
 ## v0.6.5 2020-07-26
 
 ### Features
