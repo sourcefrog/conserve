@@ -25,26 +25,34 @@ use crate::ui::with_locked_ui;
 const PROGRESS_RATE_LIMIT: Duration = Duration::from_millis(200);
 
 /// A progress bar, created from the UI.
-#[derive(Default)]
 pub struct ProgressBar {
     phase: String,
     /// The filename currently being processed.
     filename: String,
-    // TODO: Elapsed time.
     total_work: usize,
     work_done: usize,
     bytes_done: u64,
     bytes_total: u64,
     percent: Option<f64>,
+    start: Instant,
 
     /// The time this bar was last drawn on the screen, if it ever was.
     last_drawn: Option<Instant>,
-    // TODO: Total bytes, done bytes, for rate.
 }
 
 impl ProgressBar {
     pub fn new() -> ProgressBar {
-        ProgressBar::default()
+        ProgressBar {
+            phase: String::new(),
+            filename: String::new(),
+            total_work: 0,
+            work_done: 0,
+            bytes_done: 0,
+            bytes_total: 0,
+            percent: None,
+            start: Instant::now(),
+            last_drawn: None,
+        }
     }
 
     pub fn set_phase(&mut self, phase: String) {
@@ -105,6 +113,19 @@ impl ProgressBar {
         with_locked_ui(|ui| ui.draw_progress_bar(self));
     }
 
+    fn estimate_remaining(&self, percent_done: f64) -> Option<Duration> {
+        const MIN_ESTIMATE_WINDOW: Duration = Duration::from_millis(500);
+        const MIN_ESTIMATE_PERCENT: f64 = 1f64;
+        if percent_done < MIN_ESTIMATE_PERCENT {
+            return None;
+        }
+        let elapsed = Instant::now() - self.start;
+        if elapsed < MIN_ESTIMATE_WINDOW {
+            return None;
+        }
+        Some(elapsed.mul_f64((100f64 - percent_done) / percent_done))
+    }
+
     pub(crate) fn draw(&self, out: &mut dyn std::io::Write, width: usize) {
         let mut prefix = String::with_capacity(50);
         if !self.phase.is_empty() {
@@ -143,13 +164,17 @@ impl ProgressBar {
         } else {
             String::new()
         };
+        let remaining_str = percent
+            .and_then(|p| self.estimate_remaining(p))
+            .map(|dur| format!("{} remaining ", duration_brief(dur)))
+            .unwrap_or_default();
 
         let mut message = String::with_capacity(200);
         if !self.filename.is_empty() {
             write!(message, "{}", self.filename).unwrap();
         }
 
-        let message_limit = width - prefix.len() - percent_str.len();
+        let message_limit = width - prefix.len() - percent_str.len() - remaining_str.len();
         let truncated_message = if message.len() < message_limit {
             message
         } else {
@@ -172,6 +197,7 @@ impl ProgressBar {
                 out,
                 style::SetForegroundColor(style::Color::Cyan),
                 style::Print(percent_str),
+                style::Print(remaining_str),
             )
             .unwrap();
         }
@@ -190,5 +216,14 @@ impl ProgressBar {
 impl Drop for ProgressBar {
     fn drop(&mut self) {
         with_locked_ui(|ui| ui.clear_progress())
+    }
+}
+
+fn duration_brief(d: Duration) -> String {
+    let secs = d.as_secs();
+    if secs >= 120 {
+        format!("{:4} min", secs / 60)
+    } else {
+        format!("{:4} sec", secs)
     }
 }
