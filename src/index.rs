@@ -400,7 +400,6 @@ pub struct IndexEntryIter {
     /// returned to the client.
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
     excludes: GlobSet,
-    /// The `i` directory within the band where all files for this index are written.
     hunk_iter: IndexHunkIter,
 }
 
