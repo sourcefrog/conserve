@@ -110,8 +110,10 @@ impl ProgressBar {
         if !self.phase.is_empty() {
             write!(prefix, "{} ", self.phase).unwrap();
         }
+        let mut work_percent = None;
         if self.total_work > 0 {
             if self.work_done > 0 {
+                work_percent = Some(100f64 * self.work_done as f64 / self.total_work as f64);
                 write!(
                     prefix,
                     "{}/{} ",
@@ -135,7 +137,8 @@ impl ProgressBar {
             .unwrap();
         }
 
-        let percent_str = if let Some(percent) = self.percent {
+        let percent = self.percent.or(work_percent);
+        let percent_str = if let Some(percent) = percent {
             format!("{:>4.1}% ", percent)
         } else {
             String::new()
