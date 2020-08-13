@@ -44,6 +44,16 @@ pub struct ValidateStats {
     /// Count of files in the wrong place.
     pub structure_problems: usize,
     pub io_errors: usize,
+
+    /// Failed to open a band.
+    pub band_open_errors: usize,
+
+    /// Failed to open a stored tree.
+    pub tree_open_errors: usize,
+    pub tree_validate_errors: usize,
+
+    pub band_metadata_problems: usize,
+
     /// Count of files not expected to be in the archive.
     pub unexpected_files: usize,
     pub missing_band_heads: usize,

@@ -16,7 +16,9 @@
 use std::collections::{BTreeSet, HashMap};
 use std::io::ErrorKind;
 use std::path::Path;
+use std::sync::Mutex;
 
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::backup::BackupOptions;
@@ -256,13 +258,44 @@ impl Archive {
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
         let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
-        self.validate_bands(&block_lengths, &mut stats)?;
 
-        if stats.has_problems() {
-            ui::problem("Archive has some problems.");
-        } else {
-            ui::println("Archive is OK.");
-        }
+        ui::println("Check indexes...");
+        let band_ids = self.list_band_ids()?;
+        let num_bands = band_ids.len();
+
+        let mut progress_bar = ProgressBar::new();
+        progress_bar.set_phase("Check index".to_owned());
+        progress_bar.set_total_work(num_bands);
+        let progress_bar_mutex = Mutex::new(progress_bar);
+
+        stats += band_ids
+            .into_par_iter()
+            .map(|band_id| {
+                let mut stats = ValidateStats::default();
+
+                if let Ok(b) = Band::open(self, &band_id) {
+                    if b.validate(&mut stats).is_err() {
+                        stats.band_metadata_problems += 1;
+                    }
+                } else {
+                    stats.band_open_errors += 1;
+                }
+
+                if let Ok(st) = self.open_stored_tree(BandSelectionPolicy::Specified(band_id)) {
+                    if st.validate(&block_lengths, &mut stats).is_err() {
+                        stats.tree_validate_errors += 1
+                    }
+                } else {
+                    stats.tree_open_errors += 1
+                }
+
+                if let Ok(mut progress_bar_lock) = progress_bar_mutex.lock() {
+                    progress_bar_lock.increment_work_done(1);
+                }
+                stats
+            })
+            .reduce(|| ValidateStats::default(), |a, b| a + b);
+
         Ok(stats)
     }
 
@@ -327,28 +360,6 @@ impl Archive {
             }
         }
         Ok(stats)
-    }
-
-    fn validate_bands(
-        &self,
-        block_lengths: &HashMap<BlockHash, usize>,
-        stats: &mut ValidateStats,
-    ) -> Result<()> {
-        // TODO: Don't stop early on any errors in the steps below, but do count them.
-        ui::println("Check indexes...");
-        let mut progress_bar = ProgressBar::new();
-        let band_ids = self.list_band_ids()?;
-        let num_bands = band_ids.len();
-        for (i, band_id) in band_ids.into_iter().enumerate() {
-            progress_bar.set_fraction(i, num_bands);
-            progress_bar.set_phase(format!("Check tree {}", band_id));
-            let b = Band::open(self, &band_id)?;
-            b.validate(stats)?;
-
-            let st = self.open_stored_tree(BandSelectionPolicy::Specified(band_id))?;
-            st.validate(block_lengths, stats)?;
-        }
-        Ok(())
     }
 
     /// Return an iterator that reconstructs the most complete available index for a possibly-incomplete band.

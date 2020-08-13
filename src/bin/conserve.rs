@@ -263,7 +263,10 @@ impl Command {
                 let stats = Archive::open_path(archive)?.validate()?;
                 stats.summarize(&mut stdout)?;
                 if stats.has_problems() {
+                    ui::problem("Archive has some problems.");
                     return Ok(ExitCode::PartialCorruption);
+                } else {
+                    ui::println("Archive is OK.");
                 }
             }
             Command::Versions {
