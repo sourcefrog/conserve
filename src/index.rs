@@ -387,7 +387,6 @@ impl IndexHunkIter {
                 source,
             })?;
         if entries.is_empty() {
-            ui::problem(&format!("Index hunk {:?} is empty", path));
             // It's legal, it's just weird - and it can be produced by some old Conserve versions.
         }
         Ok(Some(entries))
