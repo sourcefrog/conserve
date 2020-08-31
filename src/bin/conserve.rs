@@ -62,6 +62,8 @@ enum Command {
     },
 
     /// Delete blocks unreferenced by any index.
+    ///
+    /// CAUTION: Do not gc while a backup is underway.
     Gc {
         /// Archive to delete from.
         archive: PathBuf,
