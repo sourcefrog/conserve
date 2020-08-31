@@ -61,6 +61,15 @@ enum Command {
         archive: PathBuf,
     },
 
+    /// Delete blocks unreferenced by any index.
+    Gc {
+        /// Archive to delete from.
+        archive: PathBuf,
+        /// Don't actually delete, just check what could be deleted.
+        #[structopt(long)]
+        dry_run: bool,
+    },
+
     /// List files in a stored tree or source directory, with exclusions.
     Ls {
         #[structopt(flatten)]
@@ -205,6 +214,11 @@ impl Command {
                 let st = stored_tree_from_opt(archive, backup, exclude)?;
                 let lt = LiveTree::open(source)?.with_excludes(excludes);
                 output::show_tree_diff(&mut conserve::iter_merged_entries(&st, &lt)?, &mut stdout)?;
+            }
+            Command::Gc { archive, dry_run } => {
+                let archive = Archive::open_path(archive)?;
+                let stats = archive.delete_unreferenced(*dry_run)?;
+                ui::println(&format!("{:#?}", stats));
             }
             Command::Init { archive } => {
                 Archive::create_path(&archive)?;

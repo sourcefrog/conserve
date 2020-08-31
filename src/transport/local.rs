@@ -108,6 +108,10 @@ impl Transport for LocalTransport {
         }
     }
 
+    fn remove_file(&self, relpath: &str) -> io::Result<()> {
+        std::fs::remove_file(self.full_path(relpath))
+    }
+
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport> {
         Box::new(LocalTransport {
             root: self.root.join(relpath),

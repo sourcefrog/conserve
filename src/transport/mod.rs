@@ -94,6 +94,9 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// Get metadata about a file.
     fn metadata(&self, relpath: &str) -> io::Result<Metadata>;
 
+    /// Delete a file.
+    fn remove_file(&self, relpath: &str) -> io::Result<()>;
+
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;
 

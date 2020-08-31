@@ -139,6 +139,11 @@ impl BlockDir {
             .map_err(Error::from)
     }
 
+    /// Returns the compressed on-disk size of a block.
+    pub fn compressed_size(&self, hash: &BlockHash) -> Result<u64> {
+        Ok(self.transport.metadata(&block_relpath(hash))?.len)
+    }
+
     /// Read back the contents of a block, as a byte array.
     ///
     /// To read a whole file, use StoredFile instead.
@@ -160,6 +165,12 @@ impl BlockDir {
             decompressed.truncate(len);
             Ok((decompressed, sizes))
         }
+    }
+
+    pub fn delete_block(&self, hash: &BlockHash) -> Result<()> {
+        self.transport
+            .remove_file(&block_relpath(hash))
+            .map_err(Error::from)
     }
 
     /// Return an iterator of block subdirectories, in arbitrary order.
@@ -425,7 +436,7 @@ mod tests {
             .store_file_content(&Apath::from("/hello"), &mut example_file)
             .unwrap();
 
-        // Should be in one block, and as it's currently unsalted the hash is the same.
+        // Should be in one block, with the expected hash.
         assert_eq!(1, addrs.len());
         assert_eq!(0, addrs[0].start);
         assert_eq!(addrs[0].hash, expected_hash);
@@ -439,6 +450,9 @@ mod tests {
         let expected_file = testdir.path().join("66a").join(EXAMPLE_BLOCK_HASH);
         let attr = fs::metadata(expected_file).unwrap();
         assert!(attr.is_file());
+
+        // Compressed size is as expected.
+        assert_eq!(block_dir.compressed_size(&expected_hash).unwrap(), 8);
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
 

@@ -209,6 +209,9 @@ both     /subdir/subfile
         .stderr(predicate::str::is_empty());
     // TODO: Deserialize index json, or somehow check it.
 
+    // gc: should find no garbage.
+    run_conserve().arg("gc").arg(&arch_dir).assert().success();
+
     run_conserve()
         .arg("versions")
         .arg(&arch_dir)
@@ -346,6 +349,8 @@ fn empty_archive() {
         .assert()
         .success()
         .stdout(predicate::str::is_empty());
+
+    run_conserve().arg("gc").arg(adir).assert().success();
 }
 
 /// Check behavior on an incomplete version.
@@ -367,6 +372,14 @@ fn incomplete_version() {
 
     // ls succeeds on an incomplete band
     run_conserve().arg("ls").arg(af.path()).assert().success();
+
+    // Cannot gc with an empty band.
+    run_conserve()
+        .arg("gc")
+        .arg(af.path())
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("incomplete and may be in use"));
 }
 
 #[test]
