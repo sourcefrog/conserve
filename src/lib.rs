@@ -22,6 +22,7 @@ mod blockdir;
 pub mod blockhash;
 pub mod compress;
 pub mod copy_tree;
+mod delete_guard;
 mod entry;
 pub mod errors;
 pub mod excludes;
