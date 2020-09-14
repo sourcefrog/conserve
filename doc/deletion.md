@@ -1,4 +1,4 @@
-# Deletion in Conserve
+#  Deletion in Conserve
 
 Conserve's formats are intended to perform well for a user who keeps making
 backups without ever deleting data. In this case, files are never deleted or
@@ -19,8 +19,21 @@ reading while another is writing, or even to allow multiple overlapping backups.
 Deleting bands can break another client who is currently writing to them, but
 they should break in a safe way, just seeing that the band is no longer present.
 
-Deleting unreferenced blocks or temporary files while a backup is underway
-could potentially break the backup, by deleting data that it just wrote and
-is soon going to reference from an index. This is prevented by a
-`DeleteGuard` which aborts the deletion if there are any concurrent writes of
-new bands.
+## Deletion guards
+
+Garbage collection while a backup is underway could lead the backup process to
+write a reference to a block which is imminently deleted by the gc process.
+
+So we need to prevent new backups starting while gc is underway, and also
+prevent gc starting while a backup is underway.
+
+A pending backup can be detected by the gc task by the presence of an
+incomplete band as the highest-numbered band. An incomplete band might be left
+behind by an interrupted backup; the user can resolve this by running a new
+backup that has time to complete, or by deleting the incomplete band.
+
+A pending GC operation is marked by a `GC_LOCK` file in the root of the
+archive. This might be left behind if the gc is interrupted, but the user can
+run it again to allow it to complete.
+
+Both these interlocks are managed by a `DeleteGuard` object.
