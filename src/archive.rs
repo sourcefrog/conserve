@@ -274,7 +274,7 @@ impl Archive {
     pub fn delete_unreferenced(&self, dry_run: bool) -> Result<DeleteUnreferencedStats> {
         let block_dir = self.block_dir();
         let mut stats = DeleteUnreferencedStats::default();
-        let delete_guard = delete_guard::DeleteGuard::new(self)?;
+        let delete_guard = gc_lock::GarbageCollectionLock::new(self)?;
 
         let mut blocks: BTreeSet<BlockHash> = self.iter_present_blocks()?.collect();
         for block_hash in self.iter_referenced_blocks()? {

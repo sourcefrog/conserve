@@ -32,7 +32,7 @@
 
 use crate::*;
 
-pub(crate) struct DeleteGuard {
+pub(crate) struct GarbageCollectionLock {
     /// Last band id present when the guard was created. May be None if
     /// there are no bands.
     band_id: Option<BandId>,
@@ -40,16 +40,16 @@ pub(crate) struct DeleteGuard {
     archive: Archive,
 }
 
-impl DeleteGuard {
+impl GarbageCollectionLock {
     /// Create a soft lock on this archive.
     ///
     /// Returns `Err(Error::DeleteWithIncompleteBackup)` if the last
     /// backup is incomplete.
-    pub fn new(archive: &Archive) -> Result<DeleteGuard> {
+    pub fn new(archive: &Archive) -> Result<GarbageCollectionLock> {
         let archive = archive.clone();
         if let Some(band_id) = archive.last_band_id()? {
             if archive.band_is_closed(&band_id)? {
-                Ok(DeleteGuard {
+                Ok(GarbageCollectionLock {
                     archive,
                     band_id: Some(band_id),
                 })
@@ -57,7 +57,7 @@ impl DeleteGuard {
                 Err(Error::DeleteWithIncompleteBackup { band_id })
             }
         } else {
-            Ok(DeleteGuard {
+            Ok(GarbageCollectionLock {
                 archive,
                 band_id: None,
             })
@@ -84,7 +84,7 @@ mod test {
     #[test]
     fn empty_archive_ok() {
         let archive = ScratchArchive::new();
-        let delete_guard = DeleteGuard::new(&archive).unwrap();
+        let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
         delete_guard.check().unwrap();
     }
 
@@ -95,7 +95,7 @@ mod test {
         archive
             .backup(&source.path(), &BackupOptions::default())
             .unwrap();
-        let delete_guard = DeleteGuard::new(&archive).unwrap();
+        let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
         delete_guard.check().unwrap();
     }
 
@@ -103,7 +103,7 @@ mod test {
     fn concurrent_complete_backup_denied() {
         let archive = ScratchArchive::new();
         let source = TreeFixture::new();
-        let delete_guard = DeleteGuard::new(&archive).unwrap();
+        let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
         archive
             .backup(&source.path(), &BackupOptions::default())
             .unwrap();
@@ -118,7 +118,7 @@ mod test {
     fn incomplete_backup_denied() {
         let archive = ScratchArchive::new();
         Band::create(&archive).unwrap();
-        let result = DeleteGuard::new(&archive);
+        let result = GarbageCollectionLock::new(&archive);
         assert!(result.is_err());
         assert_eq!(
             result.err().unwrap().to_string(),
