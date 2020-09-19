@@ -1,5 +1,12 @@
 # Conserve release history
 
+## v0.6.7 NOT RELEASED YET
+
+### Features
+
+- New `conserve gc` command deletes unreferenced blocks, which might have been
+  left behind by a previous interrupted backup.
+
 ## v0.6.6 2020-08-30
 
 ### Performance

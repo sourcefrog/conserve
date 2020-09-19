@@ -10,14 +10,14 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Test Conserve through its public API.
+//! Test garbage collection.
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 use conserve::*;
 
 #[test]
 fn unreferenced_blocks() {
-    let af = ScratchArchive::new();
+    let archive = ScratchArchive::new();
     let tf = TreeFixture::new();
     tf.create_file("hello");
     let content_hash: BlockHash =
@@ -26,13 +26,87 @@ fn unreferenced_blocks() {
             .parse()
             .unwrap();
 
-    let _copy_stats = af
+    let _copy_stats = archive
         .backup(&tf.path(), &BackupOptions::default())
         .expect("backup");
 
     // Delete the band and index
-    std::fs::remove_dir_all(af.path().join("b0000")).unwrap();
+    std::fs::remove_dir_all(archive.path().join("b0000")).unwrap();
 
-    let unreferenced: Vec<BlockHash> = af.unreferenced_blocks().unwrap().collect();
+    let unreferenced: Vec<BlockHash> = archive.unreferenced_blocks().unwrap().collect();
     assert_eq!(unreferenced, [content_hash]);
+
+    // Delete dry run.
+    let delete_stats = archive
+        .delete_unreferenced(&DeleteOptions {
+            dry_run: true,
+            break_lock: false,
+        })
+        .unwrap();
+    assert_eq!(
+        delete_stats,
+        DeleteUnreferencedStats {
+            unreferenced_block_count: 1,
+            unreferenced_block_bytes: 10,
+            deletion_errors: 0,
+            deleted_block_count: 0,
+        }
+    );
+
+    // Delete unreferenced blocks.
+    let options = DeleteOptions {
+        dry_run: false,
+        break_lock: false,
+    };
+    let delete_stats = archive.delete_unreferenced(&options).unwrap();
+    assert_eq!(
+        delete_stats,
+        DeleteUnreferencedStats {
+            unreferenced_block_count: 1,
+            unreferenced_block_bytes: 10,
+            deletion_errors: 0,
+            deleted_block_count: 1,
+        }
+    );
+
+    // Try again to delete: should find no garbage.
+    let delete_stats = archive.delete_unreferenced(&options).unwrap();
+    assert_eq!(
+        delete_stats,
+        DeleteUnreferencedStats {
+            unreferenced_block_count: 0,
+            unreferenced_block_bytes: 0,
+            deletion_errors: 0,
+            deleted_block_count: 0,
+        }
+    );
+}
+
+#[test]
+fn backup_prevented_by_gc_lock() -> Result<()> {
+    let archive = ScratchArchive::new();
+    let tf = TreeFixture::new();
+    tf.create_file("hello");
+
+    let lock1 = GarbageCollectionLock::new(&archive)?;
+
+    // Backup should fail while gc lock is held.
+    let backup_result = archive.backup(&tf.path(), &BackupOptions::default());
+    match backup_result {
+        Err(Error::GarbageCollectionLockHeld) => (),
+        other => panic!("unexpected result {:?}", other),
+    };
+
+    // Leak the lock, then gc breaking the lock.
+    std::mem::forget(lock1);
+    archive.delete_unreferenced(&DeleteOptions {
+        break_lock: true,
+        ..Default::default()
+    })?;
+
+    // Backup should now succeed.
+    let backup_result = archive.backup(&tf.path(), &BackupOptions::default());
+    assert!(backup_result.is_ok());
+
+    Ok(())
 }

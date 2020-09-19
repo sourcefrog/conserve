@@ -51,6 +51,12 @@ struct ArchiveHeader {
     conserve_archive_version: String,
 }
 
+#[derive(Default, Debug)]
+pub struct DeleteOptions {
+    pub dry_run: bool,
+    pub break_lock: bool,
+}
+
 impl Archive {
     /// Make a new archive in a local direcotry.
     pub fn create_path(path: &Path) -> Result<Archive> {
@@ -226,7 +232,18 @@ impl Archive {
     }
 
     /// Returns all blocks referenced by all bands.
+    ///
+    /// Shows a progress bar as they're collected.
     pub fn referenced_blocks(&self) -> Result<BTreeSet<BlockHash>> {
+        self.iter_referenced_blocks().map(Iterator::collect)
+    }
+
+    /// Iterate all blocks referenced by all bands.
+    ///
+    /// The iterator returns repeatedly-referenced blocks repeatedly, without deduplicating.
+    ///
+    /// This shows a progress bar as indexes are iterated.
+    fn iter_referenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         let archive = self.clone();
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Find referenced blocks...".to_owned());
@@ -235,23 +252,78 @@ impl Archive {
         Ok(band_ids
             .into_iter()
             .enumerate()
-            .inspect(|(i, _)| progress_bar.set_fraction(*i, num_bands))
+            .inspect(move |(i, _)| progress_bar.set_fraction(*i, num_bands))
             .map(move |(_i, band_id)| Band::open(&archive, &band_id).expect("Failed to open band"))
             .flat_map(|band| band.iter_entries().expect("Failed to iter entries"))
             .flat_map(|entry| entry.addrs)
-            .map(|addr| addr.hash)
-            .collect())
+            .map(|addr| addr.hash))
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
     pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         let referenced = self.referenced_blocks()?;
+        Ok(self
+            .iter_present_blocks()?
+            .filter(move |hash| !referenced.contains(hash)))
+    }
+
+    fn iter_present_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Find present blocks...".to_owned());
         Ok(self
             .block_dir()
             .block_names()?
-            .filter(move |hash| !referenced.contains(hash)))
+            .inspect(move |_| progress_bar.increment_work_done(1)))
+    }
+
+    /// Delete unreferenced blocks.
+    pub fn delete_unreferenced(&self, options: &DeleteOptions) -> Result<DeleteUnreferencedStats> {
+        let block_dir = self.block_dir();
+        let mut stats = DeleteUnreferencedStats::default();
+        let delete_guard = if options.break_lock {
+            gc_lock::GarbageCollectionLock::break_lock(self)?
+        } else {
+            gc_lock::GarbageCollectionLock::new(self)?
+        };
+
+        let mut blocks: BTreeSet<BlockHash> = self.iter_present_blocks()?.collect();
+        for block_hash in self.iter_referenced_blocks()? {
+            // NOTE: We could potentially notice here blocks that are missing: referenced but
+            // not present. However, because the reference iter can contain duplicates,
+            // it would require keeping another set. On the whole that seems better left
+            // to validation.
+            blocks.remove(&block_hash);
+        }
+        stats.unreferenced_block_count = blocks.len();
+
+        let mut progress_bar = ProgressBar::new();
+        progress_bar.set_phase("Measure unreferenced blocks".to_owned());
+        progress_bar.set_total_work(blocks.len());
+        let progress_bar_mutex = Mutex::new(progress_bar);
+        let total_bytes = blocks
+            .par_iter()
+            .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
+            .map(|hash| block_dir.compressed_size(hash).unwrap_or_default())
+            .sum();
+        stats.unreferenced_block_bytes = total_bytes;
+
+        delete_guard.check()?;
+
+        if !blocks.is_empty() && !options.dry_run {
+            let mut progress_bar = ProgressBar::new();
+            progress_bar.set_phase("Deleting unreferenced blocks".to_owned());
+            progress_bar.set_total_work(blocks.len());
+            let progress_bar_mutex = Mutex::new(progress_bar);
+            let error_count = blocks
+                .par_iter()
+                .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
+                .filter(|block_hash| block_dir.delete_block(&block_hash).is_err())
+                .count();
+            stats.deletion_errors += error_count;
+            stats.deleted_block_count += blocks.len() - error_count;
+        }
+
+        Ok(stats)
     }
 
     pub fn validate(&self) -> Result<ValidateStats> {
