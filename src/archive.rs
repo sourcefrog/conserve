@@ -299,29 +299,28 @@ impl Archive {
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Measure unreferenced blocks".to_owned());
         progress_bar.set_total_work(blocks.len());
+        let progress_bar_mutex = Mutex::new(progress_bar);
         let total_bytes = blocks
-            .iter()
-            .inspect(|_| progress_bar.increment_work_done(1))
+            .par_iter()
+            .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
             .map(|hash| block_dir.compressed_size(hash).unwrap_or_default())
             .sum();
         stats.unreferenced_block_bytes = total_bytes;
 
         delete_guard.check()?;
 
-        if !blocks.is_empty() {
+        if !blocks.is_empty() && !options.dry_run {
             let mut progress_bar = ProgressBar::new();
             progress_bar.set_phase("Deleting unreferenced blocks".to_owned());
             progress_bar.set_total_work(blocks.len());
-            for block_hash in blocks {
-                if !options.dry_run {
-                    if block_dir.delete_block(&block_hash).is_err() {
-                        stats.deletion_errors += 1;
-                    } else {
-                        stats.deleted_block_count += 1;
-                    }
-                }
-                progress_bar.increment_work_done(1);
-            }
+            let progress_bar_mutex = Mutex::new(progress_bar);
+            let error_count = blocks
+                .par_iter()
+                .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
+                .filter(|block_hash| block_dir.delete_block(&block_hash).is_err())
+                .count();
+            stats.deletion_errors += error_count;
+            stats.deleted_block_count += blocks.len() - error_count;
         }
 
         Ok(stats)
