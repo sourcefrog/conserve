@@ -246,4 +246,5 @@ the index hunk.
 
 New in 0.6.7: A `GC_LOCK` file in the archive directory indicates that a
 garbage collection operation is underway, and new backups or gc operations
-cannot start.
+cannot start. The file contains an empty json dict, `{}`. More keys may be
+added in future.

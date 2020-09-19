@@ -12,7 +12,8 @@
 // GNU General Public License for more details.
 
 //! A `DeleteGuard` prevents block deletion while either a backup is pending,
-//! or if a band is created concurrently with garbage enumeration.
+//! or if a band is created concurrently with garbage enumeration, or if
+//! another gc operation is underway.
 //!
 //! Deletion of blocks works by: finding all the blocks that are present,
 //! then finding all the blocks that are referenced, then deleting the
@@ -32,7 +33,10 @@
 
 use crate::*;
 
-pub(crate) struct GarbageCollectionLock {
+const GC_LOCK: &str = "GC_LOCK";
+
+#[derive(Debug)]
+pub struct GarbageCollectionLock {
     /// Last band id present when the guard was created. May be None if
     /// there are no bands.
     band_id: Option<BandId>,
@@ -40,28 +44,43 @@ pub(crate) struct GarbageCollectionLock {
     archive: Archive,
 }
 
+/// Lock on an archive for gc, that excludes backups and gc by other processes.
+///
+/// The lock is released when the object is dropped.
 impl GarbageCollectionLock {
-    /// Create a soft lock on this archive.
+    /// Lock this archive for garbage collection.
     ///
     /// Returns `Err(Error::DeleteWithIncompleteBackup)` if the last
     /// backup is incomplete.
     pub fn new(archive: &Archive) -> Result<GarbageCollectionLock> {
         let archive = archive.clone();
-        if let Some(band_id) = archive.last_band_id()? {
-            if archive.band_is_closed(&band_id)? {
-                Ok(GarbageCollectionLock {
-                    archive,
-                    band_id: Some(band_id),
-                })
-            } else {
-                Err(Error::DeleteWithIncompleteBackup { band_id })
+        let band_id = archive.last_band_id()?;
+        if let Some(band_id) = band_id.clone() {
+            if !archive.band_is_closed(&band_id)? {
+                return Err(Error::DeleteWithIncompleteBackup { band_id });
             }
-        } else {
-            Ok(GarbageCollectionLock {
-                archive,
-                band_id: None,
-            })
         }
+        if archive.transport().exists(GC_LOCK).unwrap_or(true) {
+            return Err(Error::GarbageCollectionLockHeld {});
+        }
+        archive.transport().write_file(GC_LOCK, b"{}\n")?;
+        Ok(GarbageCollectionLock { archive, band_id })
+    }
+
+    /// Take a lock on an archive, breaking any existing gc lock.
+    ///
+    /// Use this only if you're confident that the process owning the lock
+    /// has terminated and the lock is stale.
+    pub fn break_lock(archive: &Archive) -> Result<GarbageCollectionLock> {
+        if GarbageCollectionLock::is_locked(archive)? {
+            archive.transport().remove_file(GC_LOCK)?;
+        }
+        GarbageCollectionLock::new(archive)
+    }
+
+    /// Returns true if the archive is currently locked by a gc process.
+    pub fn is_locked(archive: &Archive) -> Result<bool> {
+        archive.transport().exists(GC_LOCK).map_err(Error::from)
     }
 
     /// Check that no new versions have been created in this archive since
@@ -76,6 +95,16 @@ impl GarbageCollectionLock {
     }
 }
 
+impl Drop for GarbageCollectionLock {
+    fn drop(&mut self) {
+        if let Err(err) = self.archive.transport().remove_file(GC_LOCK) {
+            // Print directly to stderr, in case the UI structure is in a
+            // bad state during unwind.
+            eprintln!("Failed to delete GC_LOCK: {:?}", err)
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -85,7 +114,12 @@ mod test {
     fn empty_archive_ok() {
         let archive = ScratchArchive::new();
         let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
+        assert!(archive.transport().exists("GC_LOCK").unwrap());
         delete_guard.check().unwrap();
+
+        // Released when dropped.
+        drop(delete_guard);
+        assert!(!archive.transport().exists("GC_LOCK").unwrap());
     }
 
     #[test]
@@ -124,5 +158,35 @@ mod test {
             result.err().unwrap().to_string(),
             "Can't delete blocks because the last band (b0000) is incomplete and may be in use"
         );
+    }
+
+    #[test]
+    fn concurrent_gc_prevented() {
+        let archive = ScratchArchive::new();
+        let _lock1 = GarbageCollectionLock::new(&archive).unwrap();
+        // Should not be able to create a second lock while one gc is running.
+        let lock2_result = GarbageCollectionLock::new(&archive);
+        match lock2_result {
+            Err(Error::GarbageCollectionLockHeld) => (),
+            other => panic!("unexpected result {:?}", other),
+        };
+    }
+
+    #[test]
+    fn sequential_gc_allowed() {
+        let archive = ScratchArchive::new();
+        let _lock1 = GarbageCollectionLock::new(&archive).unwrap();
+        drop(_lock1);
+        let _lock2 = GarbageCollectionLock::new(&archive).unwrap();
+        drop(_lock2);
+    }
+
+    #[test]
+    fn break_lock() {
+        let archive = ScratchArchive::new();
+        let lock1 = GarbageCollectionLock::new(&archive).unwrap();
+        // Pretend the process owning lock1 died, and get a new lock.
+        std::mem::forget(lock1);
+        let _lock2 = GarbageCollectionLock::break_lock(&archive).unwrap();
     }
 }

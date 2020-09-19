@@ -83,12 +83,17 @@ pub enum Error {
     #[error("Band {} is incomplete", band_id)]
     BandIncomplete { band_id: BandId },
 
-    #[error("Can't delete blocks because the last band ({}) is incomplete and may be in use",
-        band_id)]
+    #[error(
+        "Can't delete blocks because the last band ({}) is incomplete and may be in use",
+        band_id
+    )]
     DeleteWithIncompleteBackup { band_id: BandId },
 
     #[error("Can't continue with deletion because the archive was changed by another process")]
     DeleteWithConcurrentActivity,
+
+    #[error("Archive is already locked for garbage collection")]
+    GarbageCollectionLockHeld,
 
     #[error(transparent)]
     ParseGlob {
