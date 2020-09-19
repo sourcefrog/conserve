@@ -117,6 +117,12 @@ with
 
     cargo +nightly install -f --path . --features blake2_simd_asm
 
+### Arch Linux
+
+To install from from available [AUR packages](https://aur.archlinux.org/packages/?O=0&SeB=nd&K=Robust+portable+backup+tool+written&outdated=&SB=n&SO=a&PP=50&do_Search=Go), use an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers):
+
+    yay -S conserve
+
 ## More documentation
 
 - [A comparison to other backup systems][comparison]
