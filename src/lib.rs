@@ -48,6 +48,7 @@ pub mod unix_time;
 
 pub use crate::apath::Apath;
 pub use crate::archive::Archive;
+pub use crate::archive::DeleteOptions;
 pub use crate::backup::BackupOptions;
 pub use crate::backup::BackupWriter;
 pub use crate::band::Band;

@@ -37,7 +37,12 @@ fn unreferenced_blocks() {
     assert_eq!(unreferenced, [content_hash]);
 
     // Delete dry run.
-    let delete_stats = archive.delete_unreferenced(true).unwrap();
+    let delete_stats = archive
+        .delete_unreferenced(&DeleteOptions {
+            dry_run: true,
+            break_lock: false,
+        })
+        .unwrap();
     assert_eq!(
         delete_stats,
         DeleteUnreferencedStats {
@@ -49,7 +54,11 @@ fn unreferenced_blocks() {
     );
 
     // Delete unreferenced blocks.
-    let delete_stats = archive.delete_unreferenced(false).unwrap();
+    let options = DeleteOptions {
+        dry_run: false,
+        break_lock: false,
+    };
+    let delete_stats = archive.delete_unreferenced(&options).unwrap();
     assert_eq!(
         delete_stats,
         DeleteUnreferencedStats {
@@ -61,7 +70,7 @@ fn unreferenced_blocks() {
     );
 
     // Try again to delete: should find no garbage.
-    let delete_stats = archive.delete_unreferenced(false).unwrap();
+    let delete_stats = archive.delete_unreferenced(&options).unwrap();
     assert_eq!(
         delete_stats,
         DeleteUnreferencedStats {

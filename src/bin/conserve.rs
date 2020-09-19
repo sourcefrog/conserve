@@ -70,6 +70,9 @@ enum Command {
         /// Don't actually delete, just check what could be deleted.
         #[structopt(long)]
         dry_run: bool,
+        /// Break a lock left behind by a previous interrupted gc operation, and then gc.
+        #[structopt(long)]
+        break_lock: bool,
     },
 
     /// List files in a stored tree or source directory, with exclusions.
@@ -217,9 +220,16 @@ impl Command {
                 let lt = LiveTree::open(source)?.with_excludes(excludes);
                 output::show_tree_diff(&mut conserve::iter_merged_entries(&st, &lt)?, &mut stdout)?;
             }
-            Command::Gc { archive, dry_run } => {
+            Command::Gc {
+                archive,
+                dry_run,
+                break_lock,
+            } => {
                 let archive = Archive::open_path(archive)?;
-                let stats = archive.delete_unreferenced(*dry_run)?;
+                let stats = archive.delete_unreferenced(&DeleteOptions {
+                    dry_run: *dry_run,
+                    break_lock: *break_lock,
+                })?;
                 ui::println(&format!("{:#?}", stats));
             }
             Command::Init { archive } => {

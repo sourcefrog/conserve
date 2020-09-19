@@ -51,6 +51,12 @@ struct ArchiveHeader {
     conserve_archive_version: String,
 }
 
+#[derive(Default, Debug)]
+pub struct DeleteOptions {
+    pub dry_run: bool,
+    pub break_lock: bool,
+}
+
 impl Archive {
     /// Make a new archive in a local direcotry.
     pub fn create_path(path: &Path) -> Result<Archive> {
@@ -271,10 +277,14 @@ impl Archive {
     }
 
     /// Delete unreferenced blocks.
-    pub fn delete_unreferenced(&self, dry_run: bool) -> Result<DeleteUnreferencedStats> {
+    pub fn delete_unreferenced(&self, options: &DeleteOptions) -> Result<DeleteUnreferencedStats> {
         let block_dir = self.block_dir();
         let mut stats = DeleteUnreferencedStats::default();
-        let delete_guard = gc_lock::GarbageCollectionLock::new(self)?;
+        let delete_guard = if options.break_lock {
+            gc_lock::GarbageCollectionLock::break_lock(self)?
+        } else {
+            gc_lock::GarbageCollectionLock::new(self)?
+        };
 
         let mut blocks: BTreeSet<BlockHash> = self.iter_present_blocks()?.collect();
         for block_hash in self.iter_referenced_blocks()? {
@@ -303,7 +313,7 @@ impl Archive {
             progress_bar.set_phase("Deleting unreferenced blocks".to_owned());
             progress_bar.set_total_work(blocks.len());
             for block_hash in blocks {
-                if !dry_run {
+                if !options.dry_run {
                     if block_dir.delete_block(&block_hash).is_err() {
                         stats.deletion_errors += 1;
                     } else {
