@@ -92,7 +92,7 @@ pub enum Error {
     #[error("Can't continue with deletion because the archive was changed by another process")]
     DeleteWithConcurrentActivity,
 
-    #[error("Archive is already locked for garbage collection")]
+    #[error("Archive is locked for garbage collection")]
     GarbageCollectionLockHeld,
 
     #[error(transparent)]

@@ -56,6 +56,9 @@ impl BackupWriter {
     ///
     /// This currently makes a new top-level band.
     pub fn begin(archive: &Archive) -> Result<BackupWriter> {
+        if gc_lock::GarbageCollectionLock::is_locked(archive)? {
+            return Err(Error::GarbageCollectionLockHeld);
+        }
         let basis_index = archive
             .last_complete_band()?
             .map(|b| b.iter_entries())

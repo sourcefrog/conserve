@@ -137,14 +137,11 @@ mod test {
     fn concurrent_complete_backup_denied() {
         let archive = ScratchArchive::new();
         let source = TreeFixture::new();
-        let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
-        archive
-            .backup(&source.path(), &BackupOptions::default())
-            .unwrap();
-        let result = delete_guard.check();
+        let _delete_guard = GarbageCollectionLock::new(&archive).unwrap();
+        let backup_result = archive.backup(&source.path(), &BackupOptions::default());
         assert_eq!(
-            result.err().expect("guard check fails").to_string(),
-            "Can't continue with deletion because the archive was changed by another process"
+            backup_result.err().expect("backup fails").to_string(),
+            "Archive is locked for garbage collection"
         );
     }
 

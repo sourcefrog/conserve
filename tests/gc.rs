@@ -81,3 +81,32 @@ fn unreferenced_blocks() {
         }
     );
 }
+
+#[test]
+fn backup_prevented_by_gc_lock() -> Result<()> {
+    let archive = ScratchArchive::new();
+    let tf = TreeFixture::new();
+    tf.create_file("hello");
+
+    let lock1 = GarbageCollectionLock::new(&archive)?;
+
+    // Backup should fail while gc lock is held.
+    let backup_result = archive.backup(&tf.path(), &BackupOptions::default());
+    match backup_result {
+        Err(Error::GarbageCollectionLockHeld) => (),
+        other => panic!("unexpected result {:?}", other),
+    };
+
+    // Leak the lock, then gc breaking the lock.
+    std::mem::forget(lock1);
+    archive.delete_unreferenced(&DeleteOptions {
+        break_lock: true,
+        ..Default::default()
+    })?;
+
+    // Backup should now succeed.
+    let backup_result = archive.backup(&tf.path(), &BackupOptions::default());
+    assert!(backup_result.is_ok());
+
+    Ok(())
+}
