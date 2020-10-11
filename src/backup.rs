@@ -178,10 +178,10 @@ impl BackupWriter {
         } else {
             stats.new_files += 1;
         }
-        let content = &mut from_tree.file_contents(&source_entry)?;
-        // TODO: Don't read the whole file into memory, but especially don't do that and
-        // then downcast it to Read.
-        let (addrs, file_stats) = self.store_files.store_file_content(&apath, content)?;
+        let read_source = from_tree.file_contents(&source_entry);
+        let (addrs, file_stats) = self
+            .store_files
+            .store_file_content(&apath, &mut read_source?)?;
         stats += file_stats;
         self.index_builder.push_entry(IndexEntry {
             addrs,
