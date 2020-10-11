@@ -22,6 +22,16 @@ use crate::stats::CopyStats;
 use crate::tree::ReadTree;
 use crate::*;
 
+/// Configuration of how to make a backup.
+#[derive(Debug, Default)]
+pub struct BackupOptions {
+    /// Print filenames to the UI as they're copied.
+    pub print_filenames: bool,
+
+    /// Exclude these globs from the backup.
+    pub excludes: Option<GlobSet>,
+}
+
 /// Backup a source directory into a new band in the archive.
 ///
 /// Returns statistics about what was copied.
@@ -56,11 +66,14 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
             }
             Kind::File => {
                 stats.files += 1;
-                let result = writer.copy_file(&entry, source).map(|s| stats += s);
+                let result = writer.copy_file(&entry, source);
+                if let Ok(file_stats) = &result {
+                    stats += file_stats.clone()
+                }
                 if let Some(bytes) = entry.size() {
                     progress_bar.increment_bytes_done(bytes);
                 }
-                result
+                result.and(Ok(()))
             }
             Kind::Symlink => {
                 stats.symlinks += 1;
@@ -82,25 +95,6 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
     stats += writer.finish()?;
     // TODO: Merge in stats from the tree iter and maybe the source tree?
     Ok(stats)
-}
-
-/// Configuration of how to make a backup.
-#[derive(Debug)]
-pub struct BackupOptions {
-    /// Print filenames to the UI as they're copied.
-    pub print_filenames: bool,
-
-    /// Exclude these globs from the backup.
-    pub excludes: Option<GlobSet>,
-}
-
-impl Default for BackupOptions {
-    fn default() -> Self {
-        BackupOptions {
-            print_filenames: false,
-            excludes: None,
-        }
-    }
 }
 
 /// Accepts files to write in the archive (in apath order.)
@@ -137,17 +131,6 @@ impl BackupWriter {
         })
     }
 
-    /// Push a new entry into the backup's IndexBuilder.
-    ///
-    /// This is public only to facilitate testing.
-    pub(crate) fn push_entry(&mut self, index_entry: IndexEntry) -> Result<()> {
-        // TODO: Return or accumulate index sizes.
-        self.index_builder.push_entry(index_entry)?;
-        Ok(())
-    }
-}
-
-impl tree::WriteTree for BackupWriter {
     fn finish(self) -> Result<CopyStats> {
         let index_builder_stats = self.index_builder.finish()?;
         self.band.close(index_builder_stats.index_hunks)?;
@@ -159,7 +142,8 @@ impl tree::WriteTree for BackupWriter {
 
     fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         // TODO: Pass back index sizes
-        self.push_entry(IndexEntry::metadata_from(source_entry))
+        self.index_builder
+            .push_entry(IndexEntry::metadata_from(source_entry))
     }
 
     /// Copy in the contents of a file from another tree.
@@ -186,7 +170,7 @@ impl tree::WriteTree for BackupWriter {
                 // with the archive invariants, which include that all the
                 // blocks referenced by the index, are actually present.
                 stats.unmodified_files += 1;
-                self.push_entry(basis_entry)?;
+                self.index_builder.push_entry(basis_entry)?;
                 return Ok(stats);
             } else {
                 stats.modified_files += 1;
@@ -199,7 +183,7 @@ impl tree::WriteTree for BackupWriter {
         // then downcast it to Read.
         let (addrs, file_stats) = self.store_files.store_file_content(&apath, content)?;
         stats += file_stats;
-        self.push_entry(IndexEntry {
+        self.index_builder.push_entry(IndexEntry {
             addrs,
             ..IndexEntry::metadata_from(source_entry)
         })?;
@@ -209,6 +193,7 @@ impl tree::WriteTree for BackupWriter {
     fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         let target = source_entry.symlink_target().clone();
         assert!(target.is_some());
-        self.push_entry(IndexEntry::metadata_from(source_entry))
+        self.index_builder
+            .push_entry(IndexEntry::metadata_from(source_entry))
     }
 }
