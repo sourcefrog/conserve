@@ -84,11 +84,15 @@ impl tree::ReadTree for LiveTree {
         Ok(Box::new(Iter::new(&self.path, &self.excludes)?))
     }
 
-    fn iter_subtree_entries(&self, subtree: &Apath) -> Result<Box<dyn Iterator<Item = LiveEntry>>> {
+    fn iter_filtered(
+        &self,
+        subtree: &Apath,
+        excludes: &GlobSet,
+    ) -> Result<Box<dyn Iterator<Item = LiveEntry>>> {
         // TODO: Just skip directly to the requested directory, and stop when it's done.
         let subtree = subtree.to_owned();
         Ok(Box::new(
-            self.iter_entries()?
+            Iter::new(&self.path, excludes)?
                 .filter(move |entry| subtree.is_prefix_of(entry.apath())),
         ))
     }
@@ -464,7 +468,7 @@ mod tests {
         let lt = LiveTree::open(tf.path()).unwrap();
 
         let names: Vec<String> = lt
-            .iter_subtree_entries(&"/subdir".into())
+            .iter_filtered(&"/subdir".into(), &excludes::excludes_nothing())
             .unwrap()
             .map(|entry| entry.apath.into())
             .collect();

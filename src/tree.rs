@@ -21,7 +21,7 @@ use crate::*;
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
 pub trait ReadTree {
     // TODO: Perhaps hide these and just return dyn objects?
-    type Entry: Entry;
+    type Entry: Entry + 'static;
     type R: std::io::Read;
 
     /// Iterate, in apath order, all the entries in this tree.
@@ -31,14 +31,18 @@ pub trait ReadTree {
     /// iterator.
     fn iter_entries(&self) -> Result<Box<dyn Iterator<Item = Self::Entry>>>;
 
-    /// Iterate, in apath order, the entries from a subtree.
-    ///
-    /// The provided implementation iterates and filters all entries, but implementations
-    /// may be able to do better.
-    fn iter_subtree_entries(
+    /// Return entries within the subtree and not excluded.
+    fn iter_filtered(
         &self,
         subtree: &Apath,
-    ) -> Result<Box<dyn Iterator<Item = Self::Entry>>>;
+        excludes: &GlobSet,
+    ) -> Result<Box<dyn Iterator<Item = Self::Entry>>> {
+        let subtree = subtree.to_owned();
+        let excludes = excludes.clone();
+        Ok(Box::new(self.iter_entries()?.filter(move |entry| {
+            subtree.is_prefix_of(entry.apath()) && !excludes.is_match(entry.apath())
+        })))
+    }
 
     /// Read file contents as a `std::io::Read`.
     // TODO: Remove this and use ReadBlocks or similar.

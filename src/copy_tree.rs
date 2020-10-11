@@ -51,7 +51,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     progress_bar.set_phase("Copying".to_owned());
     let entry_iter: Box<dyn Iterator<Item = ST::Entry>> = match &options.only_subtree {
         None => Box::new(source.iter_entries()?),
-        Some(subtree) => source.iter_subtree_entries(subtree)?,
+        Some(subtree) => source.iter_filtered(subtree, &excludes::excludes_nothing())?,
     };
     for entry in entry_iter {
         if options.print_filenames {

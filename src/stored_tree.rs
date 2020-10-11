@@ -111,19 +111,6 @@ impl ReadTree for StoredTree {
         ))
     }
 
-    fn iter_subtree_entries(
-        &self,
-        subtree: &Apath,
-    ) -> Result<Box<dyn Iterator<Item = IndexEntry>>> {
-        // TODO: Advance in the index to the requested directory, and stop immediately when it's
-        // done.
-        let subtree = subtree.to_owned();
-        Ok(Box::new(
-            self.iter_entries()?
-                .filter(move |entry| subtree.is_prefix_of(entry.apath())),
-        ))
-    }
-
     fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R> {
         Ok(self.open_stored_file(entry)?.into_read())
     }
@@ -177,14 +164,14 @@ mod test {
     }
 
     #[test]
-    fn iter_subtree_entries() {
+    fn iter_filtered() {
         let archive = Archive::open_path(Path::new("testdata/archive/v0.6.3/minimal-1/")).unwrap();
         let st = archive
             .open_stored_tree(BandSelectionPolicy::Latest)
             .unwrap();
 
         let names: Vec<String> = st
-            .iter_subtree_entries(&"/subdir".into())
+            .iter_filtered(&"/subdir".into(), &excludes::excludes_nothing())
             .unwrap()
             .map(|entry| entry.apath.into())
             .collect();
