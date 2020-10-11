@@ -19,8 +19,6 @@ use std::iter::Peekable;
 use std::path::Path;
 use std::vec;
 
-use globset::GlobSet;
-
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
 use crate::stats::{IndexBuilderStats, IndexReadStats};
@@ -276,7 +274,6 @@ impl IndexRead {
     pub fn iter_entries(&self) -> Result<IndexEntryIter> {
         Ok(IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
-            excludes: excludes::excludes_nothing(),
             hunk_iter: self.iter_hunks(),
         })
     }
@@ -398,7 +395,6 @@ pub struct IndexEntryIter {
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
-    excludes: GlobSet,
     hunk_iter: IndexHunkIter,
 }
 
@@ -407,10 +403,8 @@ impl Iterator for IndexEntryIter {
 
     fn next(&mut self) -> Option<IndexEntry> {
         loop {
-            while let Some(entry) = self.buffered_entries.next() {
-                if !self.excludes.is_match(&entry.apath) {
-                    return Some(entry);
-                }
+            if let Some(entry) = self.buffered_entries.next() {
+                return Some(entry);
             }
             if !self.refill_entry_buffer_or_warn() {
                 return None;
@@ -420,11 +414,6 @@ impl Iterator for IndexEntryIter {
 }
 
 impl IndexEntryIter {
-    /// Consume this iterator and return a new one with exclusions.
-    pub fn with_excludes(self, excludes: globset::GlobSet) -> IndexEntryIter {
-        IndexEntryIter { excludes, ..self }
-    }
-
     /// Return the entry for given apath, if it is present, otherwise None.
     /// It follows this will also return None at the end of the index.
     ///
@@ -725,24 +714,6 @@ mod tests {
         // Try to add an identically-named file within the next hunk and it should error,
         // because the IndexBuilder remembers the last file name written.
         add_an_entry(&mut ib, "hello");
-    }
-
-    #[test]
-    fn excluded_entries() {
-        let (testdir, mut ib) = scratch_indexbuilder();
-        add_an_entry(&mut ib, "/bar");
-        add_an_entry(&mut ib, "/foo");
-        add_an_entry(&mut ib, "/foobar");
-        ib.finish_hunk().unwrap();
-
-        let excludes = excludes::from_strings(&["/fo*"]).unwrap();
-        let it = IndexRead::open_path(&testdir.path())
-            .iter_entries()
-            .unwrap()
-            .with_excludes(excludes.unwrap());
-
-        let names: Vec<String> = it.map(|x| x.apath.into()).collect();
-        assert_eq!(names, &["/bar"]);
     }
 
     #[test]
