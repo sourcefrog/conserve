@@ -99,6 +99,9 @@ enum Command {
     Ls {
         #[structopt(flatten)]
         stos: StoredTreeOrSource,
+
+        #[structopt(long, short, number_of_values = 1)]
+        exclude: Vec<String>,
     },
 
     /// Copy a stored tree to a restore directory.
@@ -125,6 +128,9 @@ enum Command {
         /// Count in bytes, not megabytes.
         #[structopt(long)]
         bytes: bool,
+
+        #[structopt(long, short, number_of_values = 1)]
+        exclude: Vec<String>,
     },
 
     /// Check that an archive is internally consistent.
@@ -156,9 +162,6 @@ struct StoredTreeOrSource {
 
     #[structopt(long, short, conflicts_with = "source")]
     backup: Option<BandId>,
-
-    #[structopt(long, short, number_of_values = 1)]
-    exclude: Vec<String>,
 }
 
 /// Show debugging information.
@@ -286,8 +289,8 @@ impl Command {
                 Archive::create_path(&archive)?;
                 ui::println(&format!("Created new archive in {:?}", &archive));
             }
-            Command::Ls { stos } => {
-                let excludes = Some(excludes::from_strings(&stos.exclude)?);
+            Command::Ls { stos, exclude } => {
+                let excludes = Some(excludes::from_strings(exclude)?);
                 if let Some(archive) = &stos.archive {
                     output::show_entry_names(
                         stored_tree_from_opt(archive, &stos.backup)?
@@ -326,8 +329,12 @@ impl Command {
                 ui::println("Restore complete.");
                 copy_stats.summarize_restore(&mut stdout)?;
             }
-            Command::Size { ref stos, bytes } => {
-                let excludes = Some(excludes::from_strings(&stos.exclude)?);
+            Command::Size {
+                ref stos,
+                bytes,
+                ref exclude,
+            } => {
+                let excludes = Some(excludes::from_strings(exclude)?);
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
                         .size(excludes)?
