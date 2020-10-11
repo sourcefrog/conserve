@@ -19,7 +19,74 @@ use globset::GlobSet;
 use crate::blockdir::StoreFiles;
 use crate::index::IndexEntryIter;
 use crate::stats::CopyStats;
+use crate::tree::ReadTree;
 use crate::*;
+
+/// Backup a source directory into a new band in the archive.
+///
+/// Returns statistics about what was copied.
+pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> Result<CopyStats> {
+    let mut writer = BackupWriter::begin(archive)?;
+    let mut stats = CopyStats::default();
+    let mut progress_bar = ProgressBar::new();
+    // This causes us to walk the source tree twice, which is probably an acceptable option
+    // since it's nice to see realistic overall progress. We could keep all the entries
+    // in memory, and maybe we should, but it might get unreasonably big.
+
+    // if options.measure_first {
+    //     progress_bar.set_phase("Measure source tree".to_owned());
+    //     // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
+    //     // again a second time? But, that'll potentially use memory proportional to tree size, which
+    //     // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
+    //     // deleted or changed while this is running.
+    //     progress_bar.set_bytes_total(source.size()?.file_bytes as u64);
+    // }
+
+    progress_bar.set_phase("Copying".to_owned());
+    let entry_iter = source.iter_entries()?;
+    // let entry_iter: Box<dyn Iterator<Item = LiveTree::Entry>> = match &options.only_subtree {
+    //     None => Box::new(source.iter_entries()?),
+    //     Some(subtree) => source.iter_subtree_entries(subtree)?,
+    // };
+    for entry in entry_iter {
+        if options.print_filenames {
+            crate::ui::println(entry.apath());
+        }
+        progress_bar.set_filename(entry.apath().to_string());
+        if let Err(e) = match entry.kind() {
+            Kind::Dir => {
+                stats.directories += 1;
+                writer.copy_dir(&entry)
+            }
+            Kind::File => {
+                stats.files += 1;
+                let result = writer.copy_file(&entry, source).map(|s| stats += s);
+                if let Some(bytes) = entry.size() {
+                    progress_bar.increment_bytes_done(bytes);
+                }
+                result
+            }
+            Kind::Symlink => {
+                stats.symlinks += 1;
+                writer.copy_symlink(&entry)
+            }
+            Kind::Unknown => {
+                stats.unknown_kind += 1;
+                // TODO: Perhaps eventually we could backup and restore pipes,
+                // sockets, etc. Or at least count them. For now, silently skip.
+                // https://github.com/sourcefrog/conserve/issues/82
+                continue;
+            }
+        } {
+            ui::show_error(&e);
+            stats.errors += 1;
+            continue;
+        }
+    }
+    stats += writer.finish()?;
+    // TODO: Merge in stats from the tree iter and maybe the source tree?
+    Ok(stats)
+}
 
 /// Configuration of how to make a backup.
 #[derive(Debug)]

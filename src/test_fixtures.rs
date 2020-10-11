@@ -65,10 +65,10 @@ impl ScratchArchive {
         }
 
         let options = &BackupOptions::default();
-        self.archive.backup(&srcdir.path(), &options).unwrap();
+        backup(&self.archive, &srcdir.live_tree(), &options).unwrap();
 
         srcdir.create_file("hello2");
-        self.archive.backup(&srcdir.path(), &options).unwrap();
+        backup(&self.archive, &srcdir.live_tree(), &options).unwrap();
     }
 }
 

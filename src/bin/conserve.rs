@@ -196,11 +196,13 @@ impl Command {
                 verbose,
                 exclude,
             } => {
+                let excludes = excludes::from_strings(exclude)?;
+                let source = &LiveTree::open(source)?.with_excludes(excludes.clone());
                 let options = BackupOptions {
                     print_filenames: *verbose,
-                    excludes: excludes::from_strings(exclude)?,
+                    excludes,
                 };
-                let copy_stats = Archive::open_path(archive)?.backup(source, &options)?;
+                let copy_stats = backup(&Archive::open_path(archive)?, &source, &options)?;
                 ui::println("Backup complete.");
                 copy_stats.summarize_backup(&mut stdout);
             }

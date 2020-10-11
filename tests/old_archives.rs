@@ -117,9 +117,12 @@ fn restore_modify_backup() {
         .expect("overwrite file");
 
         let new_archive = Archive::open_path(&new_archive_path).expect("Open new archive");
-        let backup_stats = new_archive
-            .backup(&working_tree.path(), &BackupOptions::default())
-            .expect("Backup modified tree");
+        let backup_stats = backup(
+            &new_archive,
+            &LiveTree::open(working_tree.path()).unwrap(),
+            &BackupOptions::default(),
+        )
+        .expect("Backup modified tree");
 
         assert_eq!(backup_stats.files, 3);
         // unmodified_files should be 0, but the unchanged file is s not defected as unmodified,
