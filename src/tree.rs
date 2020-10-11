@@ -34,13 +34,18 @@ pub trait ReadTree {
     /// Return entries within the subtree and not excluded.
     fn iter_filtered(
         &self,
-        subtree: &Apath,
-        excludes: &GlobSet,
+        subtree: Option<Apath>,
+        excludes: Option<GlobSet>,
     ) -> Result<Box<dyn Iterator<Item = Self::Entry>>> {
-        let subtree = subtree.to_owned();
-        let excludes = excludes.clone();
         Ok(Box::new(self.iter_entries()?.filter(move |entry| {
-            subtree.is_prefix_of(entry.apath()) && !excludes.is_match(entry.apath())
+            subtree
+                .as_ref()
+                .map(|s| s.is_prefix_of(entry.apath()))
+                .unwrap_or(true)
+                && excludes
+                    .as_ref()
+                    .map(|e| !e.is_match(entry.apath()))
+                    .unwrap_or(true)
         })))
     }
 

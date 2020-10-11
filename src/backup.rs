@@ -43,11 +43,7 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
     // }
 
     progress_bar.set_phase("Copying".to_owned());
-    let entry_iter = source.iter_entries()?;
-    // let entry_iter: Box<dyn Iterator<Item = LiveTree::Entry>> = match &options.only_subtree {
-    //     None => Box::new(source.iter_entries()?),
-    //     Some(subtree) => source.iter_subtree_entries(subtree)?,
-    // };
+    let entry_iter = source.iter_filtered(None, Some(options.excludes.clone()))?;
     for entry in entry_iter {
         if options.print_filenames {
             crate::ui::println(entry.apath());

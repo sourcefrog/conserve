@@ -62,7 +62,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     srcdir.create_file("baz");
     // TODO: Include a symlink only on Unix.
     let excludes = excludes::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
-    let source = srcdir.live_tree().with_excludes(excludes.clone());
+    let source = srcdir.live_tree();
     let options = BackupOptions {
         excludes,
         ..BackupOptions::default()
@@ -119,7 +119,7 @@ pub fn backup_more_excludes() {
     srcdir.create_file("bar");
 
     let excludes = excludes::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
-    let source = srcdir.live_tree().with_excludes(excludes.clone());
+    let source = srcdir.live_tree();
     let options = BackupOptions {
         excludes,
         print_filenames: false,

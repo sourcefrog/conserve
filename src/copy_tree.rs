@@ -23,6 +23,7 @@ pub struct CopyOptions {
     pub measure_first: bool,
     /// Copy only this subtree from the source.
     pub only_subtree: Option<Apath>,
+    pub excludes: Option<GlobSet>,
 }
 
 /// Copy files and other entries from one tree to another.
@@ -49,10 +50,8 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     }
 
     progress_bar.set_phase("Copying".to_owned());
-    let entry_iter: Box<dyn Iterator<Item = ST::Entry>> = match &options.only_subtree {
-        None => Box::new(source.iter_entries()?),
-        Some(subtree) => source.iter_filtered(subtree, &excludes::excludes_nothing())?,
-    };
+    let entry_iter: Box<dyn Iterator<Item = ST::Entry>> =
+        source.iter_filtered(options.only_subtree.clone(), options.excludes.clone())?;
     for entry in entry_iter {
         if options.print_filenames {
             crate::ui::println(entry.apath());

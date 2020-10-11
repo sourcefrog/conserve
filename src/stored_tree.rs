@@ -30,7 +30,6 @@ pub struct StoredTree {
     band: Band,
     archive: Archive,
     block_dir: BlockDir,
-    excludes: GlobSet,
 }
 
 impl StoredTree {
@@ -38,13 +37,8 @@ impl StoredTree {
         Ok(StoredTree {
             band: Band::open(archive, band_id)?,
             block_dir: archive.block_dir().clone(),
-            excludes: excludes::excludes_nothing(),
             archive: archive.clone(),
         })
-    }
-
-    pub fn with_excludes(self, excludes: GlobSet) -> StoredTree {
-        StoredTree { excludes, ..self }
     }
 
     pub fn band(&self) -> &Band {
@@ -102,12 +96,10 @@ impl ReadTree for StoredTree {
 
     /// Return an iter of index entries in this stored tree.
     fn iter_entries(&self) -> Result<Box<dyn Iterator<Item = index::IndexEntry>>> {
-        let excludes = self.excludes.clone();
         Ok(Box::new(
             self.archive
                 .iter_stitched_index_hunks(self.band.id())
-                .flatten()
-                .filter(move |entry| !excludes.is_match(&entry.apath)),
+                .flatten(),
         ))
     }
 
@@ -171,7 +163,7 @@ mod test {
             .unwrap();
 
         let names: Vec<String> = st
-            .iter_filtered(&"/subdir".into(), &excludes::excludes_nothing())
+            .iter_filtered(Some("/subdir".into()), None)
             .unwrap()
             .map(|entry| entry.apath.into())
             .collect();

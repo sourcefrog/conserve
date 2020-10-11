@@ -41,32 +41,41 @@ pub struct MergedEntry {
 ///
 /// Note that at present this only says whether files are absent from either
 /// side, not whether there is a content difference.
-pub fn iter_merged_entries<AT, BT>(a: &AT, b: &BT) -> Result<MergeTrees<AT, BT>>
+pub struct MergeTrees<AE, BE>
 where
-    AT: ReadTree,
-    BT: ReadTree,
+    AE: Entry,
+    BE: Entry,
 {
-    Ok(MergeTrees {
-        ait: a.iter_entries()?,
-        bit: b.iter_entries()?,
-        na: None,
-        nb: None,
-    })
-}
-
-pub struct MergeTrees<AT: ReadTree, BT: ReadTree> {
-    ait: Box<dyn Iterator<Item = AT::Entry>>,
-    bit: Box<dyn Iterator<Item = BT::Entry>>,
+    ait: Box<dyn Iterator<Item = AE>>,
+    bit: Box<dyn Iterator<Item = BE>>,
 
     // Read in advance entries from A and B.
-    na: Option<AT::Entry>,
-    nb: Option<BT::Entry>,
+    na: Option<AE>,
+    nb: Option<BE>,
 }
 
-impl<AT, BT> Iterator for MergeTrees<AT, BT>
+impl<AE, BE> MergeTrees<AE, BE>
 where
-    AT: ReadTree,
-    BT: ReadTree,
+    AE: Entry,
+    BE: Entry,
+{
+    pub fn new(
+        ait: Box<dyn Iterator<Item = AE>>,
+        bit: Box<dyn Iterator<Item = BE>>,
+    ) -> MergeTrees<AE, BE> {
+        MergeTrees {
+            ait,
+            bit,
+            na: None,
+            nb: None,
+        }
+    }
+}
+
+impl<AE, BE> Iterator for MergeTrees<AE, BE>
+where
+    AE: Entry,
+    BE: Entry,
 {
     type Item = MergedEntry;
 
@@ -142,9 +151,11 @@ mod tests {
     fn merge_entry_trees() {
         let ta = TreeFixture::new();
         let tb = TreeFixture::new();
-        let di = iter_merged_entries(&ta.live_tree(), &tb.live_tree())
-            .unwrap()
-            .collect::<Vec<_>>();
+        let di = MergeTrees::new(
+            ta.live_tree().iter_entries().unwrap(),
+            tb.live_tree().iter_entries().unwrap(),
+        )
+        .collect::<Vec<_>>();
         assert_eq!(di.len(), 1);
         assert_eq!(
             di[0],

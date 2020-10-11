@@ -117,7 +117,6 @@ impl Archive {
     /// Restore a selected version, or by default the latest, to a destination directory.
     pub fn restore(&self, destination_path: &Path, options: &RestoreOptions) -> Result<CopyStats> {
         let st = self.open_stored_tree(options.band_selection.clone())?;
-        let st = st.with_excludes(options.excludes.clone());
         let rt = if options.overwrite {
             RestoreTree::create_overwrite(destination_path)
         } else {
@@ -126,6 +125,7 @@ impl Archive {
         let opts = CopyOptions {
             print_filenames: options.print_filenames,
             only_subtree: options.only_subtree.clone(),
+            excludes: Some(options.excludes.clone()),
             ..CopyOptions::default()
         };
         copy_tree(&st, rt, &opts)

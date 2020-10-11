@@ -62,7 +62,7 @@ pub use crate::gc_lock::GarbageCollectionLock;
 pub use crate::index::{IndexBuilder, IndexEntry, IndexRead};
 pub use crate::kind::Kind;
 pub use crate::live_tree::{LiveEntry, LiveTree};
-pub use crate::merge::{iter_merged_entries, MergedEntryKind};
+pub use crate::merge::{MergeTrees, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
 pub use crate::progress::ProgressBar;
 pub use crate::restore::{RestoreOptions, RestoreTree};
