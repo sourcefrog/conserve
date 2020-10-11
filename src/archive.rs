@@ -125,7 +125,7 @@ impl Archive {
         let opts = CopyOptions {
             print_filenames: options.print_filenames,
             only_subtree: options.only_subtree.clone(),
-            excludes: Some(options.excludes.clone()),
+            excludes: options.excludes.clone(),
             ..CopyOptions::default()
         };
         copy_tree(&st, rt, &opts)

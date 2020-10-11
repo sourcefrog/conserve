@@ -22,7 +22,6 @@ use globset::GlobSet;
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
-use crate::excludes;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::stats::CopyStats;
 use crate::*;
@@ -31,7 +30,7 @@ use crate::*;
 #[derive(Debug)]
 pub struct RestoreOptions {
     pub print_filenames: bool,
-    pub excludes: GlobSet,
+    pub excludes: Option<GlobSet>,
     /// Restore only this subdirectory.
     pub only_subtree: Option<Apath>,
     pub overwrite: bool,
@@ -45,7 +44,7 @@ impl Default for RestoreOptions {
             print_filenames: false,
             overwrite: false,
             band_selection: BandSelectionPolicy::LatestClosed,
-            excludes: excludes::excludes_nothing(),
+            excludes: None,
             only_subtree: None,
         }
     }

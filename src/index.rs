@@ -739,7 +739,7 @@ mod tests {
         let it = IndexRead::open_path(&testdir.path())
             .iter_entries()
             .unwrap()
-            .with_excludes(excludes);
+            .with_excludes(excludes.unwrap());
 
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/bar"]);

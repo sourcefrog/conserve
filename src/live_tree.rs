@@ -418,7 +418,7 @@ mod tests {
         let excludes = excludes::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
         let lt = LiveTree::open(tf.path()).unwrap();
-        let mut source_iter = lt.iter_filtered(None, Some(excludes)).unwrap();
+        let mut source_iter = lt.iter_filtered(None, excludes).unwrap();
         let result = source_iter.by_ref().collect::<Vec<_>>();
 
         // First one is the root

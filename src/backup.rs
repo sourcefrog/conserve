@@ -43,7 +43,7 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
     // }
 
     progress_bar.set_phase("Copying".to_owned());
-    let entry_iter = source.iter_filtered(None, Some(options.excludes.clone()))?;
+    let entry_iter = source.iter_filtered(None, options.excludes.clone())?;
     for entry in entry_iter {
         if options.print_filenames {
             crate::ui::println(entry.apath());
@@ -91,14 +91,14 @@ pub struct BackupOptions {
     pub print_filenames: bool,
 
     /// Exclude these globs from the backup.
-    pub excludes: GlobSet,
+    pub excludes: Option<GlobSet>,
 }
 
 impl Default for BackupOptions {
     fn default() -> Self {
         BackupOptions {
             print_filenames: false,
-            excludes: GlobSet::empty(),
+            excludes: None,
         }
     }
 }

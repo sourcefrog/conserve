@@ -266,8 +266,8 @@ impl Command {
                 let lt = LiveTree::open(source)?;
                 output::show_tree_diff(
                     &mut MergeTrees::new(
-                        st.iter_filtered(None, Some(excludes.clone()))?,
-                        lt.iter_filtered(None, Some(excludes.clone()))?,
+                        st.iter_filtered(None, excludes.clone())?,
+                        lt.iter_filtered(None, excludes.clone())?,
                     ),
                     &mut stdout,
                 )?;
@@ -290,7 +290,7 @@ impl Command {
                 ui::println(&format!("Created new archive in {:?}", &archive));
             }
             Command::Ls { stos, exclude } => {
-                let excludes = Some(excludes::from_strings(exclude)?);
+                let excludes = excludes::from_strings(exclude)?;
                 if let Some(archive) = &stos.archive {
                     output::show_entry_names(
                         stored_tree_from_opt(archive, &stos.backup)?
@@ -334,7 +334,7 @@ impl Command {
                 bytes,
                 ref exclude,
             } => {
-                let excludes = Some(excludes::from_strings(exclude)?);
+                let excludes = excludes::from_strings(exclude)?;
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
                         .size(excludes)?
