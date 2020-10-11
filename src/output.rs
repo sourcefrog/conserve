@@ -67,7 +67,7 @@ pub fn show_verbose_version_list(
             let tree_mb = crate::misc::bytes_to_human_mb(
                 archive
                     .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))?
-                    .size()?
+                    .size(None)?
                     .file_bytes,
             );
             writeln!(

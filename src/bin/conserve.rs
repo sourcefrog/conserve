@@ -121,6 +121,10 @@ enum Command {
     Size {
         #[structopt(flatten)]
         stos: StoredTreeOrSource,
+
+        /// Count in bytes, not megabytes.
+        #[structopt(long)]
+        bytes: bool,
     },
 
     /// Check that an archive is internally consistent.
@@ -322,20 +326,22 @@ impl Command {
                 ui::println("Restore complete.");
                 copy_stats.summarize_restore(&mut stdout)?;
             }
-            Command::Size { ref stos } => {
-                if !stos.exclude.is_empty() {
-                    todo!("size with exclusions not implemented")
-                }
+            Command::Size { ref stos, bytes } => {
+                let excludes = Some(excludes::from_strings(&stos.exclude)?);
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
-                        .size()?
+                        .size(excludes)?
                         .file_bytes
                 } else {
                     LiveTree::open(stos.source.as_ref().unwrap())?
-                        .size()?
+                        .size(excludes)?
                         .file_bytes
                 };
-                ui::println(&conserve::bytes_to_human_mb(size));
+                if *bytes {
+                    ui::println(&format!("{}", size));
+                } else {
+                    ui::println(&conserve::bytes_to_human_mb(size));
+                }
             }
             Command::Validate { archive } => {
                 let stats = Archive::open_path(archive)?.validate()?;

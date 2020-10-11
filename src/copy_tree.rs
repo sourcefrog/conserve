@@ -46,7 +46,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         // again a second time? But, that'll potentially use memory proportional to tree size, which
         // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
         // deleted or changed while this is running.
-        progress_bar.set_bytes_total(source.size()?.file_bytes as u64);
+        progress_bar.set_bytes_total(source.size(options.excludes.clone())?.file_bytes as u64);
     }
 
     progress_bar.set_phase("Copying".to_owned());

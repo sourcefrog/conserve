@@ -469,3 +469,18 @@ fn delete_nonexistent_band() {
         .stdout(pred_fn)
         .failure();
 }
+
+#[test]
+fn size_exclude() {
+    let source = TreeFixture::new();
+    source.create_file_with_contents("small", b"0123456789");
+    source.create_file_with_contents("junk", b"01234567890123456789");
+
+    run_conserve()
+        .args(&["size", "--bytes", "--source"])
+        .arg(&source.path())
+        .args(&["--exclude=/junk"])
+        .assert()
+        .success()
+        .stdout("10\n");
+}
