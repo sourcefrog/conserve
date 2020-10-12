@@ -116,6 +116,8 @@ impl BackupWriter {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
+        // TODO: Use a stitched band as the basis.
+        // <https://github.com/sourcefrog/conserve/issues/142>
         let basis_index = archive
             .last_complete_band()?
             .map(|b| b.iter_entries())
