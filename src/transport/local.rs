@@ -112,6 +112,14 @@ impl Transport for LocalTransport {
         std::fs::remove_file(self.full_path(relpath))
     }
 
+    fn remove_dir(&self, relpath: &str) -> io::Result<()> {
+        std::fs::remove_dir(self.full_path(relpath))
+    }
+
+    fn remove_dir_all(&self, relpath: &str) -> io::Result<()> {
+        std::fs::remove_dir_all(self.full_path(relpath))
+    }
+
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport> {
         Box::new(LocalTransport {
             root: self.root.join(relpath),
@@ -283,5 +291,18 @@ mod test {
         assert_eq!(sub_list[0].name, "bbb");
 
         temp.close().unwrap();
+    }
+
+    #[test]
+    fn remove_dir_all() -> std::io::Result<()> {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
+
+        transport.create_dir("aaa")?;
+        transport.create_dir("aaa/bbb")?;
+        transport.create_dir("aaa/bbb/ccc")?;
+
+        transport.remove_dir_all("aaa")?;
+        Ok(())
     }
 }

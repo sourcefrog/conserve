@@ -292,7 +292,8 @@ impl CopyStats {
 }
 
 #[derive(Add, AddAssign, Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct DeleteUnreferencedStats {
+pub struct DeleteStats {
+    pub deleted_band_count: usize,
     pub unreferenced_block_count: usize,
     pub unreferenced_block_bytes: u64,
     pub deletion_errors: usize,

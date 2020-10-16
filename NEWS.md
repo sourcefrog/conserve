@@ -2,6 +2,11 @@
 
 ## v0.6.8 NOT RELEASED YET
 
+### Features
+
+- New `conserve delete` command to delete specified backup versions and (by
+  default) blocks they reference.
+
 ## v0.6.7 2020-10-04
 
 ### Features

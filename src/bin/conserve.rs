@@ -45,6 +45,26 @@ enum Command {
 
     Debug(Debug),
 
+    /// Delete backups from an archive.
+    Delete {
+        /// Archive to delete from.
+        archive: PathBuf,
+        /// Backup to delete.
+        #[structopt(long, short, multiple(true), required(true), number_of_values(1))]
+        backup: Vec<BandId>,
+        /// Don't actually delete, just check what could be deleted.
+        #[structopt(long)]
+        dry_run: bool,
+        /// Break a lock left behind by a previous interrupted gc operation, and then gc.
+        #[structopt(long)]
+        break_lock: bool,
+        /// Delete indexes but don't garbage-collect blocks.
+        ///
+        /// (Faster, but doesn't free up space. The archive should later be gc'd.)
+        #[structopt(long)]
+        no_gc: bool,
+    },
+
     /// Compare a stored tree to a source directory.
     Diff {
         archive: PathBuf,
@@ -206,6 +226,23 @@ impl Command {
                     writeln!(bw, "{}", hash)?;
                 }
             }
+            Command::Delete {
+                archive,
+                backup,
+                dry_run,
+                no_gc,
+                break_lock,
+            } => {
+                let stats = Archive::open_path(archive)?.delete_bands(
+                    &backup,
+                    &DeleteOptions {
+                        dry_run: *dry_run,
+                        break_lock: *break_lock,
+                        no_gc: *no_gc,
+                    },
+                )?;
+                ui::println(&format!("{:#?}", stats));
+            }
             Command::Diff {
                 archive,
                 source,
@@ -229,6 +266,7 @@ impl Command {
                 let stats = archive.delete_unreferenced(&DeleteOptions {
                     dry_run: *dry_run,
                     break_lock: *break_lock,
+                    no_gc: false,
                 })?;
                 ui::println(&format!("{:#?}", stats));
             }

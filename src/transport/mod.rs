@@ -97,6 +97,12 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// Delete a file.
     fn remove_file(&self, relpath: &str) -> io::Result<()>;
 
+    /// Delete an empty directory.
+    fn remove_dir(&self, relpath: &str) -> io::Result<()>;
+
+    /// Delete a directory and all its contents.
+    fn remove_dir_all(&self, relpath: &str) -> io::Result<()>;
+
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;
 

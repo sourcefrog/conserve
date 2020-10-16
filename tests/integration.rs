@@ -490,3 +490,16 @@ fn exclude_files() {
     assert!(dest.join("subdir").is_dir());
     assert_eq!(stats.files, 2);
 }
+
+#[test]
+fn delete_bands() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+
+    let stats = af
+        .delete_bands(&[BandId::new(&[0]), BandId::new(&[1])], &Default::default())
+        .expect("delete_bands");
+
+    assert_eq!(stats.deleted_block_count, 1);
+    assert_eq!(stats.deleted_band_count, 2);
+}

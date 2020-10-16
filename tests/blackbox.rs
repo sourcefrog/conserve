@@ -435,3 +435,37 @@ fn restore_only_subtree() {
 
     dest.close().unwrap();
 }
+
+#[test]
+fn delete_bands() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+
+    run_conserve()
+        .args(&["delete"])
+        .args(&["-b", "b0000"])
+        .args(&["-b", "b0001"])
+        .arg(af.path())
+        .assert()
+        .success();
+}
+
+#[test]
+fn delete_nonexistent_band() {
+    let af = ScratchArchive::new();
+
+    run_conserve()
+        .args(&["delete"])
+        .args(&["-b", "b0000"])
+        .arg(af.path())
+        .assert()
+        .stdout(
+            predicate::str::is_match(
+                r"conserve error: Failed to delete band b0000
+  caused by: No such file or directory \(os error \d+\)
+",
+            )
+            .unwrap(),
+        )
+        .failure();
+}

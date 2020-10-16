@@ -159,6 +159,18 @@ impl Band {
         Ok(new)
     }
 
+    /// Delete a band.
+    pub fn delete(archive: &Archive, band_id: &BandId) -> Result<()> {
+        // TODO: Count how many files were deleted, and the total size?
+        archive
+            .transport()
+            .remove_dir_all(&band_id.to_string())
+            .map_err(|source| Error::BandDeletion {
+                band_id: band_id.clone(),
+                source,
+            })
+    }
+
     pub fn is_closed(&self) -> Result<bool> {
         self.transport
             .exists(BAND_TAIL_FILENAME)
@@ -288,6 +300,15 @@ mod tests {
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)
         assert!(dur < Duration::seconds(5));
+    }
+
+    #[test]
+    fn delete_band() {
+        let af = ScratchArchive::new();
+        let _band = Band::create(&af).unwrap();
+        Band::delete(&af, &BandId::new(&[0])).expect("delete band");
+
+        assert_eq!(af.transport().exists("b0000").unwrap(), false);
     }
 
     #[test]

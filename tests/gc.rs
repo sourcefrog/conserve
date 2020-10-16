@@ -41,15 +41,17 @@ fn unreferenced_blocks() {
         .delete_unreferenced(&DeleteOptions {
             dry_run: true,
             break_lock: false,
+            no_gc: false,
         })
         .unwrap();
     assert_eq!(
         delete_stats,
-        DeleteUnreferencedStats {
+        DeleteStats {
             unreferenced_block_count: 1,
             unreferenced_block_bytes: 10,
             deletion_errors: 0,
             deleted_block_count: 0,
+            deleted_band_count: 0,
         }
     );
 
@@ -57,15 +59,17 @@ fn unreferenced_blocks() {
     let options = DeleteOptions {
         dry_run: false,
         break_lock: false,
+        ..Default::default()
     };
     let delete_stats = archive.delete_unreferenced(&options).unwrap();
     assert_eq!(
         delete_stats,
-        DeleteUnreferencedStats {
+        DeleteStats {
             unreferenced_block_count: 1,
             unreferenced_block_bytes: 10,
             deletion_errors: 0,
             deleted_block_count: 1,
+            deleted_band_count: 0,
         }
     );
 
@@ -73,11 +77,12 @@ fn unreferenced_blocks() {
     let delete_stats = archive.delete_unreferenced(&options).unwrap();
     assert_eq!(
         delete_stats,
-        DeleteUnreferencedStats {
+        DeleteStats {
             unreferenced_block_count: 0,
             unreferenced_block_bytes: 0,
             deletion_errors: 0,
             deleted_block_count: 0,
+            deleted_band_count: 0,
         }
     );
 }

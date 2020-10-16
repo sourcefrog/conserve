@@ -55,6 +55,7 @@ struct ArchiveHeader {
 pub struct DeleteOptions {
     pub dry_run: bool,
     pub break_lock: bool,
+    pub no_gc: bool,
 }
 
 impl Archive {
@@ -277,9 +278,9 @@ impl Archive {
     }
 
     /// Delete unreferenced blocks.
-    pub fn delete_unreferenced(&self, options: &DeleteOptions) -> Result<DeleteUnreferencedStats> {
+    pub fn delete_unreferenced(&self, options: &DeleteOptions) -> Result<DeleteStats> {
         let block_dir = self.block_dir();
-        let mut stats = DeleteUnreferencedStats::default();
+        let mut stats = DeleteStats::default();
         let delete_guard = if options.break_lock {
             gc_lock::GarbageCollectionLock::break_lock(self)?
         } else {
@@ -323,6 +324,24 @@ impl Archive {
             stats.deleted_block_count += blocks.len() - error_count;
         }
 
+        Ok(stats)
+    }
+
+    /// Delete bands, and the blocks that they referenec.
+    pub fn delete_bands(
+        &self,
+        band_ids: &[BandId],
+        options: &DeleteOptions,
+    ) -> Result<DeleteStats> {
+        let mut stats = DeleteStats::default();
+        for band_id in band_ids {
+            if !options.dry_run {
+                Band::delete(self, band_id).map(|()| stats.deleted_band_count += 1)?
+            }
+        }
+        if !options.no_gc {
+            stats += self.delete_unreferenced(options)?;
+        }
         Ok(stats)
     }
 
