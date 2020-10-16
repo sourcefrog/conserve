@@ -148,8 +148,6 @@ there's no guarantee of support.
 Some other limitations:
 
 - `conserve diff` exists, [but is not yet very useful][21].
-- [The `conserve delete` command to trim the backup archive is not
-  implemented][43], but the `b0123` band directories can be deleted directly.
 - [Permissions and ownership are not stored](https://github.com/sourcefrog/conserve/issues/46).
 
 Prior to 1.0, data formats may change on each minor version number change (0.x):
