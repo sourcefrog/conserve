@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "conserve"
-version = "0.6.8-pre"
+version = "0.6.8"
 dependencies = [
  "assert_cmd",
  "assert_fs",
