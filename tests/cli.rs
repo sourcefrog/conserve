@@ -40,7 +40,7 @@ fn run_conserve() -> Command {
 }
 
 #[test]
-fn blackbox_no_args() {
+fn no_args() {
     // Run with no arguments, should fail with a usage message to stderr.
     run_conserve()
         .assert()
@@ -50,7 +50,7 @@ fn blackbox_no_args() {
 }
 
 #[test]
-fn blackbox_help() {
+fn help() {
     run_conserve()
         .arg("--help")
         .assert()
@@ -77,7 +77,7 @@ fn clean_error_on_non_archive() {
 }
 
 #[test]
-fn blackbox_backup() {
+fn basic_backup() {
     let testdir = TempDir::new().unwrap();
     let arch_dir = testdir.path().join("a");
 
