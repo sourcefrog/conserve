@@ -454,18 +454,18 @@ fn delete_bands() {
 fn delete_nonexistent_band() {
     let af = ScratchArchive::new();
 
+    let pred_fn = predicate::str::is_match(
+        r"conserve error: Failed to delete band b0000
+  caused by: (No such file or directory|The system cannot find the file specified\.) \(os error \d+\)
+",
+        )
+        .unwrap();
+
     run_conserve()
         .args(&["delete"])
         .args(&["-b", "b0000"])
         .arg(af.path())
         .assert()
-        .stdout(
-            predicate::str::is_match(
-                r"conserve error: Failed to delete band b0000
-  caused by: No such file or directory \(os error \d+\)
-",
-            )
-            .unwrap(),
-        )
+        .stdout(pred_fn)
         .failure();
 }
