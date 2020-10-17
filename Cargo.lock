@@ -159,6 +159,7 @@ dependencies = [
  "escargot",
  "globset",
  "hex",
+ "itertools",
  "lazy_static",
  "libc",
  "predicates",
@@ -394,6 +395,15 @@ dependencies = [
  "thread_local",
  "walkdir 2.3.1",
  "winapi-util",
+]
+
+[[package]]
+name = "itertools"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+dependencies = [
+ "either",
 ]
 
 [[package]]

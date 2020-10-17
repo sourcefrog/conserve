@@ -227,7 +227,7 @@ fn source_unreadable() {
 
     let stats = backup(&af, &tf.live_tree(), &BackupOptions::default()).expect("backup");
     assert_eq!(stats.errors, 1);
-    assert_eq!(stats.new_files, 2);
+    assert_eq!(stats.new_files, 3);
     assert_eq!(stats.files, 3);
 
     // TODO: On Windows change the ACL to make the file unreadable to the current user or to

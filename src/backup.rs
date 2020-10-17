@@ -15,6 +15,7 @@
 //! into an archive.
 
 use globset::GlobSet;
+use itertools::Itertools;
 
 use crate::blockdir::StoreFiles;
 use crate::index::IndexEntryIter;
@@ -54,43 +55,26 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
 
     progress_bar.set_phase("Copying".to_owned());
     let entry_iter = source.iter_filtered(None, options.excludes.clone())?;
-    for entry in entry_iter {
-        if options.print_filenames {
-            crate::ui::println(entry.apath());
-        }
-        progress_bar.set_filename(entry.apath().to_string());
-        if let Err(e) = match entry.kind() {
-            Kind::Dir => {
-                stats.directories += 1;
-                writer.copy_dir(&entry)
+    for entry_group in entry_iter
+        .chunks(crate::index::MAX_ENTRIES_PER_HUNK)
+        .into_iter()
+    {
+        for entry in entry_group {
+            if options.print_filenames {
+                crate::ui::println(entry.apath());
             }
-            Kind::File => {
-                stats.files += 1;
-                let result = writer.copy_file(&entry, source);
-                if let Ok(file_stats) = &result {
-                    stats += file_stats.clone()
-                }
-                if let Some(bytes) = entry.size() {
-                    progress_bar.increment_bytes_done(bytes);
-                }
-                result.and(Ok(()))
-            }
-            Kind::Symlink => {
-                stats.symlinks += 1;
-                writer.copy_symlink(&entry)
-            }
-            Kind::Unknown => {
-                stats.unknown_kind += 1;
-                // TODO: Perhaps eventually we could backup and restore pipes,
-                // sockets, etc. Or at least count them. For now, silently skip.
-                // https://github.com/sourcefrog/conserve/issues/82
+            progress_bar.set_filename(entry.apath().to_string());
+            if let Err(e) = writer.copy_entry(&entry, source) {
+                ui::show_error(&e);
+                stats.errors += 1;
                 continue;
             }
-        } {
-            ui::show_error(&e);
-            stats.errors += 1;
-            continue;
+            if let Some(bytes) = entry.size() {
+                progress_bar.increment_bytes_done(bytes);
+            }
         }
+        // TODO: Finish any compression groups.
+        // TODO: Sort and then write out the index hunk for this group.
     }
     stats += writer.finish()?;
     // TODO: Merge in stats from the tree iter and maybe the source tree?
@@ -98,10 +82,11 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
 }
 
 /// Accepts files to write in the archive (in apath order.)
-pub struct BackupWriter {
+struct BackupWriter {
     band: Band,
     index_builder: IndexBuilder,
     store_files: StoreFiles,
+    stats: CopyStats,
 
     /// The index for the last stored band, used as hints for whether newly
     /// stored files have changed.
@@ -129,6 +114,7 @@ impl BackupWriter {
             band,
             index_builder,
             store_files: StoreFiles::new(archive.block_dir().clone()),
+            stats: CopyStats::default(),
             basis_index,
         })
     }
@@ -138,23 +124,35 @@ impl BackupWriter {
         self.band.close(index_builder_stats.index_hunks)?;
         Ok(CopyStats {
             index_builder_stats,
-            ..CopyStats::default()
+            ..self.stats
         })
+    }
+
+    fn copy_entry<R: ReadTree>(&mut self, entry: &R::Entry, source: &R) -> Result<()> {
+        match entry.kind() {
+            Kind::Dir => self.copy_dir(entry),
+            Kind::File => self.copy_file(entry, source),
+            Kind::Symlink => self.copy_symlink(entry),
+            Kind::Unknown => {
+                self.stats.unknown_kind += 1;
+                // TODO: Perhaps eventually we could backup and restore pipes,
+                // sockets, etc. Or at least count them. For now, silently skip.
+                // https://github.com/sourcefrog/conserve/issues/82
+                Ok(())
+            }
+        }
     }
 
     fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         // TODO: Pass back index sizes
+        self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry))
     }
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(
-        &mut self,
-        source_entry: &R::Entry,
-        from_tree: &R,
-    ) -> Result<CopyStats> {
-        let mut stats = CopyStats::default();
+    fn copy_file<R: ReadTree>(&mut self, source_entry: &R::Entry, from_tree: &R) -> Result<()> {
+        self.stats.files += 1;
         let apath = source_entry.apath();
         if let Some(basis_entry) = self
             .basis_index
@@ -171,29 +169,29 @@ impl BackupWriter {
                 // We can reasonably assume that the existing archive complies
                 // with the archive invariants, which include that all the
                 // blocks referenced by the index, are actually present.
-                stats.unmodified_files += 1;
+                self.stats.unmodified_files += 1;
                 self.index_builder.push_entry(basis_entry)?;
-                return Ok(stats);
+                return Ok(());
             } else {
-                stats.modified_files += 1;
+                self.stats.modified_files += 1;
             }
         } else {
-            stats.new_files += 1;
+            self.stats.new_files += 1;
         }
         let read_source = from_tree.file_contents(&source_entry);
         let (addrs, file_stats) = self
             .store_files
             .store_file_content(&apath, &mut read_source?)?;
-        stats += file_stats;
+        self.stats += file_stats;
         self.index_builder.push_entry(IndexEntry {
             addrs,
             ..IndexEntry::metadata_from(source_entry)
-        })?;
-        Ok(stats)
+        })
     }
 
     fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         let target = source_entry.symlink_target().clone();
+        self.stats.symlinks += 1;
         assert!(target.is_some());
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry))
