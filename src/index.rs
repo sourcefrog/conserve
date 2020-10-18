@@ -159,6 +159,7 @@ impl IndexBuilder {
         }
     }
 
+    /// Finish the last hunk of this index, and return the stats.
     pub fn finish(mut self) -> Result<IndexBuilderStats> {
         self.finish_hunk()?;
         Ok(self.stats)
@@ -167,20 +168,9 @@ impl IndexBuilder {
     /// Append an entry to the index.
     ///
     /// The new entry must sort after everything already written to the index.
-    pub(crate) fn push_entry(&mut self, entry: IndexEntry) -> Result<()> {
-        // We do this check here rather than the Index constructor so that we
-        // can still read invalid apaths...
+    pub(crate) fn push_entry(&mut self, entry: IndexEntry) {
         self.check_order.check(&entry.apath);
         self.entries.push(entry);
-        if self.entries.len() >= MAX_ENTRIES_PER_HUNK {
-            self.finish_hunk()
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn flush(&mut self) -> Result<()> {
-        self.finish_hunk()
     }
 
     /// Finish this hunk of the index.
@@ -188,11 +178,10 @@ impl IndexBuilder {
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the buffer to start receiving
     /// entries for the next hunk.
-    fn finish_hunk(&mut self) -> Result<()> {
+    pub fn finish_hunk(&mut self) -> Result<()> {
         if self.entries.is_empty() {
             return Ok(());
         }
-
         let relpath = hunk_relpath(self.sequence);
         let write_error = |source| Error::WriteIndex {
             path: relpath.clone(),
@@ -483,7 +472,6 @@ mod tests {
             addrs: vec![],
             target: None,
         })
-        .unwrap();
     }
 
     #[test]
@@ -518,8 +506,7 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
-        })
-        .unwrap();
+        });
         ib.push_entry(IndexEntry {
             apath: "aaa".into(),
             mtime: 1_461_736_377,
@@ -527,8 +514,7 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
-        })
-        .unwrap();
+        });
     }
 
     #[test]
@@ -542,8 +528,7 @@ mod tests {
             addrs: vec![],
             mtime_nanos: 0,
             target: None,
-        })
-        .unwrap();
+        });
     }
 
     #[test]

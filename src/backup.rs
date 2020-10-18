@@ -35,6 +35,18 @@ pub struct BackupOptions {
     pub excludes: Option<GlobSet>,
 }
 
+// This causes us to walk the source tree twice, which is probably an acceptable option
+// since it's nice to see realistic overall progress. We could keep all the entries
+// in memory, and maybe we should, but it might get unreasonably big.
+// if options.measure_first {
+//     progress_bar.set_phase("Measure source tree".to_owned());
+//     // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
+//     // again a second time? But, that'll potentially use memory proportional to tree size, which
+//     // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
+//     // deleted or changed while this is running.
+//     progress_bar.set_bytes_total(source.size()?.file_bytes as u64);
+// }
+
 /// Backup a source directory into a new band in the archive.
 ///
 /// Returns statistics about what was copied.
@@ -42,18 +54,6 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
     let mut writer = BackupWriter::begin(archive)?;
     let mut stats = CopyStats::default();
     let mut progress_bar = ProgressBar::new();
-    // This causes us to walk the source tree twice, which is probably an acceptable option
-    // since it's nice to see realistic overall progress. We could keep all the entries
-    // in memory, and maybe we should, but it might get unreasonably big.
-
-    // if options.measure_first {
-    //     progress_bar.set_phase("Measure source tree".to_owned());
-    //     // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
-    //     // again a second time? But, that'll potentially use memory proportional to tree size, which
-    //     // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
-    //     // deleted or changed while this is running.
-    //     progress_bar.set_bytes_total(source.size()?.file_bytes as u64);
-    // }
 
     progress_bar.set_phase("Copying".to_owned());
     let entry_iter = source.iter_filtered(None, options.excludes.clone())?;
@@ -75,8 +75,7 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
                 progress_bar.increment_bytes_done(bytes);
             }
         }
-        // TODO: Finish any compression groups.
-        // TODO: Sort and then write out the index hunk for this group.
+        writer.flush_group()?;
     }
     stats += writer.finish()?;
     // TODO: Merge in stats from the tree iter and maybe the source tree?
@@ -132,6 +131,13 @@ impl BackupWriter {
         })
     }
 
+    /// Write out any pending data blocks, and then the pending index entries.
+    fn flush_group(&mut self) -> Result<()> {
+        // TODO: Finish any compression groups.
+        // TODO: Sort and then write out the index hunk for this group.
+        self.index_builder.finish_hunk()
+    }
+
     fn copy_entry<R: ReadTree>(&mut self, entry: &R::Entry, source: &R) -> Result<()> {
         match entry.kind() {
             Kind::Dir => self.copy_dir(entry),
@@ -151,7 +157,8 @@ impl BackupWriter {
         // TODO: Pass back index sizes
         self.stats.directories += 1;
         self.index_builder
-            .push_entry(IndexEntry::metadata_from(source_entry))
+            .push_entry(IndexEntry::metadata_from(source_entry));
+        Ok(())
     }
 
     /// Copy in the contents of a file from another tree.
@@ -174,7 +181,7 @@ impl BackupWriter {
                 // with the archive invariants, which include that all the
                 // blocks referenced by the index, are actually present.
                 self.stats.unmodified_files += 1;
-                self.index_builder.push_entry(basis_entry)?;
+                self.index_builder.push_entry(basis_entry);
                 return Ok(());
             } else {
                 self.stats.modified_files += 1;
@@ -193,7 +200,8 @@ impl BackupWriter {
         self.index_builder.push_entry(IndexEntry {
             addrs,
             ..IndexEntry::metadata_from(source_entry)
-        })
+        });
+        Ok(())
     }
 
     fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
@@ -201,7 +209,8 @@ impl BackupWriter {
         self.stats.symlinks += 1;
         assert!(target.is_some());
         self.index_builder
-            .push_entry(IndexEntry::metadata_from(source_entry))
+            .push_entry(IndexEntry::metadata_from(source_entry));
+        Ok(())
     }
 }
 
