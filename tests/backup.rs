@@ -23,7 +23,7 @@ pub fn many_files_multiple_hunks() {
     // The directory also counts as an entry, so we should be able to fit 1999
     // files in 2 hunks of 1000 entries.
     for i in 0..1999 {
-        srcdir.create_file(&format!("file{}", i));
+        srcdir.create_file(&format!("file{:04}", i));
     }
     let stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).expect("backup");
     assert_eq!(
@@ -37,5 +37,13 @@ pub fn many_files_multiple_hunks() {
     assert_eq!(stats.new_files, 1999);
     assert_eq!(stats.single_block_files, 1999);
     assert_eq!(stats.errors, 0);
+    // They all have the same content.
     assert_eq!(stats.written_blocks, 1);
+
+    let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+    let mut entry_iter = tree.iter_entries().unwrap();
+    assert_eq!(entry_iter.next().unwrap().apath(), "/");
+    for (i, entry) in entry_iter.enumerate() {
+        assert_eq!(entry.apath().to_string(), format!("/file{:04}", i));
+    }
 }
