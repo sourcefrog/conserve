@@ -71,9 +71,7 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
                 stats.errors += 1;
                 continue;
             }
-            if let Some(bytes) = entry.size() {
-                progress_bar.increment_bytes_done(bytes);
-            }
+            progress_bar.increment_bytes_done(entry.size().unwrap_or(0));
         }
         writer.flush_group()?;
     }
@@ -134,7 +132,6 @@ impl BackupWriter {
     /// Write out any pending data blocks, and then the pending index entries.
     fn flush_group(&mut self) -> Result<()> {
         // TODO: Finish any compression groups.
-        // TODO: Sort and then write out the index hunk for this group.
         self.index_builder.finish_hunk()
     }
 
