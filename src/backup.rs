@@ -14,6 +14,7 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
+use std::convert::TryInto;
 use std::io::prelude::*;
 
 use globset::GlobSet;
@@ -241,17 +242,7 @@ fn store_file_content(
             break;
         }
         let block_data = &buffer.0[..read_len];
-        let hash = block_dir.hash_bytes(block_data)?;
-        if block_dir.contains(&hash)? {
-            // TODO: Separate counter for size of the already-present blocks?
-            stats.deduplicated_blocks += 1;
-            stats.deduplicated_bytes += read_len as u64;
-        } else {
-            let comp_len = block_dir.compress_and_store(block_data, &hash)?;
-            stats.written_blocks += 1;
-            stats.uncompressed_bytes += read_len as u64;
-            stats.compressed_bytes += comp_len;
-        }
+        let hash = store_or_deduplicate(block_data, block_dir, &mut stats)?;
         addresses.push(Address {
             hash,
             start: 0,
@@ -264,6 +255,106 @@ fn store_file_content(
         _ => stats.multi_block_files += 1,
     }
     Ok((addresses, stats))
+}
+
+fn store_or_deduplicate(
+    block_data: &[u8],
+    block_dir: &mut BlockDir,
+    stats: &mut CopyStats,
+) -> Result<BlockHash> {
+    let hash = block_dir.hash_bytes(block_data)?;
+    if block_dir.contains(&hash)? {
+        stats.deduplicated_blocks += 1;
+        stats.deduplicated_bytes += block_data.len() as u64;
+    } else {
+        let comp_len = block_dir.compress_and_store(block_data, &hash)?;
+        stats.written_blocks += 1;
+        stats.uncompressed_bytes += block_data.len() as u64;
+        stats.compressed_bytes += comp_len;
+    }
+    Ok(hash)
+}
+
+/// Combines multiple small files into a single block.
+///
+/// When the block is finished, and only then, this returns the index entries with the addresses
+/// completed.
+struct FileCombiner {
+    /// Buffer of concatenated data from small files.
+    buf: Vec<u8>,
+    queue: Vec<QueuedFile>,
+}
+
+/// A file in the process of being written into a combined block.
+///
+/// While this exists, the data has been stored into the combine buffer, and we know
+/// the offset and length. But since the combine buffer hasn't been finished and hashed,
+/// we do not yet know a full address.
+struct QueuedFile {
+    /// Offset of the start of the data from this file within `buf`.
+    start: usize,
+    /// Length of data in this file.
+    len: usize,
+    /// IndexEntry without addresses.
+    entry: IndexEntry,
+}
+
+impl FileCombiner {
+    fn new() -> FileCombiner {
+        FileCombiner {
+            buf: Vec::new(),
+            queue: Vec::new(),
+        }
+    }
+
+    /// Write all the content from the combined block to a blockdir.
+    ///
+    /// Returns the fully populated entries for all files in this combined block.
+    ///
+    /// After this call the FileCombiner is empty and can be reused for more files into a new
+    /// block.
+    fn flush(&mut self, block_dir: &mut BlockDir) -> Result<(CopyStats, Vec<IndexEntry>)> {
+        let mut stats = CopyStats::default();
+        let hash: BlockHash = store_or_deduplicate(&self.buf, block_dir, &mut stats)?;
+        self.buf.clear();
+        let finished_entries = self
+            .queue
+            .drain(..)
+            .map(|qf| IndexEntry {
+                addrs: vec![Address {
+                    hash: hash.clone(),
+                    start: qf.start.try_into().unwrap(),
+                    len: qf.len.try_into().unwrap(),
+                }],
+                ..qf.entry
+            })
+            .collect();
+        Ok((stats, finished_entries))
+    }
+
+    /// Add the contents of a small file into this combiner.
+    ///
+    /// `entry` should be an IndexEntry that's complete apart from the block addresses.
+    fn push_file(&mut self, entry: IndexEntry, from_file: &mut dyn Read) -> Result<()> {
+        let start = self.buf.len();
+        let expected_len: usize = entry
+            .size()
+            .expect("small file has no length")
+            .try_into()
+            .unwrap();
+        assert!(expected_len > 0, "small file is empty");
+        self.buf.resize(start + expected_len, 0);
+        let len = from_file
+            .read(&mut self.buf[start..])
+            .map_err(|source| Error::StoreFile {
+                apath: entry.apath.to_owned(),
+                source,
+            })?;
+        // TODO: Maybe check this is actually the end of the file.
+        self.buf.truncate(start + len);
+        self.queue.push(QueuedFile { start, len, entry });
+        Ok(())
+    }
 }
 
 #[cfg(test)]

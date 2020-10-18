@@ -91,6 +91,12 @@ pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");
 /// Break blocks at this many uncompressed bytes.
 pub(crate) const MAX_BLOCK_SIZE: usize = 1 << 20;
 
+/// Maximum file size that will be combined with others rather than being stored alone.
+const SMALL_FILE_CAP: u64 = 100_000;
+
+/// Target maximum uncompressed size for combined blocks.
+const TARGET_COMBINED_BLOCK_SIZE: usize = MAX_BLOCK_SIZE;
+
 /// ISO timestamp, for https://docs.rs/chrono/0.4.11/chrono/format/strftime/.
 const TIMESTAMP_FORMAT: &str = "%F %T";
 
