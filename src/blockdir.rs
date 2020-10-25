@@ -131,6 +131,24 @@ impl BlockDir {
         Ok(comp_len)
     }
 
+    pub(crate) fn store_or_deduplicate(
+        &mut self,
+        block_data: &[u8],
+        stats: &mut CopyStats,
+    ) -> Result<BlockHash> {
+        let hash = self.hash_bytes(block_data)?;
+        if self.contains(&hash)? {
+            stats.deduplicated_blocks += 1;
+            stats.deduplicated_bytes += block_data.len() as u64;
+        } else {
+            let comp_len = self.compress_and_store(block_data, &hash)?;
+            stats.written_blocks += 1;
+            stats.uncompressed_bytes += block_data.len() as u64;
+            stats.compressed_bytes += comp_len;
+        }
+        Ok(hash)
+    }
+
     /// True if the named block is present in this directory.
     pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
         self.transport

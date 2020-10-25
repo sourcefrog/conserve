@@ -66,7 +66,7 @@ pub use crate::merge::{MergeTrees, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
 pub use crate::progress::ProgressBar;
 pub use crate::restore::{RestoreOptions, RestoreTree};
-pub use crate::stats::{DeleteStats, ValidateStats};
+pub use crate::stats::{CopyStats, DeleteStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
 
