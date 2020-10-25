@@ -132,6 +132,7 @@ pub struct CopyStats {
     pub written_blocks: usize,
 
     pub empty_files: usize,
+    pub small_combined_files: usize,
     pub single_block_files: usize,
     pub multi_block_files: usize,
 

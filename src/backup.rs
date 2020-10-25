@@ -188,13 +188,13 @@ impl BackupWriter {
             self.stats.new_files += 1;
         }
         let read_source = from_tree.file_contents(&source_entry);
-        let (addrs, file_stats) = store_file_content(
+        let addrs = store_file_content(
             &apath,
             &mut read_source?,
             &mut self.block_dir,
             &mut self.buffer,
+            &mut self.stats,
         )?;
-        self.stats += file_stats;
         self.index_builder.push_entry(IndexEntry {
             addrs,
             ..IndexEntry::metadata_from(source_entry)
@@ -226,9 +226,9 @@ fn store_file_content(
     from_file: &mut dyn Read,
     block_dir: &mut BlockDir,
     buffer: &mut Buffer,
-) -> Result<(Vec<Address>, CopyStats)> {
+    stats: &mut CopyStats,
+) -> Result<Vec<Address>> {
     let mut addresses = Vec::<Address>::with_capacity(1);
-    let mut stats = CopyStats::default();
     loop {
         // TODO: Possibly read repeatedly in case we get a short read and have room for more,
         // so that short reads don't lead to short blocks being stored.
@@ -242,7 +242,7 @@ fn store_file_content(
             break;
         }
         let block_data = &buffer.0[..read_len];
-        let hash = block_dir.store_or_deduplicate(block_data, &mut stats)?;
+        let hash = block_dir.store_or_deduplicate(block_data, stats)?;
         addresses.push(Address {
             hash,
             start: 0,
@@ -254,7 +254,7 @@ fn store_file_content(
         1 => stats.single_block_files += 1,
         _ => stats.multi_block_files += 1,
     }
-    Ok((addresses, stats))
+    Ok(addresses)
 }
 
 /// Combines multiple small files into a single block.
@@ -341,7 +341,6 @@ impl FileCombiner {
             .unwrap();
         let index_entry = IndexEntry::metadata_from(live_entry);
         if expected_len == 0 {
-            panic!();
             self.finished.push(index_entry);
             return Ok(());
         }
@@ -354,9 +353,10 @@ impl FileCombiner {
             })?;
         self.buf.truncate(start + len);
         if len == 0 {
-            panic!();
+            self.stats.empty_files += 1;
             self.finished.push(index_entry);
         } else {
+            self.stats.small_combined_files += 1;
             self.queue.push(QueuedFile {
                 start,
                 len,
@@ -410,11 +410,13 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
-        let (addrs, stats) = store_file_content(
+        let mut stats = CopyStats::default();
+        let addrs = store_file_content(
             &Apath::from("/hello"),
             &mut example_file,
             &mut block_dir,
             &mut Buffer::new(),
+            &mut stats,
         )
         .unwrap();
 
@@ -467,11 +469,12 @@ mod tests {
     #[test]
     fn retrieve_partial_data() {
         let (_testdir, mut block_dir) = setup();
-        let (addrs, _stats) = store_file_content(
+        let addrs = store_file_content(
             &"/hello".into(),
             &mut Cursor::new(b"0123456789abcdef"),
             &mut block_dir,
             &mut Buffer::new(),
+            &mut CopyStats::default(),
         )
         .unwrap();
         assert_eq!(addrs.len(), 1);
@@ -497,11 +500,12 @@ mod tests {
     #[test]
     fn invalid_addresses() {
         let (_testdir, mut block_dir) = setup();
-        let (addrs, _stats) = store_file_content(
+        let addrs = store_file_content(
             &"/hello".into(),
             &mut Cursor::new(b"0123456789abcdef"),
             &mut block_dir,
             &mut Buffer::new(),
+            &mut CopyStats::default(),
         )
         .unwrap();
         assert_eq!(addrs.len(), 1);
@@ -546,11 +550,13 @@ mod tests {
 
         let mut example_file = make_example_file();
         let mut buffer = Buffer::new();
-        let (addrs1, stats) = store_file_content(
+        let mut stats = CopyStats::default();
+        let addrs1 = store_file_content(
             &Apath::from("/ello"),
             &mut example_file,
             &mut block_dir,
             &mut buffer,
+            &mut stats,
         )
         .unwrap();
         assert_eq!(stats.deduplicated_blocks, 0);
@@ -559,11 +565,13 @@ mod tests {
         assert_eq!(stats.compressed_bytes, 8);
 
         let mut example_file = make_example_file();
-        let (addrs2, stats2) = store_file_content(
+        let mut stats2 = CopyStats::default();
+        let addrs2 = store_file_content(
             &Apath::from("/ello2"),
             &mut example_file,
             &mut block_dir,
             &mut buffer,
+            &mut stats2,
         )
         .unwrap();
         assert_eq!(stats2.deduplicated_blocks, 1);
@@ -592,11 +600,13 @@ mod tests {
         assert_eq!(tf_len, TOTAL_SIZE);
         tf.seek(SeekFrom::Start(0)).unwrap();
 
-        let (addrs, stats) = store_file_content(
+        let mut stats = CopyStats::default();
+        let addrs = store_file_content(
             &Apath::from("/big"),
             &mut tf,
             &mut block_dir,
             &mut Buffer::new(),
+            &mut stats,
         )
         .unwrap();
 
@@ -689,6 +699,10 @@ mod tests {
                 }]
             );
         }
+        assert_eq!(stats.small_combined_files, 10);
+        assert_eq!(stats.empty_files, 0);
+        assert_eq!(stats.single_block_files, 0);
+        assert_eq!(stats.multi_block_files, 0);
         assert_eq!(stats.uncompressed_bytes, 100);
         assert_eq!(stats.written_blocks, 1);
     }
