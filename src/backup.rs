@@ -84,7 +84,7 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
 /// Accepts files to write in the archive (in apath order.)
 struct BackupWriter {
     band: Band,
-    index_builder: IndexBuilder,
+    index_builder: IndexWriter,
     stats: CopyStats,
     block_dir: BlockDir,
     buffer: Buffer,
@@ -132,7 +132,7 @@ impl BackupWriter {
 
     /// Write out any pending data blocks, and then the pending index entries.
     fn flush_group(&mut self) -> Result<()> {
-        // TODO: Finish any compression groups.
+        // TODO: Finish FileCombiner, when this class has one.
         self.index_builder.finish_hunk()
     }
 

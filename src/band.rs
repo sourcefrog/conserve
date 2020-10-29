@@ -181,8 +181,8 @@ impl Band {
         &self.band_id
     }
 
-    pub fn index_builder(&self) -> IndexBuilder {
-        IndexBuilder::new(self.transport.sub_transport(INDEX_DIR))
+    pub fn index_builder(&self) -> IndexWriter {
+        IndexWriter::new(self.transport.sub_transport(INDEX_DIR))
     }
 
     /// Get read-only access to the index of this band.

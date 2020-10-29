@@ -94,7 +94,7 @@ pub struct IndexReadStats {
 }
 
 #[derive(Add, AddAssign, Clone, Debug, Default, Eq, PartialEq)]
-pub struct IndexBuilderStats {
+pub struct IndexWriterStats {
     pub index_hunks: u64,
     pub uncompressed_index_bytes: u64,
     pub compressed_index_bytes: u64,
@@ -138,7 +138,7 @@ pub struct CopyStats {
 
     pub errors: usize,
 
-    pub index_builder_stats: IndexBuilderStats,
+    pub index_builder_stats: IndexWriterStats,
     // TODO: Include elapsed time.
 }
 

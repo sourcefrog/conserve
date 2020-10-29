@@ -59,7 +59,7 @@ pub use crate::copy_tree::copy_tree;
 pub use crate::entry::Entry;
 pub use crate::errors::Error;
 pub use crate::gc_lock::GarbageCollectionLock;
-pub use crate::index::{IndexBuilder, IndexEntry, IndexRead};
+pub use crate::index::{IndexEntry, IndexRead, IndexWriter};
 pub use crate::kind::Kind;
 pub use crate::live_tree::{LiveEntry, LiveTree};
 pub use crate::merge::{MergeTrees, MergedEntryKind};
