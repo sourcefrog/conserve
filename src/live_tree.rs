@@ -171,7 +171,7 @@ impl Iter {
     /// Construct a new iter that will visit everything below this root path,
     /// subject to some exclusions
     fn new(root_path: &Path, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Result<Iter> {
-        let subtree = subtree.unwrap_or("/".into());
+        let subtree = subtree.unwrap_or_else(|| "/".into());
         let start_path = relative_path(root_path, &subtree);
         let start_metadata = fs::symlink_metadata(&start_path).map_err(Error::from)?;
         // Preload iter to return the root and then recurse into it.

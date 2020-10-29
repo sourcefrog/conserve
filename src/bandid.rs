@@ -108,7 +108,7 @@ impl fmt::Display for BandId {
     /// but they can be longer.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut result = String::with_capacity(self.seqs.len() * 5);
-        result.push_str("b");
+        result.push('b');
         for s in &self.seqs {
             result.push_str(&format!("{:04}-", s));
         }

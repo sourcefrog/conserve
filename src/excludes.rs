@@ -29,7 +29,7 @@ pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(
     if empty {
         return Ok(None);
     }
-    builder.build().map_err(Into::into).map(|gs| Some(gs))
+    builder.build().map_err(Into::into).map(Some)
 }
 
 pub fn excludes_nothing() -> GlobSet {

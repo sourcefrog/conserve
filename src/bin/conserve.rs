@@ -267,7 +267,7 @@ impl Command {
                 output::show_tree_diff(
                     &mut MergeTrees::new(
                         st.iter_filtered(None, excludes.clone())?,
-                        lt.iter_filtered(None, excludes.clone())?,
+                        lt.iter_filtered(None, excludes)?,
                     ),
                     &mut stdout,
                 )?;

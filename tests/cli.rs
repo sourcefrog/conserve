@@ -173,7 +173,7 @@ both     /subdir/subfile
     let is_expected_blocks = |output: &[u8]| {
         let output_str = std::str::from_utf8(&output).unwrap();
         let mut blocks: Vec<&str> = output_str.lines().collect();
-        blocks.sort();
+        blocks.sort_unstable();
         blocks == expected_blocks
     };
 

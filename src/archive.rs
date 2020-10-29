@@ -367,7 +367,7 @@ impl Archive {
                 }
                 stats
             })
-            .reduce(|| ValidateStats::default(), |a, b| a + b);
+            .reduce(ValidateStats::default, |a, b| a + b);
 
         Ok(stats)
     }
