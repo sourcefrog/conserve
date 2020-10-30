@@ -126,7 +126,7 @@ impl BackupWriter {
 
     fn finish(self) -> Result<CopyStats> {
         let index_builder_stats = self.index_builder.finish()?;
-        self.band.close(index_builder_stats.index_hunks)?;
+        self.band.close(index_builder_stats.index_hunks as u64)?;
         Ok(CopyStats {
             index_builder_stats,
             ..self.stats
