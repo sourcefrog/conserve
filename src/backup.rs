@@ -77,7 +77,7 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
         writer.flush_group()?;
     }
     stats += writer.finish()?;
-    // TODO: Merge in stats from the tree iter and maybe the source tree?
+    // TODO: Merge in stats from the source tree?
     Ok(stats)
 }
 
@@ -152,7 +152,6 @@ impl BackupWriter {
     }
 
     fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
-        // TODO: Pass back index sizes
         self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
@@ -356,6 +355,9 @@ impl FileCombiner {
             self.stats.empty_files += 1;
             self.finished.push(index_entry);
         } else {
+            // TODO: Check whether this file is exactly the same as, or a prefix of,
+            // one already stored inside this block. In that case trim the buffer and
+            // use the existing start/len.
             self.stats.small_combined_files += 1;
             self.queue.push(QueuedFile {
                 start,
