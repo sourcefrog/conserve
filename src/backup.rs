@@ -354,17 +354,17 @@ impl FileCombiner {
         if len == 0 {
             self.stats.empty_files += 1;
             self.finished.push(index_entry);
-        } else {
-            // TODO: Check whether this file is exactly the same as, or a prefix of,
-            // one already stored inside this block. In that case trim the buffer and
-            // use the existing start/len.
-            self.stats.small_combined_files += 1;
-            self.queue.push(QueuedFile {
-                start,
-                len,
-                entry: index_entry,
-            });
+            return Ok(());
         }
+        // TODO: Check whether this file is exactly the same as, or a prefix of,
+        // one already stored inside this block. In that case trim the buffer and
+        // use the existing start/len.
+        self.stats.small_combined_files += 1;
+        self.queue.push(QueuedFile {
+            start,
+            len,
+            entry: index_entry,
+        });
         if self.buf.len() >= TARGET_COMBINED_BLOCK_SIZE {
             self.flush()
         } else {
