@@ -130,6 +130,8 @@ pub struct CopyStats {
 
     pub deduplicated_blocks: usize,
     pub written_blocks: usize,
+    /// Blocks containing combined small files.
+    pub combined_blocks: usize,
 
     pub empty_files: usize,
     pub small_combined_files: usize,
@@ -140,6 +142,26 @@ pub struct CopyStats {
 
     pub index_builder_stats: IndexWriterStats,
     // TODO: Include elapsed time.
+}
+
+fn write_size<I: Into<usize>>(w: &mut dyn io::Write, label: &str, value: I) {
+    writeln!(
+        w,
+        "{:>12} MB   {}",
+        value.into().separate_with_commas(),
+        label
+    )
+    .unwrap();
+}
+
+fn write_count<I: Into<usize>>(w: &mut dyn io::Write, label: &str, value: I) {
+    writeln!(
+        w,
+        "{:>12}      {}",
+        value.into().separate_with_commas(),
+        label
+    )
+    .unwrap();
 }
 
 impl CopyStats {
@@ -172,7 +194,7 @@ impl CopyStats {
 
     pub fn summarize_backup(&self, w: &mut dyn io::Write) {
         // TODO: Perhaps summarize to a string, or make this the Display impl.
-        writeln!(w, "{:>12}      files:", self.files.separate_with_commas()).unwrap();
+        write_count(w, "files:", self.files);
         writeln!(
             w,
             "{:>12}        unmodified files",
@@ -191,6 +213,7 @@ impl CopyStats {
             self.new_files.separate_with_commas()
         )
         .unwrap();
+        write_count(w, "  small combined files", self.small_combined_files);
         writeln!(
             w,
             "{:>12}      symlinks",
@@ -224,6 +247,7 @@ impl CopyStats {
             self.written_blocks.separate_with_commas(),
         )
         .unwrap();
+        write_count(w, "  blocks of combined files", self.combined_blocks);
         writeln!(
             w,
             "{:>12} MB     uncompressed",

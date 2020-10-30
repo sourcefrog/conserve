@@ -92,6 +92,8 @@ struct BackupWriter {
     /// The index for the last stored band, used as hints for whether newly
     /// stored files have changed.
     basis_index: Option<IndexEntryIter>,
+
+    file_combiner: FileCombiner,
 }
 
 impl BackupWriter {
@@ -118,6 +120,7 @@ impl BackupWriter {
             block_dir: archive.block_dir().clone(),
             stats: CopyStats::default(),
             basis_index,
+            file_combiner: FileCombiner::new(archive.block_dir().clone()),
         })
     }
 
@@ -133,10 +136,13 @@ impl BackupWriter {
     /// Write out any pending data blocks, and then the pending index entries.
     fn flush_group(&mut self) -> Result<()> {
         // TODO: Finish FileCombiner, when this class has one.
+        let (stats, mut entries) = self.file_combiner.drain()?;
+        self.stats += stats;
+        self.index_builder.append_entries(&mut entries);
         self.index_builder.finish_hunk()
     }
 
-    fn copy_entry<R: ReadTree>(&mut self, entry: &R::Entry, source: &R) -> Result<()> {
+    fn copy_entry(&mut self, entry: &LiveEntry, source: &LiveTree) -> Result<()> {
         match entry.kind() {
             Kind::Dir => self.copy_dir(entry),
             Kind::File => self.copy_file(entry, source),
@@ -159,7 +165,7 @@ impl BackupWriter {
     }
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(&mut self, source_entry: &R::Entry, from_tree: &R) -> Result<()> {
+    fn copy_file(&mut self, source_entry: &LiveEntry, from_tree: &LiveTree) -> Result<()> {
         self.stats.files += 1;
         let apath = source_entry.apath();
         if let Some(basis_entry) = self
@@ -186,10 +192,13 @@ impl BackupWriter {
         } else {
             self.stats.new_files += 1;
         }
-        let read_source = from_tree.file_contents(&source_entry);
+        let mut read_source = from_tree.file_contents(&source_entry)?;
+        if source_entry.size().expect("LiveEntry has a size") <= SMALL_FILE_CAP {
+            return self.file_combiner.push_file(source_entry, &mut read_source);
+        }
         let addrs = store_file_content(
             &apath,
-            &mut read_source?,
+            &mut read_source,
             &mut self.block_dir,
             &mut self.buffer,
             &mut self.stats,
@@ -296,9 +305,16 @@ impl FileCombiner {
     }
 
     /// Flush any pending files, and return accumulated file entries and stats.
-    fn drain(mut self) -> Result<(CopyStats, Vec<IndexEntry>)> {
+    /// The FileCombiner is then empty and ready for reuse.
+    fn drain(&mut self) -> Result<(CopyStats, Vec<IndexEntry>)> {
         self.flush()?;
-        Ok((self.stats, self.finished))
+        debug_assert!(self.queue.is_empty());
+        debug_assert!(self.buf.is_empty());
+        let stats = self.stats.clone();
+        self.stats = CopyStats::default();
+        let finished = self.finished.drain(..).collect();
+        debug_assert!(self.finished.is_empty());
+        Ok((stats, finished))
     }
 
     /// Write all the content from the combined block to a blockdir.
@@ -309,12 +325,13 @@ impl FileCombiner {
     /// block.
     fn flush(&mut self) -> Result<()> {
         if self.queue.is_empty() {
-            assert!(self.buf.is_empty());
+            debug_assert!(self.buf.is_empty());
             return Ok(());
         }
         let hash = self
             .block_dir
             .store_or_deduplicate(&self.buf, &mut self.stats)?;
+        self.stats.combined_blocks += 1;
         self.buf.clear();
         self.finished
             .extend(self.queue.drain(..).map(|qf| IndexEntry {
@@ -340,6 +357,7 @@ impl FileCombiner {
             .unwrap();
         let index_entry = IndexEntry::metadata_from(live_entry);
         if expected_len == 0 {
+            self.stats.empty_files += 1;
             self.finished.push(index_entry);
             return Ok(());
         }
@@ -382,7 +400,6 @@ mod tests {
     use tempfile::{NamedTempFile, TempDir};
 
     use crate::stats::Sizes;
-    use crate::unix_time::UnixTime;
 
     use super::*;
 
@@ -630,82 +647,5 @@ mod tests {
             assert!(retr.iter().all(|b| *b == 64u8));
             assert_eq!(block_sizes.uncompressed, MAX_BLOCK_SIZE as u64);
         }
-    }
-
-    #[test]
-    fn combine_one_file() {
-        let testdir = TempDir::new().unwrap();
-        let block_dir = BlockDir::create_path(testdir.path()).unwrap();
-        let mut combiner = FileCombiner::new(block_dir);
-        let file_bytes = b"some stuff";
-        let entry = LiveEntry {
-            apath: Apath::from("/0"),
-            kind: Kind::File,
-            mtime: UnixTime {
-                secs: 1603116230,
-                nanosecs: 0,
-            },
-            symlink_target: None,
-            size: Some(file_bytes.len() as u64),
-        };
-        let mut content = Cursor::new(file_bytes);
-        combiner.push_file(&entry, &mut content).unwrap();
-        let (stats, entries) = combiner.drain().unwrap();
-        assert_eq!(entries.len(), 1);
-        let addrs = entries[0].addrs.clone();
-        assert_eq!(addrs.len(), 1, "combined file should have one block");
-        assert_eq!(addrs[0].start, 0);
-        assert_eq!(addrs[0].len, 10);
-        let expected_entry = IndexEntry {
-            addrs,
-            ..IndexEntry::metadata_from(&entry)
-        };
-        assert_eq!(entries[0], expected_entry);
-        assert_eq!(stats.uncompressed_bytes, 10);
-        assert_eq!(stats.written_blocks, 1);
-    }
-
-    #[test]
-    fn combine_several_small_files() {
-        let testdir = TempDir::new().unwrap();
-        let block_dir = BlockDir::create_path(testdir.path()).unwrap();
-        let mut combiner = FileCombiner::new(block_dir);
-        let file_bytes = b"some stuff";
-        let mut live_entry = LiveEntry {
-            apath: Apath::from("/0"),
-            kind: Kind::File,
-            mtime: UnixTime {
-                secs: 1603116230,
-                nanosecs: 0,
-            },
-            symlink_target: None,
-            size: Some(file_bytes.len() as u64),
-        };
-        for i in 0..10 {
-            live_entry.apath = Apath::from(format!("/{:02}", i));
-            let mut content = Cursor::new(file_bytes);
-            combiner.push_file(&live_entry, &mut content).unwrap();
-        }
-        let (stats, entries) = combiner.drain().unwrap();
-        assert_eq!(entries.len(), 10);
-
-        let first_hash = &entries[0].addrs[0].hash;
-
-        for (i, entry) in entries.iter().enumerate() {
-            assert_eq!(
-                entry.addrs,
-                &[Address {
-                    hash: first_hash.clone(),
-                    start: i as u64 * 10,
-                    len: file_bytes.len() as u64
-                }]
-            );
-        }
-        assert_eq!(stats.small_combined_files, 10);
-        assert_eq!(stats.empty_files, 0);
-        assert_eq!(stats.single_block_files, 0);
-        assert_eq!(stats.multi_block_files, 0);
-        assert_eq!(stats.uncompressed_bytes, 100);
-        assert_eq!(stats.written_blocks, 1);
     }
 }

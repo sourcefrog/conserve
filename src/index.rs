@@ -178,8 +178,8 @@ impl IndexWriter {
         self.entries.push(entry);
     }
 
-    pub(crate) fn append_entries(&mut self, entries: &[IndexEntry]) {
-        self.entries.extend_from_slice(entries);
+    pub(crate) fn append_entries(&mut self, entries: &mut Vec<IndexEntry>) {
+        self.entries.append(entries);
     }
 
     /// Finish this hunk of the index.
@@ -552,7 +552,7 @@ mod tests {
     #[test]
     fn basic() {
         let (testdir, mut ib) = setup();
-        ib.append_entries(&[sample_entry("/apple"), sample_entry("/banana")]);
+        ib.append_entries(&mut vec![sample_entry("/apple"), sample_entry("/banana")]);
         let stats = ib.finish().unwrap();
 
         assert_eq!(stats.index_hunks, 1);
@@ -585,9 +585,9 @@ mod tests {
     #[test]
     fn multiple_hunks() {
         let (testdir, mut ib) = setup();
-        ib.append_entries(&[sample_entry("/1.1"), sample_entry("/1.2")]);
+        ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
         ib.finish_hunk().unwrap();
-        ib.append_entries(&[sample_entry("/2.1"), sample_entry("/2.2")]);
+        ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
         ib.finish_hunk().unwrap();
 
         let index_read = IndexRead::open_path(&testdir.path());
@@ -617,9 +617,9 @@ mod tests {
     #[test]
     fn iter_hunks_advance_to_after() {
         let (testdir, mut ib) = setup();
-        ib.append_entries(&[sample_entry("/1.1"), sample_entry("/1.2")]);
+        ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
         ib.finish_hunk().unwrap();
-        ib.append_entries(&[sample_entry("/2.1"), sample_entry("/2.2")]);
+        ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
         ib.finish_hunk().unwrap();
 
         let index_read = IndexRead::open_path(&testdir.path());

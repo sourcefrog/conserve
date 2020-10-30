@@ -122,6 +122,20 @@ impl TreeFixture {
         full_path
     }
 
+    /// Create a file with a specified length. The first bytes of the file are the `prefix` and the remainder is zeros.
+    pub fn create_file_of_length_with_prefix(
+        &self,
+        relative_path: &str,
+        length: u64,
+        prefix: &[u8],
+    ) -> PathBuf {
+        let full_path = self.root.join(relative_path);
+        let mut f = fs::File::create(&full_path).unwrap();
+        f.write_all(prefix).unwrap();
+        f.set_len(length).expect("set file length");
+        full_path
+    }
+
     pub fn create_dir(&self, relative_path: &str) {
         fs::create_dir(self.root.join(relative_path)).unwrap();
     }

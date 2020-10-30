@@ -48,11 +48,11 @@ impl LiveTree {
 /// An in-memory Entry describing a file/dir/symlink in a live tree.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LiveEntry {
-    pub(crate) apath: Apath,
-    pub(crate) kind: Kind,
-    pub(crate) mtime: UnixTime,
-    pub(crate) size: Option<u64>,
-    pub(crate) symlink_target: Option<String>,
+    apath: Apath,
+    kind: Kind,
+    mtime: UnixTime,
+    size: Option<u64>,
+    symlink_target: Option<String>,
 }
 
 fn relative_path(root: &Path, apath: &Apath) -> PathBuf {
