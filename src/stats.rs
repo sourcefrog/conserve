@@ -201,10 +201,15 @@ impl CopyStats {
         write_count(w, "  unmodified files", self.unmodified_files);
         write_count(w, "  modified files", self.modified_files);
         write_count(w, "  new files", self.new_files);
-        write_count(w, "  small combined files", self.small_combined_files);
         write_count(w, "symlinks", self.symlinks);
         write_count(w, "directories", self.directories);
         write_count(w, "unsupported file kind", self.unknown_kind);
+        writeln!(w).unwrap();
+
+        write_count(w, "empty files", self.empty_files);
+        write_count(w, "small combined files", self.small_combined_files);
+        write_count(w, "single block files", self.single_block_files);
+        write_count(w, "multi-block files", self.multi_block_files);
         writeln!(w).unwrap();
 
         write_count(w, "deduplicated data blocks:", self.deduplicated_blocks);
