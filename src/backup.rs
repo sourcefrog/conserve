@@ -176,12 +176,6 @@ impl BackupWriter {
             if source_entry.is_unchanged_from(&basis_entry) {
                 // TODO: In verbose mode, say if the file is changed, unchanged,
                 // etc, but without duplicating the filenames.
-                //
-                // ui::println(&format!("unchanged file {}", apath));
-
-                // We can reasonably assume that the existing archive complies
-                // with the archive invariants, which include that all the
-                // blocks referenced by the index, are actually present.
                 self.stats.unmodified_files += 1;
                 self.index_builder.push_entry(basis_entry);
                 return Ok(());
@@ -192,7 +186,14 @@ impl BackupWriter {
             self.stats.new_files += 1;
         }
         let mut read_source = from_tree.file_contents(&source_entry)?;
-        if source_entry.size().expect("LiveEntry has a size") <= SMALL_FILE_CAP {
+        let size = source_entry.size().expect("LiveEntry has a size");
+        if size == 0 {
+            self.index_builder
+                .push_entry(IndexEntry::metadata_from(source_entry));
+            self.stats.empty_files += 1;
+            return Ok(());
+        }
+        if size <= SMALL_FILE_CAP {
             return self.file_combiner.push_file(source_entry, &mut read_source);
         }
         let addrs = store_file_content(
