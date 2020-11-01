@@ -23,7 +23,7 @@ use predicates::prelude::*;
 
 use conserve::*;
 
-const ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.2", "0.6.3"];
+const ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.2", "0.6.3", "0.6.9"];
 
 fn open_old_archive(ver: &str, name: &str) -> Archive {
     Archive::open_path(&Path::new(&format!("testdata/archive/v{}/{}/", ver, name)))
