@@ -99,6 +99,9 @@ enum Command {
     Ls {
         #[structopt(flatten)]
         stos: StoredTreeOrSource,
+
+        #[structopt(long, short, number_of_values = 1)]
+        exclude: Vec<String>,
     },
 
     /// Copy a stored tree to a restore directory.
@@ -121,6 +124,13 @@ enum Command {
     Size {
         #[structopt(flatten)]
         stos: StoredTreeOrSource,
+
+        /// Count in bytes, not megabytes.
+        #[structopt(long)]
+        bytes: bool,
+
+        #[structopt(long, short, number_of_values = 1)]
+        exclude: Vec<String>,
     },
 
     /// Check that an archive is internally consistent.
@@ -152,9 +162,6 @@ struct StoredTreeOrSource {
 
     #[structopt(long, short, conflicts_with = "source")]
     backup: Option<BandId>,
-
-    #[structopt(long, short, number_of_values = 1)]
-    exclude: Vec<String>,
 }
 
 /// Show debugging information.
@@ -196,11 +203,14 @@ impl Command {
                 verbose,
                 exclude,
             } => {
+                let excludes = excludes::from_strings(exclude)?;
+                let source = &LiveTree::open(source)?;
                 let options = BackupOptions {
                     print_filenames: *verbose,
-                    excludes: excludes::from_strings(exclude)?,
+                    excludes,
+                    ..Default::default()
                 };
-                let copy_stats = Archive::open_path(archive)?.backup(source, &options)?;
+                let copy_stats = backup(&Archive::open_path(archive)?, &source, &options)?;
                 ui::println("Backup complete.");
                 copy_stats.summarize_backup(&mut stdout);
             }
@@ -211,7 +221,7 @@ impl Command {
                 }
             }
             Command::Debug(Debug::Index { archive, backup }) => {
-                let st = stored_tree_from_opt(archive, &backup, &Vec::new())?;
+                let st = stored_tree_from_opt(archive, &backup)?;
                 output::show_index_json(&st.band(), &mut stdout)?;
             }
             Command::Debug(Debug::Referenced { archive }) => {
@@ -253,9 +263,15 @@ impl Command {
                 // TODO: Summarize diff.
                 // TODO: Optionally include unchanged files.
                 let excludes = excludes::from_strings(exclude)?;
-                let st = stored_tree_from_opt(archive, backup, exclude)?;
-                let lt = LiveTree::open(source)?.with_excludes(excludes);
-                output::show_tree_diff(&mut conserve::iter_merged_entries(&st, &lt)?, &mut stdout)?;
+                let st = stored_tree_from_opt(archive, backup)?;
+                let lt = LiveTree::open(source)?;
+                output::show_tree_diff(
+                    &mut MergeTrees::new(
+                        st.iter_filtered(None, excludes.clone())?,
+                        lt.iter_filtered(None, excludes)?,
+                    ),
+                    &mut stdout,
+                )?;
             }
             Command::Gc {
                 archive,
@@ -274,15 +290,18 @@ impl Command {
                 Archive::create_path(&archive)?;
                 ui::println(&format!("Created new archive in {:?}", &archive));
             }
-            Command::Ls { stos } => {
+            Command::Ls { stos, exclude } => {
+                let excludes = excludes::from_strings(exclude)?;
                 if let Some(archive) = &stos.archive {
-                    output::show_tree_names(
-                        &stored_tree_from_opt(archive, &stos.backup, &stos.exclude)?,
+                    output::show_entry_names(
+                        stored_tree_from_opt(archive, &stos.backup)?
+                            .iter_filtered(None, excludes)?,
                         &mut stdout,
                     )?;
                 } else {
-                    output::show_tree_names(
-                        &live_tree_from_opt(stos.source.as_ref().unwrap(), &stos.exclude)?,
+                    output::show_entry_names(
+                        LiveTree::open(stos.source.clone().unwrap())?
+                            .iter_filtered(None, excludes)?,
                         &mut stdout,
                     )?;
                 }
@@ -311,17 +330,26 @@ impl Command {
                 ui::println("Restore complete.");
                 copy_stats.summarize_restore(&mut stdout)?;
             }
-            Command::Size { ref stos } => {
+            Command::Size {
+                ref stos,
+                bytes,
+                ref exclude,
+            } => {
+                let excludes = excludes::from_strings(exclude)?;
                 let size = if let Some(archive) = &stos.archive {
-                    stored_tree_from_opt(archive, &stos.backup, &stos.exclude)?
-                        .size()?
+                    stored_tree_from_opt(archive, &stos.backup)?
+                        .size(excludes)?
                         .file_bytes
                 } else {
-                    live_tree_from_opt(stos.source.as_ref().unwrap(), &stos.exclude)?
-                        .size()?
+                    LiveTree::open(stos.source.as_ref().unwrap())?
+                        .size(excludes)?
                         .file_bytes
                 };
-                ui::println(&conserve::bytes_to_human_mb(size));
+                if *bytes {
+                    ui::println(&format!("{}", size));
+                } else {
+                    ui::println(&conserve::bytes_to_human_mb(size));
+                }
             }
             Command::Validate { archive } => {
                 let stats = Archive::open_path(archive)?.validate()?;
@@ -351,16 +379,10 @@ impl Command {
     }
 }
 
-fn stored_tree_from_opt(
-    archive: &Path,
-    backup: &Option<BandId>,
-    exclude: &[String],
-) -> Result<StoredTree> {
+fn stored_tree_from_opt(archive: &Path, backup: &Option<BandId>) -> Result<StoredTree> {
     let archive = Archive::open_path(archive)?;
     let policy = band_selection_policy_from_opt(backup);
-    Ok(archive
-        .open_stored_tree(policy)?
-        .with_excludes(excludes::from_strings(exclude)?))
+    archive.open_stored_tree(policy)
 }
 
 fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolicy {
@@ -369,10 +391,6 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
     } else {
         BandSelectionPolicy::Latest
     }
-}
-
-fn live_tree_from_opt(source: &Path, exclude: &[String]) -> Result<LiveTree> {
-    Ok(LiveTree::open(source)?.with_excludes(excludes::from_strings(exclude)?))
 }
 
 fn main() {

@@ -34,9 +34,7 @@ pub fn simple_backup() {
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
     // TODO: Include a symlink only on Unix.
-    let copy_stats = af
-        .backup(&srcdir.path(), &BackupOptions::default())
-        .expect("backup");
+    let copy_stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).expect("backup");
     assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
     assert_eq!(copy_stats.files, 1);
     check_backup(&af);
@@ -64,11 +62,12 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     srcdir.create_file("baz");
     // TODO: Include a symlink only on Unix.
     let excludes = excludes::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
+    let source = srcdir.live_tree();
     let options = BackupOptions {
         excludes,
         ..BackupOptions::default()
     };
-    let copy_stats = af.backup(&srcdir.path(), &options).expect("backup");
+    let copy_stats = backup(&af, &source, &options).expect("backup");
 
     check_backup(&af);
 
@@ -120,11 +119,13 @@ pub fn backup_more_excludes() {
     srcdir.create_file("bar");
 
     let excludes = excludes::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
+    let source = srcdir.live_tree();
     let options = BackupOptions {
         excludes,
         print_filenames: false,
+        ..Default::default()
     };
-    let stats = af.backup(&srcdir.path(), &options).expect("backup");
+    let stats = backup(&af, &source, &options).expect("backup");
 
     assert_eq!(1, stats.written_blocks);
     assert_eq!(1, stats.files);
@@ -146,7 +147,7 @@ fn check_backup(af: &ScratchArchive) {
     let band = Band::open(&af, &band_ids[0]).unwrap();
     assert!(band.is_closed().unwrap());
 
-    let index_entries = band.iter_entries().unwrap().collect::<Vec<IndexEntry>>();
+    let index_entries = band.iter_entries().collect::<Vec<IndexEntry>>();
     assert_eq!(2, index_entries.len());
 
     let root_entry = &index_entries[0];
@@ -186,9 +187,7 @@ fn large_file() {
     let tf = TreeFixture::new();
     let large_content = String::from("abcd").repeat(1 << 20);
     tf.create_file_with_contents("large", &large_content.as_bytes());
-    let copy_stats = af
-        .backup(&tf.path(), &BackupOptions::default())
-        .expect("backup");
+    let copy_stats = backup(&af, &tf.live_tree(), &BackupOptions::default()).expect("backup");
     assert_eq!(copy_stats.new_files, 1);
     // First 1MB should be new; remainder should be deduplicated.
     assert_eq!(copy_stats.uncompressed_bytes, 1 << 20);
@@ -227,11 +226,9 @@ fn source_unreadable() {
 
     tf.make_file_unreadable("b_unreadable");
 
-    let stats = af
-        .backup(&tf.path(), &BackupOptions::default())
-        .expect("backup");
+    let stats = backup(&af, &tf.live_tree(), &BackupOptions::default()).expect("backup");
     assert_eq!(stats.errors, 1);
-    assert_eq!(stats.new_files, 2);
+    assert_eq!(stats.new_files, 3);
     assert_eq!(stats.files, 3);
 
     // TODO: On Windows change the ACL to make the file unreadable to the current user or to
@@ -256,7 +253,7 @@ fn mtime_before_epoch() {
     dbg!(&entries[1].mtime());
 
     let af = ScratchArchive::new();
-    af.backup(&tf.path(), &BackupOptions::default())
+    backup(&af, &tf.live_tree(), &BackupOptions::default())
         .expect("backup shouldn't crash on before-epoch mtimes");
 }
 
@@ -266,9 +263,7 @@ pub fn symlink() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_symlink("symlink", "/a/broken/destination");
-    let copy_stats = af
-        .backup(&srcdir.path(), &BackupOptions::default())
-        .expect("backup");
+    let copy_stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).expect("backup");
 
     assert_eq!(0, copy_stats.files);
     assert_eq!(1, copy_stats.symlinks);
@@ -281,7 +276,7 @@ pub fn symlink() {
     let band = Band::open(&af, &band_ids[0]).unwrap();
     assert!(band.is_closed().unwrap());
 
-    let index_entries = band.iter_entries().unwrap().collect::<Vec<IndexEntry>>();
+    let index_entries = band.iter_entries().collect::<Vec<IndexEntry>>();
     assert_eq!(2, index_entries.len());
 
     let e2 = &index_entries[1];
@@ -297,9 +292,7 @@ pub fn empty_file_uses_zero_blocks() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file_with_contents("empty", &[]);
-    let stats = af
-        .backup(&srcdir.path(), &BackupOptions::default())
-        .unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).unwrap();
 
     assert_eq!(1, stats.files);
     assert_eq!(stats.written_blocks, 0);
@@ -332,7 +325,7 @@ pub fn detect_unmodified() {
     srcdir.create_file("bbb");
 
     let options = BackupOptions::default();
-    let stats = af.backup(&srcdir.path(), &options).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 2);
@@ -340,7 +333,7 @@ pub fn detect_unmodified() {
 
     // Make a second backup from the same tree, and we should see that
     // both files are unmodified.
-    let stats = af.backup(&srcdir.path(), &options).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 0);
@@ -350,7 +343,7 @@ pub fn detect_unmodified() {
     // as unmodified.
     srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
-    let stats = af.backup(&srcdir.path(), &options).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 0);
@@ -366,7 +359,7 @@ pub fn detect_minimal_mtime_change() {
     srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
     let options = BackupOptions::default();
-    let stats = af.backup(&srcdir.path(), &options).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 2);
@@ -388,7 +381,7 @@ pub fn detect_minimal_mtime_change() {
         }
     }
 
-    let stats = af.backup(&srcdir.path(), &options).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
     assert_eq!(stats.files, 2);
     assert_eq!(stats.unmodified_files, 1);
 }
@@ -500,6 +493,6 @@ fn delete_bands() {
         .delete_bands(&[BandId::new(&[0]), BandId::new(&[1])], &Default::default())
         .expect("delete_bands");
 
-    assert_eq!(stats.deleted_block_count, 1);
+    assert_eq!(stats.deleted_block_count, 2);
     assert_eq!(stats.deleted_band_count, 2);
 }

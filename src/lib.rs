@@ -49,8 +49,7 @@ pub mod unix_time;
 pub use crate::apath::Apath;
 pub use crate::archive::Archive;
 pub use crate::archive::DeleteOptions;
-pub use crate::backup::BackupOptions;
-pub use crate::backup::BackupWriter;
+pub use crate::backup::{backup, BackupOptions};
 pub use crate::band::Band;
 pub use crate::band::BandSelectionPolicy;
 pub use crate::bandid::BandId;
@@ -60,15 +59,16 @@ pub use crate::copy_tree::copy_tree;
 pub use crate::entry::Entry;
 pub use crate::errors::Error;
 pub use crate::gc_lock::GarbageCollectionLock;
-pub use crate::index::{IndexBuilder, IndexEntry, IndexRead};
+pub use crate::index::{IndexEntry, IndexRead, IndexWriter};
 pub use crate::kind::Kind;
 pub use crate::live_tree::{LiveEntry, LiveTree};
-pub use crate::merge::{iter_merged_entries, MergedEntryKind};
+pub use crate::merge::{MergeTrees, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
 pub use crate::progress::ProgressBar;
 pub use crate::restore::{RestoreOptions, RestoreTree};
-pub use crate::stats::{DeleteStats, ValidateStats};
+pub use crate::stats::{CopyStats, DeleteStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
+pub use crate::transport::Transport;
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
 
 // Commonly-used external types.
@@ -91,6 +91,12 @@ pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");
 
 /// Break blocks at this many uncompressed bytes.
 pub(crate) const MAX_BLOCK_SIZE: usize = 1 << 20;
+
+/// Maximum file size that will be combined with others rather than being stored alone.
+const SMALL_FILE_CAP: u64 = 100_000;
+
+/// Target maximum uncompressed size for combined blocks.
+const TARGET_COMBINED_BLOCK_SIZE: usize = MAX_BLOCK_SIZE;
 
 /// ISO timestamp, for https://docs.rs/chrono/0.4.11/chrono/format/strftime/.
 const TIMESTAMP_FORMAT: &str = "%F %T";

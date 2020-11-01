@@ -24,7 +24,6 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io;
-use std::io::prelude::*;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -37,7 +36,7 @@ use thousands::Separable;
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::stats::{CopyStats, Sizes, ValidateStats};
+use crate::stats::{Sizes, ValidateStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
 use crate::*;
@@ -104,7 +103,7 @@ impl BlockDir {
     }
 
     /// Returns the number of compressed bytes.
-    fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
+    pub(crate) fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
         // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
         let mut compressor = Compressor::new();
         let compressed = compressor.compress(&in_buf)?;
@@ -130,6 +129,24 @@ impl BlockDir {
                 }
             })?;
         Ok(comp_len)
+    }
+
+    pub(crate) fn store_or_deduplicate(
+        &mut self,
+        block_data: &[u8],
+        stats: &mut CopyStats,
+    ) -> Result<BlockHash> {
+        let hash = self.hash_bytes(block_data)?;
+        if self.contains(&hash)? {
+            stats.deduplicated_blocks += 1;
+            stats.deduplicated_bytes += block_data.len() as u64;
+        } else {
+            let comp_len = self.compress_and_store(block_data, &hash)?;
+            stats.written_blocks += 1;
+            stats.uncompressed_bytes += block_data.len() as u64;
+            stats.compressed_bytes += comp_len;
+        }
+        Ok(hash)
     }
 
     /// True if the named block is present in this directory.
@@ -317,307 +334,10 @@ impl BlockDir {
         };
         Ok((decompressor.take_buffer(), sizes))
     }
-}
 
-/// Manages storage into the BlockDir of any number of files.
-///
-/// At present this just holds a reusable input buffer.
-///
-/// In future it will combine small files into aggregate blocks,
-/// and perhaps compress them in parallel.
-pub(crate) struct StoreFiles {
-    // TODO: Rename to FileWriter or similar? Perhaps doesn't need to be
-    // separate from BackupWriter.
-    block_dir: BlockDir,
-    input_buf: Vec<u8>,
-}
-
-impl StoreFiles {
-    pub(crate) fn new(block_dir: BlockDir) -> StoreFiles {
-        StoreFiles {
-            block_dir,
-            input_buf: vec![0; MAX_BLOCK_SIZE],
-        }
-    }
-
-    pub(crate) fn store_file_content(
-        &mut self,
-        apath: &Apath,
-        from_file: &mut dyn Read,
-    ) -> Result<(Vec<Address>, CopyStats)> {
-        let mut addresses = Vec::<Address>::with_capacity(1);
-        let mut stats = CopyStats::default();
-        loop {
-            // TODO: Possibly read repeatedly in case we get a short read and have room for more,
-            // so that short reads don't lead to short blocks being stored.
-            // TODO: Error should actually be an error about the source file?
-            // TODO: This shouldn't directly read from the source, it should take blocks in.
-            let read_len =
-                from_file
-                    .read(&mut self.input_buf)
-                    .map_err(|source| Error::StoreFile {
-                        apath: apath.to_owned(),
-                        source,
-                    })?;
-            if read_len == 0 {
-                break;
-            }
-            let block_data = &self.input_buf[..read_len];
-            let hash = hash_bytes(block_data)?;
-            if self.block_dir.contains(&hash)? {
-                // TODO: Separate counter for size of the already-present blocks?
-                stats.deduplicated_blocks += 1;
-                stats.deduplicated_bytes += read_len as u64;
-            } else {
-                let comp_len = self.block_dir.compress_and_store(block_data, &hash)?;
-                stats.written_blocks += 1;
-                stats.uncompressed_bytes += read_len as u64;
-                stats.compressed_bytes += comp_len;
-            }
-            addresses.push(Address {
-                hash,
-                start: 0,
-                len: read_len as u64,
-            });
-        }
-        match addresses.len() {
-            0 => stats.empty_files += 1,
-            1 => stats.single_block_files += 1,
-            _ => stats.multi_block_files += 1,
-        }
-        Ok((addresses, stats))
-    }
-}
-
-fn hash_bytes(in_buf: &[u8]) -> Result<BlockHash> {
-    let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
-    hasher.update(in_buf);
-    Ok(BlockHash::from(hasher.finalize()))
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::io::prelude::*;
-    use std::io::SeekFrom;
-
-    use tempfile::{NamedTempFile, TempDir};
-
-    use super::*;
-
-    const EXAMPLE_TEXT: &[u8] = b"hello!";
-    const EXAMPLE_BLOCK_HASH: &str = "66ad1939a9289aa9f1f1d9ad7bcee694293c7623affb5979bd\
-         3f844ab4adcf2145b117b7811b3cee31e130efd760e9685f208c2b2fb1d67e28262168013ba63c";
-
-    fn make_example_file() -> NamedTempFile {
-        let mut tf = NamedTempFile::new().unwrap();
-        tf.write_all(EXAMPLE_TEXT).unwrap();
-        tf.flush().unwrap();
-        tf.seek(SeekFrom::Start(0)).unwrap();
-        tf
-    }
-
-    fn setup() -> (TempDir, BlockDir) {
-        let testdir = TempDir::new().unwrap();
-        let block_dir = BlockDir::create_path(testdir.path()).unwrap();
-        (testdir, block_dir)
-    }
-
-    #[test]
-    pub fn store_a_file() {
-        let expected_hash = EXAMPLE_BLOCK_HASH.to_string().parse().unwrap();
-        let (testdir, block_dir) = setup();
-        let mut example_file = make_example_file();
-
-        assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
-        let mut store = StoreFiles::new(block_dir.clone());
-
-        let (addrs, stats) = store
-            .store_file_content(&Apath::from("/hello"), &mut example_file)
-            .unwrap();
-
-        // Should be in one block, with the expected hash.
-        assert_eq!(1, addrs.len());
-        assert_eq!(0, addrs[0].start);
-        assert_eq!(addrs[0].hash, expected_hash);
-
-        // Block should be the one block present in the list.
-        let present_blocks = block_dir.block_names().unwrap().collect::<Vec<_>>();
-        assert_eq!(present_blocks.len(), 1);
-        assert_eq!(present_blocks[0], expected_hash);
-
-        // Subdirectory and file should exist
-        let expected_file = testdir.path().join("66a").join(EXAMPLE_BLOCK_HASH);
-        let attr = fs::metadata(expected_file).unwrap();
-        assert!(attr.is_file());
-
-        // Compressed size is as expected.
-        assert_eq!(block_dir.compressed_size(&expected_hash).unwrap(), 8);
-
-        assert_eq!(block_dir.contains(&expected_hash).unwrap(), true);
-
-        assert_eq!(stats.deduplicated_blocks, 0);
-        assert_eq!(stats.written_blocks, 1);
-        assert_eq!(stats.uncompressed_bytes, 6);
-        assert_eq!(stats.compressed_bytes, 8);
-
-        // Will vary depending on compressor and we don't want to be too brittle.
-        assert!(stats.compressed_bytes <= 19, stats.compressed_bytes);
-
-        // Try to read back
-        let (back, sizes) = block_dir.get(&addrs[0]).unwrap();
-        assert_eq!(back, EXAMPLE_TEXT);
-        assert_eq!(
-            sizes,
-            Sizes {
-                uncompressed: EXAMPLE_TEXT.len() as u64,
-                compressed: 8u64,
-            }
-        );
-
-        let mut stats = ValidateStats::default();
-        block_dir.validate(&mut stats).unwrap();
-        assert_eq!(stats.io_errors, 0);
-        assert_eq!(stats.block_error_count, 0);
-        assert_eq!(stats.block_read_count, 1);
-    }
-
-    #[test]
-    fn retrieve_partial_data() {
-        let (_testdir, block_dir) = setup();
-        let mut store_files = StoreFiles::new(block_dir.clone());
-        let (addrs, _stats) = store_files
-            .store_file_content(&"/hello".into(), &mut io::Cursor::new(b"0123456789abcdef"))
-            .unwrap();
-        assert_eq!(addrs.len(), 1);
-        let hash = addrs[0].hash.clone();
-        let first_half = Address {
-            start: 0,
-            len: 8,
-            hash,
-        };
-        let (first_half_content, _first_half_stats) = block_dir.get(&first_half).unwrap();
-        assert_eq!(first_half_content, b"01234567");
-
-        let hash = addrs[0].hash.clone();
-        let second_half = Address {
-            start: 8,
-            len: 8,
-            hash,
-        };
-        let (second_half_content, _second_half_stats) = block_dir.get(&second_half).unwrap();
-        assert_eq!(second_half_content, b"89abcdef");
-    }
-
-    #[test]
-    fn invalid_addresses() {
-        let (_testdir, block_dir) = setup();
-        let mut store_files = StoreFiles::new(block_dir.clone());
-        let (addrs, _stats) = store_files
-            .store_file_content(&"/hello".into(), &mut io::Cursor::new(b"0123456789abcdef"))
-            .unwrap();
-        assert_eq!(addrs.len(), 1);
-
-        // Address with start point too high.
-        let hash = addrs[0].hash.clone();
-        let starts_too_late = Address {
-            hash: hash.clone(),
-            start: 16,
-            len: 2,
-        };
-        let result = block_dir.get(&starts_too_late);
-        assert_eq!(
-            &result.err().unwrap().to_string(),
-            &format!(
-                "Address {{ hash: {:?}, start: 16, len: 2 }} \
-                   extends beyond decompressed block length 16",
-                hash
-            )
-        );
-
-        // Address with length too long.
-        let too_long = Address {
-            hash: hash.clone(),
-            start: 10,
-            len: 10,
-        };
-        let result = block_dir.get(&too_long);
-        assert_eq!(
-            &result.err().unwrap().to_string(),
-            &format!(
-                "Address {{ hash: {:?}, start: 10, len: 10 }} \
-                   extends beyond decompressed block length 16",
-                hash
-            )
-        );
-    }
-
-    #[test]
-    pub fn write_same_data_again() {
-        let (_testdir, block_dir) = setup();
-
-        let mut example_file = make_example_file();
-        let mut store = StoreFiles::new(block_dir);
-        let (addrs1, stats) = store
-            .store_file_content(&Apath::from("/ello"), &mut example_file)
-            .unwrap();
-        assert_eq!(stats.deduplicated_blocks, 0);
-        assert_eq!(stats.written_blocks, 1);
-        assert_eq!(stats.uncompressed_bytes, 6);
-        assert_eq!(stats.compressed_bytes, 8);
-
-        let mut example_file = make_example_file();
-        let (addrs2, stats2) = store
-            .store_file_content(&Apath::from("/ello2"), &mut example_file)
-            .unwrap();
-        assert_eq!(stats2.deduplicated_blocks, 1);
-        assert_eq!(stats2.written_blocks, 0);
-        assert_eq!(stats2.compressed_bytes, 0);
-
-        assert_eq!(addrs1, addrs2);
-    }
-
-    #[test]
-    // Large enough that it should break across blocks.
-    pub fn large_file() {
-        use super::MAX_BLOCK_SIZE;
-        let (_testdir, block_dir) = setup();
-        let mut tf = NamedTempFile::new().unwrap();
-        const N_CHUNKS: u64 = 10;
-        const CHUNK_SIZE: u64 = 1 << 21;
-        const TOTAL_SIZE: u64 = N_CHUNKS * CHUNK_SIZE;
-        let a_chunk = vec![b'@'; CHUNK_SIZE as usize];
-        for _i in 0..N_CHUNKS {
-            tf.write_all(&a_chunk).unwrap();
-        }
-        tf.flush().unwrap();
-        let tf_len = tf.seek(SeekFrom::Current(0)).unwrap();
-        println!("tf len={}", tf_len);
-        assert_eq!(tf_len, TOTAL_SIZE);
-        tf.seek(SeekFrom::Start(0)).unwrap();
-
-        let mut store = StoreFiles::new(block_dir.clone());
-        let (addrs, stats) = store
-            .store_file_content(&Apath::from("/big"), &mut tf)
-            .unwrap();
-
-        // Only one block needs to get compressed. The others are deduplicated.
-        assert_eq!(stats.uncompressed_bytes, MAX_BLOCK_SIZE as u64);
-        // Should be very compressible
-        assert!(stats.compressed_bytes < (MAX_BLOCK_SIZE as u64 / 10));
-        assert_eq!(stats.written_blocks, 1);
-        assert_eq!(
-            stats.deduplicated_blocks as u64,
-            TOTAL_SIZE / (MAX_BLOCK_SIZE as u64) - 1
-        );
-
-        // 10x 2MB should be twenty blocks
-        assert_eq!(addrs.len(), 20);
-        for a in addrs {
-            let (retr, block_sizes) = block_dir.get(&a).unwrap();
-            assert_eq!(retr.len(), MAX_BLOCK_SIZE as usize);
-            assert!(retr.iter().all(|b| *b == 64u8));
-            assert_eq!(block_sizes.uncompressed, MAX_BLOCK_SIZE as u64);
-        }
+    pub(crate) fn hash_bytes(&self, in_buf: &[u8]) -> Result<BlockHash> {
+        let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
+        hasher.update(in_buf);
+        Ok(BlockHash::from(hasher.finalize()))
     }
 }

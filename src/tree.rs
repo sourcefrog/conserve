@@ -21,7 +21,7 @@ use crate::*;
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
 pub trait ReadTree {
     // TODO: Perhaps hide these and just return dyn objects?
-    type Entry: Entry;
+    type Entry: Entry + 'static;
     type R: std::io::Read;
 
     /// Iterate, in apath order, all the entries in this tree.
@@ -31,14 +31,23 @@ pub trait ReadTree {
     /// iterator.
     fn iter_entries(&self) -> Result<Box<dyn Iterator<Item = Self::Entry>>>;
 
-    /// Iterate, in apath order, the entries from a subtree.
-    ///
-    /// The provided implementation iterates and filters all entries, but implementations
-    /// may be able to do better.
-    fn iter_subtree_entries(
+    /// Return entries within the subtree and not excluded.
+    fn iter_filtered(
         &self,
-        subtree: &Apath,
-    ) -> Result<Box<dyn Iterator<Item = Self::Entry>>>;
+        subtree: Option<Apath>,
+        excludes: Option<GlobSet>,
+    ) -> Result<Box<dyn Iterator<Item = Self::Entry>>> {
+        Ok(Box::new(self.iter_entries()?.filter(move |entry| {
+            subtree
+                .as_ref()
+                .map(|s| s.is_prefix_of(entry.apath()))
+                .unwrap_or(true)
+                && excludes
+                    .as_ref()
+                    .map(|e| !e.is_match(entry.apath()))
+                    .unwrap_or(true)
+        })))
+    }
 
     /// Read file contents as a `std::io::Read`.
     // TODO: Remove this and use ReadBlocks or similar.
@@ -51,11 +60,11 @@ pub trait ReadTree {
     /// Measure the tree size.
     ///
     /// This typically requires walking all entries, which may take a while.
-    fn size(&self) -> Result<TreeSize> {
+    fn size(&self, excludes: Option<GlobSet>) -> Result<TreeSize> {
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Measuring".to_owned());
         let mut tot = 0u64;
-        for e in self.iter_entries()? {
+        for e in self.iter_filtered(None, excludes)? {
             // While just measuring size, ignore directories/files we can't stat.
             if let Some(bytes) = e.size() {
                 tot += bytes;

@@ -65,10 +65,14 @@ impl ScratchArchive {
         }
 
         let options = &BackupOptions::default();
-        self.archive.backup(&srcdir.path(), &options).unwrap();
+        backup(&self.archive, &srcdir.live_tree(), &options).unwrap();
 
         srcdir.create_file("hello2");
-        self.archive.backup(&srcdir.path(), &options).unwrap();
+        backup(&self.archive, &srcdir.live_tree(), &options).unwrap();
+    }
+
+    pub fn transport(&self) -> &dyn Transport {
+        self.archive.transport()
     }
 }
 
@@ -119,6 +123,20 @@ impl TreeFixture {
         let full_path = self.root.join(relative_path);
         let mut f = fs::File::create(&full_path).unwrap();
         f.write_all(contents).unwrap();
+        full_path
+    }
+
+    /// Create a file with a specified length. The first bytes of the file are the `prefix` and the remainder is zeros.
+    pub fn create_file_of_length_with_prefix(
+        &self,
+        relative_path: &str,
+        length: u64,
+        prefix: &[u8],
+    ) -> PathBuf {
+        let full_path = self.root.join(relative_path);
+        let mut f = fs::File::create(&full_path).unwrap();
+        f.write_all(prefix).unwrap();
+        f.set_len(length).expect("set file length");
         full_path
     }
 

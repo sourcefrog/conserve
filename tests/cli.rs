@@ -167,13 +167,12 @@ both     /subdir/subfile
         .stdout("b0000\n");
 
     let expected_blocks = [
-        "1e99127adff52dec50072705c860e753b2d9c14c0e019bf9a258071699aac38db7d604b3e4ac5345d81ec7e3d8810a805a4e5ff3a44a9f7aa94d120220d2873a",
-        "fec91c70284c72d0d4e3684788a90de9338a5b2f47f01fedbe203cafd68708718ae5672d10eca804a8121904047d40d1d6cf11e7a76419357a9469af41f22d01",
+        "ea50e43840e5f310490bba1b641db82480a05e16e9ae220c1e5113c79b59541fa5a6ddb13db20d4df53dfcecb3ed9969e41a329e07afe0fbb597251a789c3575",
     ];
     let is_expected_blocks = |output: &[u8]| {
         let output_str = std::str::from_utf8(&output).unwrap();
         let mut blocks: Vec<&str> = output_str.lines().collect();
-        blocks.sort();
+        blocks.sort_unstable();
         blocks == expected_blocks
     };
 
@@ -468,4 +467,19 @@ fn delete_nonexistent_band() {
         .assert()
         .stdout(pred_fn)
         .failure();
+}
+
+#[test]
+fn size_exclude() {
+    let source = TreeFixture::new();
+    source.create_file_with_contents("small", b"0123456789");
+    source.create_file_with_contents("junk", b"01234567890123456789");
+
+    run_conserve()
+        .args(&["size", "--bytes", "--source"])
+        .arg(&source.path())
+        .args(&["--exclude=/junk"])
+        .assert()
+        .success()
+        .stdout("10\n");
 }

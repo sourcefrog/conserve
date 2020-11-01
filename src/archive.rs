@@ -21,7 +21,6 @@ use std::sync::Mutex;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::backup::BackupOptions;
 use crate::blockhash::BlockHash;
 use crate::copy_tree::CopyOptions;
 use crate::errors::Error;
@@ -115,27 +114,9 @@ impl Archive {
         })
     }
 
-    /// Backup a source directory into a new band in the archive.
-    ///
-    /// Returns statistics about what was copied.
-    pub fn backup(&self, source_path: &Path, options: &BackupOptions) -> Result<CopyStats> {
-        let live_tree = LiveTree::open(source_path)?.with_excludes(options.excludes.clone());
-        let writer = BackupWriter::begin(self)?;
-        copy_tree(
-            &live_tree,
-            writer,
-            &CopyOptions {
-                print_filenames: options.print_filenames,
-                measure_first: false,
-                ..CopyOptions::default()
-            },
-        )
-    }
-
     /// Restore a selected version, or by default the latest, to a destination directory.
     pub fn restore(&self, destination_path: &Path, options: &RestoreOptions) -> Result<CopyStats> {
         let st = self.open_stored_tree(options.band_selection.clone())?;
-        let st = st.with_excludes(options.excludes.clone());
         let rt = if options.overwrite {
             RestoreTree::create_overwrite(destination_path)
         } else {
@@ -144,6 +125,7 @@ impl Archive {
         let opts = CopyOptions {
             print_filenames: options.print_filenames,
             only_subtree: options.only_subtree.clone(),
+            excludes: options.excludes.clone(),
             ..CopyOptions::default()
         };
         copy_tree(&st, rt, &opts)
@@ -255,7 +237,7 @@ impl Archive {
             .enumerate()
             .inspect(move |(i, _)| progress_bar.set_fraction(*i, num_bands))
             .map(move |(_i, band_id)| Band::open(&archive, &band_id).expect("Failed to open band"))
-            .flat_map(|band| band.iter_entries().expect("Failed to iter entries"))
+            .flat_map(|band| band.iter_entries())
             .flat_map(|entry| entry.addrs)
             .map(|addr| addr.hash))
     }
@@ -385,7 +367,7 @@ impl Archive {
                 }
                 stats
             })
-            .reduce(|| ValidateStats::default(), |a, b| a + b);
+            .reduce(ValidateStats::default, |a, b| a + b);
 
         Ok(stats)
     }

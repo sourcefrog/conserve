@@ -23,7 +23,7 @@ use predicates::prelude::*;
 
 use conserve::*;
 
-const ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.2", "0.6.3"];
+const ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.2", "0.6.3", "0.6.9"];
 
 fn open_old_archive(ver: &str, name: &str) -> Archive {
     Archive::open_path(&Path::new(&format!("testdata/archive/v{}/{}/", ver, name)))
@@ -117,9 +117,12 @@ fn restore_modify_backup() {
         .expect("overwrite file");
 
         let new_archive = Archive::open_path(&new_archive_path).expect("Open new archive");
-        let backup_stats = new_archive
-            .backup(&working_tree.path(), &BackupOptions::default())
-            .expect("Backup modified tree");
+        let backup_stats = backup(
+            &new_archive,
+            &LiveTree::open(working_tree.path()).unwrap(),
+            &BackupOptions::default(),
+        )
+        .expect("Backup modified tree");
 
         assert_eq!(backup_stats.files, 3);
         // unmodified_files should be 0, but the unchanged file is s not defected as unmodified,

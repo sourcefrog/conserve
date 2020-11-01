@@ -15,6 +15,7 @@
 
 use std::fs;
 use std::io;
+use std::io::prelude::*;
 use std::path::Path;
 
 pub(crate) fn ensure_dir_exists(path: &Path) -> std::io::Result<()> {
@@ -30,4 +31,24 @@ pub(crate) fn ensure_dir_exists(path: &Path) -> std::io::Result<()> {
 /// True if a directory exists and is empty.
 pub(crate) fn directory_is_empty(path: &Path) -> std::io::Result<bool> {
     Ok(std::fs::read_dir(path)?.next().is_none())
+}
+
+/// Read up to `len` bytes into a buffer, and resize the vec to the bytes read.
+pub(crate) fn read_with_retries(
+    buf: &mut Vec<u8>,
+    len: usize,
+    from_file: &mut dyn Read,
+) -> std::io::Result<()> {
+    // TODO: This could safely resize the buf without initializing, since it will be overwritten.
+    buf.resize(len, 0);
+    let mut bytes_read = 0;
+    while bytes_read < len {
+        let read_len = from_file.read(&mut buf[bytes_read..])?;
+        if read_len == 0 {
+            break;
+        }
+        bytes_read += read_len;
+    }
+    buf.truncate(bytes_read);
+    Ok(())
 }

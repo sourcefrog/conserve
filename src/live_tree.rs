@@ -30,7 +30,6 @@ use crate::*;
 #[derive(Clone)]
 pub struct LiveTree {
     path: PathBuf,
-    excludes: GlobSet,
 }
 
 impl LiveTree {
@@ -38,15 +37,7 @@ impl LiveTree {
         // TODO: Maybe fail here if the root doesn't exist or isn't a directory?
         Ok(LiveTree {
             path: path.as_ref().to_path_buf(),
-            excludes: excludes::excludes_nothing(),
         })
-    }
-
-    /// Return a new LiveTree which when listed will ignore certain files.
-    ///
-    /// This replaces any previous exclusions.
-    pub fn with_excludes(self, excludes: GlobSet) -> LiveTree {
-        LiveTree { excludes, ..self }
     }
 
     fn relative_path(&self, apath: &Apath) -> PathBuf {
@@ -64,8 +55,8 @@ pub struct LiveEntry {
     symlink_target: Option<String>,
 }
 
-fn relative_path(root: &PathBuf, apath: &Apath) -> PathBuf {
-    let mut path = root.clone();
+fn relative_path(root: &Path, apath: &Apath) -> PathBuf {
+    let mut path = root.to_path_buf();
     path.push(&apath[1..]);
     path
 }
@@ -81,16 +72,15 @@ impl tree::ReadTree for LiveTree {
     /// child directories, visit them according to a sorted comparison by their UTF-8
     /// name.
     fn iter_entries(&self) -> Result<Box<dyn Iterator<Item = Self::Entry>>> {
-        Ok(Box::new(Iter::new(&self.path, &self.excludes)?))
+        Ok(Box::new(Iter::new(&self.path, None, None)?))
     }
 
-    fn iter_subtree_entries(&self, subtree: &Apath) -> Result<Box<dyn Iterator<Item = LiveEntry>>> {
-        // TODO: Just skip directly to the requested directory, and stop when it's done.
-        let subtree = subtree.to_owned();
-        Ok(Box::new(
-            self.iter_entries()?
-                .filter(move |entry| subtree.is_prefix_of(entry.apath())),
-        ))
+    fn iter_filtered(
+        &self,
+        subtree: Option<Apath>,
+        excludes: Option<GlobSet>,
+    ) -> Result<Box<dyn Iterator<Item = LiveEntry>>> {
+        Ok(Box::new(Iter::new(&self.path, subtree, excludes)?))
     }
 
     fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
@@ -172,7 +162,7 @@ pub struct Iter {
     check_order: apath::CheckOrder,
 
     /// glob pattern to skip in iterator
-    excludes: GlobSet,
+    excludes: Option<GlobSet>,
 
     stats: LiveTreeIterStats,
 }
@@ -180,25 +170,27 @@ pub struct Iter {
 impl Iter {
     /// Construct a new iter that will visit everything below this root path,
     /// subject to some exclusions
-    fn new(root_path: &Path, excludes: &GlobSet) -> Result<Iter> {
-        let root_metadata = fs::symlink_metadata(&root_path).map_err(Error::from)?;
+    fn new(root_path: &Path, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Result<Iter> {
+        let subtree = subtree.unwrap_or_else(|| "/".into());
+        let start_path = relative_path(root_path, &subtree);
+        let start_metadata = fs::symlink_metadata(&start_path).map_err(Error::from)?;
         // Preload iter to return the root and then recurse into it.
         let mut entry_deque = VecDeque::<LiveEntry>::new();
         entry_deque.push_back(LiveEntry::from_fs_metadata(
-            Apath::from("/"),
-            &root_metadata,
+            subtree.clone(),
+            &start_metadata,
             None,
         ));
         // TODO: Consider the case where the root is not actually a directory?
         // Should that be supported?
         let mut dir_deque = VecDeque::<Apath>::new();
-        dir_deque.push_back("/".into());
+        dir_deque.push_back(subtree);
         Ok(Iter {
             root_path: root_path.to_path_buf(),
             entry_deque,
             dir_deque,
             check_order: apath::CheckOrder::new(),
-            excludes: excludes.clone(),
+            excludes,
             stats: LiveTreeIterStats::default(),
         })
     }
@@ -263,9 +255,11 @@ impl Iter {
                 }
             };
 
-            if self.excludes.is_match(&child_apath_str) {
-                self.stats.exclusions += 1;
-                continue;
+            if let Some(ref excludes) = self.excludes {
+                if excludes.is_match(&child_apath_str) {
+                    self.stats.exclusions += 1;
+                    continue;
+                }
             }
             let metadata = match dir_entry.metadata() {
                 Ok(metadata) => metadata,
@@ -423,8 +417,8 @@ mod tests {
 
         let excludes = excludes::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
-        let lt = LiveTree::open(tf.path()).unwrap().with_excludes(excludes);
-        let mut source_iter = lt.iter_entries().unwrap();
+        let lt = LiveTree::open(tf.path()).unwrap();
+        let mut source_iter = lt.iter_filtered(None, excludes).unwrap();
         let result = source_iter.by_ref().collect::<Vec<_>>();
 
         // First one is the root
@@ -464,7 +458,7 @@ mod tests {
         let lt = LiveTree::open(tf.path()).unwrap();
 
         let names: Vec<String> = lt
-            .iter_subtree_entries(&"/subdir".into())
+            .iter_filtered(Some("/subdir".into()), None)
             .unwrap()
             .map(|entry| entry.apath.into())
             .collect();

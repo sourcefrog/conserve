@@ -67,7 +67,7 @@ pub fn show_verbose_version_list(
             let tree_mb = crate::misc::bytes_to_human_mb(
                 archive
                     .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))?
-                    .size()?
+                    .size(None)?
                     .file_bytes,
             );
             writeln!(
@@ -89,14 +89,14 @@ pub fn show_verbose_version_list(
 pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
     // TODO: Maybe use https://docs.serde.rs/serde/ser/trait.Serializer.html#method.collect_seq.
     let bw = BufWriter::new(w);
-    let index_entries: Vec<IndexEntry> = band.iter_entries()?.collect();
+    let index_entries: Vec<IndexEntry> = band.iter_entries().collect();
     serde_json::ser::to_writer_pretty(bw, &index_entries)
         .map_err(|source| Error::SerializeIndex { source })
 }
 
-pub fn show_tree_names<T: ReadTree>(tree: &T, w: &mut dyn Write) -> Result<()> {
+pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(it: I, w: &mut dyn Write) -> Result<()> {
     let mut bw = BufWriter::new(w);
-    for entry in tree.iter_entries()? {
+    for entry in it {
         writeln!(bw, "{}", entry.apath())?;
     }
     Ok(())

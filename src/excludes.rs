@@ -17,12 +17,19 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use super::*;
 
-pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
+pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(
+    excludes: I,
+) -> Result<Option<GlobSet>> {
     let mut builder = GlobSetBuilder::new();
+    let mut empty = true;
     for i in excludes {
         builder.add(Glob::new(i.as_ref()).map_err(|source| Error::ParseGlob { source })?);
+        empty = false;
     }
-    builder.build().map_err(Into::into)
+    if empty {
+        return Ok(None);
+    }
+    builder.build().map_err(Into::into).map(Some)
 }
 
 pub fn excludes_nothing() -> GlobSet {
@@ -36,7 +43,7 @@ mod tests {
     #[test]
     pub fn simple_parse() {
         let vec = vec!["fo*", "foo", "bar*"];
-        let excludes = excludes::from_strings(&vec).unwrap();
+        let excludes = excludes::from_strings(&vec).expect("ok").expect("some");
         assert_eq!(excludes.matches("foo").len(), 2);
         assert_eq!(excludes.matches("foobar").len(), 1);
         assert_eq!(excludes.matches("barBaz").len(), 1);
@@ -45,13 +52,17 @@ mod tests {
 
     #[test]
     pub fn path_parse() {
-        let excludes = excludes::from_strings(&["fo*/bar/baz*"]).unwrap();
+        let excludes = excludes::from_strings(&["fo*/bar/baz*"])
+            .expect("ok")
+            .expect("some");
         assert_eq!(excludes.matches("foo/bar/baz.rs").len(), 1);
     }
 
     #[test]
     pub fn extendend_pattern_parse() {
-        let excludes = excludes::from_strings(&["fo?", "ba[abc]", "[!a-z]"]).unwrap();
+        let excludes = excludes::from_strings(&["fo?", "ba[abc]", "[!a-z]"])
+            .expect("ok")
+            .expect("some");
         assert_eq!(excludes.matches("foo").len(), 1);
         assert_eq!(excludes.matches("fo").len(), 0);
         assert_eq!(excludes.matches("baa").len(), 1);

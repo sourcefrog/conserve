@@ -1,5 +1,23 @@
 # Conserve release history
 
+## v0.6.9 NOT RELEASED YET
+
+### Features
+
+- New option `conserve size --bytes` gives output in bytes, rather than
+  megabytes.
+
+### Performance
+
+- Reading a subtree of a local source is faster, because it no longer reads and
+  discards the whole tree.
+
+- Small files (under 100kB) are combined into blocks, to allow better cross-file
+  compression and to produce fewer small file reads and writes.
+
+- Backups use a stitched index as the basis. As a result, Conserve is better
+  able to recognize unchanged files after an interrupted backup.
+
 ## v0.6.8 2020-10-16
 
 ### Features

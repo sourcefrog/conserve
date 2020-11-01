@@ -94,8 +94,8 @@ pub struct IndexReadStats {
 }
 
 #[derive(Add, AddAssign, Clone, Debug, Default, Eq, PartialEq)]
-pub struct IndexBuilderStats {
-    pub index_hunks: u64,
+pub struct IndexWriterStats {
+    pub index_hunks: usize,
     pub uncompressed_index_bytes: u64,
     pub compressed_index_bytes: u64,
 }
@@ -130,15 +130,41 @@ pub struct CopyStats {
 
     pub deduplicated_blocks: usize,
     pub written_blocks: usize,
+    /// Blocks containing combined small files.
+    pub combined_blocks: usize,
 
     pub empty_files: usize,
+    pub small_combined_files: usize,
     pub single_block_files: usize,
     pub multi_block_files: usize,
 
     pub errors: usize,
 
-    pub index_builder_stats: IndexBuilderStats,
+    pub index_builder_stats: IndexWriterStats,
     // TODO: Include elapsed time.
+}
+
+fn write_size<I: Into<u64>>(w: &mut dyn io::Write, label: &str, value: I) {
+    writeln!(w, "{:>12} MB   {}", mb_string(value.into()), label).unwrap();
+}
+
+fn write_compressed_size(w: &mut dyn io::Write, compressed: u64, uncompressed: u64) {
+    write_size(w, "uncompressed", uncompressed);
+    write_size(
+        w,
+        &format!("after {:.1}x compression", ratio(uncompressed, compressed)),
+        compressed,
+    );
+}
+
+fn write_count<I: Into<usize>>(w: &mut dyn io::Write, label: &str, value: I) {
+    writeln!(
+        w,
+        "{:>12}      {}",
+        value.into().separate_with_commas(),
+        label
+    )
+    .unwrap();
 }
 
 impl CopyStats {
@@ -171,123 +197,36 @@ impl CopyStats {
 
     pub fn summarize_backup(&self, w: &mut dyn io::Write) {
         // TODO: Perhaps summarize to a string, or make this the Display impl.
-        writeln!(w, "{:>12}      files:", self.files.separate_with_commas()).unwrap();
-        writeln!(
-            w,
-            "{:>12}        unmodified files",
-            self.unmodified_files.separate_with_commas()
-        )
-        .unwrap();
-        writeln!(
-            w,
-            "{:>12}        modified files",
-            self.modified_files.separate_with_commas()
-        )
-        .unwrap();
-        writeln!(
-            w,
-            "{:>12}        new files",
-            self.new_files.separate_with_commas()
-        )
-        .unwrap();
-        writeln!(
-            w,
-            "{:>12}      symlinks",
-            self.symlinks.separate_with_commas()
-        )
-        .unwrap();
-        writeln!(
-            w,
-            "{:>12}      directories",
-            self.directories.separate_with_commas()
-        )
-        .unwrap();
-        writeln!(
-            w,
-            "{:>12}      special files skipped",
-            self.unknown_kind.separate_with_commas(),
-        )
-        .unwrap();
+        write_count(w, "files:", self.files);
+        write_count(w, "  unmodified files", self.unmodified_files);
+        write_count(w, "  modified files", self.modified_files);
+        write_count(w, "  new files", self.new_files);
+        write_count(w, "symlinks", self.symlinks);
+        write_count(w, "directories", self.directories);
+        write_count(w, "unsupported file kind", self.unknown_kind);
         writeln!(w).unwrap();
 
-        writeln!(
-            w,
-            "{:>12}      deduplicated data blocks:",
-            self.deduplicated_blocks.separate_with_commas(),
-        )
-        .unwrap();
-        writeln!(w, "{:>12} MB     saved", mb_string(self.deduplicated_bytes),).unwrap();
-        writeln!(
-            w,
-            "{:>12}      new data blocks:",
-            self.written_blocks.separate_with_commas(),
-        )
-        .unwrap();
-        writeln!(
-            w,
-            "{:>12} MB     uncompressed",
-            mb_string(self.uncompressed_bytes),
-        )
-        .unwrap();
-        writeln!(
-            w,
-            "{:>12} MB     after {:.1}x compression",
-            mb_string(self.compressed_bytes),
-            ratio(self.uncompressed_bytes, self.compressed_bytes)
-        )
-        .unwrap();
-
+        write_count(w, "empty files", self.empty_files);
+        write_count(w, "small combined files", self.small_combined_files);
+        write_count(w, "single block files", self.single_block_files);
+        write_count(w, "multi-block files", self.multi_block_files);
         writeln!(w).unwrap();
+
+        write_count(w, "deduplicated data blocks:", self.deduplicated_blocks);
+        write_size(w, "  saved", self.deduplicated_bytes);
+        writeln!(w).unwrap();
+
+        write_count(w, "new data blocks:", self.deduplicated_blocks);
+        write_count(w, "  blocks of combined files", self.combined_blocks);
+        write_compressed_size(w, self.compressed_bytes, self.uncompressed_bytes);
+        writeln!(w).unwrap();
+
         let idx = &self.index_builder_stats;
-        writeln!(
-            w,
-            "{:>12}      new index hunks:",
-            idx.index_hunks.separate_with_commas(),
-        )
-        .unwrap();
-        writeln!(
-            w,
-            "{:>12} MB     uncompressed",
-            mb_string(idx.uncompressed_index_bytes),
-        )
-        .unwrap();
-        writeln!(
-            w,
-            "{:>12} MB     after {:.1}x compression",
-            mb_string(idx.compressed_index_bytes),
-            ratio(idx.uncompressed_index_bytes, idx.compressed_index_bytes),
-        )
-        .unwrap();
+        write_count(w, "new index hunks", idx.index_hunks);
+        write_compressed_size(w, idx.compressed_index_bytes, idx.uncompressed_index_bytes);
         writeln!(w).unwrap();
-        writeln!(w, "{:>12}      errors", self.errors.separate_with_commas()).unwrap();
 
-        // format!(
-        //     "{:>12} MB   in {} files, {} directories, {} symlinks.\n\
-        //      {:>12}      files are unchanged.\n\
-        //      {:>12} MB/s input rate.\n\
-        //      {:>12} MB   after deduplication.\n\
-        //      {:>12} MB   in {} blocks after {:.1}x compression.\n\
-        //      {:>12} MB   in {} index hunks after {:.1}x compression.\n\
-        //      {:>12}      elapsed.\n",
-        //     (self.get_size("file.bytes").uncompressed / M).separate_with_commas(),
-        //     self.get_count("file").separate_with_commas(),
-        //     self.get_count("dir").separate_with_commas(),
-        //     self.get_count("symlink").separate_with_commas(),
-        //     self.get_count("file.unchanged").separate_with_commas(),
-        //     (mbps_rate(
-        //         self.get_size("file.bytes").uncompressed,
-        //         self.elapsed_time()
-        //     ) as u64)
-        //         .separate_with_commas(),
-        //     (self.get_size("block").uncompressed / M).separate_with_commas(),
-        //     (self.get_size("block").compressed / M).separate_with_commas(),
-        //     self.get_count("block.write").separate_with_commas(),
-        //     compression_ratio(&self.get_size("block")),
-        //     (self.get_size("index").compressed / M).separate_with_commas(),
-        //     self.get_count("index.hunk").separate_with_commas(),
-        //     compression_ratio(&self.get_size("index")),
-        //     duration_to_hms(self.elapsed_time()),
-        // )
+        write_count(w, "errors", self.errors);
     }
 }
 
