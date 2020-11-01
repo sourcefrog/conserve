@@ -208,6 +208,7 @@ impl Command {
                 let options = BackupOptions {
                     print_filenames: *verbose,
                     excludes,
+                    ..Default::default()
                 };
                 let copy_stats = backup(&Archive::open_path(archive)?, &source, &options)?;
                 ui::println("Backup complete.");

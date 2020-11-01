@@ -191,7 +191,7 @@ impl Band {
     }
 
     /// Return an iterator through entries in this band.
-    pub fn iter_entries(&self) -> Result<index::IndexEntryIter> {
+    pub fn iter_entries(&self) -> index::IndexEntryIter<index::IndexHunkIter> {
         self.index().iter_entries()
     }
 

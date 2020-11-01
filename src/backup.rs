@@ -21,20 +21,31 @@ use globset::GlobSet;
 use itertools::Itertools;
 
 use crate::blockdir::Address;
-use crate::index::IndexEntryIter;
 use crate::io::read_with_retries;
 use crate::stats::CopyStats;
 use crate::tree::ReadTree;
 use crate::*;
 
 /// Configuration of how to make a backup.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct BackupOptions {
     /// Print filenames to the UI as they're copied.
     pub print_filenames: bool,
 
     /// Exclude these globs from the backup.
     pub excludes: Option<GlobSet>,
+
+    pub max_entries_per_hunk: usize,
+}
+
+impl Default for BackupOptions {
+    fn default() -> BackupOptions {
+        BackupOptions {
+            print_filenames: false,
+            excludes: None,
+            max_entries_per_hunk: crate::index::MAX_ENTRIES_PER_HUNK,
+        }
+    }
 }
 
 // This causes us to walk the source tree twice, which is probably an acceptable option
@@ -59,10 +70,7 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
 
     progress_bar.set_phase("Copying".to_owned());
     let entry_iter = source.iter_filtered(None, options.excludes.clone())?;
-    for entry_group in entry_iter
-        .chunks(crate::index::MAX_ENTRIES_PER_HUNK)
-        .into_iter()
-    {
+    for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
             if options.print_filenames {
                 crate::ui::println(entry.apath());
@@ -91,7 +99,7 @@ struct BackupWriter {
 
     /// The index for the last stored band, used as hints for whether newly
     /// stored files have changed.
-    basis_index: Option<IndexEntryIter>,
+    basis_index: Option<crate::index::IndexEntryIter<crate::stitch::IterStitchedIndexHunks>>,
 
     file_combiner: FileCombiner,
 }
@@ -104,12 +112,9 @@ impl BackupWriter {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
-        // TODO: Use a stitched band as the basis.
-        // <https://github.com/sourcefrog/conserve/issues/142>
         let basis_index = archive
-            .last_complete_band()?
-            .map(|b| b.iter_entries())
-            .transpose()?;
+            .last_band_id()?
+            .map(|band_id| archive.iter_stitched_index_hunks(&band_id).iter_entries());
         // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;
         let index_builder = band.index_builder();

@@ -120,3 +120,59 @@ pub fn mixed_medium_small_files_two_hunks() {
     }
     assert_eq!(tree.iter_entries().unwrap().count(), 2000);
 }
+
+#[test]
+fn detect_unchanged_from_stitched_index() {
+    let af = ScratchArchive::new();
+    let srcdir = TreeFixture::new();
+    srcdir.create_file("a");
+    srcdir.create_file("b");
+    // Use small hunks for easier manipulation.
+    let stats = backup(
+        &af,
+        &srcdir.live_tree(),
+        &BackupOptions {
+            max_entries_per_hunk: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(stats.new_files, 2);
+    assert_eq!(stats.small_combined_files, 2);
+    assert_eq!(stats.index_builder_stats.index_hunks, 3);
+
+    // Make a second backup, with the first file changed.
+    srcdir.create_file_with_contents("a", b"new a contents");
+    let stats = backup(
+        &af,
+        &srcdir.live_tree(),
+        &BackupOptions {
+            max_entries_per_hunk: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(stats.unmodified_files, 1);
+    assert_eq!(stats.modified_files, 1);
+    assert_eq!(stats.index_builder_stats.index_hunks, 3);
+
+    // Delete the last hunk and reopen the last band.
+    af.transport().remove_file("b0001/BANDTAIL").unwrap();
+    af.transport()
+        .remove_file("b0001/i/00000/000000002")
+        .unwrap();
+
+    // The third backup should see nothing changed, by looking at the stitched
+    // index from both b0 and b1.
+    let stats = backup(
+        &af,
+        &srcdir.live_tree(),
+        &BackupOptions {
+            max_entries_per_hunk: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(stats.unmodified_files, 2, "both files are unmodified");
+    assert_eq!(stats.index_builder_stats.index_hunks, 3);
+}

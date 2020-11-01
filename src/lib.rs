@@ -68,6 +68,7 @@ pub use crate::progress::ProgressBar;
 pub use crate::restore::{RestoreOptions, RestoreTree};
 pub use crate::stats::{CopyStats, DeleteStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
+pub use crate::transport::Transport;
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
 
 // Commonly-used external types.

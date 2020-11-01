@@ -70,6 +70,10 @@ impl ScratchArchive {
         srcdir.create_file("hello2");
         backup(&self.archive, &srcdir.live_tree(), &options).unwrap();
     }
+
+    pub fn transport(&self) -> &dyn Transport {
+        self.archive.transport()
+    }
 }
 
 impl Deref for ScratchArchive {

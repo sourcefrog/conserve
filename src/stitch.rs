@@ -28,6 +28,7 @@
 //!   seen.
 //! * Bands might be deleted, so their numbers are not contiguous.
 
+use crate::index::IndexEntryIter;
 use crate::*;
 
 pub struct IterStitchedIndexHunks {
@@ -51,6 +52,10 @@ impl IterStitchedIndexHunks {
             last_apath: None,
             index_hunks: None,
         }
+    }
+
+    pub fn iter_entries(self) -> IndexEntryIter<IterStitchedIndexHunks> {
+        IndexEntryIter::new(self)
     }
 }
 

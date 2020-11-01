@@ -123,6 +123,7 @@ pub fn backup_more_excludes() {
     let options = BackupOptions {
         excludes,
         print_filenames: false,
+        ..Default::default()
     };
     let stats = backup(&af, &source, &options).expect("backup");
 
@@ -146,7 +147,7 @@ fn check_backup(af: &ScratchArchive) {
     let band = Band::open(&af, &band_ids[0]).unwrap();
     assert!(band.is_closed().unwrap());
 
-    let index_entries = band.iter_entries().unwrap().collect::<Vec<IndexEntry>>();
+    let index_entries = band.iter_entries().collect::<Vec<IndexEntry>>();
     assert_eq!(2, index_entries.len());
 
     let root_entry = &index_entries[0];
@@ -275,7 +276,7 @@ pub fn symlink() {
     let band = Band::open(&af, &band_ids[0]).unwrap();
     assert!(band.is_closed().unwrap());
 
-    let index_entries = band.iter_entries().unwrap().collect::<Vec<IndexEntry>>();
+    let index_entries = band.iter_entries().collect::<Vec<IndexEntry>>();
     assert_eq!(2, index_entries.len());
 
     let e2 = &index_entries[1];

@@ -275,11 +275,8 @@ impl IndexRead {
     }
 
     /// Make an iterator that will return all entries in this band.
-    pub fn iter_entries(&self) -> Result<IndexEntryIter> {
-        Ok(IndexEntryIter {
-            buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
-            hunk_iter: self.iter_hunks(),
-        })
+    pub fn iter_entries(self) -> IndexEntryIter<IndexHunkIter> {
+        IndexEntryIter::new(self.iter_hunks())
     }
 
     /// Make an iterator that returns hunks of entries from this index.
@@ -395,14 +392,23 @@ impl IndexHunkIter {
 }
 
 /// Read out all the entries from a stored index, in apath order.
-pub struct IndexEntryIter {
+pub struct IndexEntryIter<HI: Iterator<Item = Vec<IndexEntry>>> {
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
-    hunk_iter: IndexHunkIter,
+    hunk_iter: HI,
 }
 
-impl Iterator for IndexEntryIter {
+impl<HI: Iterator<Item = Vec<IndexEntry>>> IndexEntryIter<HI> {
+    pub(crate) fn new(hunk_iter: HI) -> Self {
+        IndexEntryIter {
+            buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
+            hunk_iter,
+        }
+    }
+}
+
+impl<HI: Iterator<Item = Vec<IndexEntry>>> Iterator for IndexEntryIter<HI> {
     type Item = IndexEntry;
 
     fn next(&mut self) -> Option<IndexEntry> {
@@ -417,7 +423,7 @@ impl Iterator for IndexEntryIter {
     }
 }
 
-impl IndexEntryIter {
+impl<HI: Iterator<Item = Vec<IndexEntry>>> IndexEntryIter<HI> {
     /// Return the entry for given apath, if it is present, otherwise None.
     /// It follows this will also return None at the end of the index.
     ///
@@ -572,9 +578,7 @@ mod tests {
             "Index hunk file not found"
         );
 
-        let mut it = IndexRead::open_path(&testdir.path())
-            .iter_entries()
-            .unwrap();
+        let mut it = IndexRead::open_path(&testdir.path()).iter_entries();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
@@ -591,12 +595,13 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         let index_read = IndexRead::open_path(&testdir.path());
-        let it = index_read.iter_entries().unwrap();
+        let it = index_read.iter_entries();
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
 
         // Read it out as hunks.
-        let hunks: Vec<Vec<IndexEntry>> = index_read.iter_hunks().collect();
+        let hunks: Vec<Vec<IndexEntry>> =
+            IndexRead::open_path(&testdir.path()).iter_hunks().collect();
         assert_eq!(hunks.len(), 2);
         assert_eq!(
             hunks[0]
@@ -711,33 +716,25 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         // Advance to /foo and read on from there.
-        let mut it = IndexRead::open_path(&testdir.path())
-            .iter_entries()
-            .unwrap();
+        let mut it = IndexRead::open_path(&testdir.path()).iter_entries();
         assert_eq!(it.advance_to(&Apath::from("/foo")).unwrap().apath, "/foo");
         assert_eq!(it.next().unwrap().apath, "/foobar");
         assert_eq!(it.next().unwrap().apath, "/g01");
 
         // Advance to before /g01
-        let mut it = IndexRead::open_path(&testdir.path())
-            .iter_entries()
-            .unwrap();
+        let mut it = IndexRead::open_path(&testdir.path()).iter_entries();
         assert_eq!(it.advance_to(&Apath::from("/fxxx")), None);
         assert_eq!(it.next().unwrap().apath, "/g01");
         assert_eq!(it.next().unwrap().apath, "/g02");
 
         // Advance to before the first entry
-        let mut it = IndexRead::open_path(&testdir.path())
-            .iter_entries()
-            .unwrap();
+        let mut it = IndexRead::open_path(&testdir.path()).iter_entries();
         assert_eq!(it.advance_to(&Apath::from("/aaaa")), None);
         assert_eq!(it.next().unwrap().apath, "/bar");
         assert_eq!(it.next().unwrap().apath, "/foo");
 
         // Advance to after the last entry
-        let mut it = IndexRead::open_path(&testdir.path())
-            .iter_entries()
-            .unwrap();
+        let mut it = IndexRead::open_path(&testdir.path()).iter_entries();
         assert_eq!(it.advance_to(&Apath::from("/zz")), None);
         assert_eq!(it.next(), None);
     }
