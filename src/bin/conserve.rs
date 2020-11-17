@@ -259,19 +259,10 @@ impl Command {
                 backup,
                 exclude,
             } => {
-                // TODO: Consider whether the actual files have changed.
-                // TODO: Summarize diff.
-                // TODO: Optionally include unchanged files.
                 let excludes = excludes::from_strings(exclude)?;
                 let st = stored_tree_from_opt(archive, backup)?;
                 let lt = LiveTree::open(source)?;
-                output::show_tree_diff(
-                    &mut MergeTrees::new(
-                        st.iter_filtered(None, excludes.clone())?,
-                        lt.iter_filtered(None, excludes)?,
-                    ),
-                    &mut stdout,
-                )?;
+                diff(&st, &lt, &DiffOptions { excludes })?;
             }
             Command::Gc {
                 archive,

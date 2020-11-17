@@ -101,19 +101,3 @@ pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(it: I, w: &mut dyn Writ
     }
     Ok(())
 }
-
-pub fn show_tree_diff(
-    iter: &mut dyn Iterator<Item = crate::merge::MergedEntry>,
-    w: &mut dyn Write,
-) -> Result<()> {
-    let mut bw = BufWriter::new(w);
-    for e in iter {
-        let ks = match e.kind {
-            MergedEntryKind::LeftOnly => "left",
-            MergedEntryKind::RightOnly => "right",
-            MergedEntryKind::Both => "both",
-        };
-        writeln!(bw, "{:<8} {}", ks, e.apath)?;
-    }
-    Ok(())
-}
