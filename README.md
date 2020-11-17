@@ -119,7 +119,9 @@ with
 
 ### Arch Linux
 
-To install from from available [AUR packages](https://aur.archlinux.org/packages/?O=0&SeB=nd&K=Robust+portable+backup+tool+written&outdated=&SB=n&SO=a&PP=50&do_Search=Go), use an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers):
+To install from from available
+[AUR packages](https://aur.archlinux.org/packages/?O=0&SeB=nd&K=Robust+portable+backup+tool+written&outdated=&SB=n&SO=a&PP=50&do_Search=Go),
+use an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers):
 
     yay -S conserve
 
@@ -149,6 +151,9 @@ Some other limitations:
 
 - `conserve diff` exists, [but is not yet very useful][21].
 - [Permissions and ownership are not stored](https://github.com/sourcefrog/conserve/issues/46).
+
+For more future features, see
+<https://github.com/sourcefrog/conserve/wiki/Ideas>.
 
 Prior to 1.0, data formats may change on each minor version number change (0.x):
 you should restore using the same version that you used to make the backup.
