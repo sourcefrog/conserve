@@ -22,6 +22,6 @@ jobs:
             target
             ~/.rustup
             ~/.cargo
-          key: cache-rust-1
+          key: cache-rust-${{ matrix.os }}
       - name: Build and run tests
         run: cargo test --verbose
