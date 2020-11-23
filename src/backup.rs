@@ -27,7 +27,7 @@ use crate::tree::ReadTree;
 use crate::*;
 
 /// Configuration of how to make a backup.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BackupOptions {
     /// Print filenames to the UI as they're copied.
     pub print_filenames: bool,
@@ -64,7 +64,7 @@ impl Default for BackupOptions {
 ///
 /// Returns statistics about what was copied.
 pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> Result<CopyStats> {
-    let mut writer = BackupWriter::begin(archive)?;
+    let mut writer = BackupWriter::begin(archive, options.clone())?;
     let mut stats = CopyStats::default();
     let mut progress_bar = ProgressBar::new();
 
@@ -72,9 +72,6 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
     let entry_iter = source.iter_filtered(None, options.excludes.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
-            if options.print_filenames {
-                crate::ui::println(entry.apath());
-            }
             progress_bar.set_filename(entry.apath().to_string());
             if let Err(e) = writer.copy_entry(&entry, source) {
                 ui::show_error(&e);
@@ -102,13 +99,15 @@ struct BackupWriter {
     basis_index: Option<crate::index::IndexEntryIter<crate::stitch::IterStitchedIndexHunks>>,
 
     file_combiner: FileCombiner,
+
+    options: BackupOptions,
 }
 
 impl BackupWriter {
     /// Create a new BackupWriter.
     ///
     /// This currently makes a new top-level band.
-    pub fn begin(archive: &Archive) -> Result<BackupWriter> {
+    pub fn begin(archive: &Archive, options: BackupOptions) -> Result<BackupWriter> {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
@@ -125,6 +124,7 @@ impl BackupWriter {
             stats: CopyStats::default(),
             basis_index,
             file_combiner: FileCombiner::new(archive.block_dir().clone()),
+            options,
         })
     }
 
@@ -162,6 +162,9 @@ impl BackupWriter {
     }
 
     fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
+        if self.options.print_filenames {
+            crate::ui::println(&format!("{}/", source_entry.apath()));
+        }
         self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
@@ -179,15 +182,22 @@ impl BackupWriter {
             .flatten()
         {
             if source_entry.is_unchanged_from(&basis_entry) {
-                // TODO: In verbose mode, say if the file is changed, unchanged,
-                // etc, but without duplicating the filenames.
+                if self.options.print_filenames {
+                    crate::ui::println(&format!("{} (unchanged)", apath));
+                }
                 self.stats.unmodified_files += 1;
                 self.index_builder.push_entry(basis_entry);
                 return Ok(());
             } else {
+                if self.options.print_filenames {
+                    crate::ui::println(&format!("{} (modified)", apath));
+                }
                 self.stats.modified_files += 1;
             }
         } else {
+            if self.options.print_filenames {
+                crate::ui::println(&format!("{} (new)", apath));
+            }
             self.stats.new_files += 1;
         }
         let mut read_source = from_tree.file_contents(&source_entry)?;
@@ -218,6 +228,9 @@ impl BackupWriter {
         let target = source_entry.symlink_target().clone();
         self.stats.symlinks += 1;
         assert!(target.is_some());
+        if self.options.print_filenames {
+            crate::ui::println(&format!("{} -> {}", source_entry.apath(), target.unwrap()));
+        }
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
         Ok(())

@@ -120,7 +120,10 @@ fn restore_modify_backup() {
         let backup_stats = backup(
             &new_archive,
             &LiveTree::open(working_tree.path()).unwrap(),
-            &BackupOptions::default(),
+            &BackupOptions {
+                print_filenames: true,
+                ..Default::default()
+            },
         )
         .expect("Backup modified tree");
 
