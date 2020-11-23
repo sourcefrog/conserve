@@ -18,6 +18,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use filetime::set_file_mtime;
 use globset::GlobSet;
 
 use crate::band::BandSelectionPolicy;
@@ -109,7 +110,6 @@ impl tree::WriteTree for RestoreTree {
         from_tree: &R,
     ) -> Result<CopyStats> {
         // TODO: Restore permissions.
-        // TODO: Reset mtime: can probably use https://docs.rs/utime/0.2.2/utime/
         let path = self.rooted_path(source_entry.apath());
         let restore_err = |source| Error::Restore {
             path: path.clone(),
@@ -120,6 +120,14 @@ impl tree::WriteTree for RestoreTree {
         let content = &mut from_tree.file_contents(&source_entry)?;
         let bytes_copied = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
         restore_file.flush().map_err(restore_err)?;
+
+        set_file_mtime(&path, source_entry.mtime().into()).map_err(|source| {
+            Error::RestoreModificationTime {
+                path: path.clone(),
+                source,
+            }
+        })?;
+
         // TODO: Accumulate more stats.
         Ok(CopyStats {
             uncompressed_bytes: bytes_copied,

@@ -125,20 +125,10 @@ fn restore_modify_backup() {
         .expect("Backup modified tree");
 
         assert_eq!(backup_stats.files, 3);
-        // unmodified_files should be 0, but the unchanged file is s not defected as unmodified,
-        // for two reasons.
-        //
-        // 1. We don't restore the mtime, so that doesn't match (#47).
-        //
-        // 2. Files that have a different mtime but the same content aren't seen as
-        //    unmodified.  (And, maybe that's correct: we did have to do work to read and hash all
-        //    the content. Perhaps they should be counted separately: #124.)
-        //
-        // Similarly, modified_files should be 1.
-        assert_eq!(backup_stats.unmodified_files, 0);
-        assert_eq!(backup_stats.modified_files, 2);
-        assert_eq!(backup_stats.new_files, 1);
-        assert_eq!(backup_stats.empty_files, 1);
+        assert_eq!(backup_stats.unmodified_files, 1, "unmodified files");
+        assert_eq!(backup_stats.modified_files, 1, "modified files");
+        assert_eq!(backup_stats.new_files, 1, "new files");
+        assert_eq!(backup_stats.empty_files, 1, "empty files");
 
         // The empty file doesn't use any blocks, and the unchanged file doesn't produce
         // any new blocks. So, just one for the genuinely new content.

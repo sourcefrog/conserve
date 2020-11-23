@@ -152,6 +152,9 @@ pub enum Error {
     #[error("Failed to restore {:?}", path)]
     Restore { path: PathBuf, source: IOError },
 
+    #[error("Failed to restore modification time on {:?}", path)]
+    RestoreModificationTime { path: PathBuf, source: IOError },
+
     #[error("Failed to delete band {}", band_id)]
     BandDeletion { band_id: BandId, source: IOError },
 

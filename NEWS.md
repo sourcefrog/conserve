@@ -1,5 +1,11 @@
 # Conserve release history
 
+## v0.6.10 NOT RELEASED YET
+
+### Features
+
+- File modification time is restored by `conserve restore`.
+
 ## v0.6.9 2020-10-31
 
 ### Features

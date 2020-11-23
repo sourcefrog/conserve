@@ -11,7 +11,9 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Unix timestamps.
+//! Times relative to the Unix epoch.
+
+use filetime::FileTime;
 
 use std::convert::From;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -42,5 +44,11 @@ impl From<SystemTime> for UnixTime {
             }
             UnixTime { secs, nanosecs }
         }
+    }
+}
+
+impl From<UnixTime> for FileTime {
+    fn from(t: UnixTime) -> FileTime {
+        FileTime::from_unix_time(t.secs, t.nanosecs)
     }
 }
