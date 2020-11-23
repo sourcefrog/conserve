@@ -18,6 +18,7 @@ use std::io::prelude::*;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use filetime::{set_file_mtime, FileTime};
 
 use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
@@ -243,7 +244,8 @@ fn mtime_before_epoch() {
     let tf = TreeFixture::new();
     let file_path = tf.create_file("old_file");
 
-    utime::set_file_times(&file_path, -36000, -36000).expect("Failed to set file times");
+    let t1969 = FileTime::from_unix_time(-36_000, 0);
+    set_file_mtime(&file_path, t1969).expect("Failed to set file times");
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let entries = lt.iter_entries().unwrap().collect::<Vec<_>>();

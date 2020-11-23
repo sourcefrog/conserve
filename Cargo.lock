@@ -157,6 +157,7 @@ dependencies = [
  "crossterm",
  "derive_more",
  "escargot",
+ "filetime",
  "globset",
  "hex",
  "itertools",
@@ -174,7 +175,6 @@ dependencies = [
  "thiserror",
  "thousands",
  "unicode-segmentation",
- "utime",
  "walkdir 2.3.1",
 ]
 
@@ -321,6 +321,18 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "filetime"
+version = "0.2.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c122a393ea57648015bf06fbd3d372378992e86b9ff5a7a497b076a28c79efe"
+dependencies = [
+ "cfg-if 1.0.0",
+ "libc",
+ "redox_syscall",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -1030,16 +1042,6 @@ name = "unicode-xid"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7fe0bb3479651439c9112f72b6c505038574c9fbb575ed1bf3b797fa39dd564"
-
-[[package]]
-name = "utime"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91baa0c65eabd12fcbdac8cc35ff16159cab95cae96d0222d6d0271db6193cef"
-dependencies = [
- "libc",
- "winapi 0.3.9",
-]
 
 [[package]]
 name = "vec_map"
