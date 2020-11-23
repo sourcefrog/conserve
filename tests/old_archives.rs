@@ -124,6 +124,18 @@ fn restore_modify_backup() {
         )
         .expect("Backup modified tree");
 
+        // Expected results for files:
+        // "/empty" is empty and new
+        // "/subdir/subfile" is modified
+        // "/hello" is unmodified
+        for path in &["empty", "subdir/subfile", "hello"] {
+            println!(
+                "{:<20} {:?}",
+                path,
+                working_tree.child(path).path().metadata().unwrap()
+            );
+        }
+
         assert_eq!(backup_stats.files, 3);
         assert_eq!(backup_stats.unmodified_files, 1, "unmodified files");
         assert_eq!(backup_stats.modified_files, 1, "modified files");
