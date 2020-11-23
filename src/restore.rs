@@ -18,7 +18,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use filetime::set_file_mtime;
+use filetime::set_file_handle_times;
 use globset::GlobSet;
 
 use crate::band::BandSelectionPolicy;
@@ -120,10 +120,9 @@ impl tree::WriteTree for RestoreTree {
         let content = &mut from_tree.file_contents(&source_entry)?;
         let bytes_copied = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
         restore_file.flush().map_err(restore_err)?;
-        // Close file before setting the mtime.
-        drop(restore_file);
 
-        set_file_mtime(&path, source_entry.mtime().into()).map_err(|source| {
+        let mtime = Some(source_entry.mtime().into());
+        set_file_handle_times(&restore_file, mtime, mtime).map_err(|source| {
             Error::RestoreModificationTime {
                 path: path.clone(),
                 source,
