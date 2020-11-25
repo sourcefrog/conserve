@@ -130,7 +130,8 @@ fn restore_modify_backup() {
         // Expected results for files:
         // "/empty" is empty and new
         // "/subdir/subfile" is modified
-        // "/hello" is unmodified
+        // "/hello" is unmodified - but depending on the filesystem mtime resolution,
+        // it might not be recognized as such.
         for path in &["empty", "subdir/subfile", "hello"] {
             println!(
                 "{:<20} {:?}",
@@ -140,8 +141,19 @@ fn restore_modify_backup() {
         }
 
         assert_eq!(backup_stats.files, 3);
-        assert_eq!(backup_stats.unmodified_files, 1, "unmodified files");
-        assert_eq!(backup_stats.modified_files, 1, "modified files");
+        assert!(
+            backup_stats.unmodified_files == 0 || backup_stats.unmodified_files == 1,
+            "unmodified files"
+        );
+        assert!(
+            backup_stats.modified_files == 1 || backup_stats.modified_files == 2,
+            "modified files"
+        );
+        assert_eq!(
+            backup_stats.modified_files + backup_stats.unmodified_files,
+            2,
+            "total modified & unmodified"
+        );
         assert_eq!(backup_stats.new_files, 1, "new files");
         assert_eq!(backup_stats.empty_files, 1, "empty files");
 
