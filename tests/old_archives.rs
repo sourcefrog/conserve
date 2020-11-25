@@ -88,6 +88,8 @@ fn restore_old_archive() {
     }
 }
 
+/// Restore from the old archive, modify the tree, then make a backup into a copy
+/// of the old archive.
 #[test]
 fn restore_modify_backup() {
     for ver in ARCHIVE_VERSIONS {
