@@ -6,6 +6,8 @@
 
 - File modification time is restored by `conserve restore`.
 
+- `conserve backup -v` shows whether files are new, modified, etc.
+
 ## v0.6.9 2020-10-31
 
 ### Features
