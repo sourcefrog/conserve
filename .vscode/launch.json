@@ -1,0 +1,178 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'conserve'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=conserve"
+                ],
+                "filter": {
+                    "name": "conserve",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'conserve'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=conserve",
+                    "--package=conserve"
+                ],
+                "filter": {
+                    "name": "conserve",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'conserve'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=conserve",
+                    "--package=conserve"
+                ],
+                "filter": {
+                    "name": "conserve",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'gc'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=gc",
+                    "--package=conserve"
+                ],
+                "filter": {
+                    "name": "gc",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'old_archives'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=old_archives",
+                    "--package=conserve"
+                ],
+                "filter": {
+                    "name": "old_archives",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'integration'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=integration",
+                    "--package=conserve"
+                ],
+                "filter": {
+                    "name": "integration",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'backup'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=backup",
+                    "--package=conserve"
+                ],
+                "filter": {
+                    "name": "backup",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'cli'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=cli",
+                    "--package=conserve"
+                ],
+                "filter": {
+                    "name": "cli",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'damaged'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=damaged",
+                    "--package=conserve"
+                ],
+                "filter": {
+                    "name": "damaged",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
