@@ -13,7 +13,7 @@
 
 //! Read archives written by older versions.
 
-use std::fs;
+use std::fs::{self, metadata};
 use std::path::Path;
 
 use assert_fs::prelude::*;
@@ -21,6 +21,7 @@ use assert_fs::TempDir;
 use copy_dir::copy_dir;
 use predicates::prelude::*;
 
+use conserve::unix_time::UnixTime;
 use conserve::*;
 
 const ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.2", "0.6.3", "0.6.9"];
@@ -85,6 +86,20 @@ fn restore_old_archive() {
         dest.child("subdir")
             .child("subfile")
             .assert("I like Rust\n");
+
+        // Check that mtimes are restored. The sub-second times are not tested
+        // because their behavior might vary depending on the local filesystem.
+        assert_eq!(
+            UnixTime::from(
+                metadata(dest.child("hello").path())
+                    .unwrap()
+                    .modified()
+                    .unwrap()
+            )
+            .secs,
+            1592266523,
+            "mtime not restored correctly"
+        );
     }
 }
 
