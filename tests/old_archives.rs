@@ -13,7 +13,7 @@
 
 //! Read archives written by older versions.
 
-use std::fs::{self, metadata};
+use std::fs::{self, metadata, read_dir};
 use std::path::Path;
 
 use assert_fs::prelude::*;
@@ -29,6 +29,23 @@ const ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.2", "0.6.3", "0.6.9"];
 fn open_old_archive(ver: &str, name: &str) -> Archive {
     Archive::open_path(&Path::new(&format!("testdata/archive/v{}/{}/", ver, name)))
         .expect("Failed to open archive")
+}
+
+#[test]
+fn all_archive_versions_are_tested() {
+    let mut present_subdirs: Vec<String> = read_dir("testdata/archive")
+        .unwrap()
+        .map(|direntry| direntry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| n != ".gitattributes")
+        .collect();
+    present_subdirs.sort();
+    assert_eq!(
+        present_subdirs,
+        ARCHIVE_VERSIONS
+            .iter()
+            .map(|s| format!("v{}", s))
+            .collect::<Vec<String>>()
+    );
 }
 
 #[test]
