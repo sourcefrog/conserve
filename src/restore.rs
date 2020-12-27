@@ -18,7 +18,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use filetime::set_file_handle_times;
+use filetime::{set_file_handle_times, set_symlink_file_times};
 use globset::GlobSet;
 
 use crate::band::BandSelectionPolicy;
@@ -141,7 +141,13 @@ impl tree::WriteTree for RestoreTree {
         use std::os::unix::fs as unix_fs;
         if let Some(ref target) = entry.symlink_target() {
             let path = self.rooted_path(entry.apath());
-            unix_fs::symlink(target, &path).map_err(|source| Error::Restore { path, source })?;
+            if let Err(source) = unix_fs::symlink(target, &path) {
+                return Err(Error::Restore { path, source });
+            }
+            let mtime = entry.mtime().into();
+            if let Err(source) = set_symlink_file_times(&path, mtime, mtime) {
+                return Err(Error::RestoreModificationTime { path, source });
+            }
         } else {
             // TODO: Treat as an error.
             ui::problem(&format!("No target in symlink entry {}", entry.apath()));
