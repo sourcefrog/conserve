@@ -151,9 +151,10 @@ impl TreeFixture {
         unix_fs::symlink(target, self.root.join(relative_path)).unwrap();
     }
 
-    /// Symlinks are just not present on Windows.
     #[cfg(windows)]
-    pub fn create_symlink(&self, _relative_path: &str, _target: &str) {}
+    pub fn create_symlink(&self, src: &str, target: &str) {
+        std::os::windows::fs::symlink_file(self.root.join(src), target).unwrap()
+    }
 
     pub fn live_tree(&self) -> LiveTree {
         // TODO: Maybe allow deref TreeFixture to LiveTree.
@@ -175,5 +176,16 @@ impl TreeFixture {
 impl Default for TreeFixture {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn create_symlink() {
+        let tf = TreeFixture::new();
+        tf.create_symlink("src", "target");
     }
 }
