@@ -22,12 +22,11 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::blockhash::BlockHash;
-use crate::copy_tree::CopyOptions;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
-use crate::stats::{CopyStats, ValidateStats};
+use crate::stats::ValidateStats;
 use crate::stitch::IterStitchedIndexHunks;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
@@ -112,23 +111,6 @@ impl Archive {
             block_dir,
             transport,
         })
-    }
-
-    /// Restore a selected version, or by default the latest, to a destination directory.
-    pub fn restore(&self, destination_path: &Path, options: &RestoreOptions) -> Result<CopyStats> {
-        let st = self.open_stored_tree(options.band_selection.clone())?;
-        let rt = if options.overwrite {
-            RestoreTree::create_overwrite(destination_path)
-        } else {
-            RestoreTree::create(destination_path)
-        }?;
-        let opts = CopyOptions {
-            print_filenames: options.print_filenames,
-            only_subtree: options.only_subtree.clone(),
-            excludes: options.excludes.clone(),
-            ..CopyOptions::default()
-        };
-        copy_tree(&st, rt, &opts)
     }
 
     pub fn block_dir(&self) -> &BlockDir {

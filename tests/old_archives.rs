@@ -88,9 +88,8 @@ fn restore_old_archive() {
         println!("restore {} to {:?}", ver, dest.path());
 
         let archive = open_old_archive(ver, "minimal-1");
-        let restore_stats = archive
-            .restore(&dest.path(), &RestoreOptions::default())
-            .expect("restore");
+        let restore_stats =
+            restore(&archive, &dest.path(), &RestoreOptions::default()).expect("restore");
 
         assert_eq!(restore_stats.files, 2);
         assert_eq!(restore_stats.symlinks, 0);
@@ -129,9 +128,8 @@ fn restore_modify_backup() {
         println!("restore {} to {:?}", ver, working_tree.path());
 
         let archive = open_old_archive(ver, "minimal-1");
-        archive
-            .restore(&working_tree.path(), &RestoreOptions::default())
-            .expect("restore");
+
+        restore(&archive, &working_tree.path(), &RestoreOptions::default()).expect("restore");
 
         // Write back into a new copy of the archive, without modifying the
         // testdata in the source tree.

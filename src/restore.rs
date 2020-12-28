@@ -21,11 +21,12 @@ use std::path::{Path, PathBuf};
 use filetime::{set_file_handle_times, set_symlink_file_times};
 use globset::GlobSet;
 
-use crate::band::BandSelectionPolicy;
+use crate::copy_tree::copy_tree;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::stats::CopyStats;
 use crate::*;
+use crate::{band::BandSelectionPolicy, copy_tree::CopyOptions};
 
 /// Description of how to restore a tree.
 #[derive(Debug)]
@@ -49,6 +50,27 @@ impl Default for RestoreOptions {
             only_subtree: None,
         }
     }
+}
+
+/// Restore a selected version, or by default the latest, to a destination directory.
+pub fn restore(
+    archive: &Archive,
+    destination_path: &Path,
+    options: &RestoreOptions,
+) -> Result<CopyStats> {
+    let st = archive.open_stored_tree(options.band_selection.clone())?;
+    let rt = if options.overwrite {
+        RestoreTree::create_overwrite(destination_path)
+    } else {
+        RestoreTree::create(destination_path)
+    }?;
+    let opts = CopyOptions {
+        print_filenames: options.print_filenames,
+        only_subtree: options.only_subtree.clone(),
+        excludes: options.excludes.clone(),
+        ..CopyOptions::default()
+    };
+    copy_tree(&st, rt, &opts)
 }
 
 /// A write-only tree on the filesystem, as a restore destination.

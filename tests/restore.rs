@@ -12,6 +12,7 @@
 
 //! Tests focussed on restore.
 
+#[cfg(unix)]
 use std::fs::{read_link, symlink_metadata};
 use std::path::PathBuf;
 

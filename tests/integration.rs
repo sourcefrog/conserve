@@ -46,9 +46,8 @@ pub fn simple_backup() {
     assert_eq!(archive.band_exists(&BandId::zero()).unwrap(), true);
     assert_eq!(archive.band_is_closed(&BandId::zero()).unwrap(), true);
     assert_eq!(archive.band_exists(&BandId::new(&[1])).unwrap(), false);
-    let copy_stats = archive
-        .restore(&restore_dir.path(), &RestoreOptions::default())
-        .expect("restore");
+    let copy_stats =
+        restore(&archive, &restore_dir.path(), &RestoreOptions::default()).expect("restore");
 
     assert_eq!(copy_stats.uncompressed_bytes, 8);
 }
@@ -89,9 +88,8 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     assert_eq!(band_info.is_closed, true);
     assert!(band_info.end_time.is_some());
 
-    let copy_stats = archive
-        .restore(&restore_dir.path(), &RestoreOptions::default())
-        .expect("restore");
+    let copy_stats =
+        restore(&archive, &restore_dir.path(), &RestoreOptions::default()).expect("restore");
 
     assert_eq!(copy_stats.uncompressed_bytes, 8);
     // TODO: Read back contents of that file.
@@ -201,9 +199,7 @@ fn large_file() {
     // Try to restore it
     let rd = TempDir::new().unwrap();
     let restore_archive = Archive::open_path(af.path()).unwrap();
-    let _stats = restore_archive
-        .restore(rd.path(), &RestoreOptions::default())
-        .expect("restore");
+    let _stats = restore(&restore_archive, rd.path(), &RestoreOptions::default()).expect("restore");
     // TODO: Examine stats.
 
     let mut content = String::new();
@@ -313,8 +309,7 @@ pub fn empty_file_uses_zero_blocks() {
 
     // Restore it
     let dest = TempDir::new().unwrap();
-    af.restore(&dest.path(), &RestoreOptions::default())
-        .expect("restore");
+    restore(&af, &dest.path(), &RestoreOptions::default()).expect("restore");
     // TODO: Check restore stats.
     dest.child("empty").assert("");
 }
@@ -396,9 +391,7 @@ fn simple_restore() {
 
     let options = RestoreOptions::default();
     let restore_archive = Archive::open_path(&af.path()).unwrap();
-    let stats = restore_archive
-        .restore(&destdir.path(), &options)
-        .expect("restore");
+    let stats = restore(&restore_archive, &destdir.path(), &options).expect("restore");
 
     assert_eq!(stats.files, 3);
 
@@ -426,7 +419,7 @@ fn restore_specified_band() {
         band_selection: BandSelectionPolicy::Specified(band_id),
         ..RestoreOptions::default()
     };
-    let stats = archive.restore(&destdir.path(), &options).expect("restore");
+    let stats = restore(&archive, &destdir.path(), &options).expect("restore");
     // Does not have the 'hello2' file added in the second version.
     assert_eq!(stats.files, 2);
 }
@@ -455,9 +448,7 @@ pub fn forced_overwrite() {
         overwrite: true,
         ..RestoreOptions::default()
     };
-    let stats = restore_archive
-        .restore(&destdir.path(), &options)
-        .expect("restore");
+    let stats = restore(&restore_archive, &destdir.path(), &options).expect("restore");
     assert_eq!(stats.files, 3);
     let dest = &destdir.path();
     assert!(dest.join("hello").is_file());
@@ -475,9 +466,7 @@ fn exclude_files() {
         excludes: excludes::from_strings(&["/**/subfile"]).unwrap(),
         ..RestoreOptions::default()
     };
-    let stats = restore_archive
-        .restore(&destdir.path(), &options)
-        .expect("restore");
+    let stats = restore(&restore_archive, &destdir.path(), &options).expect("restore");
 
     let dest = &destdir.path();
     assert!(dest.join("hello").is_file());
