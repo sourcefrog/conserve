@@ -12,7 +12,6 @@
 
 //! Test Conserve through its public API.
 
-use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -381,98 +380,6 @@ pub fn detect_minimal_mtime_change() {
     let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
     assert_eq!(stats.files, 2);
     assert_eq!(stats.unmodified_files, 1);
-}
-
-#[test]
-fn simple_restore() {
-    let af = ScratchArchive::new();
-    af.store_two_versions();
-    let destdir = TreeFixture::new();
-
-    let options = RestoreOptions::default();
-    let restore_archive = Archive::open_path(&af.path()).unwrap();
-    let stats = restore(&restore_archive, &destdir.path(), &options).expect("restore");
-
-    assert_eq!(stats.files, 3);
-
-    let dest = &destdir.path();
-    assert!(dest.join("hello").is_file());
-    assert!(dest.join("hello2").is_file());
-    assert!(dest.join("subdir").is_dir());
-    assert!(dest.join("subdir").join("subfile").is_file());
-    if SYMLINKS_SUPPORTED {
-        let dest = fs::read_link(&dest.join("link")).unwrap();
-        assert_eq!(dest.to_string_lossy(), "target");
-    }
-
-    // TODO: Test file contents are as expected.
-}
-
-#[test]
-fn restore_specified_band() {
-    let af = ScratchArchive::new();
-    af.store_two_versions();
-    let destdir = TreeFixture::new();
-    let archive = Archive::open_path(af.path()).unwrap();
-    let band_id = BandId::new(&[0]);
-    let options = RestoreOptions {
-        band_selection: BandSelectionPolicy::Specified(band_id),
-        ..RestoreOptions::default()
-    };
-    let stats = restore(&archive, &destdir.path(), &options).expect("restore");
-    // Does not have the 'hello2' file added in the second version.
-    assert_eq!(stats.files, 2);
-}
-
-#[test]
-pub fn decline_to_overwrite() {
-    let af = ScratchArchive::new();
-    af.store_two_versions();
-    let destdir = TreeFixture::new();
-    destdir.create_file("existing");
-    let restore_err_str = RestoreTree::create(destdir.path().to_owned())
-        .unwrap_err()
-        .to_string();
-    assert!(restore_err_str.contains("Destination directory not empty"));
-}
-
-#[test]
-pub fn forced_overwrite() {
-    let af = ScratchArchive::new();
-    af.store_two_versions();
-    let destdir = TreeFixture::new();
-    destdir.create_file("existing");
-
-    let restore_archive = Archive::open_path(af.path()).unwrap();
-    let options = RestoreOptions {
-        overwrite: true,
-        ..RestoreOptions::default()
-    };
-    let stats = restore(&restore_archive, &destdir.path(), &options).expect("restore");
-    assert_eq!(stats.files, 3);
-    let dest = &destdir.path();
-    assert!(dest.join("hello").is_file());
-    assert!(dest.join("existing").is_file());
-}
-
-#[test]
-fn exclude_files() {
-    let af = ScratchArchive::new();
-    af.store_two_versions();
-    let destdir = TreeFixture::new();
-    let restore_archive = Archive::open_path(af.path()).unwrap();
-    let options = RestoreOptions {
-        overwrite: true,
-        excludes: excludes::from_strings(&["/**/subfile"]).unwrap(),
-        ..RestoreOptions::default()
-    };
-    let stats = restore(&restore_archive, &destdir.path(), &options).expect("restore");
-
-    let dest = &destdir.path();
-    assert!(dest.join("hello").is_file());
-    assert!(dest.join("hello2").is_file());
-    assert!(dest.join("subdir").is_dir());
-    assert_eq!(stats.files, 2);
 }
 
 #[test]
