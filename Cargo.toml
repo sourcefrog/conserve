@@ -21,7 +21,7 @@ test = false
 [dependencies]
 blake2-rfc = "0.2.18"
 chrono = "0.4.11"
-crossterm = "0.18"
+crossterm = "0.19"
 derive_more = "0.99.7"
 filetime = "0.2"
 globset = "0.4.5"

@@ -162,7 +162,7 @@ impl UIState {
         } else {
             return;
         };
-        bar.draw(&mut io::stdout(), width);
+        bar.draw(width);
         self.progress_present = true;
     }
 

@@ -14,6 +14,7 @@
 //! Progress bars.
 
 use std::fmt::Write;
+use std::io::Write as IoWrite;
 use std::time::{Duration, Instant};
 
 use crossterm::{cursor, queue, style, terminal};
@@ -126,7 +127,7 @@ impl ProgressBar {
         Some(elapsed.mul_f64((100f64 - percent_done) / percent_done))
     }
 
-    pub(crate) fn draw(&self, out: &mut dyn std::io::Write, width: usize) {
+    pub(crate) fn draw(&self, width: usize) {
         let mut prefix = String::with_capacity(50);
         if !self.phase.is_empty() {
             write!(prefix, "{} ", self.phase).unwrap();
@@ -183,6 +184,7 @@ impl ProgressBar {
                 .collect::<String>()
         };
 
+	let mut out = std::io::stdout();
         queue!(out, cursor::Hide, cursor::MoveToColumn(0),).unwrap();
         if !prefix.is_empty() {
             queue!(
