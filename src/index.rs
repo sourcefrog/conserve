@@ -191,7 +191,7 @@ impl IndexWriter {
         if self.entries.is_empty() {
             return Ok(());
         }
-        self.entries.sort_by(|a, b| {
+        self.entries.sort_unstable_by(|a, b| {
             debug_assert!(a.apath != b.apath);
             a.apath.cmp(&b.apath)
         });
@@ -516,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn index_builder_sorts_entries() {
+    fn index_builder_sortsntries() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/zzz"));
         ib.push_entry(sample_entry("/aaa"));
