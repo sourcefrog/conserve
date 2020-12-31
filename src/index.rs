@@ -140,7 +140,7 @@ pub struct IndexWriter {
     /// The last filename from the previous hunk, to enforce ordering. At the
     /// start of the first hunk this is empty; at the start of a later hunk it's
     /// the last path from the previous hunk.
-    check_order: apath::CheckOrder,
+    check_order: apath::DebugCheckOrder,
 
     /// Statistics about work done while writing this index.
     pub stats: IndexWriterStats,
@@ -156,7 +156,7 @@ impl IndexWriter {
             transport,
             entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
             sequence: 0,
-            check_order: apath::CheckOrder::new(),
+            check_order: apath::DebugCheckOrder::new(),
             stats: IndexWriterStats::default(),
             compressor: Compressor::new(),
         }
@@ -532,6 +532,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(debug_assertions)]
     #[should_panic]
     fn no_duplicate_paths() {
         let (_testdir, mut ib) = setup();
@@ -541,6 +542,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(debug_assertions)]
     #[should_panic]
     fn no_duplicate_paths_across_hunks() {
         let (_testdir, mut ib) = setup();

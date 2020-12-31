@@ -259,6 +259,41 @@ impl CheckOrder {
     }
 }
 
+#[cfg(debug_assertions)]
+#[derive(Debug, Default)]
+pub struct DebugCheckOrder (
+    CheckOrder
+);
+
+#[cfg(debug_assertions)]
+impl DebugCheckOrder {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> DebugCheckOrder {
+        DebugCheckOrder ( CheckOrder::new())
+    }
+
+    pub fn check(&mut self, apath: &Apath) {
+        self.0.check(apath)
+    }
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Debug, Default)]
+pub struct DebugCheckOrder (
+);
+
+#[cfg(not(debug_assertions))]
+impl DebugCheckOrder {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> DebugCheckOrder {
+        DebugCheckOrder ()
+    }
+
+    pub fn check(&mut self, _apath: &Apath) {
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::Apath;

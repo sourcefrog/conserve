@@ -159,7 +159,7 @@ pub struct Iter {
     entry_deque: VecDeque<LiveEntry>,
 
     /// Check that emitted paths are in the right order.
-    check_order: apath::CheckOrder,
+    check_order: apath::DebugCheckOrder,
 
     /// glob pattern to skip in iterator
     excludes: Option<GlobSet>,
@@ -189,7 +189,7 @@ impl Iter {
             root_path: root_path.to_path_buf(),
             entry_deque,
             dir_deque,
-            check_order: apath::CheckOrder::new(),
+            check_order: apath::DebugCheckOrder::new(),
             excludes,
             stats: LiveTreeIterStats::default(),
         })
