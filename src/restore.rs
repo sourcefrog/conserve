@@ -25,6 +25,7 @@ use crate::copy_tree::copy_tree;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::stats::CopyStats;
+use crate::unix_time::UnixTime;
 use crate::*;
 use crate::{band::BandSelectionPolicy, copy_tree::CopyOptions};
 
@@ -77,9 +78,18 @@ pub fn restore(
 #[derive(Debug)]
 pub struct RestoreTree {
     path: PathBuf,
+
+    dir_mtimes: Vec<(PathBuf, UnixTime)>,
 }
 
 impl RestoreTree {
+    fn new(path: PathBuf) -> RestoreTree {
+        RestoreTree {
+            path,
+            dir_mtimes: Vec::new(),
+        }
+    }
+
     /// Create a RestoreTree.
     ///
     /// The destination must either not yet exist, or be an empty directory.
@@ -87,16 +97,14 @@ impl RestoreTree {
         let path = path.into();
         match ensure_dir_exists(&path).and_then(|()| directory_is_empty(&path)) {
             Err(source) => Err(Error::Restore { path, source }),
-            Ok(true) => Ok(RestoreTree { path }),
+            Ok(true) => Ok(RestoreTree::new(path)),
             Ok(false) => Err(Error::DestinationNotEmpty { path }),
         }
     }
 
     /// Create a RestoreTree, even if the destination directory is not empty.
     pub fn create_overwrite(path: &Path) -> Result<RestoreTree> {
-        Ok(RestoreTree {
-            path: path.to_path_buf(),
-        })
+        Ok(RestoreTree::new(path.to_path_buf()))
     }
 
     fn rooted_path(&self, apath: &Apath) -> PathBuf {
@@ -107,22 +115,23 @@ impl RestoreTree {
 
 impl tree::WriteTree for RestoreTree {
     fn finish(self) -> Result<CopyStats> {
-        // Live tree doesn't need to be finished.
+        for (path, time) in self.dir_mtimes {
+            if let Err(err) = filetime::set_file_mtime(path, time.into()) {
+                ui::problem(&format!("Failed to set directory mtime: {:?}", err));
+            }
+        }
         Ok(CopyStats::default())
     }
 
     fn copy_dir<E: Entry>(&mut self, entry: &E) -> Result<()> {
         let path = self.rooted_path(entry.apath());
-        match fs::create_dir_all(&path) {
-            Ok(()) => Ok(()),
-            Err(source) => {
-                if source.kind() == io::ErrorKind::AlreadyExists {
-                    Ok(())
-                } else {
-                    Err(Error::Restore { path, source })
-                }
+        if let Err(source) = fs::create_dir_all(&path) {
+            if source.kind() != io::ErrorKind::AlreadyExists {
+                return Err(Error::Restore { path, source });
             }
         }
+        self.dir_mtimes.push((path, entry.mtime()));
+        Ok(())
     }
 
     /// Copy in the contents of a file from another tree.

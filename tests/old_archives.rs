@@ -105,17 +105,20 @@ fn restore_old_archive() {
 
         // Check that mtimes are restored. The sub-second times are not tested
         // because their behavior might vary depending on the local filesystem.
-        assert_eq!(
-            UnixTime::from(
-                metadata(dest.child("hello").path())
-                    .unwrap()
-                    .modified()
-                    .unwrap()
-            )
-            .secs,
-            1592266523,
-            "mtime not restored correctly"
+        let file_mtime = UnixTime::from(
+            metadata(dest.child("hello").path())
+                .unwrap()
+                .modified()
+                .unwrap(),
         );
+        assert_eq!(file_mtime.secs, 1592266523, "mtime not restored correctly");
+        let dir_mtime = UnixTime::from(
+            metadata(dest.child("subdir").path())
+                .unwrap()
+                .modified()
+                .unwrap(),
+        );
+        assert_eq!(dir_mtime.secs, 1592266523,);
     }
 }
 

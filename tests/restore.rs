@@ -133,8 +133,7 @@ fn restore_symlink() {
     backup(&af, &srcdir.live_tree(), &Default::default()).unwrap();
 
     let restore_dir = TempDir::new().unwrap();
-    restore(&af, &restore_dir.path(), &Default::default())
-        .unwrap();
+    restore(&af, &restore_dir.path(), &Default::default()).unwrap();
 
     let restored_symlink_path = restore_dir.path().join("symlink");
     let sym_meta = symlink_metadata(&restored_symlink_path).unwrap();

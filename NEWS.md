@@ -4,7 +4,8 @@
 
 ### Features
 
-- File and symlink modification time is restored by `conserve restore`.
+- File, directory and symlink modification times are restored by
+  `conserve restore`.
 
 - `conserve backup -v` shows whether files are new, modified, etc.
 
