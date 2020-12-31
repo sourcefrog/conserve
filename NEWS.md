@@ -1,5 +1,7 @@
 # Conserve release history
 
+## v0.6.11 NOT RELEASED YET
+
 ## v0.6.10 2020-12-30
 
 ### Features
