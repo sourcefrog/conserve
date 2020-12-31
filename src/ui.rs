@@ -19,8 +19,9 @@ use std::io::Write as IoWrite;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crossterm::{cursor, queue, terminal};
+use crossterm::{cursor, queue, style, terminal};
 use lazy_static::lazy_static;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::stats::Sizes;
 use crate::ProgressBar;
@@ -162,7 +163,46 @@ impl UIState {
         } else {
             return;
         };
-        bar.draw(width);
+
+        let mut out = std::io::stdout();
+        let prefix = bar.render_prefix();
+        let completion = bar.render_completion();
+        let filename = bar.render_filename();
+        let filename_limit = width - prefix.len() - completion. len();
+        let truncated_filename = if filename.len() < filename_limit {
+            filename
+        } else {
+            UnicodeSegmentation::graphemes(filename.as_str(), true)
+                .take(filename_limit)
+                .collect::<String>()
+        };
+
+        queue!(out, cursor::Hide, cursor::MoveToColumn(0),).unwrap();
+        if !prefix.is_empty() {
+            queue!(
+                out,
+                style::SetForegroundColor(style::Color::Green),
+                style::Print(prefix),
+            )
+            .unwrap();
+        }
+        if !completion. is_empty() {
+            queue!(
+                out,
+                style::SetForegroundColor(style::Color::Cyan),
+                style::Print(completion) ,
+            )
+            .unwrap();
+        }
+        queue!(
+            out,
+            style::ResetColor,
+            style::Print(truncated_filename),
+            terminal::Clear(terminal::ClearType::UntilNewLine),
+            cursor::Show,
+        )
+        .unwrap();
+        out.flush().unwrap();
         self.progress_present = true;
     }
 

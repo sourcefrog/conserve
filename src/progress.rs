@@ -14,12 +14,9 @@
 //! Progress bars.
 
 use std::fmt::Write;
-use std::io::Write as IoWrite;
 use std::time::{Duration, Instant};
 
-use crossterm::{cursor, queue, style, terminal};
 use thousands::Separable;
-use unicode_segmentation::UnicodeSegmentation;
 
 use crate::ui::with_locked_ui;
 
@@ -127,15 +124,13 @@ impl ProgressBar {
         Some(elapsed.mul_f64((100f64 - percent_done) / percent_done))
     }
 
-    pub(crate) fn draw(&self, width: usize) {
+    pub(crate) fn render_prefix(&self) -> String {
         let mut prefix = String::with_capacity(50);
         if !self.phase.is_empty() {
             write!(prefix, "{} ", self.phase).unwrap();
         }
-        let mut work_percent = None;
         if self.total_work > 0 {
             if self.work_done > 0 {
-                work_percent = Some(100f64 * self.work_done as f64 / self.total_work as f64);
                 write!(
                     prefix,
                     "{}/{} ",
@@ -158,60 +153,32 @@ impl ProgressBar {
             )
             .unwrap();
         }
+        prefix
+    }
 
-        let percent = self.percent.or(work_percent);
-        let percent_str = if let Some(percent) = percent {
-            format!("{:>4.1}% ", percent)
+    fn percent(&self) -> Option<f64> {
+        if self.percent.is_some() {
+            self.percent
+        } else if self.total_work > 0 && self.work_done > 0 {
+            Some(100f64 * self.work_done as f64 / self.total_work as f64)
         } else {
-            String::new()
-        };
-        let remaining_str = percent
-            .and_then(|p| self.estimate_remaining(p))
-            .map(|dur| format!("{} remaining ", duration_brief(dur)))
-            .unwrap_or_default();
-
-        let mut message = String::with_capacity(200);
-        if !self.filename.is_empty() {
-            write!(message, "{}", self.filename).unwrap();
+            None
         }
+    }
 
-        let message_limit = width - prefix.len() - percent_str.len() - remaining_str.len();
-        let truncated_message = if message.len() < message_limit {
-            message
-        } else {
-            UnicodeSegmentation::graphemes(message.as_str(), true)
-                .take(message_limit)
-                .collect::<String>()
-        };
+    pub(crate) fn render_completion(&self) -> String {
+        let mut percent_str = String::with_capacity(20);
+        if let Some(percent) = self.percent() {
+            write!(percent_str, "{:>4.1}% ", percent).unwrap();
+            if let Some(remaining) = self.estimate_remaining(percent) {
+                write!(percent_str, "{} remaining ", duration_brief(remaining)).unwrap();
+            }
+        }
+        percent_str
+    }
 
-	let mut out = std::io::stdout();
-        queue!(out, cursor::Hide, cursor::MoveToColumn(0),).unwrap();
-        if !prefix.is_empty() {
-            queue!(
-                out,
-                style::SetForegroundColor(style::Color::Green),
-                style::Print(prefix),
-            )
-            .unwrap();
-        }
-        if !percent_str.is_empty() {
-            queue!(
-                out,
-                style::SetForegroundColor(style::Color::Cyan),
-                style::Print(percent_str),
-                style::Print(remaining_str),
-            )
-            .unwrap();
-        }
-        queue!(
-            out,
-            style::ResetColor,
-            style::Print(truncated_message),
-            terminal::Clear(terminal::ClearType::UntilNewLine),
-            cursor::Show,
-        )
-        .unwrap();
-        out.flush().unwrap();
+    pub(crate) fn render_filename(&self) -> String {
+        self.filename.clone()
     }
 }
 
