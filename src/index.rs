@@ -516,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn index_builder_sortsntries() {
+    fn index_builder_sorts_entries() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/zzz"));
         ib.push_entry(sample_entry("/aaa"));
