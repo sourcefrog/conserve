@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -67,7 +67,7 @@ pub use crate::merge::{MergeTrees, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
 pub use crate::progress::ProgressBar;
 pub use crate::restore::{restore, RestoreOptions, RestoreTree};
-pub use crate::stats::{CopyStats, DeleteStats, ValidateStats};
+pub use crate::stats::{BackupStats, CopyStats, DeleteStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::Transport;
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};

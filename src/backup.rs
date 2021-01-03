@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ use itertools::Itertools;
 
 use crate::blockdir::Address;
 use crate::io::read_with_retries;
-use crate::stats::CopyStats;
+use crate::stats::BackupStats;
 use crate::tree::ReadTree;
 use crate::*;
 
@@ -63,9 +63,13 @@ impl Default for BackupOptions {
 /// Backup a source directory into a new band in the archive.
 ///
 /// Returns statistics about what was copied.
-pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> Result<CopyStats> {
+pub fn backup(
+    archive: &Archive,
+    source: &LiveTree,
+    options: &BackupOptions,
+) -> Result<BackupStats> {
     let mut writer = BackupWriter::begin(archive, options.clone())?;
-    let mut stats = CopyStats::default();
+    let mut stats = BackupStats::default();
     let mut progress_bar = ProgressBar::new();
 
     progress_bar.set_phase("Copying".to_owned());
@@ -91,7 +95,7 @@ pub fn backup(archive: &Archive, source: &LiveTree, options: &BackupOptions) -> 
 struct BackupWriter {
     band: Band,
     index_builder: IndexWriter,
-    stats: CopyStats,
+    stats: BackupStats,
     block_dir: BlockDir,
 
     /// The index for the last stored band, used as hints for whether newly
@@ -121,17 +125,17 @@ impl BackupWriter {
             band,
             index_builder,
             block_dir: archive.block_dir().clone(),
-            stats: CopyStats::default(),
+            stats: BackupStats::default(),
             basis_index,
             file_combiner: FileCombiner::new(archive.block_dir().clone()),
             options,
         })
     }
 
-    fn finish(self) -> Result<CopyStats> {
+    fn finish(self) -> Result<BackupStats> {
         let index_builder_stats = self.index_builder.finish()?;
         self.band.close(index_builder_stats.index_hunks as u64)?;
-        Ok(CopyStats {
+        Ok(BackupStats {
             index_builder_stats,
             ..self.stats
         })
@@ -241,7 +245,7 @@ fn store_file_content(
     apath: &Apath,
     from_file: &mut dyn Read,
     block_dir: &mut BlockDir,
-    stats: &mut CopyStats,
+    stats: &mut BackupStats,
 ) -> Result<Vec<Address>> {
     let mut buffer = Vec::new();
     let mut addresses = Vec::<Address>::with_capacity(1);
@@ -280,7 +284,7 @@ struct FileCombiner {
     queue: Vec<QueuedFile>,
     /// Entries for files that have been written to the blockdir, and that have complete addresses.
     finished: Vec<IndexEntry>,
-    stats: CopyStats,
+    stats: BackupStats,
     block_dir: BlockDir,
 }
 
@@ -305,18 +309,18 @@ impl FileCombiner {
             buf: Vec::new(),
             queue: Vec::new(),
             finished: Vec::new(),
-            stats: CopyStats::default(),
+            stats: BackupStats::default(),
         }
     }
 
     /// Flush any pending files, and return accumulated file entries and stats.
     /// The FileCombiner is then empty and ready for reuse.
-    fn drain(&mut self) -> Result<(CopyStats, Vec<IndexEntry>)> {
+    fn drain(&mut self) -> Result<(BackupStats, Vec<IndexEntry>)> {
         self.flush()?;
         debug_assert!(self.queue.is_empty());
         debug_assert!(self.buf.is_empty());
         let stats = self.stats.clone();
-        self.stats = CopyStats::default();
+        self.stats = BackupStats::default();
         let finished = self.finished.drain(..).collect();
         debug_assert!(self.finished.is_empty());
         Ok((stats, finished))
@@ -434,7 +438,7 @@ mod tests {
 
         assert_eq!(block_dir.contains(&expected_hash).unwrap(), false);
 
-        let mut stats = CopyStats::default();
+        let mut stats = BackupStats::default();
         let addrs = store_file_content(
             &Apath::from("/hello"),
             &mut example_file,
@@ -496,7 +500,7 @@ mod tests {
             &"/hello".into(),
             &mut Cursor::new(b"0123456789abcdef"),
             &mut block_dir,
-            &mut CopyStats::default(),
+            &mut BackupStats::default(),
         )
         .unwrap();
         assert_eq!(addrs.len(), 1);
@@ -526,7 +530,7 @@ mod tests {
             &"/hello".into(),
             &mut Cursor::new(b"0123456789abcdef"),
             &mut block_dir,
-            &mut CopyStats::default(),
+            &mut BackupStats::default(),
         )
         .unwrap();
         assert_eq!(addrs.len(), 1);
@@ -570,7 +574,7 @@ mod tests {
         let (_testdir, mut block_dir) = setup();
 
         let mut example_file = make_example_file();
-        let mut stats = CopyStats::default();
+        let mut stats = BackupStats::default();
         let addrs1 = store_file_content(
             &Apath::from("/ello"),
             &mut example_file,
@@ -584,7 +588,7 @@ mod tests {
         assert_eq!(stats.compressed_bytes, 8);
 
         let mut example_file = make_example_file();
-        let mut stats2 = CopyStats::default();
+        let mut stats2 = BackupStats::default();
         let addrs2 = store_file_content(
             &Apath::from("/ello2"),
             &mut example_file,
@@ -618,7 +622,7 @@ mod tests {
         assert_eq!(tf_len, TOTAL_SIZE);
         tf.seek(SeekFrom::Start(0)).unwrap();
 
-        let mut stats = CopyStats::default();
+        let mut stats = BackupStats::default();
         let addrs =
             store_file_content(&Apath::from("/big"), &mut tf, &mut block_dir, &mut stats).unwrap();
 

@@ -168,7 +168,7 @@ impl UIState {
         let prefix = bar.render_prefix();
         let completion = bar.render_completion();
         let filename = bar.render_filename();
-        let filename_limit = width - prefix.len() - completion. len();
+        let filename_limit = width - prefix.len() - completion.len();
         let truncated_filename = if filename.len() < filename_limit {
             filename
         } else {
@@ -186,11 +186,11 @@ impl UIState {
             )
             .unwrap();
         }
-        if !completion. is_empty() {
+        if !completion.is_empty() {
             queue!(
                 out,
                 style::SetForegroundColor(style::Color::Cyan),
-                style::Print(completion) ,
+                style::Print(completion),
             )
             .unwrap();
         }

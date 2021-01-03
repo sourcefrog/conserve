@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -11,6 +11,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+use std::fmt;
 use std::io;
 
 use derive_more::{Add, AddAssign};
@@ -29,6 +30,29 @@ fn ratio(uncompressed: u64, compressed: u64) -> f64 {
     } else {
         0f64
     }
+}
+
+fn write_size<I: Into<u64>>(w: &mut fmt::Formatter<'_>, label: &str, value: I) {
+    writeln!(w, "{:>12} MB   {}", mb_string(value.into()), label).unwrap();
+}
+
+fn write_compressed_size(w: &mut fmt::Formatter<'_>, compressed: u64, uncompressed: u64) {
+    write_size(w, "uncompressed", uncompressed);
+    write_size(
+        w,
+        &format!("after {:.1}x compression", ratio(uncompressed, compressed)),
+        compressed,
+    );
+}
+
+fn write_count<I: Into<usize>>(w: &mut fmt::Formatter<'_>, label: &str, value: I) {
+    writeln!(
+        w,
+        "{:>12}      {}",
+        value.into().separate_with_commas(),
+        label
+    )
+    .unwrap();
 }
 
 /// Describes sizes of data read or written, with both the
@@ -144,29 +168,6 @@ pub struct CopyStats {
     // TODO: Include elapsed time.
 }
 
-fn write_size<I: Into<u64>>(w: &mut dyn io::Write, label: &str, value: I) {
-    writeln!(w, "{:>12} MB   {}", mb_string(value.into()), label).unwrap();
-}
-
-fn write_compressed_size(w: &mut dyn io::Write, compressed: u64, uncompressed: u64) {
-    write_size(w, "uncompressed", uncompressed);
-    write_size(
-        w,
-        &format!("after {:.1}x compression", ratio(uncompressed, compressed)),
-        compressed,
-    );
-}
-
-fn write_count<I: Into<usize>>(w: &mut dyn io::Write, label: &str, value: I) {
-    writeln!(
-        w,
-        "{:>12}      {}",
-        value.into().separate_with_commas(),
-        label
-    )
-    .unwrap();
-}
-
 impl CopyStats {
     pub fn summarize_restore(&self, _to_stream: &mut dyn io::Write) -> Result<()> {
         // format!(
@@ -194,9 +195,46 @@ impl CopyStats {
         //     duration_to_hms(self.elapsed_time()),
         Ok(())
     }
+}
 
-    pub fn summarize_backup(&self, w: &mut dyn io::Write) {
-        // TODO: Perhaps summarize to a string, or make this the Display impl.
+#[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
+pub struct BackupStats {
+    // TODO: Have separate more-specific stats for backup and restore, and then
+    // each can have a single Display method.
+    // TODO: Include source file bytes, including unmodified files.
+    pub files: usize,
+    pub symlinks: usize,
+    pub directories: usize,
+    pub unknown_kind: usize,
+
+    pub unmodified_files: usize,
+    pub modified_files: usize,
+    pub new_files: usize,
+
+    /// Bytes that matched an existing block.
+    pub deduplicated_bytes: u64,
+    /// Bytes that were stored as new blocks, before compression.
+    pub uncompressed_bytes: u64,
+    pub compressed_bytes: u64,
+
+    pub deduplicated_blocks: usize,
+    pub written_blocks: usize,
+    /// Blocks containing combined small files.
+    pub combined_blocks: usize,
+
+    pub empty_files: usize,
+    pub small_combined_files: usize,
+    pub single_block_files: usize,
+    pub multi_block_files: usize,
+
+    pub errors: usize,
+
+    pub index_builder_stats: IndexWriterStats,
+    // TODO: Include elapsed time.
+}
+
+impl fmt::Display for BackupStats {
+    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
         write_count(w, "files:", self.files);
         write_count(w, "  unmodified files", self.unmodified_files);
         write_count(w, "  modified files", self.modified_files);
@@ -227,6 +265,8 @@ impl CopyStats {
         writeln!(w).unwrap();
 
         write_count(w, "errors", self.errors);
+
+        Ok(())
     }
 }
 

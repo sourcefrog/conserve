@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@ use thousands::Separable;
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::stats::{Sizes, ValidateStats};
+use crate::stats::{BackupStats, Sizes, ValidateStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
 use crate::*;
@@ -134,7 +134,7 @@ impl BlockDir {
     pub(crate) fn store_or_deduplicate(
         &mut self,
         block_data: &[u8],
-        stats: &mut CopyStats,
+        stats: &mut BackupStats,
     ) -> Result<BlockHash> {
         let hash = self.hash_bytes(block_data)?;
         if self.contains(&hash)? {

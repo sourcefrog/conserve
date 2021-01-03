@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -210,9 +210,8 @@ impl Command {
                     excludes,
                     ..Default::default()
                 };
-                let copy_stats = backup(&Archive::open_path(archive)?, &source, &options)?;
-                ui::println("Backup complete.");
-                copy_stats.summarize_backup(&mut stdout);
+                let stats = backup(&Archive::open_path(archive)?, &source, &options)?;
+                ui::println(&format!("Backup complete.\n{}", stats));
             }
             Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
