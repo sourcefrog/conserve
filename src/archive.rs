@@ -13,7 +13,7 @@
 
 //! Archives holding backup material.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::io::ErrorKind;
 use std::path::Path;
 use std::sync::Mutex;
@@ -199,7 +199,7 @@ impl Archive {
     /// Returns all blocks referenced by all bands.
     ///
     /// Shows a progress bar as they're collected.
-    pub fn referenced_blocks(&self) -> Result<BTreeSet<BlockHash>> {
+    pub fn referenced_blocks(&self) -> Result<HashSet<BlockHash>> {
         self.iter_referenced_blocks().map(Iterator::collect)
     }
 
@@ -251,7 +251,7 @@ impl Archive {
             gc_lock::GarbageCollectionLock::new(self)?
         };
 
-        let mut blocks: BTreeSet<BlockHash> = self.iter_present_blocks()?.collect();
+        let mut blocks: HashSet<BlockHash> = self.iter_present_blocks()?.collect();
         for block_hash in self.iter_referenced_blocks()? {
             // NOTE: We could potentially notice here blocks that are missing: referenced but
             // not present. However, because the reference iter can contain duplicates,
@@ -394,7 +394,7 @@ impl Archive {
         }
         remove_item(&mut dirs, &BLOCK_DIR);
         dirs.sort();
-        let mut bs = BTreeSet::<BandId>::new();
+        let mut bs = HashSet::<BandId>::new();
         for d in dirs.iter() {
             if let Ok(b) = d.parse() {
                 if bs.contains(&b) {
