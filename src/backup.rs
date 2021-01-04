@@ -165,6 +165,7 @@ impl BackupWriter {
         }
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         if self.options.print_filenames {
             crate::ui::println(&format!("{}/", source_entry.apath()));
@@ -228,6 +229,7 @@ impl BackupWriter {
         Ok(())
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         let target = source_entry.symlink_target().clone();
         self.stats.symlinks += 1;
