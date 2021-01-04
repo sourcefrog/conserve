@@ -1,4 +1,4 @@
-// Copyright 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2017, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -82,11 +82,8 @@ impl StoredTree {
     }
 
     /// Open a file stored within this tree.
-    fn open_stored_file(&self, entry: &IndexEntry) -> Result<StoredFile> {
-        Ok(StoredFile::open(
-            self.block_dir.clone(),
-            entry.addrs.clone(),
-        ))
+    fn open_stored_file(&self, entry: &IndexEntry) -> StoredFile {
+        StoredFile::open(self.block_dir.clone(), entry.addrs.clone())
     }
 }
 
@@ -104,7 +101,7 @@ impl ReadTree for StoredTree {
     }
 
     fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R> {
-        Ok(self.open_stored_file(entry)?.into_read())
+        Ok(self.open_stored_file(entry).into_read())
     }
 
     fn estimate_count(&self) -> Result<u64> {

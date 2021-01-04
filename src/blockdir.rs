@@ -136,7 +136,7 @@ impl BlockDir {
         block_data: &[u8],
         stats: &mut BackupStats,
     ) -> Result<BlockHash> {
-        let hash = self.hash_bytes(block_data)?;
+        let hash = self.hash_bytes(block_data);
         if self.contains(&hash)? {
             stats.deduplicated_blocks += 1;
             stats.deduplicated_bytes += block_data.len() as u64;
@@ -335,9 +335,9 @@ impl BlockDir {
         Ok((decompressor.take_buffer(), sizes))
     }
 
-    pub(crate) fn hash_bytes(&self, in_buf: &[u8]) -> Result<BlockHash> {
+    fn hash_bytes(&self, in_buf: &[u8]) -> BlockHash {
         let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
         hasher.update(in_buf);
-        Ok(BlockHash::from(hasher.finalize()))
+        BlockHash::from(hasher.finalize())
     }
 }
