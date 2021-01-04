@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -185,6 +185,12 @@ impl ProgressBar {
 impl Drop for ProgressBar {
     fn drop(&mut self) {
         with_locked_ui(|ui| ui.clear_progress())
+    }
+}
+
+impl Default for ProgressBar {
+    fn default() -> Self {
+        ProgressBar::new()
     }
 }
 
