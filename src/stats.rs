@@ -279,3 +279,21 @@ pub struct DeleteStats {
     pub deletion_errors: usize,
     pub deleted_block_count: usize,
 }
+
+impl fmt::Display for DeleteStats {
+    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(w, "deletion stats",)?;
+
+        write_count(w, "bands deleted", self.deleted_band_count);
+        writeln!(w)?;
+
+        write_count(w, "unreferenced blocks", self.unreferenced_block_count);
+        write_size(w, "  unreferenced", self.unreferenced_block_bytes);
+        write_count(w, "  deleted", self.deleted_block_count);
+        writeln!(w)?;
+
+        write_count(w, "deletion errors", self.deletion_errors);
+
+        Ok(())
+    }
+}

@@ -250,7 +250,7 @@ impl Command {
                         no_gc: *no_gc,
                     },
                 )?;
-                ui::println(&format!("{:#?}", stats));
+                ui::println(&format!("{}", stats));
             }
             Command::Diff {
                 archive,

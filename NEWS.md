@@ -6,6 +6,8 @@
 
 - Performance improvements in backup and restore.
 
+- Better display of deletion stats.
+
 ## v0.6.10 2020-12-30
 
 ### Features
