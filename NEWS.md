@@ -2,6 +2,8 @@
 
 ## v0.6.11 NOT RELEASED YET
 
+- Fix the displayed count of blocks written in backup stats.
+
 - Performance improvements in backup and restore.
 
 ## v0.6.10 2020-12-30

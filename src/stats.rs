@@ -244,17 +244,18 @@ impl fmt::Display for BackupStats {
         write_count(w, "unsupported file kind", self.unknown_kind);
         writeln!(w).unwrap();
 
-        write_count(w, "empty files", self.empty_files);
-        write_count(w, "small combined files", self.small_combined_files);
-        write_count(w, "single block files", self.single_block_files);
-        write_count(w, "multi-block files", self.multi_block_files);
+        write_count(w, "files stored:", self.new_files + self.modified_files);
+        write_count(w, "  empty files", self.empty_files);
+        write_count(w, "  small combined files", self.small_combined_files);
+        write_count(w, "  single block files", self.single_block_files);
+        write_count(w, "  multi-block files", self.multi_block_files);
         writeln!(w).unwrap();
 
-        write_count(w, "deduplicated data blocks:", self.deduplicated_blocks);
+        write_count(w, "data blocks deduplicated:", self.deduplicated_blocks);
         write_size(w, "  saved", self.deduplicated_bytes);
         writeln!(w).unwrap();
 
-        write_count(w, "new data blocks:", self.deduplicated_blocks);
+        write_count(w, "new data blocks written:", self.written_blocks);
         write_count(w, "  blocks of combined files", self.combined_blocks);
         write_compressed_size(w, self.compressed_bytes, self.uncompressed_bytes);
         writeln!(w).unwrap();
