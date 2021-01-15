@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::ErrorKind;
 use std::path::Path;
 use std::sync::Mutex;
+use std::time::Instant;
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -245,6 +246,7 @@ impl Archive {
     pub fn delete_unreferenced(&self, options: &DeleteOptions) -> Result<DeleteStats> {
         let block_dir = self.block_dir();
         let mut stats = DeleteStats::default();
+        let start = Instant::now();
         let delete_guard = if options.break_lock {
             gc_lock::GarbageCollectionLock::break_lock(self)?
         } else {
@@ -288,16 +290,18 @@ impl Archive {
             stats.deleted_block_count += blocks.len() - error_count;
         }
 
+        stats.elapsed = start.elapsed();
         Ok(stats)
     }
 
-    /// Delete bands, and the blocks that they referenec.
+    /// Delete bands, and the blocks that they reference.
     pub fn delete_bands(
         &self,
         band_ids: &[BandId],
         options: &DeleteOptions,
     ) -> Result<DeleteStats> {
         let mut stats = DeleteStats::default();
+        let start = Instant::now();
         for band_id in band_ids {
             if !options.dry_run {
                 Band::delete(self, band_id).map(|()| stats.deleted_band_count += 1)?
@@ -306,6 +310,7 @@ impl Archive {
         if !options.no_gc {
             stats += self.delete_unreferenced(options)?;
         }
+        stats.elapsed = start.elapsed();
         Ok(stats)
     }
 

@@ -13,10 +13,12 @@
 
 use std::fmt;
 use std::io;
+use std::time::Duration;
 
 use derive_more::{Add, AddAssign};
 use thousands::Separable;
 
+use crate::ui::duration_to_hms;
 use crate::*;
 
 pub fn mb_string(s: u64) -> String {
@@ -53,6 +55,10 @@ fn write_count<I: Into<usize>>(w: &mut fmt::Formatter<'_>, label: &str, value: I
         label
     )
     .unwrap();
+}
+
+fn write_duration(w: &mut fmt::Formatter<'_>, label: &str, duration: Duration) -> fmt::Result {
+    writeln!(w, "{:>12}      {}", duration_to_hms(duration), label)
 }
 
 /// Describes sizes of data read or written, with both the
@@ -278,6 +284,7 @@ pub struct DeleteStats {
     pub unreferenced_block_bytes: u64,
     pub deletion_errors: usize,
     pub deleted_block_count: usize,
+    pub elapsed: Duration,
 }
 
 impl fmt::Display for DeleteStats {
@@ -293,6 +300,9 @@ impl fmt::Display for DeleteStats {
         writeln!(w)?;
 
         write_count(w, "deletion errors", self.deletion_errors);
+        writeln!(w)?;
+
+        write_duration(w, "elapsed", self.elapsed)?;
 
         Ok(())
     }

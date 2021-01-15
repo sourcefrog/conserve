@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -50,6 +50,7 @@ fn unreferenced_blocks() {
             deletion_errors: 0,
             deleted_block_count: 0,
             deleted_band_count: 0,
+            elapsed: delete_stats.elapsed,
         }
     );
 
@@ -68,6 +69,7 @@ fn unreferenced_blocks() {
             deletion_errors: 0,
             deleted_block_count: 1,
             deleted_band_count: 0,
+            elapsed: delete_stats.elapsed,
         }
     );
 
@@ -81,6 +83,7 @@ fn unreferenced_blocks() {
             deletion_errors: 0,
             deleted_block_count: 0,
             deleted_band_count: 0,
+            elapsed: delete_stats.elapsed,
         }
     );
 }
