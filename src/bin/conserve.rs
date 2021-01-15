@@ -274,7 +274,7 @@ impl Command {
                     break_lock: *break_lock,
                     no_gc: false,
                 })?;
-                ui::println(&format!("{:#?}", stats));
+                ui::println(&format!("{}", stats));
             }
             Command::Init { archive } => {
                 Archive::create_path(&archive)?;
