@@ -31,9 +31,11 @@ pub fn show_brief_version_list(archive: &Archive, w: &mut dyn Write) -> Result<(
 
 pub fn show_verbose_version_list(
     archive: &Archive,
+    sort_recent_first: bool,
     show_sizes: bool,
     w: &mut dyn Write,
 ) -> Result<()> {
+    let mut band_infos = vec![];
     for band_id in archive.list_band_ids()? {
         let band = match Band::open(&archive, &band_id) {
             Ok(band) => band,
@@ -49,6 +51,14 @@ pub fn show_verbose_version_list(
                 continue;
             }
         };
+        band_infos.push(info);
+    }
+    if sort_recent_first {
+        band_infos.sort_unstable_by_key(|info| std::cmp::Reverse(info.start_time));
+    }
+
+    for info in band_infos {
+        let band_id = &info.id;
         let is_complete_str = if info.is_closed {
             "complete"
         } else {
