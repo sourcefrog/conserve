@@ -22,9 +22,13 @@ use chrono::Local;
 
 use crate::*;
 
-pub fn show_brief_version_list(archive: &Archive, w: &mut dyn Write) -> Result<()> {
-    for band_id in archive.list_band_ids()? {
-        writeln!(w, "{}", band_id)?
+pub fn show_brief_version_list(
+    archive: &Archive,
+    sort_recent_first: bool,
+    w: &mut dyn Write
+) -> Result<()> {
+    for info in get_band_infos(archive, sort_recent_first)? {
+        writeln!(w, "{}", info.id)?
     }
     Ok(())
 }
@@ -35,29 +39,7 @@ pub fn show_verbose_version_list(
     show_sizes: bool,
     w: &mut dyn Write,
 ) -> Result<()> {
-    let mut band_infos = vec![];
-    for band_id in archive.list_band_ids()? {
-        let band = match Band::open(&archive, &band_id) {
-            Ok(band) => band,
-            Err(e) => {
-                ui::problem(&format!("Failed to open band {:?}: {:?}", band_id, e));
-                continue;
-            }
-        };
-        let info = match band.get_info() {
-            Ok(info) => info,
-            Err(e) => {
-                ui::problem(&format!("Failed to read band tail {:?}: {:?}", band_id, e));
-                continue;
-            }
-        };
-        band_infos.push(info);
-    }
-    if sort_recent_first {
-        band_infos.sort_unstable_by_key(|info| std::cmp::Reverse(info.start_time));
-    }
-
-    for info in band_infos {
+    for info in get_band_infos(archive, sort_recent_first)? {
         let band_id = &info.id;
         let is_complete_str = if info.is_closed {
             "complete"
@@ -110,4 +92,29 @@ pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(it: I, w: &mut dyn Writ
         writeln!(bw, "{}", entry.apath())?;
     }
     Ok(())
+}
+
+fn get_band_infos(archive: &Archive, sort_recent_first: bool) -> Result<Vec<band::Info>> {
+    let mut band_infos = vec![];
+    for band_id in archive.list_band_ids()? {
+        let band = match Band::open(&archive, &band_id) {
+            Ok(band) => band,
+            Err(e) => {
+                ui::problem(&format!("Failed to open band {:?}: {:?}", band_id, e));
+                continue;
+            }
+        };
+        let info = match band.get_info() {
+            Ok(info) => info,
+            Err(e) => {
+                ui::problem(&format!("Failed to read band tail {:?}: {:?}", band_id, e));
+                continue;
+            }
+        };
+        band_infos.push(info);
+    }
+    if sort_recent_first {
+        band_infos.sort_unstable_by_key(|info| std::cmp::Reverse(info.start_time));
+    }
+    Ok(band_infos)
 }

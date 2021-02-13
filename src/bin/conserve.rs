@@ -146,7 +146,7 @@ enum Command {
         #[structopt(long, short = "q")]
         short: bool,
         /// Sort bands to show most recent first.
-        #[structopt(long, short = "n", conflicts_with = "short" )]
+        #[structopt(long, short = "n")]
         newest: bool,
         /// Show size of stored trees.
         #[structopt(long, short = "z", conflicts_with = "short")]
@@ -363,7 +363,7 @@ impl Command {
                 ui::enable_progress(false);
                 let archive = Archive::open_path(archive)?;
                 if *short {
-                    output::show_brief_version_list(&archive, &mut stdout)?;
+                    output::show_brief_version_list(&archive, *newest, &mut stdout)?;
                 } else {
                     output::show_verbose_version_list(&archive, *newest,*sizes, &mut stdout)?;
                 }
