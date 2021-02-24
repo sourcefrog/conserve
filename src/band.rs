@@ -327,6 +327,10 @@ mod tests {
 
         let e = Band::open(&af, &BandId::zero());
         let e_str = e.unwrap_err().to_string();
-        assert!(e_str.contains("Band version \"0.8.8\" in"), e_str);
+        assert!(
+            e_str.contains("Band version \"0.8.8\" in"),
+            "bad band version: {:#?}",
+            e_str
+        );
     }
 }
