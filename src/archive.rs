@@ -201,19 +201,22 @@ impl Archive {
     ///
     /// Shows a progress bar as they're collected.
     pub fn referenced_blocks(&self) -> Result<HashSet<BlockHash>> {
-        self.iter_referenced_blocks().map(Iterator::collect)
+        self.iter_referenced_blocks(&self.list_band_ids()?)
+            .map(Iterator::collect)
     }
 
-    /// Iterate all blocks referenced by all bands.
+    /// Iterate all blocks referenced by the given bands.
     ///
     /// The iterator returns repeatedly-referenced blocks repeatedly, without deduplicating.
     ///
     /// This shows a progress bar as indexes are iterated.
-    fn iter_referenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
+    fn iter_referenced_blocks<'a>(
+        &self,
+        band_ids: &'a [BandId],
+    ) -> Result<impl Iterator<Item = BlockHash> + 'a> {
         let archive = self.clone();
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Find referenced blocks...");
-        let band_ids = self.list_band_ids()?;
         let num_bands = band_ids.len();
         Ok(band_ids
             .into_iter()
@@ -242,6 +245,11 @@ impl Archive {
             .inspect(move |_| progress_bar.increment_work_done(1)))
     }
 
+    /// Return a set of all blocks in the archive.
+    fn present_blocks(&self) -> Result<HashSet<BlockHash>> {
+        Ok(self.iter_present_blocks()?.collect())
+    }
+
     /// Delete unreferenced blocks.
     pub fn delete_unreferenced(&self, options: &DeleteOptions) -> Result<DeleteStats> {
         let block_dir = self.block_dir();
@@ -253,8 +261,9 @@ impl Archive {
             gc_lock::GarbageCollectionLock::new(self)?
         };
 
-        let mut blocks: HashSet<BlockHash> = self.iter_present_blocks()?.collect();
-        for block_hash in self.iter_referenced_blocks()? {
+        let mut blocks: HashSet<BlockHash> = self.present_blocks()?;
+        let band_ids = self.list_band_ids()?;
+        for block_hash in self.iter_referenced_blocks(&band_ids)? {
             // NOTE: We could potentially notice here blocks that are missing: referenced but
             // not present. However, because the reference iter can contain duplicates,
             // it would require keeping another set. On the whole that seems better left
@@ -302,13 +311,42 @@ impl Archive {
     ) -> Result<DeleteStats> {
         let mut stats = DeleteStats::default();
         let start = Instant::now();
-        for band_id in band_ids {
-            if !options.dry_run {
-                Band::delete(self, band_id).map(|()| stats.deleted_band_count += 1)?
+        if !options.dry_run {
+            for band_id in band_ids {
+                Band::delete(self, band_id)?;
+                stats.deleted_band_count += 1;
             }
-        }
-        if !options.no_gc {
-            stats += self.delete_unreferenced(options)?;
+            if !options.no_gc {
+                stats += self.delete_unreferenced(options)?;
+            }
+        } else {
+            let all_blocks = self.present_blocks()?;
+            let mut keep_band_ids = self.list_band_ids()?;
+            keep_band_ids.retain(|b| !band_ids.contains(b));
+            let referenced = self.iter_referenced_blocks(&keep_band_ids)?.collect();
+            let unreferenced: HashSet<BlockHash> =
+                all_blocks.difference(&referenced).cloned().collect();
+            // stats.deleted_block_count += unreferenced.count();
+            let mut count = 0;
+            let mut bytes = 0;
+
+            let mut progress_bar = ProgressBar::new();
+            progress_bar.set_phase("Measure unreferenced blocks".to_owned());
+            progress_bar.set_total_work(unreferenced.len());
+            for block_id in unreferenced {
+                progress_bar.increment_work_done(1);
+                progress_bar.set_bytes_done(bytes);
+                count += 1;
+                // skip errors while counting
+                bytes += self
+                    .block_dir
+                    .compressed_size(&block_id)
+                    .unwrap_or_default();
+            }
+            stats.deleted_band_count = band_ids.len();
+            stats.unreferenced_block_count = count;
+            stats.deleted_block_count = count;
+            stats.unreferenced_block_bytes = bytes;
         }
         stats.elapsed = start.elapsed();
         Ok(stats)
