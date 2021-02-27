@@ -475,7 +475,11 @@ mod tests {
         assert_eq!(stats.compressed_bytes, 8);
 
         // Will vary depending on compressor and we don't want to be too brittle.
-        assert!(stats.compressed_bytes <= 19, stats.compressed_bytes);
+        assert!(
+            stats.compressed_bytes <= 19,
+            "too many compressed_bytes: {}",
+            stats.compressed_bytes
+        );
 
         // Try to read back
         let (back, sizes) = block_dir.get(&addrs[0]).unwrap();

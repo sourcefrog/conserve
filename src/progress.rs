@@ -161,6 +161,8 @@ impl ProgressBar {
             self.percent
         } else if self.total_work > 0 && self.work_done > 0 {
             Some(100f64 * self.work_done as f64 / self.total_work as f64)
+        } else if self.bytes_total > 0 && self.bytes_done > 0 {
+            Some(100f64 * self.bytes_done as f64 / self.bytes_total as f64)
         } else {
             None
         }

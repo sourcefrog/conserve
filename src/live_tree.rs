@@ -397,7 +397,7 @@ mod tests {
 
         let repr = format!("{:?}", &result[6]);
         let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: UnixTime \{ [^)]* \}, size: Some\(8\), symlink_target: None \}"#).unwrap();
-        assert!(re.is_match(&repr), repr);
+        assert!(re.is_match(&repr));
 
         // TODO: Somehow get the stats out of the iterator.
         // assert_eq!(source_iter.stats.directories_visited, 4);
