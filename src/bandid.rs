@@ -53,14 +53,6 @@ impl BandId {
     /// This is only a calculation on the band id, and the band may not be present.
     ///
     /// Currently only implemented for top-level bands.
-    ///
-    /// ```
-    /// use conserve::BandId;
-    ///
-    /// assert_eq!(BandId::zero().previous(), None);
-    /// assert_eq!(BandId::zero().next_sibling().previous(),
-    ///     Some(BandId::zero()));
-    /// ```
     pub fn previous(&self) -> Option<BandId> {
         if self.seqs.len() != 1 {
             unimplemented!("BandId::previous only supported on len 1")
@@ -136,6 +128,19 @@ mod tests {
     #[test]
     fn zero() {
         assert_eq!(BandId::zero().to_string(), "b0000");
+    }
+
+    #[test]
+    fn zero_has_no_previous() {
+        assert_eq!(BandId::zero().previous(), None);
+    }
+
+    #[test]
+    fn previous_of_one_is_zero() {
+        assert_eq!(
+            BandId::zero().next_sibling().previous(),
+            Some(BandId::zero())
+        );
     }
 
     #[test]
