@@ -150,13 +150,6 @@ pub struct ListDirNames {
 ///
 /// Locations can be parsed from strings. At present the only supported form is an absolute
 /// or relative filename.
-/// ```
-/// use std::str::FromStr;
-/// use conserve::transport::Location;
-///
-/// let location: Location = Location::from_str("/backup/example").unwrap();
-/// let transport = location.open();
-/// ```
 #[derive(Debug, Eq, PartialEq)]
 pub enum Location {
     /// A local directory.
@@ -167,14 +160,6 @@ impl Location {
     /// Open a Transport that can read and write this location.
     ///
     /// The location need not already exist.
-    ///
-    /// ```
-    /// use std::path::PathBuf;
-    /// use conserve::transport::Location;
-    ///
-    /// let location = Location::Local("/backup".to_owned().into());
-    /// let transport = location.open().unwrap();
-    /// ```
     pub fn open(&self) -> Result<Box<dyn Transport>> {
         match self {
             Location::Local(pathbuf) => Ok(Box::new(local::LocalTransport::new(&pathbuf))),
@@ -188,30 +173,5 @@ impl FromStr for Location {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         // Eventually can specifically recognize url or sftp style forms here.
         Ok(Location::Local(s.into()))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use assert_fs::prelude::*;
-
-    use super::*;
-    use crate::transport::local::LocalTransport;
-
-    #[test]
-    fn list_dir_names() {
-        let temp = assert_fs::TempDir::new().unwrap();
-        temp.child("a dir").create_dir_all().unwrap();
-        temp.child("a file").touch().unwrap();
-        temp.child("another file").touch().unwrap();
-
-        let transport = LocalTransport::new(&temp.path());
-
-        let ListDirNames { mut files, dirs } = transport.list_dir_names("").unwrap();
-        assert_eq!(dirs, ["a dir"]);
-        files.sort();
-        assert_eq!(files, ["a file", "another file"]);
-
-        temp.close().unwrap();
     }
 }
