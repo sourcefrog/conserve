@@ -418,7 +418,7 @@ fn restore_only_subtree() {
     run_conserve()
         .args(&[
             "restore",
-            "testdata/archive/v0.6.3/minimal-1/",
+            "testdata/archive/minimal/v0.6.3/",
             "--only",
             "/subdir",
         ])

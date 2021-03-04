@@ -24,16 +24,22 @@ use predicates::prelude::*;
 use conserve::unix_time::UnixTime;
 use conserve::*;
 
-const ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.10", "0.6.2", "0.6.3", "0.6.9"];
+const MINIMAL_ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.10", "0.6.2", "0.6.3", "0.6.9"];
+
+
 
 fn open_old_archive(ver: &str, name: &str) -> Archive {
-    Archive::open_path(&Path::new(&format!("testdata/archive/v{}/{}/", ver, name)))
+    Archive::open_path(&Path::new(&archive_testdata_path(name, ver)))
         .expect("Failed to open archive")
+}
+
+fn archive_testdata_path(name: &str, ver: &str) -> String {
+    format!("testdata/archive/{}/v{}/", name, ver)
 }
 
 #[test]
 fn all_archive_versions_are_tested() {
-    let mut present_subdirs: Vec<String> = read_dir("testdata/archive")
+    let mut present_subdirs: Vec<String> = read_dir("testdata/archive/minimal")
         .unwrap()
         .map(|direntry| direntry.unwrap().file_name().to_string_lossy().into_owned())
         .filter(|n| n != ".gitattributes")
@@ -41,7 +47,7 @@ fn all_archive_versions_are_tested() {
     present_subdirs.sort();
     assert_eq!(
         present_subdirs,
-        ARCHIVE_VERSIONS
+        MINIMAL_ARCHIVE_VERSIONS
             .iter()
             .map(|s| format!("v{}", s))
             .collect::<Vec<String>>()
@@ -50,9 +56,9 @@ fn all_archive_versions_are_tested() {
 
 #[test]
 fn examine_archive() {
-    for ver in ARCHIVE_VERSIONS {
+    for ver in MINIMAL_ARCHIVE_VERSIONS {
         println!("examine {}", ver);
-        let archive = open_old_archive(ver, "minimal-1");
+        let archive = open_old_archive(ver, "minimal");
 
         let band_ids = archive.list_band_ids().expect("Failed to list band ids");
         assert_eq!(band_ids, &[BandId::zero()]);
@@ -69,9 +75,9 @@ fn examine_archive() {
 
 #[test]
 fn validate_archive() {
-    for ver in ARCHIVE_VERSIONS {
+    for ver in MINIMAL_ARCHIVE_VERSIONS {
         println!("validate {}", ver);
-        let archive = open_old_archive(ver, "minimal-1");
+        let archive = open_old_archive(ver, "minimal");
 
         let stats = archive.validate().expect("validate archive");
         assert_eq!(stats.structure_problems, 0);
@@ -83,11 +89,11 @@ fn validate_archive() {
 
 #[test]
 fn restore_old_archive() {
-    for ver in ARCHIVE_VERSIONS {
+    for ver in MINIMAL_ARCHIVE_VERSIONS {
         let dest = TempDir::new().unwrap();
         println!("restore {} to {:?}", ver, dest.path());
 
-        let archive = open_old_archive(ver, "minimal-1");
+        let archive = open_old_archive(ver, "minimal");
         let restore_stats =
             restore(&archive, &dest.path(), &RestoreOptions::default()).expect("restore");
 
@@ -126,18 +132,18 @@ fn restore_old_archive() {
 /// of the old archive.
 #[test]
 fn restore_modify_backup() {
-    for ver in ARCHIVE_VERSIONS {
+    for ver in MINIMAL_ARCHIVE_VERSIONS {
         let working_tree = TempDir::new().unwrap();
         println!("restore {} to {:?}", ver, working_tree.path());
 
-        let archive = open_old_archive(ver, "minimal-1");
+        let archive = open_old_archive(ver, "minimal");
 
         restore(&archive, &working_tree.path(), &RestoreOptions::default()).expect("restore");
 
         // Write back into a new copy of the archive, without modifying the
         // testdata in the source tree.
         let new_archive_temp = TempDir::new().unwrap();
-        let stored_archive_path = format!("testdata/archive/v{}/minimal-1", ver);
+        let stored_archive_path = archive_testdata_path("minimal", ver);
         let new_archive_path = new_archive_temp.path().join("archive");
         copy_dir(stored_archive_path, &new_archive_path).expect("copy archive tree");
 

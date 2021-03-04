@@ -154,7 +154,7 @@ mod test {
 
     #[test]
     fn iter_filtered() {
-        let archive = Archive::open_path(Path::new("testdata/archive/v0.6.3/minimal-1/")).unwrap();
+        let archive = Archive::open_path(Path::new("testdata/archive/minimal/v0.6.3/")).unwrap();
         let st = archive
             .open_stored_tree(BandSelectionPolicy::Latest)
             .unwrap();
