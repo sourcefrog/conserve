@@ -36,14 +36,6 @@ use serde::{Deserialize, Serialize};
 /// string ordering.
 ///
 /// Apaths must start with `/` and not end with `/` unless they have length 1.
-///
-/// ```
-/// use std::str::FromStr;
-/// use conserve::apath::Apath;
-///
-/// let apath: Apath = "/something".parse().unwrap();
-/// assert_eq!(apath.to_string(), "/something");
-/// ```
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Apath(String);
 
@@ -67,18 +59,6 @@ impl Apath {
     }
 
     /// True if self is a parent directory of, or equal to, `a`.
-    ///
-    /// ```
-    /// use conserve::Apath;
-    /// use std::ops::Not;
-    ///
-    /// assert!(Apath::from("/").is_prefix_of(&Apath::from("/stuff")));
-    /// assert!(Apath::from("/").is_prefix_of(&Apath::from("/")));
-    /// assert!(Apath::from("/stuff").is_prefix_of(&Apath::from("/stuff/file")));
-    /// assert!(Apath::from("/stuff/file").is_prefix_of(&Apath::from("/stuff")).not());
-    /// assert!(Apath::from("/this").is_prefix_of(&Apath::from("/that")).not());
-    /// assert!(Apath::from("/this").is_prefix_of(&Apath::from("/that/other")).not());
-    /// ```
     pub fn is_prefix_of(&self, a: &Apath) -> bool {
         let len = self.0.len();
         match len.cmp(&a.0.len()) {
@@ -287,80 +267,4 @@ impl DebugCheckOrder {
     }
 
     pub fn check(&mut self, _apath: &Apath) {}
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Apath;
-
-    #[test]
-    pub fn invalid() {
-        let invalid_cases = [
-            "",
-            "//",
-            "//a",
-            "/a//b",
-            "/a/",
-            "/a//",
-            "./a/b",
-            "/./a/b",
-            "/a/b/.",
-            "/a/./b",
-            "/a/b/../c",
-            "../a",
-            "/hello\0",
-        ];
-        for v in invalid_cases.iter() {
-            assert!(!Apath::is_valid(v), "{:?} incorrectly marked valid", v);
-        }
-    }
-
-    #[test]
-    pub fn valid_and_ordered() {
-        let ordered = [
-            "/",
-            "/...a",
-            "/.a",
-            "/a",
-            "/b",
-            "/kleine Katze Fuß",
-            "/~~",
-            "/ñ",
-            "/a/...",
-            "/a/..obscure",
-            "/a/.config",
-            "/a/1",
-            "/a/100",
-            "/a/2",
-            "/a/añejo",
-            "/a/b/c",
-            "/b/((",
-            "/b/,",
-            "/b/A",
-            "/b/AAAA",
-            "/b/a",
-            "/b/b",
-            "/b/c",
-            "/b/a/c",
-            "/b/b/c",
-            "/b/b/b/z",
-            "/b/b/b/{zz}",
-        ];
-        for (i, a) in ordered.iter().enumerate() {
-            assert!(Apath::is_valid(a), "{:?} incorrectly marked invalid", a);
-            let ap = Apath::from(*a);
-            // Check it can be formatted
-            assert_eq!(format!("{}", ap), *a);
-            for (j, b) in ordered.iter().enumerate() {
-                let expected_order = i.cmp(&j);
-                let bp = Apath::from(*b);
-                let r = ap.cmp(&bp);
-                assert_eq!(
-                    r, expected_order,
-                    "cmp({:?}, {:?}): returned {:?} expected {:?}", // GRCOV_EXCLUDE
-                    ap, bp, r, expected_order
-                );
-            }
-        }
-    }
 }
