@@ -14,8 +14,9 @@
 
 mod apath;
 mod backup;
+mod blockhash;
 mod damaged;
 mod delete;
-mod restore;
-mod old_archives;
 mod gc;
+mod old_archives;
+mod restore;

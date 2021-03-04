@@ -28,22 +28,7 @@ use crate::*;
 /// The hash of a block of body data.
 ///
 /// Stored in memory as compact bytes, but translatable to and from
-/// hex strings.o
-///
-/// ```
-/// use std::str::FromStr;
-/// use conserve::blockhash::BlockHash;
-///
-/// let hex_hash = concat!(
-///     "00000000000000000000000000000000",
-///     "00000000000000000000000000000000",
-///     "00000000000000000000000000000000",
-///     "00000000000000000000000000000000",);
-/// let hash = BlockHash::from_str(hex_hash)
-///     .unwrap();
-/// let hash2 = hash.clone();
-/// assert_eq!(hash2.to_string(), hex_hash);
-/// ```
+/// hex strings.
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(into = "String")]
 #[serde(try_from = "&str")]
