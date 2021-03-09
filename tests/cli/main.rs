@@ -483,3 +483,48 @@ fn size_exclude() {
         .success()
         .stdout("10\n");
 }
+
+#[test]
+fn versions() {
+    run_conserve()
+        .args(&["versions", "testdata/archive/simple/v0.6.10"])
+        .assert()
+        .success()
+        .stdout(
+            "\
+b0000                complete   2021-03-04 05:21:15     0:00
+b0001                complete   2021-03-04 05:21:30     0:00
+b0002                complete   2021-03-04 05:27:28     0:00
+",
+        );
+}
+
+#[test]
+fn versions_short() {
+    run_conserve()
+        .args(&["versions", "--short", "testdata/archive/simple/v0.6.10"])
+        .assert()
+        .success()
+        .stdout(
+            "\
+b0000
+b0001
+b0002
+",
+        );
+}
+
+#[test]
+fn versions_sizes() {
+    run_conserve()
+        .args(&["versions", "--sizes", "testdata/archive/simple/v0.6.10"])
+        .assert()
+        .success()
+        .stdout(
+            "\
+b0000                complete   2021-03-04 05:21:15     0:00           0 MB
+b0001                complete   2021-03-04 05:21:30     0:00           0 MB
+b0002                complete   2021-03-04 05:27:28     0:00           0 MB
+",
+        );
+}
