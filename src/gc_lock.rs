@@ -37,11 +37,11 @@ const GC_LOCK: &str = "GC_LOCK";
 
 #[derive(Debug)]
 pub struct GarbageCollectionLock {
+    archive: Archive,
+
     /// Last band id present when the guard was created. May be None if
     /// there are no bands.
     band_id: Option<BandId>,
-
-    archive: Archive,
 }
 
 /// Lock on an archive for gc, that excludes backups and gc by other processes.

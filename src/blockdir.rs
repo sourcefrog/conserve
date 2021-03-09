@@ -292,7 +292,7 @@ impl BlockDir {
         stats.block_error_count += results.iter().filter(|o| o.is_none()).count();
         let len_map: HashMap<BlockHash, usize> = results
             .into_iter()
-            .filter_map(std::convert::identity) // keep only Some values
+            .flatten() // keep only Some values
             .collect();
         Ok(len_map)
     }
