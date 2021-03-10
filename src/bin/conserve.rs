@@ -148,6 +148,9 @@ enum Command {
         /// Show size of stored trees.
         #[structopt(long, short = "z", conflicts_with = "short")]
         sizes: bool,
+        /// Show times in UTC.
+        #[structopt(long)]
+        utc: bool,
     },
 }
 
@@ -355,13 +358,14 @@ impl Command {
                 archive,
                 short,
                 sizes,
+                utc,
             } => {
                 ui::enable_progress(false);
                 let archive = Archive::open_path(archive)?;
                 if *short {
                     output::show_brief_version_list(&archive, &mut stdout)?;
                 } else {
-                    output::show_verbose_version_list(&archive, *sizes, &mut stdout)?;
+                    output::show_verbose_version_list(&archive, *sizes, *utc, &mut stdout)?;
                 }
             }
         }

@@ -8,6 +8,8 @@
 
 - Better display of deletion stats.
 
+- New `conserve versions --utc` option.
+
 ## v0.6.10 2020-12-30
 
 ### Features

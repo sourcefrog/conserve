@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2018, 2020 Martin Pool.
+// Copyright 2018, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,8 +18,6 @@
 
 use std::io::{BufWriter, Write};
 
-use chrono::Local;
-
 use crate::*;
 
 pub fn show_brief_version_list(archive: &Archive, w: &mut dyn Write) -> Result<()> {
@@ -29,9 +27,16 @@ pub fn show_brief_version_list(archive: &Archive, w: &mut dyn Write) -> Result<(
     Ok(())
 }
 
+/// Print a list of versions, one per line.
+///
+/// With `show_sizes` the (unpacked) size of the stored tree is included. This is
+/// slower because it requires walking the whole index.
+///
+/// With `utc_times`, times are shown in UTC rather than the local timezone.
 pub fn show_verbose_version_list(
     archive: &Archive,
     show_sizes: bool,
+    utc_times: bool,
     w: &mut dyn Write,
 ) -> Result<()> {
     for band_id in archive.list_band_ids()? {
@@ -54,10 +59,12 @@ pub fn show_verbose_version_list(
         } else {
             "incomplete"
         };
-        let start_time_str = info
-            .start_time
-            .with_timezone(&Local)
-            .format(crate::TIMESTAMP_FORMAT);
+        let start_time = info.start_time;
+        let start_time_str = if utc_times {
+            start_time.format(crate::TIMESTAMP_FORMAT)
+        } else {
+            start_time.with_timezone(&chrono::Local).format(crate::TIMESTAMP_FORMAT)
+        };
         let duration_str = info
             .end_time
             .and_then(|et| (et - info.start_time).to_std().ok())
