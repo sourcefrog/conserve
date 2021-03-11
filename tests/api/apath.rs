@@ -23,12 +23,18 @@ fn parse() {
 #[test]
 fn is_prefix_of() {
     use std::ops::Not;
-        assert!(Apath::from("/").is_prefix_of(&Apath::from("/stuff")));
+    assert!(Apath::from("/").is_prefix_of(&Apath::from("/stuff")));
     assert!(Apath::from("/").is_prefix_of(&Apath::from("/")));
     assert!(Apath::from("/stuff").is_prefix_of(&Apath::from("/stuff/file")));
-    assert!(Apath::from("/stuff/file").is_prefix_of(&Apath::from("/stuff")).not());
-    assert!(Apath::from("/this").is_prefix_of(&Apath::from("/that")).not());
-    assert!(Apath::from("/this").is_prefix_of(&Apath::from("/that/other")).not());
+    assert!(Apath::from("/stuff/file")
+        .is_prefix_of(&Apath::from("/stuff"))
+        .not());
+    assert!(Apath::from("/this")
+        .is_prefix_of(&Apath::from("/that"))
+        .not());
+    assert!(Apath::from("/this")
+        .is_prefix_of(&Apath::from("/that/other"))
+        .not());
 }
 
 #[test]
