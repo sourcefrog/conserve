@@ -14,27 +14,50 @@
 //! Tests of the `conserve versions` command.
 
 use assert_cmd::prelude::*;
+use conserve::test_fixtures::ScratchArchive;
 use predicates::function::function;
+use predicates::prelude::*;
 
 use crate::run_conserve;
 
 #[test]
-fn versions() {
+fn utc() {
     run_conserve()
         .args(&["versions", "--utc", "testdata/archive/simple/v0.6.10"])
         .assert()
         .success()
         .stdout(
             "\
-b0000                complete   2021-03-04 13:21:15     0:00
-b0001                complete   2021-03-04 13:21:30     0:00
-b0002                complete   2021-03-04 13:27:28     0:00
+b0000                2021-03-04 13:21:15       0:00
+b0001                2021-03-04 13:21:30       0:00
+b0002                2021-03-04 13:27:28       0:00
 ",
         );
 }
 
 #[test]
-fn versions_in_local_time() {
+fn newest_first() {
+    run_conserve()
+        .args(&[
+            "versions",
+            "--newest",
+            "--utc",
+            "testdata/archive/simple/v0.6.10",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(
+            "\
+b0002                2021-03-04 13:27:28       0:00
+b0001                2021-03-04 13:21:30       0:00
+b0000                2021-03-04 13:21:15       0:00
+",
+        );
+}
+
+#[test]
+fn local_time() {
     // Without --utc we don't know exactly what times will be produced,
     // and it's hard to control the timezone for tests on Windows.
     run_conserve()
@@ -45,7 +68,7 @@ fn versions_in_local_time() {
 }
 
 #[test]
-fn versions_short() {
+fn short() {
     run_conserve()
         .args(&["versions", "--short", "testdata/archive/simple/v0.6.10"])
         .assert()
@@ -60,7 +83,7 @@ b0002
 }
 
 #[test]
-fn versions_sizes() {
+fn tree_sizes() {
     run_conserve()
         .args(&[
             "versions",
@@ -72,9 +95,23 @@ fn versions_sizes() {
         .success()
         .stdout(
             "\
-b0000                complete   2021-03-04 13:21:15     0:00           0 MB
-b0001                complete   2021-03-04 13:21:30     0:00           0 MB
-b0002                complete   2021-03-04 13:27:28     0:00           0 MB
+b0000                2021-03-04 13:21:15       0:00           0 MB
+b0001                2021-03-04 13:21:30       0:00           0 MB
+b0002                2021-03-04 13:27:28       0:00           0 MB
 ",
         );
+}
+
+#[test]
+fn short_newest_first() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+
+    run_conserve()
+        .args(&["versions", "--short", "--newest"])
+        .arg(af.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout("b0001\nb0000\n");
 }

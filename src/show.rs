@@ -16,23 +16,19 @@
 //! These are objects that accept iterators of different types of content, and write it to a
 //! file (typically stdout).
 
+use std::borrow::Cow;
 use std::io::{BufWriter, Write};
 
 use crate::*;
 
-pub fn show_brief_version_list(
-    archive: &Archive,
-    newest_first: bool,
-    w: &mut dyn Write,
-) -> Result<()> {
-    let mut band_ids = archive.list_band_ids()?;
-    if newest_first {
-        band_ids.reverse();
-    }
-    for band_id in band_ids {
-        writeln!(w, "{}", band_id)?
-    }
-    Ok(())
+#[derive(Default, Clone, Eq, PartialEq)]
+pub struct ShowVersionsOptions {
+    pub newest_first: bool,
+    pub tree_size: bool,
+    pub start_time: bool,
+    /// Show how much time the backup took, or "incomplete" if it never finished.
+    pub backup_duration: bool,
+    pub utc: bool,
 }
 
 /// Print a list of versions, one per line.
@@ -41,18 +37,22 @@ pub fn show_brief_version_list(
 /// slower because it requires walking the whole index.
 ///
 /// With `utc_times`, times are shown in UTC rather than the local timezone.
-pub fn show_verbose_version_list(
+pub fn show_versions(
     archive: &Archive,
-    show_sizes: bool,
-    utc_times: bool,
-    newest_first: bool,
+    options: &ShowVersionsOptions,
     w: &mut dyn Write,
 ) -> Result<()> {
     let mut band_ids = archive.list_band_ids()?;
-    if newest_first {
+    if options.newest_first {
         band_ids.reverse();
     }
     for band_id in band_ids {
+        if !(options.tree_size || options.start_time || options.backup_duration) {
+            writeln!(w, "{}", band_id)?;
+            continue;
+        }
+        let mut l: Vec<String> = Vec::new();
+        l.push(format!("{:<20}", band_id));
         let band = match Band::open(&archive, &band_id) {
             Ok(band) => band,
             Err(e) => {
@@ -67,43 +67,43 @@ pub fn show_verbose_version_list(
                 continue;
             }
         };
-        let is_complete_str = if info.is_closed {
-            "complete"
-        } else {
-            "incomplete"
-        };
-        let start_time = info.start_time;
-        let start_time_str = if utc_times {
-            start_time.format(crate::TIMESTAMP_FORMAT)
-        } else {
-            start_time
-                .with_timezone(&chrono::Local)
-                .format(crate::TIMESTAMP_FORMAT)
-        };
-        let duration_str = info
-            .end_time
-            .and_then(|et| (et - info.start_time).to_std().ok())
-            .map(crate::ui::duration_to_hms)
-            .unwrap_or_default();
-        if show_sizes {
-            let tree_mb = crate::misc::bytes_to_human_mb(
+
+        if options.start_time {
+            let start_time = info.start_time;
+            let start_time_str = if options.utc {
+                start_time.format(crate::TIMESTAMP_FORMAT)
+            } else {
+                start_time
+                    .with_timezone(&chrono::Local)
+                    .format(crate::TIMESTAMP_FORMAT)
+            };
+            l.push(format!("{:<10}", start_time_str));
+        }
+
+        if options.backup_duration {
+            let duration_str: Cow<str> = if info.is_closed {
+                info.end_time
+                    .and_then(|et| (et - info.start_time).to_std().ok())
+                    .map(crate::ui::duration_to_hms)
+                    .map(|s| Cow::Owned(s))
+                    .unwrap_or(Cow::Borrowed("unknown"))
+            } else {
+                Cow::Borrowed("incomplete")
+            };
+            l.push(format!("{:>10}", duration_str));
+        }
+
+        if options.tree_size {
+            let tree_mb_str = crate::misc::bytes_to_human_mb(
                 archive
                     .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))?
                     .size(None)?
                     .file_bytes,
             );
-            writeln!(
-                w,
-                "{:<20} {:<10} {} {:>8} {:>14}",
-                band_id, is_complete_str, start_time_str, duration_str, tree_mb,
-            )?;
-        } else {
-            writeln!(
-                w,
-                "{:<20} {:<10} {} {:>8}",
-                band_id, is_complete_str, start_time_str, duration_str,
-            )?;
+            l.push(format!("{:>14}", tree_mb_str,));
         }
+
+        writeln!(w, "{}", l.join(" "))?;
     }
     Ok(())
 }

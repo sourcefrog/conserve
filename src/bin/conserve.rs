@@ -227,7 +227,7 @@ impl Command {
             }
             Command::Debug(Debug::Index { archive, backup }) => {
                 let st = stored_tree_from_opt(archive, &backup)?;
-                output::show_index_json(&st.band(), &mut stdout)?;
+                show::show_index_json(&st.band(), &mut stdout)?;
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
@@ -289,13 +289,13 @@ impl Command {
             Command::Ls { stos, exclude } => {
                 let excludes = excludes::from_strings(exclude)?;
                 if let Some(archive) = &stos.archive {
-                    output::show_entry_names(
+                    show::show_entry_names(
                         stored_tree_from_opt(archive, &stos.backup)?
                             .iter_filtered(None, excludes)?,
                         &mut stdout,
                     )?;
                 } else {
-                    output::show_entry_names(
+                    show::show_entry_names(
                         LiveTree::open(stos.source.clone().unwrap())?
                             .iter_filtered(None, excludes)?,
                         &mut stdout,
@@ -366,17 +366,14 @@ impl Command {
             } => {
                 ui::enable_progress(false);
                 let archive = Archive::open_path(archive)?;
-                if *short {
-                    output::show_brief_version_list(&archive, *newest, &mut stdout)?;
-                } else {
-                    output::show_verbose_version_list(
-                        &archive,
-                        *sizes,
-                        *utc,
-                        *newest,
-                        &mut stdout,
-                    )?;
-                }
+                let options = ShowVersionsOptions {
+                    newest_first: *newest,
+                    tree_size: *sizes,
+                    utc: *utc,
+                    start_time: !*short,
+                    backup_duration: !*short,
+                };
+                conserve::show_versions(&archive, &options, &mut stdout)?;
             }
         }
         Ok(ExitCode::Ok)

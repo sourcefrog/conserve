@@ -214,35 +214,6 @@ both     /subdir/subfile
     run_conserve().arg("gc").arg(&arch_dir).assert().success();
 
     run_conserve()
-        .arg("versions")
-        .arg(&arch_dir)
-        .assert()
-        .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(
-            predicate::str::is_match(
-                r"^b0000 *complete   20\d\d-\d\d-\d\d \d\d:\d\d:\d\d +0:\d+\n$",
-            )
-            .unwrap(),
-        );
-    // TODO: Set a fake date when creating the archive and then we can check
-    // the format of the output?
-
-    run_conserve()
-        .arg("versions")
-        .arg("--sizes")
-        .arg(&arch_dir)
-        .assert()
-        .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(
-            predicate::str::is_match(
-                r"^b0000 *complete   20\d\d-\d\d-\d\d \d\d:\d\d:\d\d +0:\d+ *0 MB\n$",
-            )
-            .unwrap(),
-        );
-
-    run_conserve()
         .arg("ls")
         .arg(&arch_dir)
         .assert()
@@ -484,32 +455,4 @@ fn size_exclude() {
         .assert()
         .success()
         .stdout("10\n");
-}
-
-#[test]
-fn brief_versions_sort_recent_first() {
-    let af = ScratchArchive::new();
-    af.store_two_versions();
-
-    run_conserve()
-        .args(&["versions", "--short", "--newest"])
-        .arg(af.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::is_empty())
-        .stdout("b0001\nb0000\n");
-}
-
-#[test]
-fn verbose_versions_sort_recent_first() {
-    let af = ScratchArchive::new();
-    af.store_two_versions();
-
-    run_conserve()
-        .args(&["versions", "--newest"])
-        .arg(af.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::is_match("b0001.*\nb0000.*").unwrap());
 }

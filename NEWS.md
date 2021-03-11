@@ -12,6 +12,8 @@
 
 - New `conserve versions --newest` option (thanks to tkuestner@).
 
+- Format of `conserve versions` tabular output changed slightly.
+
 ## v0.6.10 2020-12-30
 
 ### Features
