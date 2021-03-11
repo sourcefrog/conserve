@@ -485,3 +485,31 @@ fn size_exclude() {
         .success()
         .stdout("10\n");
 }
+
+#[test]
+fn brief_versions_sort_recent_first() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+
+    run_conserve()
+        .args(&["versions", "--short", "--newest"])
+        .arg(af.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout("b0001\nb0000\n");
+}
+
+#[test]
+fn verbose_versions_sort_recent_first() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+
+    run_conserve()
+        .args(&["versions", "--newest"])
+        .arg(af.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::is_match("b0001.*\nb0000.*").unwrap());
+}

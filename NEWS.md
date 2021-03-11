@@ -10,6 +10,8 @@
 
 - New `conserve versions --utc` option.
 
+- New `conserve versions --newest` option (thanks to tkuestner@).
+
 ## v0.6.10 2020-12-30
 
 ### Features

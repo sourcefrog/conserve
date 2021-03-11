@@ -20,8 +20,16 @@ use std::io::{BufWriter, Write};
 
 use crate::*;
 
-pub fn show_brief_version_list(archive: &Archive, w: &mut dyn Write) -> Result<()> {
-    for band_id in archive.list_band_ids()? {
+pub fn show_brief_version_list(
+    archive: &Archive,
+    newest_first: bool,
+    w: &mut dyn Write,
+) -> Result<()> {
+    let mut band_ids = archive.list_band_ids()?;
+    if newest_first {
+        band_ids.reverse();
+    }
+    for band_id in band_ids {
         writeln!(w, "{}", band_id)?
     }
     Ok(())
@@ -37,9 +45,14 @@ pub fn show_verbose_version_list(
     archive: &Archive,
     show_sizes: bool,
     utc_times: bool,
+    newest_first: bool,
     w: &mut dyn Write,
 ) -> Result<()> {
-    for band_id in archive.list_band_ids()? {
+    let mut band_ids = archive.list_band_ids()?;
+    if newest_first {
+        band_ids.reverse();
+    }
+    for band_id in band_ids {
         let band = match Band::open(&archive, &band_id) {
             Ok(band) => band,
             Err(e) => {
@@ -63,7 +76,9 @@ pub fn show_verbose_version_list(
         let start_time_str = if utc_times {
             start_time.format(crate::TIMESTAMP_FORMAT)
         } else {
-            start_time.with_timezone(&chrono::Local).format(crate::TIMESTAMP_FORMAT)
+            start_time
+                .with_timezone(&chrono::Local)
+                .format(crate::TIMESTAMP_FORMAT)
         };
         let duration_str = info
             .end_time
