@@ -21,22 +21,23 @@ use std::io::{BufWriter, Write};
 
 use crate::*;
 
+/// Options controlling the behavior of `show_versions`.
 #[derive(Default, Clone, Eq, PartialEq)]
 pub struct ShowVersionsOptions {
+    /// Show versions in LIFO order by band_id.
     pub newest_first: bool,
+    /// Show the total size of files in the tree.  This is
+    /// slower because it requires walking the whole index.
     pub tree_size: bool,
+    /// Show the date and time that each backup started.
     pub start_time: bool,
     /// Show how much time the backup took, or "incomplete" if it never finished.
     pub backup_duration: bool,
+    /// Show times in UTC rather than the local timezone.
     pub utc: bool,
 }
 
 /// Print a list of versions, one per line.
-///
-/// With `show_sizes` the (unpacked) size of the stored tree is included. This is
-/// slower because it requires walking the whole index.
-///
-/// With `utc_times`, times are shown in UTC rather than the local timezone.
 pub fn show_versions(
     archive: &Archive,
     options: &ShowVersionsOptions,
