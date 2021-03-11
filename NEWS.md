@@ -1,6 +1,6 @@
 # Conserve release history
 
-## v0.6.11 NOT RELEASED YET
+## v0.6.11 2021-03-11
 
 - Fix the displayed count of blocks written in backup stats.
 
