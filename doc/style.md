@@ -63,9 +63,31 @@ Within stats objects, the last word of the name is the unit of measurement, eg
 
 ## Tests
 
-Tests for observable behavior of the public interface should be in the top-level
-`tests/` directory. Tests for private APIs, or that rely on private APIs to
-assess, are in unit test submodules.
+### Structure
+
+Code in Conserve can be tested in any of three ways:
+
+1. Key features and behaviors accessible through the command-line interface
+   should be tested in `tests/cli`, which runs the `conserve` binary as a
+   subprocess and examines its output. Since Conserve is  
+   primarily intended for use as a command-line tool these are the most
+   important tests to add.
+
+2. Public API behavior is tested through `tests/api`. These are useful for
+   behaviors that are harder to exercise or examine through the CLI.
+
+3. Unit tests that require access to private interfaces live inside the source
+   files. These are only needed when it's important to test something that
+   should not be public.
+
+Doc tests are discouraged because they're slower to build and run.
+
+### Test data
+
+Many tests need an archive or working tree as input.
+
+Some archives are provided in the `testdata/` tree. If the archive will be
+mutated by the test it should be copied to a temporary directory first.
 
 Tests that need a source tree can build it using `assert_fs` or make use of the
 example trees under `testdata/tree/`. Note that the git checkout (or Cargo build
