@@ -13,8 +13,8 @@
 
 //! Progress bars.
 
-use std::fmt::Write;
 use std::time::{Duration, Instant};
+use std::{borrow::Cow, fmt::Write};
 
 use thousands::Separable;
 
@@ -23,8 +23,8 @@ use crate::ui::with_locked_ui;
 const PROGRESS_RATE_LIMIT: Duration = Duration::from_millis(200);
 
 /// A progress bar, created from the UI.
-pub struct ProgressBar {
-    phase: String,
+pub struct ProgressBar<'a> {
+    phase: Cow<'a, str>,
     /// The filename currently being processed.
     filename: String,
     total_work: usize,
@@ -38,10 +38,10 @@ pub struct ProgressBar {
     last_drawn: Option<Instant>,
 }
 
-impl ProgressBar {
-    pub fn new() -> ProgressBar {
+impl<'a> ProgressBar<'a> {
+    pub fn new() -> ProgressBar<'a> {
         ProgressBar {
-            phase: String::new(),
+            phase: Cow::Borrowed(""),
             filename: String::new(),
             total_work: 0,
             work_done: 0,
@@ -53,8 +53,8 @@ impl ProgressBar {
         }
     }
 
-    pub fn set_phase(&mut self, phase: String) {
-        self.phase = phase;
+    pub fn set_phase<T: Into<Cow<'a, str>>>(&mut self, phase: T) {
+        self.phase = phase.into();
         self.maybe_redraw();
     }
 
@@ -184,13 +184,13 @@ impl ProgressBar {
     }
 }
 
-impl Drop for ProgressBar {
+impl<'a> Drop for ProgressBar<'a> {
     fn drop(&mut self) {
         with_locked_ui(|ui| ui.clear_progress())
     }
 }
 
-impl Default for ProgressBar {
+impl<'a> Default for ProgressBar<'a> {
     fn default() -> Self {
         ProgressBar::new()
     }

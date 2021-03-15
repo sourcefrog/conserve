@@ -212,7 +212,7 @@ impl Archive {
     fn iter_referenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         let archive = self.clone();
         let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Find referenced blocks...".to_owned());
+        progress_bar.set_phase("Find referenced blocks...");
         let band_ids = self.list_band_ids()?;
         let num_bands = band_ids.len();
         Ok(band_ids
@@ -235,7 +235,7 @@ impl Archive {
 
     fn iter_present_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Find present blocks...".to_owned());
+        progress_bar.set_phase("Find present blocks...");
         Ok(self
             .block_dir()
             .block_names()?
@@ -264,7 +264,7 @@ impl Archive {
         stats.unreferenced_block_count = blocks.len();
 
         let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Measure unreferenced blocks".to_owned());
+        progress_bar.set_phase("Measure unreferenced blocks");
         progress_bar.set_total_work(blocks.len());
         let progress_bar_mutex = Mutex::new(progress_bar);
         let total_bytes = blocks
@@ -278,7 +278,7 @@ impl Archive {
 
         if !blocks.is_empty() && !options.dry_run {
             let mut progress_bar = ProgressBar::new();
-            progress_bar.set_phase("Deleting unreferenced blocks".to_owned());
+            progress_bar.set_phase("Deleting unreferenced blocks");
             progress_bar.set_total_work(blocks.len());
             let progress_bar_mutex = Mutex::new(progress_bar);
             let error_count = blocks
@@ -324,7 +324,7 @@ impl Archive {
         let num_bands = band_ids.len();
 
         let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Check index".to_owned());
+        progress_bar.set_phase("Check index");
         progress_bar.set_total_work(num_bands);
         let progress_bar_mutex = Mutex::new(progress_bar);
 

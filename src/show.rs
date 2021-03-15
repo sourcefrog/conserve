@@ -86,7 +86,7 @@ pub fn show_versions(
                 info.end_time
                     .and_then(|et| (et - info.start_time).to_std().ok())
                     .map(crate::ui::duration_to_hms)
-                    .map(|s| Cow::Owned(s))
+                    .map(Cow::Owned)
                     .unwrap_or(Cow::Borrowed("unknown"))
             } else {
                 Cow::Borrowed("incomplete")

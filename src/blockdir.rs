@@ -253,7 +253,7 @@ impl BlockDir {
         // TODO: Test having a block with the right compression but the wrong contents.
         ui::println("Count blocks...");
         let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Count blocks".to_owned());
+        progress_bar.set_phase("Count blocks");
         let blocks: Vec<BlockHash> = self
             .block_names()?
             .enumerate()
@@ -271,7 +271,7 @@ impl BlockDir {
         progress_bar.set_total_work(blocks.len());
         stats.block_read_count = blocks.len().try_into().unwrap();
         let block_count = blocks.len();
-        progress_bar.set_phase("Check block hashes".to_owned());
+        progress_bar.set_phase("Check block hashes");
         progress_bar.set_total_work(block_count);
         progress_bar.set_work_done(0);
         let progress_bar_mutex = Mutex::new(progress_bar);

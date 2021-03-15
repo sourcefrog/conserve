@@ -72,7 +72,7 @@ pub fn backup(
     let mut stats = BackupStats::default();
     let mut progress_bar = ProgressBar::new();
 
-    progress_bar.set_phase("Copying".to_owned());
+    progress_bar.set_phase("Copying");
     let entry_iter = source.iter_filtered(None, options.excludes.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {

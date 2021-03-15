@@ -41,7 +41,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
     // since it's nice to see realistic overall progress. We could keep all the entries
     // in memory, and maybe we should, but it might get unreasonably big.
     if options.measure_first {
-        progress_bar.set_phase("Measure source tree".to_owned());
+        progress_bar.set_phase("Measure source tree");
         // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
         // again a second time? But, that'll potentially use memory proportional to tree size, which
         // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
@@ -49,7 +49,7 @@ pub fn copy_tree<ST: ReadTree, DT: WriteTree>(
         progress_bar.set_bytes_total(source.size(options.excludes.clone())?.file_bytes as u64);
     }
 
-    progress_bar.set_phase("Copying".to_owned());
+    progress_bar.set_phase("Copying");
     let entry_iter: Box<dyn Iterator<Item = ST::Entry>> =
         source.iter_filtered(options.only_subtree.clone(), options.excludes.clone())?;
     for entry in entry_iter {

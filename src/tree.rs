@@ -62,7 +62,7 @@ pub trait ReadTree {
     /// This typically requires walking all entries, which may take a while.
     fn size(&self, excludes: Option<GlobSet>) -> Result<TreeSize> {
         let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Measuring".to_owned());
+        progress_bar.set_phase("Measuring");
         let mut tot = 0u64;
         for e in self.iter_filtered(None, excludes)? {
             // While just measuring size, ignore directories/files we can't stat.
