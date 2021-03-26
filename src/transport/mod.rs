@@ -1,4 +1,4 @@
-// Copyright 2020 Martin Pool.
+// Copyright 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -24,7 +24,15 @@ use crate::Result;
 
 pub mod local;
 
-/// Abstracted filesystem IO ta access an archive.
+
+/// Open a `Transport` to access a local directory.
+pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
+    // TODO: Recognize URL-style strings.
+    Ok(Box::new(local::LocalTransport::new(&Path::new(s))))
+}
+
+
+/// Abstracted filesystem IO to access an archive.
 ///
 /// This supports operations that are common across local filesystems, SFTP, and cloud storage, and
 /// that are intended to be sufficient to efficiently implement the Conserve format.
@@ -113,13 +121,6 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
 impl Clone for Box<dyn Transport> {
     fn clone(&self) -> Box<dyn Transport> {
         self.box_clone()
-    }
-}
-
-impl dyn Transport {
-    pub fn new(s: &str) -> Result<Box<dyn Transport>> {
-        // TODO: Recognize URL-style strings.
-        Ok(Box::new(local::LocalTransport::new(&Path::new(s))))
     }
 }
 

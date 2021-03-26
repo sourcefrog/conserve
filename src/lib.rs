@@ -70,7 +70,7 @@ pub use crate::restore::{restore, RestoreOptions, RestoreTree};
 pub use crate::show::{show_versions, ShowVersionsOptions};
 pub use crate::stats::{BackupStats, CopyStats, DeleteStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
-pub use crate::transport::Transport;
+pub use crate::transport::{Transport, open_transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
 
 // Commonly-used external types.

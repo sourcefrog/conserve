@@ -145,6 +145,7 @@ mod test {
 
     use super::*;
     use crate::kind::Kind;
+    use crate::*;
 
     #[test]
     fn read_file() {
@@ -201,11 +202,11 @@ mod test {
             .write_str("Morning coffee")
             .unwrap();
 
-        let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
+        let transport = open_transport(&temp.path().to_string_lossy()).unwrap();
         let mut root_list: Vec<_> = transport
             .iter_dir_entries(".")
             .unwrap()
-            .map(io::Result::unwrap)
+            .map(std::io::Result::unwrap)
             .collect();
         assert_eq!(root_list.len(), 2);
         root_list.sort();
@@ -228,7 +229,7 @@ mod test {
         let subdir_list: Vec<_> = transport
             .iter_dir_entries("subdir")
             .unwrap()
-            .map(io::Result::unwrap)
+            .map(std::io::Result::unwrap)
             .collect();
         assert_eq!(
             subdir_list,
@@ -245,7 +246,7 @@ mod test {
     fn write_file() {
         // TODO: Maybe test some error cases of failing to write.
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
+        let transport = open_transport(&temp.path().to_string_lossy()).unwrap();
 
         transport.create_dir("subdir").unwrap();
         transport
@@ -263,7 +264,7 @@ mod test {
     #[test]
     fn create_existing_dir() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
+        let transport = open_transport(&temp.path().to_string_lossy()).unwrap();
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
@@ -275,7 +276,7 @@ mod test {
     #[test]
     fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
+        let transport = open_transport(&temp.path().to_string_lossy()).unwrap();
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();
@@ -284,7 +285,7 @@ mod test {
         let sub_list: Vec<DirEntry> = sub_transport
             .iter_dir_entries("")
             .unwrap()
-            .map(Result::unwrap)
+            .map(|r| r.unwrap())
             .collect();
 
         assert_eq!(sub_list.len(), 1);
@@ -296,7 +297,7 @@ mod test {
     #[test]
     fn remove_dir_all() -> std::io::Result<()> {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::new(&temp.path().to_string_lossy()).unwrap();
+        let transport = open_transport(&temp.path().to_string_lossy()).unwrap();
 
         transport.create_dir("aaa")?;
         transport.create_dir("aaa/bbb")?;
