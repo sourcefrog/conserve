@@ -24,13 +24,11 @@ use crate::Result;
 
 pub mod local;
 
-
 /// Open a `Transport` to access a local directory.
 pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
     // TODO: Recognize URL-style strings.
     Ok(Box::new(local::LocalTransport::new(&Path::new(s))))
 }
-
 
 /// Abstracted filesystem IO to access an archive.
 ///
