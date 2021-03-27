@@ -145,7 +145,6 @@ mod test {
 
     use super::*;
     use crate::kind::Kind;
-    use crate::*;
 
     #[test]
     fn read_file() {
@@ -202,7 +201,7 @@ mod test {
             .write_str("Morning coffee")
             .unwrap();
 
-        let transport = open_transport(&temp.path().to_string_lossy()).unwrap();
+        let transport = LocalTransport::new(&temp.path());
         let mut root_list: Vec<_> = transport
             .iter_dir_entries(".")
             .unwrap()
@@ -246,7 +245,7 @@ mod test {
     fn write_file() {
         // TODO: Maybe test some error cases of failing to write.
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = open_transport(&temp.path().to_string_lossy()).unwrap();
+        let transport = LocalTransport::new(&temp.path());
 
         transport.create_dir("subdir").unwrap();
         transport
@@ -264,7 +263,7 @@ mod test {
     #[test]
     fn create_existing_dir() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = open_transport(&temp.path().to_string_lossy()).unwrap();
+        let transport = LocalTransport::new(&temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
@@ -276,7 +275,7 @@ mod test {
     #[test]
     fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = open_transport(&temp.path().to_string_lossy()).unwrap();
+        let transport = LocalTransport::new(&temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();
@@ -297,7 +296,7 @@ mod test {
     #[test]
     fn remove_dir_all() -> std::io::Result<()> {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = open_transport(&temp.path().to_string_lossy()).unwrap();
+        let transport = LocalTransport::new(&temp.path());
 
         transport.create_dir("aaa")?;
         transport.create_dir("aaa/bbb")?;
