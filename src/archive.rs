@@ -500,7 +500,7 @@ mod tests {
             af.last_complete_band().unwrap().is_none(),
             "Archive should have no bands yet"
         );
-        assert_eq!(af.referenced_blocks().unwrap().iter().count(), 0);
+        assert_eq!(af.referenced_blocks().unwrap().len(), 0);
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 

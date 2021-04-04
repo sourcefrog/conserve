@@ -384,12 +384,12 @@ pub fn detect_minimal_mtime_change() {
 
 #[test]
 fn small_files_combined_two_backups() {
-    let mut af = ScratchArchive::new();
+    let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("file1");
     srcdir.create_file("file2");
 
-    let stats1 = backup(&mut af, &srcdir.live_tree(), &BackupOptions::default()).unwrap();
+    let stats1 = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).unwrap();
     // Although the two files have the same content, we do not yet dedupe them
     // within a combined block, so the block is different to when one identical
     // file is stored alone. This could be fixed.
@@ -401,7 +401,7 @@ fn small_files_combined_two_backups() {
     // Add one more file, also identical, but it is not combined with the previous blocks.
     // This is a shortcoming of the current dedupe approach.
     srcdir.create_file("file3");
-    let stats2 = backup(&mut af, &srcdir.live_tree(), &BackupOptions::default()).unwrap();
+    let stats2 = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).unwrap();
     assert_eq!(stats2.new_files, 1);
     assert_eq!(stats2.unmodified_files, 2);
     assert_eq!(stats2.written_blocks, 1);
