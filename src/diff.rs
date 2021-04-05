@@ -20,7 +20,29 @@ pub struct DiffOptions {
     pub excludes: Option<GlobSet>,
 }
 
-pub fn diff(st: &StoredTree, lt: &LiveTree, options: &DiffOptions) -> Result<()> {
+pub enum Change {
+    Unchanged,
+    New,
+    Deleted,
+    Changed,
+}
+
+pub struct DiffEntry {
+    apath: Apath,
+    change: Change,
+}
+
+/// Generate an iter of per-entry diffs between two trees.
+pub fn iter_diff_entries(
+    st: &StoredTree,
+    lt: &LiveTree,
+    options: &DiffOptions,
+) -> impl Iterator<Item = DiffEntry> {
+    todo!();
+    std::iter::empty()
+}
+
+pub fn show_diff(st: &StoredTree, lt: &LiveTree, options: &DiffOptions) -> Result<()> {
     // TODO: Consider whether the actual files have changed.
     // TODO: Summarize diff.
     // TODO: Optionally include unchanged files.

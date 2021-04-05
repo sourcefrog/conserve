@@ -56,7 +56,7 @@ pub use crate::band::BandSelectionPolicy;
 pub use crate::bandid::BandId;
 pub use crate::blockdir::BlockDir;
 pub use crate::blockhash::BlockHash;
-pub use crate::diff::{diff, DiffOptions};
+pub use crate::diff::{show_diff, DiffOptions};
 pub use crate::entry::Entry;
 pub use crate::errors::Error;
 pub use crate::gc_lock::GarbageCollectionLock;
@@ -70,7 +70,7 @@ pub use crate::restore::{restore, RestoreOptions, RestoreTree};
 pub use crate::show::{show_versions, ShowVersionsOptions};
 pub use crate::stats::{BackupStats, CopyStats, DeleteStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
-pub use crate::transport::{Transport, open_transport};
+pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
 
 // Commonly-used external types.
