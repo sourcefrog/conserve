@@ -14,14 +14,17 @@
 //! Test `conserve delete`.
 
 use assert_cmd::prelude::*;
+use assert_fs::prelude::*;
+use assert_fs::TempDir;
 use predicates::prelude::*;
 
 use conserve::test_fixtures::ScratchArchive;
+use conserve::BandId;
 
 use crate::run_conserve;
 
 #[test]
-fn delete_bands() {
+fn delete_both_bands() {
     let af = ScratchArchive::new();
     af.store_two_versions();
 
@@ -29,6 +32,53 @@ fn delete_bands() {
         .args(&["delete"])
         .args(&["-b", "b0000"])
         .args(&["-b", "b0001"])
+        .arg(af.path())
+        .assert()
+        .success();
+
+    assert_eq!(af.list_band_ids().unwrap().len(), 0);
+    assert_eq!(af.present_blocks().unwrap().len(), 0);
+}
+
+#[test]
+fn delete_second_version() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+
+    run_conserve()
+        .args(&["delete"])
+        .args(&["-b", "b1"])
+        .arg(af.path())
+        .assert()
+        .success();
+    // run_conserve()
+    //     .args(&["debug", "index"])
+    //     .arg(af.path())
+    //     .spawn()
+    //     .unwrap()
+    //     .wait()
+    //     .unwrap();
+
+    assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[0])]);
+    // b0 contains two small files packed into the same block.
+    assert_eq!(af.present_blocks().unwrap().len(), 1);
+
+    let rd = TempDir::new().unwrap();
+    run_conserve()
+        .arg("restore")
+        .arg(af.path())
+        .arg(rd.path())
+        .assert()
+        .success();
+    rd.child("hello").assert(predicate::path::is_file());
+    rd.child("hello").assert(predicate::eq("contents"));
+    rd.child("subdir/subfile").assert(predicate::eq("contents"));
+
+    // File added in b1 should not have been restored.
+    rd.child("hello2").assert(predicate::path::exists().not());
+
+    run_conserve()
+        .arg("validate")
         .arg(af.path())
         .assert()
         .success();
