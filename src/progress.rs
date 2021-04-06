@@ -24,6 +24,7 @@ const PROGRESS_RATE_LIMIT: Duration = Duration::from_millis(200);
 
 /// A progress bar, created from the UI.
 pub struct ProgressBar<'a> {
+    /// A brief description of the current phase of work, such as "Copying".
     phase: Cow<'a, str>,
     /// The filename currently being processed.
     filename: String,
@@ -179,8 +180,8 @@ impl<'a> ProgressBar<'a> {
         percent_str
     }
 
-    pub(crate) fn render_filename(&self) -> String {
-        self.filename.clone()
+    pub(crate) fn filename(&self) -> &str {
+        &self.filename
     }
 }
 

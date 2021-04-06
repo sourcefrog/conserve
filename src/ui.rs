@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -11,8 +11,9 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Abstract user interface trait.
+//! Console UI.
 
+use std::borrow::Cow;
 use std::fmt::Write;
 use std::io;
 use std::io::Write as IoWrite;
@@ -167,14 +168,15 @@ impl UIState {
         let mut out = std::io::stdout();
         let prefix = bar.render_prefix();
         let completion = bar.render_completion();
-        let filename = bar.render_filename();
+        let filename = bar.filename();
         let filename_limit = width - prefix.len() - completion.len();
         let truncated_filename = if filename.len() < filename_limit {
-            filename
+            Cow::Borrowed(filename)
         } else {
-            UnicodeSegmentation::graphemes(filename.as_str(), true)
+            UnicodeSegmentation::graphemes(filename, true)
                 .take(filename_limit)
                 .collect::<String>()
+                .into()
         };
 
         queue!(out, cursor::Hide, cursor::MoveToColumn(0),).unwrap();
