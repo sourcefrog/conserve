@@ -246,7 +246,7 @@ impl Archive {
     }
 
     /// Return a set of all blocks in the archive.
-    fn present_blocks(&self) -> Result<HashSet<BlockHash>> {
+    pub fn present_blocks(&self) -> Result<HashSet<BlockHash>> {
         Ok(self.iter_present_blocks()?.collect())
     }
 
