@@ -303,6 +303,9 @@ impl Archive {
     }
 
     /// Delete bands, and the blocks that they reference.
+    ///
+    /// If `delete_band_ids` is empty, this deletes no bands, but will delete any garbage
+    /// blocks referenced by no existing bands.
     pub fn delete_bands(
         &self,
         delete_band_ids: &[BandId],
@@ -310,6 +313,12 @@ impl Archive {
     ) -> Result<DeleteStats> {
         let mut stats = DeleteStats::default();
         let start = Instant::now();
+
+        let delete_guard = if options.break_lock {
+            gc_lock::GarbageCollectionLock::break_lock(self)?
+        } else {
+            gc_lock::GarbageCollectionLock::new(self)?
+        };
 
         let block_dir = self.block_dir();
         let mut keep_band_ids = self.list_band_ids()?;
@@ -340,6 +349,8 @@ impl Archive {
         stats.unreferenced_block_bytes = total_bytes;
 
         if !options.dry_run {
+            delete_guard.check()?;
+
             let mut pb = ProgressBar::new();
             pb.set_phase("Deleting bands");
             pb.set_total_work(delete_band_ids.len());
@@ -349,17 +360,17 @@ impl Archive {
                 pb.increment_work_done(1);
             }
 
-                let mut pb = ProgressBar::new();
-                pb.set_phase("Deleting unreferenced blocks");
-                pb.set_total_work(unref_count);
-                let progress_bar_mutex = Mutex::new(pb);
-                let error_count = unref
-                    .par_iter()
-                    .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
-                    .filter(|block_hash| block_dir.delete_block(&block_hash).is_err())
-                    .count();
-                stats.deletion_errors += error_count;
-                stats.deleted_block_count += unref_count - error_count;
+            let mut pb = ProgressBar::new();
+            pb.set_phase("Deleting unreferenced blocks");
+            pb.set_total_work(unref_count);
+            let progress_bar_mutex = Mutex::new(pb);
+            let error_count = unref
+                .par_iter()
+                .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
+                .filter(|block_hash| block_dir.delete_block(&block_hash).is_err())
+                .count();
+            stats.deletion_errors += error_count;
+            stats.deleted_block_count += unref_count - error_count;
         }
 
         stats.elapsed = start.elapsed();
