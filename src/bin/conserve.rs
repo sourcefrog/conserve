@@ -58,11 +58,6 @@ enum Command {
         /// Break a lock left behind by a previous interrupted gc operation, and then gc.
         #[structopt(long)]
         break_lock: bool,
-        /// Delete indexes but don't garbage-collect blocks.
-        ///
-        /// (Faster, but doesn't free up space. The archive should later be gc'd.)
-        #[structopt(long)]
-        no_gc: bool,
     },
 
     /// Compare a stored tree to a source directory.
@@ -245,7 +240,6 @@ impl Command {
                 archive,
                 backup,
                 dry_run,
-                no_gc,
                 break_lock,
             } => {
                 let stats = Archive::open_path(archive)?.delete_bands(
@@ -253,7 +247,6 @@ impl Command {
                     &DeleteOptions {
                         dry_run: *dry_run,
                         break_lock: *break_lock,
-                        no_gc: *no_gc,
                     },
                 )?;
                 ui::println(&format!("{}", stats));
@@ -278,7 +271,6 @@ impl Command {
                 let stats = archive.delete_unreferenced(&DeleteOptions {
                     dry_run: *dry_run,
                     break_lock: *break_lock,
-                    no_gc: false,
                 })?;
                 ui::println(&format!("{}", stats));
             }

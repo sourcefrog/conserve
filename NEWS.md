@@ -7,6 +7,8 @@
 - `conserve delete` plans the whole operation before deleting anything, so if
   it's interrupted early it's less likely that anything will have been deleted.
 
+- `conserve delete --no-gc` was removed; it had limited value.
+
 ## v0.6.11 2021-03-11
 
 - Fix the displayed count of blocks written in backup stats.

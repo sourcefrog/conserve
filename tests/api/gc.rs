@@ -39,7 +39,6 @@ fn unreferenced_blocks() {
         .delete_unreferenced(&DeleteOptions {
             dry_run: true,
             break_lock: false,
-            no_gc: false,
         })
         .unwrap();
     assert_eq!(

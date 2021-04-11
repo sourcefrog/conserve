@@ -54,7 +54,6 @@ struct ArchiveHeader {
 pub struct DeleteOptions {
     pub dry_run: bool,
     pub break_lock: bool,
-    pub no_gc: bool,
 }
 
 impl Archive {
@@ -350,7 +349,6 @@ impl Archive {
                 pb.increment_work_done(1);
             }
 
-            if !options.no_gc {
                 let mut pb = ProgressBar::new();
                 pb.set_phase("Deleting unreferenced blocks");
                 pb.set_total_work(unref_count);
@@ -362,7 +360,6 @@ impl Archive {
                     .count();
                 stats.deletion_errors += error_count;
                 stats.deleted_block_count += unref_count - error_count;
-            }
         }
 
         stats.elapsed = start.elapsed();
