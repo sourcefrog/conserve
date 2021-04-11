@@ -153,10 +153,10 @@ fn basic_backup() {
         .stderr(predicate::str::is_empty())
         .stdout(
             "\
-both     /
-both     /hello
-both     /subdir
-both     /subdir/subfile
+.    /
+.    /hello
+.    /subdir
+.    /subdir/subfile
 ",
         );
 

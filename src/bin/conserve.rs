@@ -267,7 +267,8 @@ impl Command {
                 let excludes = excludes::from_strings(exclude)?;
                 let st = stored_tree_from_opt(archive, backup)?;
                 let lt = LiveTree::open(source)?;
-                show_diff(&st, &lt, &DiffOptions { excludes })?;
+                let options = DiffOptions { excludes };
+                show_diff(diff(&st, &lt, &options)?, &mut stdout)?;
             }
             Command::Gc {
                 archive,
