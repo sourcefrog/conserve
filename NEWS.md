@@ -1,5 +1,12 @@
 # Conserve release history
 
+## UNRELEASED
+
+- `conserve delete --dry-run` accurately predicts how much space will be freed.
+
+- `conserve delete` plans the whole operation before deleting anything, so if
+  it's interrupted early it's less likely that anything will have been deleted.
+
 ## v0.6.11 2021-03-11
 
 - Fix the displayed count of blocks written in backup stats.

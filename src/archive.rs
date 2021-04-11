@@ -306,48 +306,65 @@ impl Archive {
     /// Delete bands, and the blocks that they reference.
     pub fn delete_bands(
         &self,
-        band_ids: &[BandId],
+        delete_band_ids: &[BandId],
         options: &DeleteOptions,
     ) -> Result<DeleteStats> {
         let mut stats = DeleteStats::default();
         let start = Instant::now();
+
+        let block_dir = self.block_dir();
+        let mut keep_band_ids = self.list_band_ids()?;
+        keep_band_ids.retain(|b| !delete_band_ids.contains(b));
+
+        let referenced = self.iter_referenced_blocks(&keep_band_ids)?.collect();
+        let unref: HashSet<BlockHash> = self
+            .present_blocks()?
+            .difference(&referenced)
+            .cloned()
+            .collect();
+        let unref_count = unref.len();
+        stats.unreferenced_block_count = unref_count;
+
+        let mut pb = ProgressBar::new();
+        pb.set_phase("Measure unreferenced blocks".to_owned());
+        pb.set_total_work(unref.len());
+        let pb_mutex = Mutex::new(pb);
+        let total_bytes = unref
+            .par_iter()
+            .inspect(|_| pb_mutex.lock().unwrap().increment_work_done(1))
+            .map(|block_id| {
+                let size = block_dir.compressed_size(&block_id).unwrap_or_default();
+                pb_mutex.lock().unwrap().increment_bytes_done(size);
+                size
+            })
+            .sum();
+        stats.unreferenced_block_bytes = total_bytes;
+
         if !options.dry_run {
-            for band_id in band_ids {
+            let mut pb = ProgressBar::new();
+            pb.set_phase("Deleting bands");
+            pb.set_total_work(delete_band_ids.len());
+            for band_id in delete_band_ids {
                 Band::delete(self, band_id)?;
                 stats.deleted_band_count += 1;
+                pb.increment_work_done(1);
             }
-            if !options.no_gc {
-                stats += self.delete_unreferenced(options)?;
-            }
-        } else {
-            let all_blocks = self.present_blocks()?;
-            let mut keep_band_ids = self.list_band_ids()?;
-            keep_band_ids.retain(|b| !band_ids.contains(b));
-            let referenced = self.iter_referenced_blocks(&keep_band_ids)?.collect();
-            let unreferenced: HashSet<BlockHash> =
-                all_blocks.difference(&referenced).cloned().collect();
-            // stats.deleted_block_count += unreferenced.count();
-            let mut count = 0;
-            let mut bytes = 0;
 
-            let mut progress_bar = ProgressBar::new();
-            progress_bar.set_phase("Measure unreferenced blocks".to_owned());
-            progress_bar.set_total_work(unreferenced.len());
-            for block_id in unreferenced {
-                progress_bar.increment_work_done(1);
-                progress_bar.set_bytes_done(bytes);
-                count += 1;
-                // skip errors while counting
-                bytes += self
-                    .block_dir
-                    .compressed_size(&block_id)
-                    .unwrap_or_default();
+            if !options.no_gc {
+                let mut pb = ProgressBar::new();
+                pb.set_phase("Deleting unreferenced blocks");
+                pb.set_total_work(unref_count);
+                let progress_bar_mutex = Mutex::new(pb);
+                let error_count = unref
+                    .par_iter()
+                    .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
+                    .filter(|block_hash| block_dir.delete_block(&block_hash).is_err())
+                    .count();
+                stats.deletion_errors += error_count;
+                stats.deleted_block_count += unref_count - error_count;
             }
-            stats.deleted_band_count = band_ids.len();
-            stats.unreferenced_block_count = count;
-            stats.deleted_block_count = count;
-            stats.unreferenced_block_bytes = bytes;
         }
+
         stats.elapsed = start.elapsed();
         Ok(stats)
     }
