@@ -1,6 +1,6 @@
 # Conserve release history
 
-## UNRELEASED
+## v0.6.12 2021-04-11
 
 - `conserve delete --dry-run` accurately predicts how much space will be freed.
 
