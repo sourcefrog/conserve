@@ -36,10 +36,13 @@ fn unreferenced_blocks() {
 
     // Delete dry run.
     let delete_stats = archive
-        .delete_unreferenced(&DeleteOptions {
-            dry_run: true,
-            break_lock: false,
-        })
+        .delete_bands(
+            &[],
+            &DeleteOptions {
+                dry_run: true,
+                break_lock: false,
+            },
+        )
         .unwrap();
     assert_eq!(
         delete_stats,
@@ -59,7 +62,7 @@ fn unreferenced_blocks() {
         break_lock: false,
         ..Default::default()
     };
-    let delete_stats = archive.delete_unreferenced(&options).unwrap();
+    let delete_stats = archive.delete_bands(&[], &options).unwrap();
     assert_eq!(
         delete_stats,
         DeleteStats {
@@ -73,7 +76,7 @@ fn unreferenced_blocks() {
     );
 
     // Try again to delete: should find no garbage.
-    let delete_stats = archive.delete_unreferenced(&options).unwrap();
+    let delete_stats = archive.delete_bands(&[], &options).unwrap();
     assert_eq!(
         delete_stats,
         DeleteStats {
@@ -104,10 +107,13 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
 
     // Leak the lock, then gc breaking the lock.
     std::mem::forget(lock1);
-    archive.delete_unreferenced(&DeleteOptions {
-        break_lock: true,
-        ..Default::default()
-    })?;
+    archive.delete_bands(
+        &[],
+        &DeleteOptions {
+            break_lock: true,
+            ..Default::default()
+        },
+    )?;
 
     // Backup should now succeed.
     let backup_result = backup(&archive, &tf.live_tree(), &BackupOptions::default());

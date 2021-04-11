@@ -249,59 +249,6 @@ impl Archive {
         Ok(self.iter_present_blocks()?.collect())
     }
 
-    /// Delete unreferenced blocks.
-    pub fn delete_unreferenced(&self, options: &DeleteOptions) -> Result<DeleteStats> {
-        let block_dir = self.block_dir();
-        let mut stats = DeleteStats::default();
-        let start = Instant::now();
-        let delete_guard = if options.break_lock {
-            gc_lock::GarbageCollectionLock::break_lock(self)?
-        } else {
-            gc_lock::GarbageCollectionLock::new(self)?
-        };
-
-        let mut blocks: HashSet<BlockHash> = self.present_blocks()?;
-        let band_ids = self.list_band_ids()?;
-        for block_hash in self.iter_referenced_blocks(&band_ids)? {
-            // NOTE: We could potentially notice here blocks that are missing: referenced but
-            // not present. However, because the reference iter can contain duplicates,
-            // it would require keeping another set. On the whole that seems better left
-            // to validation.
-            blocks.remove(&block_hash);
-        }
-        stats.unreferenced_block_count = blocks.len();
-
-        let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Measure unreferenced blocks");
-        progress_bar.set_total_work(blocks.len());
-        let progress_bar_mutex = Mutex::new(progress_bar);
-        let total_bytes = blocks
-            .par_iter()
-            .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
-            .map(|hash| block_dir.compressed_size(hash).unwrap_or_default())
-            .sum();
-        stats.unreferenced_block_bytes = total_bytes;
-
-        delete_guard.check()?;
-
-        if !blocks.is_empty() && !options.dry_run {
-            let mut progress_bar = ProgressBar::new();
-            progress_bar.set_phase("Deleting unreferenced blocks");
-            progress_bar.set_total_work(blocks.len());
-            let progress_bar_mutex = Mutex::new(progress_bar);
-            let error_count = blocks
-                .par_iter()
-                .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
-                .filter(|block_hash| block_dir.delete_block(&block_hash).is_err())
-                .count();
-            stats.deletion_errors += error_count;
-            stats.deleted_block_count += blocks.len() - error_count;
-        }
-
-        stats.elapsed = start.elapsed();
-        Ok(stats)
-    }
-
     /// Delete bands, and the blocks that they reference.
     ///
     /// If `delete_band_ids` is empty, this deletes no bands, but will delete any garbage

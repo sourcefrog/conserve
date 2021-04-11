@@ -268,10 +268,13 @@ impl Command {
                 break_lock,
             } => {
                 let archive = Archive::open_path(archive)?;
-                let stats = archive.delete_unreferenced(&DeleteOptions {
-                    dry_run: *dry_run,
-                    break_lock: *break_lock,
-                })?;
+                let stats = archive.delete_bands(
+                    &[],
+                    &DeleteOptions {
+                        dry_run: *dry_run,
+                        break_lock: *break_lock,
+                    },
+                )?;
                 ui::println(&format!("{}", stats));
             }
             Command::Init { archive } => {
