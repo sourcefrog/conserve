@@ -41,6 +41,43 @@ fn delete_both_bands() {
 }
 
 #[test]
+fn delete_first_version() {
+    let af = ScratchArchive::new();
+    af.store_two_versions();
+
+    run_conserve()
+        .args(&["delete"])
+        .args(&["-b", "b0"])
+        .arg(af.path())
+        .assert()
+        .success();
+
+    assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[1])]);
+    // b0 contains two small files packed into the same block, which is not deleted.
+    // b1 (not deleted) adds one additional block, which is still referenced.
+    assert_eq!(af.present_blocks().unwrap().len(), 2);
+
+    let rd = TempDir::new().unwrap();
+    run_conserve()
+        .arg("restore")
+        .arg(af.path())
+        .arg(rd.path())
+        .assert()
+        .success();
+    rd.child("hello").assert(predicate::path::is_file());
+    rd.child("hello").assert(predicate::eq("contents"));
+    rd.child("subdir/subfile").assert(predicate::eq("contents"));
+
+    // File added in b1 has been restored.
+    rd.child("hello2").assert(predicate::eq("contents"));
+
+    run_conserve()
+        .arg("validate")
+        .arg(af.path())
+        .assert()
+        .success();
+}
+#[test]
 fn delete_second_version() {
     let af = ScratchArchive::new();
     af.store_two_versions();
@@ -51,13 +88,6 @@ fn delete_second_version() {
         .arg(af.path())
         .assert()
         .success();
-    // run_conserve()
-    //     .args(&["debug", "index"])
-    //     .arg(af.path())
-    //     .spawn()
-    //     .unwrap()
-    //     .wait()
-    //     .unwrap();
 
     assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[0])]);
     // b0 contains two small files packed into the same block.
