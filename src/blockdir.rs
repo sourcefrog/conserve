@@ -274,7 +274,7 @@ impl BlockDir {
         progress_bar.set_phase("Check block hashes");
         progress_bar.set_total_work(block_count);
         progress_bar.set_work_done(0);
-        let progress_bar_mutex = Mutex::new(progress_bar);
+        let pb_mutex = Mutex::new(progress_bar);
         // Make a vec of Some(usize) if the block could be read, or None if it
         // failed, where the usize gives the uncompressed data size.
         let mut results: Vec<Option<(BlockHash, usize)>> = Vec::new();
@@ -285,7 +285,11 @@ impl BlockDir {
                     .get_block_content(&hash)
                     .map(|(bytes, _sizes)| (hash, bytes.len()))
                     .ok();
-                progress_bar_mutex.lock().unwrap().increment_work_done(1);
+                let mut pbl = pb_mutex.lock().unwrap();
+                pbl.increment_work_done(1);
+                if let Some(ref t) = r {
+                    pbl.increment_bytes_done(t.1 as u64);
+                }
                 r
             })
             .collect_into_vec(&mut results);
