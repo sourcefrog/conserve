@@ -73,6 +73,8 @@ enum Command {
         backup: Option<BandId>,
         #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
+        #[structopt(long)]
+        include_unchanged: bool,
     },
 
     /// Create a new archive.
@@ -263,11 +265,15 @@ impl Command {
                 source,
                 backup,
                 exclude,
+                include_unchanged,
             } => {
                 let excludes = excludes::from_strings(exclude)?;
                 let st = stored_tree_from_opt(archive, backup)?;
                 let lt = LiveTree::open(source)?;
-                let options = DiffOptions { excludes };
+                let options = DiffOptions {
+                    excludes,
+                    include_unchanged: *include_unchanged,
+                };
                 show_diff(diff(&st, &lt, &options)?, &mut stdout)?;
             }
             Command::Gc {

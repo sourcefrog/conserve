@@ -27,7 +27,11 @@ fn diff_unchanged() {
 
     let st = a.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
 
-    let des: Vec<DiffEntry> = diff(&st, &lt, &DiffOptions::default()).unwrap().collect();
+    let options = DiffOptions {
+        include_unchanged: true,
+        ..DiffOptions::default()
+    };
+    let des: Vec<DiffEntry> = diff(&st, &lt, &options).unwrap().collect();
     assert_eq!(des.len(), 2); // Root directory and the file "/thing".
     assert_eq!(
         des[0],
@@ -36,4 +40,19 @@ fn diff_unchanged() {
             kind: DiffKind::Unchanged,
         }
     );
+    assert_eq!(
+        des[1],
+        DiffEntry {
+            apath: "/thing".into(),
+            kind: DiffKind::Unchanged,
+        }
+    );
+
+    // Excluding unchanged elements
+    let options = DiffOptions {
+        include_unchanged: false,
+        ..DiffOptions::default()
+    };
+    let des: Vec<DiffEntry> = diff(&st, &lt, &options).unwrap().collect();
+    assert_eq!(des.len(), 0);
 }

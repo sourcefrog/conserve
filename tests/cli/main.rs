@@ -145,7 +145,7 @@ fn basic_backup() {
         .stdout("0 MB\n"); // "contents"
 
     run_conserve()
-        .arg("diff")
+        .args(&["diff", "--include-unchanged"])
         .arg(&arch_dir)
         .arg(&src)
         .assert()
@@ -160,7 +160,16 @@ fn basic_backup() {
 ",
         );
 
-    run_conserve()
+        run_conserve()
+        .args(&["diff"])
+        .arg(&arch_dir)
+        .arg(&src)
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::is_empty());
+
+        run_conserve()
         .args(&["versions", "--short"])
         .arg(&arch_dir)
         .assert()

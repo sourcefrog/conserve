@@ -20,6 +20,7 @@ use crate::*;
 #[derive(Default, Debug)]
 pub struct DiffOptions {
     pub excludes: Option<GlobSet>,
+    pub include_unchanged: bool,
 }
 
 /// The overall state of change of an entry.
@@ -55,20 +56,25 @@ pub fn diff(
     lt: &LiveTree,
     options: &DiffOptions,
 ) -> Result<impl Iterator<Item = DiffEntry>> {
+    let include_unchanged: bool = options.include_unchanged;
     Ok(MergeTrees::new(
         st.iter_filtered(None, options.excludes.clone())?,
         lt.iter_filtered(None, options.excludes.clone())?,
     )
-    .map(|me| {
+    .filter_map(move |me| {
         let kind = match me.kind {
             MergedEntryKind::Both => DiffKind::Unchanged,
             MergedEntryKind::LeftOnly => DiffKind::Deleted,
             MergedEntryKind::RightOnly => DiffKind::New,
         };
         // TODO: Check metadata and file content before deciding that it's unchanged.
-        DiffEntry {
-            apath: me.apath,
-            kind,
+        if include_unchanged || kind != DiffKind::Unchanged {
+            Some(DiffEntry {
+                apath: me.apath,
+                kind,
+            })
+        } else {
+            None
         }
     }))
 }
