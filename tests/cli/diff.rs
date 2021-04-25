@@ -13,6 +13,8 @@
 
 //! Test `conserve diff`.
 
+use std::fs;
+
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 
@@ -25,6 +27,21 @@ fn setup() -> (ScratchArchive, TreeFixture) {
     let tf = TreeFixture::new();
     tf.create_file_with_contents("hello.c", b"void main() {}");
     tf.create_dir("subdir");
+    run_conserve()
+        .arg("backup")
+        .arg(af.path())
+        .arg(tf.path())
+        .assert()
+        .success();
+    (af, tf)
+}
+
+#[cfg(unix)]
+fn setup_symlink() -> (ScratchArchive, TreeFixture) {
+    let af = ScratchArchive::new();
+    let tf = TreeFixture::new();
+    tf.create_dir("subdir");
+    tf.create_symlink("subdir/link", "target");
     run_conserve()
         .arg("backup")
         .arg(af.path())
@@ -148,5 +165,57 @@ fn change_file_content() {
         .assert()
         .success()
         .stdout(".\t/\n*\t/hello.c\n.\t/subdir\n")
+        .stderr(predicate::str::is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+pub fn symlink_unchanged() {
+    let (af, tf) = setup_symlink();
+
+    run_conserve()
+        .arg("diff")
+        .arg(af.path())
+        .arg(tf.path())
+        .assert()
+        .success()
+        .stdout("")
+        .stderr(predicate::str::is_empty());
+
+    run_conserve()
+        .arg("diff")
+        .arg("--include-unchanged")
+        .arg(af.path())
+        .arg(tf.path())
+        .assert()
+        .success()
+        .stdout(".\t/\n.\t/subdir\n.\t/subdir/link\n")
+        .stderr(predicate::str::is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+pub fn symlink_changed() {
+    let (af, tf) = setup_symlink();
+    fs::remove_file(tf.path().join("subdir/link")).unwrap();
+    tf.create_symlink("subdir/link", "newtarget");
+
+    run_conserve()
+        .arg("diff")
+        .arg(af.path())
+        .arg(tf.path())
+        .assert()
+        .success()
+        .stdout("*\t/subdir/link\n")
+        .stderr(predicate::str::is_empty());
+
+    run_conserve()
+        .arg("diff")
+        .arg("--include-unchanged")
+        .arg(af.path())
+        .arg(tf.path())
+        .assert()
+        .success()
+        .stdout(".\t/\n.\t/subdir\n*\t/subdir/link\n")
         .stderr(predicate::str::is_empty());
 }

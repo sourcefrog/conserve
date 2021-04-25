@@ -99,7 +99,10 @@ where
 {
     // TODO: Actually compare content, if requested
     let ak = ae.kind();
-    if ak != be.kind() || (ak == File && (ae.mtime() != be.mtime() || ae.size() != be.size())) {
+    if ak != be.kind()
+        || (ak == File && (ae.mtime() != be.mtime() || ae.size() != be.size()))
+        || (ak == Symlink && (ae.symlink_target() != be.symlink_target()))
+    {
         DiffEntry {
             kind: Changed,
             apath,
