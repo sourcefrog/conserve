@@ -20,34 +20,16 @@ use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
 pub trait ReadTree {
-    // TODO: Perhaps hide these and just return dyn objects?
     type Entry: Entry + 'static;
     type R: std::io::Read;
+    type IT: Iterator<Item = Self::Entry>;
 
     /// Iterate, in apath order, all the entries in this tree.
     ///
     /// Errors reading individual paths or directories are sent to the UI and
     /// counted, but are not treated as fatal, and don't appear as Results in the
     /// iterator.
-    fn iter_entries(&self) -> Result<Box<dyn Iterator<Item = Self::Entry>>>;
-
-    /// Return entries within the subtree and not excluded.
-    fn iter_filtered(
-        &self,
-        subtree: Option<Apath>,
-        excludes: Option<GlobSet>,
-    ) -> Result<Box<dyn Iterator<Item = Self::Entry>>> {
-        Ok(Box::new(self.iter_entries()?.filter(move |entry| {
-            subtree
-                .as_ref()
-                .map(|s| s.is_prefix_of(entry.apath()))
-                .unwrap_or(true)
-                && excludes
-                    .as_ref()
-                    .map(|e| !e.is_match(entry.apath()))
-                    .unwrap_or(true)
-        })))
-    }
+    fn iter_entries(&self, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Result<Self::IT>;
 
     /// Read file contents as a `std::io::Read`.
     // TODO: Remove this and use ReadBlocks or similar.
@@ -64,7 +46,7 @@ pub trait ReadTree {
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Measuring");
         let mut tot = 0u64;
-        for e in self.iter_filtered(None, excludes)? {
+        for e in self.iter_entries(None, excludes)? {
             // While just measuring size, ignore directories/files we can't stat.
             if let Some(bytes) = e.size() {
                 tot += bytes;

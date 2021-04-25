@@ -276,7 +276,7 @@ impl IndexRead {
 
     /// Make an iterator that will return all entries in this band.
     pub fn iter_entries(self) -> IndexEntryIter<IndexHunkIter> {
-        IndexEntryIter::new(self.iter_hunks())
+        IndexEntryIter::new(self.iter_hunks(), None, None)
     }
 
     /// Make an iterator that returns hunks of entries from this index.
@@ -397,13 +397,17 @@ pub struct IndexEntryIter<HI: Iterator<Item = Vec<IndexEntry>>> {
     /// returned to the client.
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
     hunk_iter: HI,
+    subtree: Option<Apath>,
+    excludes: Option<GlobSet>,
 }
 
 impl<HI: Iterator<Item = Vec<IndexEntry>>> IndexEntryIter<HI> {
-    pub(crate) fn new(hunk_iter: HI) -> Self {
+    pub(crate) fn new(hunk_iter: HI, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Self {
         IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             hunk_iter,
+            subtree,
+            excludes,
         }
     }
 }
@@ -414,6 +418,16 @@ impl<HI: Iterator<Item = Vec<IndexEntry>>> Iterator for IndexEntryIter<HI> {
     fn next(&mut self) -> Option<IndexEntry> {
         loop {
             if let Some(entry) = self.buffered_entries.next() {
+                if let Some(subtree) = &self.subtree {
+                    if !subtree.is_prefix_of(&entry.apath) {
+                        continue;
+                    }
+                }
+                if let Some(excludes) = &self.excludes {
+                    if excludes.is_match(&entry.apath) {
+                        continue;
+                    }
+                }
                 return Some(entry);
             }
             if !self.refill_entry_buffer_or_warn() {

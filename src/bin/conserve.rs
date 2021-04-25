@@ -293,13 +293,13 @@ impl Command {
                 if let Some(archive) = &stos.archive {
                     show::show_entry_names(
                         stored_tree_from_opt(archive, &stos.backup)?
-                            .iter_filtered(None, excludes)?,
+                            .iter_entries(None, excludes)?,
                         &mut stdout,
                     )?;
                 } else {
                     show::show_entry_names(
                         LiveTree::open(stos.source.clone().unwrap())?
-                            .iter_filtered(None, excludes)?,
+                            .iter_entries(None, excludes)?,
                         &mut stdout,
                     )?;
                 }

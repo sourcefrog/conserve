@@ -179,7 +179,7 @@ fn large_file() {
     let af = ScratchArchive::new();
     let tf = TreeFixture::new();
 
-    let  large_content = vec![b'a'; 4<<20];
+    let large_content = vec![b'a'; 4 << 20];
     tf.create_file_with_contents("large", &large_content);
 
     let backup_stats = backup(&af, &tf.live_tree(), &BackupOptions::default()).expect("backup");
@@ -195,11 +195,11 @@ fn large_file() {
     // Try to restore it
     let rd = TempDir::new().unwrap();
     let restore_archive = Archive::open_path(af.path()).unwrap();
-    let restore_stats = restore(&restore_archive, rd.path(), &RestoreOptions::default()).expect("restore");
+    let restore_stats =
+        restore(&restore_archive, rd.path(), &RestoreOptions::default()).expect("restore");
     assert_eq!(restore_stats.files, 1);
 
-    let  content = std::fs::read(rd.path().join("large"))
-        .unwrap();
+    let content = std::fs::read(rd.path().join("large")).unwrap();
     assert_eq!(large_content, content);
 }
 
@@ -237,7 +237,7 @@ fn mtime_before_epoch() {
     set_file_mtime(&file_path, t1969).expect("Failed to set file times");
 
     let lt = LiveTree::open(tf.path()).unwrap();
-    let entries = lt.iter_entries().unwrap().collect::<Vec<_>>();
+    let entries = lt.iter_entries(None, None).unwrap().collect::<Vec<_>>();
 
     assert_eq!(entries[0].apath(), "/");
     assert_eq!(entries[1].apath(), "/old_file");
@@ -291,7 +291,7 @@ pub fn empty_file_uses_zero_blocks() {
     // Read back the empty file
     let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
     let empty_entry = st
-        .iter_entries()
+        .iter_entries(None, None)
         .unwrap()
         .find(|ref i| &i.apath == "/empty")
         .expect("found one entry");
@@ -434,12 +434,12 @@ fn many_small_files_combined_to_one_block() {
     assert_eq!(stats.combined_blocks, 2);
 
     let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
-    let mut entry_iter = tree.iter_entries().unwrap();
+    let mut entry_iter = tree.iter_entries(None, None).unwrap();
     assert_eq!(entry_iter.next().unwrap().apath(), "/");
     for (i, entry) in entry_iter.enumerate() {
         assert_eq!(entry.apath().to_string(), format!("/file{:04}", i));
     }
-    assert_eq!(tree.iter_entries().unwrap().count(), 2000);
+    assert_eq!(tree.iter_entries(None, None).unwrap().count(), 2000);
 }
 
 #[test]
@@ -473,12 +473,12 @@ pub fn mixed_medium_small_files_two_hunks() {
     assert_eq!(stats.written_blocks, 3);
 
     let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
-    let mut entry_iter = tree.iter_entries().unwrap();
+    let mut entry_iter = tree.iter_entries(None, None).unwrap();
     assert_eq!(entry_iter.next().unwrap().apath(), "/");
     for (i, entry) in entry_iter.enumerate() {
         assert_eq!(entry.apath().to_string(), format!("/file{:04}", i));
     }
-    assert_eq!(tree.iter_entries().unwrap().count(), 2000);
+    assert_eq!(tree.iter_entries(None, None).unwrap().count(), 2000);
 }
 
 #[test]

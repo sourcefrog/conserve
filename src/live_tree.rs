@@ -64,6 +64,7 @@ fn relative_path(root: &Path, apath: &Apath) -> PathBuf {
 impl tree::ReadTree for LiveTree {
     type Entry = LiveEntry;
     type R = std::fs::File;
+    type IT = Iter;
 
     /// Iterate source files descending through a source directory.
     ///
@@ -71,16 +72,8 @@ impl tree::ReadTree for LiveTree {
     /// is the defined order for files stored in an archive.  Within those files and
     /// child directories, visit them according to a sorted comparison by their UTF-8
     /// name.
-    fn iter_entries(&self) -> Result<Box<dyn Iterator<Item = Self::Entry>>> {
-        Ok(Box::new(Iter::new(&self.path, None, None)?))
-    }
-
-    fn iter_filtered(
-        &self,
-        subtree: Option<Apath>,
-        excludes: Option<GlobSet>,
-    ) -> Result<Box<dyn Iterator<Item = LiveEntry>>> {
-        Ok(Box::new(Iter::new(&self.path, subtree, excludes)?))
+    fn iter_entries(&self, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Result<Self::IT> {
+        Iter::new(&self.path, subtree, excludes)
     }
 
     fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
@@ -93,7 +86,7 @@ impl tree::ReadTree for LiveTree {
         // TODO: This stats the file and builds an entry about them, just to
         // throw it away. We could perhaps change the iter to optionally do
         // less work.
-        Ok(self.iter_entries()?.count() as u64)
+        Ok(self.iter_entries(None, None)?.count() as u64)
     }
 }
 
@@ -383,7 +376,7 @@ mod tests {
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
         let lt = LiveTree::open(tf.path()).unwrap();
-        let mut source_iter = lt.iter_entries().unwrap();
+        let mut source_iter = lt.iter_entries(None, None).unwrap();
         let result = source_iter.by_ref().collect::<Vec<_>>();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -418,7 +411,7 @@ mod tests {
         let excludes = excludes::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
         let lt = LiveTree::open(tf.path()).unwrap();
-        let mut source_iter = lt.iter_filtered(None, excludes).unwrap();
+        let mut source_iter = lt.iter_entries(None, excludes).unwrap();
         let result = source_iter.by_ref().collect::<Vec<_>>();
 
         // First one is the root
@@ -440,7 +433,7 @@ mod tests {
         tf.create_symlink("from", "to");
 
         let lt = LiveTree::open(tf.path()).unwrap();
-        let result = lt.iter_entries().unwrap().collect::<Vec<_>>();
+        let result = lt.iter_entries(None, None).unwrap().collect::<Vec<_>>();
 
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[1].apath, "/from");
@@ -458,7 +451,7 @@ mod tests {
         let lt = LiveTree::open(tf.path()).unwrap();
 
         let names: Vec<String> = lt
-            .iter_filtered(Some("/subdir".into()), None)
+            .iter_entries(Some("/subdir".into()), None)
             .unwrap()
             .map(|entry| entry.apath.into())
             .collect();

@@ -148,8 +148,8 @@ mod tests {
         let ta = TreeFixture::new();
         let tb = TreeFixture::new();
         let di = MergeTrees::new(
-            ta.live_tree().iter_entries().unwrap(),
-            tb.live_tree().iter_entries().unwrap(),
+            ta.live_tree().iter_entries(None, None).unwrap(),
+            tb.live_tree().iter_entries(None, None).unwrap(),
         )
         .collect::<Vec<_>>();
         assert_eq!(di.len(), 1);

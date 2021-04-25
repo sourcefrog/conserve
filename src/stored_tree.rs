@@ -56,7 +56,7 @@ impl StoredTree {
     ) -> Result<()> {
         let band_id = self.band().id();
         for entry in self
-            .iter_entries()?
+            .iter_entries(None, None)?
             .filter(|entry| entry.kind() == Kind::File)
         {
             for addr in entry.addrs {
@@ -90,14 +90,14 @@ impl StoredTree {
 impl ReadTree for StoredTree {
     type R = ReadStoredFile;
     type Entry = IndexEntry;
+    type IT = index::IndexEntryIter<stitch::IterStitchedIndexHunks>;
 
     /// Return an iter of index entries in this stored tree.
-    fn iter_entries(&self) -> Result<Box<dyn Iterator<Item = index::IndexEntry>>> {
-        Ok(Box::new(
-            self.archive
-                .iter_stitched_index_hunks(self.band.id())
-                .flatten(),
-        ))
+    fn iter_entries(&self, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Result<Self::IT> {
+        Ok(self
+            .archive
+            .iter_stitched_index_hunks(self.band.id())
+            .iter_entries(subtree, excludes))
     }
 
     fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R> {
@@ -126,7 +126,11 @@ mod test {
 
         assert_eq!(*st.band().id(), last_band_id);
 
-        let names: Vec<String> = st.iter_entries().unwrap().map(|e| e.apath.into()).collect();
+        let names: Vec<String> = st
+            .iter_entries(None, None)
+            .unwrap()
+            .map(|e| e.apath.into())
+            .collect();
         let expected = if SYMLINKS_SUPPORTED {
             vec![
                 "/",
@@ -153,14 +157,14 @@ mod test {
     }
 
     #[test]
-    fn iter_filtered() {
+    fn iter_entries() {
         let archive = Archive::open_path(Path::new("testdata/archive/minimal/v0.6.3/")).unwrap();
         let st = archive
             .open_stored_tree(BandSelectionPolicy::Latest)
             .unwrap();
 
         let names: Vec<String> = st
-            .iter_filtered(Some("/subdir".into()), None)
+            .iter_entries(Some("/subdir".into()), None)
             .unwrap()
             .map(|entry| entry.apath.into())
             .collect();

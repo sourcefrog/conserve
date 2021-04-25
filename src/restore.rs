@@ -12,11 +12,11 @@
 
 //! Restore from the archive to the filesystem.
 
-use std::{fs, time::Instant};
 use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::{fs, time::Instant};
 
 use filetime::{set_file_handle_times, set_symlink_file_times};
 use globset::GlobSet;
@@ -80,7 +80,7 @@ pub fn restore(
     // }
 
     progress_bar.set_phase("Copying");
-    let entry_iter = st.iter_filtered(options.only_subtree.clone(), options.excludes.clone())?;
+    let entry_iter = st.iter_entries(options.only_subtree.clone(), options.excludes.clone())?;
     for entry in entry_iter {
         if options.print_filenames {
             crate::ui::println(entry.apath());
@@ -159,7 +159,7 @@ impl RestoreTree {
         // Remove initial slash so that the apath is relative to the destination.
         self.path.join(&apath[1..])
     }
-    
+
     fn finish(self) -> Result<RestoreStats> {
         for (path, time) in self.dir_mtimes {
             if let Err(err) = filetime::set_file_mtime(path, time.into()) {
