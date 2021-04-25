@@ -153,14 +153,14 @@ fn basic_backup() {
         .stderr(predicate::str::is_empty())
         .stdout(
             "\
-.    /
-.    /hello
-.    /subdir
-.    /subdir/subfile
+.\t/
+.\t/hello
+.\t/subdir
+.\t/subdir/subfile
 ",
         );
 
-        run_conserve()
+    run_conserve()
         .args(&["diff"])
         .arg(&arch_dir)
         .arg(&src)
@@ -169,7 +169,7 @@ fn basic_backup() {
         .stderr(predicate::str::is_empty())
         .stdout(predicate::str::is_empty());
 
-        run_conserve()
+    run_conserve()
         .args(&["versions", "--short"])
         .arg(&arch_dir)
         .assert()

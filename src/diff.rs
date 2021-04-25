@@ -15,6 +15,8 @@
 //!
 //! See also [conserve::show_diff] to format the diff as text.
 
+use std::fmt;
+
 use crate::*;
 
 #[derive(Default, Debug)]
@@ -33,7 +35,7 @@ pub enum DiffKind {
 }
 
 impl DiffKind {
-    pub fn as_char(self) -> char {
+    pub fn as_sigil(self) -> char {
         use DiffKind::*;
         match self {
             Unchanged => '.',
@@ -50,6 +52,12 @@ pub struct DiffEntry {
     pub kind: DiffKind,
 }
 
+impl fmt::Display for DiffEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}\t{}", self.kind.as_sigil(), self.apath)
+    }
+}
+
 /// Generate an iter of per-entry diffs between two trees.
 pub fn diff(
     st: &StoredTree,
@@ -61,20 +69,24 @@ pub fn diff(
         st.iter_filtered(None, options.excludes.clone())?,
         lt.iter_filtered(None, options.excludes.clone())?,
     )
-    .filter_map(move |me| {
-        let kind = match me.kind {
-            MergedEntryKind::Both => DiffKind::Unchanged,
-            MergedEntryKind::LeftOnly => DiffKind::Deleted,
-            MergedEntryKind::RightOnly => DiffKind::New,
-        };
-        // TODO: Check metadata and file content before deciding that it's unchanged.
-        if include_unchanged || kind != DiffKind::Unchanged {
-            Some(DiffEntry {
-                apath: me.apath,
-                kind,
-            })
-        } else {
-            None
-        }
-    }))
+    .map(move |me| diff_merged_entry(me))
+    .filter(move |de: &DiffEntry| include_unchanged || de.kind != DiffKind::Unchanged))
+}
+
+fn diff_merged_entry(me: merge::MergedEntry) -> DiffEntry {
+    use DiffKind::*;
+    let kind = match me.kind {
+        MergedEntryKind::Both => Unchanged,
+        MergedEntryKind::LeftOnly => Deleted,
+        MergedEntryKind::RightOnly => New,
+    };
+    let de = DiffEntry {
+        apath: me.apath,
+        kind,
+    };
+    if kind == Deleted || kind == New {
+        return de;
+    }
+    // TODO: Check metadata and file content before deciding that it's unchanged.
+    de
 }

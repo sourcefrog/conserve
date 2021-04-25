@@ -131,7 +131,7 @@ pub fn show_diff<D: Iterator<Item = DiffEntry>>(diff: D, w: &mut dyn Write) -> R
     // TODO: Optionally include unchanged files.
     let mut bw = BufWriter::new(w);
     for de in diff {
-        writeln!(bw, "{}    {}", de.kind.as_char(), de.apath)?;
+        writeln!(bw, "{}", de)?;
     }
     Ok(())
 }
