@@ -69,14 +69,18 @@ pub fn diff(
         st.iter_filtered(None, options.excludes.clone())?,
         lt.iter_filtered(None, options.excludes.clone())?,
     )
-    .map(move |me| diff_merged_entry(me))
+    .map(diff_merged_entry)
     .filter(move |de: &DiffEntry| include_unchanged || de.kind != DiffKind::Unchanged))
 }
 
-fn diff_merged_entry<AE,BE>(me: merge::MergedEntry<AE,BE>) -> DiffEntry where AE:Entry,BE:Entry {
+fn diff_merged_entry<AE, BE>(me: merge::MergedEntry<AE, BE>) -> DiffEntry
+where
+    AE: Entry,
+    BE: Entry,
+{
     use DiffKind::*;
     let kind = match me.kind {
-        MergedEntryKind::Both(_,_) => Unchanged,
+        MergedEntryKind::Both(_, _) => Unchanged,
         MergedEntryKind::LeftOnly(_) => Deleted,
         MergedEntryKind::RightOnly(_) => New,
     };
