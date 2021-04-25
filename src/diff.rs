@@ -20,6 +20,7 @@ use std::fmt;
 use crate::*;
 
 use DiffKind::*;
+use Kind::*;
 use MergedEntryKind::*;
 
 #[derive(Default, Debug)]
@@ -96,16 +97,17 @@ where
     AE: Entry,
     BE: Entry,
 {
+    // TODO: Actually compare content, if requested
     let ak = ae.kind();
-    if ak != be.kind() {
-        return DiffEntry {
+    if ak != be.kind() || (ak == File && (ae.mtime() != be.mtime() || ae.size() != be.size())) {
+        DiffEntry {
             kind: Changed,
             apath,
-        };
-    }
-    // TODO: Actually compare content, if requested
-    DiffEntry {
-        kind: Unchanged,
-        apath,
+        }
+    } else {
+        DiffEntry {
+            kind: Unchanged,
+            apath,
+        }
     }
 }

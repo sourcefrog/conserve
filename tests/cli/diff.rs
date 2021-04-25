@@ -124,3 +124,29 @@ fn change_kind() {
         .stdout(".\t/\n.\t/hello.c\n*\t/subdir\n")
         .stderr(predicate::str::is_empty());
 }
+
+#[test]
+fn change_file_content() {
+    // This actually detects that the file size/mtime changed, and does not thoroughly read the file.
+    let (af, tf) = setup();
+    tf.create_file_with_contents("hello.c", b"int main() { abort(); }");
+
+    run_conserve()
+        .arg("diff")
+        .arg(af.path())
+        .arg(tf.path())
+        .assert()
+        .success()
+        .stdout("*\t/hello.c\n")
+        .stderr(predicate::str::is_empty());
+
+    run_conserve()
+        .arg("diff")
+        .arg("--include-unchanged")
+        .arg(af.path())
+        .arg(tf.path())
+        .assert()
+        .success()
+        .stdout(".\t/\n*\t/hello.c\n.\t/subdir\n")
+        .stderr(predicate::str::is_empty());
+}
