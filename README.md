@@ -149,7 +149,6 @@ there's no guarantee of support.
 
 Some other limitations:
 
-- `conserve diff` exists, [but is not yet very useful][21].
 - [Permissions and ownership are not stored](https://github.com/sourcefrog/conserve/issues/46).
 
 For more future features, see
@@ -160,7 +159,6 @@ you should restore using the same version that you used to make the backup.
 
 [5]: https://github.com/sourcefrog/conserve/issues/5
 [8]: https://github.com/sourcefrog/conserve/issues/8
-[21]: https://github.com/sourcefrog/conserve/issues/21
 [32]: https://github.com/sourcefrog/conserve/issues/32
 [41]: https://github.com/sourcefrog/conserve/issues/41
 [42]: https://github.com/sourcefrog/conserve/issues/42
@@ -177,7 +175,7 @@ from both systems.
 
 ## Licence and non-warranty
 
-Copyright 2012-2020 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
+Copyright 2012-2021 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
