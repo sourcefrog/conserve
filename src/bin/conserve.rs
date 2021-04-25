@@ -324,9 +324,8 @@ impl Command {
                     overwrite: *force_overwrite,
                 };
 
-                let copy_stats = restore(&archive, &destination, &options)?;
-                ui::println("Restore complete.");
-                copy_stats.summarize_restore(&mut stdout)?;
+                let stats = restore(&archive, &destination, &options)?;
+                ui::println(&format!("Restore complete.\n{}", stats));
             }
             Command::Size {
                 ref stos,

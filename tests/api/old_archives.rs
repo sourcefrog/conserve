@@ -99,7 +99,6 @@ fn restore_old_archive() {
         assert_eq!(restore_stats.symlinks, 0);
         assert_eq!(restore_stats.directories, 2);
         assert_eq!(restore_stats.errors, 0);
-        assert_eq!(restore_stats.empty_files, 0);
 
         dest.child("hello").assert("hello world\n");
         dest.child("subdir").assert(predicate::path::is_dir());

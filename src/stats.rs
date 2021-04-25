@@ -139,66 +139,31 @@ pub struct LiveTreeIterStats {
 }
 
 #[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
-pub struct CopyStats {
-    // TODO: Have separate more-specific stats for backup and restore, and then
-    // each can have a single Display method.
-    // TODO: Include source file bytes, including unmodified files.
+pub struct RestoreStats {
     pub files: usize,
     pub symlinks: usize,
     pub directories: usize,
     pub unknown_kind: usize,
 
-    pub unmodified_files: usize,
-    pub modified_files: usize,
-    pub new_files: usize,
-
-    /// Bytes that matched an existing block.
-    pub deduplicated_bytes: u64,
-    /// Bytes that were stored as new blocks, before compression.
-    pub uncompressed_bytes: u64,
-    pub compressed_bytes: u64,
-
-    pub deduplicated_blocks: usize,
-    pub written_blocks: usize,
-    /// Blocks containing combined small files.
-    pub combined_blocks: usize,
-
-    pub empty_files: usize,
-    pub small_combined_files: usize,
-    pub single_block_files: usize,
-    pub multi_block_files: usize,
-
     pub errors: usize,
 
-    pub index_builder_stats: IndexWriterStats,
+    pub uncompressed_file_bytes: u64,
+
     // TODO: Include elapsed time.
 }
 
-impl CopyStats {
-    pub fn summarize_restore(&self, _to_stream: &mut dyn io::Write) -> Result<()> {
-        // format!(
-        //     "{:>12} MB   in {} files, {} directories, {} symlinks.\n\
-        //      {:>12} MB/s output rate.\n\
-        //      {:>12} MB   after deduplication.\n\
-        //      {:>12} MB   in {} blocks after {:.1}x compression.\n\
-        //      {:>12} MB   in {} compressed index hunks.\n\
-        //      {:>12}      elapsed.\n",
-        //     (self.get_size("file.bytes").uncompressed / M).separate_with_commas(),
-        //     self.get_count("file").separate_with_commas(),
-        //     self.get_count("dir").separate_with_commas(),
-        //     self.get_count("symlink").separate_with_commas(),
-        //     (mbps_rate(
-        //         self.get_size("file.bytes").uncompressed,
-        //         self.elapsed_time()
-        //     ) as u64)
-        //         .separate_with_commas(),
-        //     (self.get_size("block").uncompressed / M).separate_with_commas(),
-        //     (self.get_size("block").compressed / M).separate_with_commas(),
-        //     self.get_count("block.read").separate_with_commas(),
-        //     compression_ratio(&self.get_size("block")),
-        //     (self.get_size("index").compressed / M).separate_with_commas(),
-        //     self.get_count("index.hunk").separate_with_commas(),
-        //     duration_to_hms(self.elapsed_time()),
+impl fmt::Display for RestoreStats {
+    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_count(w, "files:", self.files);
+        write_size(w, "  ", self.uncompressed_file_bytes);
+
+        write_count(w, "symlinks", self.symlinks);
+        write_count(w, "directories", self.directories);
+        write_count(w, "unsupported file kind", self.unknown_kind);
+        writeln!(w).unwrap();
+
+        write_count(w, "errors", self.errors);
+
         Ok(())
     }
 }

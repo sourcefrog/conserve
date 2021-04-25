@@ -15,7 +15,7 @@
 
 use std::ops::Range;
 
-use crate::stats::{CopyStats, Sizes};
+use crate::stats::Sizes;
 use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
@@ -73,29 +73,6 @@ pub trait ReadTree {
         }
         Ok(TreeSize { file_bytes: tot })
     }
-}
-
-/// A tree open for writing, either local or an an archive.
-///
-/// This isn't a sub-trait of ReadTree since a backup band can't be read while writing is
-/// still underway.
-///
-/// Entries must be written in Apath order, since that's a requirement of the index.
-pub trait WriteTree {
-    fn finish(self) -> Result<CopyStats>;
-
-    /// Copy a directory entry from a source tree to this tree.
-    fn copy_dir<E: Entry>(&mut self, entry: &E) -> Result<()>;
-
-    /// Copy a symlink entry from a source tree to this tree.
-    fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()>;
-
-    /// Copy in the contents of a file from another tree.
-    ///
-    /// Returns Sizes describing the compressed and uncompressed sizes copied.
-    // TODO: Use some better interface than IO::Read, that permits getting sizes
-    // from the source file when restoring.
-    fn copy_file<R: ReadTree>(&mut self, entry: &R::Entry, from_tree: &R) -> Result<CopyStats>;
 }
 
 /// Read a file as a series of blocks of bytes.

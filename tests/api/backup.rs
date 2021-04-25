@@ -45,7 +45,7 @@ pub fn simple_backup() {
     let copy_stats =
         restore(&archive, &restore_dir.path(), &RestoreOptions::default()).expect("restore");
 
-    assert_eq!(copy_stats.uncompressed_bytes, 8);
+    assert_eq!(copy_stats.uncompressed_file_bytes, 8);
 }
 
 #[test]
@@ -87,7 +87,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     let copy_stats =
         restore(&archive, &restore_dir.path(), &RestoreOptions::default()).expect("restore");
 
-    assert_eq!(copy_stats.uncompressed_bytes, 8);
+    assert_eq!(copy_stats.uncompressed_file_bytes, 8);
     // TODO: Read back contents of that file.
     // TODO: Compressed size isn't set properly when restoring, because it's
     // lost by passing through a std::io::Read in ReadStoredFile.

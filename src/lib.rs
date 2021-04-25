@@ -21,7 +21,6 @@ pub mod bandid;
 mod blockdir;
 pub mod blockhash;
 pub mod compress;
-pub mod copy_tree;
 mod diff;
 mod entry;
 pub mod errors;
@@ -68,10 +67,10 @@ pub use crate::misc::bytes_to_human_mb;
 pub use crate::progress::ProgressBar;
 pub use crate::restore::{restore, RestoreOptions, RestoreTree};
 pub use crate::show::{show_diff, show_versions, ShowVersionsOptions};
-pub use crate::stats::{BackupStats, CopyStats, DeleteStats, ValidateStats};
+pub use crate::stats::{BackupStats, RestoreStats, DeleteStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
-pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, WriteTree};
+pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};
 
 // Commonly-used external types.
 pub use globset::GlobSet;

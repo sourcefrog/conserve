@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,13 +21,12 @@ use std::path::{Path, PathBuf};
 use filetime::{set_file_handle_times, set_symlink_file_times};
 use globset::GlobSet;
 
-use crate::copy_tree::copy_tree;
+use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
-use crate::stats::CopyStats;
+use crate::stats::RestoreStats;
 use crate::unix_time::UnixTime;
 use crate::*;
-use crate::{band::BandSelectionPolicy, copy_tree::CopyOptions};
 
 /// Description of how to restore a tree.
 #[derive(Debug)]
@@ -58,20 +57,67 @@ pub fn restore(
     archive: &Archive,
     destination_path: &Path,
     options: &RestoreOptions,
-) -> Result<CopyStats> {
+) -> Result<RestoreStats> {
     let st = archive.open_stored_tree(options.band_selection.clone())?;
-    let rt = if options.overwrite {
+    let mut rt = if options.overwrite {
         RestoreTree::create_overwrite(destination_path)
     } else {
         RestoreTree::create(destination_path)
     }?;
-    let opts = CopyOptions {
-        print_filenames: options.print_filenames,
-        only_subtree: options.only_subtree.clone(),
-        excludes: options.excludes.clone(),
-        ..CopyOptions::default()
-    };
-    copy_tree(&st, rt, &opts)
+    let mut stats = RestoreStats::default();
+    let mut progress_bar = ProgressBar::new();
+    // // This causes us to walk the source tree twice, which is probably an acceptable option
+    // // since it's nice to see realistic overall progress. We could keep all the entries
+    // // in memory, and maybe we should, but it might get unreasonably big.
+    // if options.measure_first {
+    //     progress_bar.set_phase("Measure source tree");
+    //     // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
+    //     // again a second time? But, that'll potentially use memory proportional to tree size, which
+    //     // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
+    //     // deleted or changed while this is running.
+    //     progress_bar.set_bytes_total(st.size(options.excludes.clone())?.file_bytes as u64);
+    // }
+
+    progress_bar.set_phase("Copying");
+    let entry_iter = st.iter_filtered(options.only_subtree.clone(), options.excludes.clone())?;
+    for entry in entry_iter {
+        if options.print_filenames {
+            crate::ui::println(entry.apath());
+        }
+        progress_bar.set_filename(entry.apath().to_string());
+        if let Err(e) = match entry.kind() {
+            Kind::Dir => {
+                stats.directories += 1;
+                rt.copy_dir(&entry)
+            }
+            Kind::File => {
+                stats.files += 1;
+                let result = rt.copy_file(&entry, &st).map(|s| stats += s);
+                if let Some(bytes) = entry.size() {
+                    progress_bar.increment_bytes_done(bytes);
+                }
+                result
+            }
+            Kind::Symlink => {
+                stats.symlinks += 1;
+                rt.copy_symlink(&entry)
+            }
+            Kind::Unknown => {
+                stats.unknown_kind += 1;
+                // TODO: Perhaps eventually we could backup and restore pipes,
+                // sockets, etc. Or at least count them. For now, silently skip.
+                // https://github.com/sourcefrog/conserve/issues/82
+                continue;
+            }
+        } {
+            ui::show_error(&e);
+            stats.errors += 1;
+            continue;
+        }
+    }
+    stats += rt.finish()?;
+    // TODO: Merge in stats from the tree iter and maybe the source tree?
+    Ok(stats)
 }
 
 /// A write-only tree on the filesystem, as a restore destination.
@@ -111,16 +157,14 @@ impl RestoreTree {
         // Remove initial slash so that the apath is relative to the destination.
         self.path.join(&apath[1..])
     }
-}
-
-impl tree::WriteTree for RestoreTree {
-    fn finish(self) -> Result<CopyStats> {
+    
+    fn finish(self) -> Result<RestoreStats> {
         for (path, time) in self.dir_mtimes {
             if let Err(err) = filetime::set_file_mtime(path, time.into()) {
                 ui::problem(&format!("Failed to set directory mtime: {:?}", err));
             }
         }
-        Ok(CopyStats::default())
+        Ok(RestoreStats::default())
     }
 
     fn copy_dir<E: Entry>(&mut self, entry: &E) -> Result<()> {
@@ -139,7 +183,7 @@ impl tree::WriteTree for RestoreTree {
         &mut self,
         source_entry: &R::Entry,
         from_tree: &R,
-    ) -> Result<CopyStats> {
+    ) -> Result<RestoreStats> {
         // TODO: Restore permissions.
         let path = self.rooted_path(source_entry.apath());
         let restore_err = |source| Error::Restore {
@@ -161,9 +205,9 @@ impl tree::WriteTree for RestoreTree {
         })?;
 
         // TODO: Accumulate more stats.
-        Ok(CopyStats {
-            uncompressed_bytes: bytes_copied,
-            ..CopyStats::default()
+        Ok(RestoreStats {
+            uncompressed_file_bytes: bytes_copied,
+            ..RestoreStats::default()
         })
     }
 
