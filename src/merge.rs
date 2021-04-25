@@ -46,28 +46,28 @@ where
 ///
 /// Note that at present this only says whether files are absent from either
 /// side, not whether there is a content difference.
-pub struct MergeTrees<AE, BE>
+pub struct MergeTrees<AE, BE, AIT, BIT>
 where
     AE: Entry,
     BE: Entry,
+    AIT: Iterator<Item = AE>,
+    BIT: Iterator<Item = BE>,
 {
-    ait: Box<dyn Iterator<Item = AE>>,
-    bit: Box<dyn Iterator<Item = BE>>,
-
+    ait: AIT,
+    bit: BIT,
     // Read in advance entries from A and B.
     na: Option<AE>,
     nb: Option<BE>,
 }
 
-impl<AE, BE> MergeTrees<AE, BE>
+impl<AE, BE, AIT, BIT> MergeTrees<AE, BE, AIT, BIT>
 where
     AE: Entry,
     BE: Entry,
+    AIT: Iterator<Item = AE>,
+    BIT: Iterator<Item = BE>,
 {
-    pub fn new(
-        ait: Box<dyn Iterator<Item = AE>>,
-        bit: Box<dyn Iterator<Item = BE>>,
-    ) -> MergeTrees<AE, BE> {
+    pub fn new(ait: AIT, bit: BIT) -> MergeTrees<AE, BE, AIT, BIT> {
         MergeTrees {
             ait,
             bit,
@@ -77,10 +77,12 @@ where
     }
 }
 
-impl<AE, BE> Iterator for MergeTrees<AE, BE>
+impl<AE, BE, AIT, BIT> Iterator for MergeTrees<AE, BE, AIT, BIT>
 where
     AE: Entry,
     BE: Entry,
+    AIT: Iterator<Item = AE>,
+    BIT: Iterator<Item = BE>,
 {
     type Item = MergedEntry<AE, BE>;
 

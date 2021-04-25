@@ -68,8 +68,8 @@ pub fn diff(
     options: &DiffOptions,
 ) -> Result<impl Iterator<Item = DiffEntry>> {
     let include_unchanged: bool = options.include_unchanged;
-    let bit = Box::new(lt.iter_filtered(None, options.excludes.clone())?
-        .filter(|le| le.kind() != Unknown));
+    let bit = lt.iter_filtered(None, options.excludes.clone())?
+        .filter(|le| le.kind() != Unknown);
     Ok(MergeTrees::new(
         st.iter_filtered(None, options.excludes.clone())?,
         bit,
