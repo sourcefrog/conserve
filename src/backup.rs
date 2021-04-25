@@ -14,7 +14,7 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
-use std::convert::TryInto;
+use std::{convert::TryInto, time::Instant};
 use std::io::prelude::*;
 
 use globset::GlobSet;
@@ -68,6 +68,7 @@ pub fn backup(
     source: &LiveTree,
     options: &BackupOptions,
 ) -> Result<BackupStats> {
+    let start = Instant::now();
     let mut writer = BackupWriter::begin(archive, options.clone())?;
     let mut stats = BackupStats::default();
     let mut progress_bar = ProgressBar::new();
@@ -87,6 +88,7 @@ pub fn backup(
         writer.flush_group()?;
     }
     stats += writer.finish()?;
+    stats.elapsed = start.elapsed();
     // TODO: Merge in stats from the source tree?
     Ok(stats)
 }

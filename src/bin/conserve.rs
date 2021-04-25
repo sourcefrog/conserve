@@ -350,7 +350,7 @@ impl Command {
             }
             Command::Validate { archive } => {
                 let stats = Archive::open_path(archive)?.validate()?;
-                stats.summarize(&mut stdout)?;
+                println!("{}", stats);
                 if stats.has_problems() {
                     ui::problem("Archive has some problems.");
                     return Ok(ExitCode::PartialCorruption);

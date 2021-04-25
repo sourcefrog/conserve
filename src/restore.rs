@@ -12,7 +12,7 @@
 
 //! Restore from the archive to the filesystem.
 
-use std::fs;
+use std::{fs, time::Instant};
 use std::fs::File;
 use std::io;
 use std::io::Write;
@@ -66,6 +66,7 @@ pub fn restore(
     }?;
     let mut stats = RestoreStats::default();
     let mut progress_bar = ProgressBar::new();
+    let start = Instant::now();
     // // This causes us to walk the source tree twice, which is probably an acceptable option
     // // since it's nice to see realistic overall progress. We could keep all the entries
     // // in memory, and maybe we should, but it might get unreasonably big.
@@ -116,6 +117,7 @@ pub fn restore(
         }
     }
     stats += rt.finish()?;
+    stats.elapsed = start.elapsed();
     // TODO: Merge in stats from the tree iter and maybe the source tree?
     Ok(stats)
 }

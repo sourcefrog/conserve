@@ -12,14 +12,12 @@
 // GNU General Public License for more details.
 
 use std::fmt;
-use std::io;
 use std::time::Duration;
 
 use derive_more::{Add, AddAssign};
 use thousands::Separable;
 
 use crate::ui::duration_to_hms;
-use crate::*;
 
 pub fn mb_string(s: u64) -> String {
     (s / 1_000_000).separate_with_commas()
@@ -77,39 +75,53 @@ pub struct ValidateStats {
 
     /// Failed to open a band.
     pub band_open_errors: usize,
+    pub band_metadata_problems: usize,
+    pub missing_band_heads: usize,
 
     /// Failed to open a stored tree.
     pub tree_open_errors: usize,
     pub tree_validate_errors: usize,
 
-    pub band_metadata_problems: usize,
-
     /// Count of files not expected to be in the archive.
     pub unexpected_files: usize,
-    pub missing_band_heads: usize,
 
     /// Number of blocks read.
     pub block_read_count: u64,
     /// Number of blocks that failed to read back.
     pub block_error_count: usize,
     pub block_missing_count: usize,
+
+    pub elapsed: Duration,
+}
+
+impl fmt::Display for ValidateStats {
+    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.has_problems() {
+            writeln!(w, "VALIDATION FOUND PROBLEMS")?;
+        } else {
+            writeln!(w, "No problems found in archive")?;
+        }
+
+        write_count(w, "structure problems", self.structure_problems);
+        write_count(w, "IO errors", self.io_errors);
+        write_count(w, "band open errors", self.band_open_errors);
+        write_count(w, "band metadata errors", self.band_metadata_problems);
+        write_count(w, "missing band heads", self.missing_band_heads);
+        write_count(w, "tree open errors", self.tree_open_errors);
+        write_count(w, "tree validate errors", self.tree_validate_errors);
+        write_count(w, "unexpected files", self.unexpected_files);
+        write_count(w, "block errors", self.block_error_count);
+        write_count(w, "blocks missing", self.block_missing_count);
+        writeln!(w).unwrap();
+
+        write_count(w, "blocks read", self.block_read_count as usize);
+        write_duration(w, "elapsed", self.elapsed)?;
+
+        Ok(())
+    }
 }
 
 impl ValidateStats {
-    pub fn summarize(&self, write: &mut dyn io::Write) -> Result<()> {
-        // format!(
-        //     "{:>12} MB   in {} blocks.\n\
-        //      {:>12} MB/s block validation rate.\n\
-        //      {:>12}      elapsed.\n",
-        //     (self.get_size("block").uncompressed / M).separate_with_commas(),
-        //     self.get_count("block.read").separate_with_commas(),
-        //     (mbps_rate(self.get_size("block").uncompressed, self.elapsed_time()) as u64)
-        //         .separate_with_commas(),
-        //     duration_to_hms(self.elapsed_time()),
-        // )
-        writeln!(write, "{:#?}", self).map_err(Error::from)
-    }
-
     pub fn has_problems(&self) -> bool {
         self.block_error_count > 0 || self.io_errors > 0 || self.block_missing_count > 0
     }
@@ -149,7 +161,7 @@ pub struct RestoreStats {
 
     pub uncompressed_file_bytes: u64,
 
-    // TODO: Include elapsed time.
+    pub elapsed: Duration,
 }
 
 impl fmt::Display for RestoreStats {
@@ -163,6 +175,7 @@ impl fmt::Display for RestoreStats {
         writeln!(w).unwrap();
 
         write_count(w, "errors", self.errors);
+        write_duration(w, "elapsed", self.elapsed)?;
 
         Ok(())
     }
@@ -201,7 +214,7 @@ pub struct BackupStats {
     pub errors: usize,
 
     pub index_builder_stats: IndexWriterStats,
-    // TODO: Include elapsed time.
+    pub elapsed: Duration,
 }
 
 impl fmt::Display for BackupStats {
@@ -237,6 +250,7 @@ impl fmt::Display for BackupStats {
         writeln!(w).unwrap();
 
         write_count(w, "errors", self.errors);
+        write_duration(w, "elapsed", self.elapsed)?;
 
         Ok(())
     }

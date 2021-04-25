@@ -218,7 +218,7 @@ impl Archive {
         progress_bar.set_phase("Find referenced blocks...");
         let num_bands = band_ids.len();
         Ok(band_ids
-            .into_iter()
+            .iter()
             .enumerate()
             .inspect(move |(i, _)| progress_bar.set_fraction(*i, num_bands))
             .map(move |(_i, band_id)| Band::open(&archive, &band_id).expect("Failed to open band"))
@@ -325,6 +325,7 @@ impl Archive {
     }
 
     pub fn validate(&self) -> Result<ValidateStats> {
+        let start = Instant::now();
         let mut stats = self.validate_archive_dir()?;
         ui::println("Check blockdir...");
         let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
@@ -366,6 +367,7 @@ impl Archive {
             })
             .reduce(ValidateStats::default, |a, b| a + b);
 
+        stats.elapsed = start.elapsed();
         Ok(stats)
     }
 
