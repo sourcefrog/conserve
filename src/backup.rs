@@ -608,47 +608,4 @@ mod tests {
 
         assert_eq!(addrs1, addrs2);
     }
-
-    #[test]
-    // Large enough that it should break across blocks.
-    fn large_file() {
-        use super::MAX_BLOCK_SIZE;
-        let (_testdir, mut block_dir) = setup();
-        let mut tf = NamedTempFile::new().unwrap();
-        const N_CHUNKS: u64 = 10;
-        const CHUNK_SIZE: u64 = 1 << 21;
-        const TOTAL_SIZE: u64 = N_CHUNKS * CHUNK_SIZE;
-        let a_chunk = vec![b'@'; CHUNK_SIZE as usize];
-        for _i in 0..N_CHUNKS {
-            tf.write_all(&a_chunk).unwrap();
-        }
-        tf.flush().unwrap();
-        let tf_len = tf.seek(SeekFrom::Current(0)).unwrap();
-        println!("tf len={}", tf_len);
-        assert_eq!(tf_len, TOTAL_SIZE);
-        tf.seek(SeekFrom::Start(0)).unwrap();
-
-        let mut stats = BackupStats::default();
-        let addrs =
-            store_file_content(&Apath::from("/big"), &mut tf, &mut block_dir, &mut stats).unwrap();
-
-        // Only one block needs to get compressed. The others are deduplicated.
-        assert_eq!(stats.uncompressed_bytes, MAX_BLOCK_SIZE as u64);
-        // Should be very compressible
-        assert!(stats.compressed_bytes < (MAX_BLOCK_SIZE as u64 / 10));
-        assert_eq!(stats.written_blocks, 1);
-        assert_eq!(
-            stats.deduplicated_blocks as u64,
-            TOTAL_SIZE / (MAX_BLOCK_SIZE as u64) - 1
-        );
-
-        // 10x 2MB should be twenty blocks
-        assert_eq!(addrs.len(), 20);
-        for a in addrs {
-            let (retr, block_sizes) = block_dir.get(&a).unwrap();
-            assert_eq!(retr.len(), MAX_BLOCK_SIZE as usize);
-            assert!(retr.iter().all(|b| *b == 64u8));
-            assert_eq!(block_sizes.uncompressed, MAX_BLOCK_SIZE as u64);
-        }
-    }
 }

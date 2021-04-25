@@ -12,9 +12,6 @@
 
 //! Tests focussed on backup behavior.
 
-use std::fs::File;
-use std::io::prelude::*;
-
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use filetime::{set_file_mtime, FileTime};
@@ -177,34 +174,31 @@ fn check_backup(af: &ScratchArchive) {
     assert_eq!(af.unreferenced_blocks().unwrap().count(), 0);
 }
 
-/// Store and retrieve large files.
 #[test]
 fn large_file() {
     let af = ScratchArchive::new();
-
     let tf = TreeFixture::new();
-    let large_content = String::from("abcd").repeat(1 << 20);
-    tf.create_file_with_contents("large", &large_content.as_bytes());
-    let copy_stats = backup(&af, &tf.live_tree(), &BackupOptions::default()).expect("backup");
-    assert_eq!(copy_stats.new_files, 1);
+
+    let  large_content = vec![b'a'; 4<<20];
+    tf.create_file_with_contents("large", &large_content);
+
+    let backup_stats = backup(&af, &tf.live_tree(), &BackupOptions::default()).expect("backup");
+    assert_eq!(backup_stats.new_files, 1);
     // First 1MB should be new; remainder should be deduplicated.
-    assert_eq!(copy_stats.uncompressed_bytes, 1 << 20);
-    assert_eq!(copy_stats.written_blocks, 1);
-    assert_eq!(copy_stats.deduplicated_bytes, 3 << 20);
-    assert_eq!(copy_stats.deduplicated_blocks, 3);
-    assert_eq!(copy_stats.errors, 0);
-    assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
+    assert_eq!(backup_stats.uncompressed_bytes, 1 << 20);
+    assert_eq!(backup_stats.written_blocks, 1);
+    assert_eq!(backup_stats.deduplicated_blocks, 3);
+    assert_eq!(backup_stats.deduplicated_bytes, 3 << 20);
+    assert_eq!(backup_stats.errors, 0);
+    assert_eq!(backup_stats.index_builder_stats.index_hunks, 1);
 
     // Try to restore it
     let rd = TempDir::new().unwrap();
     let restore_archive = Archive::open_path(af.path()).unwrap();
-    let _stats = restore(&restore_archive, rd.path(), &RestoreOptions::default()).expect("restore");
-    // TODO: Examine stats.
+    let restore_stats = restore(&restore_archive, rd.path(), &RestoreOptions::default()).expect("restore");
+    assert_eq!(restore_stats.files, 1);
 
-    let mut content = String::new();
-    File::open(rd.path().join("large"))
-        .unwrap()
-        .read_to_string(&mut content)
+    let  content = std::fs::read(rd.path().join("large"))
         .unwrap();
     assert_eq!(large_content, content);
 }
