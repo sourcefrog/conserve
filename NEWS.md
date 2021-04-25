@@ -1,5 +1,11 @@
 # Conserve release history
 
+## UNRELEASED
+
+- `conserve diff` is more useful, and shows whether files have changed
+  size/mtime. (It does not yet compare file content for files with the same
+  metadata.)
+
 ## v0.6.11 2021-03-11
 
 - Fix the displayed count of blocks written in backup stats.
