@@ -91,8 +91,7 @@ where
         // Preload next-A and next-B, if they're not already
         // loaded.
         //
-        // TODO: Perhaps use <https://doc.rust-lang.org/stable/core/iter/struct.Peekable.html> instead of keeping a
-        // readahead here?
+        // TODO: Perhaps use `Peekable` instead of keeping a readahead here?
         if self.na.is_none() {
             self.na = ait.next();
         }
@@ -119,25 +118,18 @@ where
             let pa = self.na.as_ref().unwrap().apath().clone();
             let pb = self.nb.as_ref().unwrap().apath().clone();
             match pa.cmp(&pb) {
-                Ordering::Equal => {
-                    let ta = self.na.take().unwrap();
-                    let tb = self.nb.take().unwrap();
-                    Some(MergedEntry {
-                        apath: pa,
-                        kind: Both(ta, tb),
-                    })
-                }
+                Ordering::Equal => Some(MergedEntry {
+                    apath: pa,
+                    kind: Both(self.na.take().unwrap(), self.nb.take().unwrap()),
+                }),
                 Ordering::Less => Some(MergedEntry {
                     apath: pa,
                     kind: LeftOnly(self.na.take().unwrap()),
                 }),
-                Ordering::Greater => {
-                    self.nb.take().unwrap();
-                    Some(MergedEntry {
-                        apath: pb,
-                        kind: RightOnly(self.nb.take().unwrap()),
-                    })
-                }
+                Ordering::Greater => Some(MergedEntry {
+                    apath: pb,
+                    kind: RightOnly(self.nb.take().unwrap()),
+                }),
             }
         }
     }
@@ -166,7 +158,7 @@ mod tests {
                 assert_eq!(be.kind(), Kind::Dir);
                 assert_eq!(ae.apath(), "/");
                 assert_eq!(be.apath(), "/");
-            },
+            }
             other => panic!("unexpected {:#?}", other),
         }
     }
