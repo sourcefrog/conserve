@@ -1,5 +1,11 @@
 # Conserve release history
 
+## UNRELEASED
+
+- `conserve diff` is more useful, and shows whether files have changed
+  size/mtime. (It does not yet compare file content for files with the same
+  metadata.)
+
 ## v0.6.12 2021-04-11
 
 - `conserve delete --dry-run` accurately predicts how much space will be freed.

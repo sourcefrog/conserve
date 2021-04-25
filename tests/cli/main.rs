@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ use predicates::prelude::*;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
 mod delete;
+mod diff;
 mod versions;
 
 lazy_static! {
@@ -144,22 +145,6 @@ fn basic_backup() {
         .success()
         .stderr(predicate::str::is_empty())
         .stdout("0 MB\n"); // "contents"
-
-    run_conserve()
-        .arg("diff")
-        .arg(&arch_dir)
-        .arg(&src)
-        .assert()
-        .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(
-            "\
-both     /
-both     /hello
-both     /subdir
-both     /subdir/subfile
-",
-        );
 
     run_conserve()
         .args(&["versions", "--short"])

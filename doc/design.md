@@ -198,3 +198,27 @@ well as to the terminal, and at a different level of detail. This implies:
 
 Progess bars are drawn only for the small number of main loops that are expected
 to take a long time, and don't implicitly pop up due to IO.
+
+## Diff
+
+Diff is implemented as two layers: generating an iterator of `DiffEntry`, and
+then drawing this to stdout with various options.
+
+We iterate entries of the two trees in parallel, using `merge` to stay aligned
+on the apath and detect entries that are present on one side but not the other.
+This stage produces `Added` and `Deleted` entries.
+
+Then, for entries present on both trees we need to determine whether they are
+the same or different.
+
+In doing so there are several aspects we can check:
+
+- The mtime.
+- The kind of file: for example a file replaced by a symlink.
+- Other metadata that might be added later including permissions.
+- The size of the file.
+- The full content of the file.
+
+Reading the file body is needed to thoroughly check if it's changed, but this is
+significantly more expensive than just reading the index and statting the file,
+so this is optional.

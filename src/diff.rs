@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -11,41 +11,106 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-use std::io::prelude::*;
-use std::io::{stdout, BufWriter};
+//! Diff two trees: for example a live tree against a stored tree.
+//!
+//! See also [conserve::show_diff] to format the diff as text.
+
+use std::fmt;
 
 use crate::*;
 
+use DiffKind::*;
+use Kind::*;
+use MergedEntryKind::*;
+
+#[derive(Default, Debug)]
 pub struct DiffOptions {
     pub excludes: Option<GlobSet>,
+    pub include_unchanged: bool,
 }
 
-pub fn diff(st: &StoredTree, lt: &LiveTree, options: &DiffOptions) -> Result<()> {
-    // TODO: Consider whether the actual files have changed.
-    // TODO: Summarize diff.
-    // TODO: Optionally include unchanged files.
-
-    show_tree_diff(
-        &mut MergeTrees::new(
-            st.iter_filtered(None, options.excludes.clone())?,
-            lt.iter_filtered(None, options.excludes.clone())?,
-        ),
-        &mut stdout(),
-    )
+/// The overall state of change of an entry.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum DiffKind {
+    Unchanged,
+    New,
+    Deleted,
+    Changed,
 }
 
-fn show_tree_diff(
-    iter: &mut dyn Iterator<Item = crate::merge::MergedEntry>,
-    w: &mut dyn Write,
-) -> Result<()> {
-    let mut bw = BufWriter::new(w);
-    for e in iter {
-        let ks = match e.kind {
-            MergedEntryKind::LeftOnly => "left",
-            MergedEntryKind::RightOnly => "right",
-            MergedEntryKind::Both => "both",
-        };
-        writeln!(bw, "{:<8} {}", ks, e.apath)?;
+impl DiffKind {
+    pub fn as_sigil(self) -> char {
+        match self {
+            Unchanged => '.',
+            New => '+',
+            Deleted => '-',
+            Changed => '*',
+        }
     }
-    Ok(())
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct DiffEntry {
+    pub apath: Apath,
+    pub kind: DiffKind,
+}
+
+impl fmt::Display for DiffEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}\t{}", self.kind.as_sigil(), self.apath)
+    }
+}
+
+/// Generate an iter of per-entry diffs between two trees.
+pub fn diff(
+    st: &StoredTree,
+    lt: &LiveTree,
+    options: &DiffOptions,
+) -> Result<impl Iterator<Item = DiffEntry>> {
+    let include_unchanged: bool = options.include_unchanged;
+    Ok(MergeTrees::new(
+        st.iter_filtered(None, options.excludes.clone())?,
+        lt.iter_filtered(None, options.excludes.clone())?,
+    )
+    .map(diff_merged_entry)
+    .filter(move |de: &DiffEntry| include_unchanged || de.kind != DiffKind::Unchanged))
+}
+
+fn diff_merged_entry<AE, BE>(me: merge::MergedEntry<AE, BE>) -> DiffEntry
+where
+    AE: Entry,
+    BE: Entry,
+{
+    let apath = me.apath;
+    match me.kind {
+        Both(ae, be) => diff_common_entry(ae, be, apath),
+        LeftOnly(_) => DiffEntry {
+            kind: Deleted,
+            apath,
+        },
+        RightOnly(_) => DiffEntry { kind: New, apath },
+    }
+}
+
+fn diff_common_entry<AE, BE>(ae: AE, be: BE, apath: Apath) -> DiffEntry
+where
+    AE: Entry,
+    BE: Entry,
+{
+    // TODO: Actually compare content, if requested
+    let ak = ae.kind();
+    if ak != be.kind()
+        || (ak == File && (ae.mtime() != be.mtime() || ae.size() != be.size()))
+        || (ak == Symlink && (ae.symlink_target() != be.symlink_target()))
+    {
+        DiffEntry {
+            kind: Changed,
+            apath,
+        }
+    } else {
+        DiffEntry {
+            kind: Unchanged,
+            apath,
+        }
+    }
 }

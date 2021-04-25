@@ -167,7 +167,7 @@ impl TreeFixture {
         let p = self.root.join(relative_path);
         let f = File::open(&p).unwrap();
         let mut perms = f.metadata().unwrap().permissions();
-        perms.set_mode(0);
+        perms.set_mode(0o0);
         fs::set_permissions(&p, perms).unwrap();
     }
 }

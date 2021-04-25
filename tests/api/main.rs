@@ -17,6 +17,7 @@ mod backup;
 mod blockhash;
 mod damaged;
 mod delete;
+mod diff;
 mod gc;
 mod old_archives;
 mod restore;
