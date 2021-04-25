@@ -222,7 +222,7 @@ impl Archive {
             .enumerate()
             .inspect(move |(i, _)| progress_bar.set_fraction(*i, num_bands))
             .map(move |(_i, band_id)| Band::open(&archive, &band_id).expect("Failed to open band"))
-            .flat_map(|band| band.iter_entries())
+            .flat_map(|band| band.index().iter_entries())
             .flat_map(|entry| entry.addrs)
             .map(|addr| addr.hash))
     }

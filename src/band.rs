@@ -190,11 +190,6 @@ impl Band {
         IndexRead::open(self.transport.sub_transport(INDEX_DIR))
     }
 
-    /// Return an iterator through entries in this band.
-    pub fn iter_entries(&self) -> index::IndexEntryIter<index::IndexHunkIter> {
-        self.index().iter_entries()
-    }
-
     fn read_head(&self) -> Result<Head> {
         read_json(&self.transport, BAND_HEAD_FILENAME)
     }
