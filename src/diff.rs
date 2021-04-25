@@ -17,6 +17,8 @@
 
 use std::fmt;
 
+use readahead_iterator::IntoReadahead;
+
 use crate::*;
 
 use DiffKind::*;
@@ -67,15 +69,18 @@ pub fn diff(
     lt: &LiveTree,
     options: &DiffOptions,
 ) -> Result<impl Iterator<Item = DiffEntry>> {
+    let readahead = 1000;
     let include_unchanged: bool = options.include_unchanged;
+    let ait = st
+        .iter_entries(None, options.excludes.clone())?
+        .readahead(readahead);
     let bit = lt
         .iter_entries(None, options.excludes.clone())?
-        .filter(|le| le.kind() != Unknown);
-    Ok(
-        MergeTrees::new(st.iter_entries(None, options.excludes.clone())?, bit)
-            .map(diff_merged_entry)
-            .filter(move |de: &DiffEntry| include_unchanged || de.kind != DiffKind::Unchanged),
-    )
+        .filter(|le| le.kind() != Unknown)
+        .readahead(readahead);
+    Ok(MergeTrees::new(ait, bit)
+        .map(diff_merged_entry)
+        .filter(move |de: &DiffEntry| include_unchanged || de.kind != DiffKind::Unchanged))
 }
 
 fn diff_merged_entry<AE, BE>(me: merge::MergedEntry<AE, BE>) -> DiffEntry

@@ -161,6 +161,7 @@ dependencies = [
  "libc",
  "predicates",
  "rayon",
+ "readahead-iterator",
  "regex",
  "semver",
  "serde",
@@ -737,6 +738,12 @@ dependencies = [
  "lazy_static",
  "num_cpus",
 ]
+
+[[package]]
+name = "readahead-iterator"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02f9dee1f2335dd766f2791ebc34d7ce789139d4937ef5ce282d73e034a09a3c"
 
 [[package]]
 name = "redox_syscall"
