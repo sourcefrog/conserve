@@ -19,6 +19,9 @@ use std::fmt;
 
 use crate::*;
 
+use DiffKind::*;
+use MergedEntryKind::*;
+
 #[derive(Default, Debug)]
 pub struct DiffOptions {
     pub excludes: Option<GlobSet>,
@@ -36,7 +39,6 @@ pub enum DiffKind {
 
 impl DiffKind {
     pub fn as_sigil(self) -> char {
-        use DiffKind::*;
         match self {
             Unchanged => '.',
             New => '+',
@@ -78,19 +80,32 @@ where
     AE: Entry,
     BE: Entry,
 {
-    use DiffKind::*;
-    let kind = match me.kind {
-        MergedEntryKind::Both(_, _) => Unchanged,
-        MergedEntryKind::LeftOnly(_) => Deleted,
-        MergedEntryKind::RightOnly(_) => New,
-    };
-    let de = DiffEntry {
-        apath: me.apath,
-        kind,
-    };
-    if kind == Deleted || kind == New {
-        return de;
+    let apath = me.apath;
+    match me.kind {
+        Both(ae, be) => diff_common_entry(ae, be, apath),
+        LeftOnly(_) => DiffEntry {
+            kind: Deleted,
+            apath,
+        },
+        RightOnly(_) => DiffEntry { kind: New, apath },
     }
-    // TODO: Check metadata and file content before deciding that it's unchanged.
-    de
+}
+
+fn diff_common_entry<AE, BE>(ae: AE, be: BE, apath: Apath) -> DiffEntry
+where
+    AE: Entry,
+    BE: Entry,
+{
+    let ak = ae.kind();
+    if ak != be.kind() {
+        return DiffEntry {
+            kind: Changed,
+            apath,
+        };
+    }
+    // TODO: Actually compare content, if requested
+    DiffEntry {
+        kind: Unchanged,
+        apath,
+    }
 }

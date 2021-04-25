@@ -20,6 +20,20 @@ use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
 use crate::run_conserve;
 
+fn setup() -> (ScratchArchive, TreeFixture) {
+    let af = ScratchArchive::new();
+    let tf = TreeFixture::new();
+    tf.create_file_with_contents("hello.c", b"void main() {}");
+    tf.create_dir("subdir");
+    run_conserve()
+        .arg("backup")
+        .arg(af.path())
+        .arg(tf.path())
+        .assert()
+        .success();
+    (af, tf)
+}
+
 #[test]
 fn no_changes() {
     let (af, tf) = setup();
@@ -85,16 +99,28 @@ fn remove_file() {
         .stderr(predicate::str::is_empty());
 }
 
-fn setup() -> (ScratchArchive, TreeFixture) {
-    let af = ScratchArchive::new();
-    let tf = TreeFixture::new();
-    tf.create_file_with_contents("hello.c", b"void main() {}");
-    tf.create_dir("subdir");
+#[test]
+fn change_kind() {
+    let (af, tf) = setup();
+    std::fs::remove_dir(tf.path().join("subdir")).unwrap();
+    tf.create_file_with_contents("subdir", b"used to be a directory, no longer");
+
     run_conserve()
-        .arg("backup")
+        .arg("diff")
         .arg(af.path())
         .arg(tf.path())
         .assert()
-        .success();
-    (af, tf)
+        .success()
+        .stdout("*\t/subdir\n")
+        .stderr(predicate::str::is_empty());
+
+    run_conserve()
+        .arg("diff")
+        .arg("--include-unchanged")
+        .arg(af.path())
+        .arg(tf.path())
+        .assert()
+        .success()
+        .stdout(".\t/\n.\t/hello.c\n*\t/subdir\n")
+        .stderr(predicate::str::is_empty());
 }
