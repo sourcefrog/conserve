@@ -45,14 +45,18 @@ Conserve's [guiding principles](doc/manifesto.md):
 
 Conserve storage is within an _archive_ directory created by `conserve init`:
 
-    conserve init /backup/home.cons
+    $ conserve init /backup/home.cons
 
 `conserve backup` copies a source directory into a new _version_ within the
 archive. Conserve copies files, directories, and (on Unix) symlinks. If the
 `conserve backup` command completes successfully (copying the whole source
 tree), the backup is considered _complete_.
 
-    conserve backup /backup/home.cons ~
+    $ conserve backup /backup/home.cons ~ --exclude /.cache
+
+`conserve diff` shows what's different between an archive and a source directory. It should typically be given the same `--exclude` options as were used to make the backup.
+
+    $ conserve diff /backup/home.cons ~ --exclude /.cache
 
 `conserve versions` lists the versions in an archive, whether or not the backup
 is _complete_, the time at which the backup started, and the time taken to
