@@ -741,9 +741,9 @@ dependencies = [
 
 [[package]]
 name = "readahead-iterator"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02f9dee1f2335dd766f2791ebc34d7ce789139d4937ef5ce282d73e034a09a3c"
+checksum = "73ea134c32fe12df286020949d57d052a90c4001f2dbec4c1c074f39bcb7fc8c"
 
 [[package]]
 name = "redox_syscall"
