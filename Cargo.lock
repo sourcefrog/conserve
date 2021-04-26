@@ -172,7 +172,6 @@ dependencies = [
  "thiserror",
  "thousands",
  "unicode-segmentation",
- "walkdir 2.3.1",
 ]
 
 [[package]]
