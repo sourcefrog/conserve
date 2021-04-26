@@ -104,7 +104,8 @@ where
     AE: Entry,
     BE: Entry,
 {
-    // TODO: Actually compare content, if requested
+    // TODO: Actually compare content, if requested.
+    // TODO: Skip Kind::Unknown.
     let ak = ae.kind();
     if ak != be.kind()
         || (ak == File && (ae.mtime() != be.mtime() || ae.size() != be.size()))
