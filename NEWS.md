@@ -1,6 +1,6 @@
 # Conserve release history
 
-## UNRELEASED
+## v0.6.13 2021-04-26
 
 - `conserve diff` is more useful, and shows whether files have changed
   size/mtime. (It does not yet compare file content for files with the same
