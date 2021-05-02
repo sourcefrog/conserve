@@ -18,10 +18,7 @@
 //! across incremental backups, hiding from the caller that data may be distributed across
 //! multiple index files, bands, and blocks.
 
-use std::collections::HashMap;
-
 use crate::blockdir::BlockDir;
-use crate::kind::Kind;
 use crate::stored_file::{ReadStoredFile, StoredFile};
 use crate::*;
 
@@ -47,38 +44,6 @@ impl StoredTree {
 
     pub fn is_closed(&self) -> Result<bool> {
         self.band.is_closed()
-    }
-
-    pub fn validate(
-        &self,
-        block_lengths: &HashMap<BlockHash, usize>,
-        stats: &mut ValidateStats,
-    ) -> Result<()> {
-        let band_id = self.band().id();
-        for entry in self
-            .iter_entries(None, None)?
-            .filter(|entry| entry.kind() == Kind::File)
-        {
-            for addr in entry.addrs {
-                if let Some(block_len) = block_lengths.get(&addr.hash) {
-                    // Present, but the address is out of range.
-                    if (addr.start + addr.len) > (*block_len as u64) {
-                        ui::problem(&format!(
-                            "Address {:?} in {:?} in {:?} extends beyond compressed data length {}",
-                            addr, &entry.apath, band_id, block_len
-                        ));
-                        stats.block_missing_count += 1;
-                    }
-                } else {
-                    ui::problem(&format!(
-                        "Address {:?} in {:?} in {:?} points to missing block",
-                        &entry.apath, band_id, addr
-                    ));
-                    stats.block_missing_count += 1;
-                }
-            }
-        }
-        Ok(())
     }
 
     /// Open a file stored within this tree.

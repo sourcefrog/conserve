@@ -1,5 +1,11 @@
 # Conserve release history
 
+## UNRELEASED
+
+- `conserve validate` reads all indexes before checking block contents, which
+  avoids false-positive warnings when a backup is made simultaneously with
+  validation.
+
 ## v0.6.13 2021-04-26
 
 - `conserve diff` is more useful, and shows whether files have changed

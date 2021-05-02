@@ -45,6 +45,7 @@ pub mod transport;
 mod tree;
 pub mod ui;
 pub mod unix_time;
+mod validate;
 
 pub use crate::apath::Apath;
 pub use crate::archive::Archive;

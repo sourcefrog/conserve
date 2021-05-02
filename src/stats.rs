@@ -90,6 +90,7 @@ pub struct ValidateStats {
     /// Number of blocks that failed to read back.
     pub block_error_count: usize,
     pub block_missing_count: usize,
+    pub block_too_short: usize,
 
     pub elapsed: Duration,
 }
@@ -110,8 +111,10 @@ impl fmt::Display for ValidateStats {
         write_count(w, "tree open errors", self.tree_open_errors);
         write_count(w, "tree validate errors", self.tree_validate_errors);
         write_count(w, "unexpected files", self.unexpected_files);
+        writeln!(w).unwrap();
         write_count(w, "block errors", self.block_error_count);
-        write_count(w, "blocks missing", self.block_missing_count);
+        write_count(w, "blocks missing", self.block_too_short);
+        write_count(w, "blocks too short", self.block_missing_count);
         writeln!(w).unwrap();
 
         write_count(w, "blocks read", self.block_read_count as usize);

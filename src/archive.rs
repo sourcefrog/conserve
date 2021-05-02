@@ -327,45 +327,33 @@ impl Archive {
     pub fn validate(&self) -> Result<ValidateStats> {
         let start = Instant::now();
         let mut stats = self.validate_archive_dir()?;
-        ui::println("Check blockdir...");
-        let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
 
         ui::println("Count indexes...");
         let band_ids = self.list_band_ids()?;
-        let num_bands = band_ids.len();
 
-        let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Check index");
-        progress_bar.set_total_work(num_bands);
-        let pb_mutex = Mutex::new(progress_bar);
+        // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
+        //    values referenced by all the indexes.
+        let (referenced_lens, ref_stats) = validate::validate_bands(self, &band_ids);
+        stats += ref_stats;
 
-        stats += band_ids
-            .into_par_iter()
-            .map(|band_id| {
-                let mut stats = ValidateStats::default();
+        // 2. Check the hash of all blocks are correct, and remember how long
+        //    the uncompressed data is.
+        ui::println("Check blockdir...");
+        let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
 
-                if let Ok(b) = Band::open(self, &band_id) {
-                    if b.validate(&mut stats).is_err() {
-                        stats.band_metadata_problems += 1;
-                    }
-                } else {
-                    stats.band_open_errors += 1;
+        // 3. Check that all referenced ranges are inside the present data.
+        for (block_hash, referenced_len) in referenced_lens.0 {
+            if let Some(actual_len) = block_lengths.get(&block_hash) {
+                if referenced_len > (*actual_len as u64) {
+                    ui::problem(&format!("Block {:?} is too short", block_hash,));
+                    // TODO: A separate counter; this is worse than just being missing
+                    stats.block_missing_count += 1;
                 }
-
-                if let Ok(st) = self.open_stored_tree(BandSelectionPolicy::Specified(band_id)) {
-                    if st.validate(&block_lengths, &mut stats).is_err() {
-                        stats.tree_validate_errors += 1
-                    }
-                } else {
-                    stats.tree_open_errors += 1
-                }
-
-                if let Ok(mut pb_lock) = pb_mutex.lock() {
-                    pb_lock.increment_work_done(1);
-                }
-                stats
-            })
-            .sum();
+            } else {
+                ui::problem(&format!("Block {:?} is missing", block_hash));
+                stats.block_missing_count += 1;
+            }
+        }
 
         stats.elapsed = start.elapsed();
         Ok(stats)

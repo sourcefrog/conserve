@@ -268,7 +268,7 @@ impl BlockDir {
             "Check {} blocks...",
             blocks.len().separate_with_commas()
         ));
-        progress_bar.set_total_work(blocks.len());
+        
         stats.block_read_count = blocks.len().try_into().unwrap();
         let block_count = blocks.len();
         progress_bar.set_phase("Check block hashes");
