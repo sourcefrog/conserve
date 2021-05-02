@@ -2,8 +2,7 @@
 
 <https://github.com/sourcefrog/conserve/>
 
-[![Rust](https://github.com/sourcefrog/conserve/workflows/Rust/badge.svg?branch=master)](https://github.com/sourcefrog/conserve/actions?query=workflow%3ARust)
-[![Windows build status](https://ci.appveyor.com/api/projects/status/uw61cgrek8ykfi7g?svg=true)](https://ci.appveyor.com/project/sourcefrog/conserve)
+[![GitHub build status](https://github.com/sourcefrog/conserve/workflows/Rust/badge.svg?branch=main)](https://github.com/sourcefrog/conserve/actions?query=workflow%3ARust)
 [![crates.io](https://img.shields.io/crates/v/conserve.svg)](https://crates.io/crates/conserve)
 ![Maturity: Beta](https://img.shields.io/badge/maturity-beta-yellow.svg)
 
@@ -54,7 +53,9 @@ tree), the backup is considered _complete_.
 
     $ conserve backup /backup/home.cons ~ --exclude /.cache
 
-`conserve diff` shows what's different between an archive and a source directory. It should typically be given the same `--exclude` options as were used to make the backup.
+`conserve diff` shows what's different between an archive and a source
+directory. It should typically be given the same `--exclude` options as were
+used to make the backup.
 
     $ conserve diff /backup/home.cons ~ --exclude /.cache
 
