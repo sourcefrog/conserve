@@ -330,14 +330,14 @@ impl Archive {
         ui::println("Check blockdir...");
         let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
 
-        ui::println("Check indexes...");
+        ui::println("Count indexes...");
         let band_ids = self.list_band_ids()?;
         let num_bands = band_ids.len();
 
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Check index");
         progress_bar.set_total_work(num_bands);
-        let progress_bar_mutex = Mutex::new(progress_bar);
+        let pb_mutex = Mutex::new(progress_bar);
 
         stats += band_ids
             .into_par_iter()
@@ -360,12 +360,12 @@ impl Archive {
                     stats.tree_open_errors += 1
                 }
 
-                if let Ok(mut progress_bar_lock) = progress_bar_mutex.lock() {
-                    progress_bar_lock.increment_work_done(1);
+                if let Ok(mut pb_lock) = pb_mutex.lock() {
+                    pb_lock.increment_work_done(1);
                 }
                 stats
             })
-            .reduce(ValidateStats::default, |a, b| a + b);
+            .sum();
 
         stats.elapsed = start.elapsed();
         Ok(stats)

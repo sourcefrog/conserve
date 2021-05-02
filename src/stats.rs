@@ -14,7 +14,7 @@
 use std::fmt;
 use std::time::Duration;
 
-use derive_more::{Add, AddAssign};
+use derive_more::{Add, AddAssign, Sum};
 use thousands::Separable;
 
 use crate::ui::duration_to_hms;
@@ -67,7 +67,7 @@ pub struct Sizes {
     pub uncompressed: u64,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Add, AddAssign)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Add, AddAssign, Sum)]
 pub struct ValidateStats {
     /// Count of files in the wrong place.
     pub structure_problems: usize,
