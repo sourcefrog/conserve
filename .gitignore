@@ -5,3 +5,5 @@ tags
 .*.sw[po]
 .idea/
 conserve.iml
+perf.data*
+perf.old
