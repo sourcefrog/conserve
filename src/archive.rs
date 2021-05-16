@@ -19,6 +19,7 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::Instant;
 
+use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -231,22 +232,9 @@ impl Archive {
     pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         let referenced = self.referenced_blocks()?;
         Ok(self
-            .iter_present_blocks()?
-            .filter(move |hash| !referenced.contains(hash)))
-    }
-
-    fn iter_present_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Find present blocks...");
-        Ok(self
             .block_dir()
             .block_names()?
-            .inspect(move |_| progress_bar.increment_work_done(1)))
-    }
-
-    /// Return a set of all blocks in the archive.
-    pub fn present_blocks(&self) -> Result<HashSet<BlockHash>> {
-        Ok(self.iter_present_blocks()?.collect())
+            .filter(move |h| !referenced.contains(h)))
     }
 
     /// Delete bands, and the blocks that they reference.
@@ -271,12 +259,12 @@ impl Archive {
         let mut keep_band_ids = self.list_band_ids()?;
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
-        let referenced = self.iter_referenced_blocks(&keep_band_ids)?.collect();
-        let unref: HashSet<BlockHash> = self
-            .present_blocks()?
-            .difference(&referenced)
-            .cloned()
-            .collect();
+        let referenced: HashSet<BlockHash> = self.iter_referenced_blocks(&keep_band_ids)?.collect();
+        let unref = self
+            .block_dir()
+            .block_names()?
+            .filter(|bh| !referenced.contains(bh))
+            .collect_vec();
         let unref_count = unref.len();
         stats.unreferenced_block_count = unref_count;
 

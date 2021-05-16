@@ -459,9 +459,9 @@ mod tests {
         assert_eq!(addrs[0].hash, expected_hash);
 
         // Block should be the one block present in the list.
-        let present_blocks = block_dir.block_names().unwrap().collect::<Vec<_>>();
+        let present_blocks = block_dir.block_names().unwrap().collect_vec();
         assert_eq!(present_blocks.len(), 1);
-        assert_eq!(present_blocks[0], expected_hash);
+        assert!(present_blocks.contains(&expected_hash));
 
         // Subdirectory and file should exist
         let expected_file = testdir.path().join("66a").join(EXAMPLE_BLOCK_HASH);
