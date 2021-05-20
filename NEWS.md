@@ -1,6 +1,6 @@
 # Conserve release history
 
-## UNRELEASED
+## v0.6.14 2021-05-20
 
 - `conserve validate` reads all indexes before checking block contents, which
   avoids false-positive warnings when a backup is made simultaneously with
