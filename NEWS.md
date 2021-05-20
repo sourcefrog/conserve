@@ -6,6 +6,11 @@
   avoids false-positive warnings when a backup is made simultaneously with
   validation.
 
+- New option `conserve validate --quick`, which checks that referenced data
+  blocks are present on disk without reading their content. Corruption or IO
+  errors inside the blocks will of course not be detected by a `--quick`
+  validation.
+
 ## v0.6.13 2021-04-26
 
 - `conserve diff` is more useful, and shows whether files have changed

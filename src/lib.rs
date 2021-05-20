@@ -72,6 +72,7 @@ pub use crate::stats::{BackupStats, DeleteStats, RestoreStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};
+pub use crate::validate::{ValidateOptions};
 
 // Commonly-used external types.
 pub use globset::GlobSet;

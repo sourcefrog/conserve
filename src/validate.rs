@@ -18,6 +18,12 @@ use crate::*;
 
 pub(crate) struct BlockLengths(pub(crate) HashMap<BlockHash, u64>);
 
+#[derive(Debug, Default)]
+pub struct ValidateOptions {
+    /// Assume blocks that are present have the right content: don't read and hash them.
+    pub skip_block_hashes: bool,
+}
+
 impl BlockLengths {
     fn new() -> BlockLengths {
         BlockLengths(HashMap::new())

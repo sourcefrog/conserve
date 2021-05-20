@@ -312,7 +312,7 @@ impl Archive {
         Ok(stats)
     }
 
-    pub fn validate(&self) -> Result<ValidateStats> {
+    pub fn validate(&self, options: &ValidateOptions) -> Result<ValidateStats> {
         let start = Instant::now();
         let mut stats = self.validate_archive_dir()?;
 
@@ -324,22 +324,37 @@ impl Archive {
         let (referenced_lens, ref_stats) = validate::validate_bands(self, &band_ids);
         stats += ref_stats;
 
-        // 2. Check the hash of all blocks are correct, and remember how long
-        //    the uncompressed data is.
-        ui::println("Check blockdir...");
-        let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
-
-        // 3. Check that all referenced ranges are inside the present data.
-        for (block_hash, referenced_len) in referenced_lens.0 {
-            if let Some(actual_len) = block_lengths.get(&block_hash) {
-                if referenced_len > (*actual_len as u64) {
-                    ui::problem(&format!("Block {:?} is too short", block_hash,));
-                    // TODO: A separate counter; this is worse than just being missing
-                    stats.block_missing_count += 1;
-                }
-            } else {
+        if options.skip_block_hashes {
+            // 3a. Check that all referenced blocks are present, without spending time reading their
+            // content.
+            ui::println("List present blocks...");
+            // TODO: Just validate blockdir structure.
+            let present_blocks: HashSet<BlockHash> = self.block_dir.block_names()?.collect();
+            for block_hash in referenced_lens
+                .0
+                .keys()
+                .filter(|&bh| !present_blocks.contains(bh))
+            {
                 ui::problem(&format!("Block {:?} is missing", block_hash));
                 stats.block_missing_count += 1;
+            }
+        } else {
+            // 2. Check the hash of all blocks are correct, and remember how long
+            //    the uncompressed data is.
+            ui::println("Check blockdir...");
+            let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
+            // 3b. Check that all referenced ranges are inside the present data.
+            for (block_hash, referenced_len) in referenced_lens.0 {
+                if let Some(actual_len) = block_lengths.get(&block_hash) {
+                    if referenced_len > (*actual_len as u64) {
+                        ui::problem(&format!("Block {:?} is too short", block_hash,));
+                        // TODO: A separate counter; this is worse than just being missing
+                        stats.block_missing_count += 1;
+                    }
+                } else {
+                    ui::problem(&format!("Block {:?} is missing", block_hash));
+                    stats.block_missing_count += 1;
+                }
             }
         }
 

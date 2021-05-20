@@ -134,6 +134,10 @@ enum Command {
     Validate {
         /// Path of the archive to check.
         archive: PathBuf,
+
+        /// Skip reading and checking the content of data blocks.
+        #[structopt(long, short = "q")]
+        quick: bool,
     },
 
     /// List backup versions in an archive.
@@ -348,8 +352,11 @@ impl Command {
                     ui::println(&conserve::bytes_to_human_mb(size));
                 }
             }
-            Command::Validate { archive } => {
-                let stats = Archive::open_path(archive)?.validate()?;
+            Command::Validate { archive, quick } => {
+                let options = ValidateOptions {
+                    skip_block_hashes: *quick,
+                };
+                let stats = Archive::open_path(archive)?.validate(&options)?;
                 println!("{}", stats);
                 if stats.has_problems() {
                     ui::problem("Archive has some problems.");
