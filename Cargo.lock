@@ -143,7 +143,7 @@ dependencies = [
 
 [[package]]
 name = "conserve"
-version = "0.6.14"
+version = "0.6.15-pre"
 dependencies = [
  "assert_cmd",
  "assert_fs",
