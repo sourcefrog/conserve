@@ -21,7 +21,7 @@
 //!
 //! The structure is: archive > blockdir > subdir > file.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::Path;
@@ -29,7 +29,6 @@ use std::sync::Mutex;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use thousands::Separable;
@@ -244,15 +243,23 @@ impl BlockDir {
         Ok(self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok()))
+    }
 
-        // .enumerate()
-        // .inspect(|(i, _hash)| {
-        //     if i % 100 == 0 {
-        //         progress_bar.set_work_done(*i)
-        //     }
-        // })
-        // .map(|(_i, hash)| hash)
-        // .collect()
+    /// Return all the blocknames in the blockdir.
+    pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
+        let mut progress_bar = ProgressBar::new();
+        progress_bar.set_phase("List blocks");
+        Ok(self
+            .iter_block_dir_entries()?
+            .filter_map(|de| de.name.parse().ok())
+            .enumerate()
+            .inspect(|(i, _hash)| {
+                if i % 100 == 0 {
+                    progress_bar.set_work_done(*i)
+                }
+            })
+            .map(|(_i, hash)| hash)
+            .collect())
     }
 
     /// Check format invariants of the BlockDir.
@@ -264,7 +271,7 @@ impl BlockDir {
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
         ui::println("Count blocks...");
-        let blocks = self.block_names()?.collect_vec();
+        let blocks = self.block_names_set()?;
         crate::ui::println(&format!(
             "Check {} blocks...",
             blocks.len().separate_with_commas()

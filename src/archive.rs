@@ -329,7 +329,7 @@ impl Archive {
             // content.
             ui::println("List present blocks...");
             // TODO: Just validate blockdir structure.
-            let present_blocks: HashSet<BlockHash> = self.block_dir.block_names()?.collect();
+            let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
             for block_hash in referenced_lens
                 .0
                 .keys()
