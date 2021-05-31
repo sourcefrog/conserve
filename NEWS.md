@@ -5,6 +5,13 @@
 - Find referenced blocks by walking all bands in parallel. This significantly
   speeds up GC, deletion, etc: 6.5x faster in one test.
 
+- Exclude patterns changed: patterns starting with a `/` match against the
+  entire path from the top of the tree, and patterns not starting with a slash
+  match anywhere inside the path. For example, `/target/release` will only
+  exclude `release` inside a directory called `target` in the tree root, but
+  `target/release` will exclude anything called `release` inside a directory
+  called `target` anywhere in the tree.
+
 ## v0.6.14 2021-05-20
 
 - `conserve validate` reads all indexes before checking block contents, which

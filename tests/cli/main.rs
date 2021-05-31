@@ -27,6 +27,7 @@ use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
 mod delete;
 mod diff;
+mod exclude;
 mod versions;
 
 lazy_static! {
@@ -338,52 +339,6 @@ fn incomplete_version() {
         .assert()
         .failure()
         .stdout(predicate::str::contains("incomplete and may be in use"));
-}
-
-#[test]
-fn exclude_option_ordering() {
-    // Regression caused by the move to structopt(?) in 7ddb02d0cf47467f1cccc2dcdedb005e8c4e3f25.
-    // See https://github.com/TeXitoi/structopt/issues/396.
-    let testdir = TempDir::new().unwrap();
-    let arch_dir = testdir.path().join("a");
-
-    // conserve init
-    run_conserve().arg("init").arg(&arch_dir).assert().success();
-
-    let src = TreeFixture::new();
-    src.create_file("hello");
-    src.create_dir("subdir");
-
-    run_conserve()
-        .args(&["backup", "--exclude", "**/target"])
-        .arg(&arch_dir)
-        .arg(&src.path())
-        .assert()
-        .success();
-}
-
-#[test]
-fn exclude_simple_glob() {
-    let af = ScratchArchive::new();
-    let src = TreeFixture::new();
-
-    src.create_dir("src");
-    src.create_file("src/hello.c");
-    src.create_file("src/hello.o");
-
-    run_conserve()
-        .args(&["backup", "-v", "--exclude", "*.o"])
-        .arg(&af.path())
-        .arg(&src.path())
-        .assert()
-        .success();
-
-    run_conserve()
-        .args(&["ls"])
-        .arg(&af.path())
-        .assert()
-        .stdout("/\n/src\n/src/hello.c\n")
-        .success();
 }
 
 #[test]

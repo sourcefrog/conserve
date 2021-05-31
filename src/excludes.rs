@@ -1,5 +1,5 @@
 // Copyright 2017 Julian Raufelder.
-// Copyright 2020 Martin Pool.
+// Copyright 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -11,19 +11,42 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Create GlobSet from a list of strings
+//! Create a [GlobSet] from a list of strings.
+//!
+//! The [GlobSet] is intended to be matched against an [Apath].
+//!
+//! Patterns that start with a slash match only against full paths from the top
+//! of the tree. Patterns that do not start with a slash match the suffix of the
+//! path.
 
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use std::borrow::Cow;
+
+use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 
 use super::*;
 
+/// Create a [GlobSet] from a list of strings.
+///
+/// The [GlobSet] is intended to be matched against an [Apath], which will
+/// always start with a `/`.
 pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(
     excludes: I,
 ) -> Result<Option<GlobSet>> {
     let mut builder = GlobSetBuilder::new();
     let mut empty = true;
-    for i in excludes {
-        builder.add(Glob::new(i.as_ref()).map_err(|source| Error::ParseGlob { source })?);
+    for s in excludes {
+        let s = s.as_ref();
+        let s: Cow<str> = if s.starts_with('/') {
+            Cow::Borrowed(s)
+        } else {
+            Cow::Owned(format!("**/{}", s))
+        };
+        let glob = GlobBuilder::new(&s)
+            .literal_separator(true)
+            .build()
+            .map_err(|source| Error::ParseGlob { source })?;
+
+        builder.add(glob);
         empty = false;
     }
     if empty {
@@ -41,17 +64,35 @@ mod tests {
     use super::super::*;
 
     #[test]
-    pub fn simple_parse() {
+    fn simple_globs() {
         let vec = vec!["fo*", "foo", "bar*"];
         let excludes = excludes::from_strings(&vec).expect("ok").expect("some");
-        assert_eq!(excludes.matches("foo").len(), 2);
-        assert_eq!(excludes.matches("foobar").len(), 1);
-        assert_eq!(excludes.matches("barBaz").len(), 1);
-        assert_eq!(excludes.matches("bazBar").len(), 0);
+
+        // Matches in the root
+        assert_eq!(excludes.matches("/foo").len(), 2);
+        assert_eq!(excludes.matches("/foobar").len(), 1);
+        assert_eq!(excludes.matches("/barBaz").len(), 1);
+        assert_eq!(excludes.matches("/bazBar").len(), 0);
+
+        // Also matches in a subdir
+        assert!(excludes.is_match("/subdir/foo"));
+        assert!(excludes.is_match("/subdir/foobar"));
+        assert!(excludes.is_match("/subdir/barBaz"));
+        assert!(!excludes.is_match("/subdir/bazBar"));
     }
 
     #[test]
-    pub fn path_parse() {
+    fn rooted_pattern() {
+        let excludes = excludes::from_strings(&["/exc"]).unwrap().unwrap();
+
+        assert!(excludes.is_match("/exc"));
+        assert!(!excludes.is_match("/excellent"));
+        assert!(!excludes.is_match("/sub/excellent"));
+        assert!(!excludes.is_match("/sub/exc"));
+    }
+
+    #[test]
+    fn path_parse() {
         let excludes = excludes::from_strings(&["fo*/bar/baz*"])
             .expect("ok")
             .expect("some");
@@ -59,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    pub fn extendend_pattern_parse() {
+    fn extendend_pattern_parse() {
         let excludes = excludes::from_strings(&["fo?", "ba[abc]", "[!a-z]"])
             .expect("ok")
             .expect("some");
@@ -71,7 +112,7 @@ mod tests {
     }
 
     #[test]
-    pub fn nothing_parse() {
+    fn nothing_parse() {
         let excludes = excludes::excludes_nothing();
         assert!(excludes.matches("a").is_empty());
     }
