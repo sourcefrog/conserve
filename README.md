@@ -96,7 +96,7 @@ tree (not the root of the filesystem.) `**` recursively matches any number of
 directories. `*.o` matches anywhere in the tree.
 
 The syntax is comes from the Rust
-[globset](https://docs.rs/globset/0.2.1/globset/#syntax) crate.
+[globset](https://docs.rs/globset/#syntax) crate.
 
 ## Install
 
