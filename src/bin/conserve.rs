@@ -232,7 +232,8 @@ impl Command {
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open_path(archive)?.referenced_blocks()? {
+                let archive = Archive::open_path(archive)?;
+                for hash in archive.referenced_blocks(&archive.list_band_ids()?)? {
                     writeln!(bw, "{}", hash)?;
                 }
             }

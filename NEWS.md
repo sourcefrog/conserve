@@ -1,5 +1,10 @@
 # Conserve release history
 
+## UNRELEASED
+
+- Find referenced blocks by walking all bands in parallel. This significantly
+  speeds up GC, deletion, etc: 6.5x faster in one test.
+
 ## v0.6.14 2021-05-20
 
 - `conserve validate` reads all indexes before checking block contents, which

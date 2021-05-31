@@ -200,37 +200,26 @@ impl Archive {
     /// Returns all blocks referenced by all bands.
     ///
     /// Shows a progress bar as they're collected.
-    pub fn referenced_blocks(&self) -> Result<HashSet<BlockHash>> {
-        self.iter_referenced_blocks(&self.list_band_ids()?)
-            .map(Iterator::collect)
-    }
-
-    /// Iterate all blocks referenced by the given bands.
-    ///
-    /// The iterator returns repeatedly-referenced blocks repeatedly, without deduplicating.
-    ///
-    /// This shows a progress bar as indexes are iterated.
-    fn iter_referenced_blocks<'a>(
-        &self,
-        band_ids: &'a [BandId],
-    ) -> Result<impl Iterator<Item = BlockHash> + 'a> {
+    pub fn referenced_blocks(&self, band_ids: &[BandId]) -> Result<HashSet<BlockHash>> {
         let archive = self.clone();
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Find referenced blocks...");
+        let pb_lock = Mutex::new(progress_bar);
         let num_bands = band_ids.len();
         Ok(band_ids
-            .iter()
+            .par_iter()
             .enumerate()
-            .inspect(move |(i, _)| progress_bar.set_fraction(*i, num_bands))
+            .inspect(move |(i, _)| pb_lock.lock().unwrap().set_fraction(*i, num_bands))
             .map(move |(_i, band_id)| Band::open(&archive, &band_id).expect("Failed to open band"))
-            .flat_map(|band| band.index().iter_entries())
-            .flat_map(|entry| entry.addrs)
-            .map(|addr| addr.hash))
+            .flat_map_iter(|band| band.index().iter_entries())
+            .flat_map_iter(|entry| entry.addrs)
+            .map(|addr| addr.hash)
+            .collect())
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
     pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        let referenced = self.referenced_blocks()?;
+        let referenced = self.referenced_blocks(&self.list_band_ids()?)?;
         Ok(self
             .block_dir()
             .block_names()?
@@ -259,7 +248,7 @@ impl Archive {
         let mut keep_band_ids = self.list_band_ids()?;
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
-        let referenced: HashSet<BlockHash> = self.iter_referenced_blocks(&keep_band_ids)?.collect();
+        let referenced = self.referenced_blocks(&keep_band_ids)?;
         let unref = self
             .block_dir()
             .block_names()?
@@ -503,7 +492,7 @@ mod tests {
             af.last_complete_band().unwrap().is_none(),
             "Archive should have no bands yet"
         );
-        assert_eq!(af.referenced_blocks().unwrap().len(), 0);
+        assert_eq!(af.referenced_blocks(&af.list_band_ids().unwrap()).unwrap().len(), 0);
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 
@@ -530,7 +519,7 @@ mod tests {
         );
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
-        assert_eq!(af.referenced_blocks().unwrap().len(), 0);
+        assert_eq!(af.referenced_blocks(&af.list_band_ids().unwrap()).unwrap().len(), 0);
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 }

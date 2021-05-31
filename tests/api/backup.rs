@@ -156,7 +156,7 @@ fn check_backup(af: &ScratchArchive) {
     assert!(file_entry.mtime > 0);
 
     assert_eq!(
-        af.referenced_blocks()
+        af.referenced_blocks(&af.list_band_ids().unwrap())
             .unwrap()
             .into_iter()
             .map(|h| h.to_string())
