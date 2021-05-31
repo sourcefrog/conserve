@@ -363,6 +363,30 @@ fn exclude_option_ordering() {
 }
 
 #[test]
+fn exclude_simple_glob() {
+    let af = ScratchArchive::new();
+    let src = TreeFixture::new();
+
+    src.create_dir("src");
+    src.create_file("src/hello.c");
+    src.create_file("src/hello.o");
+
+    run_conserve()
+        .args(&["backup", "-v", "--exclude", "*.o"])
+        .arg(&af.path())
+        .arg(&src.path())
+        .assert()
+        .success();
+
+    run_conserve()
+        .args(&["ls"])
+        .arg(&af.path())
+        .assert()
+        .stdout("/\n/src\n/src/hello.c\n")
+        .success();
+}
+
+#[test]
 fn validate_non_fatal_problems_nonzero_result() {
     run_conserve()
         .args(&["validate", "testdata/damaged/missing-block/"])

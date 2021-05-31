@@ -93,10 +93,7 @@ including `backup`, `restore`, `ls` and `list-source`.
 
 A `/` at the start of the exclusion pattern anchors it to the top of the backup
 tree (not the root of the filesystem.) `**` recursively matches any number of
-directories.
-
-At the moment exclusion patterns must always start from the root, so you need
-`**/*.swp` to exclude `.swp` files anywhere in the tree.
+directories. `*.o` matches anywhere in the tree.
 
 The syntax is comes from the Rust
 [globset](https://docs.rs/globset/0.2.1/globset/#syntax) crate.
