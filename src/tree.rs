@@ -29,7 +29,7 @@ pub trait ReadTree {
     /// Errors reading individual paths or directories are sent to the UI and
     /// counted, but are not treated as fatal, and don't appear as Results in the
     /// iterator.
-    fn iter_entries(&self, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Result<Self::IT>;
+    fn iter_entries(&self, subtree: Option<Apath>, excludes: GlobSet) -> Result<Self::IT>;
 
     /// Read file contents as a `std::io::Read`.
     // TODO: Remove this and use ReadBlocks or similar.
@@ -42,7 +42,7 @@ pub trait ReadTree {
     /// Measure the tree size.
     ///
     /// This typically requires walking all entries, which may take a while.
-    fn size(&self, excludes: Option<GlobSet>) -> Result<TreeSize> {
+    fn size(&self, excludes: GlobSet) -> Result<TreeSize> {
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Measuring");
         let mut tot = 0u64;

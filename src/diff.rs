@@ -25,10 +25,19 @@ use DiffKind::*;
 use Kind::*;
 use MergedEntryKind::*;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct DiffOptions {
-    pub excludes: Option<GlobSet>,
+    pub excludes: GlobSet,
     pub include_unchanged: bool,
+}
+
+impl Default for DiffOptions {
+    fn default() -> Self {
+        DiffOptions {
+            excludes: GlobSet::empty(),
+            include_unchanged: false,
+        }
+    }
 }
 
 /// The overall state of change of an entry.

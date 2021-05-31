@@ -492,7 +492,12 @@ mod tests {
             af.last_complete_band().unwrap().is_none(),
             "Archive should have no bands yet"
         );
-        assert_eq!(af.referenced_blocks(&af.list_band_ids().unwrap()).unwrap().len(), 0);
+        assert_eq!(
+            af.referenced_blocks(&af.list_band_ids().unwrap())
+                .unwrap()
+                .len(),
+            0
+        );
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 
@@ -519,7 +524,12 @@ mod tests {
         );
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
-        assert_eq!(af.referenced_blocks(&af.list_band_ids().unwrap()).unwrap().len(), 0);
+        assert_eq!(
+            af.referenced_blocks(&af.list_band_ids().unwrap())
+                .unwrap()
+                .len(),
+            0
+        );
         assert_eq!(af.block_dir.block_names().unwrap().count(), 0);
     }
 }

@@ -29,11 +29,8 @@ use super::*;
 ///
 /// The [GlobSet] is intended to be matched against an [Apath], which will
 /// always start with a `/`.
-pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(
-    excludes: I,
-) -> Result<Option<GlobSet>> {
+pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
-    let mut empty = true;
     for s in excludes {
         let s = s.as_ref();
         let s: Cow<str> = if s.starts_with('/') {
@@ -47,12 +44,8 @@ pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(
             .map_err(|source| Error::ParseGlob { source })?;
 
         builder.add(glob);
-        empty = false;
     }
-    if empty {
-        return Ok(None);
-    }
-    builder.build().map_err(Into::into).map(Some)
+    builder.build().map_err(Into::into)
 }
 
 pub fn excludes_nothing() -> GlobSet {
@@ -66,7 +59,7 @@ mod tests {
     #[test]
     fn simple_globs() {
         let vec = vec!["fo*", "foo", "bar*"];
-        let excludes = excludes::from_strings(&vec).expect("ok").expect("some");
+        let excludes = excludes::from_strings(&vec).expect("ok");
 
         // Matches in the root
         assert_eq!(excludes.matches("/foo").len(), 2);
@@ -83,7 +76,7 @@ mod tests {
 
     #[test]
     fn rooted_pattern() {
-        let excludes = excludes::from_strings(&["/exc"]).unwrap().unwrap();
+        let excludes = excludes::from_strings(&["/exc"]).unwrap();
 
         assert!(excludes.is_match("/exc"));
         assert!(!excludes.is_match("/excellent"));
@@ -93,17 +86,13 @@ mod tests {
 
     #[test]
     fn path_parse() {
-        let excludes = excludes::from_strings(&["fo*/bar/baz*"])
-            .expect("ok")
-            .expect("some");
+        let excludes = excludes::from_strings(&["fo*/bar/baz*"]).unwrap();
         assert_eq!(excludes.matches("foo/bar/baz.rs").len(), 1);
     }
 
     #[test]
     fn extendend_pattern_parse() {
-        let excludes = excludes::from_strings(&["fo?", "ba[abc]", "[!a-z]"])
-            .expect("ok")
-            .expect("some");
+        let excludes = excludes::from_strings(&["fo?", "ba[abc]", "[!a-z]"]).unwrap();
         assert_eq!(excludes.matches("foo").len(), 1);
         assert_eq!(excludes.matches("fo").len(), 0);
         assert_eq!(excludes.matches("baa").len(), 1);

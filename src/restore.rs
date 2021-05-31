@@ -32,7 +32,7 @@ use crate::*;
 #[derive(Debug)]
 pub struct RestoreOptions {
     pub print_filenames: bool,
-    pub excludes: Option<GlobSet>,
+    pub excludes: GlobSet,
     /// Restore only this subdirectory.
     pub only_subtree: Option<Apath>,
     pub overwrite: bool,
@@ -46,7 +46,7 @@ impl Default for RestoreOptions {
             print_filenames: false,
             overwrite: false,
             band_selection: BandSelectionPolicy::LatestClosed,
-            excludes: None,
+            excludes: excludes_nothing(),
             only_subtree: None,
         }
     }

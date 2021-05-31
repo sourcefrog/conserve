@@ -20,11 +20,11 @@ use std::path::{Path, PathBuf};
 
 use globset::GlobSet;
 
-use crate::kind::Kind;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_time::UnixTime;
 use crate::Result;
 use crate::*;
+use crate::{excludes::excludes_nothing, kind::Kind};
 
 /// A real tree on the filesystem, for use as a backup source or restore destination.
 #[derive(Clone)]
@@ -72,7 +72,7 @@ impl tree::ReadTree for LiveTree {
     /// is the defined order for files stored in an archive.  Within those files and
     /// child directories, visit them according to a sorted comparison by their UTF-8
     /// name.
-    fn iter_entries(&self, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Result<Self::IT> {
+    fn iter_entries(&self, subtree: Option<Apath>, excludes: GlobSet) -> Result<Self::IT> {
         Iter::new(&self.path, subtree, excludes)
     }
 
@@ -86,7 +86,7 @@ impl tree::ReadTree for LiveTree {
         // TODO: This stats the file and builds an entry about them, just to
         // throw it away. We could perhaps change the iter to optionally do
         // less work.
-        Ok(self.iter_entries(None, None)?.count() as u64)
+        Ok(self.iter_entries(None, excludes_nothing())?.count() as u64)
     }
 }
 
@@ -155,7 +155,7 @@ pub struct Iter {
     check_order: apath::DebugCheckOrder,
 
     /// glob pattern to skip in iterator
-    excludes: Option<GlobSet>,
+    excludes: GlobSet,
 
     stats: LiveTreeIterStats,
 }
@@ -163,7 +163,7 @@ pub struct Iter {
 impl Iter {
     /// Construct a new iter that will visit everything below this root path,
     /// subject to some exclusions
-    fn new(root_path: &Path, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Result<Iter> {
+    fn new(root_path: &Path, subtree: Option<Apath>, excludes: GlobSet) -> Result<Iter> {
         let subtree = subtree.unwrap_or_else(|| "/".into());
         let start_path = relative_path(root_path, &subtree);
         let start_metadata = fs::symlink_metadata(&start_path).map_err(Error::from)?;
@@ -248,12 +248,11 @@ impl Iter {
                 }
             };
 
-            if let Some(ref excludes) = self.excludes {
-                if excludes.is_match(&child_apath_str) {
-                    self.stats.exclusions += 1;
-                    continue;
-                }
+            if self.excludes.is_match(&child_apath_str) {
+                self.stats.exclusions += 1;
+                continue;
             }
+
             let metadata = match dir_entry.metadata() {
                 Ok(metadata) => metadata,
                 Err(e) => {
@@ -376,7 +375,7 @@ mod tests {
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
         let lt = LiveTree::open(tf.path()).unwrap();
-        let mut source_iter = lt.iter_entries(None, None).unwrap();
+        let mut source_iter = lt.iter_entries(None, excludes_nothing()).unwrap();
         let result = source_iter.by_ref().collect::<Vec<_>>();
         // First one is the root
         assert_eq!(&result[0].apath, "/");
@@ -433,7 +432,10 @@ mod tests {
         tf.create_symlink("from", "to");
 
         let lt = LiveTree::open(tf.path()).unwrap();
-        let result = lt.iter_entries(None, None).unwrap().collect::<Vec<_>>();
+        let result = lt
+            .iter_entries(None, excludes_nothing())
+            .unwrap()
+            .collect::<Vec<_>>();
 
         assert_eq!(&result[0].apath, "/");
         assert_eq!(&result[1].apath, "/from");
@@ -451,7 +453,7 @@ mod tests {
         let lt = LiveTree::open(tf.path()).unwrap();
 
         let names: Vec<String> = lt
-            .iter_entries(Some("/subdir".into()), None)
+            .iter_entries(Some("/subdir".into()), excludes_nothing())
             .unwrap()
             .map(|entry| entry.apath.into())
             .collect();

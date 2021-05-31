@@ -59,6 +59,7 @@ pub use crate::blockhash::BlockHash;
 pub use crate::diff::{diff, DiffEntry, DiffKind, DiffOptions};
 pub use crate::entry::Entry;
 pub use crate::errors::Error;
+pub use crate::excludes::excludes_nothing;
 pub use crate::gc_lock::GarbageCollectionLock;
 pub use crate::index::{IndexEntry, IndexRead, IndexWriter};
 pub use crate::kind::Kind;
@@ -72,7 +73,7 @@ pub use crate::stats::{BackupStats, DeleteStats, RestoreStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};
-pub use crate::validate::{ValidateOptions};
+pub use crate::validate::ValidateOptions;
 
 // Commonly-used external types.
 pub use globset::GlobSet;

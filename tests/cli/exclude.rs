@@ -18,7 +18,6 @@ use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
 use crate::run_conserve;
 
-
 #[test]
 fn exclude_option_ordering() {
     // Regression caused by the move to structopt(?) in 7ddb02d0cf47467f1cccc2dcdedb005e8c4e3f25.

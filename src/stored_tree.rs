@@ -58,7 +58,7 @@ impl ReadTree for StoredTree {
     type IT = index::IndexEntryIter<stitch::IterStitchedIndexHunks>;
 
     /// Return an iter of index entries in this stored tree.
-    fn iter_entries(&self, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Result<Self::IT> {
+    fn iter_entries(&self, subtree: Option<Apath>, excludes: GlobSet) -> Result<Self::IT> {
         Ok(self
             .archive
             .iter_stitched_index_hunks(self.band.id())
@@ -92,7 +92,7 @@ mod test {
         assert_eq!(*st.band().id(), last_band_id);
 
         let names: Vec<String> = st
-            .iter_entries(None, None)
+            .iter_entries(None, excludes_nothing())
             .unwrap()
             .map(|e| e.apath.into())
             .collect();
@@ -129,7 +129,7 @@ mod test {
             .unwrap();
 
         let names: Vec<String> = st
-            .iter_entries(Some("/subdir".into()), None)
+            .iter_entries(Some("/subdir".into()), excludes_nothing())
             .unwrap()
             .map(|entry| entry.apath.into())
             .collect();

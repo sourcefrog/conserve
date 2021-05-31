@@ -276,7 +276,7 @@ impl IndexRead {
 
     /// Make an iterator that will return all entries in this band.
     pub fn iter_entries(self) -> IndexEntryIter<IndexHunkIter> {
-        IndexEntryIter::new(self.iter_hunks(), None, None)
+        IndexEntryIter::new(self.iter_hunks(), None, excludes_nothing())
     }
 
     /// Make an iterator that returns hunks of entries from this index.
@@ -398,11 +398,11 @@ pub struct IndexEntryIter<HI: Iterator<Item = Vec<IndexEntry>>> {
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
     hunk_iter: HI,
     subtree: Option<Apath>,
-    excludes: Option<GlobSet>,
+    excludes: GlobSet,
 }
 
 impl<HI: Iterator<Item = Vec<IndexEntry>>> IndexEntryIter<HI> {
-    pub(crate) fn new(hunk_iter: HI, subtree: Option<Apath>, excludes: Option<GlobSet>) -> Self {
+    pub(crate) fn new(hunk_iter: HI, subtree: Option<Apath>, excludes: GlobSet) -> Self {
         IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             hunk_iter,
@@ -423,10 +423,8 @@ impl<HI: Iterator<Item = Vec<IndexEntry>>> Iterator for IndexEntryIter<HI> {
                         continue;
                     }
                 }
-                if let Some(excludes) = &self.excludes {
-                    if excludes.is_match(&entry.apath) {
-                        continue;
-                    }
+                if self.excludes.is_match(&entry.apath) {
+                    continue;
                 }
                 return Some(entry);
             }

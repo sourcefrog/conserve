@@ -33,7 +33,7 @@ pub struct BackupOptions {
     pub print_filenames: bool,
 
     /// Exclude these globs from the backup.
-    pub excludes: Option<GlobSet>,
+    pub excludes: GlobSet,
 
     pub max_entries_per_hunk: usize,
 }
@@ -42,7 +42,7 @@ impl Default for BackupOptions {
     fn default() -> BackupOptions {
         BackupOptions {
             print_filenames: false,
-            excludes: None,
+            excludes: GlobSet::empty(),
             max_entries_per_hunk: crate::index::MAX_ENTRIES_PER_HUNK,
         }
     }
@@ -120,7 +120,7 @@ impl BackupWriter {
         let basis_index = archive.last_band_id()?.map(|band_id| {
             archive
                 .iter_stitched_index_hunks(&band_id)
-                .iter_entries(None, None)
+                .iter_entries(None, excludes_nothing())
         });
         // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;
