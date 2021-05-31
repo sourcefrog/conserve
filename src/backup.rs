@@ -147,7 +147,6 @@ impl BackupWriter {
 
     /// Write out any pending data blocks, and then the pending index entries.
     fn flush_group(&mut self) -> Result<()> {
-        // TODO: Finish FileCombiner, when this class has one.
         let (stats, mut entries) = self.file_combiner.drain()?;
         self.stats += stats;
         self.index_builder.append_entries(&mut entries);
