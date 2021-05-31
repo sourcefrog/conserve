@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2019, 2020, 2021 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -30,10 +30,14 @@ pub fn simple_backup() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
-    // TODO: Include a symlink only on Unix.
+
     let copy_stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).expect("backup");
     assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
     assert_eq!(copy_stats.files, 1);
+    assert_eq!(copy_stats.deduplicated_blocks, 0);
+    assert_eq!(copy_stats.written_blocks, 1);
+    assert_eq!(copy_stats.uncompressed_bytes, 8);
+    assert_eq!(copy_stats.compressed_bytes, 10);
     check_backup(&af);
 
     let restore_dir = TempDir::new().unwrap();
