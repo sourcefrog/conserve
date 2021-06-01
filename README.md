@@ -95,8 +95,12 @@ A `/` at the start of the exclusion pattern anchors it to the top of the backup
 tree (not the root of the filesystem.) `**` recursively matches any number of
 directories. `*.o` matches anywhere in the tree.
 
-The syntax is comes from the Rust
-[globset](https://docs.rs/globset/#syntax) crate.
+`--exclude-from` reads exclusion patterns from a file, one per line, ignoring
+leading and trailing whitespace, and skipping comment lines that start with a
+`#`.
+
+The syntax is comes from the Rust [globset](https://docs.rs/globset/#syntax)
+crate.
 
 ## Install
 

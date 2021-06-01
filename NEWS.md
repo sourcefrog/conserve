@@ -12,6 +12,8 @@
   `target/release` will exclude anything called `release` inside a directory
   called `target` anywhere in the tree.
 
+- Add new `--exclude-from` option.
+
 ## v0.6.14 2021-05-20
 
 - `conserve validate` reads all indexes before checking block contents, which

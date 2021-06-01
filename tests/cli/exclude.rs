@@ -118,3 +118,28 @@ fn exclude_suffix_pattern() {
         .stdout("/\n/release\n/src\n/subproj\n/target\n/src/hello.rs\n/subproj/target\n")
         .success();
 }
+
+#[test]
+fn exclude_from_file() {
+    let af = ScratchArchive::new();
+    let src = TreeFixture::new();
+
+    src.create_dir("src");
+    src.create_file("src/hello.rs");
+    src.create_dir("junk.tmp");
+    src.create_dir("target");
+    src.create_file("thing~");
+    src.create_file_with_contents(
+        "exclude",
+        b"#some exclusions\n  *.tmp \n# hello.rs\n\n/target\n",
+    );
+
+    run_conserve()
+        .args(&["backup", "-v", "--exclude-from"])
+        .arg(&src.path().join("exclude"))
+        .arg(&af.path())
+        .args(&["--exclude=*~"])
+        .arg(&src.path())
+        .assert()
+        .success();
+}

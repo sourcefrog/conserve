@@ -41,6 +41,8 @@ enum Command {
         verbose: bool,
         #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
+        #[structopt(long, short = "E", number_of_values = 1)]
+        exclude_from: Vec<String>,
     },
 
     Debug(Debug),
@@ -68,6 +70,8 @@ enum Command {
         backup: Option<BandId>,
         #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
+        #[structopt(long, short = "E", number_of_values = 1)]
+        exclude_from: Vec<String>,
         #[structopt(long)]
         include_unchanged: bool,
     },
@@ -99,6 +103,8 @@ enum Command {
 
         #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
+        #[structopt(long, short = "E", number_of_values = 1)]
+        exclude_from: Vec<String>,
     },
 
     /// Copy a stored tree to a restore directory.
@@ -113,6 +119,8 @@ enum Command {
         verbose: bool,
         #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
+        #[structopt(long, short = "E", number_of_values = 1)]
+        exclude_from: Vec<String>,
         #[structopt(long = "only", short = "i", number_of_values = 1)]
         only_subtree: Option<Apath>,
     },
@@ -128,6 +136,8 @@ enum Command {
 
         #[structopt(long, short, number_of_values = 1)]
         exclude: Vec<String>,
+        #[structopt(long, short = "E", number_of_values = 1)]
+        exclude_from: Vec<String>,
     },
 
     /// Check that an archive is internally consistent.
@@ -209,8 +219,9 @@ impl Command {
                 source,
                 verbose,
                 exclude,
+                exclude_from,
             } => {
-                let excludes = excludes::from_strings(exclude)?;
+                let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let source = &LiveTree::open(source)?;
                 let options = BackupOptions {
                     print_filenames: *verbose,
@@ -263,9 +274,10 @@ impl Command {
                 source,
                 backup,
                 exclude,
+                exclude_from,
                 include_unchanged,
             } => {
-                let excludes = excludes::from_strings(exclude)?;
+                let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let st = stored_tree_from_opt(archive, backup)?;
                 let lt = LiveTree::open(source)?;
                 let options = DiffOptions {
@@ -293,8 +305,12 @@ impl Command {
                 Archive::create_path(&archive)?;
                 ui::println(&format!("Created new archive in {:?}", &archive));
             }
-            Command::Ls { stos, exclude } => {
-                let excludes = excludes::from_strings(exclude)?;
+            Command::Ls {
+                stos,
+                exclude,
+                exclude_from,
+            } => {
+                let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 if let Some(archive) = &stos.archive {
                     show::show_entry_names(
                         stored_tree_from_opt(archive, &stos.backup)?
@@ -316,14 +332,16 @@ impl Command {
                 verbose,
                 force_overwrite,
                 exclude,
+                exclude_from,
                 only_subtree,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open_path(archive)?;
+                let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
 
                 let options = RestoreOptions {
                     print_filenames: *verbose,
-                    excludes: excludes::from_strings(exclude)?,
+                    excludes,
                     only_subtree: only_subtree.clone(),
                     band_selection,
                     overwrite: *force_overwrite,
@@ -333,11 +351,12 @@ impl Command {
                 ui::println(&format!("Restore complete.\n{}", stats));
             }
             Command::Size {
-                ref stos,
+                stos,
                 bytes,
-                ref exclude,
+                exclude,
+                exclude_from,
             } => {
-                let excludes = excludes::from_strings(exclude)?;
+                let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
                         .size(excludes)?

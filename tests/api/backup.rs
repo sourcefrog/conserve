@@ -248,7 +248,6 @@ fn mtime_before_epoch() {
 
     assert_eq!(entries[0].apath(), "/");
     assert_eq!(entries[1].apath(), "/old_file");
-    dbg!(&entries[1].mtime());
 
     let af = ScratchArchive::new();
     backup(&af, &tf.live_tree(), &BackupOptions::default())

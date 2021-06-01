@@ -59,7 +59,7 @@ pub use crate::blockhash::BlockHash;
 pub use crate::diff::{diff, DiffEntry, DiffKind, DiffOptions};
 pub use crate::entry::Entry;
 pub use crate::errors::Error;
-pub use crate::excludes::excludes_nothing;
+pub use crate::excludes::{excludes_nothing, ExcludeBuilder};
 pub use crate::gc_lock::GarbageCollectionLock;
 pub use crate::index::{IndexEntry, IndexRead, IndexWriter};
 pub use crate::kind::Kind;

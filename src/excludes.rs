@@ -20,36 +20,96 @@
 //! path.
 
 use std::borrow::Cow;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 
 use super::*;
+
+pub struct ExcludeBuilder {
+    gsb: GlobSetBuilder,
+}
+
+impl ExcludeBuilder {
+    pub fn new() -> ExcludeBuilder {
+        ExcludeBuilder {
+            gsb: GlobSetBuilder::new(),
+        }
+    }
+
+    pub fn build(&self) -> Result<GlobSet> {
+        Ok(self.gsb.build()?)
+    }
+
+    pub fn add(&mut self, pat: &str) -> Result<&mut ExcludeBuilder> {
+        let pat: Cow<str> = if pat.starts_with('/') {
+            Cow::Borrowed(pat)
+        } else {
+            Cow::Owned(format!("**/{}", pat))
+        };
+        let glob = GlobBuilder::new(&pat)
+            .literal_separator(true)
+            .build()
+            .map_err(|source| Error::ParseGlob { source })?;
+        self.gsb.add(glob);
+        Ok(self)
+    }
+
+    pub fn add_file(&mut self, path: &Path) -> Result<&mut ExcludeBuilder> {
+        self.add_from_read(&mut File::open(path)?)
+    }
+
+    /// Create a [GlobSet] from lines in a file, with one pattern per line.
+    ///
+    /// Lines starting with `#` are comments, and leading and trailing whitespace is removed.
+    pub fn add_from_read(&mut self, f: &mut dyn Read) -> Result<&mut ExcludeBuilder> {
+        let mut b = String::new();
+        f.read_to_string(&mut b)?;
+        for pat in b
+            .lines()
+            .map(str::trim)
+            .filter(|s| !s.starts_with('#') && !s.is_empty())
+        {
+            self.add(pat)?;
+        }
+        Ok(self)
+    }
+
+    /// Build from command line arguments of patterns and filenames.
+    pub fn from_args(exclude: &[String], exclude_from: &[String]) -> Result<ExcludeBuilder> {
+        let mut builder = ExcludeBuilder::new();
+        for pat in exclude {
+            builder.add(pat)?;
+        }
+        for path in exclude_from {
+            builder.add_file(Path::new(path))?;
+        }
+        Ok(builder)
+    }
+}
+
+impl Default for ExcludeBuilder {
+    fn default() -> Self {
+        ExcludeBuilder::new()
+    }
+}
 
 /// Create a [GlobSet] from a list of strings.
 ///
 /// The [GlobSet] is intended to be matched against an [Apath], which will
 /// always start with a `/`.
 pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
-    let mut builder = GlobSetBuilder::new();
+    let mut builder = ExcludeBuilder::new();
     for s in excludes {
-        let s = s.as_ref();
-        let s: Cow<str> = if s.starts_with('/') {
-            Cow::Borrowed(s)
-        } else {
-            Cow::Owned(format!("**/{}", s))
-        };
-        let glob = GlobBuilder::new(&s)
-            .literal_separator(true)
-            .build()
-            .map_err(|source| Error::ParseGlob { source })?;
-
-        builder.add(glob);
+        builder.add(s.as_ref())?;
     }
-    builder.build().map_err(Into::into)
+    builder.build()
 }
 
 pub fn excludes_nothing() -> GlobSet {
-    GlobSetBuilder::new().build().unwrap()
+    GlobSet::empty()
 }
 
 #[cfg(test)]
