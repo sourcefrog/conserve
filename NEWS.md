@@ -14,6 +14,8 @@
 
 - Add new `--exclude-from` option.
 
+- Add new `--no-stats` option.
+
 ## v0.6.14 2021-05-20
 
 - `conserve validate` reads all indexes before checking block contents, which

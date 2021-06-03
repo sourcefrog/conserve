@@ -75,7 +75,7 @@ fn exclude_glob_only_in_root() {
     src.create_file("src/hello.o");
 
     run_conserve()
-        .args(&["backup", "-v", "--exclude", "/*.o"])
+        .args(&["backup", "-v", "--exclude", "/*.o", "--no-stats"])
         .arg(&af.path())
         .arg(&src.path())
         .assert()

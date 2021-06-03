@@ -43,6 +43,8 @@ enum Command {
         exclude: Vec<String>,
         #[structopt(long, short = "E", number_of_values = 1)]
         exclude_from: Vec<String>,
+        #[structopt(long)]
+        no_stats: bool,
     },
 
     Debug(Debug),
@@ -60,6 +62,8 @@ enum Command {
         /// Break a lock left behind by a previous interrupted gc operation, and then gc.
         #[structopt(long)]
         break_lock: bool,
+        #[structopt(long)]
+        no_stats: bool,
     },
 
     /// Compare a stored tree to a source directory.
@@ -94,6 +98,8 @@ enum Command {
         /// Break a lock left behind by a previous interrupted gc operation, and then gc.
         #[structopt(long)]
         break_lock: bool,
+        #[structopt(long)]
+        no_stats: bool,
     },
 
     /// List files in a stored tree or source directory, with exclusions.
@@ -123,6 +129,8 @@ enum Command {
         exclude_from: Vec<String>,
         #[structopt(long = "only", short = "i", number_of_values = 1)]
         only_subtree: Option<Apath>,
+        #[structopt(long)]
+        no_stats: bool,
     },
 
     /// Show the total size of files in a stored tree or source directory, with exclusions.
@@ -148,6 +156,8 @@ enum Command {
         /// Skip reading and checking the content of data blocks.
         #[structopt(long, short = "q")]
         quick: bool,
+        #[structopt(long)]
+        no_stats: bool,
     },
 
     /// List backup versions in an archive.
@@ -220,6 +230,7 @@ impl Command {
                 verbose,
                 exclude,
                 exclude_from,
+                no_stats,
             } => {
                 let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let source = &LiveTree::open(source)?;
@@ -229,7 +240,9 @@ impl Command {
                     ..Default::default()
                 };
                 let stats = backup(&Archive::open_path(archive)?, &source, &options)?;
-                ui::println(&format!("Backup complete.\n{}", stats));
+                if !no_stats {
+                    ui::println(&format!("Backup complete.\n{}", stats));
+                }
             }
             Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
@@ -259,6 +272,7 @@ impl Command {
                 backup,
                 dry_run,
                 break_lock,
+                no_stats,
             } => {
                 let stats = Archive::open_path(archive)?.delete_bands(
                     &backup,
@@ -267,7 +281,9 @@ impl Command {
                         break_lock: *break_lock,
                     },
                 )?;
-                ui::println(&format!("{}", stats));
+                if !no_stats {
+                    ui::println(&format!("{}", stats));
+                }
             }
             Command::Diff {
                 archive,
@@ -290,6 +306,7 @@ impl Command {
                 archive,
                 dry_run,
                 break_lock,
+                no_stats,
             } => {
                 let archive = Archive::open_path(archive)?;
                 let stats = archive.delete_bands(
@@ -299,7 +316,9 @@ impl Command {
                         break_lock: *break_lock,
                     },
                 )?;
-                ui::println(&format!("{}", stats));
+                if !no_stats {
+                    ui::println(&format!("{}", stats));
+                }
             }
             Command::Init { archive } => {
                 Archive::create_path(&archive)?;
@@ -334,6 +353,7 @@ impl Command {
                 exclude,
                 exclude_from,
                 only_subtree,
+                no_stats,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open_path(archive)?;
@@ -348,7 +368,9 @@ impl Command {
                 };
 
                 let stats = restore(&archive, &destination, &options)?;
-                ui::println(&format!("Restore complete.\n{}", stats));
+                if !no_stats {
+                    ui::println(&format!("Restore complete.\n{}", stats));
+                }
             }
             Command::Size {
                 stos,
@@ -372,12 +394,18 @@ impl Command {
                     ui::println(&conserve::bytes_to_human_mb(size));
                 }
             }
-            Command::Validate { archive, quick } => {
+            Command::Validate {
+                archive,
+                quick,
+                no_stats,
+            } => {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
                 let stats = Archive::open_path(archive)?.validate(&options)?;
-                println!("{}", stats);
+                if !no_stats {
+                    println!("{}", stats);
+                }
                 if stats.has_problems() {
                     ui::problem("Archive has some problems.");
                     return Ok(ExitCode::PartialCorruption);
