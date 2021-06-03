@@ -50,10 +50,11 @@ fn exclude_simple_glob() {
     src.create_file("src/hello.o");
 
     run_conserve()
-        .args(&["backup", "-v", "--exclude", "*.o"])
+        .args(&["backup", "-v", "--exclude", "*.o", "--no-stats"])
         .arg(&af.path())
         .arg(&src.path())
         .assert()
+        .stdout("/\n/src/\n/src/hello.c (new)\n")
         .success();
 
     run_conserve()
@@ -79,6 +80,7 @@ fn exclude_glob_only_in_root() {
         .arg(&af.path())
         .arg(&src.path())
         .assert()
+        .stdout("/\n/src/\n/src/hello.c (new)\n/src/hello.o (new)\n")
         .success();
 
     run_conserve()
