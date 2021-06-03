@@ -170,7 +170,8 @@ impl BackupWriter {
 
     fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         if self.options.print_filenames {
-            crate::ui::println(&format!("{}/", source_entry.apath()));
+            let apath = source_entry.apath();
+            crate::ui::println(&format!("{}{}", apath, if apath == "/" { "" } else { "/" }));
         }
         self.stats.directories += 1;
         self.index_builder
