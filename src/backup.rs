@@ -323,11 +323,10 @@ impl FileCombiner {
         self.flush()?;
         debug_assert!(self.queue.is_empty());
         debug_assert!(self.buf.is_empty());
-        let stats = self.stats.clone();
-        self.stats = BackupStats::default();
-        let finished = self.finished.drain(..).collect();
-        debug_assert!(self.finished.is_empty());
-        Ok((stats, finished))
+        Ok((
+            std::mem::take(&mut self.stats),
+            std::mem::take(&mut self.finished),
+        ))
     }
 
     /// Write all the content from the combined block to a blockdir.
