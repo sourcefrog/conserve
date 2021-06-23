@@ -25,6 +25,7 @@ use predicates::prelude::*;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
+mod backup;
 mod delete;
 mod diff;
 mod exclude;
