@@ -31,8 +31,8 @@ fn simple_restore() {
     let destdir = TreeFixture::new();
 
     let options = RestoreOptions::default();
-    let restore_archive = Archive::open_path(&af.path()).unwrap();
-    let stats = restore(&restore_archive, &destdir.path(), &options).expect("restore");
+    let restore_archive = Archive::open_path(af.path()).unwrap();
+    let stats = restore(&restore_archive, destdir.path(), &options).expect("restore");
 
     assert_eq!(stats.files, 3);
 
@@ -60,7 +60,7 @@ fn restore_specified_band() {
         band_selection: BandSelectionPolicy::Specified(band_id),
         ..RestoreOptions::default()
     };
-    let stats = restore(&archive, &destdir.path(), &options).expect("restore");
+    let stats = restore(&archive, destdir.path(), &options).expect("restore");
     // Does not have the 'hello2' file added in the second version.
     assert_eq!(stats.files, 2);
 }
@@ -89,7 +89,7 @@ pub fn forced_overwrite() {
         overwrite: true,
         ..RestoreOptions::default()
     };
-    let stats = restore(&restore_archive, &destdir.path(), &options).expect("restore");
+    let stats = restore(&restore_archive, destdir.path(), &options).expect("restore");
     assert_eq!(stats.files, 3);
     let dest = &destdir.path();
     assert!(dest.join("hello").is_file());
@@ -107,7 +107,7 @@ fn exclude_files() {
         excludes: excludes::from_strings(&["/**/subfile"]).unwrap(),
         ..RestoreOptions::default()
     };
-    let stats = restore(&restore_archive, &destdir.path(), &options).expect("restore");
+    let stats = restore(&restore_archive, destdir.path(), &options).expect("restore");
 
     let dest = &destdir.path();
     assert!(dest.join("hello").is_file());
@@ -133,7 +133,7 @@ fn restore_symlink() {
     backup(&af, &srcdir.live_tree(), &Default::default()).unwrap();
 
     let restore_dir = TempDir::new().unwrap();
-    restore(&af, &restore_dir.path(), &Default::default()).unwrap();
+    restore(&af, restore_dir.path(), &Default::default()).unwrap();
 
     let restored_symlink_path = restore_dir.path().join("symlink");
     let sym_meta = symlink_metadata(&restored_symlink_path).unwrap();

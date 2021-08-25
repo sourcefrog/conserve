@@ -194,7 +194,7 @@ impl RestoreTree {
         };
         let mut restore_file = File::create(&path).map_err(restore_err)?;
         // TODO: Read one block at a time: don't pull all the contents into memory.
-        let content = &mut from_tree.file_contents(&source_entry)?;
+        let content = &mut from_tree.file_contents(source_entry)?;
         let bytes_copied = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
         restore_file.flush().map_err(restore_err)?;
 

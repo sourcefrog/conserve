@@ -189,7 +189,7 @@ impl Archive {
     /// Return the last completely-written band id, if any.
     pub fn last_complete_band(&self) -> Result<Option<Band>> {
         for id in self.list_band_ids()?.iter().rev() {
-            let b = Band::open(self, &id)?;
+            let b = Band::open(self, id)?;
             if b.is_closed()? {
                 return Ok(Some(b));
             }
@@ -210,7 +210,7 @@ impl Archive {
             .par_iter()
             .enumerate()
             .inspect(move |(i, _)| pb_lock.lock().unwrap().set_fraction(*i, num_bands))
-            .map(move |(_i, band_id)| Band::open(&archive, &band_id).expect("Failed to open band"))
+            .map(move |(_i, band_id)| Band::open(&archive, band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
             .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
@@ -265,7 +265,7 @@ impl Archive {
             .par_iter()
             .inspect(|_| pb_mutex.lock().unwrap().increment_work_done(1))
             .map(|block_id| {
-                let size = block_dir.compressed_size(&block_id).unwrap_or_default();
+                let size = block_dir.compressed_size(block_id).unwrap_or_default();
                 pb_mutex.lock().unwrap().increment_bytes_done(size);
                 size
             })
@@ -291,7 +291,7 @@ impl Archive {
             let error_count = unref
                 .par_iter()
                 .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
-                .filter(|block_hash| block_dir.delete_block(&block_hash).is_err())
+                .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
                 .count();
             stats.deletion_errors += error_count;
             stats.deleted_block_count += unref_count - error_count;

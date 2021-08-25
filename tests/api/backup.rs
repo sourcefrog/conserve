@@ -47,7 +47,7 @@ pub fn simple_backup() {
     assert_eq!(archive.band_is_closed(&BandId::zero()).unwrap(), true);
     assert_eq!(archive.band_exists(&BandId::new(&[1])).unwrap(), false);
     let copy_stats =
-        restore(&archive, &restore_dir.path(), &RestoreOptions::default()).expect("restore");
+        restore(&archive, restore_dir.path(), &RestoreOptions::default()).expect("restore");
 
     assert_eq!(copy_stats.uncompressed_file_bytes, 8);
 }
@@ -89,7 +89,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     assert!(band_info.end_time.is_some());
 
     let copy_stats =
-        restore(&archive, &restore_dir.path(), &RestoreOptions::default()).expect("restore");
+        restore(&archive, restore_dir.path(), &RestoreOptions::default()).expect("restore");
 
     assert_eq!(copy_stats.uncompressed_file_bytes, 8);
     // TODO: Read back contents of that file.
@@ -143,7 +143,7 @@ fn check_backup(af: &ScratchArchive) {
         BandId::new(&[0])
     );
 
-    let band = Band::open(&af, &band_ids[0]).unwrap();
+    let band = Band::open(af, &band_ids[0]).unwrap();
     assert!(band.is_closed().unwrap());
 
     let index_entries = band.index().iter_entries().collect::<Vec<IndexEntry>>();
@@ -299,7 +299,7 @@ pub fn empty_file_uses_zero_blocks() {
     let empty_entry = st
         .iter_entries(None, excludes_nothing())
         .unwrap()
-        .find(|ref i| &i.apath == "/empty")
+        .find(|i| &i.apath == "/empty")
         .expect("found one entry");
     let mut sf = st.file_contents(&empty_entry).unwrap();
     let mut s = String::new();
@@ -308,7 +308,7 @@ pub fn empty_file_uses_zero_blocks() {
 
     // Restore it
     let dest = TempDir::new().unwrap();
-    restore(&af, &dest.path(), &RestoreOptions::default()).expect("restore");
+    restore(&af, dest.path(), &RestoreOptions::default()).expect("restore");
     // TODO: Check restore stats.
     dest.child("empty").assert("");
 }

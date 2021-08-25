@@ -53,6 +53,6 @@ fn diff_unchanged() {
         include_unchanged: false,
         ..DiffOptions::default()
     };
-    let des: Vec<DiffEntry> = diff(&st, &lt, &options).unwrap().collect();
-    assert_eq!(des.len(), 0);
+
+    assert_eq!(diff(&st, &lt, &options).unwrap().count(), 0);
 }

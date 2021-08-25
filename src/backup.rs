@@ -186,7 +186,7 @@ impl BackupWriter {
         if let Some(basis_entry) = self
             .basis_index
             .as_mut()
-            .map(|bi| bi.advance_to(&apath))
+            .map(|bi| bi.advance_to(apath))
             .flatten()
         {
             if source_entry.is_unchanged_from(&basis_entry) {
@@ -208,7 +208,7 @@ impl BackupWriter {
             }
             self.stats.new_files += 1;
         }
-        let mut read_source = from_tree.file_contents(&source_entry)?;
+        let mut read_source = from_tree.file_contents(source_entry)?;
         let size = source_entry.size().expect("LiveEntry has a size");
         if size == 0 {
             self.index_builder
@@ -220,7 +220,7 @@ impl BackupWriter {
             return self.file_combiner.push_file(source_entry, &mut read_source);
         }
         let addrs = store_file_content(
-            &apath,
+            apath,
             &mut read_source,
             &mut self.block_dir,
             &mut self.stats,

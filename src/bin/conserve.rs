@@ -239,7 +239,7 @@ impl Command {
                     excludes,
                     ..Default::default()
                 };
-                let stats = backup(&Archive::open_path(archive)?, &source, &options)?;
+                let stats = backup(&Archive::open_path(archive)?, source, &options)?;
                 if !no_stats {
                     ui::println(&format!("Backup complete.\n{}", stats));
                 }
@@ -251,8 +251,8 @@ impl Command {
                 }
             }
             Command::Debug(Debug::Index { archive, backup }) => {
-                let st = stored_tree_from_opt(archive, &backup)?;
-                show::show_index_json(&st.band(), &mut stdout)?;
+                let st = stored_tree_from_opt(archive, backup)?;
+                show::show_index_json(st.band(), &mut stdout)?;
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
@@ -275,7 +275,7 @@ impl Command {
                 no_stats,
             } => {
                 let stats = Archive::open_path(archive)?.delete_bands(
-                    &backup,
+                    backup,
                     &DeleteOptions {
                         dry_run: *dry_run,
                         break_lock: *break_lock,
@@ -321,7 +321,7 @@ impl Command {
                 }
             }
             Command::Init { archive } => {
-                Archive::create_path(&archive)?;
+                Archive::create_path(archive)?;
                 ui::println(&format!("Created new archive in {:?}", &archive));
             }
             Command::Ls {
@@ -367,7 +367,7 @@ impl Command {
                     overwrite: *force_overwrite,
                 };
 
-                let stats = restore(&archive, &destination, &options)?;
+                let stats = restore(&archive, destination, &options)?;
                 if !no_stats {
                     ui::println(&format!("Restore complete.\n{}", stats));
                 }

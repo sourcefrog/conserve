@@ -54,7 +54,7 @@ pub fn show_versions(
         }
         let mut l: Vec<String> = Vec::new();
         l.push(format!("{:<20}", band_id));
-        let band = match Band::open(&archive, &band_id) {
+        let band = match Band::open(archive, &band_id) {
             Ok(band) => band,
             Err(e) => {
                 ui::problem(&format!("Failed to open band {:?}: {:?}", band_id, e));

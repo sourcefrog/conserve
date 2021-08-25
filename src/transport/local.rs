@@ -81,7 +81,7 @@ impl Transport for LocalTransport {
     }
 
     fn create_dir(&self, relpath: &str) -> io::Result<()> {
-        create_dir(self.full_path(&relpath)).or_else(|err| {
+        create_dir(self.full_path(relpath)).or_else(|err| {
             if err.kind() == io::ErrorKind::AlreadyExists {
                 Ok(())
             } else {

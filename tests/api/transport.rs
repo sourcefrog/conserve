@@ -35,9 +35,7 @@ fn list_dir_names() {
     temp.child("a file").touch().unwrap();
     temp.child("another file").touch().unwrap();
 
-    let transport = Location::Local((&temp.path()).to_path_buf())
-        .open()
-        .unwrap();
+    let transport = Location::Local(temp.path().to_path_buf()).open().unwrap();
 
     let ListDirNames { mut files, dirs } = transport.list_dir_names("").unwrap();
     assert_eq!(dirs, ["a dir"]);

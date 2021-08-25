@@ -27,7 +27,7 @@ pub mod local;
 /// Open a `Transport` to access a local directory.
 pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
     // TODO: Recognize URL-style strings.
-    Ok(Box::new(local::LocalTransport::new(&Path::new(s))))
+    Ok(Box::new(local::LocalTransport::new(Path::new(s))))
 }
 
 /// Abstracted filesystem IO to access an archive.
@@ -161,7 +161,7 @@ impl Location {
     /// The location need not already exist.
     pub fn open(&self) -> Result<Box<dyn Transport>> {
         match self {
-            Location::Local(pathbuf) => Ok(Box::new(local::LocalTransport::new(&pathbuf))),
+            Location::Local(pathbuf) => Ok(Box::new(local::LocalTransport::new(pathbuf))),
         }
     }
 }

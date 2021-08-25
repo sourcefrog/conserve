@@ -362,7 +362,7 @@ impl IndexHunkIter {
         let path = &hunk_relpath(self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
-        if let Err(err) = self.transport.read_file(&path, &mut self.compressed_buf) {
+        if let Err(err) = self.transport.read_file(path, &mut self.compressed_buf) {
             if err.kind() == io::ErrorKind::NotFound {
                 // TODO: Cope with one hunk being missing, while there are still
                 // later-numbered hunks. This would require reading the whole
@@ -380,7 +380,7 @@ impl IndexHunkIter {
         let index_bytes = self.decompressor.decompress(&self.compressed_buf)?;
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
         let entries: Vec<IndexEntry> =
-            serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeIndex {
+            serde_json::from_slice(index_bytes).map_err(|source| Error::DeserializeIndex {
                 path: path.clone(),
                 source,
             })?;

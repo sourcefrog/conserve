@@ -51,7 +51,7 @@ fn band_version_requirement() -> semver::VersionReq {
 }
 
 fn band_version_supported(version: &str) -> bool {
-    semver::Version::parse(&version)
+    semver::Version::parse(version)
         .map(|sv| band_version_requirement().matches(&sv))
         .unwrap_or(false)
 }

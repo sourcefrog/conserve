@@ -60,7 +60,7 @@ pub(crate) fn validate_bands(
     let pb_mutex = Mutex::new(progress_bar);
 
     for band_id in band_ids {
-        if let Ok(b) = Band::open(archive, &band_id) {
+        if let Ok(b) = Band::open(archive, band_id) {
             if b.validate(&mut stats).is_err() {
                 stats.band_metadata_problems += 1;
             }

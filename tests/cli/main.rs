@@ -160,7 +160,7 @@ fn basic_backup() {
         "ea50e43840e5f310490bba1b641db82480a05e16e9ae220c1e5113c79b59541fa5a6ddb13db20d4df53dfcecb3ed9969e41a329e07afe0fbb597251a789c3575",
     ];
     let is_expected_blocks = |output: &[u8]| {
-        let output_str = std::str::from_utf8(&output).unwrap();
+        let output_str = std::str::from_utf8(output).unwrap();
         let mut blocks: Vec<&str> = output_str.lines().collect();
         blocks.sort_unstable();
         blocks == expected_blocks

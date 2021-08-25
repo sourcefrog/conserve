@@ -23,6 +23,6 @@ fn to_from_string() {
         "00000000000000000000000000000000",
     );
     let hash = BlockHash::from_str(hex_hash).unwrap();
-    let hash2 = hash.clone();
+    let hash2 = hash;
     assert_eq!(hash2.to_string(), hex_hash);
 }

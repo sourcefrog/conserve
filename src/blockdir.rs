@@ -106,7 +106,7 @@ impl BlockDir {
     pub(crate) fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
         // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
         let mut compressor = Compressor::new();
-        let compressed = compressor.compress(&in_buf)?;
+        let compressed = compressor.compress(in_buf)?;
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
         let relpath = block_relpath(hash);
@@ -328,7 +328,7 @@ impl BlockDir {
         let actual_hash = BlockHash::from(blake2b::blake2b(
             BLAKE_HASH_SIZE_BYTES,
             &[],
-            &decompressed_bytes,
+            decompressed_bytes,
         ));
         if actual_hash != *hash {
             ui::problem(&format!(
