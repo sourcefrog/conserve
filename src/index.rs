@@ -652,11 +652,11 @@ mod tests {
 
         let names: Vec<String> = index_read
             .iter_hunks()
-            .advance_to_after(&"/subdir".into())
+            .advance_to_after(&"/nonexistent".into())
             .flatten()
             .map(|entry| entry.apath.into())
             .collect();
-        assert!(names.is_empty());
+        assert_eq!(names, [""; 0]);
 
         let names: Vec<String> = index_read
             .iter_hunks()
