@@ -289,7 +289,7 @@ mod tests {
         // Try get_info
         let info = band2.get_info().expect("get_info failed");
         assert_eq!(info.id.to_string(), "b0000");
-        assert_eq!(info.is_closed, true);
+        assert!(info.is_closed);
         assert_eq!(info.index_hunk_count, Some(0));
         let dur = info.end_time.expect("info has an end_time") - info.start_time;
         // Test should have taken (much) less than 5s between starting and finishing
@@ -303,7 +303,7 @@ mod tests {
         let _band = Band::create(&af).unwrap();
         Band::delete(&af, &BandId::new(&[0])).expect("delete band");
 
-        assert_eq!(af.transport().exists("b0000").unwrap(), false);
+        assert!(!af.transport().exists("b0000").unwrap());
     }
 
     #[test]

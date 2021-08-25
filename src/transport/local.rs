@@ -222,8 +222,8 @@ mod test {
         assert_eq!(root_list[1].name, "subdir");
         assert_eq!(root_list[1].kind, Kind::Dir);
 
-        assert_eq!(transport.exists("root file").unwrap(), true);
-        assert_eq!(transport.exists("nuh-uh").unwrap(), false);
+        assert!(transport.exists("root file").unwrap());
+        assert!(!transport.exists("nuh-uh").unwrap());
 
         let subdir_list: Vec<_> = transport
             .iter_dir_entries("subdir")

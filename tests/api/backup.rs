@@ -43,9 +43,9 @@ pub fn simple_backup() {
     let restore_dir = TempDir::new().unwrap();
 
     let archive = Archive::open_path(af.path()).unwrap();
-    assert_eq!(archive.band_exists(&BandId::zero()).unwrap(), true);
-    assert_eq!(archive.band_is_closed(&BandId::zero()).unwrap(), true);
-    assert_eq!(archive.band_exists(&BandId::new(&[1])).unwrap(), false);
+    assert!(archive.band_exists(&BandId::zero()).unwrap());
+    assert!(archive.band_is_closed(&BandId::zero()).unwrap());
+    assert!(!archive.band_exists(&BandId::new(&[1])).unwrap());
     let copy_stats =
         restore(&archive, restore_dir.path(), &RestoreOptions::default()).expect("restore");
 
@@ -85,7 +85,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     let band_info = band.get_info()?;
     assert_eq!(band_info.index_hunk_count, Some(1));
     assert_eq!(band_info.id, BandId::zero());
-    assert_eq!(band_info.is_closed, true);
+    assert!(band_info.is_closed);
     assert!(band_info.end_time.is_some());
 
     let copy_stats =
