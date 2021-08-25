@@ -60,7 +60,6 @@ fn unreferenced_blocks() {
     let options = DeleteOptions {
         dry_run: false,
         break_lock: false,
-        ..Default::default()
     };
     let delete_stats = archive.delete_bands(&[], &options).unwrap();
     assert_eq!(
