@@ -458,7 +458,7 @@ mod tests {
 
         temp.child("i am already here").touch().unwrap();
 
-        let result = Archive::create_path(&temp.path());
+        let result = Archive::create_path(temp.path());
         assert!(result.is_err());
         if let Err(Error::NewArchiveDirectoryNotEmpty) = result {
         } else {

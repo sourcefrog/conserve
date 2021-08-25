@@ -80,7 +80,7 @@ mod tests {
         };
         let filename = "test.json";
 
-        let transport = LocalTransport::new(&temp.path());
+        let transport = LocalTransport::new(temp.path());
         super::write_json(&transport, filename, &entry).unwrap();
 
         let json_child = temp.child("test.json");

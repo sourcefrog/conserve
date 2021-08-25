@@ -94,11 +94,11 @@ mod test {
 
         let comp = compressor.compress(b"hello world").unwrap();
         assert_eq!(comp, b"\x0b(hello world");
-        assert_eq!(decompressor.decompress(&comp).unwrap(), b"hello world");
+        assert_eq!(decompressor.decompress(comp).unwrap(), b"hello world");
 
         let long_input = b"hello world, hello world, hello world, hello world";
         let comp = compressor.compress(long_input).unwrap();
         assert_eq!(comp, b"\x32\x30hello world, \x92\x0d\0");
-        assert_eq!(decompressor.decompress(&comp).unwrap(), &long_input[..]);
+        assert_eq!(decompressor.decompress(comp).unwrap(), &long_input[..]);
     }
 }

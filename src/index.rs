@@ -592,7 +592,7 @@ mod tests {
             "Index hunk file not found"
         );
 
-        let mut it = IndexRead::open_path(&testdir.path()).iter_entries();
+        let mut it = IndexRead::open_path(testdir.path()).iter_entries();
         let entry = it.next().expect("Get first entry");
         assert_eq!(&entry.apath, "/apple");
         let entry = it.next().expect("Get second entry");
@@ -608,14 +608,14 @@ mod tests {
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
         ib.finish_hunk().unwrap();
 
-        let index_read = IndexRead::open_path(&testdir.path());
+        let index_read = IndexRead::open_path(testdir.path());
         let it = index_read.iter_entries();
         let names: Vec<String> = it.map(|x| x.apath.into()).collect();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
 
         // Read it out as hunks.
         let hunks: Vec<Vec<IndexEntry>> =
-            IndexRead::open_path(&testdir.path()).iter_hunks().collect();
+            IndexRead::open_path(testdir.path()).iter_hunks().collect();
         assert_eq!(hunks.len(), 2);
         assert_eq!(
             hunks[0]
@@ -641,7 +641,7 @@ mod tests {
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
         ib.finish_hunk().unwrap();
 
-        let index_read = IndexRead::open_path(&testdir.path());
+        let index_read = IndexRead::open_path(testdir.path());
         let names: Vec<String> = index_read
             .iter_hunks()
             .advance_to_after(&"/".into())
@@ -730,25 +730,25 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         // Advance to /foo and read on from there.
-        let mut it = IndexRead::open_path(&testdir.path()).iter_entries();
+        let mut it = IndexRead::open_path(testdir.path()).iter_entries();
         assert_eq!(it.advance_to(&Apath::from("/foo")).unwrap().apath, "/foo");
         assert_eq!(it.next().unwrap().apath, "/foobar");
         assert_eq!(it.next().unwrap().apath, "/g01");
 
         // Advance to before /g01
-        let mut it = IndexRead::open_path(&testdir.path()).iter_entries();
+        let mut it = IndexRead::open_path(testdir.path()).iter_entries();
         assert_eq!(it.advance_to(&Apath::from("/fxxx")), None);
         assert_eq!(it.next().unwrap().apath, "/g01");
         assert_eq!(it.next().unwrap().apath, "/g02");
 
         // Advance to before the first entry
-        let mut it = IndexRead::open_path(&testdir.path()).iter_entries();
+        let mut it = IndexRead::open_path(testdir.path()).iter_entries();
         assert_eq!(it.advance_to(&Apath::from("/aaaa")), None);
         assert_eq!(it.next().unwrap().apath, "/bar");
         assert_eq!(it.next().unwrap().apath, "/foo");
 
         // Advance to after the last entry
-        let mut it = IndexRead::open_path(&testdir.path()).iter_entries();
+        let mut it = IndexRead::open_path(testdir.path()).iter_entries();
         assert_eq!(it.advance_to(&Apath::from("/zz")), None);
         assert_eq!(it.next(), None);
     }
@@ -765,7 +765,7 @@ mod tests {
         ib.finish_hunk()?;
         // Think about, but don't actually add some files
         ib.finish_hunk()?;
-        let read_index = IndexRead::open_path(&testdir.path());
+        let read_index = IndexRead::open_path(testdir.path());
         assert_eq!(read_index.count_hunks()?, 1);
         Ok(())
     }

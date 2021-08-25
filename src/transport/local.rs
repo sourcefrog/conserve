@@ -156,7 +156,7 @@ mod test {
 
         let transport = LocalTransport::new(temp.path());
         let mut buf = Vec::new();
-        transport.read_file(&filename, &mut buf).unwrap();
+        transport.read_file(filename, &mut buf).unwrap();
         assert_eq!(buf, content.as_bytes());
 
         temp.close().unwrap();
@@ -171,7 +171,7 @@ mod test {
 
         let transport = LocalTransport::new(temp.path());
 
-        assert_eq!(transport.metadata(&filename).unwrap(), Metadata { len: 24 });
+        assert_eq!(transport.metadata(filename).unwrap(), Metadata { len: 24 });
         assert!(transport.metadata("nopoem").is_err());
     }
 
@@ -183,7 +183,7 @@ mod test {
         let filename = "test.txt";
         temp.child(filename).write_binary(desired).unwrap();
         let transport = LocalTransport::new(temp.path());
-        transport.read_file(&filename, &mut buf).unwrap();
+        transport.read_file(filename, &mut buf).unwrap();
         assert_eq!(
             String::from_utf8_lossy(&buf),
             String::from_utf8_lossy(desired)
@@ -201,7 +201,7 @@ mod test {
             .write_str("Morning coffee")
             .unwrap();
 
-        let transport = LocalTransport::new(&temp.path());
+        let transport = LocalTransport::new(temp.path());
         let mut root_list: Vec<_> = transport
             .iter_dir_entries(".")
             .unwrap()
@@ -245,7 +245,7 @@ mod test {
     fn write_file() {
         // TODO: Maybe test some error cases of failing to write.
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(&temp.path());
+        let transport = LocalTransport::new(temp.path());
 
         transport.create_dir("subdir").unwrap();
         transport
@@ -263,7 +263,7 @@ mod test {
     #[test]
     fn create_existing_dir() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(&temp.path());
+        let transport = LocalTransport::new(temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
@@ -275,7 +275,7 @@ mod test {
     #[test]
     fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(&temp.path());
+        let transport = LocalTransport::new(temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();
@@ -296,7 +296,7 @@ mod test {
     #[test]
     fn remove_dir_all() -> std::io::Result<()> {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(&temp.path());
+        let transport = LocalTransport::new(temp.path());
 
         transport.create_dir("aaa")?;
         transport.create_dir("aaa/bbb")?;
