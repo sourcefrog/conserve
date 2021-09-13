@@ -7,6 +7,7 @@ on:
     paths: 
       - '**/Cargo.toml'
       - '**/Cargo.lock'
+      - .github/workflows/cargo-audit.yml
 
 jobs:
   cargo-audit:
