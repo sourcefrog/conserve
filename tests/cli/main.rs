@@ -19,8 +19,6 @@ use std::process::Command;
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use escargot::CargoRun;
-use lazy_static::lazy_static;
 use predicates::prelude::*;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
@@ -31,18 +29,8 @@ mod diff;
 mod exclude;
 mod versions;
 
-lazy_static! {
-    // This doesn's pass `.current_target()` because it doesn't seem
-    // necessary for typical cases (cross-builds won't work with this)
-    // and it causes everything to rebuild which slows the tests a lot.
-    static ref CARGO_RUN: CargoRun = escargot::CargoBuild::new()
-        .current_release()
-        .run() // Build it and return a proxy to run it
-        .unwrap();
-}
-
 fn run_conserve() -> Command {
-    CARGO_RUN.command()
+    Command::cargo_bin("conserve").expect("locate conserve binary")
 }
 
 #[test]

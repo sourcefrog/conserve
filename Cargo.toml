@@ -3,10 +3,7 @@ authors = ["Martin Pool <mbp@sourcefrog.net>"]
 description = "A robust backup tool."
 edition = "2018"
 homepage = "https://github.com/sourcefrog/conserve/"
-keywords = [
-    "archive",
-    "backup",
-]
+keywords = ["archive", "backup"]
 license = "GPL-2.0"
 name = "conserve"
 readme = "README.md"
@@ -45,11 +42,9 @@ features = ["derive"]
 version = "1.0.111"
 
 [dev-dependencies]
-assert_cmd = "1.0.1"
+assert_cmd = "2.0.1"
 assert_fs = "1.0.0"
 copy_dir = "0.1.2"
-escargot = "0.5.0"
-lazy_static = "1.4.0"
 libc = "0.2.71"
 predicates = "1.0.4"
 
