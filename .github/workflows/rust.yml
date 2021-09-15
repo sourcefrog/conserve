@@ -15,4 +15,4 @@ jobs:
       - name: Show version
         run: rustup show
       - name: Build and run tests
-        run: cargo test --verbose
+        run: cargo test
