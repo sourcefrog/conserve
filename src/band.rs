@@ -173,7 +173,7 @@ impl Band {
 
     pub fn is_closed(&self) -> Result<bool> {
         self.transport
-            .exists(BAND_TAIL_FILENAME)
+            .is_file(BAND_TAIL_FILENAME)
             .map_err(Error::from)
     }
 
@@ -197,7 +197,7 @@ impl Band {
     fn read_tail(&self) -> Result<Option<Tail>> {
         if self
             .transport
-            .exists(BAND_TAIL_FILENAME)
+            .is_file(BAND_TAIL_FILENAME)
             .map_err(Error::from)?
         {
             Ok(Some(read_json(&self.transport, BAND_TAIL_FILENAME)?))
@@ -303,7 +303,8 @@ mod tests {
         let _band = Band::create(&af).unwrap();
         Band::delete(&af, &BandId::new(&[0])).expect("delete band");
 
-        assert!(!af.transport().exists("b0000").unwrap());
+        assert!(!af.transport().is_file("b0000").unwrap());
+        assert!(!af.transport().is_dir("b0000").unwrap());
     }
 
     #[test]

@@ -78,8 +78,11 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// memory, and this is simple to support on all implementations.
     fn read_file(&self, path: &str, out_buf: &mut Vec<u8>) -> io::Result<()>;
 
-    /// Check if an entry exists.
-    fn exists(&self, path: &str) -> io::Result<bool>;
+    /// Check if a directory exists.
+    fn is_dir(&self, path: &str) -> io::Result<bool>;
+
+    /// Check if a regular file exists.
+    fn is_file(&self, path: &str) -> io::Result<bool>;
 
     /// Create a directory, if it does not exist.
     ///

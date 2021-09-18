@@ -72,8 +72,12 @@ impl Transport for LocalTransport {
         Ok(())
     }
 
-    fn exists(&self, relpath: &str) -> io::Result<bool> {
-        Ok(self.full_path(relpath).exists())
+    fn is_file(&self, relpath: &str) -> io::Result<bool> {
+        Ok(self.full_path(relpath).is_file())
+    }
+
+    fn is_dir(&self, relpath: &str) -> io::Result<bool> {
+        Ok(self.full_path(relpath).is_dir())
     }
 
     fn box_clone(&self) -> Box<dyn Transport> {
@@ -222,8 +226,8 @@ mod test {
         assert_eq!(root_list[1].name, "subdir");
         assert_eq!(root_list[1].kind, Kind::Dir);
 
-        assert!(transport.exists("root file").unwrap());
-        assert!(!transport.exists("nuh-uh").unwrap());
+        assert!(transport.is_file("root file").unwrap());
+        assert!(!transport.is_file("nuh-uh").unwrap());
 
         let subdir_list: Vec<_> = transport
             .iter_dir_entries("subdir")

@@ -152,7 +152,7 @@ impl BlockDir {
     /// True if the named block is present in this directory.
     pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
         self.transport
-            .exists(&block_relpath(hash))
+            .is_file(&block_relpath(hash))
             .map_err(Error::from)
     }
 

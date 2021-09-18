@@ -120,7 +120,7 @@ impl Archive {
 
     pub fn band_exists(&self, band_id: &BandId) -> Result<bool> {
         self.transport
-            .exists(&format!(
+            .is_file(&format!(
                 "{}/{}",
                 band_id.to_string(),
                 crate::BAND_HEAD_FILENAME
@@ -130,7 +130,7 @@ impl Archive {
 
     pub fn band_is_closed(&self, band_id: &BandId) -> Result<bool> {
         self.transport
-            .exists(&format!(
+            .is_file(&format!(
                 "{}/{}",
                 band_id.to_string(),
                 crate::BAND_TAIL_FILENAME

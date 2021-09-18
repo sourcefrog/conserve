@@ -60,7 +60,7 @@ impl GarbageCollectionLock {
                 return Err(Error::DeleteWithIncompleteBackup { band_id });
             }
         }
-        if archive.transport().exists(GC_LOCK).unwrap_or(true) {
+        if archive.transport().is_file(GC_LOCK).unwrap_or(true) {
             return Err(Error::GarbageCollectionLockHeld {});
         }
         archive.transport().write_file(GC_LOCK, b"{}\n")?;
@@ -80,7 +80,7 @@ impl GarbageCollectionLock {
 
     /// Returns true if the archive is currently locked by a gc process.
     pub fn is_locked(archive: &Archive) -> Result<bool> {
-        archive.transport().exists(GC_LOCK).map_err(Error::from)
+        archive.transport().is_file(GC_LOCK).map_err(Error::from)
     }
 
     /// Check that no new versions have been created in this archive since
@@ -114,12 +114,12 @@ mod test {
     fn empty_archive_ok() {
         let archive = ScratchArchive::new();
         let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
-        assert!(archive.transport().exists("GC_LOCK").unwrap());
+        assert!(archive.transport().is_file("GC_LOCK").unwrap());
         delete_guard.check().unwrap();
 
         // Released when dropped.
         drop(delete_guard);
-        assert!(!archive.transport().exists("GC_LOCK").unwrap());
+        assert!(!archive.transport().is_file("GC_LOCK").unwrap());
     }
 
     #[test]
