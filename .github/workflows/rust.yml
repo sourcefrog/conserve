@@ -13,6 +13,19 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Show version
-        run: rustup show
+        run: |
+          rustup show
+          cargo --version
+          rustc --version
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
       - name: Build and run tests
         run: cargo test
