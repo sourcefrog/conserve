@@ -94,7 +94,7 @@ fn add_entries() {
 #[test]
 fn remove_file() {
     let (af, tf) = setup();
-    std::fs::remove_file(tf.path().join("hello.c")).unwrap();
+    fs::remove_file(tf.path().join("hello.c")).unwrap();
 
     run_conserve()
         .arg("diff")
@@ -119,7 +119,7 @@ fn remove_file() {
 #[test]
 fn change_kind() {
     let (af, tf) = setup();
-    std::fs::remove_dir(tf.path().join("subdir")).unwrap();
+    fs::remove_dir(tf.path().join("subdir")).unwrap();
     tf.create_file_with_contents("subdir", b"used to be a directory, no longer");
 
     run_conserve()
