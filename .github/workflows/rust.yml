@@ -27,5 +27,7 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             cargo-${{ runner.os }}-
-      - name: Build and run tests
+      - name: Build
+        run: cargo build --all-targets
+      - name: Run tests
         run: cargo test
