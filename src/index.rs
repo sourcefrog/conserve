@@ -231,6 +231,7 @@ fn subdir_relpath(hunk_number: u32) -> String {
 }
 
 /// Return the relative path for a hunk.
+#[mutants::skip] // By default it returns "" which causes a loop. TODO: Avoid the loop.
 fn hunk_relpath(hunk_number: u32) -> String {
     format!("{:05}/{:09}", hunk_number / HUNKS_PER_SUBDIR, hunk_number)
 }

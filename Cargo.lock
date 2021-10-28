@@ -152,6 +152,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "libc",
+ "mutants",
  "predicates",
  "rayon",
  "readahead-iterator",
@@ -492,6 +493,12 @@ checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "mutants"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc0287524726960e07b119cebd01678f852f147742ae0d925e6a520dca956126"
 
 [[package]]
 name = "nodrop"
