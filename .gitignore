@@ -7,3 +7,5 @@ tags
 conserve.iml
 perf.data*
 perf.old
+mutants.out
+mutants.out.old
