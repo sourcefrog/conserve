@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015, 2016, 2017, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -61,10 +61,10 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     srcdir.create_file("bar");
     srcdir.create_file("baz");
     // TODO: Include a symlink only on Unix.
-    let excludes = excludes::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
+    let exclude = Exclude::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
     let source = srcdir.live_tree();
     let options = BackupOptions {
-        excludes,
+        exclude,
         ..BackupOptions::default()
     };
     let copy_stats = backup(&af, &source, &options).expect("backup");
@@ -117,10 +117,10 @@ pub fn backup_more_excludes() {
     srcdir.create_file("baz");
     srcdir.create_file("bar");
 
-    let excludes = excludes::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
+    let exclude = Exclude::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
     let source = srcdir.live_tree();
     let options = BackupOptions {
-        excludes,
+        exclude,
         print_filenames: false,
         ..Default::default()
     };
@@ -242,7 +242,7 @@ fn mtime_before_epoch() {
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let entries = lt
-        .iter_entries(None, excludes_nothing())
+        .iter_entries(None, Exclude::nothing())
         .unwrap()
         .collect::<Vec<_>>();
 
@@ -297,7 +297,7 @@ pub fn empty_file_uses_zero_blocks() {
     // Read back the empty file
     let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
     let empty_entry = st
-        .iter_entries(None, excludes_nothing())
+        .iter_entries(None, Exclude::nothing())
         .unwrap()
         .find(|i| &i.apath == "/empty")
         .expect("found one entry");
@@ -440,13 +440,13 @@ fn many_small_files_combined_to_one_block() {
     assert_eq!(stats.combined_blocks, 2);
 
     let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
-    let mut entry_iter = tree.iter_entries(None, excludes_nothing()).unwrap();
+    let mut entry_iter = tree.iter_entries(None, Exclude::nothing()).unwrap();
     assert_eq!(entry_iter.next().unwrap().apath(), "/");
     for (i, entry) in entry_iter.enumerate() {
         assert_eq!(entry.apath().to_string(), format!("/file{:04}", i));
     }
     assert_eq!(
-        tree.iter_entries(None, excludes_nothing()).unwrap().count(),
+        tree.iter_entries(None, Exclude::nothing()).unwrap().count(),
         2000
     );
 }
@@ -482,13 +482,13 @@ pub fn mixed_medium_small_files_two_hunks() {
     assert_eq!(stats.written_blocks, 3);
 
     let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
-    let mut entry_iter = tree.iter_entries(None, excludes_nothing()).unwrap();
+    let mut entry_iter = tree.iter_entries(None, Exclude::nothing()).unwrap();
     assert_eq!(entry_iter.next().unwrap().apath(), "/");
     for (i, entry) in entry_iter.enumerate() {
         assert_eq!(entry.apath().to_string(), format!("/file{:04}", i));
     }
     assert_eq!(
-        tree.iter_entries(None, excludes_nothing()).unwrap().count(),
+        tree.iter_entries(None, Exclude::nothing()).unwrap().count(),
         2000
     );
 }

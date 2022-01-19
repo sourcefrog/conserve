@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -27,14 +27,14 @@ use MergedEntryKind::*;
 
 #[derive(Debug)]
 pub struct DiffOptions {
-    pub excludes: GlobSet,
+    pub exclude: Exclude,
     pub include_unchanged: bool,
 }
 
 impl Default for DiffOptions {
     fn default() -> Self {
         DiffOptions {
-            excludes: GlobSet::empty(),
+            exclude: Exclude::nothing(),
             include_unchanged: false,
         }
     }
@@ -81,10 +81,10 @@ pub fn diff(
     let readahead = 1000;
     let include_unchanged: bool = options.include_unchanged;
     let ait = st
-        .iter_entries(None, options.excludes.clone())?
+        .iter_entries(None, options.exclude.clone())?
         .readahead(readahead);
     let bit = lt
-        .iter_entries(None, options.excludes.clone())?
+        .iter_entries(None, options.exclude.clone())?
         .filter(|le| le.kind() != Unknown)
         .readahead(readahead);
     Ok(MergeTrees::new(ait, bit)

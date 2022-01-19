@@ -57,9 +57,9 @@ impl IterStitchedIndexHunks {
     pub fn iter_entries(
         self,
         subtree: Option<Apath>,
-        excludes: GlobSet,
+        exclude: Exclude,
     ) -> IndexEntryIter<IterStitchedIndexHunks> {
-        IndexEntryIter::new(self, subtree, excludes)
+        IndexEntryIter::new(self, subtree, exclude)
     }
 }
 

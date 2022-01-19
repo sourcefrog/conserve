@@ -1,5 +1,5 @@
 // Copyright 2017 Julian Raufelder.
-// Copyright 2020, 2021 Martin Pool.
+// Copyright 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -11,9 +11,9 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Create a [GlobSet] from a list of strings.
+//! Exclude files from operations based on globs, etc.
 //!
-//! The [GlobSet] is intended to be matched against an [Apath].
+//! Globs match against Apaths.
 //!
 //! Patterns that start with a slash match only against full paths from the top
 //! of the tree. Patterns that do not start with a slash match the suffix of the
@@ -28,6 +28,45 @@ use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 
 use super::*;
 
+/// Describes which files to exclude from a backup, restore, etc.
+#[derive(Clone, Debug)]
+pub struct Exclude {
+    globset: GlobSet,
+    // TODO: Control of matching cachedir.
+}
+
+impl Exclude {
+    /// Create an [Exclude] from a list of glob strings.
+    ///
+    /// The globs match against the apath, which will
+    /// always start with a `/`.
+    pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<Exclude> {
+        let mut builder = ExcludeBuilder::new();
+        for s in excludes {
+            builder.add(s.as_ref())?;
+        }
+        builder.build()
+    }
+
+    /// Exclude nothing, even items that might be excluded by default.
+    pub fn nothing() -> Exclude {
+        Exclude {
+            globset: GlobSet::empty(),
+        }
+    }
+
+    /// True if this apath should be excluded.
+    pub fn matches<'a, A>(&self, apath: &'a A) -> bool
+    where
+        &'a A: Into<Apath> + 'a,
+        A: ?Sized,
+    {
+        let apath: Apath = apath.into();
+        self.globset.is_match(apath)
+    }
+}
+
+/// Construct Exclude object.
 pub struct ExcludeBuilder {
     gsb: GlobSetBuilder,
 }
@@ -39,8 +78,10 @@ impl ExcludeBuilder {
         }
     }
 
-    pub fn build(&self) -> Result<GlobSet> {
-        Ok(self.gsb.build()?)
+    pub fn build(&self) -> Result<Exclude> {
+        Ok(Exclude {
+            globset: self.gsb.build()?,
+        })
     }
 
     pub fn add(&mut self, pat: &str) -> Result<&mut ExcludeBuilder> {
@@ -96,22 +137,6 @@ impl Default for ExcludeBuilder {
     }
 }
 
-/// Create a [GlobSet] from a list of strings.
-///
-/// The [GlobSet] is intended to be matched against an [Apath], which will
-/// always start with a `/`.
-pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<GlobSet> {
-    let mut builder = ExcludeBuilder::new();
-    for s in excludes {
-        builder.add(s.as_ref())?;
-    }
-    builder.build()
-}
-
-pub fn excludes_nothing() -> GlobSet {
-    GlobSet::empty()
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::*;
@@ -119,50 +144,51 @@ mod tests {
     #[test]
     fn simple_globs() {
         let vec = vec!["fo*", "foo", "bar*"];
-        let excludes = excludes::from_strings(&vec).expect("ok");
+        let exclude = Exclude::from_strings(&vec).unwrap();
 
         // Matches in the root
-        assert_eq!(excludes.matches("/foo").len(), 2);
-        assert_eq!(excludes.matches("/foobar").len(), 1);
-        assert_eq!(excludes.matches("/barBaz").len(), 1);
-        assert_eq!(excludes.matches("/bazBar").len(), 0);
+        assert!(exclude.matches("/foo"));
+        assert!(exclude.matches("/foobar"));
+        assert!(exclude.matches("/barBaz"));
+        assert!(!exclude.matches("/bazBar"));
 
         // Also matches in a subdir
-        assert!(excludes.is_match("/subdir/foo"));
-        assert!(excludes.is_match("/subdir/foobar"));
-        assert!(excludes.is_match("/subdir/barBaz"));
-        assert!(!excludes.is_match("/subdir/bazBar"));
+        assert!(exclude.matches("/subdir/foo"));
+        assert!(exclude.matches("/subdir/foobar"));
+        assert!(exclude.matches("/subdir/barBaz"));
+        assert!(!exclude.matches("/subdir/bazBar"));
     }
 
     #[test]
     fn rooted_pattern() {
-        let excludes = excludes::from_strings(&["/exc"]).unwrap();
+        let exclude = Exclude::from_strings(&["/exc"]).unwrap();
 
-        assert!(excludes.is_match("/exc"));
-        assert!(!excludes.is_match("/excellent"));
-        assert!(!excludes.is_match("/sub/excellent"));
-        assert!(!excludes.is_match("/sub/exc"));
+        assert!(exclude.matches("/exc"));
+        assert!(!exclude.matches("/excellent"));
+        assert!(!exclude.matches("/sub/excellent"));
+        assert!(!exclude.matches("/sub/exc"));
     }
 
     #[test]
     fn path_parse() {
-        let excludes = excludes::from_strings(&["fo*/bar/baz*"]).unwrap();
-        assert_eq!(excludes.matches("foo/bar/baz.rs").len(), 1);
+        let exclude = Exclude::from_strings(&["fo*/bar/baz*"]).unwrap();
+        assert!(exclude.matches("/foo/bar/baz.rs"))
     }
 
     #[test]
-    fn extendend_pattern_parse() {
-        let excludes = excludes::from_strings(&["fo?", "ba[abc]", "[!a-z]"]).unwrap();
-        assert_eq!(excludes.matches("foo").len(), 1);
-        assert_eq!(excludes.matches("fo").len(), 0);
-        assert_eq!(excludes.matches("baa").len(), 1);
-        assert_eq!(excludes.matches("1").len(), 1);
-        assert_eq!(excludes.matches("a").len(), 0);
+    fn extended_pattern_parse() {
+        // Note that these are globs, not regexps, so "fo?" means "fo" followed by one character.
+        let exclude = Exclude::from_strings(&["fo?", "ba[abc]", "[!a-z]"]).unwrap();
+        assert!(exclude.matches("/foo"));
+        assert!(!exclude.matches("/fo"));
+        assert!(exclude.matches("/baa"));
+        assert!(exclude.matches("/1"));
+        assert!(!exclude.matches("/a"));
     }
 
     #[test]
     fn nothing_parse() {
-        let excludes = excludes::excludes_nothing();
-        assert!(excludes.matches("a").is_empty());
+        let exclude = Exclude::nothing();
+        assert!(!exclude.matches("/a"));
     }
 }

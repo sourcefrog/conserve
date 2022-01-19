@@ -19,7 +19,6 @@ use std::path::{Path, PathBuf};
 use std::{fs, time::Instant};
 
 use filetime::{set_file_handle_times, set_symlink_file_times};
-use globset::GlobSet;
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
@@ -32,7 +31,7 @@ use crate::*;
 #[derive(Debug)]
 pub struct RestoreOptions {
     pub print_filenames: bool,
-    pub excludes: GlobSet,
+    pub exclude: Exclude,
     /// Restore only this subdirectory.
     pub only_subtree: Option<Apath>,
     pub overwrite: bool,
@@ -46,7 +45,7 @@ impl Default for RestoreOptions {
             print_filenames: false,
             overwrite: false,
             band_selection: BandSelectionPolicy::LatestClosed,
-            excludes: excludes_nothing(),
+            exclude: Exclude::nothing(),
             only_subtree: None,
         }
     }
@@ -80,7 +79,7 @@ pub fn restore(
     // }
 
     progress_bar.set_phase("Copying");
-    let entry_iter = st.iter_entries(options.only_subtree.clone(), options.excludes.clone())?;
+    let entry_iter = st.iter_entries(options.only_subtree.clone(), options.exclude.clone())?;
     for entry in entry_iter {
         if options.print_filenames {
             crate::ui::println(entry.apath());

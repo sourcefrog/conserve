@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -232,11 +232,11 @@ impl Command {
                 exclude_from,
                 no_stats,
             } => {
-                let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
+                let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let source = &LiveTree::open(source)?;
                 let options = BackupOptions {
                     print_filenames: *verbose,
-                    excludes,
+                    exclude,
                     ..Default::default()
                 };
                 let stats = backup(&Archive::open_path(archive)?, source, &options)?;
@@ -293,11 +293,11 @@ impl Command {
                 exclude_from,
                 include_unchanged,
             } => {
-                let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
+                let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let st = stored_tree_from_opt(archive, backup)?;
                 let lt = LiveTree::open(source)?;
                 let options = DiffOptions {
-                    excludes,
+                    exclude,
                     include_unchanged: *include_unchanged,
                 };
                 show_diff(diff(&st, &lt, &options)?, &mut stdout)?;
@@ -329,17 +329,16 @@ impl Command {
                 exclude,
                 exclude_from,
             } => {
-                let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
+                let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 if let Some(archive) = &stos.archive {
                     show::show_entry_names(
-                        stored_tree_from_opt(archive, &stos.backup)?
-                            .iter_entries(None, excludes)?,
+                        stored_tree_from_opt(archive, &stos.backup)?.iter_entries(None, exclude)?,
                         &mut stdout,
                     )?;
                 } else {
                     show::show_entry_names(
                         LiveTree::open(stos.source.clone().unwrap())?
-                            .iter_entries(None, excludes)?,
+                            .iter_entries(None, exclude)?,
                         &mut stdout,
                     )?;
                 }
@@ -357,11 +356,10 @@ impl Command {
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open_path(archive)?;
-                let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
-
+                let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let options = RestoreOptions {
                     print_filenames: *verbose,
-                    excludes,
+                    exclude,
                     only_subtree: only_subtree.clone(),
                     band_selection,
                     overwrite: *force_overwrite,

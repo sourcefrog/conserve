@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -277,7 +277,7 @@ impl IndexRead {
 
     /// Make an iterator that will return all entries in this band.
     pub fn iter_entries(self) -> IndexEntryIter<IndexHunkIter> {
-        IndexEntryIter::new(self.iter_hunks(), None, excludes_nothing())
+        IndexEntryIter::new(self.iter_hunks(), None, Exclude::nothing())
     }
 
     /// Make an iterator that returns hunks of entries from this index.
@@ -399,16 +399,16 @@ pub struct IndexEntryIter<HI: Iterator<Item = Vec<IndexEntry>>> {
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
     hunk_iter: HI,
     subtree: Option<Apath>,
-    excludes: GlobSet,
+    exclude: Exclude,
 }
 
 impl<HI: Iterator<Item = Vec<IndexEntry>>> IndexEntryIter<HI> {
-    pub(crate) fn new(hunk_iter: HI, subtree: Option<Apath>, excludes: GlobSet) -> Self {
+    pub(crate) fn new(hunk_iter: HI, subtree: Option<Apath>, exclude: Exclude) -> Self {
         IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             hunk_iter,
             subtree,
-            excludes,
+            exclude,
         }
     }
 }
@@ -424,7 +424,7 @@ impl<HI: Iterator<Item = Vec<IndexEntry>>> Iterator for IndexEntryIter<HI> {
                         continue;
                     }
                 }
-                if self.excludes.is_match(&entry.apath) {
+                if self.exclude.matches(&entry.apath) {
                     continue;
                 }
                 return Some(entry);

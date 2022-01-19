@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2017, 2018, 2019, 2020, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@ pub trait ReadTree {
     /// Errors reading individual paths or directories are sent to the UI and
     /// counted, but are not treated as fatal, and don't appear as Results in the
     /// iterator.
-    fn iter_entries(&self, subtree: Option<Apath>, excludes: GlobSet) -> Result<Self::IT>;
+    fn iter_entries(&self, subtree: Option<Apath>, exclude: Exclude) -> Result<Self::IT>;
 
     /// Read file contents as a `std::io::Read`.
     // TODO: Remove this and use ReadBlocks or similar.
@@ -42,11 +42,11 @@ pub trait ReadTree {
     /// Measure the tree size.
     ///
     /// This typically requires walking all entries, which may take a while.
-    fn size(&self, excludes: GlobSet) -> Result<TreeSize> {
+    fn size(&self, exclude: Exclude) -> Result<TreeSize> {
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Measuring");
         let mut tot = 0u64;
-        for e in self.iter_entries(None, excludes)? {
+        for e in self.iter_entries(None, exclude)? {
             // While just measuring size, ignore directories/files we can't stat.
             if let Some(bytes) = e.size() {
                 tot += bytes;
