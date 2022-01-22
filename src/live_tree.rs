@@ -210,6 +210,7 @@ impl Iter {
                 return;
             }
         };
+        let mut subdir_apaths: Vec<Apath> = Vec::new();
         for dir_entry in dir_iter {
             let dir_entry = match dir_entry {
                 Ok(dir_entry) => dir_entry,
@@ -238,21 +239,23 @@ impl Iter {
                 }
             };
             child_apath_str.push_str(child_name);
+            let child_apath: Apath = child_apath_str.into();
+
+            if self.exclude.matches(&child_apath) {
+                self.stats.exclusions += 1;
+                continue;
+            }
+
             let ft = match dir_entry.file_type() {
                 Ok(ft) => ft,
                 Err(e) => {
                     ui::problem(&format!(
                         "Error getting type of {:?} during iteration: {}",
-                        child_apath_str, e
+                        child_apath, e
                     ));
                     continue;
                 }
             };
-
-            if self.exclude.matches(&child_apath_str) {
-                self.stats.exclusions += 1;
-                continue;
-            }
 
             let metadata = match dir_entry.metadata() {
                 Ok(metadata) => metadata,
@@ -263,13 +266,13 @@ impl Iter {
                             // between listing the directory and looking at the contents.
                             ui::problem(&format!(
                                 "File disappeared during iteration: {:?}: {}",
-                                child_apath_str, e
+                                child_apath, e
                             ));
                         }
                         _ => {
                             ui::problem(&format!(
                                 "Failed to read source metadata from {:?}: {}",
-                                child_apath_str, e
+                                child_apath, e
                             ));
                             self.stats.metadata_error += 1;
                         }
@@ -286,7 +289,7 @@ impl Iter {
                     Err(e) => {
                         ui::problem(&format!(
                             "Failed to read target of symlink {:?}: {}",
-                            child_apath_str, e
+                            child_apath, e
                         ));
                         continue;
                     }
@@ -296,7 +299,7 @@ impl Iter {
                     Err(e) => {
                         ui::problem(&format!(
                             "Failed to decode target of symlink {:?}: {:?}",
-                            child_apath_str, e
+                            child_apath, e
                         ));
                         continue;
                     }
@@ -304,20 +307,26 @@ impl Iter {
             } else {
                 None
             };
+            if ft.is_dir() {
+                subdir_apaths.push(child_apath.clone());
+            }
             children.push((
                 child_name.to_string(),
-                LiveEntry::from_fs_metadata(child_apath_str.into(), &metadata, target),
+                LiveEntry::from_fs_metadata(child_apath, &metadata, target),
             ));
         }
-        children.sort_unstable_by(|a, b| a.0.cmp(&b.0));
         // To get the right overall tree ordering, any new subdirectories
         // discovered here should be visited together in apath order, but before
         // any previously pending directories. In other words, in reverse order
         // push them onto the front of the dir deque.
-        for idir in children.iter().filter(|x| x.1.kind == Kind::Dir).rev() {
-            self.dir_deque.push_front(idir.1.apath().clone())
+        if !subdir_apaths.is_empty() {
+            subdir_apaths.sort_unstable();
+            self.dir_deque.reserve(subdir_apaths.len());
+            for a in subdir_apaths.into_iter().rev() {
+                self.dir_deque.push_front(a);
+            }
         }
-        self.entry_deque.reserve(children.len());
+        children.sort_unstable_by(|a, b| a.0.cmp(&b.0));
         self.entry_deque.extend(children.into_iter().map(|x| x.1));
     }
 }
