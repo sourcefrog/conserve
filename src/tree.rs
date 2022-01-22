@@ -29,7 +29,7 @@ pub trait ReadTree {
     /// Errors reading individual paths or directories are sent to the UI and
     /// counted, but are not treated as fatal, and don't appear as Results in the
     /// iterator.
-    fn iter_entries(&self, subtree: Option<Apath>, exclude: Exclude) -> Result<Self::IT>;
+    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT>;
 
     /// Read file contents as a `std::io::Read`.
     // TODO: Remove this and use ReadBlocks or similar.
@@ -46,7 +46,7 @@ pub trait ReadTree {
         let mut progress_bar = ProgressBar::new();
         progress_bar.set_phase("Measuring");
         let mut tot = 0u64;
-        for e in self.iter_entries(None, exclude)? {
+        for e in self.iter_entries(Apath::root(), exclude)? {
             // While just measuring size, ignore directories/files we can't stat.
             if let Some(bytes) = e.size() {
                 tot += bytes;

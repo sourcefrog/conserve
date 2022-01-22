@@ -73,7 +73,7 @@ pub fn backup(
     let mut progress_bar = ProgressBar::new();
 
     progress_bar.set_phase("Copying");
-    let entry_iter = source.iter_entries(None, options.exclude.clone())?;
+    let entry_iter = source.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
             progress_bar.set_filename(entry.apath().to_string());
@@ -119,7 +119,7 @@ impl BackupWriter {
         let basis_index = archive.last_band_id()?.map(|band_id| {
             archive
                 .iter_stitched_index_hunks(&band_id)
-                .iter_entries(None, Exclude::nothing())
+                .iter_entries(Apath::root(), Exclude::nothing())
         });
         // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;

@@ -79,7 +79,10 @@ pub fn restore(
     // }
 
     progress_bar.set_phase("Copying");
-    let entry_iter = st.iter_entries(options.only_subtree.clone(), options.exclude.clone())?;
+    let entry_iter = st.iter_entries(
+        options.only_subtree.clone().unwrap_or_else(Apath::root),
+        options.exclude.clone(),
+    )?;
     for entry in entry_iter {
         if options.print_filenames {
             crate::ui::println(entry.apath());

@@ -62,8 +62,8 @@ impl tree::ReadTree for LiveTree {
     type R = std::fs::File;
     type IT = Iter;
 
-    fn iter_entries(&self, subtree: Option<Apath>, exclude: Exclude) -> Result<Self::IT> {
-        Iter::new(&self.path, subtree, exclude)
+    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
+        Iter::new(&self.path, subtree.clone(), exclude)
     }
 
     fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
@@ -76,7 +76,9 @@ impl tree::ReadTree for LiveTree {
         // TODO: This stats the file and builds an entry about them, just to
         // throw it away. We could perhaps change the iter to optionally do
         // less work.
-        Ok(self.iter_entries(None, Exclude::nothing())?.count() as u64)
+        Ok(self
+            .iter_entries(Apath::root(), Exclude::nothing())?
+            .count() as u64)
     }
 }
 
@@ -160,8 +162,7 @@ pub struct Iter {
 impl Iter {
     /// Construct a new iter that will visit everything below this root path,
     /// subject to some exclusions
-    fn new(root_path: &Path, subtree: Option<Apath>, exclude: Exclude) -> Result<Iter> {
-        let subtree = subtree.unwrap_or_else(|| "/".into());
+    fn new(root_path: &Path, subtree: Apath, exclude: Exclude) -> Result<Iter> {
         let start_metadata = fs::symlink_metadata(&subtree.below(root_path))?;
         // Preload iter to return the root and then recurse into it.
         let entry_deque: VecDeque<LiveEntry> = [LiveEntry::from_fs_metadata(

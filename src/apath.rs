@@ -71,6 +71,7 @@ impl Apath {
     }
 
     /// True if self is a parent directory of, or equal to, `a`.
+    #[must_use]
     pub fn is_prefix_of(&self, a: &Apath) -> bool {
         let len = self.0.len();
         match len.cmp(&a.0.len()) {
@@ -84,10 +85,17 @@ impl Apath {
     }
 
     /// Return a PathBuf for this Apath below a tree root directory.
+    #[must_use]
     pub fn below<R: Into<PathBuf>>(&self, tree_root: R) -> PathBuf {
         let mut buf: PathBuf = tree_root.into();
         buf.push(&self[1..]);
         buf
+    }
+
+    /// Construct an Apath for the root of the tree.
+    #[must_use]
+    pub fn root() -> Apath {
+        "/".into()
     }
 }
 

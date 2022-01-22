@@ -33,7 +33,10 @@ fn list_simple_directory() {
     tf.create_dir("jelly");
     tf.create_dir("jam/.etc");
     let lt = LiveTree::open(tf.path()).unwrap();
-    let result: Vec<LiveEntry> = lt.iter_entries(None, Exclude::nothing()).unwrap().collect();
+    let result: Vec<LiveEntry> = lt
+        .iter_entries(Apath::root(), Exclude::nothing())
+        .unwrap()
+        .collect();
     let names = entry_iter_to_apath_strings(result.clone());
     // First one is the root
     assert_eq!(
@@ -72,7 +75,7 @@ fn exclude_entries_directory() {
     let exclude = Exclude::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
-    let names = entry_iter_to_apath_strings(lt.iter_entries(None, exclude).unwrap());
+    let names = entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), exclude).unwrap());
 
     // First one is the root
     assert_eq!(names, ["/", "/baz", "/baz/test"]);
@@ -90,7 +93,8 @@ fn symlinks() {
     tf.create_symlink("from", "to");
 
     let lt = LiveTree::open(tf.path()).unwrap();
-    let names = entry_iter_to_apath_strings(lt.iter_entries(None, Exclude::nothing()).unwrap());
+    let names =
+        entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), Exclude::nothing()).unwrap());
 
     assert_eq!(names, ["/", "/from"]);
 }
@@ -107,7 +111,7 @@ fn iter_subtree_entries() {
     let lt = LiveTree::open(tf.path()).unwrap();
 
     let names = entry_iter_to_apath_strings(
-        lt.iter_entries(Some("/subdir".into()), Exclude::nothing())
+        lt.iter_entries("/subdir".into(), Exclude::nothing())
             .unwrap(),
     );
     assert_eq!(names, ["/subdir", "/subdir/a", "/subdir/b"]);
@@ -122,7 +126,8 @@ fn exclude_cachedir() {
     cachedir::add_tag(&cache_dir).unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
-    let names = entry_iter_to_apath_strings(lt.iter_entries(None, Exclude::nothing()).unwrap());
+    let names =
+        entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), Exclude::nothing()).unwrap());
     assert_eq!(names, ["/", "/a"]);
 }
 
