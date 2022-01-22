@@ -252,9 +252,12 @@ impl Iter {
                     Ok(true) => continue,
                     Ok(false) => (),
                     Err(e) => {
-                        ui::problem(&format!("Error checking CACHEDIR.TAG in {:?}: {}", dir_entry, e));
+                        ui::problem(&format!(
+                            "Error checking CACHEDIR.TAG in {:?}: {}",
+                            dir_entry, e
+                        ));
                     }
-                }}
+                }
             }
 
             let metadata = match dir_entry.metadata() {
