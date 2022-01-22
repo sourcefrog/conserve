@@ -11,7 +11,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Find source files within a source directory, in apath order.
+//! Access a "live" on-disk tree as a source for backups, destination for restores, etc.
 
 use std::collections::vec_deque::VecDeque;
 use std::fs;
@@ -30,6 +30,7 @@ pub struct LiveTree {
 }
 
 impl LiveTree {
+    /// Open the live tree rooted at `path`.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<LiveTree> {
         // TODO: Maybe fail here if the root doesn't exist or isn't a directory?
         Ok(LiveTree {
@@ -39,6 +40,11 @@ impl LiveTree {
 
     fn relative_path(&self, apath: &Apath) -> PathBuf {
         relative_path(&self.path, apath)
+    }
+
+    /// Return the root path for this tree.
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 }
 
@@ -345,116 +351,5 @@ impl Iterator for Iter {
                 return None;
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::super::*;
-    use crate::test_fixtures::TreeFixture;
-
-    use regex::Regex;
-
-    #[test]
-    fn open_tree() {
-        let tf = TreeFixture::new();
-        let lt = LiveTree::open(tf.path()).unwrap();
-        assert_eq!(lt.path, tf.path());
-    }
-
-    #[test]
-    fn simple_directory() {
-        let tf = TreeFixture::new();
-        tf.create_file("bba");
-        tf.create_file("aaa");
-        tf.create_dir("jam");
-        tf.create_file("jam/apricot");
-        tf.create_dir("jelly");
-        tf.create_dir("jam/.etc");
-        let lt = LiveTree::open(tf.path()).unwrap();
-        let mut source_iter = lt.iter_entries(None, Exclude::nothing()).unwrap();
-        let result = source_iter.by_ref().collect::<Vec<_>>();
-        // First one is the root
-        assert_eq!(&result[0].apath, "/");
-        assert_eq!(&result[1].apath, "/aaa");
-        assert_eq!(&result[2].apath, "/bba");
-        assert_eq!(&result[3].apath, "/jam");
-        assert_eq!(&result[4].apath, "/jelly");
-        assert_eq!(&result[5].apath, "/jam/.etc");
-        assert_eq!(&result[6].apath, "/jam/apricot");
-        assert_eq!(result.len(), 7);
-
-        let repr = format!("{:?}", &result[6]);
-        let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: UnixTime \{ [^)]* \}, size: Some\(8\), symlink_target: None \}"#).unwrap();
-        assert!(re.is_match(&repr));
-
-        // TODO: Somehow get the stats out of the iterator.
-        // assert_eq!(source_iter.stats.directories_visited, 4);
-        // assert_eq!(source_iter.stats.entries_returned, 7);
-    }
-
-    #[test]
-    fn exclude_entries_directory() {
-        let tf = TreeFixture::new();
-        tf.create_file("foooo");
-        tf.create_file("bar");
-        tf.create_dir("fooooBar");
-        tf.create_dir("baz");
-        tf.create_file("baz/bar");
-        tf.create_file("baz/bas");
-        tf.create_file("baz/test");
-
-        let exclude = Exclude::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
-
-        let lt = LiveTree::open(tf.path()).unwrap();
-        let mut source_iter = lt.iter_entries(None, exclude).unwrap();
-        let result = source_iter.by_ref().collect::<Vec<_>>();
-
-        // First one is the root
-        assert_eq!(&result[0].apath, "/");
-        assert_eq!(&result[1].apath, "/baz");
-        assert_eq!(&result[2].apath, "/baz/test");
-        assert_eq!(result.len(), 3);
-
-        // TODO: Get stats back from the iterator
-        // assert_eq!(source_iter.stats.directories_visited, 2);
-        // assert_eq!(source_iter.stats.entries_returned, 3);
-        // assert_eq!(source_iter.stats.exclusions, 5);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn symlinks() {
-        let tf = TreeFixture::new();
-        tf.create_symlink("from", "to");
-
-        let lt = LiveTree::open(tf.path()).unwrap();
-        let result = lt
-            .iter_entries(None, Exclude::nothing())
-            .unwrap()
-            .collect::<Vec<_>>();
-
-        assert_eq!(&result[0].apath, "/");
-        assert_eq!(&result[1].apath, "/from");
-    }
-
-    #[test]
-    fn iter_subtree_entries() {
-        let tf = TreeFixture::new();
-        tf.create_file("in base");
-        tf.create_dir("subdir");
-        tf.create_file("subdir/a");
-        tf.create_file("subdir/b");
-        tf.create_file("zzz");
-
-        let lt = LiveTree::open(tf.path()).unwrap();
-
-        let names: Vec<String> = lt
-            .iter_entries(Some("/subdir".into()), Exclude::nothing())
-            .unwrap()
-            .map(|entry| entry.apath.into())
-            .collect();
-
-        assert_eq!(names.as_slice(), ["/subdir", "/subdir/a", "/subdir/b"]);
     }
 }

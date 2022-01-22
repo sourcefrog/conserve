@@ -19,6 +19,7 @@ mod damaged;
 mod delete;
 mod diff;
 mod gc;
+mod live_tree;
 mod old_archives;
 mod restore;
 mod transport;
