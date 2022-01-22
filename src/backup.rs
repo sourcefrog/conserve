@@ -185,8 +185,7 @@ impl BackupWriter {
         if let Some(basis_entry) = self
             .basis_index
             .as_mut()
-            .map(|bi| bi.advance_to(apath))
-            .flatten()
+            .and_then(|bi| bi.advance_to(apath))
         {
             if source_entry.is_unchanged_from(&basis_entry) {
                 if self.options.print_filenames {

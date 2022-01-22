@@ -38,6 +38,7 @@ use crate::ProgressBar;
 ///
 /// So this class also works when stdout is redirected to a file, in
 /// which case it will get only messages and no progress bar junk.
+#[derive(Default)]
 pub(crate) struct UIState {
     /// Is a progress bar currently on the screen?
     progress_present: bool,
@@ -89,15 +90,6 @@ pub fn enable_progress(enabled: bool) {
     use crossterm::tty::IsTty;
     let mut ui = UI_STATE.lock().unwrap();
     ui.progress_enabled = io::stdout().is_tty() && enabled;
-}
-
-impl Default for UIState {
-    fn default() -> UIState {
-        UIState {
-            progress_present: false,
-            progress_enabled: false,
-        }
-    }
 }
 
 pub fn compression_percent(s: &Sizes) -> i64 {

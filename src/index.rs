@@ -352,6 +352,7 @@ impl Iterator for IndexHunkIter {
 
 impl IndexHunkIter {
     /// Advance self so that it returns only entries with apaths ordered after `apath`.
+    #[must_use]
     pub fn advance_to_after(self, apath: &Apath) -> Self {
         IndexHunkIter {
             after: Some(apath.clone()),

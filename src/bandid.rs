@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -37,11 +37,13 @@ impl BandId {
     }
 
     /// Return the origin BandId.
+    #[must_use]
     pub fn zero() -> BandId {
         BandId::new(&[0])
     }
 
     /// Return the next BandId at the same level as self.
+    #[must_use]
     pub fn next_sibling(&self) -> BandId {
         let mut next_seqs = self.seqs.clone();
         next_seqs[self.seqs.len() - 1] += 1;
@@ -53,6 +55,7 @@ impl BandId {
     /// This is only a calculation on the band id, and the band may not be present.
     ///
     /// Currently only implemented for top-level bands.
+    #[must_use]
     pub fn previous(&self) -> Option<BandId> {
         if self.seqs.len() != 1 {
             unimplemented!("BandId::previous only supported on len 1")
