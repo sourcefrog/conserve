@@ -103,6 +103,9 @@ leading and trailing whitespace, and skipping comment lines that start with a
 The syntax is comes from the Rust [globset](https://docs.rs/globset/#syntax)
 crate.
 
+Directories marked with [`CACHEDIR.TAG`](https://bford.info/cachedir/) are
+automatically excluded from backups.
+
 ## Install
 
 To build Conserve you need [Rust][rust] and a C compiler that can be used by

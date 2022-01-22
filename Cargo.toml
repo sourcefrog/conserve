@@ -17,6 +17,7 @@ test = false
 
 [dependencies]
 blake2-rfc = "0.2.18"
+cachedir = "0.3"
 chrono = "0.4.19"
 crossterm = "0.22"
 derive_more = "0.99"
@@ -47,6 +48,7 @@ assert_cmd = "2.0.1"
 assert_fs = "1.0.0"
 copy_dir = "0.1.2"
 predicates = "2"
+pretty_assertions = "1.0"
 
 [features]
 blake2_simd_asm = ["blake2-rfc/simd_asm"]

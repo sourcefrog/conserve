@@ -10,6 +10,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+use pretty_assertions::assert_eq;
 use regex::Regex;
 
 use conserve::test_fixtures::TreeFixture;
@@ -110,6 +111,19 @@ fn iter_subtree_entries() {
             .unwrap(),
     );
     assert_eq!(names, ["/subdir", "/subdir/a", "/subdir/b"]);
+}
+
+#[test]
+fn exclude_cachedir() {
+    let tf = TreeFixture::new();
+    tf.create_file("a");
+    let cache_dir = tf.create_dir("cache");
+    tf.create_dir("cache/1");
+    cachedir::add_tag(&cache_dir).unwrap();
+
+    let lt = LiveTree::open(tf.path()).unwrap();
+    let names = entry_iter_to_apath_strings(lt.iter_entries(None, Exclude::nothing()).unwrap());
+    assert_eq!(names, ["/", "/a"]);
 }
 
 /// Collect apaths from an iterator into a list of string.

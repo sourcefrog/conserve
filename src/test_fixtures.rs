@@ -140,8 +140,11 @@ impl TreeFixture {
         full_path
     }
 
-    pub fn create_dir(&self, relative_path: &str) {
-        fs::create_dir(self.root.join(relative_path)).unwrap();
+    /// Create a new subdirectory and return its full path.
+    pub fn create_dir(&self, relative_path: &str) -> PathBuf {
+        let full_path: PathBuf = self.root.join(relative_path);
+        fs::create_dir(&full_path).unwrap();
+        full_path
     }
 
     #[cfg(unix)]

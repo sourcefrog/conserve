@@ -16,6 +16,9 @@
 
 - Add new `--no-stats` option.
 
+- Directories marked with [`CACHEDIR.TAG`](https://bford.info/cachedir/) are
+  automatically excluded from backups.
+
 ## v0.6.14 2021-05-20
 
 - `conserve validate` reads all indexes before checking block contents, which
