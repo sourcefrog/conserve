@@ -222,24 +222,18 @@ impl Iter {
                     continue;
                 }
             };
-            let mut child_apath_str = parent_apath.to_string();
-            // TODO: Specific Apath join method?
-            if child_apath_str != "/" {
-                child_apath_str.push('/');
-            }
-            let child_osstr = &dir_entry.file_name();
+            let child_osstr = dir_entry.file_name();
             let child_name = match child_osstr.to_str() {
                 Some(c) => c,
                 None => {
                     ui::problem(&format!(
-                        "Can't decode filename {:?} in {:?}",
+                        "Couldn't decode filename {:?} in {:?}",
                         child_osstr, dir_path,
                     ));
                     continue;
                 }
             };
-            child_apath_str.push_str(child_name);
-            let child_apath: Apath = child_apath_str.into();
+            let child_apath = parent_apath.append(child_name);
 
             if self.exclude.matches(&child_apath) {
                 self.stats.exclusions += 1;

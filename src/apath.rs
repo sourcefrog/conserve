@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 //! Apaths in memory are simply strings.
 
 use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
+use std::ffi::OsStr;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -58,6 +59,17 @@ impl Apath {
         true
     }
 
+    /// Construct a new Apath for a child of `self`.
+    #[must_use]
+    pub fn append(&self, child_name: &str) -> Apath {
+        let mut c = self.0.clone();
+        if c != "/" {
+            c.push('/');
+        }
+        c.push_str(child_name);
+        Apath(c)
+    }
+
     /// True if self is a parent directory of, or equal to, `a`.
     pub fn is_prefix_of(&self, a: &Apath) -> bool {
         let len = self.0.len();
@@ -85,11 +97,22 @@ impl FromStr for Apath {
 }
 
 #[derive(Debug)]
+pub struct DecodeFilenameError<'name> {
+    name: &'name OsStr,
+}
+
+impl<'name> fmt::Display for DecodeFilenameError<'name> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Couldn't decode filename {:?}", self.name)
+    }
+}
+
+#[derive(Debug)]
 pub struct ApathParseError {}
 
 impl fmt::Display for ApathParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Invalid apath: must have an initial slash and no ..")
+        f.write_str("Invalid apath: must have an initial slash and no ..")
     }
 }
 
