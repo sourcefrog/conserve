@@ -68,12 +68,6 @@ impl tree::ReadTree for LiveTree {
     type R = std::fs::File;
     type IT = Iter;
 
-    /// Iterate source files descending through a source directory.
-    ///
-    /// Visit the files in a directory before descending into its children, as
-    /// is the defined order for files stored in an archive.  Within those files and
-    /// child directories, visit them according to a sorted comparison by their UTF-8
-    /// name.
     fn iter_entries(&self, subtree: Option<Apath>, exclude: Exclude) -> Result<Self::IT> {
         Iter::new(&self.path, subtree, exclude)
     }
@@ -141,6 +135,13 @@ impl LiveEntry {
 }
 
 /// Recursive iterator of the contents of a live tree.
+///
+/// Iterate source files descending through a source directory.
+///
+/// Visit the files in a directory before descending into its children, as
+/// is the defined order for files stored in an archive.  Within those files and
+/// child directories, visit them according to a sorted comparison by their UTF-8
+/// name.
 #[derive(Debug)]
 pub struct Iter {
     /// Root of the source tree.
@@ -156,7 +157,7 @@ pub struct Iter {
     /// Check that emitted paths are in the right order.
     check_order: apath::DebugCheckOrder,
 
-    /// glob pattern to skip in iterator
+    /// Patterns to exclude from iteration.
     exclude: Exclude,
 
     stats: LiveTreeIterStats,
@@ -167,19 +168,17 @@ impl Iter {
     /// subject to some exclusions
     fn new(root_path: &Path, subtree: Option<Apath>, exclude: Exclude) -> Result<Iter> {
         let subtree = subtree.unwrap_or_else(|| "/".into());
-        let start_path = relative_path(root_path, &subtree);
-        let start_metadata = fs::symlink_metadata(&start_path).map_err(Error::from)?;
+        let start_metadata = fs::symlink_metadata(relative_path(root_path, &subtree))?;
         // Preload iter to return the root and then recurse into it.
-        let mut entry_deque = VecDeque::<LiveEntry>::new();
-        entry_deque.push_back(LiveEntry::from_fs_metadata(
+        let entry_deque: VecDeque<LiveEntry> = [LiveEntry::from_fs_metadata(
             subtree.clone(),
             &start_metadata,
             None,
-        ));
+        )]
+        .into();
         // TODO: Consider the case where the root is not actually a directory?
         // Should that be supported?
-        let mut dir_deque = VecDeque::<Apath>::new();
-        dir_deque.push_back(subtree);
+        let dir_deque: VecDeque<Apath> = [subtree].into();
         Ok(Iter {
             root_path: root_path.to_path_buf(),
             entry_deque,
