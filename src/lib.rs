@@ -75,9 +75,6 @@ pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};
 pub use crate::validate::ValidateOptions;
 
-// Commonly-used external types.
-pub use globset::GlobSet;
-
 pub type Result<T> = std::result::Result<T, Error>;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
