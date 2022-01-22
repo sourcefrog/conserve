@@ -194,13 +194,8 @@ impl Iter {
     /// Any errors occurring are logged but not returned; we'll continue to
     /// visit whatever can be read.
     fn visit_next_directory(&mut self, parent_apath: &Apath) {
-        // TODO: Rather than mutating self, return new vectors to append, so that
-        // this function isn't too big?
-        //
-        // TODO: Perhaps reuse the child buffer in the Iter, which we know will
-        // now be empty? We have to be able to sort it, but perhaps a Vec in
-        // reverse order from which we pop would work well.
         self.stats.directories_visited += 1;
+        // Tuples of (name, entry) so that we can sort children by name.
         let mut children = Vec::<(String, LiveEntry)>::new();
         let dir_path = relative_path(&self.root_path, parent_apath);
         let dir_iter = match fs::read_dir(&dir_path) {
