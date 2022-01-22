@@ -38,7 +38,7 @@ impl LiveTree {
     }
 
     fn relative_path(&self, apath: &Apath) -> PathBuf {
-        relative_path(&self.path, apath)
+        apath.below(&self.path)
     }
 
     /// Return the root path for this tree.
@@ -55,12 +55,6 @@ pub struct LiveEntry {
     mtime: UnixTime,
     size: Option<u64>,
     symlink_target: Option<String>,
-}
-
-fn relative_path(root: &Path, apath: &Apath) -> PathBuf {
-    let mut path = root.to_path_buf();
-    path.push(&apath[1..]);
-    path
 }
 
 impl tree::ReadTree for LiveTree {
@@ -168,7 +162,7 @@ impl Iter {
     /// subject to some exclusions
     fn new(root_path: &Path, subtree: Option<Apath>, exclude: Exclude) -> Result<Iter> {
         let subtree = subtree.unwrap_or_else(|| "/".into());
-        let start_metadata = fs::symlink_metadata(relative_path(root_path, &subtree))?;
+        let start_metadata = fs::symlink_metadata(&subtree.below(root_path))?;
         // Preload iter to return the root and then recurse into it.
         let entry_deque: VecDeque<LiveEntry> = [LiveEntry::from_fs_metadata(
             subtree.clone(),
@@ -197,7 +191,7 @@ impl Iter {
         self.stats.directories_visited += 1;
         // Tuples of (name, entry) so that we can sort children by name.
         let mut children = Vec::<(String, LiveEntry)>::new();
-        let dir_path = relative_path(&self.root_path, parent_apath);
+        let dir_path = parent_apath.below(&self.root_path);
         let dir_iter = match fs::read_dir(&dir_path) {
             Ok(i) => i,
             Err(e) => {

@@ -23,7 +23,7 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -81,6 +81,13 @@ impl Apath {
                     && (self.0.ends_with('/') || a.0.chars().nth(self.0.len()) == Some('/'))
             }
         }
+    }
+
+    /// Return a PathBuf for this Apath below a tree root directory.
+    pub fn below<R: Into<PathBuf>>(&self, tree_root: R) -> PathBuf {
+        let mut buf: PathBuf = tree_root.into();
+        buf.push(&self[1..]);
+        buf
     }
 }
 
