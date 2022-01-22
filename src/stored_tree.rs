@@ -19,6 +19,7 @@
 //! multiple index files, bands, and blocks.
 
 use crate::blockdir::BlockDir;
+use crate::stitch::IterStitchedIndexHunks;
 use crate::stored_file::{ReadStoredFile, StoredFile};
 use crate::*;
 
@@ -59,9 +60,7 @@ impl ReadTree for StoredTree {
 
     /// Return an iter of index entries in this stored tree.
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
-        Ok(self
-            .archive
-            .iter_stitched_index_hunks(self.band.id())
+        Ok(IterStitchedIndexHunks::new(&self.archive, self.band.id())
             .iter_entries(subtree, exclude))
     }
 

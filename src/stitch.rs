@@ -45,6 +45,15 @@ pub struct IterStitchedIndexHunks {
 }
 
 impl IterStitchedIndexHunks {
+    /// Return an iterator that reconstructs the most complete available index
+    /// for a possibly-incomplete band.
+    ///
+    /// If the band is complete, this is simply the band's index.
+    ///
+    /// If it's incomplete, it stitches together the index by picking up at
+    /// the same point in the previous band, continuing backwards recursively
+    /// until either there are no more previous indexes, or a complete index
+    /// is found.
     pub(crate) fn new(archive: &Archive, band_id: &BandId) -> IterStitchedIndexHunks {
         IterStitchedIndexHunks {
             archive: archive.clone(),
@@ -102,6 +111,8 @@ impl Iterator for IterStitchedIndexHunks {
 fn previous_existing_band(archive: &Archive, band_id: &BandId) -> Option<BandId> {
     let mut band_id = band_id.clone();
     loop {
+        // TODO: It might be faster to list the present bands and calculate
+        // from that, rather than walking backwards one at a time...
         if let Some(prev_band_id) = band_id.previous() {
             band_id = prev_band_id;
             if archive.band_exists(&band_id).unwrap_or(false) {
@@ -115,8 +126,8 @@ fn previous_existing_band(archive: &Archive, band_id: &BandId) -> Option<BandId>
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::test_fixtures::ScratchArchive;
-    use crate::*;
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
         IndexEntry {
@@ -130,8 +141,7 @@ mod test {
     }
 
     fn simple_ls(archive: &Archive, band_id: &BandId) -> String {
-        let strs: Vec<String> = archive
-            .iter_stitched_index_hunks(band_id)
+        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, band_id)
             .flatten()
             .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
             .collect();
@@ -140,6 +150,9 @@ mod test {
 
     #[test]
     fn stitch_index() -> Result<()> {
+        // This test uses private interfaces to create an index that breaks
+        // across hunks in a certain way.
+
         let af = ScratchArchive::new();
 
         // Construct a history with four versions:

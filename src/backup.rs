@@ -22,6 +22,7 @@ use itertools::Itertools;
 use crate::blockdir::Address;
 use crate::io::read_with_retries;
 use crate::stats::BackupStats;
+use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::ReadTree;
 use crate::*;
 
@@ -117,8 +118,7 @@ impl BackupWriter {
             return Err(Error::GarbageCollectionLockHeld);
         }
         let basis_index = archive.last_band_id()?.map(|band_id| {
-            archive
-                .iter_stitched_index_hunks(&band_id)
+            IterStitchedIndexHunks::new(archive, &band_id)
                 .iter_entries(Apath::root(), Exclude::nothing())
         });
         // Create the new band only after finding the basis band!
