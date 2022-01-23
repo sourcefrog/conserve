@@ -59,7 +59,7 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
     // Trees containing a naive copy of the source at each backup.
     let mut backup_contents: Vec<TempDir> = Vec::new();
     for (i, c) in changes.iter().enumerate() {
-        println!("{i}: {c:?}");
+        println!("{}: {:?}", i, c);
         match c {
             AddFile => {
                 let content = format!("initial content of {}", next_file).into_bytes();
