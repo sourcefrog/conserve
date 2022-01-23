@@ -47,8 +47,12 @@ version = "1"
 assert_cmd = "2.0"
 assert_fs = "1.0"
 copy_dir = "0.1.2"
+cp_r = "0.4"
+dir-assert = "0.2"
 predicates = "2"
 pretty_assertions = "1.0"
+proptest = "1.0"
+proptest-derive = "0.2"
 
 [features]
 blake2_simd_asm = ["blake2-rfc/simd_asm"]

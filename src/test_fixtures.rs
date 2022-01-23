@@ -85,6 +85,12 @@ impl Deref for ScratchArchive {
     }
 }
 
+impl AsRef<Archive> for ScratchArchive {
+    fn as_ref(&self) -> &Archive {
+        &self.archive
+    }
+}
+
 impl Default for ScratchArchive {
     fn default() -> Self {
         Self::new()
