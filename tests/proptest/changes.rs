@@ -89,7 +89,11 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
                 // Wait a little bit to let files get distinct mtimes: very
                 // close-spaced updates might not be distinguishable by mtime.
                 std::thread::sleep(std::time::Duration::from_millis(10));
-                backup(&archive, &tf.live_tree(), &BackupOptions::default()).unwrap();
+                let options = BackupOptions {
+                    max_entries_per_hunk: 3,
+                    ..BackupOptions::default()
+                };
+                backup(&archive, &tf.live_tree(), &options).unwrap();
                 let snapshot = TempDir::new().unwrap();
                 cp_r::CopyOptions::default()
                     .copy_tree(&tf.path(), snapshot.path())
