@@ -1,6 +1,6 @@
 # Conserve release history
 
-## UNRELEASED
+## v0.6.15 2021-01-23
 
 - Find referenced blocks by walking all bands in parallel. This significantly
   speeds up GC, deletion, etc: 6.5x faster in one test.
