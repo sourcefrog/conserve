@@ -134,6 +134,7 @@ proptest! {
     // are more understandable to rust-analyzer.
 
     #[test]
+    #[ignore] // making all these backups is expensive
     fn changes(changes: Vec<TreeChange>) {
         backup_sequential_changes(&changes);
     }

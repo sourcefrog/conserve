@@ -25,21 +25,27 @@ it sets a direction.
 
 ## Testing
 
-Code can be tested in up to four different ways:
+Code can be tested in any of five different places:
+
+* Public API tests, in `tests/api`. All core features should be exercised here,
+  although some edge cases that can't be reached through the public API could
+  be left for unit tests.
+
+* Black-box tests that run the Conserve CLI as a binary, in
+  `tests/cli`.  All the main uses of the CLI should be exercised here.
+
+* Time-consuming tests, using proptest, in `tests/expensive`. These are
+  `#[ignore]` at the test level, and only run by `cargo test --
+  --include-ignored`, which is done on CI.
+
+* Doctests, especially for functions in the public API that are amenable to
+  small examples. These are somewhat slow to build so are used only in cases
+  where an example is especially helpful in describing the API.
 
 * Individual functions, as unit tests within the implementation module. Prefer
   this for things that are important to test, but not exposed or not easily
-  testable through the public API.
-
-* Doctests, especially for functions in the public API that are amenable to
-  small examples.
-
-* Public API tests, in `tests/blackbox.rs`. All core features should be
-  exercise here, although some edge cases that can't be reached through the
-  public API could be left for unit tests.
-
-* Black-box tests that run the Conserve CLI as a binary, in
-  `tests/blackbox.md`.  All the main uses of the CLI should be exercised here.
+  testable through the public API. Most things should be tested through the 
+  public API and not inside the implementation.
 
 If it's hard to work out how to test your change please feel free to put up a
 draft PR with no tests and just ask.
