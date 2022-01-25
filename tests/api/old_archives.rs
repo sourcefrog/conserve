@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2020, Martin Pool.
+// Copyright 2020, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@ use std::path::Path;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use copy_dir::copy_dir;
 use predicates::prelude::*;
 
 use conserve::unix_time::UnixTime;
@@ -144,7 +143,9 @@ fn restore_modify_backup() {
         let new_archive_temp = TempDir::new().unwrap();
         let stored_archive_path = archive_testdata_path("minimal", ver);
         let new_archive_path = new_archive_temp.path().join("archive");
-        copy_dir(stored_archive_path, &new_archive_path).expect("copy archive tree");
+        cp_r::CopyOptions::default()
+            .copy_tree(stored_archive_path, &new_archive_path)
+            .expect("copy archive tree");
 
         working_tree
             .child("empty")

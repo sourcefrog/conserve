@@ -46,7 +46,6 @@ version = "1"
 [dev-dependencies]
 assert_cmd = "2.0"
 assert_fs = "1.0"
-copy_dir = "0.1.2"
 cp_r = "0.4"
 dir-assert = "0.2"
 predicates = "2"
