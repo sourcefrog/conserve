@@ -42,4 +42,4 @@ jobs:
       - name: Build
         run: cargo build --all-targets
       - name: Run tests
-        run: cargo test
+        run: cargo test -- --include-ignored
