@@ -60,6 +60,18 @@ impl Default for BackupOptions {
 //     progress_bar.set_bytes_total(source.size()?.file_bytes as u64);
 // }
 
+#[derive(Default)]
+struct ProgressModel {
+    filename: String,
+    bytes_done: u64,
+}
+
+impl nutmeg::Model for ProgressModel {
+    fn render(&mut self, _width: usize) -> String {
+        format!("Copying {} MB | {}", self.bytes_done / 1_000_000, self.filename)
+    }
+}
+
 /// Backup a source directory into a new band in the archive.
 ///
 /// Returns statistics about what was copied.
@@ -71,19 +83,22 @@ pub fn backup(
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive, options.clone())?;
     let mut stats = BackupStats::default();
-    let mut progress_bar = ProgressBar::new();
+    let view = nutmeg::View::new(ProgressModel::default(), nutmeg::ViewOptions::default());
 
-    progress_bar.set_phase("Copying");
     let entry_iter = source.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
-            progress_bar.set_filename(entry.apath().to_string());
+            view.update(|model| model.filename = entry.apath().to_string());
             if let Err(e) = writer.copy_entry(&entry, source) {
                 ui::show_error(&e);
                 stats.errors += 1;
                 continue;
             }
-            progress_bar.increment_bytes_done(entry.size().unwrap_or(0));
+            if let Some(bytes) = entry.size() {
+                if bytes > 0 {
+                    view.update(|model| model.bytes_done += bytes)
+                }
+            }
         }
         writer.flush_group()?;
     }
