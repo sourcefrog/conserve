@@ -27,7 +27,7 @@ hex = "0.4.2"
 itertools = "0.10"
 lazy_static = "1.4.0"
 mutants = "0.0.3"
-nutmeg = { version = "0.0.1" }
+nutmeg = { version = "0.0.2", git = "https://github.com/sourcefrog/nutmeg.git" }
 rayon = "1.3.0"
 readahead-iterator = "0.1.1"
 regex = "1.3.9"
