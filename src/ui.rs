@@ -69,18 +69,22 @@ where
     cb(UI_STATE.lock().unwrap().deref_mut())
 }
 
+pub(crate) fn format_error_causes(error: &dyn std::error::Error) -> String {
+    let mut buf = error.to_string();
+    let mut cause = error;
+    while let Some(c) = cause.source() {
+        write!(&mut buf, "\n  caused by: {}", c).expect("Failed to format error cause");
+        cause = c;
+    }
+    buf
+}
+
 /// Report that a non-fatal error occurred.
 ///
 /// The program will continue.
 pub fn show_error(e: &dyn std::error::Error) {
     // TODO: Convert to logging.
-    let mut buf = e.to_string();
-    let mut cause = e;
-    while let Some(c) = cause.source() {
-        write!(&mut buf, "\n  caused by: {}", c).expect("Failed to format error cause");
-        cause = c;
-    }
-    problem(&buf);
+    problem(&format_error_causes(e));
 }
 
 /// Enable drawing progress bars, only if stdout is a tty.
