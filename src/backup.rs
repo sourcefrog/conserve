@@ -68,7 +68,7 @@ struct ProgressModel {
 
 impl nutmeg::Model for ProgressModel {
     fn render(&mut self, _width: usize) -> String {
-        format!("Copying {} MB | {}", self.bytes_done / 1_000_000, self.filename)
+        format!("Copying {} MB\n{}", self.bytes_done / 1_000_000, self.filename)
     }
 }
 
