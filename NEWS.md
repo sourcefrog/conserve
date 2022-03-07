@@ -1,5 +1,14 @@
 # Conserve release history
 
+## Unreleased
+
+- Changed the format of text output from `conserve backup -v`: it only shows new
+  or changed files (and currently only plain files), and the file state is shown
+  by a single-character prefix similar to `conserve diff`, rather than a suffix.
+
+- Changed to use [Nutmeg](https://libs.rs/nutmeg) to draw progress bars, 
+  which changes their appearance somewhat.
+
 ## v0.6.15 2021-01-23
 
 - Find referenced blocks by walking all bands in parallel. This significantly

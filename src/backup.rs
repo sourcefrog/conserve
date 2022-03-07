@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -68,7 +68,11 @@ struct ProgressModel {
 
 impl nutmeg::Model for ProgressModel {
     fn render(&mut self, _width: usize) -> String {
-        format!("Copying {} MB\n{}", self.bytes_done / 1_000_000, self.filename)
+        format!(
+            "Copying {} MB\n{}",
+            self.bytes_done / 1_000_000,
+            self.filename
+        )
     }
 }
 
@@ -81,18 +85,26 @@ pub fn backup(
     options: &BackupOptions,
 ) -> Result<BackupStats> {
     let start = Instant::now();
-    let mut writer = BackupWriter::begin(archive, options.clone())?;
+    let mut writer = BackupWriter::begin(archive)?;
     let mut stats = BackupStats::default();
-    let view = nutmeg::View::new(ProgressModel::default(), nutmeg::ViewOptions::default());
+    let mut view = nutmeg::View::new(ProgressModel::default(), nutmeg::Options::default());
 
     let entry_iter = source.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
             view.update(|model| model.filename = entry.apath().to_string());
-            if let Err(e) = writer.copy_entry(&entry, source) {
-                ui::show_error(&e);
-                stats.errors += 1;
-                continue;
+            match writer.copy_entry(&entry, source) {
+                Err(e) => {
+                    writeln!(view, "{}", ui::format_error_causes(&e))?;
+                    stats.errors += 1;
+                    continue;
+                }
+                Ok(Some(diff_kind))
+                    if options.print_filenames && diff_kind != DiffKind::Unchanged =>
+                {
+                    writeln!(view, "{} {}", diff_kind.as_sigil(), entry.apath())?;
+                }
+                Ok(_) => {}
             }
             if let Some(bytes) = entry.size() {
                 if bytes > 0 {
@@ -120,15 +132,13 @@ struct BackupWriter {
     basis_index: Option<crate::index::IndexEntryIter<crate::stitch::IterStitchedIndexHunks>>,
 
     file_combiner: FileCombiner,
-
-    options: BackupOptions,
 }
 
 impl BackupWriter {
     /// Create a new BackupWriter.
     ///
     /// This currently makes a new top-level band.
-    pub fn begin(archive: &Archive, options: BackupOptions) -> Result<BackupWriter> {
+    pub fn begin(archive: &Archive) -> Result<BackupWriter> {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
@@ -146,7 +156,6 @@ impl BackupWriter {
             stats: BackupStats::default(),
             basis_index,
             file_combiner: FileCombiner::new(archive.block_dir().clone()),
-            options,
         })
     }
 
@@ -167,7 +176,12 @@ impl BackupWriter {
         self.index_builder.finish_hunk()
     }
 
-    fn copy_entry(&mut self, entry: &LiveEntry, source: &LiveTree) -> Result<()> {
+    /// Add one entry to the backup.
+    ///
+    /// Return an indication of whether it changed (if it's a file), or
+    /// None for non-plain-file types where that information is not currently
+    /// calculated.
+    fn copy_entry(&mut self, entry: &LiveEntry, source: &LiveTree) -> Result<Option<DiffKind>> {
         match entry.kind() {
             Kind::Dir => self.copy_dir(entry),
             Kind::File => self.copy_file(entry, source),
@@ -177,49 +191,43 @@ impl BackupWriter {
                 // TODO: Perhaps eventually we could backup and restore pipes,
                 // sockets, etc. Or at least count them. For now, silently skip.
                 // https://github.com/sourcefrog/conserve/issues/82
-                Ok(())
+                Ok(None)
             }
         }
     }
 
-    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
-        if self.options.print_filenames {
-            let apath = source_entry.apath();
-            crate::ui::println(&format!("{}{}", apath, if apath == "/" { "" } else { "/" }));
-        }
+    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
         self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
-        Ok(())
+        Ok(None) // TODO: See if it changed from the basis?
     }
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file(&mut self, source_entry: &LiveEntry, from_tree: &LiveTree) -> Result<()> {
+    fn copy_file(
+        &mut self,
+        source_entry: &LiveEntry,
+        from_tree: &LiveTree,
+    ) -> Result<Option<DiffKind>> {
         self.stats.files += 1;
         let apath = source_entry.apath();
+        let result;
         if let Some(basis_entry) = self
             .basis_index
             .as_mut()
             .and_then(|bi| bi.advance_to(apath))
         {
             if source_entry.is_unchanged_from(&basis_entry) {
-                if self.options.print_filenames {
-                    crate::ui::println(&format!("{} (unchanged)", apath));
-                }
                 self.stats.unmodified_files += 1;
                 self.index_builder.push_entry(basis_entry);
-                return Ok(());
+                return Ok(Some(DiffKind::Unchanged));
             } else {
-                if self.options.print_filenames {
-                    crate::ui::println(&format!("{} (modified)", apath));
-                }
                 self.stats.modified_files += 1;
+                result = Some(DiffKind::Changed);
             }
         } else {
-            if self.options.print_filenames {
-                crate::ui::println(&format!("{} (new)", apath));
-            }
             self.stats.new_files += 1;
+            result = Some(DiffKind::New);
         }
         let mut read_source = from_tree.file_contents(source_entry)?;
         let size = source_entry.size().expect("LiveEntry has a size");
@@ -227,10 +235,12 @@ impl BackupWriter {
             self.index_builder
                 .push_entry(IndexEntry::metadata_from(source_entry));
             self.stats.empty_files += 1;
-            return Ok(());
+            return Ok(result);
         }
         if size <= SMALL_FILE_CAP {
-            return self.file_combiner.push_file(source_entry, &mut read_source);
+            self.file_combiner
+                .push_file(source_entry, &mut read_source)?;
+            return Ok(result);
         }
         let addrs = store_file_content(
             apath,
@@ -242,19 +252,16 @@ impl BackupWriter {
             addrs,
             ..IndexEntry::metadata_from(source_entry)
         });
-        Ok(())
+        Ok(result)
     }
 
-    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
+    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
         let target = source_entry.symlink_target().clone();
         self.stats.symlinks += 1;
         assert!(target.is_some());
-        if self.options.print_filenames {
-            crate::ui::println(&format!("{} -> {}", source_entry.apath(), target.unwrap()));
-        }
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
-        Ok(())
+        Ok(None)
     }
 }
 

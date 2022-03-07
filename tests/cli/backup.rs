@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -31,5 +31,5 @@ fn backup_verbose() {
         .arg(src.path())
         .assert()
         .success()
-        .stdout("/\n/subdir/\n/subdir/a (new)\n/subdir/b (new)\n");
+        .stdout("+ /subdir/a\n+ /subdir/b\n");
 }
