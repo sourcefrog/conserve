@@ -57,7 +57,7 @@ pub struct DeleteOptions {
 }
 
 impl Archive {
-    /// Make a new archive in a local direcotry.
+    /// Make a new archive in a local directory.
     pub fn create_path(path: &Path) -> Result<Archive> {
         Archive::create(Box::new(LocalTransport::new(path)))
     }
