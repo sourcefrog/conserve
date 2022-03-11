@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015, 2016, 2018, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -226,6 +226,52 @@ impl UIState {
         // )
         // .unwrap();
     }
+}
+
+pub(crate) struct LinearModel {
+    pub i: usize,
+    pub n: usize,
+    pub message: Cow<'static, str>,
+}
+
+impl LinearModel {
+    pub(crate) fn new<S: Into<Cow<'static, str>>>(message: S, n: usize) -> LinearModel {
+        LinearModel {
+            i: 0,
+            n,
+            message: message.into(),
+        }
+    }
+}
+
+impl nutmeg::Model for LinearModel {
+    fn render(&mut self, _width: usize) -> String {
+        format!("{}: {}/{}", self.message, self.i, self.n)
+    }
+}
+
+pub(crate) struct UnboundedModel {
+    pub message: Cow<'static, str>, 
+    pub i: usize,
+}
+
+impl UnboundedModel {
+    pub fn new<S: Into<Cow<'static, str>>>(message: S) -> UnboundedModel {
+        UnboundedModel {
+            i: 0,
+            message: message.into()
+        }
+    }
+}
+
+impl nutmeg::Model for UnboundedModel {
+    fn render(&mut self, _width: usize) -> String {
+        format!("{}: {}", self.message, self.i)
+    }
+}
+
+pub(crate) fn nutmeg_options() -> nutmeg::Options {
+    nutmeg::Options::default().progress_enabled(UI_STATE.lock().unwrap().progress_enabled)
 }
 
 #[cfg(test)]
