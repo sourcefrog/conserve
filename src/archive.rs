@@ -229,6 +229,7 @@ impl Archive {
         let mut stats = DeleteStats::default();
         let start = Instant::now();
 
+        // TODO: No need to lock for dry_run.
         let delete_guard = if options.break_lock {
             gc_lock::GarbageCollectionLock::break_lock(self)?
         } else {
@@ -240,12 +241,17 @@ impl Archive {
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
         let referenced = self.referenced_blocks(&keep_band_ids)?;
-        // TODO: Show progress while finding present blocks.
+        let progress = nutmeg::View::new(
+            ui::UnboundedModel::new("Find present blocks"),
+            ui::nutmeg_options()
+        );
         let unref = self
             .block_dir()
             .block_names()?
+            .inspect(|_| progress.update(|model| model.i += 1))
             .filter(|bh| !referenced.contains(bh))
             .collect_vec();
+        drop(progress);
         let unref_count = unref.len();
         stats.unreferenced_block_count = unref_count;
 
