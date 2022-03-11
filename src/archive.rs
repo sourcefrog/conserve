@@ -16,7 +16,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io::ErrorKind;
 use std::path::Path;
-use std::sync::Mutex;
+
 use std::time::Instant;
 
 use itertools::Itertools;
@@ -31,6 +31,7 @@ use crate::misc::remove_item;
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
+use crate::ui::LinearModel;
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -193,15 +194,14 @@ impl Archive {
     /// Shows a progress bar as they're collected.
     pub fn referenced_blocks(&self, band_ids: &[BandId]) -> Result<HashSet<BlockHash>> {
         let archive = self.clone();
-        let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Find referenced blocks...");
-        let pb_lock = Mutex::new(progress_bar);
-        let num_bands = band_ids.len();
+        let progress = nutmeg::View::new(
+            LinearModel::new("Find referenced blocks in band", band_ids.len()),
+            ui::nutmeg_options(),
+        );
         Ok(band_ids
             .par_iter()
-            .enumerate()
-            .inspect(move |(i, _)| pb_lock.lock().unwrap().set_fraction(*i, num_bands))
-            .map(move |(_i, band_id)| Band::open(&archive, band_id).expect("Failed to open band"))
+            .inspect(move |_| progress.update(|model| model.i += 1))
+            .map(move |band_id| Band::open(&archive, band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
             .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
@@ -240,6 +240,7 @@ impl Archive {
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
         let referenced = self.referenced_blocks(&keep_band_ids)?;
+        // TODO: Show progress while finding present blocks.
         let unref = self
             .block_dir()
             .block_names()?
@@ -248,40 +249,37 @@ impl Archive {
         let unref_count = unref.len();
         stats.unreferenced_block_count = unref_count;
 
-        let mut pb = ProgressBar::new();
-        pb.set_phase("Measure unreferenced blocks".to_owned());
-        pb.set_total_work(unref.len());
-        let pb_mutex = Mutex::new(pb);
+        let progress = nutmeg::View::new(
+            LinearModel::new("Measure unreferenced blocks", unref.len()),
+            ui::nutmeg_options(),
+        );
         let total_bytes = unref
             .par_iter()
-            .inspect(|_| pb_mutex.lock().unwrap().increment_work_done(1))
-            .map(|block_id| {
-                let size = block_dir.compressed_size(block_id).unwrap_or_default();
-                pb_mutex.lock().unwrap().increment_bytes_done(size);
-                size
-            })
+            .inspect(|_| progress.update(|model| model.i += 1))
+            .map(|block_id| block_dir.compressed_size(block_id).unwrap_or_default())
             .sum();
         stats.unreferenced_block_bytes = total_bytes;
 
         if !options.dry_run {
             delete_guard.check()?;
 
-            let mut pb = ProgressBar::new();
-            pb.set_phase("Deleting bands");
-            pb.set_total_work(delete_band_ids.len());
+            let progress = nutmeg::View::new(
+                LinearModel::new("Delete bands", delete_band_ids.len()),
+                ui::nutmeg_options()
+            );
             for band_id in delete_band_ids {
                 Band::delete(self, band_id)?;
                 stats.deleted_band_count += 1;
-                pb.increment_work_done(1);
+                progress.update(|model| model.i += 1);
             }
 
-            let mut pb = ProgressBar::new();
-            pb.set_phase("Deleting unreferenced blocks");
-            pb.set_total_work(unref_count);
-            let progress_bar_mutex = Mutex::new(pb);
+            let progress = nutmeg::View::new(
+                LinearModel::new("Delete blocks", unref_count),
+                ui::nutmeg_options()
+            );
             let error_count = unref
                 .par_iter()
-                .inspect(|_| progress_bar_mutex.lock().unwrap().increment_work_done(1))
+                .inspect(|_| progress.update(|model| model.i += 1))
                 .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
                 .count();
             stats.deletion_errors += error_count;
@@ -374,6 +372,7 @@ impl Archive {
         }
         remove_item(&mut files, &HEADER_FILENAME);
         if !files.is_empty() {
+            // TODO: Ignore .DS_Store
             stats.unexpected_files += 1;
             ui::problem(&format!(
                 "Unexpected files in archive directory {:?}: {:?}",

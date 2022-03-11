@@ -1,4 +1,4 @@
-// Copyright 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -10,10 +10,11 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+use std::cmp::max;
 use std::collections::HashMap;
-use std::{cmp::max, sync::Mutex};
 
 use crate::blockdir::Address;
+use crate::ui::LinearModel;
 use crate::*;
 
 pub(crate) struct BlockLengths(pub(crate) HashMap<BlockHash, u64>);
@@ -47,18 +48,17 @@ impl BlockLengths {
         }
     }
 }
+
 pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
 ) -> (BlockLengths, ValidateStats) {
     let mut stats = ValidateStats::default();
     let mut block_lens = BlockLengths::new();
-
-    let mut progress_bar = ProgressBar::new();
-    progress_bar.set_phase("Check index");
-    progress_bar.set_total_work(band_ids.len());
-    let pb_mutex = Mutex::new(progress_bar);
-
+    let view = nutmeg::View::new(
+        LinearModel::new("Check index", band_ids.len()),
+        ui::nutmeg_options(),
+    );
     for band_id in band_ids {
         if let Ok(b) = Band::open(archive, band_id) {
             if b.validate(&mut stats).is_err() {
@@ -68,7 +68,6 @@ pub(crate) fn validate_bands(
             stats.band_open_errors += 1;
             continue;
         }
-
         if let Ok(st) = archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
             if let Ok((st_block_lens, st_stats)) = validate_stored_tree(&st) {
                 stats += st_stats;
@@ -80,10 +79,7 @@ pub(crate) fn validate_bands(
             stats.tree_open_errors += 1;
             continue;
         }
-
-        if let Ok(mut pb_lock) = pb_mutex.lock() {
-            pb_lock.increment_work_done(1);
-        }
+        view.update(|model| model.i += 1);
     }
     (block_lens, stats)
 }

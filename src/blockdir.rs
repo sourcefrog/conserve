@@ -235,11 +235,10 @@ impl BlockDir {
             }))
     }
 
-    /// Return all the blocknames in the blockdir,
-    /// in arbitrary order.
+    /// Return all the blocknames in the blockdir, in arbitrary order.
     pub fn block_names(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("List blocks");
+        let progress = nutmeg::View::new("List blocks", ui::nutmeg_options());
+        progress.update(|_|());
         Ok(self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok()))
@@ -247,18 +246,14 @@ impl BlockDir {
 
     /// Return all the blocknames in the blockdir.
     pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
-        let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("List blocks");
+        let progress = nutmeg::View::new(
+            ui::UnboundedModel::new("List blocks"),
+            ui::nutmeg_options(),
+        );
         Ok(self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok())
-            .enumerate()
-            .inspect(|(i, _hash)| {
-                if i % 100 == 0 {
-                    progress_bar.set_work_done(*i)
-                }
-            })
-            .map(|(_i, hash)| hash)
+            .inspect(|_| progress.update(|model| model.i += 1))
             .collect())
     }
 

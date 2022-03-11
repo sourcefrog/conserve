@@ -87,7 +87,7 @@ pub fn backup(
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive)?;
     let mut stats = BackupStats::default();
-    let mut view = nutmeg::View::new(ProgressModel::default(), nutmeg::Options::default());
+    let mut view = nutmeg::View::new(ProgressModel::default(), ui::nutmeg_options());
 
     let entry_iter = source.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
