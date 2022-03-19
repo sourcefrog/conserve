@@ -42,12 +42,10 @@ lazy_static! {
     static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState::default());
 }
 
-// TODO: Rather than a directly-called function, hook this into logging.
 pub fn println(s: &str) {
     with_locked_ui(|ui| ui.println(s))
 }
 
-// TODO: Rather than a directly-called function, hook this into logging.
 pub fn problem(s: &str) {
     with_locked_ui(|ui| ui.problem(s));
 }
@@ -74,7 +72,7 @@ pub(crate) fn format_error_causes(error: &dyn std::error::Error) -> String {
 ///
 /// The program will continue.
 pub fn show_error(e: &dyn std::error::Error) {
-    // TODO: Convert to logging.
+    // TODO: Log it.
     problem(&format_error_causes(e));
 }
 
@@ -86,7 +84,8 @@ pub fn enable_progress(enabled: bool) {
     ui.progress_enabled = enabled;
 }
 
-pub fn compression_percent(s: &Sizes) -> i64 {
+#[allow(unused)]
+pub(crate) fn compression_percent(s: &Sizes) -> i64 {
     if s.uncompressed > 0 {
         100i64 - (100 * s.compressed / s.uncompressed) as i64
     } else {
@@ -94,7 +93,7 @@ pub fn compression_percent(s: &Sizes) -> i64 {
     }
 }
 
-pub fn duration_to_hms(d: Duration) -> String {
+pub(crate) fn duration_to_hms(d: Duration) -> String {
     let elapsed_secs = d.as_secs();
     if elapsed_secs >= 3600 {
         format!(
@@ -108,7 +107,8 @@ pub fn duration_to_hms(d: Duration) -> String {
     }
 }
 
-pub fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
+#[allow(unused)]
+pub(crate) fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
     let secs = elapsed.as_secs() as f64 + f64::from(elapsed.subsec_millis()) / 1000.0;
     if secs > 0.0 {
         bytes as f64 / secs / 1e6
@@ -118,7 +118,8 @@ pub fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
 }
 
 /// Describe the compression ratio: higher is better.
-pub fn compression_ratio(s: &Sizes) -> f64 {
+#[allow(unused)]
+pub(crate) fn compression_ratio(s: &Sizes) -> f64 {
     if s.compressed > 0 {
         s.uncompressed as f64 / s.compressed as f64
     } else {
