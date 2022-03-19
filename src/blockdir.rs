@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -25,7 +25,6 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::Path;
-use std::sync::Mutex;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
@@ -269,13 +268,30 @@ impl BlockDir {
             "Check {} blocks...",
             blocks.len().separate_with_commas()
         ));
-
         stats.block_read_count = blocks.len().try_into().unwrap();
-        let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Check block hashes");
-        progress_bar.set_total_work(blocks.len());
-        progress_bar.set_work_done(0);
-        let pb_mutex = Mutex::new(progress_bar);
+        struct ProgressModel {
+            total_blocks: usize,
+            blocks_done: usize,
+            bytes_done: usize,
+        }
+        impl nutmeg::Model for ProgressModel {
+            fn render(&mut self, _width: usize) -> String {
+                format!(
+                    "Check block {}/{}: {} MB done",
+                    self.blocks_done,
+                    self.total_blocks,
+                    self.bytes_done / 1_000_000
+                )
+            }
+        }
+        let progress_bar = nutmeg::View::new(
+            ProgressModel {
+                total_blocks: blocks.len(),
+                blocks_done: 0,
+                bytes_done: 0,
+            },
+            ui::nutmeg_options(),
+        );
         // Make a vec of Some(usize) if the block could be read, or None if it
         // failed, where the usize gives the uncompressed data size.
         let results: Vec<Option<(BlockHash, usize)>> = blocks
@@ -286,11 +302,11 @@ impl BlockDir {
                     .get_block_content(&hash)
                     .map(|(bytes, _sizes)| (hash, bytes.len()))
                     .ok();
-                let mut pbl = pb_mutex.lock().unwrap();
-                pbl.increment_work_done(1);
-                if let Some(ref t) = r {
-                    pbl.increment_bytes_done(t.1 as u64);
-                }
+                let bytes = r.as_ref().map(|x| x.1).unwrap_or_default();
+                progress_bar.update(|model| {
+                    model.blocks_done += 1;
+                    model.bytes_done += bytes
+                });
                 r
             })
             .collect();
