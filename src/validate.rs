@@ -63,9 +63,10 @@ pub(crate) fn validate_bands(
     impl nutmeg::Model for ProgressModel {
         fn render(&mut self, _width: usize) -> String {
             format!(
-                "Check index {}/{}, {} remaining",
+                "Check index {}/{}, {} done, {} remaining",
                 self.bands_done,
                 self.bands_total,
+                ui::percent_done(self.bands_done, self.bands_total),
                 ui::estimate_remaining(&self.start, self.bands_done, self.bands_total)
             )
         }

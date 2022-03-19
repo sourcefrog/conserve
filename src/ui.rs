@@ -112,9 +112,9 @@ pub fn duration_to_hms(d: Duration) -> String {
 fn duration_brief(d: Duration) -> String {
     let secs = d.as_secs();
     if secs >= 120 {
-        format!("{:4} min", secs / 60)
+        format!("{} min", secs / 60)
     } else {
-        format!("{:4} sec", secs)
+        format!("{} sec", secs)
     }
 }
 
@@ -127,6 +127,14 @@ pub(crate) fn estimate_remaining(start: &Instant, done: usize, total: usize) -> 
         let total = total as f64;
         let estimate = Duration::from_secs_f64(elapsed.as_secs_f64() * (total / done - 1.0));
         duration_brief(estimate)
+    }
+}
+
+pub(crate) fn percent_done(done: usize, total: usize) -> String {
+    if total == 0 || done > total {
+        "??%".into()
+    } else {
+        format!("{:.1}%", done as f64 * 100.0 / total as f64)
     }
 }
 
