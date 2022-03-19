@@ -251,7 +251,7 @@ impl nutmeg::Model for LinearModel {
 }
 
 pub(crate) struct UnboundedModel {
-    pub message: Cow<'static, str>, 
+    pub message: Cow<'static, str>,
     pub i: usize,
 }
 
@@ -259,7 +259,7 @@ impl UnboundedModel {
     pub fn new<S: Into<Cow<'static, str>>>(message: S) -> UnboundedModel {
         UnboundedModel {
             i: 0,
-            message: message.into()
+            message: message.into(),
         }
     }
 }

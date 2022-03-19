@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -51,6 +51,21 @@ impl Default for RestoreOptions {
     }
 }
 
+struct ProgressModel {
+    filename: String,
+    bytes_done: u64,
+}
+
+impl nutmeg::Model for ProgressModel {
+    fn render(&mut self, _width: usize) -> String {
+        format!(
+            "Restoring: {} MB\n{}",
+            self.bytes_done / 1_000_000,
+            self.filename
+        )
+    }
+}
+
 /// Restore a selected version, or by default the latest, to a destination directory.
 pub fn restore(
     archive: &Archive,
@@ -64,7 +79,13 @@ pub fn restore(
         RestoreTree::create(destination_path)
     }?;
     let mut stats = RestoreStats::default();
-    let mut progress_bar = ProgressBar::new();
+    let progress_bar = nutmeg::View::new(
+        ProgressModel {
+            filename: String::new(),
+            bytes_done: 0,
+        },
+        ui::nutmeg_options(),
+    );
     let start = Instant::now();
     // // This causes us to walk the source tree twice, which is probably an acceptable option
     // // since it's nice to see realistic overall progress. We could keep all the entries
@@ -77,17 +98,15 @@ pub fn restore(
     //     // deleted or changed while this is running.
     //     progress_bar.set_bytes_total(st.size(options.excludes.clone())?.file_bytes as u64);
     // }
-
-    progress_bar.set_phase("Copying");
     let entry_iter = st.iter_entries(
         options.only_subtree.clone().unwrap_or_else(Apath::root),
         options.exclude.clone(),
     )?;
     for entry in entry_iter {
         if options.print_filenames {
-            crate::ui::println(entry.apath());
+            progress_bar.message(&format!("{}\n", entry.apath()));
         }
-        progress_bar.set_filename(entry.apath().to_string());
+        progress_bar.update(|model| model.filename = entry.apath().to_string());
         if let Err(e) = match entry.kind() {
             Kind::Dir => {
                 stats.directories += 1;
@@ -97,7 +116,7 @@ pub fn restore(
                 stats.files += 1;
                 let result = rt.copy_file(&entry, &st).map(|s| stats += s);
                 if let Some(bytes) = entry.size() {
-                    progress_bar.increment_bytes_done(bytes);
+                    progress_bar.update(|model| model.bytes_done += bytes);
                 }
                 result
             }

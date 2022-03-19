@@ -243,7 +243,7 @@ impl Archive {
         let referenced = self.referenced_blocks(&keep_band_ids)?;
         let progress = nutmeg::View::new(
             ui::UnboundedModel::new("Find present blocks"),
-            ui::nutmeg_options()
+            ui::nutmeg_options(),
         );
         let unref = self
             .block_dir()
@@ -271,7 +271,7 @@ impl Archive {
 
             let progress = nutmeg::View::new(
                 LinearModel::new("Delete bands", delete_band_ids.len()),
-                ui::nutmeg_options()
+                ui::nutmeg_options(),
             );
             for band_id in delete_band_ids {
                 Band::delete(self, band_id)?;
@@ -281,7 +281,7 @@ impl Archive {
 
             let progress = nutmeg::View::new(
                 LinearModel::new("Delete blocks", unref_count),
-                ui::nutmeg_options()
+                ui::nutmeg_options(),
             );
             let error_count = unref
                 .par_iter()
