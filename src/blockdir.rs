@@ -282,9 +282,9 @@ impl BlockDir {
                     "Check block {}/{}: {} done, {} MB checked, {} remaining",
                     self.blocks_done,
                     self.total_blocks,
-                    ui::percent_done(self.blocks_done, self.total_blocks),
+                    nutmeg::percent_done(self.blocks_done, self.total_blocks),
                     self.bytes_done / 1_000_000,
-                    ui::estimate_remaining(&self.start, self.blocks_done, self.total_blocks)
+                    nutmeg::estimate_remaining(&self.start, self.blocks_done, self.total_blocks)
                 )
             }
         }

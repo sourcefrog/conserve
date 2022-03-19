@@ -16,7 +16,7 @@
 use std::borrow::Cow;
 use std::fmt::Write;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use lazy_static::lazy_static;
 
@@ -106,35 +106,6 @@ pub fn duration_to_hms(d: Duration) -> String {
         )
     } else {
         format!("   {:2}:{:02}", (elapsed_secs / 60) % 60, elapsed_secs % 60)
-    }
-}
-
-fn duration_brief(d: Duration) -> String {
-    let secs = d.as_secs();
-    if secs >= 120 {
-        format!("{} min", secs / 60)
-    } else {
-        format!("{} sec", secs)
-    }
-}
-
-pub(crate) fn estimate_remaining(start: &Instant, done: usize, total: usize) -> String {
-    let elapsed = start.elapsed();
-    if total == 0 || done == 0 || elapsed.is_zero() || done > total {
-        "unknown".into()
-    } else {
-        let done = done as f64;
-        let total = total as f64;
-        let estimate = Duration::from_secs_f64(elapsed.as_secs_f64() * (total / done - 1.0));
-        duration_brief(estimate)
-    }
-}
-
-pub(crate) fn percent_done(done: usize, total: usize) -> String {
-    if total == 0 || done > total {
-        "??%".into()
-    } else {
-        format!("{:.1}%", done as f64 * 100.0 / total as f64)
     }
 }
 

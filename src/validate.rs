@@ -66,8 +66,8 @@ pub(crate) fn validate_bands(
                 "Check index {}/{}, {} done, {} remaining",
                 self.bands_done,
                 self.bands_total,
-                ui::percent_done(self.bands_done, self.bands_total),
-                ui::estimate_remaining(&self.start, self.bands_done, self.bands_total)
+                nutmeg::percent_done(self.bands_done, self.bands_total),
+                nutmeg::estimate_remaining(&self.start, self.bands_done, self.bands_total)
             )
         }
     }
