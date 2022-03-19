@@ -19,7 +19,6 @@ test = false
 blake2-rfc = "0.2.18"
 cachedir = "0.3"
 chrono = "0.4.19"
-crossterm = "0.22"
 derive_more = "0.99"
 filetime = "0.2"
 globset = "0.4.5"
@@ -38,7 +37,6 @@ structopt = "0.3"
 tempfile = "3"
 thiserror = "1.0.19"
 thousands = "0.2.0"
-unicode-segmentation = "1.6.0"
 
 [dependencies.serde]
 features = ["derive"]

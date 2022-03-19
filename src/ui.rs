@@ -15,17 +15,12 @@
 
 use std::borrow::Cow;
 use std::fmt::Write;
-use std::io;
-use std::io::Write as IoWrite;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crossterm::{cursor, queue, style, terminal};
 use lazy_static::lazy_static;
-use unicode_segmentation::UnicodeSegmentation;
 
 use crate::stats::Sizes;
-use crate::ProgressBar;
 
 /// A terminal/text UI.
 ///
@@ -40,9 +35,6 @@ use crate::ProgressBar;
 /// which case it will get only messages and no progress bar junk.
 #[derive(Default)]
 pub(crate) struct UIState {
-    /// Is a progress bar currently on the screen?
-    progress_present: bool,
-
     /// Should a progress bar be drawn?
     progress_enabled: bool,
 }
@@ -91,9 +83,8 @@ pub fn show_error(e: &dyn std::error::Error) {
 ///
 /// Progress bars are off by default.
 pub fn enable_progress(enabled: bool) {
-    use crossterm::tty::IsTty;
     let mut ui = UI_STATE.lock().unwrap();
-    ui.progress_enabled = io::stdout().is_tty() && enabled;
+    ui.progress_enabled = enabled;
 }
 
 pub fn compression_percent(s: &Sizes) -> i64 {
@@ -118,6 +109,15 @@ pub fn duration_to_hms(d: Duration) -> String {
     }
 }
 
+fn duration_brief(d: Duration) -> String {
+    let secs = d.as_secs();
+    if secs >= 120 {
+        format!("{:4} min", secs / 60)
+    } else {
+        format!("{:4} sec", secs)
+    }
+}
+
 pub fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
     let secs = elapsed.as_secs() as f64 + f64::from(elapsed.subsec_millis()) / 1000.0;
     if secs > 0.0 {
@@ -137,80 +137,15 @@ pub fn compression_ratio(s: &Sizes) -> f64 {
 }
 
 impl UIState {
-    pub(crate) fn clear_progress(&mut self) {
-        let mut stdout = io::stdout();
-        if self.progress_present {
-            queue!(
-                stdout,
-                terminal::Clear(terminal::ClearType::CurrentLine),
-                cursor::MoveToColumn(0)
-            )
-            .unwrap();
-            stdout.flush().unwrap();
-            self.progress_present = false;
-        }
-    }
-
-    pub(crate) fn draw_progress_bar(&mut self, bar: &ProgressBar) {
-        if !self.progress_enabled {
-            return;
-        }
-        let width = if let Ok((width, _)) = terminal::size() {
-            width as usize
-        } else {
-            return;
-        };
-
-        let mut out = std::io::stdout();
-        let prefix = bar.render_prefix();
-        let completion = bar.render_completion();
-        let filename = bar.filename();
-        let filename_limit = width - prefix.len() - completion.len();
-        let truncated_filename = if filename.len() < filename_limit {
-            Cow::Borrowed(filename)
-        } else {
-            UnicodeSegmentation::graphemes(filename, true)
-                .take(filename_limit)
-                .collect::<String>()
-                .into()
-        };
-
-        queue!(out, cursor::Hide, cursor::MoveToColumn(0),).unwrap();
-        if !prefix.is_empty() {
-            queue!(
-                out,
-                style::SetForegroundColor(style::Color::Green),
-                style::Print(prefix),
-            )
-            .unwrap();
-        }
-        if !completion.is_empty() {
-            queue!(
-                out,
-                style::SetForegroundColor(style::Color::Cyan),
-                style::Print(completion),
-            )
-            .unwrap();
-        }
-        queue!(
-            out,
-            style::ResetColor,
-            style::Print(truncated_filename),
-            terminal::Clear(terminal::ClearType::UntilNewLine),
-            cursor::Show,
-        )
-        .unwrap();
-        out.flush().unwrap();
-        self.progress_present = true;
-    }
-
     pub(crate) fn println(&mut self, s: &str) {
-        self.clear_progress();
+        // TODO: Go through Nutmeg instead...
+        // self.clear_progress();
         println!("{}", s);
     }
 
     fn problem(&mut self, s: &str) {
-        self.clear_progress();
+        // TODO: Go through Nutmeg instead...
+        // self.clear_progress();
         println!("conserve error: {}", s);
         // Drawing this way makes messages leak from tests, for unclear reasons.
 
