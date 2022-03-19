@@ -16,7 +16,7 @@
 use std::borrow::Cow;
 use std::fmt::Write;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use lazy_static::lazy_static;
 
@@ -115,6 +115,18 @@ fn duration_brief(d: Duration) -> String {
         format!("{:4} min", secs / 60)
     } else {
         format!("{:4} sec", secs)
+    }
+}
+
+pub(crate) fn estimate_remaining(start: &Instant, done: usize, total: usize) -> String {
+    let elapsed = start.elapsed();
+    if total == 0 || done == 0 || elapsed.is_zero() || done > total {
+        "unknown".into()
+    } else {
+        let done = done as f64;
+        let total = total as f64;
+        let estimate = Duration::from_secs_f64(elapsed.as_secs_f64() * (total / done - 1.0));
+        duration_brief(estimate)
     }
 }
 

@@ -25,6 +25,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::Path;
+use std::time::Instant;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
@@ -273,14 +274,16 @@ impl BlockDir {
             total_blocks: usize,
             blocks_done: usize,
             bytes_done: usize,
+            start: Instant,
         }
         impl nutmeg::Model for ProgressModel {
             fn render(&mut self, _width: usize) -> String {
                 format!(
-                    "Check block {}/{}: {} MB done",
+                    "Check block {}/{}: {} MB done, {} remaining",
                     self.blocks_done,
                     self.total_blocks,
-                    self.bytes_done / 1_000_000
+                    self.bytes_done / 1_000_000,
+                    ui::estimate_remaining(&self.start, self.blocks_done, self.total_blocks)
                 )
             }
         }
@@ -289,6 +292,7 @@ impl BlockDir {
                 total_blocks: blocks.len(),
                 blocks_done: 0,
                 bytes_done: 0,
+                start: Instant::now(),
             },
             ui::nutmeg_options(),
         );

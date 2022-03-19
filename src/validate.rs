@@ -12,9 +12,9 @@
 
 use std::cmp::max;
 use std::collections::HashMap;
+use std::time::Instant;
 
 use crate::blockdir::Address;
-use crate::ui::LinearModel;
 use crate::*;
 
 pub(crate) struct BlockLengths(pub(crate) HashMap<BlockHash, u64>);
@@ -55,8 +55,27 @@ pub(crate) fn validate_bands(
 ) -> (BlockLengths, ValidateStats) {
     let mut stats = ValidateStats::default();
     let mut block_lens = BlockLengths::new();
+    struct ProgressModel {
+        bands_done: usize,
+        bands_total: usize,
+        start: Instant,
+    }
+    impl nutmeg::Model for ProgressModel {
+        fn render(&mut self, _width: usize) -> String {
+            format!(
+                "Check index {}/{}, {} remaining",
+                self.bands_done,
+                self.bands_total,
+                ui::estimate_remaining(&self.start, self.bands_done, self.bands_total)
+            )
+        }
+    }
     let view = nutmeg::View::new(
-        LinearModel::new("Check index", band_ids.len()),
+        ProgressModel {
+            start: Instant::now(),
+            bands_done: 0,
+            bands_total: band_ids.len(),
+        },
         ui::nutmeg_options(),
     );
     for band_id in band_ids {
@@ -79,7 +98,7 @@ pub(crate) fn validate_bands(
             stats.tree_open_errors += 1;
             continue;
         }
-        view.update(|model| model.i += 1);
+        view.update(|model| model.bands_done += 1);
     }
     (block_lens, stats)
 }
