@@ -29,6 +29,7 @@ use std::time::Instant;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
+use nutmeg::models::UnboundedModel;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use thousands::Separable;
@@ -246,12 +247,11 @@ impl BlockDir {
 
     /// Return all the blocknames in the blockdir.
     pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
-        let progress =
-            nutmeg::View::new(ui::UnboundedModel::new("List blocks"), ui::nutmeg_options());
+        let progress = nutmeg::View::new(UnboundedModel::new("List blocks"), ui::nutmeg_options());
         Ok(self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok())
-            .inspect(|_| progress.update(|model| model.i += 1))
+            .inspect(|_| progress.update(|model| model.increment(1)))
             .collect())
     }
 

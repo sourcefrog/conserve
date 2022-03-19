@@ -20,6 +20,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use itertools::Itertools;
+use nutmeg::models::{LinearModel, UnboundedModel};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -31,7 +32,6 @@ use crate::misc::remove_item;
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
-use crate::ui::LinearModel;
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -200,7 +200,7 @@ impl Archive {
         );
         Ok(band_ids
             .par_iter()
-            .inspect(move |_| progress.update(|model| model.i += 1))
+            .inspect(move |_| progress.update(|model| model.increment(1)))
             .map(move |band_id| Band::open(&archive, band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
             .flat_map_iter(|entry| entry.addrs)
@@ -242,13 +242,13 @@ impl Archive {
 
         let referenced = self.referenced_blocks(&keep_band_ids)?;
         let progress = nutmeg::View::new(
-            ui::UnboundedModel::new("Find present blocks"),
+            UnboundedModel::new("Find present blocks"),
             ui::nutmeg_options(),
         );
         let unref = self
             .block_dir()
             .block_names()?
-            .inspect(|_| progress.update(|model| model.i += 1))
+            .inspect(|_| progress.update(|model| model.increment(1)))
             .filter(|bh| !referenced.contains(bh))
             .collect_vec();
         drop(progress);
@@ -261,7 +261,7 @@ impl Archive {
         );
         let total_bytes = unref
             .par_iter()
-            .inspect(|_| progress.update(|model| model.i += 1))
+            .inspect(|_| progress.update(|model| model.increment(1)))
             .map(|block_id| block_dir.compressed_size(block_id).unwrap_or_default())
             .sum();
         stats.unreferenced_block_bytes = total_bytes;
@@ -276,7 +276,7 @@ impl Archive {
             for band_id in delete_band_ids {
                 Band::delete(self, band_id)?;
                 stats.deleted_band_count += 1;
-                progress.update(|model| model.i += 1);
+                progress.update(|model| model.increment(1));
             }
 
             let progress = nutmeg::View::new(
@@ -285,7 +285,7 @@ impl Archive {
             );
             let error_count = unref
                 .par_iter()
-                .inspect(|_| progress.update(|model| model.i += 1))
+                .inspect(|_| progress.update(|model| model.increment(1)))
                 .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
                 .count();
             stats.deletion_errors += error_count;
