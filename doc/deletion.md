@@ -1,4 +1,4 @@
-#  Deletion in Conserve
+# Deletion in Conserve
 
 Conserve's formats are intended to perform well for a user who keeps making
 backups without ever deleting data. In this case, files are never deleted or
@@ -19,10 +19,28 @@ reading while another is writing, or even to allow multiple overlapping backups.
 Deleting bands can break another client who is currently writing to them, but
 they should break in a safe way, just seeing that the band is no longer present.
 
+## Deletion and GC algorithm
+
+(Currently in `Archive::delete_bands`.)
+
+1. List all bands, and subtract the bands to be deleted (none, if this is just garbage collection).
+
+2. List the blocks referenced by the bands that will be retained.
+
+3. List all and find blocks that are not referenced by any band that will be retained.
+
+4. Delete any bands to be deleted.
+
+5. Delete any now-unreferenced blocks.
+
 ## Deletion guards
 
 Garbage collection while a backup is underway could lead the backup process to
 write a reference to a block which is imminently deleted by the gc process.
+
+(However,
+<https://github.com/sourcefrog/conserve/issues/170> points out that blocking
+deletion when there's an incomplete backup is not ideal.)
 
 So we need to prevent new backups starting while gc is underway, and also
 prevent gc starting while a backup is underway.
