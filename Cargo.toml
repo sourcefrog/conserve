@@ -40,7 +40,6 @@ thousands = "0.2.0"
 [dependencies.nutmeg]
 version = "0.0.3-pre"
 git = "https://github.com/sourcefrog/nutmeg.git"
-branch = "models"
 
 [dependencies.serde]
 features = ["derive"]

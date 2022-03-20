@@ -552,7 +552,7 @@ dependencies = [
 [[package]]
 name = "nutmeg"
 version = "0.0.3-pre"
-source = "git+https://github.com/sourcefrog/nutmeg.git?branch=models#e476cb11d06ca6e1c21094f0133640251e344460"
+source = "git+https://github.com/sourcefrog/nutmeg.git#76acd5af33fc09440b60f4308c9f45e30160498c"
 dependencies = [
  "atty",
  "parking_lot",
