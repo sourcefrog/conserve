@@ -38,7 +38,7 @@ thiserror = "1.0.19"
 thousands = "0.2.0"
 
 [dependencies.nutmeg]
-version = "0.0.3-pre"
+version = "0.1.0"
 git = "https://github.com/sourcefrog/nutmeg.git"
 
 [dependencies.serde]
