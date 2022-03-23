@@ -480,9 +480,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.14"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
+checksum = "6389c490849ff5bc16be905ae24bc913a9c8892e19b2341dbc175e14c341c2b8"
 dependencies = [
  "cfg-if",
 ]
@@ -552,7 +552,7 @@ dependencies = [
 [[package]]
 name = "nutmeg"
 version = "0.0.3-pre"
-source = "git+https://github.com/sourcefrog/nutmeg.git#76acd5af33fc09440b60f4308c9f45e30160498c"
+source = "git+https://github.com/sourcefrog/nutmeg.git#ecee60373510eaf9ba0081f70d95cfa718fbab0c"
 dependencies = [
  "atty",
  "parking_lot",
@@ -1226,6 +1226,6 @@ checksum = "504a2476202769977a040c6364301a3f65d0cc9e3fb08600b2bda150a0488316"
 
 [[package]]
 name = "yansi"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fc79f4a1e39857fc00c3f662cbf2651c771f00e9c15fe2abc341806bd46bd71"
+checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
