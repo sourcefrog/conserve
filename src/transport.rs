@@ -1,4 +1,4 @@
-// Copyright 2020, 2021 Martin Pool.
+// Copyright 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,6 +18,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use url::Url;
+
 use crate::errors::Error;
 use crate::kind::Kind;
 use crate::Result;
@@ -25,9 +27,19 @@ use crate::Result;
 pub mod local;
 
 /// Open a `Transport` to access a local directory.
+///
+/// `s` may be a local path or a URL.
 pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
-    // TODO: Recognize URL-style strings.
-    Ok(Box::new(local::LocalTransport::new(Path::new(s))))
+    if let Ok(url) = Url::parse(s) {
+        match url.scheme() {
+            "file" => Ok(Box::new(local::LocalTransport::new(Path::new(url.path())))),
+            other => Err(Error::UrlScheme {
+                scheme: other.to_owned(),
+            }),
+        }
+    } else {
+        Ok(Box::new(local::LocalTransport::new(Path::new(s))))
+    }
 }
 
 /// Abstracted filesystem IO to access an archive.

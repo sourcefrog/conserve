@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -157,6 +157,9 @@ pub enum Error {
 
     #[error("Failed to delete band {}", band_id)]
     BandDeletion { band_id: BandId, source: IOError },
+
+    #[error("Unsupported URL scheme {}", scheme)]
+    UrlScheme { scheme: String },
 
     /// Generic IO error.
     #[error(transparent)]

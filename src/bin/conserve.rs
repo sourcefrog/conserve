@@ -14,7 +14,7 @@
 //! Command-line entry point for Conserve backups.
 
 use std::io::{BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{Parser, StructOpt, Subcommand};
 use tracing::trace;
@@ -49,7 +49,7 @@ enum Command {
     /// Copy source directory into an archive.
     Backup {
         /// Path of an existing archive.
-        archive: PathBuf,
+        archive: String,
         /// Source directory to copy from.
         source: PathBuf,
         /// Print copied file names.
@@ -69,7 +69,7 @@ enum Command {
     /// Delete backups from an archive.
     Delete {
         /// Archive to delete from.
-        archive: PathBuf,
+        archive: String,
         /// Backup to delete.
         #[clap(
             long,
@@ -91,7 +91,7 @@ enum Command {
 
     /// Compare a stored tree to a source directory.
     Diff {
-        archive: PathBuf,
+        archive: String,
         source: PathBuf,
         #[clap(long, short)]
         backup: Option<BandId>,
@@ -106,7 +106,7 @@ enum Command {
     /// Create a new archive.
     Init {
         /// Path for new archive.
-        archive: PathBuf,
+        archive: String,
     },
 
     /// Delete blocks unreferenced by any index.
@@ -114,7 +114,7 @@ enum Command {
     /// CAUTION: Do not gc while a backup is underway.
     Gc {
         /// Archive to delete from.
-        archive: PathBuf,
+        archive: String,
         /// Don't actually delete, just check what could be deleted.
         #[clap(long)]
         dry_run: bool,
@@ -138,7 +138,7 @@ enum Command {
 
     /// Copy a stored tree to a restore directory.
     Restore {
-        archive: PathBuf,
+        archive: String,
         destination: PathBuf,
         #[clap(long, short)]
         backup: Option<BandId>,
@@ -174,7 +174,7 @@ enum Command {
     /// Check that an archive is internally consistent.
     Validate {
         /// Path of the archive to check.
-        archive: PathBuf,
+        archive: String,
 
         /// Skip reading and checking the content of data blocks.
         #[clap(long, short = 'q')]
@@ -185,7 +185,7 @@ enum Command {
 
     /// List backup versions in an archive.
     Versions {
-        archive: PathBuf,
+        archive: String,
         /// Show only version names.
         #[clap(long, short = 'q')]
         short: bool,
@@ -204,7 +204,7 @@ enum Command {
 #[derive(Debug, StructOpt)]
 struct StoredTreeOrSource {
     #[clap(required_unless_present = "source")]
-    archive: Option<PathBuf>,
+    archive: Option<String>,
 
     /// List files in a source directory rather than an archive.
     #[clap(
@@ -225,7 +225,7 @@ enum Debug {
     /// Dump the index as json.
     Index {
         /// Path of the archive to read.
-        archive: PathBuf,
+        archive: String,
 
         /// Backup version number.
         #[clap(long, short)]
@@ -233,13 +233,13 @@ enum Debug {
     },
 
     /// List all blocks.
-    Blocks { archive: PathBuf },
+    Blocks { archive: String },
 
     /// List all blocks referenced by any band.
-    Referenced { archive: PathBuf },
+    Referenced { archive: String },
 
     /// List garbage blocks referenced by no band.
-    Unreferenced { archive: PathBuf },
+    Unreferenced { archive: String },
 }
 
 enum ExitCode {
@@ -267,14 +267,17 @@ impl Command {
                     exclude,
                     ..Default::default()
                 };
-                let stats = backup(&Archive::open_path(archive)?, source, &options)?;
+                let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
                 if !no_stats {
                     ui::println(&format!("Backup complete.\n{}", stats));
                 }
             }
             Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open_path(archive)?.block_dir().block_names()? {
+                for hash in Archive::open(open_transport(archive)?)?
+                    .block_dir()
+                    .block_names()?
+                {
                     writeln!(bw, "{}", hash)?;
                 }
             }
@@ -284,14 +287,14 @@ impl Command {
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                let archive = Archive::open_path(archive)?;
+                let archive = Archive::open(open_transport(archive)?)?;
                 for hash in archive.referenced_blocks(&archive.list_band_ids()?)? {
                     writeln!(bw, "{}", hash)?;
                 }
             }
             Command::Debug(Debug::Unreferenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open_path(archive)?.unreferenced_blocks()? {
+                for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks()? {
                     writeln!(bw, "{}", hash)?;
                 }
             }
@@ -302,7 +305,7 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let stats = Archive::open_path(archive)?.delete_bands(
+                let stats = Archive::open(open_transport(archive)?)?.delete_bands(
                     backup,
                     &DeleteOptions {
                         dry_run: *dry_run,
@@ -336,7 +339,7 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let archive = Archive::open_path(archive)?;
+                let archive = Archive::open(open_transport(archive)?)?;
                 let stats = archive.delete_bands(
                     &[],
                     &DeleteOptions {
@@ -349,7 +352,7 @@ impl Command {
                 }
             }
             Command::Init { archive } => {
-                Archive::create_path(archive)?;
+                Archive::create(open_transport(archive)?)?;
                 ui::println(&format!("Created new archive in {:?}", &archive));
             }
             Command::Ls {
@@ -385,7 +388,7 @@ impl Command {
                 no_stats,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
-                let archive = Archive::open_path(archive)?;
+                let archive = Archive::open(open_transport(archive)?)?;
                 let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let options = RestoreOptions {
                     print_filenames: *verbose,
@@ -430,7 +433,7 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                let stats = Archive::open_path(archive)?.validate(&options)?;
+                let stats = Archive::open(open_transport(archive)?)?.validate(&options)?;
                 if !no_stats {
                     println!("{}", stats);
                 }
@@ -449,7 +452,7 @@ impl Command {
                 utc,
             } => {
                 ui::enable_progress(false);
-                let archive = Archive::open_path(archive)?;
+                let archive = Archive::open(open_transport(archive)?)?;
                 let options = ShowVersionsOptions {
                     newest_first: *newest,
                     tree_size: *sizes,
@@ -464,8 +467,8 @@ impl Command {
     }
 }
 
-fn stored_tree_from_opt(archive: &Path, backup: &Option<BandId>) -> Result<StoredTree> {
-    let archive = Archive::open_path(archive)?;
+fn stored_tree_from_opt(archive_location: &str, backup: &Option<BandId>) -> Result<StoredTree> {
+    let archive = Archive::open(open_transport(archive_location)?)?;
     let policy = band_selection_policy_from_opt(backup);
     archive.open_stored_tree(policy)
 }

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use predicates::prelude::*;
+use url::Url;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
@@ -189,9 +190,11 @@ fn basic_backup() {
     // gc: should find no garbage.
     run_conserve().arg("gc").arg(&arch_dir).assert().success();
 
+    // You can open it with a file URL.
+    let file_url = Url::from_directory_path(&arch_dir).unwrap();
     run_conserve()
         .arg("ls")
-        .arg(&arch_dir)
+        .arg(file_url.as_str())
         .assert()
         .success()
         .stderr(predicate::str::is_empty())

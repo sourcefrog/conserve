@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Archives may be specified as URLs: currently only as `file:///` URLs.
+
 - Changed the format of text output from `conserve backup -v`: it only shows new
   or changed files (and currently only plain files), and the file state is shown
   by a single-character prefix similar to `conserve diff`, rather than a suffix.
