@@ -133,17 +133,8 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;
 
-    /// Clone this object into a new box.
-    fn box_clone(&self) -> Box<dyn Transport>;
-
     /// Return a URL scheme describing this transport, such as "file".
     fn url_scheme(&self) -> &'static str;
-}
-
-impl Clone for Box<dyn Transport> {
-    fn clone(&self) -> Box<dyn Transport> {
-        self.box_clone()
-    }
 }
 
 /// A directory entry read from a transport.

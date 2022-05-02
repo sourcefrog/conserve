@@ -25,6 +25,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
 
 use blake2_rfc::blake2b;
@@ -68,7 +69,7 @@ pub struct Address {
 /// A readable, writable directory within a band holding data blocks.
 #[derive(Clone, Debug)]
 pub struct BlockDir {
-    transport: Box<dyn Transport>,
+    transport: Arc<dyn Transport>,
 }
 
 /// Returns the transport-relative subdirectory name.
@@ -88,7 +89,9 @@ impl BlockDir {
     }
 
     pub fn open(transport: Box<dyn Transport>) -> BlockDir {
-        BlockDir { transport }
+        BlockDir {
+            transport: Arc::from(transport),
+        }
     }
 
     /// Create a BlockDir directory and return an object accessing it.
@@ -100,7 +103,9 @@ impl BlockDir {
         transport
             .create_dir("")
             .map_err(|source| Error::CreateBlockDir { source })?;
-        Ok(BlockDir { transport })
+        Ok(BlockDir {
+            transport: Arc::from(transport),
+        })
     }
 
     /// Returns the number of compressed bytes.

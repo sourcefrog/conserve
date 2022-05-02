@@ -17,6 +17,7 @@ use std::cmp::Ordering;
 use std::io;
 use std::iter::Peekable;
 use std::path::Path;
+use std::sync::Arc;
 use std::vec;
 
 use crate::compress::snappy::{Compressor, Decompressor};
@@ -129,7 +130,7 @@ impl IndexEntry {
 /// hunks preserve apath order.
 pub struct IndexWriter {
     /// The `i` directory within the band where all files for this index are written.
-    transport: Box<dyn Transport>,
+    transport: Arc<dyn Transport>,
 
     /// Currently queued entries to be written out, in arbitrary order.
     entries: Vec<IndexEntry>,
@@ -153,7 +154,7 @@ impl IndexWriter {
     /// Make a new builder that will write files into the given directory.
     pub fn new(transport: Box<dyn Transport>) -> IndexWriter {
         IndexWriter {
-            transport,
+            transport: Arc::from(transport),
             entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
             sequence: 0,
             check_order: apath::DebugCheckOrder::new(),
@@ -239,7 +240,7 @@ fn hunk_relpath(hunk_number: u32) -> String {
 #[derive(Debug, Clone)]
 pub struct IndexRead {
     /// Transport pointing to this index directory.
-    transport: Box<dyn Transport>,
+    transport: Arc<dyn Transport>,
 }
 
 impl IndexRead {
@@ -249,7 +250,9 @@ impl IndexRead {
     }
 
     pub(crate) fn open(transport: Box<dyn Transport>) -> IndexRead {
-        IndexRead { transport }
+        IndexRead {
+            transport: Arc::from(transport),
+        }
     }
 
     /// Return the (1-based) number of index hunks in an index directory.
@@ -285,7 +288,7 @@ impl IndexRead {
     pub fn iter_hunks(&self) -> IndexHunkIter {
         IndexHunkIter {
             next_hunk_number: 0,
-            transport: self.transport.box_clone(),
+            transport: Arc::clone(&self.transport),
             decompressor: Decompressor::new(),
             compressed_buf: Vec::new(),
             stats: IndexReadStats::default(),
@@ -300,7 +303,7 @@ impl IndexRead {
 pub struct IndexHunkIter {
     next_hunk_number: u32,
     /// The `i` directory within the band where all files for this index are written.
-    transport: Box<dyn Transport>,
+    transport: Arc<dyn Transport>,
     decompressor: Decompressor,
     compressed_buf: Vec<u8>,
     pub stats: IndexReadStats,

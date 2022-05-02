@@ -16,6 +16,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io::ErrorKind;
 use std::path::Path;
+use std::sync::Arc;
 
 use std::time::Instant;
 
@@ -43,7 +44,7 @@ pub struct Archive {
     /// Holds body content for all file versions.
     block_dir: BlockDir,
 
-    transport: Box<dyn Transport>,
+    transport: Arc<dyn Transport>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -82,7 +83,7 @@ impl Archive {
         )?;
         Ok(Archive {
             block_dir,
-            transport,
+            transport: Arc::from(transport),
         })
     }
 
@@ -110,7 +111,7 @@ impl Archive {
         let block_dir = BlockDir::open(transport.sub_transport(BLOCK_DIR));
         Ok(Archive {
             block_dir,
-            transport,
+            transport: Arc::from(transport),
         })
     }
 

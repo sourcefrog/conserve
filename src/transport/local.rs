@@ -80,10 +80,6 @@ impl Transport for LocalTransport {
         Ok(self.full_path(relpath).is_dir())
     }
 
-    fn box_clone(&self) -> Box<dyn Transport> {
-        Box::new(self.clone())
-    }
-
     fn create_dir(&self, relpath: &str) -> io::Result<()> {
         create_dir(self.full_path(relpath)).or_else(|err| {
             if err.kind() == io::ErrorKind::AlreadyExists {
