@@ -7,7 +7,6 @@ use std::io::{self, Read};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use bytes::Bytes;
 use tracing::{info, trace};
@@ -20,7 +19,7 @@ use crate::{Kind, Result};
 #[derive(Clone)]
 pub struct SftpTransport {
     url: Url,
-    sftp: Arc<Mutex<ssh2::Sftp>>,
+    sftp: Arc<ssh2::Sftp>,
     base_path: PathBuf,
 }
 
@@ -45,7 +44,7 @@ impl SftpTransport {
         trace!("Authenticated!");
         let sftp = session.sftp()?;
         Ok(SftpTransport {
-            sftp: Arc::new(Mutex::new(sftp)),
+            sftp: Arc::new(sftp),
             url: url.clone(),
             base_path: url.path().into(),
         })
@@ -54,8 +53,6 @@ impl SftpTransport {
     fn lstat(&self, path: &str) -> io::Result<ssh2::FileStat> {
         trace!("lstat {path}");
         self.sftp
-            .lock()
-            .unwrap()
             .lstat(&self.base_path.join(path))
             .map_err(translate_error)
     }
@@ -87,20 +84,15 @@ impl Transport for SftpTransport {
         &self,
         path: &str,
     ) -> io::Result<Box<dyn Iterator<Item = io::Result<super::DirEntry>>>> {
-        let dir = self
-            .sftp
-            .lock()
-            .unwrap()
-            .opendir(&self.base_path.join(path))?;
+        let dir = self.sftp.opendir(&self.base_path.join(path))?;
         Ok(Box::new(ReadDir(dir)))
     }
 
     fn read_file(&self, path: &str) -> io::Result<Bytes> {
-        let sftp_lock = self.sftp.lock().unwrap();
         let full_path = self.base_path.join(path);
         trace!("attempt open {}", full_path.display());
         let mut buf = Vec::with_capacity(2 << 20);
-        let mut file = sftp_lock.open(&full_path).map_err(translate_error)?;
+        let mut file = self.sftp.open(&full_path).map_err(translate_error)?;
         let len = file.read_to_end(&mut buf)?;
         assert_eq!(len, buf.len());
         trace!("read {} bytes from {}", len, full_path.display());
