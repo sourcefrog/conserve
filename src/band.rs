@@ -63,6 +63,9 @@ pub struct Band {
 
     /// Transport pointing to the archive directory.
     transport: Box<dyn Transport>,
+
+    /// Deserialized band head info.
+    head: Head,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -122,7 +125,11 @@ impl Band {
             band_format_version: Some(BAND_FORMAT_VERSION.to_owned()),
         };
         write_json(&transport, BAND_HEAD_FILENAME, &head)?;
-        Ok(Band { band_id, transport })
+        Ok(Band {
+            band_id,
+            head,
+            transport,
+        })
     }
 
     /// Mark this band closed: no more blocks should be written after this.
@@ -140,23 +147,23 @@ impl Band {
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
         let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
-        let new = Band {
-            band_id: band_id.to_owned(),
-            transport,
-        };
-        let head = new.read_head()?;
-        if let Some(version) = head.band_format_version {
+        let head: Head = read_json(&transport, BAND_HEAD_FILENAME)?;
+        if let Some(version) = &head.band_format_version {
             if !band_version_supported(&version) {
                 return Err(Error::UnsupportedBandVersion {
                     band_id: band_id.to_owned(),
-                    version,
+                    version: version.to_owned(),
                 });
             }
         } else {
             // Unmarked, old bands, are accepted for now. In the next archive
             // version, band version markers ought to become mandatory.
         }
-        Ok(new)
+        Ok(Band {
+            band_id: band_id.to_owned(),
+            head,
+            transport,
+        })
     }
 
     /// Delete a band.
@@ -190,10 +197,6 @@ impl Band {
         IndexRead::open(self.transport.sub_transport(INDEX_DIR))
     }
 
-    fn read_head(&self) -> Result<Head> {
-        read_json(&self.transport, BAND_HEAD_FILENAME)
-    }
-
     fn read_tail(&self) -> Result<Option<Tail>> {
         if self
             .transport
@@ -208,13 +211,12 @@ impl Band {
 
     /// Return info about the state of this band.
     pub fn get_info(&self) -> Result<Info> {
-        let head = self.read_head()?;
         let is_closed = self.is_closed()?;
         let tail_option = self.read_tail()?;
         Ok(Info {
             id: self.band_id.clone(),
             is_closed,
-            start_time: Utc.timestamp(head.start_time, 0),
+            start_time: Utc.timestamp(self.head.start_time, 0),
             end_time: tail_option
                 .as_ref()
                 .map(|tail| Utc.timestamp(tail.end_time, 0)),
