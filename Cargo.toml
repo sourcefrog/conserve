@@ -37,6 +37,10 @@ snap = "1.0.0"
 tempfile = "3"
 thiserror = "1.0.19"
 thousands = "0.2.0"
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = {version = "0.3.11", features = ["env-filter", "fmt"]}
+url = "2.2.2"
 
 [dev-dependencies]
 assert_cmd = "2.0"
@@ -47,6 +51,7 @@ predicates = "2"
 pretty_assertions = "1.0"
 proptest = "1.0"
 proptest-derive = "0.2"
+tracing-test = "0.1"
 
 [features]
 blake2_simd_asm = ["blake2-rfc/simd_asm"]

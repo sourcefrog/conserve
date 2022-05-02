@@ -17,6 +17,7 @@ use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use clap::{Parser, StructOpt, Subcommand};
+use tracing::trace;
 
 use conserve::backup::BackupOptions;
 use conserve::ReadTree;
@@ -37,6 +38,10 @@ struct Args {
     /// No progress bars.
     #[clap(long, short = 'P', global = true)]
     no_progress: bool,
+
+    /// Show debug trace to stdout.
+    #[clap(long, short = 'D', global = true)]
+    debug: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -475,7 +480,13 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
 
 fn main() {
     let args = Args::parse();
-    ui::enable_progress(!args.no_progress);
+    ui::enable_progress(!args.no_progress && !args.debug);
+    if args.debug {
+        tracing_subscriber::fmt::Subscriber::builder()
+            .with_max_level(tracing::Level::TRACE)
+            .init();
+        trace!("tracing enabled");
+    }
     let result = args.command.run();
     match result {
         Err(ref e) => {
