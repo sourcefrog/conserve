@@ -179,4 +179,10 @@ pub enum Error {
         #[from]
         source: snap::Error,
     },
+
+    #[error("SSH error")]
+    Ssh {
+        #[from]
+        source: ssh2::Error,
+    },
 }

@@ -23,6 +23,8 @@ use url::Url;
 use crate::*;
 
 pub mod local;
+pub mod sftp;
+
 use local::LocalTransport;
 
 /// Open a `Transport` to access a local directory.
@@ -38,6 +40,7 @@ pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Box::new(LocalTransport::new(Path::new(s))))
             }
+            "sftp" => Ok(Box::new(sftp::SftpTransport::new(&url)?)),
             other => Err(Error::UrlScheme {
                 scheme: other.to_owned(),
             }),
