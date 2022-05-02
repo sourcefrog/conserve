@@ -102,27 +102,27 @@ impl Transport for SftpTransport {
     }
 
     fn create_dir(&self, _relpath: &str) -> io::Result<()> {
-        todo!()
+        todo!("create_dir")
     }
 
     fn write_file(&self, _relpath: &str, _content: &[u8]) -> io::Result<()> {
-        todo!()
+        todo!("write_file")
     }
 
     fn metadata(&self, _relpath: &str) -> io::Result<super::Metadata> {
-        todo!()
+        todo!("metadata")
     }
 
     fn remove_file(&self, _relpath: &str) -> io::Result<()> {
-        todo!()
+        todo!("remove_file")
     }
 
     fn remove_dir(&self, _relpath: &str) -> io::Result<()> {
-        todo!()
+        todo!("remove_dir")
     }
 
     fn remove_dir_all(&self, _relpath: &str) -> io::Result<()> {
-        todo!()
+        todo!("remove_dir_all")
     }
 
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport> {
