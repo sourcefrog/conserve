@@ -47,10 +47,9 @@ where
     T: DeserializeOwned,
     TR: AsRef<dyn Transport>,
 {
-    let mut buf = Vec::new();
-    transport
+    let bytes = transport
         .as_ref()
-        .read_file(path, &mut buf)
+        .read_file(path)
         .map_err(|err| match err.kind() {
             io::ErrorKind::NotFound => Error::MetadataNotFound {
                 path: path.to_owned(),
@@ -58,7 +57,7 @@ where
             },
             _ => err.into(),
         })?;
-    serde_json::from_slice(&buf).map_err(|source| Error::DeserializeJson {
+    serde_json::from_slice(&bytes).map_err(|source| Error::DeserializeJson {
         source,
         path: path.into(),
     })

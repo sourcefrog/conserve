@@ -16,6 +16,7 @@ name = "conserve"
 
 [dependencies]
 blake2-rfc = "0.2.18"
+bytes = "1.1.0"
 cachedir = "0.3"
 chrono = "0.4.19"
 clap = { version = "3.0", features = ["derive"] }

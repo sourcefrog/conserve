@@ -18,6 +18,8 @@ use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
+use bytes::Bytes;
+
 use crate::transport::{DirEntry, Metadata, Transport};
 
 #[derive(Clone, Debug)]
@@ -57,16 +59,13 @@ impl Transport for LocalTransport {
         })))
     }
 
-    fn read_file(&self, relpath: &str, out_buf: &mut Vec<u8>) -> io::Result<()> {
-        out_buf.truncate(0);
-        // read_to_end reads in gradually increasing parts, but here we can probably read one large
-        // buffer.
+    fn read_file(&self, relpath: &str) -> io::Result<Bytes> {
         let mut file = File::open(&self.full_path(relpath))?;
-        let prefetch_len: usize = file.metadata()?.len().try_into().unwrap();
-        out_buf.resize(prefetch_len, 0);
-        let actual_len = file.read(out_buf)?;
+        let estimated_len: usize = file.metadata()?.len().try_into().unwrap();
+        let mut out_buf = Vec::with_capacity(estimated_len);
+        let actual_len = file.read_to_end(&mut out_buf)?;
         out_buf.truncate(actual_len);
-        Ok(())
+        Ok(out_buf.into())
     }
 
     fn is_file(&self, relpath: &str) -> io::Result<bool> {
@@ -159,8 +158,7 @@ mod test {
         temp.child(filename).write_str(content).unwrap();
 
         let transport = LocalTransport::new(temp.path());
-        let mut buf = Vec::new();
-        transport.read_file(filename, &mut buf).unwrap();
+        let buf = transport.read_file(filename).unwrap();
         assert_eq!(buf, content.as_bytes());
 
         temp.close().unwrap();
@@ -183,22 +181,6 @@ mod test {
             }
         );
         assert!(transport.metadata("nopoem").is_err());
-    }
-
-    #[test]
-    fn read_with_non_empty_buffer() {
-        let mut buf = b"already has some stuff".to_vec();
-        let temp = assert_fs::TempDir::new().unwrap();
-        let desired = b"content from file";
-        let filename = "test.txt";
-        temp.child(filename).write_binary(desired).unwrap();
-        let transport = LocalTransport::new(temp.path());
-        transport.read_file(filename, &mut buf).unwrap();
-        assert_eq!(
-            String::from_utf8_lossy(&buf),
-            String::from_utf8_lossy(desired)
-        );
-        temp.close().unwrap();
     }
 
     #[test]

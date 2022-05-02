@@ -17,6 +17,7 @@
 use std::io;
 use std::path::Path;
 
+use bytes::Bytes;
 use url::Url;
 
 use crate::*;
@@ -92,7 +93,7 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     ///
     /// Files in the archive are of bounded size, so it's OK to always read them entirely into
     /// memory, and this is simple to support on all implementations.
-    fn read_file(&self, path: &str, out_buf: &mut Vec<u8>) -> io::Result<()>;
+    fn read_file(&self, path: &str) -> io::Result<Bytes>;
 
     /// Check if a directory exists.
     fn is_dir(&self, path: &str) -> io::Result<bool> {

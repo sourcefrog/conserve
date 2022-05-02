@@ -290,7 +290,6 @@ impl IndexRead {
             next_hunk_number: 0,
             transport: Arc::clone(&self.transport),
             decompressor: Decompressor::new(),
-            compressed_buf: Vec::new(),
             stats: IndexReadStats::default(),
             after: None,
         }
@@ -305,7 +304,6 @@ pub struct IndexHunkIter {
     /// The `i` directory within the band where all files for this index are written.
     transport: Arc<dyn Transport>,
     decompressor: Decompressor,
-    compressed_buf: Vec<u8>,
     pub stats: IndexReadStats,
     /// If set, yield only entries ordered after this apath.
     after: Option<Apath>,
@@ -368,22 +366,24 @@ impl IndexHunkIter {
         let path = &hunk_relpath(self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
-        if let Err(err) = self.transport.read_file(path, &mut self.compressed_buf) {
-            if err.kind() == io::ErrorKind::NotFound {
+        let compressed_bytes = match self.transport.read_file(path) {
+            Ok(b) => b,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // TODO: Cope with one hunk being missing, while there are still
                 // later-numbered hunks. This would require reading the whole
                 // list of hunks first.
                 return Ok(None);
-            } else {
+            }
+            Err(source) => {
                 return Err(Error::ReadIndex {
                     path: path.clone(),
-                    source: err,
+                    source,
                 });
             }
-        }
+        };
         self.stats.index_hunks += 1;
-        self.stats.compressed_index_bytes += self.compressed_buf.len() as u64;
-        let index_bytes = self.decompressor.decompress(&self.compressed_buf)?;
+        self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
+        let index_bytes = self.decompressor.decompress(&compressed_bytes)?;
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
         let entries: Vec<IndexEntry> =
             serde_json::from_slice(index_bytes).map_err(|source| Error::DeserializeIndex {

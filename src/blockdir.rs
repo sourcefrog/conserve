@@ -335,14 +335,14 @@ impl BlockDir {
         // TODO: Reuse decompressor buffer.
         // TODO: Reuse read buffer.
         let mut decompressor = Decompressor::new();
-        let mut compressed_bytes = Vec::new();
         let block_relpath = block_relpath(hash);
-        self.transport
-            .read_file(&block_relpath, &mut compressed_bytes)
-            .map_err(|source| Error::ReadBlock {
-                source,
-                hash: hash.to_string(),
-            })?;
+        let compressed_bytes =
+            self.transport
+                .read_file(&block_relpath)
+                .map_err(|source| Error::ReadBlock {
+                    source,
+                    hash: hash.to_string(),
+                })?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::from(blake2b::blake2b(
             BLAKE_HASH_SIZE_BYTES,
