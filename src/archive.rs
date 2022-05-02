@@ -302,6 +302,7 @@ impl Archive {
 
         ui::println("Count indexes...");
         let band_ids = self.list_band_ids()?;
+        ui::println(&format!("Checking {} indexes...", band_ids.len()));
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
