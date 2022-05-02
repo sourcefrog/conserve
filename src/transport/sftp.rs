@@ -52,11 +52,12 @@ impl SftpTransport {
     }
 
     fn lstat(&self, path: &str) -> io::Result<ssh2::FileStat> {
-        Ok(self
-            .sftp
+        trace!("lstat {path}");
+        self.sftp
             .lock()
             .unwrap()
-            .lstat(&self.base_path.join(path))?)
+            .lstat(&self.base_path.join(path))
+            .map_err(translate_error)
     }
 }
 
