@@ -3,7 +3,7 @@
 //! Read/write archive over SFTP.
 
 use std::fmt;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -107,12 +107,20 @@ impl Transport for SftpTransport {
         Ok(self.lstat(path)?.is_file())
     }
 
-    fn create_dir(&self, _relpath: &str) -> io::Result<()> {
-        todo!("create_dir")
+    fn create_dir(&self, relpath: &str) -> io::Result<()> {
+        let full_path = self.base_path.join(relpath);
+        trace!("create_dir {:?}", full_path);
+        self.sftp.mkdir(&full_path, 0o700).map_err(translate_error)
     }
 
-    fn write_file(&self, _relpath: &str, _content: &[u8]) -> io::Result<()> {
-        todo!("write_file")
+    fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()> {
+        let full_path = self.base_path.join(relpath);
+        trace!("write_file {:>9} bytes to {:?}", content.len(), full_path);
+        let mut file = self.sftp.create(&full_path).map_err(translate_error)?;
+        file.write_all(content).map_err(|err| {
+            debug!("sftp error {err:?} writing {full_path:?}");
+            err
+        })
     }
 
     fn metadata(&self, _relpath: &str) -> io::Result<super::Metadata> {
