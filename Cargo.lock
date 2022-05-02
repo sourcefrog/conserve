@@ -220,6 +220,7 @@ dependencies = [
  "hex",
  "itertools",
  "lazy_static",
+ "libssh2-sys",
  "mutants",
  "nutmeg",
  "predicates",

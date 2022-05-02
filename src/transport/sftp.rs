@@ -27,7 +27,6 @@ pub struct SftpTransport {
 impl SftpTransport {
     pub fn new(url: &Url) -> Result<SftpTransport> {
         assert_eq!(url.scheme(), "sftp");
-        assert!(url.host_str().is_some());
         let addr = format!(
             "{}:{}",
             url.host_str().expect("url must have a host"),
@@ -69,6 +68,19 @@ impl fmt::Debug for SftpTransport {
     }
 }
 
+/// Map other errors to io::Error that aren't handled by libssh.
+///
+/// See https://github.com/alexcrichton/ssh2-rs/issues/244.
+fn translate_error(err: ssh2::Error) -> io::Error {
+    match err.code() {
+        ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_NO_SUCH_FILE)
+        | ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_NO_SUCH_PATH) => {
+            io::Error::new(io::ErrorKind::NotFound, err)
+        }
+        _ => io::Error::from(err),
+    }
+}
+
 impl Transport for SftpTransport {
     fn iter_dir_entries(
         &self,
@@ -84,9 +96,10 @@ impl Transport for SftpTransport {
 
     fn read_file(&self, path: &str) -> io::Result<Bytes> {
         let sftp_lock = self.sftp.lock().unwrap();
-        let mut buf = Vec::with_capacity(2 << 20);
         let full_path = self.base_path.join(path);
-        let mut file = sftp_lock.open(&full_path)?;
+        trace!("attempt open {}", full_path.display());
+        let mut buf = Vec::with_capacity(2 << 20);
+        let mut file = sftp_lock.open(&full_path).map_err(translate_error)?;
         let len = file.read_to_end(&mut buf)?;
         assert_eq!(len, buf.len());
         trace!("read {} bytes from {}", len, full_path.display());
