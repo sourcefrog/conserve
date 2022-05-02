@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use bytes::Bytes;
+use tracing::{info, trace};
 use url::Url;
 
 use super::{DirEntry, Transport};
@@ -33,14 +34,16 @@ impl SftpTransport {
             url.port().unwrap_or(22)
         );
         let tcp_stream = TcpStream::connect(&addr)?;
-        eprintln!("got tcp connection");
+        trace!("got tcp connection");
         let mut session = ssh2::Session::new()?;
         session.set_tcp_stream(tcp_stream);
         session.handshake()?;
-        eprintln!("SSH hands shaken");
-        eprintln!("banner>> {}", session.banner().unwrap_or("(none)"));
+        trace!(
+            "SSH hands shaken, banner: {}",
+            session.banner().unwrap_or("(none)")
+        );
         session.userauth_agent(url.username())?;
-        eprintln!("Authenticated!");
+        trace!("Authenticated!");
         let sftp = session.sftp()?;
         Ok(SftpTransport {
             sftp: Arc::new(Mutex::new(sftp)),
@@ -82,9 +85,11 @@ impl Transport for SftpTransport {
     fn read_file(&self, path: &str) -> io::Result<Bytes> {
         let sftp_lock = self.sftp.lock().unwrap();
         let mut buf = Vec::with_capacity(2 << 20);
-        let mut file = sftp_lock.open(&self.base_path.join(path))?;
+        let full_path = self.base_path.join(path);
+        let mut file = sftp_lock.open(&full_path)?;
         let len = file.read_to_end(&mut buf)?;
         assert_eq!(len, buf.len());
+        trace!("read {} bytes from {}", len, full_path.display());
         Ok(buf.into())
     }
 
@@ -161,7 +166,7 @@ impl Iterator for ReadDir {
                     return None;
                 }
                 Err(err) => {
-                    eprintln!("{:?}", err);
+                    info!("SFTP error {:?}", err);
                     return Some(Err(err.into()));
                 }
             }
