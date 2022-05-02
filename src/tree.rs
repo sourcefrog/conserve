@@ -43,14 +43,35 @@ pub trait ReadTree {
     ///
     /// This typically requires walking all entries, which may take a while.
     fn size(&self, exclude: Exclude) -> Result<TreeSize> {
-        let mut progress_bar = ProgressBar::new();
-        progress_bar.set_phase("Measuring");
+        struct Model {
+            files: usize,
+            total_bytes: u64,
+        }
+        impl nutmeg::Model for Model {
+            fn render(&mut self, _width: usize) -> String {
+                format!(
+                    "Measuring... {} files, {} MB",
+                    self.files,
+                    self.total_bytes / 1_000_000
+                )
+            }
+        }
+        let progress = nutmeg::View::new(
+            Model {
+                files: 0,
+                total_bytes: 0,
+            },
+            ui::nutmeg_options(),
+        );
         let mut tot = 0u64;
         for e in self.iter_entries(Apath::root(), exclude)? {
             // While just measuring size, ignore directories/files we can't stat.
             if let Some(bytes) = e.size() {
                 tot += bytes;
-                progress_bar.increment_bytes_done(bytes);
+                progress.update(|model| {
+                    model.files += 1;
+                    model.total_bytes += bytes;
+                });
             }
         }
         Ok(TreeSize { file_bytes: tot })

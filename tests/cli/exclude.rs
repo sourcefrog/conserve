@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -54,7 +54,7 @@ fn exclude_simple_glob() {
         .arg(&af.path())
         .arg(&src.path())
         .assert()
-        .stdout("/\n/src/\n/src/hello.c (new)\n")
+        .stdout("+ /src/hello.c\n")
         .success();
 
     run_conserve()
@@ -80,7 +80,7 @@ fn exclude_glob_only_in_root() {
         .arg(&af.path())
         .arg(&src.path())
         .assert()
-        .stdout("/\n/src/\n/src/hello.c (new)\n/src/hello.o (new)\n")
+        .stdout("+ /src/hello.c\n+ /src/hello.o\n")
         .success();
 
     run_conserve()

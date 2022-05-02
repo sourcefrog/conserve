@@ -63,7 +63,7 @@ impl tree::ReadTree for LiveTree {
     type IT = Iter;
 
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
-        Iter::new(&self.path, subtree.clone(), exclude)
+        Iter::new(&self.path, subtree, exclude)
     }
 
     fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
