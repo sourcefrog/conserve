@@ -158,7 +158,7 @@ pub enum Error {
     #[error("Failed to delete band {}", band_id)]
     BandDeletion { band_id: BandId, source: IOError },
 
-    #[error("Unsupported URL scheme {}", scheme)]
+    #[error("Unsupported URL scheme {:?}", scheme)]
     UrlScheme { scheme: String },
 
     /// Generic IO error.

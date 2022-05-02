@@ -15,16 +15,14 @@
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
 use std::io;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::path::Path;
 
 use url::Url;
 
-use crate::errors::Error;
-use crate::kind::Kind;
-use crate::Result;
+use crate::*;
 
 pub mod local;
+use local::LocalTransport;
 
 /// Open a `Transport` to access a local directory.
 ///
@@ -32,13 +30,17 @@ pub mod local;
 pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
     if let Ok(url) = Url::parse(s) {
         match url.scheme() {
-            "file" => Ok(Box::new(local::LocalTransport::new(Path::new(url.path())))),
+            "file" => Ok(Box::new(LocalTransport::new(Path::new(url.path())))),
+            d if d.len() == 1 => {
+                // Probably a Windows path with drive letter, like c:/thing.
+                Ok(Box::new(LocalTransport::new(Path::new(s))))
+            }
             other => Err(Error::UrlScheme {
                 scheme: other.to_owned(),
             }),
         }
     } else {
-        Ok(Box::new(local::LocalTransport::new(Path::new(s))))
+        Ok(Box::new(LocalTransport::new(Path::new(s))))
     }
 }
 
@@ -161,34 +163,4 @@ pub struct Metadata {
 pub struct ListDirNames {
     pub files: Vec<String>,
     pub dirs: Vec<String>,
-}
-
-/// A path or other URL-like specification of a directory that can be opened as a transport.
-///
-/// Locations can be parsed from strings. At present the only supported form is an absolute
-/// or relative filename.
-#[derive(Debug, Eq, PartialEq)]
-pub enum Location {
-    /// A local directory.
-    Local(PathBuf),
-}
-
-impl Location {
-    /// Open a Transport that can read and write this location.
-    ///
-    /// The location need not already exist.
-    pub fn open(&self) -> Result<Box<dyn Transport>> {
-        match self {
-            Location::Local(pathbuf) => Ok(Box::new(local::LocalTransport::new(pathbuf))),
-        }
-    }
-}
-
-impl FromStr for Location {
-    type Err = Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        // Eventually can specifically recognize url or sftp style forms here.
-        Ok(Location::Local(s.into()))
-    }
 }

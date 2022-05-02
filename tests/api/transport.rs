@@ -11,27 +11,14 @@
 // GNU General Public License for more details.
 
 use assert_fs::prelude::*;
+use url::Url;
 
-use conserve::transport::{open_transport, ListDirNames, Location};
+use conserve::transport::{open_transport, ListDirNames};
 
 #[test]
 fn open_local() {
     let transport = open_transport("/backup").unwrap();
     assert_eq!(transport.url_scheme(), "file");
-}
-
-#[test]
-fn open_local_from_location() {
-    let location = Location::Local("/backup".to_owned().into());
-    let _transport = location.open().unwrap();
-}
-
-#[test]
-fn parse_location() {
-    use conserve::transport::Location;
-    use std::str::FromStr;
-    let location: Location = Location::from_str("/backup/example").unwrap();
-    let _transport = location.open();
 }
 
 #[test]
@@ -41,7 +28,8 @@ fn list_dir_names() {
     temp.child("a file").touch().unwrap();
     temp.child("another file").touch().unwrap();
 
-    let transport = Location::Local(temp.path().to_path_buf()).open().unwrap();
+    let url = Url::from_directory_path(temp.path()).unwrap();
+    let transport = open_transport(&url.as_str()).unwrap();
 
     let ListDirNames { mut files, dirs } = transport.list_dir_names("").unwrap();
     assert_eq!(dirs, ["a dir"]);
@@ -49,4 +37,33 @@ fn list_dir_names() {
     assert_eq!(files, ["a file", "another file"]);
 
     temp.close().unwrap();
+}
+
+#[test]
+fn parse_location_urls() {
+    fn parsed_scheme(s: &str) -> &'static str {
+        open_transport(s).unwrap().url_scheme()
+    }
+
+    assert_eq!(parsed_scheme("./relative"), "file");
+    assert_eq!(parsed_scheme("/backup/repo.c6"), "file");
+    assert_eq!(parsed_scheme("../backup/repo.c6"), "file");
+    assert_eq!(parsed_scheme("c:/backup/repo"), "file");
+    assert_eq!(parsed_scheme(r#"c:\backup\repo\"#), "file");
+}
+
+#[test]
+fn unsupported_location_urls() {
+    assert_eq!(
+        open_transport("http://conserve.example/repo")
+            .unwrap_err()
+            .to_string(),
+        "Unsupported URL scheme \"http\""
+    );
+    assert_eq!(
+        open_transport("ftp://user@conserve.example/repo")
+            .unwrap_err()
+            .to_string(),
+        "Unsupported URL scheme \"ftp\""
+    );
 }
