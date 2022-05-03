@@ -13,7 +13,6 @@ version = "0.6.15"
 [[bin]]
 doc = false
 name = "conserve"
-test = false
 
 [dependencies]
 blake2-rfc = "0.2.18"
