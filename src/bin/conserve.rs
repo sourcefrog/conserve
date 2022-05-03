@@ -27,7 +27,8 @@ use conserve::*;
 #[clap(
     name = "conserve",
     about = "A robust backup tool <https://github.com/sourcefrog/conserve/>",
-    author
+    author,
+    version
 )]
 struct Args {
     #[clap(subcommand)]
@@ -54,7 +55,7 @@ enum Command {
     },
 
     #[clap(subcommand)]
-    Debug(XDebug),
+    Debug(Debug),
 
     /// Delete backups from an archive.
     Delete {
@@ -211,7 +212,7 @@ struct StoredTreeOrSource {
 
 /// Show debugging information.
 #[derive(Debug, Subcommand)]
-enum XDebug {
+enum Debug {
     /// Dump the index as json.
     Index {
         /// Path of the archive to read.
@@ -262,24 +263,24 @@ impl Command {
                     ui::println(&format!("Backup complete.\n{}", stats));
                 }
             }
-            Command::Debug(XDebug::Blocks { archive }) => {
+            Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open_path(archive)?.block_dir().block_names()? {
                     writeln!(bw, "{}", hash)?;
                 }
             }
-            Command::Debug(XDebug::Index { archive, backup }) => {
+            Command::Debug(Debug::Index { archive, backup }) => {
                 let st = stored_tree_from_opt(archive, backup)?;
                 show::show_index_json(st.band(), &mut stdout)?;
             }
-            Command::Debug(XDebug::Referenced { archive }) => {
+            Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 let archive = Archive::open_path(archive)?;
                 for hash in archive.referenced_blocks(&archive.list_band_ids()?)? {
                     writeln!(bw, "{}", hash)?;
                 }
             }
-            Command::Debug(XDebug::Unreferenced { archive }) => {
+            Command::Debug(Debug::Unreferenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open_path(archive)?.unreferenced_blocks()? {
                     writeln!(bw, "{}", hash)?;
