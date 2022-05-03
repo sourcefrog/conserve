@@ -33,6 +33,10 @@ use conserve::*;
 struct Args {
     #[clap(subcommand)]
     command: Command,
+
+    /// No progress bars.
+    #[clap(long, short = 'P', global = true)]
+    no_progress: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -470,8 +474,8 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
 }
 
 fn main() {
-    ui::enable_progress(true);
     let args = Args::parse();
+    ui::enable_progress(!args.no_progress);
     let result = args.command.run();
     match result {
         Err(ref e) => {

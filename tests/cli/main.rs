@@ -205,9 +205,12 @@ fn basic_backup() {
     // TODO: Factor out comparison to expected tree.
     let restore_dir = TempDir::new().unwrap();
 
+    // Also try --no-progress here; should make no difference because these tests run
+    // without a pty.
     run_conserve()
         .arg("restore")
         .arg("-v")
+        .arg("--no-progress")
         .arg(&arch_dir)
         .arg(restore_dir.path())
         .assert()

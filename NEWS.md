@@ -9,6 +9,8 @@
 - Changed to use [Nutmeg](https://libs.rs/nutmeg) to draw progress bars, 
   which changes their appearance somewhat.
 
+- Added a `--no-progress` option.
+
 ## v0.6.15 2021-01-23
 
 - Find referenced blocks by walking all bands in parallel. This significantly
