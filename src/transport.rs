@@ -18,6 +18,7 @@ use std::io;
 use std::path::Path;
 
 use bytes::Bytes;
+use tracing::trace;
 use url::Url;
 
 use crate::*;
@@ -142,7 +143,17 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     fn remove_dir(&self, relpath: &str) -> io::Result<()>;
 
     /// Delete a directory and all its contents.
-    fn remove_dir_all(&self, relpath: &str) -> io::Result<()>;
+    fn remove_dir_all(&self, relpath: &str) -> io::Result<()> {
+        trace!("remove_dir_all {relpath:?}");
+        let dir_names = self.list_dir_names(relpath)?;
+        for file_name in dir_names.files {
+            self.remove_file(&format!("{}/{}", relpath, file_name))?;
+        }
+        for dir_name in dir_names.dirs {
+            self.remove_dir_all(&format!("{}/{}", relpath, dir_name))?;
+        }
+        self.remove_dir(&relpath)
+    }
 
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;

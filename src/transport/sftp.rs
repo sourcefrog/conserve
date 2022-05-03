@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use tracing::{info, trace};
+use tracing::{debug, info, trace};
 use url::Url;
 
 use super::{DirEntry, Transport};
@@ -84,7 +84,9 @@ impl Transport for SftpTransport {
         &self,
         path: &str,
     ) -> io::Result<Box<dyn Iterator<Item = io::Result<super::DirEntry>>>> {
-        let dir = self.sftp.opendir(&self.base_path.join(path))?;
+        let full_path = &self.base_path.join(path);
+        trace!("iter_dir_entries {:?}", full_path);
+        let dir = self.sftp.opendir(&full_path)?;
         Ok(Box::new(ReadDir(dir)))
     }
 
@@ -127,16 +129,16 @@ impl Transport for SftpTransport {
         todo!("metadata")
     }
 
-    fn remove_file(&self, _relpath: &str) -> io::Result<()> {
-        todo!("remove_file")
+    fn remove_file(&self, relpath: &str) -> io::Result<()> {
+        let full_path = self.base_path.join(relpath);
+        trace!("remove_file {full_path:?}");
+        self.sftp.unlink(&full_path).map_err(translate_error)
     }
 
-    fn remove_dir(&self, _relpath: &str) -> io::Result<()> {
-        todo!("remove_dir")
-    }
-
-    fn remove_dir_all(&self, _relpath: &str) -> io::Result<()> {
-        todo!("remove_dir_all")
+    fn remove_dir(&self, relpath: &str) -> io::Result<()> {
+        let full_path = self.base_path.join(relpath);
+        trace!("remove_dir {full_path:?}");
+        self.sftp.rmdir(&full_path).map_err(translate_error)
     }
 
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport> {
@@ -168,6 +170,7 @@ impl Iterator for ReadDir {
                     if name == "." || name == ".." {
                         continue;
                     }
+                    trace!("read dir got name {}", name);
                     return Some(Ok(DirEntry {
                         name,
                         kind: file_stat.file_type().into(),
@@ -177,6 +180,7 @@ impl Iterator for ReadDir {
                     // Apparently there's no symbolic version for it, but this is the error
                     // code.
                     // <https://github.com/alexcrichton/ssh2-rs/issues/140>
+                    trace!("read dir end");
                     return None;
                 }
                 Err(err) => {
