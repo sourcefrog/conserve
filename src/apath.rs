@@ -125,6 +125,8 @@ impl<'name> fmt::Display for DecodeFilenameError<'name> {
 #[derive(Debug)]
 pub struct ApathParseError {}
 
+impl std::error::Error for ApathParseError {}
+
 impl fmt::Display for ApathParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Invalid apath: must have an initial slash and no ..")

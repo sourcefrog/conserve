@@ -19,6 +19,7 @@ test = false
 blake2-rfc = "0.2.18"
 cachedir = "0.3"
 chrono = "0.4.19"
+clap = { version = "3.0", features = ["derive"] }
 derive_more = "0.99"
 filetime = "0.2"
 globset = "0.4.5"
@@ -31,16 +32,12 @@ rayon = "1.3.0"
 readahead-iterator = "0.1.1"
 regex = "1.3.9"
 semver = "1"
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 snap = "1.0.0"
-structopt = "0.3"
 tempfile = "3"
 thiserror = "1.0.19"
 thousands = "0.2.0"
-
-[dependencies.serde]
-features = ["derive"]
-version = "1"
 
 [dev-dependencies]
 assert_cmd = "2.0"
@@ -54,7 +51,6 @@ proptest-derive = "0.2"
 
 [features]
 blake2_simd_asm = ["blake2-rfc/simd_asm"]
-debug_clap = ["structopt/debug"]
 
 [lib]
 doctest = false

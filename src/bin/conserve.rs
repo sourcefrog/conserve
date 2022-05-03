@@ -16,19 +16,25 @@
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
-use structopt::StructOpt;
+use clap::{Parser, StructOpt, Subcommand};
 
 use conserve::backup::BackupOptions;
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
 
-#[derive(Debug, StructOpt)]
-#[structopt(
+#[derive(Debug, Parser)]
+#[clap(
     name = "conserve",
     about = "A robust backup tool <https://github.com/sourcefrog/conserve/>",
     author
 )]
+struct Args {
+    #[clap(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand, Debug)]
 enum Command {
     /// Copy source directory into an archive.
     Backup {
@@ -37,32 +43,39 @@ enum Command {
         /// Source directory to copy from.
         source: PathBuf,
         /// Print copied file names.
-        #[structopt(long, short)]
+        #[clap(long, short)]
         verbose: bool,
-        #[structopt(long, short, number_of_values = 1)]
+        #[clap(long, short, number_of_values = 1)]
         exclude: Vec<String>,
-        #[structopt(long, short = "E", number_of_values = 1)]
+        #[clap(long, short = 'E', number_of_values = 1)]
         exclude_from: Vec<String>,
-        #[structopt(long)]
+        #[clap(long)]
         no_stats: bool,
     },
 
-    Debug(Debug),
+    #[clap(subcommand)]
+    Debug(XDebug),
 
     /// Delete backups from an archive.
     Delete {
         /// Archive to delete from.
         archive: PathBuf,
         /// Backup to delete.
-        #[structopt(long, short, multiple(true), required(true), number_of_values(1))]
+        #[clap(
+            long,
+            short,
+            multiple_occurrences(true),
+            required(true),
+            number_of_values(1)
+        )]
         backup: Vec<BandId>,
         /// Don't actually delete, just check what could be deleted.
-        #[structopt(long)]
+        #[clap(long)]
         dry_run: bool,
         /// Break a lock left behind by a previous interrupted gc operation, and then gc.
-        #[structopt(long)]
+        #[clap(long)]
         break_lock: bool,
-        #[structopt(long)]
+        #[clap(long)]
         no_stats: bool,
     },
 
@@ -70,13 +83,13 @@ enum Command {
     Diff {
         archive: PathBuf,
         source: PathBuf,
-        #[structopt(long, short)]
+        #[clap(long, short)]
         backup: Option<BandId>,
-        #[structopt(long, short, number_of_values = 1)]
+        #[clap(long, short, number_of_values = 1)]
         exclude: Vec<String>,
-        #[structopt(long, short = "E", number_of_values = 1)]
+        #[clap(long, short = 'E', number_of_values = 1)]
         exclude_from: Vec<String>,
-        #[structopt(long)]
+        #[clap(long)]
         include_unchanged: bool,
     },
 
@@ -93,23 +106,23 @@ enum Command {
         /// Archive to delete from.
         archive: PathBuf,
         /// Don't actually delete, just check what could be deleted.
-        #[structopt(long)]
+        #[clap(long)]
         dry_run: bool,
         /// Break a lock left behind by a previous interrupted gc operation, and then gc.
-        #[structopt(long)]
+        #[clap(long)]
         break_lock: bool,
-        #[structopt(long)]
+        #[clap(long)]
         no_stats: bool,
     },
 
     /// List files in a stored tree or source directory, with exclusions.
     Ls {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         stos: StoredTreeOrSource,
 
-        #[structopt(long, short, number_of_values = 1)]
+        #[clap(long, short, number_of_values = 1)]
         exclude: Vec<String>,
-        #[structopt(long, short = "E", number_of_values = 1)]
+        #[clap(long, short = 'E', number_of_values = 1)]
         exclude_from: Vec<String>,
     },
 
@@ -117,34 +130,34 @@ enum Command {
     Restore {
         archive: PathBuf,
         destination: PathBuf,
-        #[structopt(long, short)]
+        #[clap(long, short)]
         backup: Option<BandId>,
-        #[structopt(long, short)]
+        #[clap(long, short)]
         force_overwrite: bool,
-        #[structopt(long, short)]
+        #[clap(long, short)]
         verbose: bool,
-        #[structopt(long, short, number_of_values = 1)]
+        #[clap(long, short, number_of_values = 1)]
         exclude: Vec<String>,
-        #[structopt(long, short = "E", number_of_values = 1)]
+        #[clap(long, short = 'E', number_of_values = 1)]
         exclude_from: Vec<String>,
-        #[structopt(long = "only", short = "i", number_of_values = 1)]
+        #[clap(long = "only", short = 'i', number_of_values = 1)]
         only_subtree: Option<Apath>,
-        #[structopt(long)]
+        #[clap(long)]
         no_stats: bool,
     },
 
     /// Show the total size of files in a stored tree or source directory, with exclusions.
     Size {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         stos: StoredTreeOrSource,
 
         /// Count in bytes, not megabytes.
-        #[structopt(long)]
+        #[clap(long)]
         bytes: bool,
 
-        #[structopt(long, short, number_of_values = 1)]
+        #[clap(long, short, number_of_values = 1)]
         exclude: Vec<String>,
-        #[structopt(long, short = "E", number_of_values = 1)]
+        #[clap(long, short = 'E', number_of_values = 1)]
         exclude_from: Vec<String>,
     },
 
@@ -154,9 +167,9 @@ enum Command {
         archive: PathBuf,
 
         /// Skip reading and checking the content of data blocks.
-        #[structopt(long, short = "q")]
+        #[clap(long, short = 'q')]
         quick: bool,
-        #[structopt(long)]
+        #[clap(long)]
         no_stats: bool,
     },
 
@@ -164,43 +177,48 @@ enum Command {
     Versions {
         archive: PathBuf,
         /// Show only version names.
-        #[structopt(long, short = "q")]
+        #[clap(long, short = 'q')]
         short: bool,
         /// Sort bands to show most recent first.
-        #[structopt(long, short = "n")]
+        #[clap(long, short = 'n')]
         newest: bool,
         /// Show size of stored trees.
-        #[structopt(long, short = "z", conflicts_with = "short")]
+        #[clap(long, short = 'z', conflicts_with = "short")]
         sizes: bool,
         /// Show times in UTC.
-        #[structopt(long)]
+        #[clap(long)]
         utc: bool,
     },
 }
 
 #[derive(Debug, StructOpt)]
 struct StoredTreeOrSource {
-    #[structopt(required_unless = "source")]
+    #[clap(required_unless_present = "source")]
     archive: Option<PathBuf>,
 
     /// List files in a source directory rather than an archive.
-    #[structopt(long, short, conflicts_with = "archive", required_unless = "archive")]
+    #[clap(
+        long,
+        short,
+        conflicts_with = "archive",
+        required_unless_present = "archive"
+    )]
     source: Option<PathBuf>,
 
-    #[structopt(long, short, conflicts_with = "source")]
+    #[clap(long, short, conflicts_with = "source")]
     backup: Option<BandId>,
 }
 
 /// Show debugging information.
-#[derive(Debug, StructOpt)]
-enum Debug {
+#[derive(Debug, Subcommand)]
+enum XDebug {
     /// Dump the index as json.
     Index {
         /// Path of the archive to read.
         archive: PathBuf,
 
         /// Backup version number.
-        #[structopt(long, short)]
+        #[clap(long, short)]
         backup: Option<BandId>,
     },
 
@@ -244,24 +262,24 @@ impl Command {
                     ui::println(&format!("Backup complete.\n{}", stats));
                 }
             }
-            Command::Debug(Debug::Blocks { archive }) => {
+            Command::Debug(XDebug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open_path(archive)?.block_dir().block_names()? {
                     writeln!(bw, "{}", hash)?;
                 }
             }
-            Command::Debug(Debug::Index { archive, backup }) => {
+            Command::Debug(XDebug::Index { archive, backup }) => {
                 let st = stored_tree_from_opt(archive, backup)?;
                 show::show_index_json(st.band(), &mut stdout)?;
             }
-            Command::Debug(Debug::Referenced { archive }) => {
+            Command::Debug(XDebug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 let archive = Archive::open_path(archive)?;
                 for hash in archive.referenced_blocks(&archive.list_band_ids()?)? {
                     writeln!(bw, "{}", hash)?;
                 }
             }
-            Command::Debug(Debug::Unreferenced { archive }) => {
+            Command::Debug(XDebug::Unreferenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open_path(archive)?.unreferenced_blocks()? {
                     writeln!(bw, "{}", hash)?;
@@ -452,7 +470,8 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
 
 fn main() {
     ui::enable_progress(true);
-    let result = Command::from_args().run();
+    let args = Args::parse();
+    let result = args.command.run();
     match result {
         Err(ref e) => {
             ui::show_error(e);
@@ -467,4 +486,10 @@ fn main() {
         }
         Ok(code) => std::process::exit(code as i32),
     }
+}
+
+#[test]
+fn verify_clap() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
 }
