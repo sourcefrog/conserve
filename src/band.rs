@@ -197,25 +197,16 @@ impl Band {
         IndexRead::open(self.transport.sub_transport(INDEX_DIR))
     }
 
-    fn read_tail(&self) -> Result<Option<Tail>> {
-        if self
-            .transport
-            .is_file(BAND_TAIL_FILENAME)
-            .map_err(Error::from)?
-        {
-            Ok(Some(read_json(&self.transport, BAND_TAIL_FILENAME)?))
-        } else {
-            Ok(None)
-        }
-    }
-
     /// Return info about the state of this band.
     pub fn get_info(&self) -> Result<Info> {
-        let is_closed = self.is_closed()?;
-        let tail_option = self.read_tail()?;
+        let tail_option: Option<Tail> = match read_json(&self.transport, BAND_TAIL_FILENAME) {
+            Ok(tail) => Some(tail),
+            Err(Error::MetadataNotFound { .. }) => None,
+            Err(err) => return Err(err),
+        };
         Ok(Info {
             id: self.band_id.clone(),
-            is_closed,
+            is_closed: tail_option.is_some(),
             start_time: Utc.timestamp(self.head.start_time, 0),
             end_time: tail_option
                 .as_ref()
