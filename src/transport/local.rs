@@ -47,17 +47,14 @@ impl Transport for LocalTransport {
         // Archives should never normally contain non-UTF-8 (or even non-ASCII) filenames, but
         // let's pass them back as lossy UTF-8 so they can be reported at a higher level, for
         // example during validation.
-        let relpath = relpath.to_owned();
-        Ok(Box::new(self.full_path(&relpath).read_dir()?.map(
-            move |i| {
-                i.and_then(|de| {
-                    Ok(DirEntry {
-                        name: de.file_name().to_string_lossy().into(),
-                        kind: de.file_type()?.into(),
-                    })
-                })
-            },
-        )))
+        let full_path = self.full_path(relpath);
+        Ok(Box::new(full_path.read_dir()?.map(move |de_result| {
+            let de = de_result?;
+            Ok(DirEntry {
+                name: de.file_name().to_string_lossy().into(),
+                kind: de.file_type()?.into(),
+            })
+        })))
     }
 
     fn read_file(&self, relpath: &str, out_buf: &mut Vec<u8>) -> io::Result<()> {
