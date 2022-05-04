@@ -97,10 +97,22 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     fn read_file(&self, path: &str, out_buf: &mut Vec<u8>) -> io::Result<()>;
 
     /// Check if a directory exists.
-    fn is_dir(&self, path: &str) -> io::Result<bool>;
+    fn is_dir(&self, path: &str) -> io::Result<bool> {
+        match self.metadata(path) {
+            Ok(metadata) => Ok(metadata.kind == Kind::Dir),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(err) => Err(err),
+        }
+    }
 
     /// Check if a regular file exists.
-    fn is_file(&self, path: &str) -> io::Result<bool>;
+    fn is_file(&self, path: &str) -> io::Result<bool> {
+        match self.metadata(path) {
+            Ok(metadata) => Ok(metadata.kind == Kind::File),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(err) => Err(err),
+        }
+    }
 
     /// Create a directory, if it does not exist.
     ///
