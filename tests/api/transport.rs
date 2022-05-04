@@ -12,10 +12,16 @@
 
 use assert_fs::prelude::*;
 
-use conserve::transport::{ListDirNames, Location};
+use conserve::transport::{open_transport, ListDirNames, Location};
 
 #[test]
 fn open_local() {
+    let transport = open_transport("/backup").unwrap();
+    assert_eq!(transport.url_scheme(), "file");
+}
+
+#[test]
+fn open_local_from_location() {
     let location = Location::Local("/backup".to_owned().into());
     let _transport = location.open().unwrap();
 }

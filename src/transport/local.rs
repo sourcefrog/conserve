@@ -134,6 +134,10 @@ impl Transport for LocalTransport {
         let fsmeta = self.root.join(relpath).metadata()?;
         Ok(Metadata { len: fsmeta.len() })
     }
+
+    fn url_scheme(&self) -> &'static str {
+        "file"
+    }
 }
 
 impl AsRef<dyn Transport> for LocalTransport {

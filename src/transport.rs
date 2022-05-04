@@ -117,6 +117,9 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
 
     /// Clone this object into a new box.
     fn box_clone(&self) -> Box<dyn Transport>;
+
+    /// Return a URL scheme describing this transport, such as "file".
+    fn url_scheme(&self) -> &'static str;
 }
 
 impl Clone for Box<dyn Transport> {
