@@ -30,13 +30,11 @@ use local::LocalTransport;
 pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
     if let Ok(url) = Url::parse(s) {
         match url.scheme() {
-            "file" => {
-                let path = url.path();
-                assert!(!path.starts_with("//"));
-                Ok(Box::new(LocalTransport::new(Path::new(url.path()))))
-            }
+            "file" => Ok(Box::new(LocalTransport::new(
+                &url.to_file_path().expect("extract URL file path"),
+            ))),
             d if d.len() == 1 => {
-                // Probably a Windows path with drive letter, like c:/thing.
+                // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Box::new(LocalTransport::new(Path::new(s))))
             }
             other => Err(Error::UrlScheme {

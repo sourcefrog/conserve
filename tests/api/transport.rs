@@ -29,7 +29,9 @@ fn list_dir_names() {
     temp.child("another file").touch().unwrap();
 
     let url = Url::from_directory_path(temp.path()).unwrap();
+    dbg!(&url);
     let transport = open_transport(&url.as_str()).unwrap();
+    dbg!(&transport);
 
     let ListDirNames { mut files, dirs } = transport.list_dir_names("").unwrap();
     assert_eq!(dirs, ["a dir"]);
