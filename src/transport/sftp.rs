@@ -70,6 +70,7 @@ impl fmt::Debug for SftpTransport {
 ///
 /// See https://github.com/alexcrichton/ssh2-rs/issues/244.
 fn translate_error(err: ssh2::Error) -> io::Error {
+    debug!(?err);
     match err.code() {
         ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_NO_SUCH_FILE)
         | ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_NO_SUCH_PATH) => {
@@ -101,14 +102,6 @@ impl Transport for SftpTransport {
         Ok(buf.into())
     }
 
-    fn is_dir(&self, path: &str) -> io::Result<bool> {
-        Ok(self.lstat(path)?.is_dir())
-    }
-
-    fn is_file(&self, path: &str) -> io::Result<bool> {
-        Ok(self.lstat(path)?.is_file())
-    }
-
     fn create_dir(&self, relpath: &str) -> io::Result<()> {
         let full_path = self.base_path.join(relpath);
         trace!("create_dir {:?}", full_path);
@@ -125,8 +118,14 @@ impl Transport for SftpTransport {
         })
     }
 
-    fn metadata(&self, _relpath: &str) -> io::Result<super::Metadata> {
-        todo!("metadata")
+    fn metadata(&self, relpath: &str) -> io::Result<super::Metadata> {
+        let full_path = self.base_path.join(relpath);
+        let stat = self.lstat(relpath)?;
+        trace!("metadata {full_path:?}");
+        Ok(super::Metadata {
+            kind: stat.file_type().into(),
+            len: stat.size.unwrap_or_default(),
+        })
     }
 
     fn remove_file(&self, relpath: &str) -> io::Result<()> {
