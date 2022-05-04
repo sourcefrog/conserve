@@ -151,6 +151,9 @@ pub struct DirEntry {
 pub struct Metadata {
     /// File length.
     pub len: u64,
+
+    /// Kind of file.
+    pub kind: Kind,
 }
 
 /// A list of all the files and directories in a directory.

@@ -149,7 +149,7 @@ impl Band {
         let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
         let head: Head = read_json(&transport, BAND_HEAD_FILENAME)?;
         if let Some(version) = &head.band_format_version {
-            if !band_version_supported(&version) {
+            if !band_version_supported(version) {
                 return Err(Error::UnsupportedBandVersion {
                     band_id: band_id.to_owned(),
                     version: version.to_owned(),

@@ -128,7 +128,10 @@ impl Transport for LocalTransport {
 
     fn metadata(&self, relpath: &str) -> io::Result<Metadata> {
         let fsmeta = self.root.join(relpath).metadata()?;
-        Ok(Metadata { len: fsmeta.len() })
+        Ok(Metadata {
+            len: fsmeta.len(),
+            kind: fsmeta.file_type().into(),
+        })
     }
 
     fn url_scheme(&self) -> &'static str {
@@ -175,7 +178,13 @@ mod test {
 
         let transport = LocalTransport::new(temp.path());
 
-        assert_eq!(transport.metadata(filename).unwrap(), Metadata { len: 24 });
+        assert_eq!(
+            transport.metadata(filename).unwrap(),
+            Metadata {
+                len: 24,
+                kind: Kind::File
+            }
+        );
         assert!(transport.metadata("nopoem").is_err());
     }
 
