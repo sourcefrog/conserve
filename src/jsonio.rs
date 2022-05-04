@@ -13,6 +13,8 @@
 
 //! Read and write JSON files.
 
+use std::io;
+
 use serde::de::DeserializeOwned;
 
 use crate::errors::Error;
@@ -49,7 +51,13 @@ where
     transport
         .as_ref()
         .read_file(path, &mut buf)
-        .map_err(Error::from)?;
+        .map_err(|err| match err.kind() {
+            io::ErrorKind::NotFound => Error::MetadataNotFound {
+                path: path.to_owned(),
+                source: err,
+            },
+            _ => err.into(),
+        })?;
     serde_json::from_slice(&buf).map_err(|source| Error::DeserializeJson {
         source,
         path: path.into(),

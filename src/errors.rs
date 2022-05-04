@@ -134,6 +134,12 @@ pub enum Error {
         source: serde_json::Error,
     },
 
+    #[error("Metadata file not found: {:?}", path)]
+    MetadataNotFound {
+        path: String,
+        source: std::io::Error,
+    },
+
     #[error("Failed to list bands")]
     ListBands { source: std::io::Error },
 

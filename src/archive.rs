@@ -97,6 +97,7 @@ impl Archive {
     pub fn open(transport: Box<dyn Transport>) -> Result<Archive> {
         let header: ArchiveHeader =
             read_json(&transport, HEADER_FILENAME).map_err(|err| match err {
+                Error::MetadataNotFound { .. } => Error::NotAnArchive {},
                 Error::IOError { source } if source.kind() == ErrorKind::NotFound => {
                     Error::NotAnArchive {}
                 }
