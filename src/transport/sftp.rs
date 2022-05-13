@@ -105,7 +105,14 @@ impl Transport for SftpTransport {
     fn create_dir(&self, relpath: &str) -> io::Result<()> {
         let full_path = self.base_path.join(relpath);
         trace!("create_dir {:?}", full_path);
-        self.sftp.mkdir(&full_path, 0o700).map_err(translate_error)
+        match self.sftp.mkdir(&full_path, 0o700) {
+            Ok(()) => Ok(()),
+            Err(err) if err.code() == ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_FAILURE) => {
+                // openssh seems to say failure for "directory exists" :/
+                Ok(())
+            }
+            Err(err) => Err(translate_error(err)),
+        }
     }
 
     fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()> {
