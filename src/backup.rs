@@ -18,6 +18,7 @@ use std::io::prelude::*;
 use std::{convert::TryInto, time::Instant};
 
 use itertools::Itertools;
+use tracing::trace;
 
 use crate::blockdir::Address;
 use crate::io::read_with_retries;
@@ -192,6 +193,7 @@ impl BackupWriter {
 
     /// Write out any pending data blocks, and then the pending index entries.
     fn flush_group(&mut self) -> Result<()> {
+        trace!("flush index hunk group");
         let (stats, mut entries) = self.file_combiner.drain()?;
         self.stats += stats;
         self.index_builder.append_entries(&mut entries);
@@ -233,7 +235,7 @@ impl BackupWriter {
     ) -> Result<Option<DiffKind>> {
         self.stats.files += 1;
         let apath = source_entry.apath();
-        let result;
+        let diff_kind;
         if let Some(basis_entry) = self
             .basis_index
             .as_mut()
@@ -245,24 +247,25 @@ impl BackupWriter {
                 return Ok(Some(DiffKind::Unchanged));
             } else {
                 self.stats.modified_files += 1;
-                result = Some(DiffKind::Changed);
+                diff_kind = Some(DiffKind::Changed);
             }
         } else {
             self.stats.new_files += 1;
-            result = Some(DiffKind::New);
+            diff_kind = Some(DiffKind::New);
         }
+        trace!("store file {diff_kind:?} {:?}", source_entry.apath());
         let mut read_source = from_tree.file_contents(source_entry)?;
         let size = source_entry.size().expect("LiveEntry has a size");
         if size == 0 {
             self.index_builder
                 .push_entry(IndexEntry::metadata_from(source_entry));
             self.stats.empty_files += 1;
-            return Ok(result);
+            return Ok(diff_kind);
         }
         if size <= SMALL_FILE_CAP {
             self.file_combiner
                 .push_file(source_entry, &mut read_source)?;
-            return Ok(result);
+            return Ok(diff_kind);
         }
         let addrs = store_file_content(
             apath,
@@ -274,7 +277,7 @@ impl BackupWriter {
             addrs,
             ..IndexEntry::metadata_from(source_entry)
         });
-        Ok(result)
+        Ok(diff_kind)
     }
 
     fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
