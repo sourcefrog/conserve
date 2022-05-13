@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,6 +28,8 @@
 //!   seen.
 //! * Bands might be deleted, so their numbers are not contiguous.
 
+use tracing::trace;
+
 use crate::index::IndexEntryIter;
 use crate::*;
 
@@ -42,6 +44,9 @@ pub struct IterStitchedIndexHunks {
     index_hunks: Option<crate::index::IndexHunkIter>,
 
     archive: Archive,
+
+    /// We conclusively reached the end of the stitched indexes.
+    done: bool,
 }
 
 impl IterStitchedIndexHunks {
@@ -60,6 +65,7 @@ impl IterStitchedIndexHunks {
             band_id: band_id.clone(),
             last_apath: None,
             index_hunks: None,
+            done: false,
         }
     }
 
@@ -76,22 +82,36 @@ impl Iterator for IterStitchedIndexHunks {
     type Item = Vec<IndexEntry>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
         loop {
+            trace!("get next stitched index hunk...");
             // If we're already reading an index, and it has more content, return that.
             if let Some(index_hunks) = &mut self.index_hunks {
+                trace!("iterate hunks of current index...");
                 for hunk in index_hunks {
                     if let Some(last_entry) = hunk.last() {
+                        trace!("found hunk ending in {:?}", last_entry.apath());
                         self.last_apath = Some(last_entry.apath().clone());
                         return Some(hunk);
                     } // otherwise, empty, try the next
                 }
                 if self.archive.band_is_closed(&self.band_id).unwrap_or(false) {
+                    trace!(
+                        "band {:?} is closed; stitched iteration complete",
+                        &self.band_id
+                    );
+                    self.done = true;
                     return None;
                 }
                 self.index_hunks = None;
                 if let Some(band_id) = previous_existing_band(&self.archive, &self.band_id) {
+                    trace!("moving back to previous band {band_id:?}");
                     self.band_id = band_id;
                 } else {
+                    trace!("no previous band to stitch; stitched iteration is complete");
+                    self.done = true;
                     return None;
                 }
             }
@@ -101,6 +121,7 @@ impl Iterator for IterStitchedIndexHunks {
                 .index()
                 .iter_hunks();
             if let Some(last) = &self.last_apath {
+                trace!("advance to after {last:?} in previous band");
                 iter_hunks = iter_hunks.advance_to_after(last)
             }
             self.index_hunks = Some(iter_hunks);
