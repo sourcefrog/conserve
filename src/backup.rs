@@ -207,32 +207,28 @@ impl BackupWriter {
     /// calculated.
     fn copy_entry(&mut self, entry: &LiveEntry, source: &LiveTree) -> Result<Option<DiffKind>> {
         match entry.kind() {
-            Kind::Dir => self.copy_dir(entry),
-            Kind::File => self.copy_file(entry, source),
-            Kind::Symlink => self.copy_symlink(entry),
+            Kind::Dir => self.copy_dir(entry)?,
+            Kind::File => return self.copy_file(entry, source).map(Option::Some),
+            Kind::Symlink => self.copy_symlink(entry)?,
             Kind::Unknown => {
                 self.stats.unknown_kind += 1;
                 // TODO: Perhaps eventually we could backup and restore pipes,
                 // sockets, etc. Or at least count them. For now, silently skip.
                 // https://github.com/sourcefrog/conserve/issues/82
-                Ok(None)
             }
         }
+        Ok(None)
     }
 
-    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
+    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
-        Ok(None) // TODO: See if it changed from the basis?
+        Ok(())
     }
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file(
-        &mut self,
-        source_entry: &LiveEntry,
-        from_tree: &LiveTree,
-    ) -> Result<Option<DiffKind>> {
+    fn copy_file(&mut self, source_entry: &LiveEntry, from_tree: &LiveTree) -> Result<DiffKind> {
         self.stats.files += 1;
         let apath = source_entry.apath();
         let diff_kind;
@@ -244,14 +240,14 @@ impl BackupWriter {
             if source_entry.is_unchanged_from(&basis_entry) {
                 self.stats.unmodified_files += 1;
                 self.index_builder.push_entry(basis_entry);
-                return Ok(Some(DiffKind::Unchanged));
+                return Ok(DiffKind::Unchanged);
             } else {
                 self.stats.modified_files += 1;
-                diff_kind = Some(DiffKind::Changed);
+                diff_kind = DiffKind::Changed;
             }
         } else {
             self.stats.new_files += 1;
-            diff_kind = Some(DiffKind::New);
+            diff_kind = DiffKind::New;
         }
         trace!("store file {diff_kind:?} {:?}", source_entry.apath());
         let mut read_source = from_tree.file_contents(source_entry)?;
@@ -280,13 +276,13 @@ impl BackupWriter {
         Ok(diff_kind)
     }
 
-    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
+    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<()> {
         let target = source_entry.symlink_target().clone();
         self.stats.symlinks += 1;
         assert!(target.is_some());
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
-        Ok(None)
+        Ok(())
     }
 }
 
