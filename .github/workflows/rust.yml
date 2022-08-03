@@ -37,8 +37,6 @@ jobs:
             ~/.cargo/git
             target
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            cargo-${{ runner.os }}-
       - name: Build
         run: cargo build --all-targets
       - name: Run tests
