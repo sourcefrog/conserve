@@ -22,7 +22,7 @@ use crate::*;
 
 type IOError = std::io::Error;
 
-/// Conserve specific error.
+/// Conserve library specific error.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Block file {hash:?} corrupt; actual hash {actual_hash:?}")]

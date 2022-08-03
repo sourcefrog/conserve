@@ -13,16 +13,22 @@
 
 //! Command-line entry point for Conserve backups.
 
+use std::error::Error;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+use std::process::ExitCode;
+use std::str::FromStr;
 
 use clap::{Parser, StructOpt, Subcommand};
-use tracing::trace;
+use log::{LoggingOptions, LogGuard};
+use tracing::{ trace, error, info, warn };
 
 use conserve::backup::BackupOptions;
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
+
+mod log;
 
 #[derive(Debug, Parser)]
 #[clap(
@@ -40,8 +46,13 @@ struct Args {
     no_progress: bool,
 
     /// Show debug trace to stdout.
+    // TODO: Allow specifying a log level instead of only a debug flag.
     #[clap(long, short = 'D', global = true)]
     debug: bool,
+
+    /// Path to the output log file
+    #[clap(long, short = 'L', global = true)]
+    log_file: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -242,14 +253,15 @@ enum Debug {
     Unreferenced { archive: String },
 }
 
-enum ExitCode {
+#[repr(u8)]
+enum CommandExitCode {
     Ok = 0,
     Failed = 1,
     PartialCorruption = 2,
 }
 
 impl Command {
-    fn run(&self) -> Result<ExitCode> {
+    fn run(&self) -> Result<CommandExitCode> {
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -269,7 +281,8 @@ impl Command {
                 };
                 let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
                 if !no_stats {
-                    ui::println(&format!("Backup complete.\n{}", stats));
+                    info!("Backup complete.");
+                    info!("{}", stats);
                 }
             }
             Command::Debug(Debug::Blocks { archive }) => {
@@ -313,7 +326,7 @@ impl Command {
                     },
                 )?;
                 if !no_stats {
-                    ui::println(&format!("{}", stats));
+                    info!("{}", stats);
                 }
             }
             Command::Diff {
@@ -348,12 +361,12 @@ impl Command {
                     },
                 )?;
                 if !no_stats {
-                    ui::println(&format!("{}", stats));
+                    info!("{}", stats);
                 }
             }
             Command::Init { archive } => {
                 Archive::create(open_transport(archive)?)?;
-                ui::println(&format!("Created new archive in {:?}", &archive));
+                info!("Created new archive in {:?}", &archive);
             }
             Command::Ls {
                 stos,
@@ -400,7 +413,8 @@ impl Command {
 
                 let stats = restore(&archive, destination, &options)?;
                 if !no_stats {
-                    ui::println(&format!("Restore complete.\n{}", stats));
+                    info!("Restore complete.");
+                    info!("{}", stats);
                 }
             }
             Command::Size {
@@ -420,9 +434,9 @@ impl Command {
                         .file_bytes
                 };
                 if *bytes {
-                    ui::println(&format!("{}", size));
+                    info!("{}", size);
                 } else {
-                    ui::println(&conserve::bytes_to_human_mb(size));
+                    info!("{}", &conserve::bytes_to_human_mb(size));
                 }
             }
             Command::Validate {
@@ -438,10 +452,10 @@ impl Command {
                     println!("{}", stats);
                 }
                 if stats.has_problems() {
-                    ui::problem("Archive has some problems.");
-                    return Ok(ExitCode::PartialCorruption);
+                    warn!("Archive has some problems.");
+                    return Ok(CommandExitCode::PartialCorruption);
                 } else {
-                    ui::println("Archive is OK.");
+                    info!("Archive is OK.");
                 }
             }
             Command::Versions {
@@ -463,7 +477,7 @@ impl Command {
                 conserve::show_versions(&archive, &options, &mut stdout)?;
             }
         }
-        Ok(ExitCode::Ok)
+        Ok(CommandExitCode::Ok)
     }
 }
 
@@ -481,30 +495,62 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
     }
 }
 
-fn main() {
-    let args = Args::parse();
-    ui::enable_progress(!args.no_progress && !args.debug);
+fn initialize_log(args: &Args) -> std::result::Result<LogGuard, String> {
+    let file = args.log_file
+        .as_ref()
+        .map(|file| PathBuf::from_str(&file))
+        .transpose()
+        .map_err(|_| "Unparseable log file path".to_string())?;
+
+    let guard = log::init(LoggingOptions{
+        file,
+        level: if args.debug { tracing::Level::TRACE } else { tracing::Level::INFO }
+    })?;
+
     if args.debug {
-        tracing_subscriber::fmt::Subscriber::builder()
-            .with_max_level(tracing::Level::TRACE)
-            .init();
         trace!("tracing enabled");
     }
+
+    Ok(guard)
+}
+
+fn main() -> ExitCode {
+    let args = Args::parse();
+    let _log_guard = match initialize_log(&args) {
+        Ok(guard) => guard,
+        Err(message) => {
+            eprintln!("Failed to initialize log system:");
+            eprintln!("{}", message);
+            return ExitCode::from(4);
+        }
+    };
+
+    ui::enable_progress(!args.no_progress && !args.debug);
     let result = args.command.run();
-    match result {
+    let exit_code = match result {
         Err(ref e) => {
-            ui::show_error(e);
+            error!("{}", e.to_string());
+            
+            let mut cause: &dyn Error = e;
+            while let Some(c) = cause.source() {
+                error!("  caused by: {}", c);
+                cause = c;
+            }
+            
             // // TODO: Perhaps always log the traceback to a log file.
+            // // NOTE(WolverinDEV): May always log this as trace level?
             // if let Some(bt) = e.backtrace() {
             //     if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {
             //         println!("{}", bt);
             //     }
             // }
             // Avoid Rust redundantly printing the error.
-            std::process::exit(ExitCode::Failed as i32)
+            ExitCode::FAILURE
         }
-        Ok(code) => std::process::exit(code as i32),
-    }
+        Ok(code) => ExitCode::from(code as u8),
+    };
+
+    exit_code
 }
 
 #[test]

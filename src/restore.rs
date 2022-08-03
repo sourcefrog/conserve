@@ -18,7 +18,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, time::Instant};
 
-use filetime::{set_file_handle_times, set_symlink_file_times};
+use filetime::{set_file_handle_times};
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;

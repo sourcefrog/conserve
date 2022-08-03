@@ -10,3 +10,4 @@ perf.old
 mutants.out
 mutants.out.old
 .cargo/config.toml
+test/
