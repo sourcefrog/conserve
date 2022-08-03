@@ -17,9 +17,13 @@
 //! file (typically stdout).
 
 use std::borrow::Cow;
-use std::io::{BufWriter, Write};
 
-use crate::*;
+use conserve::ui::duration_to_hms;
+use conserve::{Archive, Result, Band, BandSelectionPolicy, Exclude, bytes_to_human_mb, IndexEntry, DiffEntry, ReadTree};
+use tracing::{warn, info};
+
+/// ISO timestamp, for https://docs.rs/chrono/0.4.11/chrono/format/strftime/.
+const TIMESTAMP_FORMAT: &str = "%F %T";
 
 /// Options controlling the behavior of `show_versions`.
 #[derive(Default, Clone, Eq, PartialEq)]
@@ -37,11 +41,10 @@ pub struct ShowVersionsOptions {
     pub utc: bool,
 }
 
-/// Print a list of versions, one per line.
+/// Prinat all available versions to the `tracing`.
 pub fn show_versions(
     archive: &Archive,
     options: &ShowVersionsOptions,
-    w: &mut dyn Write,
 ) -> Result<()> {
     let mut band_ids = archive.list_band_ids()?;
     if options.newest_first {
@@ -49,7 +52,7 @@ pub fn show_versions(
     }
     for band_id in band_ids {
         if !(options.tree_size || options.start_time || options.backup_duration) {
-            writeln!(w, "{}", band_id)?;
+            info!("{}", band_id);
             continue;
         }
         let mut l: Vec<String> = Vec::new();
@@ -57,14 +60,14 @@ pub fn show_versions(
         let band = match Band::open(archive, &band_id) {
             Ok(band) => band,
             Err(e) => {
-                ui::problem(&format!("Failed to open band {:?}: {:?}", band_id, e));
+                warn!("Failed to open band {:?}: {:?}", band_id, e);
                 continue;
             }
         };
         let info = match band.get_info() {
             Ok(info) => info,
             Err(e) => {
-                ui::problem(&format!("Failed to read band tail {:?}: {:?}", band_id, e));
+                warn!("Failed to read band tail {:?}: {:?}", band_id, e);
                 continue;
             }
         };
@@ -72,11 +75,11 @@ pub fn show_versions(
         if options.start_time {
             let start_time = info.start_time;
             let start_time_str = if options.utc {
-                start_time.format(crate::TIMESTAMP_FORMAT)
+                start_time.format(TIMESTAMP_FORMAT)
             } else {
                 start_time
                     .with_timezone(&chrono::Local)
-                    .format(crate::TIMESTAMP_FORMAT)
+                    .format(TIMESTAMP_FORMAT)
             };
             l.push(format!("{:<10}", start_time_str));
         }
@@ -85,7 +88,7 @@ pub fn show_versions(
             let duration_str: Cow<str> = if info.is_closed {
                 info.end_time
                     .and_then(|et| (et - info.start_time).to_std().ok())
-                    .map(crate::ui::duration_to_hms)
+                    .map(duration_to_hms)
                     .map(Cow::Owned)
                     .unwrap_or(Cow::Borrowed("unknown"))
             } else {
@@ -95,7 +98,7 @@ pub fn show_versions(
         }
 
         if options.tree_size {
-            let tree_mb_str = crate::misc::bytes_to_human_mb(
+            let tree_mb_str = bytes_to_human_mb(
                 archive
                     .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))?
                     .size(Exclude::nothing())?
@@ -104,34 +107,36 @@ pub fn show_versions(
             l.push(format!("{:>14}", tree_mb_str,));
         }
 
-        writeln!(w, "{}", l.join(" "))?;
+        info!("{}", l.join(" "));
     }
     Ok(())
 }
 
-pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
+pub fn show_index_json(band: &Band) -> Result<()> {
     // TODO: Maybe use https://docs.serde.rs/serde/ser/trait.Serializer.html#method.collect_seq.
-    let bw = BufWriter::new(w);
     let index_entries: Vec<IndexEntry> = band.index().iter_entries().collect();
-    serde_json::ser::to_writer_pretty(bw, &index_entries)
-        .map_err(|source| Error::SerializeIndex { source })
-}
-
-pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(it: I, w: &mut dyn Write) -> Result<()> {
-    let mut bw = BufWriter::new(w);
-    for entry in it {
-        writeln!(bw, "{}", entry.apath())?;
+    let json = serde_json::to_string_pretty(&index_entries)
+        .map_err(|source| conserve::Error::SerializeIndex { source })?;
+    for line in json.lines() {
+        info!("{}", line);
     }
     Ok(())
 }
 
-pub fn show_diff<D: Iterator<Item = DiffEntry>>(diff: D, w: &mut dyn Write) -> Result<()> {
+pub fn show_entry_names<E: conserve::Entry, I: Iterator<Item = E>>(it: I) -> Result<()> {
+    for entry in it {
+        info!("{}", entry.apath());
+    }
+    Ok(())
+}
+
+pub fn show_diff<D: Iterator<Item = DiffEntry>>(diff: D) -> Result<()> {
     // TODO: Consider whether the actual files have changed.
     // TODO: Summarize diff.
     // TODO: Optionally include unchanged files.
-    let mut bw = BufWriter::new(w);
     for de in diff {
-        writeln!(bw, "{}", de)?;
+        info!("{}", de);
     }
+    
     Ok(())
 }

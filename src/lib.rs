@@ -34,7 +34,6 @@ pub mod live_tree;
 mod merge;
 pub(crate) mod misc;
 pub mod restore;
-pub mod show;
 pub mod stats;
 mod stitch;
 mod stored_file;
@@ -66,7 +65,6 @@ pub use crate::live_tree::{LiveEntry, LiveTree};
 pub use crate::merge::{MergeTrees, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
 pub use crate::restore::{restore, RestoreOptions, RestoreTree};
-pub use crate::show::{show_diff, show_versions, ShowVersionsOptions};
 pub use crate::stats::{BackupStats, DeleteStats, RestoreStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
@@ -96,9 +94,6 @@ const SMALL_FILE_CAP: u64 = 100_000;
 
 /// Target maximum uncompressed size for combined blocks.
 const TARGET_COMBINED_BLOCK_SIZE: usize = MAX_BLOCK_SIZE;
-
-/// ISO timestamp, for https://docs.rs/chrono/0.4.11/chrono/format/strftime/.
-const TIMESTAMP_FORMAT: &str = "%F %T";
 
 /// Temporary files in the archive have this prefix.
 const TMP_PREFIX: &str = "tmp";

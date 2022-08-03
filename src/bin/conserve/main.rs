@@ -21,6 +21,7 @@ use std::str::FromStr;
 
 use clap::{Parser, StructOpt, Subcommand};
 use log::{LoggingOptions, LogGuard};
+use show::{show_diff, ShowVersionsOptions, show_versions};
 use tracing::{ trace, error, info, warn };
 
 use conserve::backup::BackupOptions;
@@ -29,6 +30,7 @@ use conserve::RestoreOptions;
 use conserve::*;
 
 mod log;
+mod show;
 
 #[derive(Debug, Parser)]
 #[clap(
@@ -45,7 +47,7 @@ struct Args {
     #[clap(long, short = 'P', global = true)]
     no_progress: bool,
 
-    /// Show debug trace to stdout.
+    /// Set the log level to trace
     // TODO: Allow specifying a log level instead of only a debug flag.
     #[clap(long, short = 'D', global = true)]
     debug: bool,
@@ -262,7 +264,6 @@ enum CommandExitCode {
 
 impl Command {
     fn run(&self) -> Result<CommandExitCode> {
-        let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
                 archive,
@@ -282,33 +283,32 @@ impl Command {
                 let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
                 if !no_stats {
                     info!("Backup complete.");
-                    info!("{}", stats);
+                    for line in format!("{}", stats).lines() {
+                        info!("{}", line);
+                    }
                 }
             }
             Command::Debug(Debug::Blocks { archive }) => {
-                let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open(open_transport(archive)?)?
                     .block_dir()
                     .block_names()?
                 {
-                    writeln!(bw, "{}", hash)?;
+                    info!("{}", hash);
                 }
             }
             Command::Debug(Debug::Index { archive, backup }) => {
                 let st = stored_tree_from_opt(archive, backup)?;
-                show::show_index_json(st.band(), &mut stdout)?;
+                show::show_index_json(st.band())?;
             }
             Command::Debug(Debug::Referenced { archive }) => {
-                let mut bw = BufWriter::new(stdout);
                 let archive = Archive::open(open_transport(archive)?)?;
                 for hash in archive.referenced_blocks(&archive.list_band_ids()?)? {
-                    writeln!(bw, "{}", hash)?;
+                    info!("{}", hash);
                 }
             }
             Command::Debug(Debug::Unreferenced { archive }) => {
-                let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks()? {
-                    writeln!(bw, "{}", hash)?;
+                    info!("{}", hash);
                 }
             }
             Command::Delete {
@@ -344,7 +344,8 @@ impl Command {
                     exclude,
                     include_unchanged: *include_unchanged,
                 };
-                show_diff(diff(&st, &lt, &options)?, &mut stdout)?;
+
+                show_diff(diff(&st, &lt, &options)?)?;
             }
             Command::Gc {
                 archive,
@@ -379,13 +380,11 @@ impl Command {
                     show::show_entry_names(
                         stored_tree_from_opt(archive, &stos.backup)?
                             .iter_entries(Apath::root(), exclude)?,
-                        &mut stdout,
                     )?;
                 } else {
                     show::show_entry_names(
                         LiveTree::open(stos.source.clone().unwrap())?
                             .iter_entries(Apath::root(), exclude)?,
-                        &mut stdout,
                     )?;
                 }
             }
@@ -474,7 +473,7 @@ impl Command {
                     start_time: !*short,
                     backup_duration: !*short,
                 };
-                conserve::show_versions(&archive, &options, &mut stdout)?;
+                show_versions(&archive, &options)?;
             }
         }
         Ok(CommandExitCode::Ok)
