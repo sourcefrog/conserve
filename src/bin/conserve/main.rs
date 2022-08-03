@@ -15,7 +15,7 @@
 
 use std::error::Error;
 use std::path::PathBuf;
-use std::process::ExitCode;
+use std::process::Termination;
 use std::str::FromStr;
 
 use clap::{Parser, StructOpt, Subcommand};
@@ -254,14 +254,20 @@ enum Debug {
 }
 
 #[repr(u8)]
-enum CommandExitCode {
+enum ExitCode {
     Ok = 0,
     Failed = 1,
     PartialCorruption = 2,
 }
 
+impl Termination for ExitCode {
+    fn report(self) -> std::process::ExitCode {
+        std::process::ExitCode::from(self as u8)
+    }
+}
+
 impl Command {
-    fn run(&self) -> Result<CommandExitCode> {
+    fn run(&self) -> Result<ExitCode> {
         match self {
             Command::Backup {
                 archive,
@@ -450,7 +456,7 @@ impl Command {
                 }
                 if stats.has_problems() {
                     warn!("Archive has some problems.");
-                    return Ok(CommandExitCode::PartialCorruption);
+                    return Ok(ExitCode::PartialCorruption);
                 } else {
                     info!("Archive is OK.");
                 }
@@ -474,7 +480,7 @@ impl Command {
                 show_versions(&archive, &options)?;
             }
         }
-        Ok(CommandExitCode::Ok)
+        Ok(ExitCode::Ok)
     }
 }
 
@@ -518,7 +524,7 @@ fn main() -> ExitCode {
         Err(message) => {
             eprintln!("Failed to initialize log system:");
             eprintln!("{}", message);
-            return ExitCode::from(4);
+            return ExitCode::Failed;
         }
     };
 
@@ -542,9 +548,9 @@ fn main() -> ExitCode {
             //     }
             // }
             // Avoid Rust redundantly printing the error.
-            ExitCode::FAILURE
+            ExitCode::Failed
         }
-        Ok(code) => ExitCode::from(code as u8),
+        Ok(code) => code,
     };
 
     exit_code
