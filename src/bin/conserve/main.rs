@@ -14,7 +14,6 @@
 //! Command-line entry point for Conserve backups.
 
 use std::error::Error;
-use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::str::FromStr;
@@ -48,12 +47,11 @@ struct Args {
     no_progress: bool,
 
     /// Set the log level to trace
-    // TODO: Allow specifying a log level instead of only a debug flag.
-    #[clap(long, short = 'D', global = true)]
-    debug: bool,
-
-    /// Path to the output log file
     #[clap(long, short = 'L', global = true)]
+    log_level: Option<tracing::Level>,
+    
+    /// Path to the output log file
+    #[clap(long, short = 'F', global = true)]
     log_file: Option<String>,
 }
 
@@ -503,10 +501,10 @@ fn initialize_log(args: &Args) -> std::result::Result<LogGuard, String> {
 
     let guard = log::init(LoggingOptions{
         file,
-        level: if args.debug { tracing::Level::TRACE } else { tracing::Level::INFO }
+        level: args.log_level.unwrap_or(tracing::Level::INFO)
     })?;
 
-    if args.debug {
+    if args.log_level == Some(tracing::Level::TRACE) {
         trace!("tracing enabled");
     }
 
@@ -524,7 +522,7 @@ fn main() -> ExitCode {
         }
     };
 
-    ui::enable_progress(!args.no_progress && !args.debug);
+    ui::enable_progress(!args.no_progress);
     let result = args.command.run();
     let exit_code = match result {
         Err(ref e) => {
