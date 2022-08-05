@@ -17,6 +17,7 @@
 //! file (typically stdout).
 
 use std::borrow::Cow;
+use std::sync::{Arc, Mutex};
 
 use conserve::backup::BackupMonitor;
 use conserve::ui::duration_to_hms;
@@ -182,19 +183,20 @@ impl nutmeg::Model for BackupProgressModel {
     }
 }
 
-pub struct NutmegBackupMonitor<'a> {
-    view: &'a View<BackupProgressModel>,
+pub struct NutmegBackupMonitor {
+    view: Arc<Mutex<View<BackupProgressModel>>>,
 }
 
-impl<'a> NutmegBackupMonitor<'a> {
-    pub fn new(view: &'a View<BackupProgressModel>) -> Self {
+impl NutmegBackupMonitor {
+    pub fn new(view: Arc<Mutex<View<BackupProgressModel>>>) -> Self {
         Self { view }
     }
 }
 
-impl BackupMonitor for NutmegBackupMonitor<'_> {
+impl BackupMonitor for NutmegBackupMonitor {
     fn copy(&mut self, entry: &conserve::LiveEntry) {
-        self.view.update(|model| {
+        let view = self.view.lock().expect("lock() should not fail");
+        view.update(|model| {
             model.filename = entry.apath().to_string();
             match entry.kind() {
                 Kind::Dir => model.scanned_dirs += 1,
@@ -205,8 +207,9 @@ impl BackupMonitor for NutmegBackupMonitor<'_> {
     }
 
     fn copy_result(&mut self, entry: &conserve::LiveEntry, result: &Option<conserve::DiffKind>) {
+        let view = self.view.lock().expect("lock() should not fail");
         if let Some(diff_kind) = result.as_ref() {
-            self.view.update(|model| match diff_kind {
+            view.update(|model| match diff_kind {
                 &DiffKind::Changed => model.entries_changed += 1,
                 &DiffKind::New => model.entries_new += 1,
                 &DiffKind::Unchanged => model.entries_unchanged += 1,
@@ -215,13 +218,14 @@ impl BackupMonitor for NutmegBackupMonitor<'_> {
         }
 
         if let Some(size) = entry.size() {
-            self.view.update(|model| model.scanned_file_bytes += size);
+            view.update(|model| model.scanned_file_bytes += size);
         }
     }
 
     fn copy_error(&mut self, entry: &conserve::LiveEntry, _error: &conserve::Error) {
+        let view = self.view.lock().expect("lock() should not fail");
         if let Some(size) = entry.size() {
-            self.view.update(|model| model.scanned_file_bytes += size);
+            view.update(|model| model.scanned_file_bytes += size);
         }
     }
 }

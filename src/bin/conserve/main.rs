@@ -17,9 +17,10 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::process::Termination;
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 
 use clap::{Parser, StructOpt, Subcommand};
-use log::{LoggingOptions, LogGuard};
+use log::{LoggingOptions, LogGuard, TERMINAL_OUTPUT};
 use show::{BackupProgressModel, NutmegBackupMonitor};
 use show::{show_diff, ShowVersionsOptions, show_versions};
 use tracing::{ trace, error, info, warn };
@@ -288,10 +289,25 @@ impl Command {
 
                 // FIXME: Sync stdout with this view
                 // FIXME: Use cli flag!
-                let view = nutmeg::View::new(BackupProgressModel::default(), nutmeg::Options::default().progress_enabled(true));
-                let mut monitor = NutmegBackupMonitor::new(&view);
+                let view = Arc::new(
+                    Mutex::new(
+                        nutmeg::View::new(BackupProgressModel::default(), nutmeg::Options::default().progress_enabled(true))
+                    )
+                );
+                let mut monitor = NutmegBackupMonitor::new(view.clone());
+                let old_output = {
+                    let mut output = TERMINAL_OUTPUT.lock().unwrap();
+                    output.replace(view.clone())
+                };
 
                 let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options, Some(&mut monitor))?;
+                {
+                    let mut output = TERMINAL_OUTPUT.lock().unwrap();
+                    *output = old_output;
+                };
+                drop(monitor);
+                drop(view);
+                
                 if !no_stats {
                     info!("Backup complete.");
                     for line in format!("{}", stats).lines() {

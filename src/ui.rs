@@ -18,6 +18,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use lazy_static::lazy_static;
+use tracing::{debug, error};
 
 use crate::stats::Sizes;
 
@@ -128,17 +129,19 @@ pub(crate) fn compression_ratio(s: &Sizes) -> f64 {
     }
 }
 
+// FIXME: Don't use these functions any more.
+//        Directly log to tracing or to the monitor.
 impl UIState {
     pub(crate) fn println(&mut self, s: &str) {
         // TODO: Go through Nutmeg instead...
         // self.clear_progress();
-        println!("{}", s);
+        debug!("{}", s);
     }
 
     fn problem(&mut self, s: &str) {
         // TODO: Go through Nutmeg instead...
         // self.clear_progress();
-        println!("conserve error: {}", s);
+        error!("{}", s);
         // Drawing this way makes messages leak from tests, for unclear reasons.
 
         // queue!(
