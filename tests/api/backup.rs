@@ -31,7 +31,7 @@ pub fn simple_backup() {
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
 
-    let copy_stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).expect("backup");
+    let copy_stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).expect("backup");
     assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
     assert_eq!(copy_stats.files, 1);
     assert_eq!(copy_stats.deduplicated_blocks, 0);
@@ -67,7 +67,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
         exclude,
         ..BackupOptions::default()
     };
-    let copy_stats = backup(&af, &source, &options).expect("backup");
+    let copy_stats = backup(&af, &source, &options, None).expect("backup");
 
     check_backup(&af);
 
@@ -124,7 +124,7 @@ pub fn backup_more_excludes() {
         print_filenames: false,
         ..Default::default()
     };
-    let stats = backup(&af, &source, &options).expect("backup");
+    let stats = backup(&af, &source, &options, None).expect("backup");
 
     assert_eq!(1, stats.written_blocks);
     assert_eq!(1, stats.files);
@@ -186,7 +186,7 @@ fn large_file() {
     let large_content = vec![b'a'; 4 << 20];
     tf.create_file_with_contents("large", &large_content);
 
-    let backup_stats = backup(&af, &tf.live_tree(), &BackupOptions::default()).expect("backup");
+    let backup_stats = backup(&af, &tf.live_tree(), &BackupOptions::default(), None).expect("backup");
     assert_eq!(backup_stats.new_files, 1);
     // First 1MB should be new; remainder should be deduplicated.
     assert_eq!(backup_stats.uncompressed_bytes, 1 << 20);
@@ -220,7 +220,7 @@ fn source_unreadable() {
 
     tf.make_file_unreadable("b_unreadable");
 
-    let stats = backup(&af, &tf.live_tree(), &BackupOptions::default()).expect("backup");
+    let stats = backup(&af, &tf.live_tree(), &BackupOptions::default(), None).expect("backup");
     assert_eq!(stats.errors, 1);
     assert_eq!(stats.new_files, 3);
     assert_eq!(stats.files, 3);
@@ -260,7 +260,7 @@ pub fn symlink() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_symlink("symlink", "/a/broken/destination");
-    let copy_stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).expect("backup");
+    let copy_stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).expect("backup");
 
     assert_eq!(0, copy_stats.files);
     assert_eq!(1, copy_stats.symlinks);
@@ -289,7 +289,7 @@ pub fn empty_file_uses_zero_blocks() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file_with_contents("empty", &[]);
-    let stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).unwrap();
 
     assert_eq!(1, stats.files);
     assert_eq!(stats.written_blocks, 0);
@@ -321,7 +321,7 @@ pub fn detect_unmodified() {
     srcdir.create_file("bbb");
 
     let options = BackupOptions::default();
-    let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &options, None).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 2);
@@ -329,7 +329,7 @@ pub fn detect_unmodified() {
 
     // Make a second backup from the same tree, and we should see that
     // both files are unmodified.
-    let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &options, None).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 0);
@@ -339,7 +339,7 @@ pub fn detect_unmodified() {
     // as unmodified.
     srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
-    let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &options, None).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 0);
@@ -355,7 +355,7 @@ pub fn detect_minimal_mtime_change() {
     srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
     let options = BackupOptions::default();
-    let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &options, None).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 2);
@@ -377,7 +377,7 @@ pub fn detect_minimal_mtime_change() {
         }
     }
 
-    let stats = backup(&af, &srcdir.live_tree(), &options).unwrap();
+    let stats = backup(&af, &srcdir.live_tree(), &options, None).unwrap();
     assert_eq!(stats.files, 2);
     assert_eq!(stats.unmodified_files, 1);
 }
@@ -389,7 +389,7 @@ fn small_files_combined_two_backups() {
     srcdir.create_file("file1");
     srcdir.create_file("file2");
 
-    let stats1 = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).unwrap();
+    let stats1 = backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).unwrap();
     // Although the two files have the same content, we do not yet dedupe them
     // within a combined block, so the block is different to when one identical
     // file is stored alone. This could be fixed.
@@ -401,7 +401,7 @@ fn small_files_combined_two_backups() {
     // Add one more file, also identical, but it is not combined with the previous blocks.
     // This is a shortcoming of the current dedupe approach.
     srcdir.create_file("file3");
-    let stats2 = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).unwrap();
+    let stats2 = backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).unwrap();
     assert_eq!(stats2.new_files, 1);
     assert_eq!(stats2.unmodified_files, 2);
     assert_eq!(stats2.written_blocks, 1);
@@ -423,7 +423,7 @@ fn many_small_files_combined_to_one_block() {
             format!("something about {}", i).as_bytes(),
         );
     }
-    let stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).expect("backup");
+    let stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).expect("backup");
     assert_eq!(
         stats.index_builder_stats.index_hunks, 2,
         "expect exactly 2 hunks"
@@ -469,7 +469,7 @@ pub fn mixed_medium_small_files_two_hunks() {
             srcdir.create_file(&name);
         }
     }
-    let stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default()).expect("backup");
+    let stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).expect("backup");
     assert_eq!(
         stats.index_builder_stats.index_hunks, 2,
         "expect exactly 2 hunks"
@@ -515,6 +515,7 @@ fn detect_unchanged_from_stitched_index() {
             max_entries_per_hunk: 1,
             ..Default::default()
         },
+        None
     )
     .unwrap();
     assert_eq!(stats.new_files, 2);
@@ -530,6 +531,7 @@ fn detect_unchanged_from_stitched_index() {
             max_entries_per_hunk: 1,
             ..Default::default()
         },
+        None
     )
     .unwrap();
     assert_eq!(stats.unmodified_files, 1);
@@ -551,6 +553,7 @@ fn detect_unchanged_from_stitched_index() {
             max_entries_per_hunk: 1,
             ..Default::default()
         },
+        None
     )
     .unwrap();
     assert_eq!(stats.unmodified_files, 2, "both files are unmodified");

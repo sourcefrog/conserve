@@ -26,7 +26,7 @@ fn unreferenced_blocks() {
             .parse()
             .unwrap();
 
-    let _copy_stats = backup(&archive, &tf.live_tree(), &BackupOptions::default()).expect("backup");
+    let _copy_stats = backup(&archive, &tf.live_tree(), &BackupOptions::default(), None).expect("backup");
 
     // Delete the band and index
     std::fs::remove_dir_all(archive.path().join("b0000")).unwrap();
@@ -98,7 +98,7 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
     let lock1 = GarbageCollectionLock::new(&archive)?;
 
     // Backup should fail while gc lock is held.
-    let backup_result = backup(&archive, &tf.live_tree(), &BackupOptions::default());
+    let backup_result = backup(&archive, &tf.live_tree(), &BackupOptions::default(), None);
     match backup_result {
         Err(Error::GarbageCollectionLockHeld) => (),
         other => panic!("unexpected result {:?}", other),
@@ -115,7 +115,7 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
     )?;
 
     // Backup should now succeed.
-    let backup_result = backup(&archive, &tf.live_tree(), &BackupOptions::default());
+    let backup_result = backup(&archive, &tf.live_tree(), &BackupOptions::default(), None);
     assert!(backup_result.is_ok());
 
     Ok(())

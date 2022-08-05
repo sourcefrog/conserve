@@ -20,6 +20,7 @@ use std::str::FromStr;
 
 use clap::{Parser, StructOpt, Subcommand};
 use log::{LoggingOptions, LogGuard};
+use show::{BackupProgressModel, NutmegBackupMonitor};
 use show::{show_diff, ShowVersionsOptions, show_versions};
 use tracing::{ trace, error, info, warn };
 
@@ -284,7 +285,13 @@ impl Command {
                     exclude,
                     ..Default::default()
                 };
-                let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
+
+                // FIXME: Sync stdout with this view
+                // FIXME: Use cli flag!
+                let view = nutmeg::View::new(BackupProgressModel::default(), nutmeg::Options::default().progress_enabled(true));
+                let mut monitor = NutmegBackupMonitor::new(&view);
+
+                let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options, Some(&mut monitor))?;
                 if !no_stats {
                     info!("Backup complete.");
                     for line in format!("{}", stats).lines() {

@@ -165,6 +165,7 @@ fn restore_modify_backup() {
                 print_filenames: true,
                 ..Default::default()
             },
+            None
         )
         .expect("Backup modified tree");
 

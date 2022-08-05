@@ -130,7 +130,7 @@ fn restore_symlink() {
     let mtime: FileTime = years_ago.into();
     set_symlink_file_times(&srcdir.path().join("symlink"), mtime, mtime).unwrap();
 
-    backup(&af, &srcdir.live_tree(), &Default::default()).unwrap();
+    backup(&af, &srcdir.live_tree(), &Default::default(), None).unwrap();
 
     let restore_dir = TempDir::new().unwrap();
     restore(&af, restore_dir.path(), &Default::default()).unwrap();

@@ -18,9 +18,11 @@
 
 use std::borrow::Cow;
 
+use conserve::backup::BackupMonitor;
 use conserve::ui::duration_to_hms;
-use conserve::{Archive, Result, Band, BandSelectionPolicy, Exclude, bytes_to_human_mb, IndexEntry, DiffEntry, ReadTree};
+use conserve::{Archive, Result, Band, BandSelectionPolicy, Exclude, bytes_to_human_mb, IndexEntry, DiffEntry, ReadTree, Kind, Entry, DiffKind};
 use tracing::{warn, info};
+use nutmeg::View;
 
 /// ISO timestamp, for https://docs.rs/chrono/0.4.11/chrono/format/strftime/.
 const TIMESTAMP_FORMAT: &str = "%F %T";
@@ -139,4 +141,87 @@ pub fn show_diff<D: Iterator<Item = DiffEntry>>(diff: D) -> Result<()> {
     }
     
     Ok(())
+}
+
+// Considerations if we're trying properly extimate the remaining progress.
+//
+// This causes us to walk the source tree twice, which is probably an acceptable option
+// since it's nice to see realistic overall progress. We could keep all the entries
+// in memory, and maybe we should, but it might get unreasonably big.
+// if options.measure_first {
+//     progress_bar.set_phase("Measure source tree".to_owned());
+//     // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
+//     // again a second time? But, that'll potentially use memory proportional to tree size, which
+//     // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
+//     // deleted or changed while this is running.
+//     progress_bar.set_bytes_total(source.size()?.file_bytes as u64);
+// }
+
+#[derive(Default)]
+pub struct BackupProgressModel {
+    filename: String,
+    scanned_file_bytes: u64,
+    scanned_dirs: usize,
+    scanned_files: usize,
+    entries_new: usize,
+    entries_changed: usize,
+    entries_unchanged: usize,
+    entries_deleted: usize,
+}
+
+impl nutmeg::Model for BackupProgressModel {
+    fn render(&mut self, _width: usize) -> String {
+        format!(
+            "Scanned {} directories, {} files, {} MB\n{} new entries, {} changed, {} deleted, {} unchanged\n{}",
+            self.scanned_dirs,
+            self.scanned_files,
+            self.scanned_file_bytes / 1_000_000,
+            self.entries_new, self.entries_changed, self.entries_deleted, self.entries_unchanged,
+            self.filename
+        )
+    }
+}
+
+pub struct NutmegBackupMonitor<'a> {
+    view: &'a View<BackupProgressModel>,
+}
+
+impl<'a> NutmegBackupMonitor<'a> {
+    pub fn new(view: &'a View<BackupProgressModel>) -> Self {
+        Self { view }
+    }
+}
+
+impl BackupMonitor for NutmegBackupMonitor<'_> {
+    fn copy(&mut self, entry: &conserve::LiveEntry) {
+        self.view.update(|model| {
+            model.filename = entry.apath().to_string();
+            match entry.kind() {
+                Kind::Dir => model.scanned_dirs += 1,
+                Kind::File => model.scanned_files += 1,
+                _ => (),
+            }
+        });
+    }
+
+    fn copy_result(&mut self, entry: &conserve::LiveEntry, result: &Option<conserve::DiffKind>) {
+        if let Some(diff_kind) = result.as_ref() {
+            self.view.update(|model| match diff_kind {
+                &DiffKind::Changed => model.entries_changed += 1,
+                &DiffKind::New => model.entries_new += 1,
+                &DiffKind::Unchanged => model.entries_unchanged += 1,
+                &DiffKind::Deleted => model.entries_deleted += 1,
+            })
+        }
+
+        if let Some(size) = entry.size() {
+            self.view.update(|model| model.scanned_file_bytes += size);
+        }
+    }
+
+    fn copy_error(&mut self, entry: &conserve::LiveEntry, _error: &conserve::Error) {
+        if let Some(size) = entry.size() {
+            self.view.update(|model| model.scanned_file_bytes += size);
+        }
+    }
 }
