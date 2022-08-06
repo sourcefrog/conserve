@@ -22,7 +22,7 @@ use clap::{Parser, StructOpt, Subcommand};
 use log::{LoggingOptions, LogGuard};
 use show::{NutmegMonitor, BackupProgressModel};
 use show::{show_diff, ShowVersionsOptions, show_versions};
-use tracing::{ trace, error, info, warn };
+use tracing::{ trace, error, info, warn, Level };
 
 use conserve::backup::{BackupOptions, BackupMonitor};
 use conserve::ReadTree;
@@ -48,6 +48,10 @@ struct Args {
     /// No progress bars.
     #[clap(long, short = 'P', global = true)]
     no_progress: bool,
+
+    /// Show debug trace to stdout.
+    #[clap(long, short = 'D', global = true)]
+    debug: bool,
 
     /// Set the log level to trace
     #[clap(long, short = 'L', global = true)]
@@ -468,6 +472,7 @@ impl Command {
                     skip_block_hashes: *quick,
                 };
 
+                // FIXME: Respect the "no progress" option and only log messages.
                 let mut monitor = NutmegMonitor::<ValidateProgressModel>::new();
                 let stats = Archive::open(open_transport(archive)?)?.validate(&options, Some(&mut monitor as &mut dyn ValidateMonitor))?;
                 drop(monitor);
@@ -526,9 +531,17 @@ fn initialize_log(args: &Args) -> std::result::Result<LogGuard, String> {
         .transpose()
         .map_err(|_| "Unparseable log file path".to_string())?;
 
+    let level = args.log_level.unwrap_or({
+        if args.debug {
+            Level::TRACE
+        } else {
+            Level::INFO
+        }
+    });
+
     let guard = log::init(LoggingOptions{
         file,
-        level: args.log_level.unwrap_or(tracing::Level::INFO)
+        level
     })?;
 
     if args.log_level == Some(tracing::Level::TRACE) {

@@ -5,7 +5,9 @@ use std::sync::Mutex;
 use std::ops::Deref;
 
 use lazy_static::lazy_static;
+use tracing::Subscriber;
 use tracing::metadata::LevelFilter;
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 use tracing_subscriber::fmt;
@@ -48,25 +50,58 @@ pub struct LoggingOptions {
 }
 
 pub fn init(options: LoggingOptions) -> std::result::Result<LogGuard, String> {
-    let subscriber = Registry::default()
-        .with(
-            fmt::Layer::default()
-                .with_target(false)
-                .with_writer(|| TerminalWriter{})
-                .with_filter(LevelFilter::from(options.level))
-        );
+    let mut worker_guard = None;
+    let registry = Registry::default();
 
-    tracing::subscriber::set_global_default(subscriber)
+    // Terminal logger.
+    let registry = {
+        registry.with(
+            fmt::Layer::default()
+                    .with_target(false)
+                    .with_writer(|| TerminalWriter{})
+                    .with_filter(LevelFilter::from(options.level))
+        )
+    };
+
+    // File logger.
+    let registry: Box<dyn Subscriber + Send + Sync + 'static> = if let Some(path) = options.file {
+        let directory = path.parent()
+            .ok_or("can't resolve log file directory")?;
+
+        let file_name = path.file_name()
+            .ok_or("can't get log file name")?
+            .to_string_lossy()
+            .to_string();
+
+        let writer = tracing_appender::rolling::never(directory, file_name);
+        let (writer, guard) = tracing_appender::non_blocking(writer);
+        worker_guard = Some(guard);
+
+        Box::new(
+            registry.with(
+                fmt::Layer::default()
+                        .with_ansi(false)
+                        .with_target(false)
+                        .with_writer(writer)
+                        .with_filter(LevelFilter::from(options.level))
+            )
+        )
+    } else {
+        Box::new(registry)
+    };
+
+
+    tracing::subscriber::set_global_default(registry)
         .map_err(|_| "Failed to update global default logger".to_string())?;
 
-    Ok(LogGuard{ })
+    Ok(LogGuard{ _worker_guard: worker_guard })
 }
 
 /// Guards all logging activity.
 /// When dropping the pending logs will be written synchronously
 /// and all open handles closed.
 pub struct LogGuard {
-
+    _worker_guard: Option<WorkerGuard>,
 }
 
 pub struct ViewLogGuard {
