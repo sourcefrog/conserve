@@ -250,7 +250,7 @@ fn mtime_before_epoch() {
     assert_eq!(entries[1].apath(), "/old_file");
 
     let af = ScratchArchive::new();
-    backup(&af, &tf.live_tree(), &BackupOptions::default())
+    backup(&af, &tf.live_tree(), &BackupOptions::default(), None)
         .expect("backup shouldn't crash on before-epoch mtimes");
 }
 
