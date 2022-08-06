@@ -18,6 +18,13 @@ use std::ops::Range;
 use crate::stats::Sizes;
 use crate::*;
 
+pub trait TreeSizeMonitor<T: ReadTree> {
+    fn entry_discovered(&mut self, _entry: &T::Entry, _size: &Option<u64>) {}
+}
+
+struct DefaultTreeSizeMonitor {}
+impl<T: ReadTree> TreeSizeMonitor<T> for DefaultTreeSizeMonitor {}
+
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
 pub trait ReadTree {
     type Entry: Entry + 'static;
@@ -42,36 +49,18 @@ pub trait ReadTree {
     /// Measure the tree size.
     ///
     /// This typically requires walking all entries, which may take a while.
-    fn size(&self, exclude: Exclude) -> Result<TreeSize> {
-        struct Model {
-            files: usize,
-            total_bytes: u64,
-        }
-        impl nutmeg::Model for Model {
-            fn render(&mut self, _width: usize) -> String {
-                format!(
-                    "Measuring... {} files, {} MB",
-                    self.files,
-                    self.total_bytes / 1_000_000
-                )
-            }
-        }
-        let progress = nutmeg::View::new(
-            Model {
-                files: 0,
-                total_bytes: 0,
-            },
-            ui::nutmeg_options(),
-        );
+    fn size(&self, exclude: Exclude, monitor: Option<&mut dyn TreeSizeMonitor<Self>>) -> Result<TreeSize> where Self: Sized {
+        let mut default_monitor = DefaultTreeSizeMonitor{};
+        let monitor = monitor.unwrap_or(&mut default_monitor as &mut dyn TreeSizeMonitor<Self>);
+
         let mut tot = 0u64;
         for e in self.iter_entries(Apath::root(), exclude)? {
+            let size = e.size();
+            monitor.entry_discovered(&e, &size);
+
             // While just measuring size, ignore directories/files we can't stat.
-            if let Some(bytes) = e.size() {
+            if let Some(bytes) = size {
                 tot += bytes;
-                progress.update(|model| {
-                    model.files += 1;
-                    model.total_bytes += bytes;
-                });
             }
         }
         Ok(TreeSize { file_bytes: tot })

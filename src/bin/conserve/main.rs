@@ -20,7 +20,7 @@ use std::str::FromStr;
 
 use clap::{Parser, StructOpt, Subcommand};
 use log::{LoggingOptions, LogGuard};
-use show::{NutmegMonitor, BackupProgressModel};
+use show::{NutmegMonitor, BackupProgressModel, SizeProgressModel};
 use show::{show_diff, ShowVersionsOptions, show_versions};
 use tracing::{ trace, error, info, warn, Level };
 
@@ -448,15 +448,20 @@ impl Command {
                 exclude_from,
             } => {
                 let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
+                
+                // FIXME: Respect the "no progress" option and only log messages.
+                let mut monitor = NutmegMonitor::<SizeProgressModel>::new();
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
-                        .size(excludes)?
+                        .size(excludes, Some(&mut monitor as &mut dyn TreeSizeMonitor<_>))?
                         .file_bytes
                 } else {
                     LiveTree::open(stos.source.as_ref().unwrap())?
-                        .size(excludes)?
+                        .size(excludes, Some(&mut monitor as &mut dyn TreeSizeMonitor<_>))?
                         .file_bytes
                 };
+                drop(monitor);
+                
                 if *bytes {
                     info!("{}", size);
                 } else {
