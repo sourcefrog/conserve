@@ -20,6 +20,9 @@ use std::{fs, time::Instant};
 
 use filetime::{set_file_handle_times};
 
+#[cfg(unix)]
+use filetime::{set_symlink_file_times};
+
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
