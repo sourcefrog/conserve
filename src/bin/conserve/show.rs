@@ -18,10 +18,13 @@
 
 use std::borrow::Cow;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Instant, Duration};
 
 use conserve::backup::BackupMonitor;
+use conserve::stats::Sizes;
 use conserve::ui::duration_to_hms;
-use conserve::{Archive, Result, Band, BandSelectionPolicy, Exclude, bytes_to_human_mb, IndexEntry, DiffEntry, ReadTree, Kind, Entry, DiffKind};
+use conserve::{Archive, Result, Band, BandSelectionPolicy, Exclude, bytes_to_human_mb, IndexEntry, DiffEntry, ReadTree, Kind, Entry, DiffKind, ValidateMonitor, BandProblem, BlockMissingReason};
+use thousands::Separable;
 use tracing::{warn, info};
 use nutmeg::View;
 
@@ -204,10 +207,6 @@ impl<T: nutmeg::Model + Default + Send + 'static> NutmegMonitor<T> {
 }
 
 impl<T: nutmeg::Model> NutmegMonitor<T> {
-    pub fn view(&self) -> &Arc<Mutex<View<T>>> {
-        &self.view
-    }
-
     fn locked_view(&self) -> MutexGuard<View<T>> {
         self.view.lock().expect("lock() should not fail")
     }
@@ -246,6 +245,184 @@ impl BackupMonitor for NutmegMonitor<BackupProgressModel> {
         let view = self.locked_view();
         if let Some(size) = entry.size() {
             view.update(|model| model.scanned_file_bytes += size);
+        }
+    }
+}
+
+enum ValidateProgressState {
+    CountBands,
+    ValidateBands {
+        bands_done: usize,
+        bands_total: usize,
+        start: Instant,
+    },
+    ListBlockes { discovered: usize },
+    ReadBlocks {
+        total_blocks: usize,
+		blocks_done: usize,
+		bytes_done: usize,
+		start: Instant,
+    },
+}
+
+pub struct ValidateProgressModel {
+    bands_total: Option<usize>,
+    state: ValidateProgressState
+}
+
+impl Default for ValidateProgressModel {
+    fn default() -> Self {
+        Self {
+            bands_total: None,
+            state: ValidateProgressState::CountBands {  }
+        }
+    }
+}
+
+impl nutmeg::Model for ValidateProgressModel {
+    fn render(&mut self, _width: usize) -> String {
+        match &self.state {
+            ValidateProgressState::CountBands => "Counting bands".to_string(),
+            ValidateProgressState::ValidateBands { bands_done, bands_total, start } => {
+                format!(
+                    "Check index {}/{}, {} done, {} remaining",
+                    bands_done,
+                    bands_total,
+                    nutmeg::percent_done(*bands_done, *bands_total),
+                    nutmeg::estimate_remaining(start, *bands_done, *bands_total)
+                )
+            },
+            ValidateProgressState::ListBlockes { discovered } => {
+                format!(
+                    "Listing blocks ({} blocks discovered)",
+                    discovered
+                )
+            },
+            ValidateProgressState::ReadBlocks { 
+                total_blocks, 
+                blocks_done, 
+                bytes_done, 
+                start 
+            } => {
+                format!(
+                    "Check block {}/{}: {} done, {} MB checked, {} remaining",
+                    *blocks_done,
+                    *total_blocks,
+                    nutmeg::percent_done(*blocks_done, *total_blocks),
+                    *bytes_done / 1_000_000,
+                    nutmeg::estimate_remaining(start, *blocks_done, *total_blocks)
+                )
+            },
+        }
+    }
+}
+
+impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
+    fn count_bands(&mut self) {
+        info!("Count bands...");
+    }
+
+    fn count_bands_result(&mut self, bands: &[conserve::BandId]) {
+        info!("Checking {} bands...", bands.len());
+        
+        let view = self.locked_view();
+        view.update(|model| model.bands_total = Some(bands.len()));
+    }
+
+    fn validate_bands(&mut self) {
+        let view = self.locked_view();
+        view.update(|model| {
+            let bands_total = model.bands_total.expect("bands have been counted");
+            model.state = ValidateProgressState::ValidateBands { 
+                bands_done: 0,
+                bands_total, 
+                start: Instant::now()
+            };
+        });
+    }
+
+    fn validate_band_problem(&mut self, band: &Band, problem: &conserve::BandProblem) {
+        match problem {
+            BandProblem::MissingHeadFile { .. } => warn!("No band head file in {:?}", band.transport()),
+            BandProblem::UnexpectedFiles { files } => warn!("Unexpected files in band directory {:?}: {:?}", band.transport(), files),
+            BandProblem::UnexpectedDirectories { directories } => warn!("Incongruous directories in band directory {:?}: {:?}", band.transport(), directories),
+        }
+    }
+
+    fn validate_band_result(&mut self, _band_id: &conserve::BandId, _result: &conserve::BandValidateResult) {
+        let view = self.locked_view();
+        view.update(|model| {
+            if let ValidateProgressState::ValidateBands { bands_done, .. } = &mut model.state {
+                *bands_done += 1;
+            } else {
+                panic!("Expected state ValidateProgressState::ValidateBands");
+            }
+        });
+    }
+
+    fn validate_bands_finished(&mut self) {
+        let mut elapsed: Option<Duration> = None;
+
+        // We can't use logging while locked_view is held since we would deadlock.
+        {
+            let view = self.locked_view();
+            view.update(|model| {
+                if let ValidateProgressState::ValidateBands { start, .. } = &mut model.state {
+                    elapsed = Some(start.elapsed());
+                } else {
+                    panic!("Expected state ValidateProgressState::ValidateBands");
+                }
+            });
+        }
+
+        info!("Finished validating bands in {:#?}.", elapsed.expect("elapsed to be set"));
+    }
+
+    fn list_block_names(&mut self, current_count: usize) {
+        if current_count == 0 {
+            info!("Count blocks...");
+        }
+
+        let view = self.locked_view();
+        view.update(|model| model.state = ValidateProgressState::ListBlockes {
+            discovered: current_count
+        });
+    }
+
+    fn read_blocks(&mut self, count: usize) {
+        info!("Check {} blocks...", count.separate_with_commas());
+        
+        let view = self.locked_view();
+        view.update(|model| model.state = ValidateProgressState::ReadBlocks {
+            total_blocks: count,
+			blocks_done: 0,
+			bytes_done: 0,
+			start: Instant::now(),
+        });
+    }
+
+    fn read_block_result(&mut self, _block_hash: &conserve::BlockHash, result: &Result<(Vec<u8>, Sizes)>) {
+        let view = self.locked_view();
+  
+        view.update(|model| {
+            if let ValidateProgressState::ReadBlocks { blocks_done, bytes_done, .. } = &mut model.state {
+                if let Ok((bytes, _sizes)) = result {
+                    *bytes_done += bytes.len();
+                } else {
+                    // TODO: Add a fail counter.
+                }
+
+                *blocks_done += 1;
+            } else {
+                panic!("Expected state ValidateProgressState::ReadBlocks");
+            }
+        });
+    }
+
+    fn validate_block_missing(&mut self, block_hash: &conserve::BlockHash, reason: &conserve::BlockMissingReason) {
+        match reason {
+            BlockMissingReason::NotExisting => warn!("Block {:?} is missing", block_hash),
+            BlockMissingReason::InvalidRange => warn!("Block {:?} is too short", block_hash),
         }
     }
 }

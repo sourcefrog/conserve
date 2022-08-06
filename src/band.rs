@@ -28,6 +28,7 @@ use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
 use crate::transport::{ListDirNames, Transport};
 use crate::*;
+use crate::validate::{ValidateMonitor, BandProblem};
 
 static INDEX_DIR: &str = "i";
 
@@ -215,33 +216,34 @@ impl Band {
         })
     }
 
-    pub fn validate(&self, stats: &mut ValidateStats) -> Result<()> {
-        let ListDirNames { mut files, dirs } =
+    pub fn validate(&self, stats: &mut ValidateStats, monitor: &mut dyn ValidateMonitor) -> Result<()> {
+        let ListDirNames { mut files, mut dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
-        if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
-            ui::problem(&format!("No band head file in {:?}", self.transport));
+
+        let band_head_filename = BAND_HEAD_FILENAME.to_string();
+        if !files.contains(&band_head_filename) {
+            monitor.validate_band_problem(self, &BandProblem::MissingHeadFile{ band_head_filename });
             stats.missing_band_heads += 1;
         }
         remove_item(&mut files, &BAND_HEAD_FILENAME);
         remove_item(&mut files, &BAND_TAIL_FILENAME);
+        remove_item(&mut dirs, &INDEX_DIR);
 
         if !files.is_empty() {
-            ui::problem(&format!(
-                "Unexpected files in band directory {:?}: {:?}",
-                self.transport, files
-            ));
+            monitor.validate_band_problem(self, &BandProblem::UnexpectedFiles{ files });
             stats.unexpected_files += 1;
         }
 
-        if dirs != [INDEX_DIR.to_string()] {
-            ui::problem(&format!(
-                "Incongruous directories in band directory {:?}: {:?}",
-                self.transport, dirs
-            ));
+        if !dirs.is_empty() {
+            monitor.validate_band_problem(self, &BandProblem::UnexpectedDirectories { directories: dirs });
             stats.unexpected_files += 1;
         }
 
         Ok(())
+    }
+
+    pub fn transport(&self) -> &Box<dyn Transport> {
+        &self.transport
     }
 }
 

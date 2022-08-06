@@ -77,7 +77,7 @@ fn validate_archive() {
         let archive = open_old_archive(ver, "minimal");
 
         let stats = archive
-            .validate(&ValidateOptions::default())
+            .validate(&ValidateOptions::default(), None)
             .expect("validate archive");
         assert_eq!(stats.structure_problems, 0);
         assert_eq!(stats.io_errors, 0);

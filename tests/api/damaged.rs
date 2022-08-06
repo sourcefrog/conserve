@@ -21,7 +21,7 @@ use conserve::*;
 fn missing_block() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
 
-    let validate_stats = archive.validate(&ValidateOptions::default())?;
+    let validate_stats = archive.validate(&ValidateOptions::default(), None)?;
     assert!(validate_stats.has_problems());
     assert_eq!(validate_stats.block_missing_count, 1);
     Ok(())
@@ -33,7 +33,7 @@ fn missing_block_skip_block_hashes() -> Result<()> {
 
     let validate_stats = archive.validate(&ValidateOptions {
         skip_block_hashes: true,
-    })?;
+    }, None)?;
     assert!(validate_stats.has_problems());
     assert_eq!(validate_stats.block_missing_count, 1);
     Ok(())

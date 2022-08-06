@@ -26,14 +26,11 @@ use std::convert::TryInto;
 use std::io;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Instant;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use nutmeg::models::UnboundedModel;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use thousands::Separable;
+use tracing::warn;
 
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
@@ -251,12 +248,17 @@ impl BlockDir {
     }
 
     /// Return all the blocknames in the blockdir.
-    pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
-        let progress = nutmeg::View::new(UnboundedModel::new("List blocks"), ui::nutmeg_options());
+    pub fn block_names_set(&self, monitor: &mut dyn ValidateMonitor) -> Result<HashSet<BlockHash>> {
+        let mut block_count = 0usize;
+
+        monitor.list_block_names(block_count);
         Ok(self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok())
-            .inspect(|_| progress.update(|model| model.increment(1)))
+            .inspect(|_| {
+                block_count += 1;
+                monitor.list_block_names(block_count);
+            })
             .collect())
     }
 
@@ -264,67 +266,41 @@ impl BlockDir {
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub fn validate(&self, stats: &mut ValidateStats) -> Result<HashMap<BlockHash, usize>> {
+    pub fn validate(&self, stats: &mut ValidateStats, monitor: &mut dyn ValidateMonitor) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
-        ui::println("Count blocks...");
-        let blocks = self.block_names_set()?;
-        crate::ui::println(&format!(
-            "Check {} blocks...",
-            blocks.len().separate_with_commas()
-        ));
+        let blocks = self.block_names_set(monitor)?;
+        monitor.read_blocks(blocks.len());
+        
         stats.block_read_count = blocks.len().try_into().unwrap();
-        struct ProgressModel {
-            total_blocks: usize,
-            blocks_done: usize,
-            bytes_done: usize,
-            start: Instant,
-        }
-        impl nutmeg::Model for ProgressModel {
-            fn render(&mut self, _width: usize) -> String {
-                format!(
-                    "Check block {}/{}: {} done, {} MB checked, {} remaining",
-                    self.blocks_done,
-                    self.total_blocks,
-                    nutmeg::percent_done(self.blocks_done, self.total_blocks),
-                    self.bytes_done / 1_000_000,
-                    nutmeg::estimate_remaining(&self.start, self.blocks_done, self.total_blocks)
-                )
-            }
-        }
-        let progress_bar = nutmeg::View::new(
-            ProgressModel {
-                total_blocks: blocks.len(),
-                blocks_done: 0,
-                bytes_done: 0,
-                start: Instant::now(),
-            },
-            ui::nutmeg_options(),
-        );
+        
         // Make a vec of Some(usize) if the block could be read, or None if it
         // failed, where the usize gives the uncompressed data size.
         let results: Vec<Option<(BlockHash, usize)>> = blocks
-            .into_par_iter()
-            // .into_iter()
+            //.into_par_iter()
+            .into_iter()
             .map(|hash| {
-                let r = self
-                    .get_block_content(&hash)
+                let result = self.get_block_content(&hash);
+                // TODO(MH): Should we realy provide the block contents? May only return the size or the read error.
+                //           This would also allow to read the blocks in parallel and use a simple iterator where
+                //           we call the monitor.
+                monitor.read_block_result(&hash, &result);
+
+                result
                     .map(|(bytes, _sizes)| (hash, bytes.len()))
-                    .ok();
-                let bytes = r.as_ref().map(|x| x.1).unwrap_or_default();
-                progress_bar.update(|model| {
-                    model.blocks_done += 1;
-                    model.bytes_done += bytes
-                });
-                r
+                    .ok()
             })
             .collect();
+
+        // TODO: Only iter the results once.
         stats.block_error_count += results.iter().filter(|o| o.is_none()).count();
         let len_map: HashMap<BlockHash, usize> = results
             .into_iter()
             .flatten() // keep only Some values
             .collect();
+
+        monitor.read_blocks_finished();
         Ok(len_map)
     }
 
@@ -350,10 +326,7 @@ impl BlockDir {
             decompressed_bytes,
         ));
         if actual_hash != *hash {
-            ui::problem(&format!(
-                "Block file {:?} has actual decompressed hash {}",
-                &block_relpath, actual_hash
-            ));
+            warn!("Block file {:?} has actual decompressed hash {}", &block_relpath, actual_hash);
             return Err(Error::BlockCorrupt {
                 hash: hash.to_string(),
                 actual_hash: actual_hash.to_string(),

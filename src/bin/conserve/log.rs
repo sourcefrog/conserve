@@ -75,7 +75,7 @@ pub struct ViewLogGuard {
 }
 
 impl ViewLogGuard {
-    fn restore_previous_(&mut self) {
+    fn restore_previous(&mut self) {
         if self.released {
             return;
         }
@@ -89,7 +89,7 @@ impl ViewLogGuard {
 
 impl Drop for ViewLogGuard {
     fn drop(&mut self) {
-        self.restore_previous_();
+        self.restore_previous();
     }
 }
 

@@ -12,17 +12,65 @@
 
 use std::cmp::max;
 use std::collections::HashMap;
-use std::time::Instant;
 
 use crate::blockdir::Address;
 use crate::*;
+use crate::stats::Sizes;
 
-pub(crate) struct BlockLengths(pub(crate) HashMap<BlockHash, u64>);
+pub struct BlockLengths(pub HashMap<BlockHash, u64>);
 
 #[derive(Debug, Default)]
 pub struct ValidateOptions {
     /// Assume blocks that are present have the right content: don't read and hash them.
     pub skip_block_hashes: bool,
+}
+
+pub trait ValidateMonitor {
+    fn count_bands(&mut self) {}
+    fn count_bands_result(&mut self, _bands: &[BandId]) {}
+
+    fn validate_bands(&mut self) {}
+    fn validate_bands_finished(&mut self) {}
+
+    fn validate_band(&mut self, _band_id: &BandId) {}
+    fn validate_band_problem(&mut self, _band: &Band, _problem: &BandProblem) {}
+    fn validate_band_result(&mut self, _band_id: &BandId, _result: &BandValidateResult) {}
+
+    fn validate_block_missing(&mut self, _block_hash: &BlockHash, _reason: &BlockMissingReason) {}
+    fn validate_blocks(&mut self) {}
+    fn validate_blocks_finished(&mut self) {}
+
+    fn list_block_names(&mut self, _current_count: usize) {}
+    fn list_block_names_finished(&mut self) {}
+    
+    fn read_blocks(&mut self, _count: usize) {}
+    fn read_block_result(&mut self, _block_hash: &BlockHash, _result: &Result<(Vec<u8>, Sizes)>) {}
+    fn read_blocks_finished(&mut self) {}
+}
+
+/// Band validation result.
+pub enum BandValidateResult {
+    MetadataError(Error),
+    
+    OpenError(Error),
+    TreeOpenError(Error),
+    
+    TreeValidateError(Error),
+
+    Valid(BlockLengths, ValidateStats),
+}
+pub enum BlockMissingReason {
+    /// The target bock can not be found.
+    NotExisting,
+
+    /// The block reference points to an invalid data segment.
+    InvalidRange,
+}
+
+pub enum BandProblem {
+    MissingHeadFile{ band_head_filename: String },
+    UnexpectedFiles{ files: Vec<String> },
+    UnexpectedDirectories{ directories: Vec<String> }
 }
 
 impl BlockLengths {
@@ -52,56 +100,50 @@ impl BlockLengths {
 pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
+    monitor: &mut dyn ValidateMonitor,
 ) -> (BlockLengths, ValidateStats) {
     let mut stats = ValidateStats::default();
     let mut block_lens = BlockLengths::new();
-    struct ProgressModel {
-        bands_done: usize,
-        bands_total: usize,
-        start: Instant,
-    }
-    impl nutmeg::Model for ProgressModel {
-        fn render(&mut self, _width: usize) -> String {
-            format!(
-                "Check index {}/{}, {} done, {} remaining",
-                self.bands_done,
-                self.bands_total,
-                nutmeg::percent_done(self.bands_done, self.bands_total),
-                nutmeg::estimate_remaining(&self.start, self.bands_done, self.bands_total)
-            )
-        }
-    }
-    let view = nutmeg::View::new(
-        ProgressModel {
-            start: Instant::now(),
-            bands_done: 0,
-            bands_total: band_ids.len(),
-        },
-        ui::nutmeg_options(),
-    );
+    
     for band_id in band_ids {
-        if let Ok(b) = Band::open(archive, band_id) {
-            if b.validate(&mut stats).is_err() {
-                stats.band_metadata_problems += 1;
-            }
-        } else {
-            stats.band_open_errors += 1;
-            continue;
-        }
-        if let Ok(st) = archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
-            if let Ok((st_block_lens, st_stats)) = validate_stored_tree(&st) {
+        monitor.validate_band(band_id);
+        let result = validate_band(archive, &mut stats, band_id, monitor);
+        monitor.validate_band_result(band_id, &result);
+        
+        match result {
+            BandValidateResult::MetadataError(_) => stats.band_metadata_problems += 1,
+            BandValidateResult::OpenError(_) => stats.band_open_errors += 1,
+            BandValidateResult::TreeOpenError(_) => stats.tree_open_errors += 1,
+            BandValidateResult::TreeValidateError(_) => stats.tree_validate_errors += 1,
+            BandValidateResult::Valid(st_block_lens, st_stats) => {
                 stats += st_stats;
                 block_lens.update(st_block_lens);
-            } else {
-                stats.tree_validate_errors += 1
             }
-        } else {
-            stats.tree_open_errors += 1;
-            continue;
         }
-        view.update(|model| model.bands_done += 1);
     }
+
     (block_lens, stats)
+}
+
+pub(crate) fn validate_band(archive: &Archive, stats: &mut ValidateStats, band_id: &BandId, monitor: &mut dyn ValidateMonitor) -> BandValidateResult {
+    let band = match Band::open(archive, band_id) {
+        Ok(band) => band,
+        Err(error) => return BandValidateResult::OpenError(error)
+    };
+
+    if let Err(error) = band.validate(stats, monitor) {
+        return BandValidateResult::MetadataError(error);
+    }
+
+    let stored_tree = match archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
+        Ok(tree) => tree,
+        Err(error) => return BandValidateResult::TreeOpenError(error),
+    };
+
+    match validate_stored_tree(&stored_tree)  {
+        Ok(result) => BandValidateResult::Valid(result.0, result.1),
+        Err(error) => BandValidateResult::TreeValidateError(error),
+    }
 }
 
 pub(crate) fn validate_stored_tree(st: &StoredTree) -> Result<(BlockLengths, ValidateStats)> {

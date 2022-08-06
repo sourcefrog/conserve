@@ -33,6 +33,7 @@ use crate::misc::remove_item;
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
+use crate::validate::{ValidateMonitor, BlockMissingReason};
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -57,6 +58,9 @@ pub struct DeleteOptions {
     pub dry_run: bool,
     pub break_lock: bool,
 }
+
+struct DefaultValidateMonitor {}
+impl ValidateMonitor for DefaultValidateMonitor {}
 
 impl Archive {
     /// Make a new archive in a local directory.
@@ -298,52 +302,58 @@ impl Archive {
         Ok(stats)
     }
 
-    pub fn validate(&self, options: &ValidateOptions) -> Result<ValidateStats> {
+    pub fn validate(&self, options: &ValidateOptions, monitor: Option<&mut dyn ValidateMonitor>) -> Result<ValidateStats> {
+        let mut default_monitor = DefaultValidateMonitor{};
+        let monitor = monitor.unwrap_or(&mut default_monitor);
+        
         let start = Instant::now();
         let mut stats = self.validate_archive_dir()?;
 
-        ui::println("Count indexes...");
+        monitor.count_bands();
         let band_ids = self.list_band_ids()?;
-        ui::println(&format!("Checking {} indexes...", band_ids.len()));
+        monitor.count_bands_result(&band_ids);
 
-        // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
+
+        // 1. Walk all indexes, collecting a list of (block_hash, min_length)
         //    values referenced by all the indexes.
-        let (referenced_lens, ref_stats) = validate::validate_bands(self, &band_ids);
+        monitor.validate_bands();
+        let (referenced_lens, ref_stats) = validate::validate_bands(self, &band_ids, monitor);
         stats += ref_stats;
+        monitor.validate_bands_finished();
 
+        monitor.validate_blocks();
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
             // content.
-            ui::println("List present blocks...");
             // TODO: Just validate blockdir structure.
-            let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
+            let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set(monitor)?;
             for block_hash in referenced_lens
                 .0
                 .keys()
                 .filter(|&bh| !present_blocks.contains(bh))
             {
-                ui::problem(&format!("Block {:?} is missing", block_hash));
+                monitor.validate_block_missing(&block_hash, &BlockMissingReason::NotExisting);
                 stats.block_missing_count += 1;
             }
         } else {
             // 2. Check the hash of all blocks are correct, and remember how long
             //    the uncompressed data is.
-            ui::println("Check blockdir...");
-            let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
+            let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats, monitor)?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (block_hash, referenced_len) in referenced_lens.0 {
                 if let Some(actual_len) = block_lengths.get(&block_hash) {
                     if referenced_len > (*actual_len as u64) {
-                        ui::problem(&format!("Block {:?} is too short", block_hash,));
+                        monitor.validate_block_missing(&block_hash, &BlockMissingReason::InvalidRange);
                         // TODO: A separate counter; this is worse than just being missing
                         stats.block_missing_count += 1;
                     }
                 } else {
-                    ui::problem(&format!("Block {:?} is missing", block_hash));
+                    monitor.validate_block_missing(&block_hash, &BlockMissingReason::NotExisting);
                     stats.block_missing_count += 1;
                 }
             }
         }
+        monitor.validate_blocks_finished();
 
         stats.elapsed = start.elapsed();
         Ok(stats)

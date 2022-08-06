@@ -29,6 +29,8 @@ use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
 
+use crate::show::ValidateProgressModel;
+
 mod log;
 mod show;
 
@@ -465,9 +467,13 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                let stats = Archive::open(open_transport(archive)?)?.validate(&options)?;
+
+                let mut monitor = NutmegMonitor::<ValidateProgressModel>::new();
+                let stats = Archive::open(open_transport(archive)?)?.validate(&options, Some(&mut monitor as &mut dyn ValidateMonitor))?;
+                drop(monitor);
+                
                 if !no_stats {
-                    println!("{}", stats);
+                    info!("{}", stats);
                 }
                 if stats.has_problems() {
                     warn!("Archive has some problems.");
