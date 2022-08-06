@@ -17,13 +17,15 @@
 //! file (typically stdout).
 
 use std::borrow::Cow;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use conserve::backup::BackupMonitor;
 use conserve::ui::duration_to_hms;
 use conserve::{Archive, Result, Band, BandSelectionPolicy, Exclude, bytes_to_human_mb, IndexEntry, DiffEntry, ReadTree, Kind, Entry, DiffKind};
 use tracing::{warn, info};
 use nutmeg::View;
+
+use crate::log::{ViewLogGuard, self};
 
 /// ISO timestamp, for https://docs.rs/chrono/0.4.11/chrono/format/strftime/.
 const TIMESTAMP_FORMAT: &str = "%F %T";
@@ -183,19 +185,37 @@ impl nutmeg::Model for BackupProgressModel {
     }
 }
 
-pub struct NutmegBackupMonitor {
-    view: Arc<Mutex<View<BackupProgressModel>>>,
+pub struct NutmegMonitor<T: nutmeg::Model>  {
+    _log_guard: ViewLogGuard,
+    view: Arc<Mutex<View<T>>>,
 }
 
-impl NutmegBackupMonitor {
-    pub fn new(view: Arc<Mutex<View<BackupProgressModel>>>) -> Self {
-        Self { view }
+impl<T: nutmeg::Model + Default + Send + 'static> NutmegMonitor<T> {
+    pub fn new() -> Self {
+        let view = Arc::new(
+            Mutex::new(
+                nutmeg::View::new(T::default(), nutmeg::Options::default())
+            )
+        );
+
+        let log_guard = log::update_terminal_target(view.clone());
+        Self { _log_guard: log_guard, view }
     }
 }
 
-impl BackupMonitor for NutmegBackupMonitor {
+impl<T: nutmeg::Model> NutmegMonitor<T> {
+    pub fn view(&self) -> &Arc<Mutex<View<T>>> {
+        &self.view
+    }
+
+    fn locked_view(&self) -> MutexGuard<View<T>> {
+        self.view.lock().expect("lock() should not fail")
+    }
+}
+
+impl BackupMonitor for NutmegMonitor<BackupProgressModel> {
     fn copy(&mut self, entry: &conserve::LiveEntry) {
-        let view = self.view.lock().expect("lock() should not fail");
+        let view = self.locked_view();
         view.update(|model| {
             model.filename = entry.apath().to_string();
             match entry.kind() {
@@ -207,7 +227,7 @@ impl BackupMonitor for NutmegBackupMonitor {
     }
 
     fn copy_result(&mut self, entry: &conserve::LiveEntry, result: &Option<conserve::DiffKind>) {
-        let view = self.view.lock().expect("lock() should not fail");
+        let view = self.locked_view();
         if let Some(diff_kind) = result.as_ref() {
             view.update(|model| match diff_kind {
                 &DiffKind::Changed => model.entries_changed += 1,
@@ -223,7 +243,7 @@ impl BackupMonitor for NutmegBackupMonitor {
     }
 
     fn copy_error(&mut self, entry: &conserve::LiveEntry, _error: &conserve::Error) {
-        let view = self.view.lock().expect("lock() should not fail");
+        let view = self.locked_view();
         if let Some(size) = entry.size() {
             view.update(|model| model.scanned_file_bytes += size);
         }

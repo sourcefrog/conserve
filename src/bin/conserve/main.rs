@@ -17,15 +17,14 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::process::Termination;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
 
 use clap::{Parser, StructOpt, Subcommand};
-use log::{LoggingOptions, LogGuard, TERMINAL_OUTPUT};
-use show::{BackupProgressModel, NutmegBackupMonitor};
+use log::{LoggingOptions, LogGuard};
+use show::{NutmegMonitor, BackupProgressModel};
 use show::{show_diff, ShowVersionsOptions, show_versions};
 use tracing::{ trace, error, info, warn };
 
-use conserve::backup::BackupOptions;
+use conserve::backup::{BackupOptions, BackupMonitor};
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
@@ -269,7 +268,7 @@ impl Termination for ExitCode {
 }
 
 impl Command {
-    fn run(&self) -> Result<ExitCode> {
+    fn run(&self, args: &Args) -> Result<ExitCode> {
         match self {
             Command::Backup {
                 archive,
@@ -287,27 +286,20 @@ impl Command {
                     ..Default::default()
                 };
 
-                // FIXME: Sync stdout with this view
-                // FIXME: Use cli flag!
-                let view = Arc::new(
-                    Mutex::new(
-                        nutmeg::View::new(BackupProgressModel::default(), nutmeg::Options::default().progress_enabled(true))
-                    )
-                );
-                let mut monitor = NutmegBackupMonitor::new(view.clone());
-                let old_output = {
-                    let mut output = TERMINAL_OUTPUT.lock().unwrap();
-                    output.replace(view.clone())
+                let mut monitor = if args.no_progress {
+                    None
+                } else {
+                    Some(NutmegMonitor::<BackupProgressModel>::new())
                 };
 
-                let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options, Some(&mut monitor))?;
-                {
-                    let mut output = TERMINAL_OUTPUT.lock().unwrap();
-                    *output = old_output;
-                };
+                let stats = backup(
+                    &Archive::open(open_transport(archive)?)?, 
+                    source, 
+                    &options, 
+                    monitor.as_mut().map(|v| v as &mut dyn BackupMonitor)
+                )?;
                 drop(monitor);
-                drop(view);
-                
+
                 if !no_stats {
                     info!("Backup complete.");
                     for line in format!("{}", stats).lines() {
@@ -552,7 +544,7 @@ fn main() -> ExitCode {
     };
 
     ui::enable_progress(!args.no_progress);
-    let result = args.command.run();
+    let result = args.command.run(&args);
     let exit_code = match result {
         Err(ref e) => {
             error!("{}", e.to_string());

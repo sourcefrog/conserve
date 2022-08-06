@@ -87,7 +87,10 @@ pub fn backup(
             
             match writer.copy_entry(&entry, source) {
                 Err(e) => {
-                    debug!("{}", ui::format_error_causes(&e));
+                    for line in ui::format_error_causes(&e).lines() {
+                        debug!("{}", line);
+                    }
+                    
                     monitor.copy_error(&entry, &e);
                     stats.errors += 1;
                     continue;

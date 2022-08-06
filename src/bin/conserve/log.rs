@@ -2,8 +2,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::ops::Deref;
 
-use lazy_static::__Deref;
 use lazy_static::lazy_static;
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::prelude::*;
@@ -52,7 +52,6 @@ pub fn init(options: LoggingOptions) -> std::result::Result<LogGuard, String> {
         .with(
             fmt::Layer::default()
                 .with_target(false)
-                // FIXME: Don't pipe directly into stdout if we got a progress bar.
                 .with_writer(|| TerminalWriter{})
                 .with_filter(LevelFilter::from(options.level))
         );
@@ -68,4 +67,35 @@ pub fn init(options: LoggingOptions) -> std::result::Result<LogGuard, String> {
 /// and all open handles closed.
 pub struct LogGuard {
 
+}
+
+pub struct ViewLogGuard {
+    released: bool,
+    previous_logger: Option<Arc<Mutex<dyn Write + Send + Sync>>>,
+}
+
+impl ViewLogGuard {
+    fn restore_previous_(&mut self) {
+        if self.released {
+            return;
+        }
+
+        self.released = true;
+        
+        let mut output = TERMINAL_OUTPUT.lock().unwrap();
+        *output = self.previous_logger.take();
+    }
+}
+
+impl Drop for ViewLogGuard {
+    fn drop(&mut self) {
+        self.restore_previous_();
+    }
+}
+
+pub fn update_terminal_target(target: Arc<Mutex<dyn Write + Send + Sync>>) -> ViewLogGuard {
+    let mut output = TERMINAL_OUTPUT.lock().unwrap();
+    let previous_logger = output.replace(target);
+
+    ViewLogGuard { previous_logger, released: false }
 }
