@@ -94,7 +94,7 @@ fn restore_old_archive() {
 
         let archive = open_old_archive(ver, "minimal");
         let restore_stats =
-            restore(&archive, dest.path(), &RestoreOptions::default()).expect("restore");
+            restore(&archive, dest.path(), &RestoreOptions::default(), None).expect("restore");
 
         assert_eq!(restore_stats.files, 2);
         assert_eq!(restore_stats.symlinks, 0);
@@ -136,7 +136,7 @@ fn restore_modify_backup() {
 
         let archive = open_old_archive(ver, "minimal");
 
-        restore(&archive, working_tree.path(), &RestoreOptions::default()).expect("restore");
+        restore(&archive, working_tree.path(), &RestoreOptions::default(), None).expect("restore");
 
         // Write back into a new copy of the archive, without modifying the
         // testdata in the source tree.
@@ -161,10 +161,7 @@ fn restore_modify_backup() {
         let backup_stats = backup(
             &new_archive,
             &LiveTree::open(working_tree.path()).unwrap(),
-            &BackupOptions {
-                print_filenames: true,
-                ..Default::default()
-            },
+            &Default::default(),
             None
         )
         .expect("Backup modified tree");

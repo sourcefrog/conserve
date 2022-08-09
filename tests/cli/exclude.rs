@@ -50,7 +50,7 @@ fn exclude_simple_glob() {
     src.create_file("src/hello.o");
 
     run_conserve()
-        .args(&["backup", "-v", "--exclude", "*.o", "--no-stats"])
+        .args(&["-R", "backup", "-v", "--exclude", "*.o", "--no-stats"])
         .arg(&af.path())
         .arg(&src.path())
         .assert()
@@ -58,7 +58,7 @@ fn exclude_simple_glob() {
         .success();
 
     run_conserve()
-        .args(&["ls"])
+        .args(&["-R", "ls"])
         .arg(&af.path())
         .assert()
         .stdout("/\n/src\n/src/hello.c\n")
@@ -76,7 +76,7 @@ fn exclude_glob_only_in_root() {
     src.create_file("src/hello.o");
 
     run_conserve()
-        .args(&["backup", "-v", "--exclude", "/*.o", "--no-stats"])
+        .args(&["-R", "backup", "-v", "--exclude", "/*.o", "--no-stats"])
         .arg(&af.path())
         .arg(&src.path())
         .assert()
@@ -84,7 +84,7 @@ fn exclude_glob_only_in_root() {
         .success();
 
     run_conserve()
-        .args(&["ls"])
+        .args(&["-R", "ls"])
         .arg(&af.path())
         .assert()
         .stdout("/\n/src\n/src/hello.c\n/src/hello.o\n")
@@ -114,7 +114,7 @@ fn exclude_suffix_pattern() {
         .success();
 
     run_conserve()
-        .args(&["ls"])
+        .args(&["-R", "ls"])
         .arg(&af.path())
         .assert()
         .stdout("/\n/release\n/src\n/subproj\n/target\n/src/hello.rs\n/subproj/target\n")

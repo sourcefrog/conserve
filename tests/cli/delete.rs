@@ -119,13 +119,14 @@ fn delete_nonexistent_band() {
     let af = ScratchArchive::new();
 
     let pred_fn = predicate::str::is_match(
-        r"conserve error: Failed to delete band b0000
+        r"Failed to delete band b0000
   caused by: (No such file or directory|The system cannot find the file specified\.) \(os error \d+\)
 ",
         )
         .unwrap();
 
     run_conserve()
+        .arg("-R")
         .args(&["delete"])
         .args(&["-b", "b0000"])
         .arg(af.path())

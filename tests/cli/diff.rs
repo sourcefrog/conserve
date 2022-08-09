@@ -56,6 +56,7 @@ fn no_changes() {
     let (af, tf) = setup();
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg(af.path())
         .arg(tf.path())
@@ -65,6 +66,7 @@ fn no_changes() {
         .stderr(predicate::str::is_empty());
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg("--include-unchanged")
         .arg(af.path())
@@ -82,6 +84,7 @@ fn add_entries() {
     tf.create_file_with_contents("src/new.rs", b"pub fn main() {}");
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg(af.path())
         .arg(tf.path())
@@ -97,6 +100,7 @@ fn remove_file() {
     std::fs::remove_file(tf.path().join("hello.c")).unwrap();
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg(af.path())
         .arg(tf.path())
@@ -106,6 +110,7 @@ fn remove_file() {
         .stderr(predicate::str::is_empty());
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg("--include-unchanged")
         .arg(af.path())
@@ -123,6 +128,7 @@ fn change_kind() {
     tf.create_file_with_contents("subdir", b"used to be a directory, no longer");
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg(af.path())
         .arg(tf.path())
@@ -132,6 +138,7 @@ fn change_kind() {
         .stderr(predicate::str::is_empty());
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg("--include-unchanged")
         .arg(af.path())
@@ -149,6 +156,7 @@ fn change_file_content() {
     tf.create_file_with_contents("hello.c", b"int main() { abort(); }");
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg(af.path())
         .arg(tf.path())
@@ -158,6 +166,7 @@ fn change_file_content() {
         .stderr(predicate::str::is_empty());
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg("--include-unchanged")
         .arg(af.path())
@@ -174,6 +183,7 @@ pub fn symlink_unchanged() {
     let (af, tf) = setup_symlink();
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg(af.path())
         .arg(tf.path())
@@ -183,6 +193,7 @@ pub fn symlink_unchanged() {
         .stderr(predicate::str::is_empty());
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg("--include-unchanged")
         .arg(af.path())
@@ -201,6 +212,7 @@ pub fn symlink_changed() {
     tf.create_symlink("subdir/link", "newtarget");
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg(af.path())
         .arg(tf.path())
@@ -210,6 +222,7 @@ pub fn symlink_changed() {
         .stderr(predicate::str::is_empty());
 
     run_conserve()
+        .arg("-R")
         .arg("diff")
         .arg("--include-unchanged")
         .arg(af.path())

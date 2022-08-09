@@ -78,6 +78,7 @@ fn basic_backup() {
 
     // conserve init
     run_conserve()
+        .arg("-R")
         .arg("init")
         .arg(&arch_dir)
         .assert()
@@ -98,7 +99,7 @@ fn basic_backup() {
     assert!(src.is_dir());
 
     run_conserve()
-        .args(&["ls", "--source"])
+        .args(&["-R", "ls", "--source"])
         .arg(&src)
         .assert()
         .success()
@@ -111,7 +112,7 @@ fn basic_backup() {
         );
 
     run_conserve()
-        .args(&["size", "-s"])
+        .args(&["-R", "size", "-s"])
         .arg(&src)
         .assert()
         .success()
@@ -120,6 +121,7 @@ fn basic_backup() {
 
     // backup
     run_conserve()
+        .arg("-R")
         .arg("backup")
         .arg(&arch_dir)
         .arg(&src)
@@ -130,7 +132,7 @@ fn basic_backup() {
     // TODO: Now inspect the archive.
 
     run_conserve()
-        .args(&["size"])
+        .args(&["-R", "size"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -138,7 +140,7 @@ fn basic_backup() {
         .stdout("0 MB\n"); // "contents"
 
     run_conserve()
-        .args(&["versions", "--short"])
+        .args(&["-R", "versions", "--short"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -156,7 +158,7 @@ fn basic_backup() {
     };
 
     run_conserve()
-        .args(&["debug", "blocks"])
+        .args(&["-R", "debug", "blocks"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -164,7 +166,7 @@ fn basic_backup() {
         .stdout(predicate::function(is_expected_blocks));
 
     run_conserve()
-        .args(&["debug", "referenced"])
+        .args(&["-R", "debug", "referenced"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -193,6 +195,7 @@ fn basic_backup() {
     // You can open it with a file URL.
     let file_url = Url::from_directory_path(&arch_dir).unwrap();
     run_conserve()
+        .arg("-R")
         .arg("ls")
         .arg(file_url.as_str())
         .assert()
@@ -211,6 +214,7 @@ fn basic_backup() {
     // Also try --no-progress here; should make no difference because these tests run
     // without a pty.
     run_conserve()
+        .arg("-R")
         .arg("restore")
         .arg("-v")
         .arg("--no-progress")
@@ -375,7 +379,7 @@ fn size_exclude() {
     source.create_file_with_contents("junk", b"01234567890123456789");
 
     run_conserve()
-        .args(&["size", "--bytes", "--source"])
+        .args(&["-R", "size", "--bytes", "--source"])
         .arg(&source.path())
         .args(&["--exclude=/junk"])
         .assert()
