@@ -22,7 +22,7 @@ use filetime::{set_file_handle_times};
 
 #[cfg(unix)]
 use filetime::{set_symlink_file_times};
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
@@ -164,7 +164,7 @@ impl RestoreTree {
     fn finish(self) -> Result<RestoreStats> {
         for (path, time) in self.dir_mtimes {
             if let Err(err) = filetime::set_file_mtime(path, time.into()) {
-                ui::problem(&format!("Failed to set directory mtime: {:?}", err));
+                warn!("Failed to set directory mtime: {:?}", err);
             }
         }
         Ok(RestoreStats::default())
@@ -228,7 +228,7 @@ impl RestoreTree {
             }
         } else {
             // TODO: Treat as an error.
-            ui::problem(&format!("No target in symlink entry {}", entry.apath()));
+            warn!("No target in symlink entry {}", entry.apath());
         }
         Ok(())
     }
@@ -237,10 +237,10 @@ impl RestoreTree {
     fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()> {
         // TODO: Add a test with a canned index containing a symlink, and expect
         // it cannot be restored on Windows and can be on Unix.
-        ui::problem(&format!(
+        warn!(
             "Can't restore symlinks on non-Unix: {}",
             entry.apath()
-        ));
+        );
         Ok(())
     }
 }

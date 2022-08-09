@@ -505,7 +505,6 @@ impl Command {
                 sizes,
                 utc,
             } => {
-                ui::enable_progress(false);
                 let archive = Archive::open(open_transport(archive)?)?;
                 let options = ShowVersionsOptions {
                     newest_first: *newest,
@@ -573,7 +572,6 @@ fn main() -> ExitCode {
         }
     };
 
-    ui::enable_progress(!args.no_progress);
     let result = args.command.run(&args);
     let exit_code = match result {
         Err(ref e) => {

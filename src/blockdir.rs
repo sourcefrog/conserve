@@ -31,7 +31,7 @@ use rayon::prelude::*;
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
+use tracing::{ warn, error };
 
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
@@ -120,10 +120,10 @@ impl BlockDir {
             .or_else(|io_err| {
                 if io_err.kind() == io::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
-                    ui::problem(&format!(
+                    error!(
                         "Unexpected late detection of existing block {:?}",
                         hex_hash
-                    ));
+                    );
                     Ok(())
                 } else {
                     Err(Error::WriteBlock {
@@ -203,10 +203,10 @@ impl BlockDir {
             if dirname.len() == SUBDIR_NAME_CHARS {
                 true
             } else {
-                ui::problem(&format!(
+                error!(
                     "Unexpected subdirectory in blockdir: {:?}",
                     dirname
-                ));
+                );
                 false
             }
         });
@@ -221,14 +221,14 @@ impl BlockDir {
             .map(move |subdir_name| transport.iter_dir_entries(&subdir_name))
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
-                    ui::problem(&format!("Error listing block directory: {:?}", &err));
+                    error!("Error listing block directory: {:?}", &err);
                 }
                 iter_or.ok()
             })
             .flatten()
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
-                    ui::problem(&format!("Error listing block subdirectory: {:?}", &err));
+                    error!("Error listing block subdirectory: {:?}", &err);
                 }
                 iter_or.ok()
             })

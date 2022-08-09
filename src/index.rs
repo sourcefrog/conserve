@@ -19,6 +19,7 @@ use std::iter::Peekable;
 use std::path::Path;
 use std::sync::Arc;
 use std::vec;
+use tracing::error;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
@@ -320,10 +321,10 @@ impl Iterator for IndexHunkIter {
                 Ok(Some(entries)) => entries,
                 Err(err) => {
                     self.stats.errors += 1;
-                    ui::problem(&format!(
+                    error!(
                         "Error reading index hunk {:?}: {:?} ",
                         hunk_number, err
-                    ));
+                    );
                     continue;
                 }
             };

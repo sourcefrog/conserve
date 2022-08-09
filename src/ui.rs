@@ -14,50 +14,9 @@
 //! Console UI.
 
 use std::fmt::Write;
-use std::sync::Mutex;
 use std::time::Duration;
 
-use lazy_static::lazy_static;
-use tracing::{debug, error};
-
 use crate::stats::Sizes;
-
-/// A terminal/text UI.
-///
-/// This manages interleaving log-type messages (info and error), interleaved
-/// with progress bars.
-///
-/// Progress bars are only drawn when the application requests them with
-/// `enable_progress` and the output destination is a tty that's capable
-/// of redrawing.
-///
-/// So this class also works when stdout is redirected to a file, in
-/// which case it will get only messages and no progress bar junk.
-#[derive(Default)]
-pub(crate) struct UIState {
-    /// Should a progress bar be drawn?
-    progress_enabled: bool,
-}
-
-lazy_static! {
-    static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState::default());
-}
-
-pub fn println(s: &str) {
-    with_locked_ui(|ui| ui.println(s))
-}
-
-pub fn problem(s: &str) {
-    with_locked_ui(|ui| ui.problem(s));
-}
-
-pub(crate) fn with_locked_ui<F>(mut cb: F)
-where
-    F: FnMut(&mut UIState),
-{
-    use std::ops::DerefMut;
-    cb(UI_STATE.lock().unwrap().deref_mut())
-}
 
 pub(crate) fn format_error_causes(error: &dyn std::error::Error) -> String {
     let mut buf = error.to_string();
@@ -67,22 +26,6 @@ pub(crate) fn format_error_causes(error: &dyn std::error::Error) -> String {
         cause = c;
     }
     buf
-}
-
-/// Report that a non-fatal error occurred.
-///
-/// The program will continue.
-pub fn show_error(e: &dyn std::error::Error) {
-    // TODO: Log it.
-    problem(&format_error_causes(e));
-}
-
-/// Enable drawing progress bars, only if stdout is a tty.
-///
-/// Progress bars are off by default.
-pub fn enable_progress(enabled: bool) {
-    let mut ui = UI_STATE.lock().unwrap();
-    ui.progress_enabled = enabled;
 }
 
 #[allow(unused)]
@@ -126,35 +69,6 @@ pub(crate) fn compression_ratio(s: &Sizes) -> f64 {
         s.uncompressed as f64 / s.compressed as f64
     } else {
         0f64
-    }
-}
-
-// FIXME: Don't use these functions any more.
-//        Directly log to tracing or to the monitor.
-impl UIState {
-    pub(crate) fn println(&mut self, s: &str) {
-        // TODO: Go through Nutmeg instead...
-        // self.clear_progress();
-        debug!("{}", s);
-    }
-
-    fn problem(&mut self, s: &str) {
-        // TODO: Go through Nutmeg instead...
-        // self.clear_progress();
-        error!("{}", s);
-        // Drawing this way makes messages leak from tests, for unclear reasons.
-
-        // queue!(
-        //     stdout,
-        //     style::SetForegroundColor(style::Color::Red),
-        //     style::SetAttribute(style::Attribute::Bold),
-        //     style::Print("conserve error: "),
-        //     style::SetAttribute(style::Attribute::Reset),
-        //     style::Print(s),
-        //     style::Print("\n"),
-        //     style::ResetColor,
-        // )
-        // .unwrap();
     }
 }
 
