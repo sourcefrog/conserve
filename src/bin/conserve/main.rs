@@ -302,7 +302,7 @@ impl Command {
                     &Archive::open(open_transport(archive)?)?, 
                     source, 
                     &options, 
-                    monitor.as_mut().map(|v| v as &mut dyn BackupMonitor)
+                    monitor.as_mut().map(|v| v as &dyn BackupMonitor)
                 )?;
                 drop(monitor);
 
@@ -464,11 +464,11 @@ impl Command {
                 let mut monitor = NutmegMonitor::new(SizeProgressModel::default());
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
-                        .size(excludes, Some(&mut monitor as &mut dyn TreeSizeMonitor<_>))?
+                        .size(excludes, Some(&mut monitor as &dyn TreeSizeMonitor<_>))?
                         .file_bytes
                 } else {
                     LiveTree::open(stos.source.as_ref().unwrap())?
-                        .size(excludes, Some(&mut monitor as &mut dyn TreeSizeMonitor<_>))?
+                        .size(excludes, Some(&mut monitor as &dyn TreeSizeMonitor<_>))?
                         .file_bytes
                 };
                 drop(monitor);
@@ -490,7 +490,7 @@ impl Command {
 
                 // FIXME: Respect the "no progress" option and only log messages.
                 let mut monitor = NutmegMonitor::new(ValidateProgressModel::default());
-                let stats = Archive::open(open_transport(archive)?)?.validate(&options, Some(&mut monitor as &mut dyn ValidateMonitor))?;
+                let stats = Archive::open(open_transport(archive)?)?.validate(&options, Some(&mut monitor as &dyn ValidateMonitor))?;
                 drop(monitor);
                 
                 if !no_stats {

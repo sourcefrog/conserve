@@ -57,7 +57,7 @@ pub fn backup(
     archive: &Archive,
     source: &LiveTree,
     options: &BackupOptions,
-    monitor: Option<&mut dyn BackupMonitor>,
+    monitor: Option<&dyn BackupMonitor>,
 ) -> Result<BackupStats> {
     let _span = tracing::span!(Level::DEBUG, "backup");
 

@@ -216,7 +216,7 @@ impl Band {
         })
     }
 
-    pub fn validate(&self, stats: &mut ValidateStats, monitor: &mut dyn ValidateMonitor) -> Result<()> {
+    pub fn validate(&self, stats: &mut ValidateStats, monitor: &dyn ValidateMonitor) -> Result<()> {
         let ListDirNames { mut files, mut dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
 

@@ -18,10 +18,12 @@ use std::io::ErrorKind;
 use std::path::Path;
 use std::sync::Arc;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use rayon::prelude::*;
 
 use crate::blockhash::BlockHash;
 use crate::errors::Error;
@@ -203,23 +205,21 @@ impl Archive {
     /// Returns all blocks referenced by all bands.
     ///
     /// Shows a progress bar as they're collected.
-    pub fn referenced_blocks(&self, band_ids: &[BandId], monitor: Option<&mut dyn ReferencedBlocksMonitor>) -> Result<HashSet<BlockHash>> {
+    pub fn referenced_blocks(&self, band_ids: &[BandId], monitor: Option<&dyn ReferencedBlocksMonitor>) -> Result<HashSet<BlockHash>> {
         let mut default_monitor = DefaultMonitor{};
         let monitor = monitor.unwrap_or(&mut default_monitor);
 
         let archive = self.clone();
-        let mut current_count = 0;
+        let current_count = AtomicUsize::new(0);
         
         let result = band_ids
-            // .par_iter()
-            .iter()
+            .par_iter()
             .inspect(|_| {
-                current_count += 1;
-                monitor.list_referenced_blocks(current_count);
+                monitor.list_referenced_blocks(current_count.fetch_add(1, Ordering::Relaxed) + 1);
             })
             .map(move |band_id| Band::open(&archive, band_id).expect("Failed to open band"))
-            .flat_map(|band| band.index().iter_entries())
-            .flat_map(|entry| entry.addrs)
+            .flat_map_iter(|band| band.index().iter_entries())
+            .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
             .collect();
 
@@ -228,7 +228,7 @@ impl Archive {
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
-    pub fn unreferenced_blocks(&self, monitor: Option<&mut dyn ReferencedBlocksMonitor>) -> Result<impl Iterator<Item = BlockHash>> {
+    pub fn unreferenced_blocks(&self, monitor: Option<&dyn ReferencedBlocksMonitor>) -> Result<impl Iterator<Item = BlockHash>> {
         let referenced = self.referenced_blocks(&self.list_band_ids()?, monitor)?;
         Ok(self
             .block_dir()
@@ -244,7 +244,7 @@ impl Archive {
         &self,
         delete_band_ids: &[BandId],
         options: &DeleteOptions,
-        monitor: Option<&mut dyn DeleteMonitor>,
+        monitor: Option<&dyn DeleteMonitor>,
     ) -> Result<DeleteStats> {
         let mut default_monitor = DefaultMonitor{};
         let monitor_ = monitor.unwrap_or(&mut default_monitor);
@@ -288,13 +288,14 @@ impl Archive {
         let total_bytes = {
             monitor_.measure_unreferenced_blocks(0, unref_count); 
             
-            let mut block_index = 0;      
+            let block_index = AtomicUsize::new(0);
             let total_bytes = unref
-                //.par_iter()
-                .iter()
+                .par_iter()
                 .inspect(|_| {
-                    block_index += 1;
-                    monitor_.measure_unreferenced_blocks(block_index, unref_count);  
+                    monitor_.measure_unreferenced_blocks(
+                        block_index.fetch_add(1, Ordering::Relaxed) + 1,
+                        unref_count
+                    );  
                 })
                 .map(|block_id| block_dir.compressed_size(block_id).unwrap_or_default())
                 .sum();
@@ -324,13 +325,14 @@ impl Archive {
             {
                 monitor_.delete_blocks(0, unref.len());
 
-                let mut delete_block_count = 0;
+                let delete_block_count = AtomicUsize::new(0);
                 let error_count = unref
-                    //.par_iter()
-                    .iter()
+                    .par_iter()
                     .inspect(|_| {
-                        delete_block_count += 1;
-                        monitor_.delete_blocks(delete_block_count, unref.len());
+                        monitor_.delete_blocks(
+                            delete_block_count.fetch_add(1, Ordering::Relaxed) + 1,
+                            unref.len()
+                        );
                     })
                     .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
                     .count();
@@ -345,7 +347,7 @@ impl Archive {
         Ok(stats)
     }
 
-    pub fn validate(&self, options: &ValidateOptions, monitor: Option<&mut dyn ValidateMonitor>) -> Result<ValidateStats> {
+    pub fn validate(&self, options: &ValidateOptions, monitor: Option<&dyn ValidateMonitor>) -> Result<ValidateStats> {
         let mut default_monitor = DefaultMonitor{};
         let monitor = monitor.unwrap_or(&mut default_monitor);
         
@@ -404,7 +406,7 @@ impl Archive {
         Ok(stats)
     }
 
-    fn validate_archive_dir(&self, monitor: &mut dyn ValidateMonitor) -> Result<ValidateStats> {
+    fn validate_archive_dir(&self, monitor: &dyn ValidateMonitor) -> Result<ValidateStats> {
         // TODO: Tests for the problems detected here.
         let mut stats = ValidateStats::default();
 

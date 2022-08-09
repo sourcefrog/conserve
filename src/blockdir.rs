@@ -26,6 +26,7 @@ use std::convert::TryInto;
 use std::io;
 use std::path::Path;
 use std::sync::Arc;
+use rayon::prelude::*;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
@@ -247,25 +248,27 @@ impl BlockDir {
     }
 
     /// Return all the blocknames in the blockdir.
-    pub fn block_names_set(&self, monitor: &mut dyn ValidateMonitor) -> Result<HashSet<BlockHash>> {
+    pub fn block_names_set(&self, monitor: &dyn ValidateMonitor) -> Result<HashSet<BlockHash>> {
         let mut block_count = 0usize;
 
         monitor.list_block_names(block_count);
-        Ok(self
+        let result = self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok())
             .inspect(|_| {
                 block_count += 1;
                 monitor.list_block_names(block_count);
             })
-            .collect())
+            .collect();
+        monitor.list_block_names_finished();
+        Ok(result)
     }
 
     /// Check format invariants of the BlockDir.
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub fn validate(&self, stats: &mut ValidateStats, monitor: &mut dyn ValidateMonitor) -> Result<HashMap<BlockHash, usize>> {
+    pub fn validate(&self, stats: &mut ValidateStats, monitor: &dyn ValidateMonitor) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
@@ -277,8 +280,7 @@ impl BlockDir {
         // Make a vec of Some(usize) if the block could be read, or None if it
         // failed, where the usize gives the uncompressed data size.
         let results: Vec<Option<(BlockHash, usize)>> = blocks
-            //.into_par_iter()
-            .into_iter()
+            .into_par_iter()
             .map(|hash| {
                 let result = self.get_block_content(&hash);
                 // TODO(MH): Should we realy provide the block contents? May only return the size or the read error.

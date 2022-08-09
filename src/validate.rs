@@ -76,7 +76,7 @@ impl BlockLengths {
 pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
-    monitor: &mut dyn ValidateMonitor,
+    monitor: &dyn ValidateMonitor,
 ) -> (BlockLengths, ValidateStats) {
     let mut stats = ValidateStats::default();
     let mut block_lens = BlockLengths::new();
@@ -101,7 +101,7 @@ pub(crate) fn validate_bands(
     (block_lens, stats)
 }
 
-pub(crate) fn validate_band(archive: &Archive, stats: &mut ValidateStats, band_id: &BandId, monitor: &mut dyn ValidateMonitor) -> BandValidateResult {
+pub(crate) fn validate_band(archive: &Archive, stats: &mut ValidateStats, band_id: &BandId, monitor: &dyn ValidateMonitor) -> BandValidateResult {
     let band = match Band::open(archive, band_id) {
         Ok(band) => band,
         Err(error) => return BandValidateResult::OpenError(error)

@@ -59,7 +59,7 @@ pub fn restore(
     archive: &Archive,
     destination_path: &Path,
     options: &RestoreOptions,
-    monitor: Option<&mut dyn RestoreMonitor>,
+    monitor: Option<&dyn RestoreMonitor>,
 ) -> Result<RestoreStats> {
     let mut default_monitor = DefaultMonitor{};
     let monitor = monitor.unwrap_or(&mut default_monitor);

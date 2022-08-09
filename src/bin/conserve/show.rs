@@ -217,7 +217,7 @@ impl<T: nutmeg::Model> NutmegMonitor<T> {
 }
 
 impl BackupMonitor for NutmegMonitor<BackupProgressModel> {
-    fn copy(&mut self, entry: &conserve::LiveEntry) {
+    fn copy(&self, entry: &conserve::LiveEntry) {
         let view = self.locked_view();
         view.update(|model| {
             model.filename = entry.apath().to_string();
@@ -229,7 +229,7 @@ impl BackupMonitor for NutmegMonitor<BackupProgressModel> {
         });
     }
 
-    fn copy_result(&mut self, entry: &conserve::LiveEntry, result: &Option<conserve::DiffKind>) {
+    fn copy_result(&self, entry: &conserve::LiveEntry, result: &Option<conserve::DiffKind>) {
         let view = self.locked_view();
         if let Some(diff_kind) = result.as_ref() {
             view.update(|model| match diff_kind {
@@ -245,7 +245,7 @@ impl BackupMonitor for NutmegMonitor<BackupProgressModel> {
         }
     }
 
-    fn copy_error(&mut self, entry: &conserve::LiveEntry, _error: &conserve::Error) {
+    fn copy_error(&self, entry: &conserve::LiveEntry, _error: &conserve::Error) {
         let view = self.locked_view();
         if let Some(size) = entry.size() {
             view.update(|model| model.scanned_file_bytes += size);
@@ -325,11 +325,11 @@ impl nutmeg::Model for ValidateProgressModel {
 }
 
 impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
-    fn validate_archive(&mut self) {
+    fn validate_archive(&self) {
         info!("Check archive top-level directory...");
     }
 
-    fn validate_archive_problem(&mut self, problem: &ValidateArchiveProblem) {
+    fn validate_archive_problem(&self, problem: &ValidateArchiveProblem) {
         match problem {
             ValidateArchiveProblem::UnexpectedFileType { name, kind } => {
                 error!(
@@ -355,18 +355,18 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
         }
     }
 
-    fn count_bands(&mut self) {
+    fn count_bands(&self) {
         info!("Count bands...");
     }
 
-    fn count_bands_result(&mut self, bands: &[conserve::BandId]) {
+    fn count_bands_result(&self, bands: &[conserve::BandId]) {
         info!("Checking {} bands...", bands.len());
 
         let view = self.locked_view();
         view.update(|model| model.bands_total = Some(bands.len()));
     }
 
-    fn validate_bands(&mut self) {
+    fn validate_bands(&self) {
         let view = self.locked_view();
         view.update(|model| {
             let bands_total = model.bands_total.expect("bands have been counted");
@@ -378,7 +378,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
         });
     }
 
-    fn validate_band_problem(&mut self, band: &Band, problem: &conserve::BandProblem) {
+    fn validate_band_problem(&self, band: &Band, problem: &conserve::BandProblem) {
         match problem {
             BandProblem::MissingHeadFile { .. } => {
                 warn!("No band head file in {:?}", band.transport())
@@ -397,7 +397,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
     }
 
     fn validate_band_result(
-        &mut self,
+        &self,
         _band_id: &conserve::BandId,
         _result: &conserve::BandValidateResult,
     ) {
@@ -411,7 +411,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
         });
     }
 
-    fn validate_bands_finished(&mut self) {
+    fn validate_bands_finished(&self) {
         let mut elapsed: Option<Duration> = None;
 
         // We can't use logging while locked_view is held since we would deadlock.
@@ -432,7 +432,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
         );
     }
 
-    fn list_block_names(&mut self, current_count: usize) {
+    fn list_block_names(&self, current_count: usize) {
         if current_count == 0 {
             info!("Count blocks...");
         }
@@ -445,7 +445,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
         });
     }
 
-    fn read_blocks(&mut self, count: usize) {
+    fn read_blocks(&self, count: usize) {
         info!("Check {} blocks...", count.separate_with_commas());
 
         let view = self.locked_view();
@@ -460,7 +460,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
     }
 
     fn read_block_result(
-        &mut self,
+        &self,
         _block_hash: &conserve::BlockHash,
         result: &Result<(Vec<u8>, Sizes)>,
     ) {
@@ -487,7 +487,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
     }
 
     fn validate_block_missing(
-        &mut self,
+        &self,
         block_hash: &conserve::BlockHash,
         reason: &conserve::BlockMissingReason,
     ) {
@@ -514,7 +514,7 @@ impl nutmeg::Model for SizeProgressModel {
 }
 
 impl<T: ReadTree> TreeSizeMonitor<T> for NutmegMonitor<SizeProgressModel> {
-    fn entry_discovered(&mut self, _entry: &<T as ReadTree>::Entry, size: &Option<u64>) {
+    fn entry_discovered(&self, _entry: &<T as ReadTree>::Entry, size: &Option<u64>) {
         let view = self.locked_view();
         view.update(|model| {
             model.files += 1;
@@ -573,32 +573,32 @@ impl Model for DeleteProcessState {
 }
 
 impl DeleteMonitor for NutmegMonitor<DeleteProcessState> {
-    fn referenced_blocks_monitor(&mut self) -> &mut dyn conserve::ReferencedBlocksMonitor {
+    fn referenced_blocks_monitor(&self) -> &dyn conserve::ReferencedBlocksMonitor {
         self
     }
 
-    fn find_present_blocks(&mut self, current_count: usize) {
+    fn find_present_blocks(&self, current_count: usize) {
         let view = self.locked_view();
         view.update(|view| {
             *view = DeleteProcessState::FindPresentBlocks { count: current_count };
         });
     }
 
-    fn measure_unreferenced_blocks(&mut self, current_count: usize, target_count: usize) {
+    fn measure_unreferenced_blocks(&self, current_count: usize, target_count: usize) {
         let view = self.locked_view();
         view.update(|view| {
             *view = DeleteProcessState::MeasureUnreferencedBlocks { count: current_count, target: target_count };
         });
     }
 
-    fn delete_bands(&mut self, current_count: usize, target_count: usize) {
+    fn delete_bands(&self, current_count: usize, target_count: usize) {
         let view = self.locked_view();
         view.update(|view| {
             *view = DeleteProcessState::DeleteBands { count: current_count, target: target_count };
         });
     }
 
-    fn delete_blocks(&mut self, current_count: usize, target_count: usize) {
+    fn delete_blocks(&self, current_count: usize, target_count: usize) {
         let view = self.locked_view();
         view.update(|view| {
             *view = DeleteProcessState::DeleteBlocks { count: current_count, target: target_count };
@@ -607,7 +607,7 @@ impl DeleteMonitor for NutmegMonitor<DeleteProcessState> {
 }
 
 impl ReferencedBlocksMonitor for NutmegMonitor<DeleteProcessState> {
-    fn list_referenced_blocks(&mut self, current_count: usize) {
+    fn list_referenced_blocks(&self, current_count: usize) {
         let view = self.locked_view();
         view.update(|view| {
             *view = DeleteProcessState::ListReferencedBlocks { count: current_count };
@@ -642,7 +642,7 @@ impl nutmeg::Model for RestoreProgressModel {
 }
 
 impl RestoreMonitor for NutmegMonitor<RestoreProgressModel> {
-    fn restore_entry(&mut self, entry: &IndexEntry) {
+    fn restore_entry(&self, entry: &IndexEntry) {
         let mut print_filename = false;
         {
             let view = self.locked_view();
@@ -657,7 +657,7 @@ impl RestoreMonitor for NutmegMonitor<RestoreProgressModel> {
         }
     }
 
-    fn restore_entry_result(&mut self, entry: &IndexEntry, _result: &Result<()>) {
+    fn restore_entry_result(&self, entry: &IndexEntry, _result: &Result<()>) {
         if let Some(bytes) = entry.size() {
             let view = self.locked_view();
             view.update(|view| view.bytes_done += bytes);
