@@ -1,4 +1,4 @@
-use crate::{ReadTree, LiveEntry, Error, DiffKind, BackupStats, BandId, BandProblem, BandValidateResult, BlockMissingReason, BlockHash, Band, stats::Sizes, Result, archive::ValidateArchiveProblem};
+use crate::{ReadTree, LiveEntry, Error, DiffKind, BackupStats, BandId, BandProblem, BandValidateResult, BlockMissingReason, BlockHash, Band, stats::Sizes, Result, archive::ValidateArchiveProblem, IndexEntry};
 
 /// Monitor the backup progress.
 pub trait BackupMonitor {
@@ -64,6 +64,11 @@ pub trait DeleteMonitor {
     fn delete_blocks_finished(&mut self) {}
 }
 
+pub trait RestoreMonitor {
+    fn restore_entry(&mut self, _entry: &IndexEntry) {}
+    fn restore_entry_result(&mut self, _entry: &IndexEntry, _result: &Result<()>) {}
+}
+
 /// Default monitor which does nothing.
 /// Will be used when no monitor has been specified by the caller.
 pub(crate) struct DefaultMonitor {}
@@ -77,3 +82,4 @@ impl DeleteMonitor for DefaultMonitor {
         self
     }
 }
+impl RestoreMonitor for DefaultMonitor {}

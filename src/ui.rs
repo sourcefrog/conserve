@@ -158,10 +158,6 @@ impl UIState {
     }
 }
 
-pub(crate) fn nutmeg_options() -> nutmeg::Options {
-    nutmeg::Options::default().progress_enabled(UI_STATE.lock().unwrap().progress_enabled)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

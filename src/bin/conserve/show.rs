@@ -26,7 +26,7 @@ use conserve::ui::duration_to_hms;
 use conserve::{
     bytes_to_human_mb, Archive, Band, BandProblem, BandSelectionPolicy, BlockMissingReason,
     DiffEntry, DiffKind, Entry, Exclude, IndexEntry, Kind, ReadTree, Result, TreeSizeMonitor,
-    ValidateMonitor, BackupMonitor, DeleteMonitor, ReferencedBlocksMonitor
+    ValidateMonitor, BackupMonitor, DeleteMonitor, ReferencedBlocksMonitor, RestoreMonitor
 };
 use nutmeg::{View, Model};
 use thousands::Separable;
@@ -195,10 +195,10 @@ pub struct NutmegMonitor<T: nutmeg::Model> {
     view: Arc<Mutex<View<T>>>,
 }
 
-impl<T: nutmeg::Model + Default + Send + 'static> NutmegMonitor<T> {
-    pub fn new() -> Self {
+impl<T: nutmeg::Model + Send + 'static> NutmegMonitor<T> {
+    pub fn new(initial_state: T) -> Self {
         let view = Arc::new(Mutex::new(nutmeg::View::new(
-            T::default(),
+            initial_state,
             nutmeg::Options::default(),
         )));
 
@@ -612,5 +612,55 @@ impl ReferencedBlocksMonitor for NutmegMonitor<DeleteProcessState> {
         view.update(|view| {
             *view = DeleteProcessState::ListReferencedBlocks { count: current_count };
         });
+    }
+}
+
+pub struct RestoreProgressModel {
+    print_filenames: bool,
+    filename: String,
+    bytes_done: u64,
+}
+
+impl RestoreProgressModel {
+    pub fn new(print_filenames: bool) -> Self {
+        Self {
+            print_filenames,
+            filename: "".to_string(),
+            bytes_done: 0
+        }
+    }
+}
+
+impl nutmeg::Model for RestoreProgressModel {
+    fn render(&mut self, _width: usize) -> String {
+        format!(
+            "Restoring: {} MB\n{}",
+            self.bytes_done / 1_000_000,
+            self.filename
+        )
+    }
+}
+
+impl RestoreMonitor for NutmegMonitor<RestoreProgressModel> {
+    fn restore_entry(&mut self, entry: &IndexEntry) {
+        let mut print_filename = false;
+        {
+            let view = self.locked_view();
+            view.update(|view| {
+                print_filename = view.print_filenames;
+                view.filename = entry.apath().to_string();
+            });
+        }
+
+        if print_filename {
+            info!("{}", entry.apath());
+        }
+    }
+
+    fn restore_entry_result(&mut self, entry: &IndexEntry, _result: &Result<()>) {
+        if let Some(bytes) = entry.size() {
+            let view = self.locked_view();
+            view.update(|view| view.bytes_done += bytes);
+        }
     }
 }

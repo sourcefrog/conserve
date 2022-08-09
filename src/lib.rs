@@ -71,7 +71,7 @@ pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};
 pub use crate::validate::{ ValidateOptions, BandProblem, BandValidateResult, BlockMissingReason };
-pub use crate::monitor::{ BackupMonitor, ValidateMonitor, TreeSizeMonitor, ReferencedBlocksMonitor, DeleteMonitor };
+pub use crate::monitor::{ BackupMonitor, ValidateMonitor, TreeSizeMonitor, ReferencedBlocksMonitor, DeleteMonitor, RestoreMonitor };
 
 pub type Result<T> = std::result::Result<T, Error>;
 

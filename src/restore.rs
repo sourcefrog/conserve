@@ -22,10 +22,12 @@ use filetime::{set_file_handle_times};
 
 #[cfg(unix)]
 use filetime::{set_symlink_file_times};
+use tracing::debug;
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
+use crate::monitor::{RestoreMonitor, DefaultMonitor};
 use crate::stats::RestoreStats;
 use crate::unix_time::UnixTime;
 use crate::*;
@@ -33,7 +35,6 @@ use crate::*;
 /// Description of how to restore a tree.
 #[derive(Debug)]
 pub struct RestoreOptions {
-    pub print_filenames: bool,
     pub exclude: Exclude,
     /// Restore only this subdirectory.
     pub only_subtree: Option<Apath>,
@@ -45,7 +46,6 @@ pub struct RestoreOptions {
 impl Default for RestoreOptions {
     fn default() -> Self {
         RestoreOptions {
-            print_filenames: false,
             overwrite: false,
             band_selection: BandSelectionPolicy::LatestClosed,
             exclude: Exclude::nothing(),
@@ -54,27 +54,16 @@ impl Default for RestoreOptions {
     }
 }
 
-struct ProgressModel {
-    filename: String,
-    bytes_done: u64,
-}
-
-impl nutmeg::Model for ProgressModel {
-    fn render(&mut self, _width: usize) -> String {
-        format!(
-            "Restoring: {} MB\n{}",
-            self.bytes_done / 1_000_000,
-            self.filename
-        )
-    }
-}
-
 /// Restore a selected version, or by default the latest, to a destination directory.
 pub fn restore(
     archive: &Archive,
     destination_path: &Path,
     options: &RestoreOptions,
+    monitor: Option<&mut dyn RestoreMonitor>,
 ) -> Result<RestoreStats> {
+    let mut default_monitor = DefaultMonitor{};
+    let monitor = monitor.unwrap_or(&mut default_monitor);
+
     let st = archive.open_stored_tree(options.band_selection.clone())?;
     let mut rt = if options.overwrite {
         RestoreTree::create_overwrite(destination_path)
@@ -82,13 +71,7 @@ pub fn restore(
         RestoreTree::create(destination_path)
     }?;
     let mut stats = RestoreStats::default();
-    let progress_bar = nutmeg::View::new(
-        ProgressModel {
-            filename: String::new(),
-            bytes_done: 0,
-        },
-        ui::nutmeg_options(),
-    );
+
     let start = Instant::now();
     // // This causes us to walk the source tree twice, which is probably an acceptable option
     // // since it's nice to see realistic overall progress. We could keep all the entries
@@ -106,22 +89,15 @@ pub fn restore(
         options.exclude.clone(),
     )?;
     for entry in entry_iter {
-        if options.print_filenames {
-            progress_bar.message(&format!("{}\n", entry.apath()));
-        }
-        progress_bar.update(|model| model.filename = entry.apath().to_string());
-        if let Err(e) = match entry.kind() {
+        monitor.restore_entry(&entry);
+        let result = match entry.kind() {
             Kind::Dir => {
                 stats.directories += 1;
                 rt.copy_dir(&entry)
             }
             Kind::File => {
                 stats.files += 1;
-                let result = rt.copy_file(&entry, &st).map(|s| stats += s);
-                if let Some(bytes) = entry.size() {
-                    progress_bar.update(|model| model.bytes_done += bytes);
-                }
-                result
+                rt.copy_file(&entry, &st).map(|s| stats += s)
             }
             Kind::Symlink => {
                 stats.symlinks += 1;
@@ -134,10 +110,11 @@ pub fn restore(
                 // https://github.com/sourcefrog/conserve/issues/82
                 continue;
             }
-        } {
-            ui::show_error(&e);
+        };
+        monitor.restore_entry_result(&entry, &result);
+        if let Err(error) = result {
+            debug!("{}", ui::format_error_causes(&error));
             stats.errors += 1;
-            continue;
         }
     }
     stats += rt.finish()?;
