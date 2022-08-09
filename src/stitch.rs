@@ -55,10 +55,10 @@ impl IterStitchedIndexHunks {
     /// the same point in the previous band, continuing backwards recursively
     /// until either there are no more previous indexes, or a complete index
     /// is found.
-    pub(crate) fn new(archive: &Archive, band_id: &BandId) -> IterStitchedIndexHunks {
+    pub(crate) fn new(archive: &Archive, band_id: Option<BandId>) -> IterStitchedIndexHunks {
         IterStitchedIndexHunks {
             archive: archive.clone(),
-            band_id: Some(band_id.clone()),
+            band_id,
             last_apath: None,
             index_hunks: None,
         }

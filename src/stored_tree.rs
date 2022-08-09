@@ -60,7 +60,7 @@ impl ReadTree for StoredTree {
 
     /// Return an iter of index entries in this stored tree.
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
-        Ok(IterStitchedIndexHunks::new(&self.archive, self.band.id())
+        Ok(IterStitchedIndexHunks::new(&self.archive, Some(self.band.id().clone()))
             .iter_entries(subtree, exclude))
     }
 
