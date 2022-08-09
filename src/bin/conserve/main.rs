@@ -352,7 +352,9 @@ impl Command {
                     Some(&mut monitor),
                 )?;
                 if !no_stats {
-                    info!("{}", stats);
+                    for line in format!("{}", stats).lines() {
+                        info!("{}", line);
+                    }
                 }
             }
             Command::Diff {
@@ -392,7 +394,9 @@ impl Command {
                     Some(&mut monitor),
                 )?;
                 if !no_stats {
-                    info!("{}", stats);
+                    for line in format!("{}", stats).lines() {
+                        info!("{}", line);
+                    }
                 }
             }
             Command::Init { archive } => {
@@ -444,7 +448,9 @@ impl Command {
                 let stats = restore(&archive, destination, &options, Some(&mut monitor))?;
                 if !no_stats {
                     info!("Restore complete.");
-                    info!("{}", stats);
+                    for line in format!("{}", stats).lines() {
+                        info!("{}", line);
+                    }
                 }
             }
             Command::Size {
@@ -489,7 +495,9 @@ impl Command {
                 drop(monitor);
                 
                 if !no_stats {
-                    info!("{}", stats);
+                    for line in format!("{}", stats).lines() {
+                        info!("{}", line);
+                    }
                 }
                 if stats.has_problems() {
                     warn!("Archive has some problems.");

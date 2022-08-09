@@ -37,7 +37,6 @@ pub(crate) fn compression_percent(s: &Sizes) -> i64 {
     }
 }
 
-// FIXME: Move into conserve binary
 pub fn duration_to_hms(d: Duration) -> String {
     let elapsed_secs = d.as_secs();
     if elapsed_secs >= 3600 {
