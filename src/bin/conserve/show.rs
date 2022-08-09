@@ -167,10 +167,13 @@ pub fn show_diff<D: Iterator<Item = DiffEntry>>(diff: D) -> Result<()> {
 
 #[derive(Default)]
 pub struct BackupProgressModel {
+    pub verbose: bool,
     filename: String,
+
     scanned_file_bytes: u64,
     scanned_dirs: usize,
     scanned_files: usize,
+    
     entries_new: usize,
     entries_changed: usize,
     entries_unchanged: usize,
@@ -249,12 +252,20 @@ impl BackupMonitor for NutmegMonitor<BackupProgressModel> {
 
     fn copy_result(&self, entry: &conserve::LiveEntry, result: &Option<conserve::DiffKind>) {
         if let Some(diff_kind) = result.as_ref() {
-            self.update_model(|model| match diff_kind {
-                &DiffKind::Changed => model.entries_changed += 1,
-                &DiffKind::New => model.entries_new += 1,
-                &DiffKind::Unchanged => model.entries_unchanged += 1,
-                &DiffKind::Deleted => model.entries_deleted += 1,
-            })
+            let verbose = self.update_model(|model| {
+                match diff_kind {
+                    &DiffKind::Changed => model.entries_changed += 1,
+                    &DiffKind::New => model.entries_new += 1,
+                    &DiffKind::Unchanged => model.entries_unchanged += 1,
+                    &DiffKind::Deleted => model.entries_deleted += 1,
+                };
+
+                model.verbose
+            });
+
+            if verbose {
+                info!("{} {}", diff_kind.as_sigil(), entry.apath());
+            }
         }
 
         if let Some(size) = entry.size() {

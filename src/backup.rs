@@ -31,9 +31,6 @@ use crate::*;
 /// Configuration of how to make a backup.
 #[derive(Debug, Clone)]
 pub struct BackupOptions {
-    /// Print filenames to the UI as they're copied.
-    pub print_filenames: bool,
-
     /// Exclude these globs from the backup.
     pub exclude: Exclude,
 
@@ -43,7 +40,6 @@ pub struct BackupOptions {
 impl Default for BackupOptions {
     fn default() -> BackupOptions {
         BackupOptions {
-            print_filenames: false,
             exclude: Exclude::nothing(),
             max_entries_per_hunk: crate::index::MAX_ENTRIES_PER_HUNK,
         }

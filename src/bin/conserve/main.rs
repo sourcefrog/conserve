@@ -291,12 +291,14 @@ impl Command {
                 let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let source = &LiveTree::open(source)?;
                 let options = BackupOptions {
-                    print_filenames: *verbose,
                     exclude,
                     ..Default::default()
                 };
 
-                let monitor = NutmegMonitor::new(BackupProgressModel::default(), !args.no_progress);
+                let mut model = BackupProgressModel::default();
+                model.verbose = *verbose;
+
+                let monitor = NutmegMonitor::new(model, !args.no_progress);
                 let stats = backup(
                     &Archive::open(open_transport(archive)?)?, 
                     source, 
