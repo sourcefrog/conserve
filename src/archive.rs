@@ -30,6 +30,7 @@ use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
+use crate::monitor::DefaultMonitor;
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
@@ -58,9 +59,6 @@ pub struct DeleteOptions {
     pub dry_run: bool,
     pub break_lock: bool,
 }
-
-struct DefaultValidateMonitor {}
-impl ValidateMonitor for DefaultValidateMonitor {}
 
 impl Archive {
     /// Make a new archive in a local directory.
@@ -303,7 +301,7 @@ impl Archive {
     }
 
     pub fn validate(&self, options: &ValidateOptions, monitor: Option<&mut dyn ValidateMonitor>) -> Result<ValidateStats> {
-        let mut default_monitor = DefaultValidateMonitor{};
+        let mut default_monitor = DefaultMonitor{};
         let monitor = monitor.unwrap_or(&mut default_monitor);
         
         let start = Instant::now();

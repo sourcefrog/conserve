@@ -15,7 +15,6 @@ use std::collections::HashMap;
 
 use crate::blockdir::Address;
 use crate::*;
-use crate::stats::Sizes;
 
 pub struct BlockLengths(pub HashMap<BlockHash, u64>);
 
@@ -23,29 +22,6 @@ pub struct BlockLengths(pub HashMap<BlockHash, u64>);
 pub struct ValidateOptions {
     /// Assume blocks that are present have the right content: don't read and hash them.
     pub skip_block_hashes: bool,
-}
-
-pub trait ValidateMonitor {
-    fn count_bands(&mut self) {}
-    fn count_bands_result(&mut self, _bands: &[BandId]) {}
-
-    fn validate_bands(&mut self) {}
-    fn validate_bands_finished(&mut self) {}
-
-    fn validate_band(&mut self, _band_id: &BandId) {}
-    fn validate_band_problem(&mut self, _band: &Band, _problem: &BandProblem) {}
-    fn validate_band_result(&mut self, _band_id: &BandId, _result: &BandValidateResult) {}
-
-    fn validate_block_missing(&mut self, _block_hash: &BlockHash, _reason: &BlockMissingReason) {}
-    fn validate_blocks(&mut self) {}
-    fn validate_blocks_finished(&mut self) {}
-
-    fn list_block_names(&mut self, _current_count: usize) {}
-    fn list_block_names_finished(&mut self) {}
-    
-    fn read_blocks(&mut self, _count: usize) {}
-    fn read_block_result(&mut self, _block_hash: &BlockHash, _result: &Result<(Vec<u8>, Sizes)>) {}
-    fn read_blocks_finished(&mut self) {}
 }
 
 /// Band validation result.

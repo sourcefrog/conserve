@@ -57,6 +57,8 @@ pub fn init(options: LoggingOptions) -> std::result::Result<LogGuard, String> {
     let registry = {
         registry.with(
             fmt::Layer::default()
+                    //.without_time()
+                    //.with_level(false)
                     .with_target(false)
                     .with_writer(|| TerminalWriter{})
                     .with_filter(LevelFilter::from(options.level))

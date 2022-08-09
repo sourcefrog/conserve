@@ -15,15 +15,9 @@
 
 use std::ops::Range;
 
+use crate::monitor::DefaultMonitor;
 use crate::stats::Sizes;
 use crate::*;
-
-pub trait TreeSizeMonitor<T: ReadTree> {
-    fn entry_discovered(&mut self, _entry: &T::Entry, _size: &Option<u64>) {}
-}
-
-struct DefaultTreeSizeMonitor {}
-impl<T: ReadTree> TreeSizeMonitor<T> for DefaultTreeSizeMonitor {}
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
 pub trait ReadTree {
@@ -50,7 +44,7 @@ pub trait ReadTree {
     ///
     /// This typically requires walking all entries, which may take a while.
     fn size(&self, exclude: Exclude, monitor: Option<&mut dyn TreeSizeMonitor<Self>>) -> Result<TreeSize> where Self: Sized {
-        let mut default_monitor = DefaultTreeSizeMonitor{};
+        let mut default_monitor = DefaultMonitor{};
         let monitor = monitor.unwrap_or(&mut default_monitor as &mut dyn TreeSizeMonitor<Self>);
 
         let mut tot = 0u64;

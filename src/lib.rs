@@ -44,6 +44,7 @@ mod tree;
 pub mod ui;
 pub mod unix_time;
 mod validate;
+pub(crate) mod monitor;
 
 pub use crate::apath::Apath;
 pub use crate::archive::Archive;
@@ -68,8 +69,9 @@ pub use crate::restore::{restore, RestoreOptions, RestoreTree};
 pub use crate::stats::{BackupStats, DeleteStats, RestoreStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
-pub use crate::tree::{ReadBlocks, ReadTree, TreeSize, TreeSizeMonitor};
-pub use crate::validate::{ ValidateOptions, ValidateMonitor, BandProblem, BandValidateResult, BlockMissingReason };
+pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};
+pub use crate::validate::{ ValidateOptions, BandProblem, BandValidateResult, BlockMissingReason };
+pub use crate::monitor::{ BackupMonitor, ValidateMonitor, TreeSizeMonitor };
 
 pub type Result<T> = std::result::Result<T, Error>;
 

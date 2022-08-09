@@ -22,6 +22,7 @@ use tracing::{debug, Level};
 
 use crate::blockdir::Address;
 use crate::io::read_with_retries;
+use crate::monitor::DefaultMonitor;
 use crate::stats::BackupStats;
 use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::ReadTree;
@@ -48,19 +49,6 @@ impl Default for BackupOptions {
         }
     }
 }
-
-/// Monitor the backup progress.
-pub trait BackupMonitor {
-    /// Will be called before the entry will be backupped
-    fn copy(&mut self, _entry: &LiveEntry) {}
-    fn copy_error(&mut self, _entry: &LiveEntry, _error: &Error) {}
-    fn copy_result(&mut self, _entry: &LiveEntry, _result: &Option<DiffKind>) {}
-
-    fn finished(&mut self, _stats: &BackupStats) {}
-} 
-
-struct DefaultMonitor {}
-impl BackupMonitor for DefaultMonitor {}
 
 /// Backup a source directory into a new band in the archive.
 ///
