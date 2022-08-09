@@ -47,23 +47,24 @@ impl Write for TerminalWriter {
 pub struct LoggingOptions {
     pub file: Option<PathBuf>,
     pub level: tracing::Level,
+    pub terminal_raw: bool,
 }
 
 pub fn init(options: LoggingOptions) -> std::result::Result<LogGuard, String> {
     let mut worker_guard = None;
     let registry = Registry::default();
-
+  
     // Terminal logger.
-    let registry = {
-        registry.with(
-            fmt::Layer::default()
-                    //.without_time()
-                    //.with_level(false)
-                    .with_target(false)
-                    .with_writer(|| TerminalWriter{})
-                    .with_filter(LevelFilter::from(options.level))
-        )
-    };
+    // TODO: Enable timestamps except when in raw mode.
+    //       Right now this can't be achived since without_time updates the struct signature...
+    let registry = registry.with(
+        fmt::Layer::default()
+                .without_time()
+                .with_level(!options.terminal_raw)
+                .with_target(false)
+                .with_writer(|| TerminalWriter{})
+                .with_filter(LevelFilter::from(options.level))
+    );
 
     // File logger.
     let registry: Box<dyn Subscriber + Send + Sync + 'static> = if let Some(path) = options.file {
@@ -91,7 +92,6 @@ pub fn init(options: LoggingOptions) -> std::result::Result<LogGuard, String> {
     } else {
         Box::new(registry)
     };
-
 
     tracing::subscriber::set_global_default(registry)
         .map_err(|_| "Failed to update global default logger".to_string())?;

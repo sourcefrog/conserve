@@ -53,6 +53,10 @@ struct Args {
     #[clap(long, short = 'D', global = true)]
     debug: bool,
 
+    /// Don't show log timestamps and levels for the terminal output.
+    #[clap(long, short = 'R', global = true)]
+    log_raw: bool,
+
     /// Set the log level to trace
     #[clap(long, short = 'L', global = true)]
     log_level: Option<tracing::Level>,
@@ -559,7 +563,8 @@ fn initialize_log(args: &Args) -> std::result::Result<LogGuard, String> {
 
     let guard = log::init(LoggingOptions{
         file,
-        level
+        level,
+        terminal_raw: args.log_raw
     })?;
 
     if args.log_level == Some(tracing::Level::TRACE) {
