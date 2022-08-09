@@ -196,10 +196,13 @@ pub struct NutmegMonitor<T: nutmeg::Model> {
 }
 
 impl<T: nutmeg::Model + Send + 'static> NutmegMonitor<T> {
-    pub fn new(initial_state: T) -> Self {
+    pub fn new(initial_state: T, progress_enabled: bool) -> Self {
+        // FIXME: Speed up if `progress_enabled` is false.
+        //        There is no need to proxy the log output.
+        //        Also updating the state can be refactored.
         let view = Arc::new(Mutex::new(nutmeg::View::new(
             initial_state,
-            nutmeg::Options::default(),
+            nutmeg::Options::default().progress_enabled(progress_enabled),
         )));
 
         let log_guard = log::update_terminal_target(view.clone());

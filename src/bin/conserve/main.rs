@@ -292,17 +292,12 @@ impl Command {
                     ..Default::default()
                 };
 
-                let mut monitor = if args.no_progress {
-                    None
-                } else {
-                    Some(NutmegMonitor::new(BackupProgressModel::default()))
-                };
-
+                let monitor = NutmegMonitor::new(BackupProgressModel::default(), !args.no_progress);
                 let stats = backup(
                     &Archive::open(open_transport(archive)?)?, 
                     source, 
                     &options, 
-                    monitor.as_mut().map(|v| v as &dyn BackupMonitor)
+                    Some(&monitor)
                 )?;
                 drop(monitor);
 
@@ -346,7 +341,7 @@ impl Command {
                 no_stats,
             } => {
                 // FIXME: Respect the "no progress" option and only log messages.
-                let mut monitor = NutmegMonitor::new(DeleteProcessState::default());
+                let mut monitor = NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
 
                 let stats = Archive::open(open_transport(archive)?)?.delete_bands(
                     backup,
@@ -385,7 +380,7 @@ impl Command {
                 no_stats,
             } => {
                 // FIXME: Respect the "no progress" option and only log messages.
-                let mut monitor = NutmegMonitor::new(DeleteProcessState::default());
+                let mut monitor = NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
 
                 let archive = Archive::open(open_transport(archive)?)?;
                 let stats = archive.delete_bands(
@@ -445,7 +440,7 @@ impl Command {
                 };
 
                 // FIXME: Respect the "no progress" option and only log messages.
-                let mut monitor = NutmegMonitor::new(RestoreProgressModel::new(*verbose));
+                let mut monitor = NutmegMonitor::new(RestoreProgressModel::new(*verbose), !args.no_progress);
                 let stats = restore(&archive, destination, &options, Some(&mut monitor))?;
                 if !no_stats {
                     info!("Restore complete.");
@@ -461,7 +456,7 @@ impl Command {
                 let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 
                 // FIXME: Respect the "no progress" option and only log messages.
-                let mut monitor = NutmegMonitor::new(SizeProgressModel::default());
+                let mut monitor = NutmegMonitor::new(SizeProgressModel::default(), !args.no_progress);
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
                         .size(excludes, Some(&mut monitor as &dyn TreeSizeMonitor<_>))?
@@ -489,7 +484,7 @@ impl Command {
                 };
 
                 // FIXME: Respect the "no progress" option and only log messages.
-                let mut monitor = NutmegMonitor::new(ValidateProgressModel::default());
+                let mut monitor = NutmegMonitor::new(ValidateProgressModel::default(), !args.no_progress);
                 let stats = Archive::open(open_transport(archive)?)?.validate(&options, Some(&mut monitor as &dyn ValidateMonitor))?;
                 drop(monitor);
                 
