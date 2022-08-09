@@ -668,3 +668,20 @@ impl RestoreMonitor for NutmegMonitor<RestoreProgressModel> {
         }
     }
 }
+
+#[derive(Default)]
+pub struct ReferencedBlocksProgressModel {
+    count: usize,
+}
+
+impl Model for ReferencedBlocksProgressModel {
+    fn render(&mut self, _width: usize) -> String {
+        format!("Find referenced blocks in band ({} discovered)", self.count)
+    }
+}
+
+impl ReferencedBlocksMonitor for NutmegMonitor<ReferencedBlocksProgressModel> {
+    fn list_referenced_blocks(&self, current_count: usize) {
+        self.update_model(|model| model.count = current_count);
+    }
+}

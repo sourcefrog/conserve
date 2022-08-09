@@ -20,7 +20,7 @@ use std::str::FromStr;
 
 use clap::{Parser, StructOpt, Subcommand};
 use log::{LoggingOptions, LogGuard};
-use show::{NutmegMonitor, BackupProgressModel, SizeProgressModel, DeleteProcessState, RestoreProgressModel};
+use show::{NutmegMonitor, BackupProgressModel, SizeProgressModel, DeleteProcessState, RestoreProgressModel, ReferencedBlocksProgressModel};
 use show::{show_diff, ShowVersionsOptions, show_versions};
 use tracing::{ trace, error, info, warn, Level };
 
@@ -328,14 +328,14 @@ impl Command {
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let archive = Archive::open(open_transport(archive)?)?;
-                // FIXME: Monitor?
-                for hash in archive.referenced_blocks(&archive.list_band_ids()?, None)? {
+                let monitor = NutmegMonitor::new(ReferencedBlocksProgressModel::default(), !args.no_progress);
+                for hash in archive.referenced_blocks(&archive.list_band_ids()?, Some(&monitor))? {
                     info!("{}", hash);
                 }
             }
             Command::Debug(Debug::Unreferenced { archive }) => {
-                // FIXME: Monitor?
-                for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks(None)? {
+                let monitor = NutmegMonitor::new(ReferencedBlocksProgressModel::default(), !args.no_progress);
+                for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks(Some(&monitor))? {
                     info!("{}", hash);
                 }
             }
@@ -346,16 +346,14 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                // FIXME: Respect the "no progress" option and only log messages.
-                let mut monitor = NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
-
+                let monitor = NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
                 let stats = Archive::open(open_transport(archive)?)?.delete_bands(
                     backup,
                     &DeleteOptions {
                         dry_run: *dry_run,
                         break_lock: *break_lock,
                     },
-                    Some(&mut monitor),
+                    Some(&monitor),
                 )?;
                 if !no_stats {
                     for line in format!("{}", stats).lines() {
@@ -387,7 +385,6 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                // FIXME: Respect the "no progress" option and only log messages.
                 let mut monitor = NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
 
                 let archive = Archive::open(open_transport(archive)?)?;
@@ -449,7 +446,6 @@ impl Command {
                     overwrite: *force_overwrite,
                 };
 
-                // FIXME: Respect the "no progress" option and only log messages.
                 let mut monitor = NutmegMonitor::new(RestoreProgressModel::new(*verbose), !args.no_progress);
                 let stats = restore(&archive, destination, &options, Some(&mut monitor))?;
                 if !no_stats {
@@ -467,7 +463,6 @@ impl Command {
             } => {
                 let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 
-                // FIXME: Respect the "no progress" option and only log messages.
                 let mut monitor = NutmegMonitor::new(SizeProgressModel::default(), !args.no_progress);
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
@@ -495,7 +490,6 @@ impl Command {
                     skip_block_hashes: *quick,
                 };
 
-                // FIXME: Respect the "no progress" option and only log messages.
                 let mut monitor = NutmegMonitor::new(ValidateProgressModel::default(), !args.no_progress);
                 let stats = Archive::open(open_transport(archive)?)?.validate(&options, Some(&mut monitor as &dyn ValidateMonitor))?;
                 drop(monitor);
