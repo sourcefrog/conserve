@@ -151,48 +151,6 @@ pub fn show_diff<D: Iterator<Item = DiffEntry>>(diff: D) -> Result<()> {
     Ok(())
 }
 
-// Considerations if we're trying properly extimate the remaining progress.
-//
-// This causes us to walk the source tree twice, which is probably an acceptable option
-// since it's nice to see realistic overall progress. We could keep all the entries
-// in memory, and maybe we should, but it might get unreasonably big.
-// if options.measure_first {
-//     progress_bar.set_phase("Measure source tree".to_owned());
-//     // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
-//     // again a second time? But, that'll potentially use memory proportional to tree size, which
-//     // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
-//     // deleted or changed while this is running.
-//     progress_bar.set_bytes_total(source.size()?.file_bytes as u64);
-// }
-
-#[derive(Default)]
-pub struct BackupProgressModel {
-    pub verbose: bool,
-    filename: String,
-
-    scanned_file_bytes: u64,
-    scanned_dirs: usize,
-    scanned_files: usize,
-    
-    entries_new: usize,
-    entries_changed: usize,
-    entries_unchanged: usize,
-    entries_deleted: usize,
-}
-
-impl nutmeg::Model for BackupProgressModel {
-    fn render(&mut self, _width: usize) -> String {
-        format!(
-            "Scanned {} directories, {} files, {} MB\n{} new entries, {} changed, {} deleted, {} unchanged\n{}",
-            self.scanned_dirs,
-            self.scanned_files,
-            self.scanned_file_bytes / 1_000_000,
-            self.entries_new, self.entries_changed, self.entries_deleted, self.entries_unchanged,
-            self.filename
-        )
-    }
-}
-
 enum NutmegMonitorState<T: nutmeg::Model> {
     View {
         view: Arc<Mutex<View<T>>>,
@@ -235,6 +193,48 @@ impl<T: nutmeg::Model + Send + 'static> NutmegMonitor<T> {
                 update_fn(&mut *state)
             }
         }
+    }
+}
+
+// Considerations if we're trying properly extimate the remaining progress.
+//
+// This causes us to walk the source tree twice, which is probably an acceptable option
+// since it's nice to see realistic overall progress. We could keep all the entries
+// in memory, and maybe we should, but it might get unreasonably big.
+// if options.measure_first {
+//     progress_bar.set_phase("Measure source tree".to_owned());
+//     // TODO: Maybe read all entries for the source tree in to memory now, rather than walking it
+//     // again a second time? But, that'll potentially use memory proportional to tree size, which
+//     // I'd like to avoid, and also perhaps make it more likely we grumble about files that were
+//     // deleted or changed while this is running.
+//     progress_bar.set_bytes_total(source.size()?.file_bytes as u64);
+// }
+
+#[derive(Default)]
+pub struct BackupProgressModel {
+    pub verbose: bool,
+    filename: String,
+
+    scanned_file_bytes: u64,
+    scanned_dirs: usize,
+    scanned_files: usize,
+    
+    entries_new: usize,
+    entries_changed: usize,
+    entries_unchanged: usize,
+    entries_deleted: usize,
+}
+
+impl nutmeg::Model for BackupProgressModel {
+    fn render(&mut self, _width: usize) -> String {
+        format!(
+            "Scanned {} directories, {} files, {} MB\n{} new entries, {} changed, {} deleted, {} unchanged\n{}",
+            self.scanned_dirs,
+            self.scanned_files,
+            self.scanned_file_bytes / 1_000_000,
+            self.entries_new, self.entries_changed, self.entries_deleted, self.entries_unchanged,
+            self.filename
+        )
     }
 }
 

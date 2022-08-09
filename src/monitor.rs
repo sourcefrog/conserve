@@ -2,7 +2,6 @@ use crate::{ReadTree, LiveEntry, Error, DiffKind, BackupStats, BandId, BandProbl
 
 /// Monitor the backup progress.
 pub trait BackupMonitor {
-    /// Will be called before the entry will be backupped
     fn copy(&self, _entry: &LiveEntry) {}
     fn copy_error(&self, _entry: &LiveEntry, _error: &Error) {}
     fn copy_result(&self, _entry: &LiveEntry, _result: &Option<DiffKind>) {}
@@ -43,11 +42,13 @@ pub trait TreeSizeMonitor<T: ReadTree> {
     fn entry_discovered(&self, _entry: &T::Entry, _size: &Option<u64>) {}
 }
 
+/// Monitor for iterating referenced blocks.
 pub trait ReferencedBlocksMonitor : Sync {
     fn list_referenced_blocks(&self, _current_count: usize) {}
     fn list_referenced_blocks_finished(&self) {}
 }
 
+/// Monitor for deleting backups/blocks.
 pub trait DeleteMonitor : Sync {
     fn referenced_blocks_monitor(&self) -> &dyn ReferencedBlocksMonitor;
 
@@ -64,6 +65,7 @@ pub trait DeleteMonitor : Sync {
     fn delete_blocks_finished(&self) {}
 }
 
+/// Monitor the progress of restoring files.
 pub trait RestoreMonitor {
     fn restore_entry(&self, _entry: &IndexEntry) {}
     fn restore_entry_result(&self, _entry: &IndexEntry, _result: &Result<()>) {}

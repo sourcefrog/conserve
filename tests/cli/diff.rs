@@ -13,8 +13,6 @@
 
 //! Test `conserve diff`.
 
-use std::fs;
-
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 
@@ -208,7 +206,7 @@ pub fn symlink_unchanged() {
 #[test]
 pub fn symlink_changed() {
     let (af, tf) = setup_symlink();
-    fs::remove_file(tf.path().join("subdir/link")).unwrap();
+    std::fs::remove_file(tf.path().join("subdir/link")).unwrap();
     tf.create_symlink("subdir/link", "newtarget");
 
     run_conserve()

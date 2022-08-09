@@ -12,15 +12,16 @@ use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 use tracing_subscriber::fmt;
 
-struct TerminalWriter { }
-
-impl TerminalWriter { }
-
 lazy_static!{
     pub static ref TERMINAL_OUTPUT: Mutex<Option<Arc<Mutex<dyn Write + Send + Sync>>>> = Mutex::new(
         Some(Arc::new(Mutex::new(std::io::stdout())))        
     );
 }
+
+/// Wrapper around TERMINAL_OUTPUT which dynamically writes
+/// the tracing output to the output writer set at TERMINAL_OUTPUT.
+struct TerminalWriter { }
+impl TerminalWriter { }
 
 impl Write for TerminalWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
@@ -50,6 +51,7 @@ pub struct LoggingOptions {
     pub terminal_raw: bool,
 }
 
+/// Initialize tracing logging for the binary and the library.
 pub fn init(options: LoggingOptions) -> std::result::Result<LogGuard, String> {
     let mut worker_guard = None;
     let registry = Registry::default();
@@ -106,6 +108,8 @@ pub struct LogGuard {
     _worker_guard: Option<WorkerGuard>,
 }
 
+/// Guard for the replaced log target.
+/// When it drops it restores the last logging target.
 pub struct ViewLogGuard {
     released: bool,
     previous_logger: Option<Arc<Mutex<dyn Write + Send + Sync>>>,
@@ -130,6 +134,8 @@ impl Drop for ViewLogGuard {
     }
 }
 
+/// Replace the current log target with a new one.
+/// Returns a `ViewLogGuard` which will restore the old target when dropped.
 pub fn update_terminal_target(target: Arc<Mutex<dyn Write + Send + Sync>>) -> ViewLogGuard {
     let mut output = TERMINAL_OUTPUT.lock().unwrap();
     let previous_logger = output.replace(target);
