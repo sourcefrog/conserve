@@ -156,7 +156,7 @@ mod test {
     }
 
     fn simple_ls(archive: &Archive, band_id: &BandId) -> String {
-        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, band_id)
+        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, Some(band_id.clone()))
             .flatten()
             .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
             .collect();
