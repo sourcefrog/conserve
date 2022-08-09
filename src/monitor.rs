@@ -1,4 +1,4 @@
-use crate::{ReadTree, LiveEntry, Error, DiffKind, BackupStats, BandId, BandProblem, BandValidateResult, BlockMissingReason, BlockHash, Band, stats::Sizes, Result};
+use crate::{ReadTree, LiveEntry, Error, DiffKind, BackupStats, BandId, BandProblem, BandValidateResult, BlockMissingReason, BlockHash, Band, stats::Sizes, Result, archive::ValidateArchiveProblem};
 
 /// Monitor the backup progress.
 pub trait BackupMonitor {
@@ -14,6 +14,10 @@ pub trait BackupMonitor {
 pub trait ValidateMonitor {
     fn count_bands(&mut self) {}
     fn count_bands_result(&mut self, _bands: &[BandId]) {}
+
+    fn validate_archive(&mut self) {}
+    fn validate_archive_problem(&mut self, _problem: &ValidateArchiveProblem) {}
+    fn validate_archive_finished(&mut self) {}
 
     fn validate_bands(&mut self) {}
     fn validate_bands_finished(&mut self) {}

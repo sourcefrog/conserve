@@ -34,7 +34,7 @@ use crate::monitor::DefaultMonitor;
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
-use crate::validate::{ValidateMonitor, BlockMissingReason};
+use crate::validate::{BlockMissingReason};
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -58,6 +58,15 @@ struct ArchiveHeader {
 pub struct DeleteOptions {
     pub dry_run: bool,
     pub break_lock: bool,
+}
+
+#[derive(Debug)]
+pub enum ValidateArchiveProblem {
+    UnexpectedFiles{ path: String, files: Vec<String> },
+    UnexpectedFileType{ name: String, kind: Kind },
+    UnexpectedDirectory{ path: String, directory: String },
+    DuplicateBand{ path: String, directory: String },
+    DirectoryListError { error: std::io::Error },
 }
 
 impl Archive {
@@ -305,7 +314,9 @@ impl Archive {
         let monitor = monitor.unwrap_or(&mut default_monitor);
         
         let start = Instant::now();
-        let mut stats = self.validate_archive_dir()?;
+        monitor.validate_archive();
+        let mut stats = self.validate_archive_dir(monitor)?;
+        monitor.validate_archive_finished();
 
         monitor.count_bands();
         let band_ids = self.list_band_ids()?;
@@ -357,10 +368,9 @@ impl Archive {
         Ok(stats)
     }
 
-    fn validate_archive_dir(&self) -> Result<ValidateStats> {
+    fn validate_archive_dir(&self, monitor: &mut dyn ValidateMonitor) -> Result<ValidateStats> {
         // TODO: Tests for the problems detected here.
         let mut stats = ValidateStats::default();
-        ui::println("Check archive top-level directory...");
 
         let mut files: Vec<String> = Vec::new();
         let mut dirs: Vec<String> = Vec::new();
@@ -374,15 +384,12 @@ impl Archive {
                     Kind::Dir => dirs.push(name),
                     Kind::File => files.push(name),
                     other_kind => {
-                        ui::problem(&format!(
-                            "Unexpected file kind in archive directory: {:?} of kind {:?}",
-                            name, other_kind
-                        ));
+                        monitor.validate_archive_problem(&ValidateArchiveProblem::UnexpectedFileType { name: name, kind: other_kind });
                         stats.unexpected_files += 1;
                     }
                 },
                 Err(source) => {
-                    ui::problem(&format!("Error listing archive directory: {:?}", source));
+                    monitor.validate_archive_problem(&ValidateArchiveProblem::DirectoryListError { error: source });
                     stats.io_errors += 1;
                 }
             }
@@ -391,10 +398,7 @@ impl Archive {
         if !files.is_empty() {
             // TODO: Ignore .DS_Store
             stats.unexpected_files += 1;
-            ui::problem(&format!(
-                "Unexpected files in archive directory {:?}: {:?}",
-                self.transport, files
-            ));
+            monitor.validate_archive_problem(&ValidateArchiveProblem::UnexpectedFiles { path: format!("{:?}", self.transport), files });
         }
         remove_item(&mut dirs, &BLOCK_DIR);
         dirs.sort();
@@ -403,19 +407,19 @@ impl Archive {
             if let Ok(b) = d.parse() {
                 if bs.contains(&b) {
                     stats.structure_problems += 1;
-                    ui::problem(&format!(
-                        "Duplicated band directory in {:?}: {:?}",
-                        self.transport, d
-                    ));
+                    monitor.validate_archive_problem(&ValidateArchiveProblem::DuplicateBand {
+                        path: format!("{:?}", self.transport), 
+                        directory: d.clone()
+                    });
                 } else {
                     bs.insert(b);
                 }
             } else {
                 stats.structure_problems += 1;
-                ui::problem(&format!(
-                    "Unexpected directory in {:?}: {:?}",
-                    self.transport, d
-                ));
+                monitor.validate_archive_problem(&ValidateArchiveProblem::UnexpectedDirectory {
+                    path: format!("{:?}", self.transport), 
+                    directory: d.clone()
+                });
             }
         }
         Ok(stats)

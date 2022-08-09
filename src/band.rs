@@ -28,7 +28,7 @@ use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
 use crate::transport::{ListDirNames, Transport};
 use crate::*;
-use crate::validate::{ValidateMonitor, BandProblem};
+use crate::validate::{BandProblem};
 
 static INDEX_DIR: &str = "i";
 

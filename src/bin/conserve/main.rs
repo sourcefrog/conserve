@@ -24,7 +24,7 @@ use show::{NutmegMonitor, BackupProgressModel, SizeProgressModel};
 use show::{show_diff, ShowVersionsOptions, show_versions};
 use tracing::{ trace, error, info, warn, Level };
 
-use conserve::backup::{BackupOptions, BackupMonitor};
+use conserve::backup::{BackupOptions};
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;

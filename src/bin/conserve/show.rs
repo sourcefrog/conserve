@@ -20,16 +20,17 @@ use std::borrow::Cow;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use conserve::backup::BackupMonitor;
+use conserve::archive::ValidateArchiveProblem;
 use conserve::stats::Sizes;
 use conserve::ui::duration_to_hms;
 use conserve::{
     bytes_to_human_mb, Archive, Band, BandProblem, BandSelectionPolicy, BlockMissingReason,
-    DiffEntry, DiffKind, Entry, Exclude, IndexEntry, Kind, ReadTree, Result, ValidateMonitor, TreeSizeMonitor,
+    DiffEntry, DiffKind, Entry, Exclude, IndexEntry, Kind, ReadTree, Result, TreeSizeMonitor,
+    ValidateMonitor, BackupMonitor
 };
 use nutmeg::View;
 use thousands::Separable;
-use tracing::{info, warn};
+use tracing::{info, warn, error};
 
 use crate::log::{self, ViewLogGuard};
 
@@ -324,6 +325,36 @@ impl nutmeg::Model for ValidateProgressModel {
 }
 
 impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
+    fn validate_archive(&mut self) {
+        info!("Check archive top-level directory...");
+    }
+
+    fn validate_archive_problem(&mut self, problem: &ValidateArchiveProblem) {
+        match problem {
+            ValidateArchiveProblem::UnexpectedFileType { name, kind } => {
+                error!(
+                    "Unexpected file kind in archive directory: {:?} of kind {:?}",
+                    name, kind
+                );
+            },
+            ValidateArchiveProblem::DirectoryListError { error } => {
+                error!("Error listing archive directory: {:?}", error);
+            }
+            ValidateArchiveProblem::UnexpectedFiles { path, files } => {
+                error!(
+                    "Unexpected files in archive directory {:?}: {:?}",
+                    path, files
+                );
+            }
+            ValidateArchiveProblem::DuplicateBand { path, directory } => {
+                error!("Duplicated band directory in {:?}: {:?}", path, directory);
+            }
+            ValidateArchiveProblem::UnexpectedDirectory { path, directory } => {
+                error!("Unexpected directory in {:?}: {:?}", path, directory);
+            }
+        }
+    }
+
     fn count_bands(&mut self) {
         info!("Count bands...");
     }
