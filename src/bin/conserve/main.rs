@@ -20,7 +20,7 @@ use std::str::FromStr;
 
 use clap::{Parser, StructOpt, Subcommand};
 use log::{LoggingOptions, LogGuard};
-use show::{NutmegMonitor, BackupProgressModel, SizeProgressModel};
+use show::{NutmegMonitor, BackupProgressModel, SizeProgressModel, DeleteProcessState};
 use show::{show_diff, ShowVersionsOptions, show_versions};
 use tracing::{ trace, error, info, warn, Level };
 
@@ -327,12 +327,14 @@ impl Command {
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let archive = Archive::open(open_transport(archive)?)?;
-                for hash in archive.referenced_blocks(&archive.list_band_ids()?)? {
+                // FIXME: Monitor?
+                for hash in archive.referenced_blocks(&archive.list_band_ids()?, None)? {
                     info!("{}", hash);
                 }
             }
             Command::Debug(Debug::Unreferenced { archive }) => {
-                for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks()? {
+                // FIXME: Monitor?
+                for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks(None)? {
                     info!("{}", hash);
                 }
             }
@@ -343,12 +345,16 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
+                // FIXME: Respect the "no progress" option and only log messages.
+                let mut monitor = NutmegMonitor::<DeleteProcessState>::new();
+
                 let stats = Archive::open(open_transport(archive)?)?.delete_bands(
                     backup,
                     &DeleteOptions {
                         dry_run: *dry_run,
                         break_lock: *break_lock,
                     },
+                    Some(&mut monitor),
                 )?;
                 if !no_stats {
                     info!("{}", stats);
@@ -378,6 +384,9 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
+                // FIXME: Respect the "no progress" option and only log messages.
+                let mut monitor = NutmegMonitor::<DeleteProcessState>::new();
+
                 let archive = Archive::open(open_transport(archive)?)?;
                 let stats = archive.delete_bands(
                     &[],
@@ -385,6 +394,7 @@ impl Command {
                         dry_run: *dry_run,
                         break_lock: *break_lock,
                     },
+                    Some(&mut monitor),
                 )?;
                 if !no_stats {
                     info!("{}", stats);

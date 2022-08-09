@@ -26,9 +26,9 @@ use conserve::ui::duration_to_hms;
 use conserve::{
     bytes_to_human_mb, Archive, Band, BandProblem, BandSelectionPolicy, BlockMissingReason,
     DiffEntry, DiffKind, Entry, Exclude, IndexEntry, Kind, ReadTree, Result, TreeSizeMonitor,
-    ValidateMonitor, BackupMonitor
+    ValidateMonitor, BackupMonitor, DeleteMonitor, ReferencedBlocksMonitor
 };
-use nutmeg::View;
+use nutmeg::{View, Model};
 use thousands::Separable;
 use tracing::{info, warn, error};
 
@@ -519,6 +519,98 @@ impl<T: ReadTree> TreeSizeMonitor<T> for NutmegMonitor<SizeProgressModel> {
         view.update(|model| {
             model.files += 1;
             model.total_bytes += size.unwrap_or(0);
+        });
+    }
+}
+
+pub enum DeleteProcessState {
+    ListReferencedBlocks {
+        count: usize,
+    },
+    FindPresentBlocks {
+        count: usize,
+    },
+    MeasureUnreferencedBlocks {
+        count: usize,
+        target: usize,
+    },
+    DeleteBands {
+        count: usize,
+        target: usize,
+    },
+    DeleteBlocks {
+        count: usize,
+        target: usize,
+    }
+}
+
+impl Default for DeleteProcessState {
+    fn default() -> Self {
+        DeleteProcessState::ListReferencedBlocks { count: 0 }
+    }
+}
+
+impl Model for DeleteProcessState {
+    fn render(&mut self, _width: usize) -> String {
+        match self {
+            DeleteProcessState::ListReferencedBlocks { count } => {
+                format!("Find referenced blocks in band ({} discovered)", count)
+            },
+            DeleteProcessState::FindPresentBlocks { count } => {
+                format!("Find present blocks ({} discovered)", count)
+            },
+            DeleteProcessState::MeasureUnreferencedBlocks { count, target } => {
+                format!("Measure unreferenced blocks ({}/{})", count, target)
+            },
+            DeleteProcessState::DeleteBands { count, target } => {
+                format!("Delete bands ({}/{})", count, target)
+            },
+            DeleteProcessState::DeleteBlocks { count, target } => {
+                format!("Delete blocks ({}/{})", count, target)
+            }
+        }
+    }
+}
+
+impl DeleteMonitor for NutmegMonitor<DeleteProcessState> {
+    fn referenced_blocks_monitor(&mut self) -> &mut dyn conserve::ReferencedBlocksMonitor {
+        self
+    }
+
+    fn find_present_blocks(&mut self, current_count: usize) {
+        let view = self.locked_view();
+        view.update(|view| {
+            *view = DeleteProcessState::FindPresentBlocks { count: current_count };
+        });
+    }
+
+    fn measure_unreferenced_blocks(&mut self, current_count: usize, target_count: usize) {
+        let view = self.locked_view();
+        view.update(|view| {
+            *view = DeleteProcessState::MeasureUnreferencedBlocks { count: current_count, target: target_count };
+        });
+    }
+
+    fn delete_bands(&mut self, current_count: usize, target_count: usize) {
+        let view = self.locked_view();
+        view.update(|view| {
+            *view = DeleteProcessState::DeleteBands { count: current_count, target: target_count };
+        });
+    }
+
+    fn delete_blocks(&mut self, current_count: usize, target_count: usize) {
+        let view = self.locked_view();
+        view.update(|view| {
+            *view = DeleteProcessState::DeleteBlocks { count: current_count, target: target_count };
+        });
+    }
+}
+
+impl ReferencedBlocksMonitor for NutmegMonitor<DeleteProcessState> {
+    fn list_referenced_blocks(&mut self, current_count: usize) {
+        let view = self.locked_view();
+        view.update(|view| {
+            *view = DeleteProcessState::ListReferencedBlocks { count: current_count };
         });
     }
 }

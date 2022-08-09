@@ -43,10 +43,37 @@ pub trait TreeSizeMonitor<T: ReadTree> {
     fn entry_discovered(&mut self, _entry: &T::Entry, _size: &Option<u64>) {}
 }
 
+pub trait ReferencedBlocksMonitor {
+    fn list_referenced_blocks(&mut self, _current_count: usize) {}
+    fn list_referenced_blocks_finished(&mut self) {}
+}
+
+pub trait DeleteMonitor {
+    fn referenced_blocks_monitor(&mut self) -> &mut dyn ReferencedBlocksMonitor;
+
+    fn find_present_blocks(&mut self, _current_count: usize) {}
+    fn find_present_blocks_finished(&mut self) {}
+
+    fn measure_unreferenced_blocks(&mut self, _current_count: usize, _target_count: usize) {}
+    fn measure_unreferenced_blocks_finished(&mut self) {}
+
+    fn delete_bands(&mut self, _current_count: usize, _target_count: usize) {}
+    fn delete_bands_finished(&mut self) {}
+
+    fn delete_blocks(&mut self, _current_count: usize, _target_count: usize) {}
+    fn delete_blocks_finished(&mut self) {}
+}
+
 /// Default monitor which does nothing.
 /// Will be used when no monitor has been specified by the caller.
 pub(crate) struct DefaultMonitor {}
 
 impl BackupMonitor for DefaultMonitor {}
 impl ValidateMonitor for DefaultMonitor {}
-impl<T: ReadTree> TreeSizeMonitor<T> for DefaultMonitor { }
+impl<T: ReadTree> TreeSizeMonitor<T> for DefaultMonitor {}
+impl ReferencedBlocksMonitor for DefaultMonitor {}
+impl DeleteMonitor for DefaultMonitor {
+    fn referenced_blocks_monitor(&mut self) -> &mut dyn ReferencedBlocksMonitor {
+        self
+    }
+}

@@ -21,8 +21,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use itertools::Itertools;
-use nutmeg::models::{LinearModel, UnboundedModel};
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::blockhash::BlockHash;
@@ -30,7 +28,7 @@ use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
-use crate::monitor::DefaultMonitor;
+use crate::monitor::{DefaultMonitor, DeleteMonitor, ReferencedBlocksMonitor};
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
@@ -205,25 +203,33 @@ impl Archive {
     /// Returns all blocks referenced by all bands.
     ///
     /// Shows a progress bar as they're collected.
-    pub fn referenced_blocks(&self, band_ids: &[BandId]) -> Result<HashSet<BlockHash>> {
+    pub fn referenced_blocks(&self, band_ids: &[BandId], monitor: Option<&mut dyn ReferencedBlocksMonitor>) -> Result<HashSet<BlockHash>> {
+        let mut default_monitor = DefaultMonitor{};
+        let monitor = monitor.unwrap_or(&mut default_monitor);
+
         let archive = self.clone();
-        let progress = nutmeg::View::new(
-            LinearModel::new("Find referenced blocks in band", band_ids.len()),
-            ui::nutmeg_options(),
-        );
-        Ok(band_ids
-            .par_iter()
-            .inspect(move |_| progress.update(|model| model.increment(1)))
+        let mut current_count = 0;
+        
+        let result = band_ids
+            // .par_iter()
+            .iter()
+            .inspect(|_| {
+                current_count += 1;
+                monitor.list_referenced_blocks(current_count);
+            })
             .map(move |band_id| Band::open(&archive, band_id).expect("Failed to open band"))
-            .flat_map_iter(|band| band.index().iter_entries())
-            .flat_map_iter(|entry| entry.addrs)
+            .flat_map(|band| band.index().iter_entries())
+            .flat_map(|entry| entry.addrs)
             .map(|addr| addr.hash)
-            .collect())
+            .collect();
+
+        monitor.list_referenced_blocks_finished();
+        Ok(result)
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
-    pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        let referenced = self.referenced_blocks(&self.list_band_ids()?)?;
+    pub fn unreferenced_blocks(&self, monitor: Option<&mut dyn ReferencedBlocksMonitor>) -> Result<impl Iterator<Item = BlockHash>> {
+        let referenced = self.referenced_blocks(&self.list_band_ids()?, monitor)?;
         Ok(self
             .block_dir()
             .block_names()?
@@ -238,7 +244,11 @@ impl Archive {
         &self,
         delete_band_ids: &[BandId],
         options: &DeleteOptions,
+        monitor: Option<&mut dyn DeleteMonitor>,
     ) -> Result<DeleteStats> {
+        let mut default_monitor = DefaultMonitor{};
+        let monitor_ = monitor.unwrap_or(&mut default_monitor);
+
         let mut stats = DeleteStats::default();
         let start = Instant::now();
 
@@ -253,56 +263,82 @@ impl Archive {
         let mut keep_band_ids = self.list_band_ids()?;
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
-        let referenced = self.referenced_blocks(&keep_band_ids)?;
-        let progress = nutmeg::View::new(
-            UnboundedModel::new("Find present blocks"),
-            ui::nutmeg_options(),
-        );
-        let unref = self
-            .block_dir()
-            .block_names()?
-            .inspect(|_| progress.update(|model| model.increment(1)))
-            .filter(|bh| !referenced.contains(bh))
-            .collect_vec();
-        drop(progress);
+        let referenced = self.referenced_blocks(&keep_band_ids, Some(monitor_.referenced_blocks_monitor()))?;
+        let unref = {
+            monitor_.find_present_blocks(0);
+    
+            let mut present_block_index = 0;
+            let unref = self
+                .block_dir()
+                .block_names()?
+                .inspect(|_| {
+                    present_block_index += 1;
+                    monitor_.find_present_blocks(present_block_index);
+                })
+                .filter(|bh| !referenced.contains(bh))
+                .collect_vec();
+            
+            monitor_.find_present_blocks_finished();
+            unref
+        };
+        
         let unref_count = unref.len();
         stats.unreferenced_block_count = unref_count;
 
-        let progress = nutmeg::View::new(
-            LinearModel::new("Measure unreferenced blocks", unref.len()),
-            ui::nutmeg_options(),
-        );
-        let total_bytes = unref
-            .par_iter()
-            .inspect(|_| progress.update(|model| model.increment(1)))
-            .map(|block_id| block_dir.compressed_size(block_id).unwrap_or_default())
-            .sum();
+        let total_bytes = {
+            monitor_.measure_unreferenced_blocks(0, unref_count); 
+            
+            let mut block_index = 0;      
+            let total_bytes = unref
+                //.par_iter()
+                .iter()
+                .inspect(|_| {
+                    block_index += 1;
+                    monitor_.measure_unreferenced_blocks(block_index, unref_count);  
+                })
+                .map(|block_id| block_dir.compressed_size(block_id).unwrap_or_default())
+                .sum();
+
+            monitor_.measure_unreferenced_blocks_finished();
+            total_bytes
+        };
+        
         stats.unreferenced_block_bytes = total_bytes;
 
         if !options.dry_run {
             delete_guard.check()?;
 
-            let progress = nutmeg::View::new(
-                LinearModel::new("Delete bands", delete_band_ids.len()),
-                ui::nutmeg_options(),
-            );
-            for band_id in delete_band_ids {
-                Band::delete(self, band_id)?;
-                stats.deleted_band_count += 1;
-                progress.update(|model| model.increment(1));
+            {
+                let mut delete_band_count = 0;
+                monitor_.delete_bands(0, delete_band_ids.len());
+                for band_id in delete_band_ids {
+                    delete_band_count += 1;
+                    monitor_.delete_bands(delete_band_count, delete_band_ids.len());
+
+                    Band::delete(self, band_id)?;
+                    stats.deleted_band_count += 1;
+                }
+                monitor_.delete_bands_finished();
             }
 
-            let progress = nutmeg::View::new(
-                LinearModel::new("Delete blocks", unref_count),
-                ui::nutmeg_options(),
-            );
-            let error_count = unref
-                .par_iter()
-                .inspect(|_| progress.update(|model| model.increment(1)))
-                .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
-                .count();
-            stats.deletion_errors += error_count;
-            stats.deleted_block_count += unref_count - error_count;
+            {
+                monitor_.delete_blocks(0, unref.len());
+
+                let mut delete_block_count = 0;
+                let error_count = unref
+                    //.par_iter()
+                    .iter()
+                    .inspect(|_| {
+                        delete_block_count += 1;
+                        monitor_.delete_blocks(delete_block_count, unref.len());
+                    })
+                    .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
+                    .count();
+                
+                stats.deletion_errors += error_count;
+                stats.deleted_block_count += unref_count - error_count;
+                monitor_.delete_blocks_finished();
+            }
         }
 
         stats.elapsed = start.elapsed();
@@ -493,7 +529,7 @@ mod tests {
             "Archive should have no bands yet"
         );
         assert_eq!(
-            af.referenced_blocks(&af.list_band_ids().unwrap())
+            af.referenced_blocks(&af.list_band_ids().unwrap(), None)
                 .unwrap()
                 .len(),
             0
@@ -525,7 +561,7 @@ mod tests {
         assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
         assert_eq!(
-            af.referenced_blocks(&af.list_band_ids().unwrap())
+            af.referenced_blocks(&af.list_band_ids().unwrap(), None)
                 .unwrap()
                 .len(),
             0
