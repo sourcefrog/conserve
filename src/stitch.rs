@@ -33,7 +33,8 @@ use crate::*;
 
 pub struct IterStitchedIndexHunks {
     /// Current band_id: initially the requested band_id.
-    band_id: BandId,
+    /// Might be none, if no more bands are available.
+    band_id: Option<BandId>,
 
     /// The latest (and highest-ordered) apath we have already yielded.
     last_apath: Option<Apath>,
@@ -57,7 +58,7 @@ impl IterStitchedIndexHunks {
     pub(crate) fn new(archive: &Archive, band_id: &BandId) -> IterStitchedIndexHunks {
         IterStitchedIndexHunks {
             archive: archive.clone(),
-            band_id: band_id.clone(),
+            band_id: Some(band_id.clone()),
             last_apath: None,
             index_hunks: None,
         }
@@ -85,25 +86,39 @@ impl Iterator for IterStitchedIndexHunks {
                         return Some(hunk);
                     } // otherwise, empty, try the next
                 }
-                if self.archive.band_is_closed(&self.band_id).unwrap_or(false) {
+
+                let band_id = self.band_id.take().expect("last band id should be present");
+                if self.archive.band_is_closed(&band_id).unwrap_or(false) {
+                    /* 
+                     * The current band had been completed. 
+                     * The band erlier will not contain any more information.
+                     * We're done with iterating.
+                     */
                     return None;
                 }
+                
                 self.index_hunks = None;
-                if let Some(band_id) = previous_existing_band(&self.archive, &self.band_id) {
-                    self.band_id = band_id;
-                } else {
-                    return None;
+                self.band_id = previous_existing_band(&self.archive, &band_id);
+
+                // self.band_id might be None, if there is no previous band.
+                // If so, we're done.
+            }
+
+            if let Some(band_id) = &self.band_id {
+                // Start reading this new index and skip forward until after last_apath
+                let mut iter_hunks = Band::open(&self.archive, &band_id)
+                    .expect("Failed to open band")
+                    .index()
+                    .iter_hunks();
+
+                if let Some(last) = &self.last_apath {
+                    iter_hunks = iter_hunks.advance_to_after(last)
                 }
+                self.index_hunks = Some(iter_hunks);
+            } else {
+                /* We got no more bands with possible new index information. */
+                return None;
             }
-            // Start reading this new index and skip forward until after last_apath
-            let mut iter_hunks = Band::open(&self.archive, &self.band_id)
-                .expect("Failed to open band")
-                .index()
-                .iter_hunks();
-            if let Some(last) = &self.last_apath {
-                iter_hunks = iter_hunks.advance_to_after(last)
-            }
-            self.index_hunks = Some(iter_hunks);
         }
     }
 }
