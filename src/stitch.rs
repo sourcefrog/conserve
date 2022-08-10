@@ -86,6 +86,8 @@ impl Iterator for IterStitchedIndexHunks {
                         return Some(hunk);
                     } // otherwise, empty, try the next
                 }
+                /* We iterated through any know entry. */
+                self.index_hunks = None;
 
                 let band_id = self.band_id.take().expect("last band id should be present");
                 if self.archive.band_is_closed(&band_id).unwrap_or(false) {
@@ -97,11 +99,9 @@ impl Iterator for IterStitchedIndexHunks {
                     return None;
                 }
                 
-                self.index_hunks = None;
-                self.band_id = previous_existing_band(&self.archive, &band_id);
-
-                // self.band_id might be None, if there is no previous band.
+                // self.band_id might be None afterwards, if there is no previous band.
                 // If so, we're done.
+                self.band_id = previous_existing_band(&self.archive, &band_id);
             }
 
             if let Some(band_id) = &self.band_id {
