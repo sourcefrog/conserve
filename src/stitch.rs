@@ -107,7 +107,7 @@ impl Iterator for IterStitchedIndexHunks {
 
             if let Some(band_id) = &self.band_id {
                 // Start reading this new index and skip forward until after last_apath
-                let mut iter_hunks = Band::open(&self.archive, &band_id)
+                let mut iter_hunks = Band::open(&self.archive, band_id)
                     .expect("Failed to open band")
                     .index()
                     .iter_hunks();
