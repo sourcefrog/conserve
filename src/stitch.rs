@@ -143,7 +143,7 @@ fn previous_existing_band(archive: &Archive, band_id: &BandId) -> Option<BandId>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_fixtures::ScratchArchive;
+    use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
         IndexEntry {
@@ -255,5 +255,41 @@ mod test {
         );
 
         Ok(())
+    }
+
+    /// Testing that the StitchedIndexHunks iterator does not loops forever on archives with at least one band
+    /// but no completed bands.
+    /// Reference: https://github.com/sourcefrog/conserve/pull/175
+    #[test]
+    fn issue_175() {
+        let tf = TreeFixture::new();
+        tf.create_file("file_a");
+
+        let lt = tf.live_tree();
+        let af = ScratchArchive::new();
+        backup(&af, &lt, &BackupOptions::default())
+            .expect("backup should work");
+
+        af.transport().remove_file("b0000/BANDTAIL").unwrap();
+        let band_ids = af.list_band_ids()
+            .expect("should list bands");
+            
+        let band_id = band_ids.first()
+            .expect("expected at least one band");
+
+        let mut iter = IterStitchedIndexHunks::new(&af, Some(band_id.clone()));
+        // Get the first and only index entry. 
+        // `index_hunks` and `band_id` should be `Some`.
+        assert!(iter.next().is_some());
+
+        // Remove the band head. This band can not be opened anymore.
+        // If accessed this should fail the test.
+        // Note: When refactoring `.expect("Failed to open band")` this might needs refactoring as well.
+        af.transport().remove_file("b0000/BANDHEAD").unwrap();
+
+        // No more entries should follow.
+        for _ in 0..10 {
+            assert!(iter.next().is_none());
+        }
     }
 }
