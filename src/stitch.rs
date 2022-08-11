@@ -33,6 +33,7 @@ use crate::*;
 
 pub struct IterStitchedIndexHunks {
     /// Current band_id: initially the requested band_id.
+    /// This moves back to earlier bands when we reach the end of an incomplete band.
     /// Might be none, if no more bands are available.
     band_id: Option<BandId>,
 
@@ -80,22 +81,22 @@ impl Iterator for IterStitchedIndexHunks {
         loop {
             // If we're already reading an index, and it has more content, return that.
             if let Some(index_hunks) = &mut self.index_hunks {
+                // An index iterator must be assigned to a band.
+                debug_assert!(self.band_id.is_some());
+
                 for hunk in index_hunks {
                     if let Some(last_entry) = hunk.last() {
                         self.last_apath = Some(last_entry.apath().clone());
                         return Some(hunk);
                     } // otherwise, empty, try the next
                 }
-                /* We iterated through any know entry. */
+                // There are no more index hunks in the current band.
                 self.index_hunks = None;
 
                 let band_id = self.band_id.take().expect("last band id should be present");
                 if self.archive.band_is_closed(&band_id).unwrap_or(false) {
-                    /* 
-                     * The current band had been completed. 
-                     * The band erlier will not contain any more information.
-                     * We're done with iterating.
-                     */
+                    // We reached the end of a complete index in this band, 
+                    // so there's no need to look at any earlier bands, and we're done iterating.
                     return None;
                 }
                 
@@ -116,7 +117,7 @@ impl Iterator for IterStitchedIndexHunks {
                 }
                 self.index_hunks = Some(iter_hunks);
             } else {
-                /* We got no more bands with possible new index information. */
+                // We got no more bands with possible new index information.
                 return None;
             }
         }
