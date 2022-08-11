@@ -39,5 +39,9 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
       - name: Build
         run: cargo build --all-targets
-      - name: Run tests
+      - name: Test
         run: cargo test -- --include-ignored
+      - name: Clippy
+        run: cargo clippy -- -D clippy::all
+      - name: rustfmt
+        run: cargo fmt --all -- --check
