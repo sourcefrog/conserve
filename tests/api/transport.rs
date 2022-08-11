@@ -30,7 +30,7 @@ fn list_dir_names() {
 
     let url = Url::from_directory_path(temp.path()).unwrap();
     dbg!(&url);
-    let transport = open_transport(&url.as_str()).unwrap();
+    let transport = open_transport(url.as_str()).unwrap();
     dbg!(&transport);
 
     let ListDirNames { mut files, dirs } = transport.list_dir_names("").unwrap();

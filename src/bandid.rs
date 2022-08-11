@@ -13,7 +13,7 @@
 
 //! Bands are identified by a string like `b0001-0023`, represented by a `BandId` object.
 
-use std::fmt;
+use std::fmt::{self, Write};
 use std::str::FromStr;
 
 use crate::errors::Error;
@@ -105,7 +105,7 @@ impl fmt::Display for BandId {
         let mut result = String::with_capacity(self.seqs.len() * 5);
         result.push('b');
         for s in &self.seqs {
-            result.push_str(&format!("{:04}-", s));
+            let _ = write!(result, "{:04}-", s);
         }
         result.pop(); // remove the last dash
         result.shrink_to_fit();
