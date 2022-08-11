@@ -42,6 +42,6 @@ jobs:
       - name: Test
         run: cargo test -- --include-ignored
       - name: Clippy
-        run: cargo clippy -- -D clippy::all
+        run: cargo clippy --all-targets -- -D clippy::all
       - name: rustfmt
         run: cargo fmt --all -- --check
