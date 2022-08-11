@@ -138,7 +138,7 @@ mod test {
         let _delete_guard = GarbageCollectionLock::new(&archive).unwrap();
         let backup_result = backup(&archive, &source.live_tree(), &BackupOptions::default());
         assert_eq!(
-            backup_result.err().expect("backup fails").to_string(),
+            backup_result.expect_err("backup fails").to_string(),
             "Archive is locked for garbage collection"
         );
     }
