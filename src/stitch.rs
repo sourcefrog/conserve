@@ -95,11 +95,11 @@ impl Iterator for IterStitchedIndexHunks {
 
                 let band_id = self.band_id.take().expect("last band id should be present");
                 if self.archive.band_is_closed(&band_id).unwrap_or(false) {
-                    // We reached the end of a complete index in this band, 
+                    // We reached the end of a complete index in this band,
                     // so there's no need to look at any earlier bands, and we're done iterating.
                     return None;
                 }
-                
+
                 // self.band_id might be None afterwards, if there is no previous band.
                 // If so, we're done.
                 self.band_id = previous_existing_band(&self.archive, &band_id);
@@ -267,18 +267,15 @@ mod test {
 
         let lt = tf.live_tree();
         let af = ScratchArchive::new();
-        backup(&af, &lt, &BackupOptions::default())
-            .expect("backup should work");
+        backup(&af, &lt, &BackupOptions::default()).expect("backup should work");
 
         af.transport().remove_file("b0000/BANDTAIL").unwrap();
-        let band_ids = af.list_band_ids()
-            .expect("should list bands");
-            
-        let band_id = band_ids.first()
-            .expect("expected at least one band");
+        let band_ids = af.list_band_ids().expect("should list bands");
+
+        let band_id = band_ids.first().expect("expected at least one band");
 
         let mut iter = IterStitchedIndexHunks::new(&af, Some(band_id.clone()));
-        // Get the first and only index entry. 
+        // Get the first and only index entry.
         // `index_hunks` and `band_id` should be `Some`.
         assert!(iter.next().is_some());
 

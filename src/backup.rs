@@ -233,10 +233,7 @@ impl BackupWriter {
         self.stats.files += 1;
         let apath = source_entry.apath();
         let result;
-        if let Some(basis_entry) = self
-            .basis_index
-            .advance_to(apath)
-        {
+        if let Some(basis_entry) = self.basis_index.advance_to(apath) {
             if source_entry.is_unchanged_from(&basis_entry) {
                 self.stats.unmodified_files += 1;
                 self.index_builder.push_entry(basis_entry);
