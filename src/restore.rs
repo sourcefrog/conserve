@@ -61,8 +61,8 @@ pub fn restore(
     options: &RestoreOptions,
     monitor: Option<&dyn RestoreMonitor>,
 ) -> Result<RestoreStats> {
-    let mut default_monitor = DefaultMonitor {};
-    let monitor = monitor.unwrap_or(&mut default_monitor);
+    let default_monitor = DefaultMonitor {};
+    let monitor = monitor.unwrap_or(&default_monitor);
 
     let st = archive.open_stored_tree(options.band_selection.clone())?;
     let mut rt = if options.overwrite {

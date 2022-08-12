@@ -392,8 +392,7 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let mut monitor =
-                    NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
+                let monitor = NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
 
                 let archive = Archive::open(open_transport(archive)?)?;
                 let stats = archive.delete_bands(
@@ -402,7 +401,7 @@ impl Command {
                         dry_run: *dry_run,
                         break_lock: *break_lock,
                     },
-                    Some(&mut monitor),
+                    Some(&monitor),
                 )?;
                 if !no_stats {
                     for line in format!("{}", stats).lines() {
@@ -454,9 +453,9 @@ impl Command {
                     overwrite: *force_overwrite,
                 };
 
-                let mut monitor =
+                let monitor =
                     NutmegMonitor::new(RestoreProgressModel::new(*verbose), !args.no_progress);
-                let stats = restore(&archive, destination, &options, Some(&mut monitor))?;
+                let stats = restore(&archive, destination, &options, Some(&monitor))?;
                 if !no_stats {
                     info!("Restore complete.");
                     for line in format!("{}", stats).lines() {
@@ -472,15 +471,14 @@ impl Command {
             } => {
                 let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
 
-                let mut monitor =
-                    NutmegMonitor::new(SizeProgressModel::default(), !args.no_progress);
+                let monitor = NutmegMonitor::new(SizeProgressModel::default(), !args.no_progress);
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
-                        .size(excludes, Some(&mut monitor as &dyn TreeSizeMonitor<_>))?
+                        .size(excludes, Some(&monitor as &dyn TreeSizeMonitor<_>))?
                         .file_bytes
                 } else {
                     LiveTree::open(stos.source.as_ref().unwrap())?
-                        .size(excludes, Some(&mut monitor as &dyn TreeSizeMonitor<_>))?
+                        .size(excludes, Some(&monitor as &dyn TreeSizeMonitor<_>))?
                         .file_bytes
                 };
                 drop(monitor);
@@ -500,10 +498,10 @@ impl Command {
                     skip_block_hashes: *quick,
                 };
 
-                let mut monitor =
+                let monitor =
                     NutmegMonitor::new(ValidateProgressModel::default(), !args.no_progress);
                 let stats = Archive::open(open_transport(archive)?)?
-                    .validate(&options, Some(&mut monitor as &dyn ValidateMonitor))?;
+                    .validate(&options, Some(&monitor as &dyn ValidateMonitor))?;
                 drop(monitor);
 
                 if !no_stats {
@@ -558,7 +556,7 @@ fn initialize_log(args: &Args) -> std::result::Result<LogGuard, String> {
     let file = args
         .log_file
         .as_ref()
-        .map(|file| PathBuf::from_str(&file))
+        .map(|file| PathBuf::from_str(file))
         .transpose()
         .map_err(|_| "Unparseable log file path".to_string())?;
 

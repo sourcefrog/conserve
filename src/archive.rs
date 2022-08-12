@@ -210,8 +210,8 @@ impl Archive {
         band_ids: &[BandId],
         monitor: Option<&dyn ReferencedBlocksMonitor>,
     ) -> Result<HashSet<BlockHash>> {
-        let mut default_monitor = DefaultMonitor {};
-        let monitor = monitor.unwrap_or(&mut default_monitor);
+        let default_monitor = DefaultMonitor {};
+        let monitor = monitor.unwrap_or(&default_monitor);
 
         let archive = self.clone();
         let current_count = AtomicUsize::new(0);
@@ -253,8 +253,8 @@ impl Archive {
         options: &DeleteOptions,
         monitor: Option<&dyn DeleteMonitor>,
     ) -> Result<DeleteStats> {
-        let mut default_monitor = DefaultMonitor {};
-        let monitor_ = monitor.unwrap_or(&mut default_monitor);
+        let default_monitor = DefaultMonitor {};
+        let monitor_ = monitor.unwrap_or(&default_monitor);
 
         let mut stats = DeleteStats::default();
         let start = Instant::now();
@@ -360,8 +360,8 @@ impl Archive {
         options: &ValidateOptions,
         monitor: Option<&dyn ValidateMonitor>,
     ) -> Result<ValidateStats> {
-        let mut default_monitor = DefaultMonitor {};
-        let monitor = monitor.unwrap_or(&mut default_monitor);
+        let default_monitor = DefaultMonitor {};
+        let monitor = monitor.unwrap_or(&default_monitor);
 
         let start = Instant::now();
         monitor.validate_archive();
@@ -390,7 +390,7 @@ impl Archive {
                 .keys()
                 .filter(|&bh| !present_blocks.contains(bh))
             {
-                monitor.validate_block_missing(&block_hash, &BlockMissingReason::NotExisting);
+                monitor.validate_block_missing(block_hash, &BlockMissingReason::NotExisting);
                 stats.block_missing_count += 1;
             }
         } else {
@@ -437,7 +437,7 @@ impl Archive {
                     other_kind => {
                         monitor.validate_archive_problem(
                             &ValidateArchiveProblem::UnexpectedFileType {
-                                name: name,
+                                name,
                                 kind: other_kind,
                             },
                         );

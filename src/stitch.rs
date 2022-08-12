@@ -267,7 +267,7 @@ mod test {
 
         let lt = tf.live_tree();
         let af = ScratchArchive::new();
-        backup(&af, &lt, &BackupOptions::default()).expect("backup should work");
+        backup(&af, &lt, &BackupOptions::default(), None).expect("backup should work");
 
         af.transport().remove_file("b0000/BANDTAIL").unwrap();
         let band_ids = af.list_band_ids().expect("should list bands");

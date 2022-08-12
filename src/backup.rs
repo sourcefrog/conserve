@@ -57,8 +57,8 @@ pub fn backup(
 ) -> Result<BackupStats> {
     let _span = tracing::span!(Level::DEBUG, "backup");
 
-    let mut default_monitor = DefaultMonitor {};
-    let monitor = monitor.unwrap_or(&mut default_monitor);
+    let default_monitor = DefaultMonitor {};
+    let monitor = monitor.unwrap_or(&default_monitor);
 
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive)?;

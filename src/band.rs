@@ -248,8 +248,8 @@ impl Band {
         Ok(())
     }
 
-    pub fn transport(&self) -> &Box<dyn Transport> {
-        &self.transport
+    pub fn transport(&self) -> &dyn Transport {
+        self.transport.as_ref()
     }
 }
 

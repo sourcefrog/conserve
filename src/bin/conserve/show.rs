@@ -259,10 +259,10 @@ impl BackupMonitor for NutmegMonitor<BackupProgressModel> {
         if let Some(diff_kind) = result.as_ref() {
             let verbose = self.update_model(|model| {
                 match diff_kind {
-                    &DiffKind::Changed => model.entries_changed += 1,
-                    &DiffKind::New => model.entries_new += 1,
-                    &DiffKind::Unchanged => model.entries_unchanged += 1,
-                    &DiffKind::Deleted => model.entries_deleted += 1,
+                    DiffKind::Changed => model.entries_changed += 1,
+                    DiffKind::New => model.entries_new += 1,
+                    DiffKind::Unchanged => model.entries_unchanged += 1,
+                    DiffKind::Deleted => model.entries_deleted += 1,
                 };
 
                 model.verbose
