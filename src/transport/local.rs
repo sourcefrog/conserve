@@ -97,7 +97,7 @@ impl Transport for LocalTransport {
             return Err(err);
         }
         if let Err(persist_error) = temp.persist(&full_path) {
-            let _ = persist_error.file.close()?;
+            persist_error.file.close()?;
             Err(persist_error.error)
         } else {
             Ok(())

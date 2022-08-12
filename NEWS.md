@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fixed: Previously, if the first backup in an archive was incomplete, Conserve
+  could get painfully slow, due to a bug that caused it to repeatedly reread
+  the incomplete index. (Thanks to WolverinDEV.)
+
 - Archives may be specified as URLs: currently only as `file:///` URLs.
 
 - Changed the format of text output from `conserve backup -v`: it only shows new
