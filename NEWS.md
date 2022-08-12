@@ -1,6 +1,8 @@
 # Conserve release history
 
-## Unreleased
+## v0.6.16
+
+Released 2022-08-12
 
 - Fixed: Previously, if the first backup in an archive was incomplete, Conserve
   could get painfully slow, due to a bug that caused it to repeatedly reread
