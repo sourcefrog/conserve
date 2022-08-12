@@ -248,10 +248,7 @@ impl Iter {
                     Ok(true) => continue,
                     Ok(false) => (),
                     Err(e) => {
-                        error!(
-                            "Error checking CACHEDIR.TAG in {:?}: {}",
-                            dir_entry, e
-                        );
+                        error!("Error checking CACHEDIR.TAG in {:?}: {}", dir_entry, e);
                     }
                 }
             }
@@ -286,10 +283,7 @@ impl Iter {
                 let t = match dir_path.join(dir_entry.file_name()).read_link() {
                     Ok(t) => t,
                     Err(e) => {
-                        error!(
-                            "Failed to read target of symlink {:?}: {}",
-                            child_apath, e
-                        );
+                        error!("Failed to read target of symlink {:?}: {}", child_apath, e);
                         continue;
                     }
                 };

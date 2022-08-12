@@ -27,10 +27,10 @@ pub struct ValidateOptions {
 /// Band validation result.
 pub enum BandValidateResult {
     MetadataError(Error),
-    
+
     OpenError(Error),
     TreeOpenError(Error),
-    
+
     TreeValidateError(Error),
 
     Valid(BlockLengths, ValidateStats),
@@ -44,9 +44,9 @@ pub enum BlockMissingReason {
 }
 
 pub enum BandProblem {
-    MissingHeadFile{ band_head_filename: String },
-    UnexpectedFiles{ files: Vec<String> },
-    UnexpectedDirectories{ directories: Vec<String> }
+    MissingHeadFile { band_head_filename: String },
+    UnexpectedFiles { files: Vec<String> },
+    UnexpectedDirectories { directories: Vec<String> },
 }
 
 impl BlockLengths {
@@ -80,12 +80,12 @@ pub(crate) fn validate_bands(
 ) -> (BlockLengths, ValidateStats) {
     let mut stats = ValidateStats::default();
     let mut block_lens = BlockLengths::new();
-    
+
     for band_id in band_ids {
         monitor.validate_band(band_id);
         let result = validate_band(archive, &mut stats, band_id, monitor);
         monitor.validate_band_result(band_id, &result);
-        
+
         match result {
             BandValidateResult::MetadataError(_) => stats.band_metadata_problems += 1,
             BandValidateResult::OpenError(_) => stats.band_open_errors += 1,
@@ -101,22 +101,28 @@ pub(crate) fn validate_bands(
     (block_lens, stats)
 }
 
-pub(crate) fn validate_band(archive: &Archive, stats: &mut ValidateStats, band_id: &BandId, monitor: &dyn ValidateMonitor) -> BandValidateResult {
+pub(crate) fn validate_band(
+    archive: &Archive,
+    stats: &mut ValidateStats,
+    band_id: &BandId,
+    monitor: &dyn ValidateMonitor,
+) -> BandValidateResult {
     let band = match Band::open(archive, band_id) {
         Ok(band) => band,
-        Err(error) => return BandValidateResult::OpenError(error)
+        Err(error) => return BandValidateResult::OpenError(error),
     };
 
     if let Err(error) = band.validate(stats, monitor) {
         return BandValidateResult::MetadataError(error);
     }
 
-    let stored_tree = match archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
-        Ok(tree) => tree,
-        Err(error) => return BandValidateResult::TreeOpenError(error),
-    };
+    let stored_tree =
+        match archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
+            Ok(tree) => tree,
+            Err(error) => return BandValidateResult::TreeOpenError(error),
+        };
 
-    match validate_stored_tree(&stored_tree)  {
+    match validate_stored_tree(&stored_tree) {
         Ok(result) => BandValidateResult::Valid(result.0, result.1),
         Err(error) => BandValidateResult::TreeValidateError(error),
     }

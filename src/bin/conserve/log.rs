@@ -1,27 +1,26 @@
 use std::io::Write;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::ops::Deref;
 
 use lazy_static::lazy_static;
-use tracing::Subscriber;
 use tracing::metadata::LevelFilter;
+use tracing::Subscriber;
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
-use tracing_subscriber::fmt;
 
-lazy_static!{
-    pub static ref TERMINAL_OUTPUT: Mutex<Option<Arc<Mutex<dyn Write + Send + Sync>>>> = Mutex::new(
-        Some(Arc::new(Mutex::new(std::io::stdout())))        
-    );
+lazy_static! {
+    pub static ref TERMINAL_OUTPUT: Mutex<Option<Arc<Mutex<dyn Write + Send + Sync>>>> =
+        Mutex::new(Some(Arc::new(Mutex::new(std::io::stdout()))));
 }
 
 /// Wrapper around TERMINAL_OUTPUT which dynamically writes
 /// the tracing output to the output writer set at TERMINAL_OUTPUT.
-struct TerminalWriter { }
-impl TerminalWriter { }
+struct TerminalWriter {}
+impl TerminalWriter {}
 
 impl Write for TerminalWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
@@ -55,25 +54,25 @@ pub struct LoggingOptions {
 pub fn init(options: LoggingOptions) -> std::result::Result<LogGuard, String> {
     let mut worker_guard = None;
     let registry = Registry::default();
-  
+
     // Terminal logger.
     // TODO: Enable timestamps except when in raw mode.
     //       Right now this can't be achived since without_time updates the struct signature...
     let registry = registry.with(
         fmt::Layer::default()
-                .without_time()
-                .with_level(!options.terminal_raw)
-                .with_target(false)
-                .with_writer(|| TerminalWriter{})
-                .with_filter(LevelFilter::from(options.level))
+            .without_time()
+            .with_level(!options.terminal_raw)
+            .with_target(false)
+            .with_writer(|| TerminalWriter {})
+            .with_filter(LevelFilter::from(options.level)),
     );
 
     // File logger.
     let registry: Box<dyn Subscriber + Send + Sync + 'static> = if let Some(path) = options.file {
-        let directory = path.parent()
-            .ok_or("can't resolve log file directory")?;
+        let directory = path.parent().ok_or("can't resolve log file directory")?;
 
-        let file_name = path.file_name()
+        let file_name = path
+            .file_name()
             .ok_or("can't get log file name")?
             .to_string_lossy()
             .to_string();
@@ -85,11 +84,11 @@ pub fn init(options: LoggingOptions) -> std::result::Result<LogGuard, String> {
         Box::new(
             registry.with(
                 fmt::Layer::default()
-                        .with_ansi(false)
-                        .with_target(false)
-                        .with_writer(writer)
-                        .with_filter(LevelFilter::from(options.level))
-            )
+                    .with_ansi(false)
+                    .with_target(false)
+                    .with_writer(writer)
+                    .with_filter(LevelFilter::from(options.level)),
+            ),
         )
     } else {
         Box::new(registry)
@@ -98,7 +97,9 @@ pub fn init(options: LoggingOptions) -> std::result::Result<LogGuard, String> {
     tracing::subscriber::set_global_default(registry)
         .map_err(|_| "Failed to update global default logger".to_string())?;
 
-    Ok(LogGuard{ _worker_guard: worker_guard })
+    Ok(LogGuard {
+        _worker_guard: worker_guard,
+    })
 }
 
 /// Guards all logging activity.
@@ -122,7 +123,7 @@ impl ViewLogGuard {
         }
 
         self.released = true;
-        
+
         let mut output = TERMINAL_OUTPUT.lock().unwrap();
         *output = self.previous_logger.take();
     }
@@ -140,5 +141,8 @@ pub fn update_terminal_target(target: Arc<Mutex<dyn Write + Send + Sync>>) -> Vi
     let mut output = TERMINAL_OUTPUT.lock().unwrap();
     let previous_logger = output.replace(target);
 
-    ViewLogGuard { previous_logger, released: false }
+    ViewLogGuard {
+        previous_logger,
+        released: false,
+    }
 }

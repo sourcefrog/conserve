@@ -31,7 +31,8 @@ pub fn simple_backup() {
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
 
-    let copy_stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).expect("backup");
+    let copy_stats =
+        backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).expect("backup");
     assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
     assert_eq!(copy_stats.files, 1);
     assert_eq!(copy_stats.deduplicated_blocks, 0);
@@ -46,8 +47,13 @@ pub fn simple_backup() {
     assert!(archive.band_exists(&BandId::zero()).unwrap());
     assert!(archive.band_is_closed(&BandId::zero()).unwrap());
     assert!(!archive.band_exists(&BandId::new(&[1])).unwrap());
-    let copy_stats =
-        restore(&archive, restore_dir.path(), &RestoreOptions::default(), None).expect("restore");
+    let copy_stats = restore(
+        &archive,
+        restore_dir.path(),
+        &RestoreOptions::default(),
+        None,
+    )
+    .expect("restore");
 
     assert_eq!(copy_stats.uncompressed_file_bytes, 8);
 }
@@ -88,8 +94,13 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     assert!(band_info.is_closed);
     assert!(band_info.end_time.is_some());
 
-    let copy_stats =
-        restore(&archive, restore_dir.path(), &RestoreOptions::default(), None).expect("restore");
+    let copy_stats = restore(
+        &archive,
+        restore_dir.path(),
+        &RestoreOptions::default(),
+        None,
+    )
+    .expect("restore");
 
     assert_eq!(copy_stats.uncompressed_file_bytes, 8);
     // TODO: Read back contents of that file.
@@ -185,7 +196,8 @@ fn large_file() {
     let large_content = vec![b'a'; 4 << 20];
     tf.create_file_with_contents("large", &large_content);
 
-    let backup_stats = backup(&af, &tf.live_tree(), &BackupOptions::default(), None).expect("backup");
+    let backup_stats =
+        backup(&af, &tf.live_tree(), &BackupOptions::default(), None).expect("backup");
     assert_eq!(backup_stats.new_files, 1);
     // First 1MB should be new; remainder should be deduplicated.
     assert_eq!(backup_stats.uncompressed_bytes, 1 << 20);
@@ -198,8 +210,13 @@ fn large_file() {
     // Try to restore it
     let rd = TempDir::new().unwrap();
     let restore_archive = Archive::open_path(af.path()).unwrap();
-    let restore_stats =
-        restore(&restore_archive, rd.path(), &RestoreOptions::default(), None).expect("restore");
+    let restore_stats = restore(
+        &restore_archive,
+        rd.path(),
+        &RestoreOptions::default(),
+        None,
+    )
+    .expect("restore");
     assert_eq!(restore_stats.files, 1);
 
     let content = std::fs::read(rd.path().join("large")).unwrap();
@@ -259,7 +276,8 @@ pub fn symlink() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_symlink("symlink", "/a/broken/destination");
-    let copy_stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).expect("backup");
+    let copy_stats =
+        backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).expect("backup");
 
     assert_eq!(0, copy_stats.files);
     assert_eq!(1, copy_stats.symlinks);
@@ -514,7 +532,7 @@ fn detect_unchanged_from_stitched_index() {
             max_entries_per_hunk: 1,
             ..Default::default()
         },
-        None
+        None,
     )
     .unwrap();
     assert_eq!(stats.new_files, 2);
@@ -530,7 +548,7 @@ fn detect_unchanged_from_stitched_index() {
             max_entries_per_hunk: 1,
             ..Default::default()
         },
-        None
+        None,
     )
     .unwrap();
     assert_eq!(stats.unmodified_files, 1);
@@ -552,7 +570,7 @@ fn detect_unchanged_from_stitched_index() {
             max_entries_per_hunk: 1,
             ..Default::default()
         },
-        None
+        None,
     )
     .unwrap();
     assert_eq!(stats.unmodified_files, 2, "both files are unmodified");

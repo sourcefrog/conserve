@@ -136,7 +136,13 @@ fn restore_modify_backup() {
 
         let archive = open_old_archive(ver, "minimal");
 
-        restore(&archive, working_tree.path(), &RestoreOptions::default(), None).expect("restore");
+        restore(
+            &archive,
+            working_tree.path(),
+            &RestoreOptions::default(),
+            None,
+        )
+        .expect("restore");
 
         // Write back into a new copy of the archive, without modifying the
         // testdata in the source tree.
@@ -162,7 +168,7 @@ fn restore_modify_backup() {
             &new_archive,
             &LiveTree::open(working_tree.path()).unwrap(),
             &Default::default(),
-            None
+            None,
         )
         .expect("Backup modified tree");
 

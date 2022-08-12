@@ -33,6 +33,7 @@ pub mod kind;
 pub mod live_tree;
 mod merge;
 pub(crate) mod misc;
+pub(crate) mod monitor;
 pub mod restore;
 pub mod stats;
 mod stitch;
@@ -44,7 +45,6 @@ mod tree;
 pub mod ui;
 pub mod unix_time;
 mod validate;
-pub(crate) mod monitor;
 
 pub use crate::apath::Apath;
 pub use crate::archive::Archive;
@@ -65,13 +65,16 @@ pub use crate::kind::Kind;
 pub use crate::live_tree::{LiveEntry, LiveTree};
 pub use crate::merge::{MergeTrees, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
+pub use crate::monitor::{
+    BackupMonitor, DeleteMonitor, ReferencedBlocksMonitor, RestoreMonitor, TreeSizeMonitor,
+    ValidateMonitor,
+};
 pub use crate::restore::{restore, RestoreOptions, RestoreTree};
 pub use crate::stats::{BackupStats, DeleteStats, RestoreStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};
-pub use crate::validate::{ ValidateOptions, BandProblem, BandValidateResult, BlockMissingReason };
-pub use crate::monitor::{ BackupMonitor, ValidateMonitor, TreeSizeMonitor, ReferencedBlocksMonitor, DeleteMonitor, RestoreMonitor };
+pub use crate::validate::{BandProblem, BandValidateResult, BlockMissingReason, ValidateOptions};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

@@ -43,8 +43,15 @@ pub trait ReadTree {
     /// Measure the tree size.
     ///
     /// This typically requires walking all entries, which may take a while.
-    fn size(&self, exclude: Exclude, monitor: Option<&dyn TreeSizeMonitor<Self>>) -> Result<TreeSize> where Self: Sized {
-        let mut default_monitor = DefaultMonitor{};
+    fn size(
+        &self,
+        exclude: Exclude,
+        monitor: Option<&dyn TreeSizeMonitor<Self>>,
+    ) -> Result<TreeSize>
+    where
+        Self: Sized,
+    {
+        let mut default_monitor = DefaultMonitor {};
         let monitor = monitor.unwrap_or(&mut default_monitor as &dyn TreeSizeMonitor<Self>);
 
         let mut tot = 0u64;

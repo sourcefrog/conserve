@@ -1,4 +1,8 @@
-use crate::{ReadTree, LiveEntry, Error, DiffKind, BackupStats, BandId, BandProblem, BandValidateResult, BlockMissingReason, BlockHash, Band, stats::Sizes, Result, archive::ValidateArchiveProblem, IndexEntry};
+use crate::{
+    archive::ValidateArchiveProblem, stats::Sizes, BackupStats, Band, BandId, BandProblem,
+    BandValidateResult, BlockHash, BlockMissingReason, DiffKind, Error, IndexEntry, LiveEntry,
+    ReadTree, Result,
+};
 
 /// Monitor the backup progress.
 pub trait BackupMonitor {
@@ -10,7 +14,7 @@ pub trait BackupMonitor {
 }
 
 /// Monitor the validation progress.
-pub trait ValidateMonitor : Sync {
+pub trait ValidateMonitor: Sync {
     fn count_bands(&self) {}
     fn count_bands_result(&self, _bands: &[BandId]) {}
 
@@ -31,7 +35,7 @@ pub trait ValidateMonitor : Sync {
 
     fn list_block_names(&self, _current_count: usize) {}
     fn list_block_names_finished(&self) {}
-    
+
     fn read_blocks(&self, _count: usize) {}
     fn read_block_result(&self, _block_hash: &BlockHash, _result: &Result<(Vec<u8>, Sizes)>) {}
     fn read_blocks_finished(&self) {}
@@ -43,13 +47,13 @@ pub trait TreeSizeMonitor<T: ReadTree> {
 }
 
 /// Monitor for iterating referenced blocks.
-pub trait ReferencedBlocksMonitor : Sync {
+pub trait ReferencedBlocksMonitor: Sync {
     fn list_referenced_blocks(&self, _current_count: usize) {}
     fn list_referenced_blocks_finished(&self) {}
 }
 
 /// Monitor for deleting backups/blocks.
-pub trait DeleteMonitor : Sync {
+pub trait DeleteMonitor: Sync {
     fn referenced_blocks_monitor(&self) -> &dyn ReferencedBlocksMonitor;
 
     fn find_present_blocks(&self, _current_count: usize) {}

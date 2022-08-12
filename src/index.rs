@@ -321,10 +321,7 @@ impl Iterator for IndexHunkIter {
                 Ok(Some(entries)) => entries,
                 Err(err) => {
                     self.stats.errors += 1;
-                    error!(
-                        "Error reading index hunk {:?}: {:?} ",
-                        hunk_number, err
-                    );
+                    error!("Error reading index hunk {:?}: {:?} ", hunk_number, err);
                     continue;
                 }
             };

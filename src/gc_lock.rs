@@ -126,7 +126,13 @@ mod test {
     fn completed_backup_ok() {
         let archive = ScratchArchive::new();
         let source = TreeFixture::new();
-        backup(&archive, &source.live_tree(), &BackupOptions::default(), None).unwrap();
+        backup(
+            &archive,
+            &source.live_tree(),
+            &BackupOptions::default(),
+            None,
+        )
+        .unwrap();
         let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
         delete_guard.check().unwrap();
     }
@@ -136,7 +142,12 @@ mod test {
         let archive = ScratchArchive::new();
         let source = TreeFixture::new();
         let _delete_guard = GarbageCollectionLock::new(&archive).unwrap();
-        let backup_result = backup(&archive, &source.live_tree(), &BackupOptions::default(), None);
+        let backup_result = backup(
+            &archive,
+            &source.live_tree(),
+            &BackupOptions::default(),
+            None,
+        );
         assert_eq!(
             backup_result.expect_err("backup fails").to_string(),
             "Archive is locked for garbage collection"

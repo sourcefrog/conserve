@@ -22,8 +22,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::blockhash::BlockHash;
 use crate::errors::Error;
@@ -34,7 +34,7 @@ use crate::monitor::{DefaultMonitor, DeleteMonitor, ReferencedBlocksMonitor};
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
-use crate::validate::{BlockMissingReason};
+use crate::validate::BlockMissingReason;
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -62,10 +62,10 @@ pub struct DeleteOptions {
 
 #[derive(Debug)]
 pub enum ValidateArchiveProblem {
-    UnexpectedFiles{ path: String, files: Vec<String> },
-    UnexpectedFileType{ name: String, kind: Kind },
-    UnexpectedDirectory{ path: String, directory: String },
-    DuplicateBand{ path: String, directory: String },
+    UnexpectedFiles { path: String, files: Vec<String> },
+    UnexpectedFileType { name: String, kind: Kind },
+    UnexpectedDirectory { path: String, directory: String },
+    DuplicateBand { path: String, directory: String },
     DirectoryListError { error: std::io::Error },
 }
 
@@ -205,13 +205,17 @@ impl Archive {
     /// Returns all blocks referenced by all bands.
     ///
     /// Shows a progress bar as they're collected.
-    pub fn referenced_blocks(&self, band_ids: &[BandId], monitor: Option<&dyn ReferencedBlocksMonitor>) -> Result<HashSet<BlockHash>> {
-        let mut default_monitor = DefaultMonitor{};
+    pub fn referenced_blocks(
+        &self,
+        band_ids: &[BandId],
+        monitor: Option<&dyn ReferencedBlocksMonitor>,
+    ) -> Result<HashSet<BlockHash>> {
+        let mut default_monitor = DefaultMonitor {};
         let monitor = monitor.unwrap_or(&mut default_monitor);
 
         let archive = self.clone();
         let current_count = AtomicUsize::new(0);
-        
+
         let result = band_ids
             .par_iter()
             .inspect(|_| {
@@ -228,7 +232,10 @@ impl Archive {
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
-    pub fn unreferenced_blocks(&self, monitor: Option<&dyn ReferencedBlocksMonitor>) -> Result<impl Iterator<Item = BlockHash>> {
+    pub fn unreferenced_blocks(
+        &self,
+        monitor: Option<&dyn ReferencedBlocksMonitor>,
+    ) -> Result<impl Iterator<Item = BlockHash>> {
         let referenced = self.referenced_blocks(&self.list_band_ids()?, monitor)?;
         Ok(self
             .block_dir()
@@ -246,7 +253,7 @@ impl Archive {
         options: &DeleteOptions,
         monitor: Option<&dyn DeleteMonitor>,
     ) -> Result<DeleteStats> {
-        let mut default_monitor = DefaultMonitor{};
+        let mut default_monitor = DefaultMonitor {};
         let monitor_ = monitor.unwrap_or(&mut default_monitor);
 
         let mut stats = DeleteStats::default();
@@ -263,10 +270,11 @@ impl Archive {
         let mut keep_band_ids = self.list_band_ids()?;
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
-        let referenced = self.referenced_blocks(&keep_band_ids, Some(monitor_.referenced_blocks_monitor()))?;
+        let referenced =
+            self.referenced_blocks(&keep_band_ids, Some(monitor_.referenced_blocks_monitor()))?;
         let unref = {
             monitor_.find_present_blocks(0);
-    
+
             let mut present_block_index = 0;
             let unref = self
                 .block_dir()
@@ -277,25 +285,25 @@ impl Archive {
                 })
                 .filter(|bh| !referenced.contains(bh))
                 .collect_vec();
-            
+
             monitor_.find_present_blocks_finished();
             unref
         };
-        
+
         let unref_count = unref.len();
         stats.unreferenced_block_count = unref_count;
 
         let total_bytes = {
-            monitor_.measure_unreferenced_blocks(0, unref_count); 
-            
+            monitor_.measure_unreferenced_blocks(0, unref_count);
+
             let block_index = AtomicUsize::new(0);
             let total_bytes = unref
                 .par_iter()
                 .inspect(|_| {
                     monitor_.measure_unreferenced_blocks(
                         block_index.fetch_add(1, Ordering::Relaxed) + 1,
-                        unref_count
-                    );  
+                        unref_count,
+                    );
                 })
                 .map(|block_id| block_dir.compressed_size(block_id).unwrap_or_default())
                 .sum();
@@ -303,7 +311,7 @@ impl Archive {
             monitor_.measure_unreferenced_blocks_finished();
             total_bytes
         };
-        
+
         stats.unreferenced_block_bytes = total_bytes;
 
         if !options.dry_run {
@@ -331,12 +339,12 @@ impl Archive {
                     .inspect(|_| {
                         monitor_.delete_blocks(
                             delete_block_count.fetch_add(1, Ordering::Relaxed) + 1,
-                            unref.len()
+                            unref.len(),
                         );
                     })
                     .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
                     .count();
-                
+
                 stats.deletion_errors += error_count;
                 stats.deleted_block_count += unref_count - error_count;
                 monitor_.delete_blocks_finished();
@@ -347,10 +355,14 @@ impl Archive {
         Ok(stats)
     }
 
-    pub fn validate(&self, options: &ValidateOptions, monitor: Option<&dyn ValidateMonitor>) -> Result<ValidateStats> {
-        let mut default_monitor = DefaultMonitor{};
+    pub fn validate(
+        &self,
+        options: &ValidateOptions,
+        monitor: Option<&dyn ValidateMonitor>,
+    ) -> Result<ValidateStats> {
+        let mut default_monitor = DefaultMonitor {};
         let monitor = monitor.unwrap_or(&mut default_monitor);
-        
+
         let start = Instant::now();
         monitor.validate_archive();
         let mut stats = self.validate_archive_dir(monitor)?;
@@ -359,7 +371,6 @@ impl Archive {
         monitor.count_bands();
         let band_ids = self.list_band_ids()?;
         monitor.count_bands_result(&band_ids);
-
 
         // 1. Walk all indexes, collecting a list of (block_hash, min_length)
         //    values referenced by all the indexes.
@@ -385,12 +396,14 @@ impl Archive {
         } else {
             // 2. Check the hash of all blocks are correct, and remember how long
             //    the uncompressed data is.
-            let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats, monitor)?;
+            let block_lengths: HashMap<BlockHash, usize> =
+                self.block_dir.validate(&mut stats, monitor)?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (block_hash, referenced_len) in referenced_lens.0 {
                 if let Some(actual_len) = block_lengths.get(&block_hash) {
                     if referenced_len > (*actual_len as u64) {
-                        monitor.validate_block_missing(&block_hash, &BlockMissingReason::InvalidRange);
+                        monitor
+                            .validate_block_missing(&block_hash, &BlockMissingReason::InvalidRange);
                         // TODO: A separate counter; this is worse than just being missing
                         stats.block_missing_count += 1;
                     }
@@ -422,12 +435,19 @@ impl Archive {
                     Kind::Dir => dirs.push(name),
                     Kind::File => files.push(name),
                     other_kind => {
-                        monitor.validate_archive_problem(&ValidateArchiveProblem::UnexpectedFileType { name: name, kind: other_kind });
+                        monitor.validate_archive_problem(
+                            &ValidateArchiveProblem::UnexpectedFileType {
+                                name: name,
+                                kind: other_kind,
+                            },
+                        );
                         stats.unexpected_files += 1;
                     }
                 },
                 Err(source) => {
-                    monitor.validate_archive_problem(&ValidateArchiveProblem::DirectoryListError { error: source });
+                    monitor.validate_archive_problem(&ValidateArchiveProblem::DirectoryListError {
+                        error: source,
+                    });
                     stats.io_errors += 1;
                 }
             }
@@ -436,7 +456,10 @@ impl Archive {
         if !files.is_empty() {
             // TODO: Ignore .DS_Store
             stats.unexpected_files += 1;
-            monitor.validate_archive_problem(&ValidateArchiveProblem::UnexpectedFiles { path: format!("{:?}", self.transport), files });
+            monitor.validate_archive_problem(&ValidateArchiveProblem::UnexpectedFiles {
+                path: format!("{:?}", self.transport),
+                files,
+            });
         }
         remove_item(&mut dirs, &BLOCK_DIR);
         dirs.sort();
@@ -446,8 +469,8 @@ impl Archive {
                 if bs.contains(&b) {
                     stats.structure_problems += 1;
                     monitor.validate_archive_problem(&ValidateArchiveProblem::DuplicateBand {
-                        path: format!("{:?}", self.transport), 
-                        directory: d.clone()
+                        path: format!("{:?}", self.transport),
+                        directory: d.clone(),
                     });
                 } else {
                     bs.insert(b);
@@ -455,8 +478,8 @@ impl Archive {
             } else {
                 stats.structure_problems += 1;
                 monitor.validate_archive_problem(&ValidateArchiveProblem::UnexpectedDirectory {
-                    path: format!("{:?}", self.transport), 
-                    directory: d.clone()
+                    path: format!("{:?}", self.transport),
+                    directory: d.clone(),
                 });
             }
         }

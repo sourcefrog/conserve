@@ -57,7 +57,7 @@ pub fn backup(
 ) -> Result<BackupStats> {
     let _span = tracing::span!(Level::DEBUG, "backup");
 
-    let mut default_monitor = DefaultMonitor{};
+    let mut default_monitor = DefaultMonitor {};
     let monitor = monitor.unwrap_or(&mut default_monitor);
 
     let start = Instant::now();
@@ -68,13 +68,13 @@ pub fn backup(
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
             monitor.copy(&entry);
-            
+
             match writer.copy_entry(&entry, source) {
                 Err(e) => {
                     for line in ui::format_error_causes(&e).lines() {
                         debug!("{}", line);
                     }
-                    
+
                     monitor.copy_error(&entry, &e);
                     stats.errors += 1;
                     continue;

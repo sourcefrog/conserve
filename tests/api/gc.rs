@@ -26,7 +26,8 @@ fn unreferenced_blocks() {
             .parse()
             .unwrap();
 
-    let _copy_stats = backup(&archive, &tf.live_tree(), &BackupOptions::default(), None).expect("backup");
+    let _copy_stats =
+        backup(&archive, &tf.live_tree(), &BackupOptions::default(), None).expect("backup");
 
     // Delete the band and index
     std::fs::remove_dir_all(archive.path().join("b0000")).unwrap();
@@ -113,7 +114,7 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
             break_lock: true,
             ..Default::default()
         },
-        None
+        None,
     )?;
 
     // Backup should now succeed.

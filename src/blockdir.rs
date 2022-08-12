@@ -21,17 +21,17 @@
 //!
 //! The structure is: archive > blockdir > subdir > file.
 
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::Path;
 use std::sync::Arc;
-use rayon::prelude::*;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use serde::{Deserialize, Serialize};
-use tracing::{ warn, error };
+use tracing::{error, warn};
 
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
@@ -120,10 +120,7 @@ impl BlockDir {
             .or_else(|io_err| {
                 if io_err.kind() == io::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
-                    error!(
-                        "Unexpected late detection of existing block {:?}",
-                        hex_hash
-                    );
+                    error!("Unexpected late detection of existing block {:?}", hex_hash);
                     Ok(())
                 } else {
                     Err(Error::WriteBlock {
@@ -203,10 +200,7 @@ impl BlockDir {
             if dirname.len() == SUBDIR_NAME_CHARS {
                 true
             } else {
-                error!(
-                    "Unexpected subdirectory in blockdir: {:?}",
-                    dirname
-                );
+                error!("Unexpected subdirectory in blockdir: {:?}", dirname);
                 false
             }
         });
@@ -268,15 +262,19 @@ impl BlockDir {
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub fn validate(&self, stats: &mut ValidateStats, monitor: &dyn ValidateMonitor) -> Result<HashMap<BlockHash, usize>> {
+    pub fn validate(
+        &self,
+        stats: &mut ValidateStats,
+        monitor: &dyn ValidateMonitor,
+    ) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
         let blocks = self.block_names_set(monitor)?;
         monitor.read_blocks(blocks.len());
-        
+
         stats.block_read_count = blocks.len().try_into().unwrap();
-        
+
         // Make a vec of Some(usize) if the block could be read, or None if it
         // failed, where the usize gives the uncompressed data size.
         let results: Vec<Option<(BlockHash, usize)>> = blocks
@@ -288,9 +286,7 @@ impl BlockDir {
                 //           we call the monitor.
                 monitor.read_block_result(&hash, &result);
 
-                result
-                    .map(|(bytes, _sizes)| (hash, bytes.len()))
-                    .ok()
+                result.map(|(bytes, _sizes)| (hash, bytes.len())).ok()
             })
             .collect();
 
@@ -327,7 +323,10 @@ impl BlockDir {
             decompressed_bytes,
         ));
         if actual_hash != *hash {
-            warn!("Block file {:?} has actual decompressed hash {}", &block_relpath, actual_hash);
+            warn!(
+                "Block file {:?} has actual decompressed hash {}",
+                &block_relpath, actual_hash
+            );
             return Err(Error::BlockCorrupt {
                 hash: hash.to_string(),
                 actual_hash: actual_hash.to_string(),

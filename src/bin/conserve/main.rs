@@ -19,12 +19,15 @@ use std::process::Termination;
 use std::str::FromStr;
 
 use clap::{Parser, StructOpt, Subcommand};
-use log::{LoggingOptions, LogGuard};
-use show::{NutmegMonitor, BackupProgressModel, SizeProgressModel, DeleteProcessState, RestoreProgressModel, ReferencedBlocksProgressModel};
-use show::{show_diff, ShowVersionsOptions, show_versions};
-use tracing::{ trace, error, info, warn, Level };
+use log::{LogGuard, LoggingOptions};
+use show::{show_diff, show_versions, ShowVersionsOptions};
+use show::{
+    BackupProgressModel, DeleteProcessState, NutmegMonitor, ReferencedBlocksProgressModel,
+    RestoreProgressModel, SizeProgressModel,
+};
+use tracing::{error, info, trace, warn, Level};
 
-use conserve::backup::{BackupOptions};
+use conserve::backup::BackupOptions;
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
@@ -60,7 +63,7 @@ struct Args {
     /// Set the log level to trace
     #[clap(long, short = 'L', global = true)]
     log_level: Option<tracing::Level>,
-    
+
     /// Path to the output log file
     #[clap(long, short = 'F', global = true)]
     log_file: Option<String>,
@@ -300,10 +303,10 @@ impl Command {
 
                 let monitor = NutmegMonitor::new(model, !args.no_progress);
                 let stats = backup(
-                    &Archive::open(open_transport(archive)?)?, 
-                    source, 
-                    &options, 
-                    Some(&monitor)
+                    &Archive::open(open_transport(archive)?)?,
+                    source,
+                    &options,
+                    Some(&monitor),
                 )?;
                 drop(monitor);
 
@@ -328,14 +331,18 @@ impl Command {
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let archive = Archive::open(open_transport(archive)?)?;
-                let monitor = NutmegMonitor::new(ReferencedBlocksProgressModel::default(), !args.no_progress);
+                let monitor =
+                    NutmegMonitor::new(ReferencedBlocksProgressModel::default(), !args.no_progress);
                 for hash in archive.referenced_blocks(&archive.list_band_ids()?, Some(&monitor))? {
                     info!("{}", hash);
                 }
             }
             Command::Debug(Debug::Unreferenced { archive }) => {
-                let monitor = NutmegMonitor::new(ReferencedBlocksProgressModel::default(), !args.no_progress);
-                for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks(Some(&monitor))? {
+                let monitor =
+                    NutmegMonitor::new(ReferencedBlocksProgressModel::default(), !args.no_progress);
+                for hash in
+                    Archive::open(open_transport(archive)?)?.unreferenced_blocks(Some(&monitor))?
+                {
                     info!("{}", hash);
                 }
             }
@@ -385,7 +392,8 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let mut monitor = NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
+                let mut monitor =
+                    NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
 
                 let archive = Archive::open(open_transport(archive)?)?;
                 let stats = archive.delete_bands(
@@ -446,7 +454,8 @@ impl Command {
                     overwrite: *force_overwrite,
                 };
 
-                let mut monitor = NutmegMonitor::new(RestoreProgressModel::new(*verbose), !args.no_progress);
+                let mut monitor =
+                    NutmegMonitor::new(RestoreProgressModel::new(*verbose), !args.no_progress);
                 let stats = restore(&archive, destination, &options, Some(&mut monitor))?;
                 if !no_stats {
                     info!("Restore complete.");
@@ -462,8 +471,9 @@ impl Command {
                 exclude_from,
             } => {
                 let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
-                
-                let mut monitor = NutmegMonitor::new(SizeProgressModel::default(), !args.no_progress);
+
+                let mut monitor =
+                    NutmegMonitor::new(SizeProgressModel::default(), !args.no_progress);
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
                         .size(excludes, Some(&mut monitor as &dyn TreeSizeMonitor<_>))?
@@ -474,7 +484,7 @@ impl Command {
                         .file_bytes
                 };
                 drop(monitor);
-                
+
                 if *bytes {
                     info!("{}", size);
                 } else {
@@ -490,10 +500,12 @@ impl Command {
                     skip_block_hashes: *quick,
                 };
 
-                let mut monitor = NutmegMonitor::new(ValidateProgressModel::default(), !args.no_progress);
-                let stats = Archive::open(open_transport(archive)?)?.validate(&options, Some(&mut monitor as &dyn ValidateMonitor))?;
+                let mut monitor =
+                    NutmegMonitor::new(ValidateProgressModel::default(), !args.no_progress);
+                let stats = Archive::open(open_transport(archive)?)?
+                    .validate(&options, Some(&mut monitor as &dyn ValidateMonitor))?;
                 drop(monitor);
-                
+
                 if !no_stats {
                     for line in format!("{}", stats).lines() {
                         info!("{}", line);
@@ -543,7 +555,8 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
 }
 
 fn initialize_log(args: &Args) -> std::result::Result<LogGuard, String> {
-    let file = args.log_file
+    let file = args
+        .log_file
         .as_ref()
         .map(|file| PathBuf::from_str(&file))
         .transpose()
@@ -557,10 +570,10 @@ fn initialize_log(args: &Args) -> std::result::Result<LogGuard, String> {
         }
     });
 
-    let guard = log::init(LoggingOptions{
+    let guard = log::init(LoggingOptions {
         file,
         level,
-        terminal_raw: args.log_raw
+        terminal_raw: args.log_raw,
     })?;
 
     if args.log_level == Some(tracing::Level::TRACE) {
@@ -585,13 +598,13 @@ fn main() -> ExitCode {
     let exit_code = match result {
         Err(ref e) => {
             error!("{}", e.to_string());
-            
+
             let mut cause: &dyn Error = e;
             while let Some(c) = cause.source() {
                 error!("  caused by: {}", c);
                 cause = c;
             }
-            
+
             // // TODO: Perhaps always log the traceback to a log file.
             // // NOTE(WolverinDEV): May always log this as trace level?
             // if let Some(bt) = e.backtrace() {

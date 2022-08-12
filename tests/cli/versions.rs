@@ -43,7 +43,7 @@ fn newest_first() {
             "--newest",
             "--utc",
             "testdata/archive/simple/v0.6.10",
-            "-R"
+            "-R",
         ])
         .assert()
         .success()
@@ -71,7 +71,12 @@ fn local_time() {
 #[test]
 fn short() {
     run_conserve()
-        .args(&["versions", "--short", "testdata/archive/simple/v0.6.10", "-R"])
+        .args(&[
+            "versions",
+            "--short",
+            "testdata/archive/simple/v0.6.10",
+            "-R",
+        ])
         .assert()
         .success()
         .stdout(
@@ -91,7 +96,7 @@ fn tree_sizes() {
             "--sizes",
             "--utc",
             "testdata/archive/simple/v0.6.10",
-            "-R"
+            "-R",
         ])
         .assert()
         .success()

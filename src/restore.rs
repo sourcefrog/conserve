@@ -18,16 +18,16 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, time::Instant};
 
-use filetime::{set_file_handle_times};
+use filetime::set_file_handle_times;
 
 #[cfg(unix)]
-use filetime::{set_symlink_file_times};
+use filetime::set_symlink_file_times;
 use tracing::{debug, warn};
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
-use crate::monitor::{RestoreMonitor, DefaultMonitor};
+use crate::monitor::{DefaultMonitor, RestoreMonitor};
 use crate::stats::RestoreStats;
 use crate::unix_time::UnixTime;
 use crate::*;
@@ -61,7 +61,7 @@ pub fn restore(
     options: &RestoreOptions,
     monitor: Option<&dyn RestoreMonitor>,
 ) -> Result<RestoreStats> {
-    let mut default_monitor = DefaultMonitor{};
+    let mut default_monitor = DefaultMonitor {};
     let monitor = monitor.unwrap_or(&mut default_monitor);
 
     let st = archive.open_stored_tree(options.band_selection.clone())?;
@@ -237,10 +237,7 @@ impl RestoreTree {
     fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()> {
         // TODO: Add a test with a canned index containing a symlink, and expect
         // it cannot be restored on Windows and can be on Unix.
-        warn!(
-            "Can't restore symlinks on non-Unix: {}",
-            entry.apath()
-        );
+        warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
         Ok(())
     }
 }

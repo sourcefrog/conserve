@@ -18,19 +18,19 @@
 
 use std::borrow::Cow;
 use std::sync::{Arc, Mutex};
-use std::time::{Instant};
+use std::time::Instant;
 
 use conserve::archive::ValidateArchiveProblem;
 use conserve::stats::Sizes;
 use conserve::ui::duration_to_hms;
 use conserve::{
-    bytes_to_human_mb, Archive, Band, BandProblem, BandSelectionPolicy, BlockMissingReason,
-    DiffEntry, DiffKind, Entry, Exclude, IndexEntry, Kind, ReadTree, Result, TreeSizeMonitor,
-    ValidateMonitor, BackupMonitor, DeleteMonitor, ReferencedBlocksMonitor, RestoreMonitor
+    bytes_to_human_mb, Archive, BackupMonitor, Band, BandProblem, BandSelectionPolicy,
+    BlockMissingReason, DeleteMonitor, DiffEntry, DiffKind, Entry, Exclude, IndexEntry, Kind,
+    ReadTree, ReferencedBlocksMonitor, RestoreMonitor, Result, TreeSizeMonitor, ValidateMonitor,
 };
-use nutmeg::{View, Model};
+use nutmeg::{Model, View};
 use thousands::Separable;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 use crate::log::{self, ViewLogGuard};
 
@@ -157,8 +157,8 @@ enum NutmegMonitorState<T: nutmeg::Model> {
         _log_guard: ViewLogGuard,
     },
     Simple {
-        state: Mutex<T>
-    }
+        state: Mutex<T>,
+    },
 }
 
 pub struct NutmegMonitor<T: nutmeg::Model> {
@@ -172,13 +172,18 @@ impl<T: nutmeg::Model + Send + 'static> NutmegMonitor<T> {
                 initial_state,
                 nutmeg::Options::default().progress_enabled(progress_enabled),
             )));
-    
+
             let log_guard = log::update_terminal_target(view.clone());
-            NutmegMonitorState::View { view, _log_guard: log_guard }
+            NutmegMonitorState::View {
+                view,
+                _log_guard: log_guard,
+            }
         } else {
-            NutmegMonitorState::Simple { state: Mutex::new(initial_state) }
+            NutmegMonitorState::Simple {
+                state: Mutex::new(initial_state),
+            }
         };
-        
+
         Self { state }
     }
 
@@ -187,7 +192,7 @@ impl<T: nutmeg::Model + Send + 'static> NutmegMonitor<T> {
             NutmegMonitorState::View { view, .. } => {
                 let view = view.lock().expect("lock() should not fail");
                 view.update(update_fn)
-            },
+            }
             NutmegMonitorState::Simple { state } => {
                 let mut state = state.lock().expect("lock() should not fail");
                 update_fn(&mut *state)
@@ -218,7 +223,7 @@ pub struct BackupProgressModel {
     scanned_file_bytes: u64,
     scanned_dirs: usize,
     scanned_files: usize,
-    
+
     entries_new: usize,
     entries_changed: usize,
     entries_unchanged: usize,
@@ -363,7 +368,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
                     "Unexpected file kind in archive directory: {:?} of kind {:?}",
                     name, kind
                 );
-            },
+            }
             ValidateArchiveProblem::DirectoryListError { error } => {
                 error!("Error listing archive directory: {:?}", error);
             }
@@ -445,10 +450,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
             }
         });
 
-        info!(
-            "Finished validating bands in {:#?}.",
-            elapsed
-        );
+        info!("Finished validating bands in {:#?}.", elapsed);
     }
 
     fn list_block_names(&self, current_count: usize) {
@@ -538,24 +540,11 @@ impl<T: ReadTree> TreeSizeMonitor<T> for NutmegMonitor<SizeProgressModel> {
 }
 
 pub enum DeleteProcessState {
-    ListReferencedBlocks {
-        count: usize,
-    },
-    FindPresentBlocks {
-        count: usize,
-    },
-    MeasureUnreferencedBlocks {
-        count: usize,
-        target: usize,
-    },
-    DeleteBands {
-        count: usize,
-        target: usize,
-    },
-    DeleteBlocks {
-        count: usize,
-        target: usize,
-    }
+    ListReferencedBlocks { count: usize },
+    FindPresentBlocks { count: usize },
+    MeasureUnreferencedBlocks { count: usize, target: usize },
+    DeleteBands { count: usize, target: usize },
+    DeleteBlocks { count: usize, target: usize },
 }
 
 impl Default for DeleteProcessState {
@@ -569,16 +558,16 @@ impl Model for DeleteProcessState {
         match self {
             DeleteProcessState::ListReferencedBlocks { count } => {
                 format!("Find referenced blocks in band ({} discovered)", count)
-            },
+            }
             DeleteProcessState::FindPresentBlocks { count } => {
                 format!("Find present blocks ({} discovered)", count)
-            },
+            }
             DeleteProcessState::MeasureUnreferencedBlocks { count, target } => {
                 format!("Measure unreferenced blocks ({}/{})", count, target)
-            },
+            }
             DeleteProcessState::DeleteBands { count, target } => {
                 format!("Delete bands ({}/{})", count, target)
-            },
+            }
             DeleteProcessState::DeleteBlocks { count, target } => {
                 format!("Delete blocks ({}/{})", count, target)
             }
@@ -593,25 +582,36 @@ impl DeleteMonitor for NutmegMonitor<DeleteProcessState> {
 
     fn find_present_blocks(&self, current_count: usize) {
         self.update_model(|view| {
-            *view = DeleteProcessState::FindPresentBlocks { count: current_count };
+            *view = DeleteProcessState::FindPresentBlocks {
+                count: current_count,
+            };
         });
     }
 
     fn measure_unreferenced_blocks(&self, current_count: usize, target_count: usize) {
         self.update_model(|view| {
-            *view = DeleteProcessState::MeasureUnreferencedBlocks { count: current_count, target: target_count };
+            *view = DeleteProcessState::MeasureUnreferencedBlocks {
+                count: current_count,
+                target: target_count,
+            };
         });
     }
 
     fn delete_bands(&self, current_count: usize, target_count: usize) {
         self.update_model(|view| {
-            *view = DeleteProcessState::DeleteBands { count: current_count, target: target_count };
+            *view = DeleteProcessState::DeleteBands {
+                count: current_count,
+                target: target_count,
+            };
         });
     }
 
     fn delete_blocks(&self, current_count: usize, target_count: usize) {
         self.update_model(|view| {
-            *view = DeleteProcessState::DeleteBlocks { count: current_count, target: target_count };
+            *view = DeleteProcessState::DeleteBlocks {
+                count: current_count,
+                target: target_count,
+            };
         });
     }
 }
@@ -619,7 +619,9 @@ impl DeleteMonitor for NutmegMonitor<DeleteProcessState> {
 impl ReferencedBlocksMonitor for NutmegMonitor<DeleteProcessState> {
     fn list_referenced_blocks(&self, current_count: usize) {
         self.update_model(|view| {
-            *view = DeleteProcessState::ListReferencedBlocks { count: current_count };
+            *view = DeleteProcessState::ListReferencedBlocks {
+                count: current_count,
+            };
         });
     }
 }
@@ -635,7 +637,7 @@ impl RestoreProgressModel {
         Self {
             print_filenames,
             filename: "".to_string(),
-            bytes_done: 0
+            bytes_done: 0,
         }
     }
 }

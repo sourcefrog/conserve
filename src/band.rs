@@ -27,8 +27,8 @@ use serde::{Deserialize, Serialize};
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
 use crate::transport::{ListDirNames, Transport};
+use crate::validate::BandProblem;
 use crate::*;
-use crate::validate::{BandProblem};
 
 static INDEX_DIR: &str = "i";
 
@@ -217,12 +217,15 @@ impl Band {
     }
 
     pub fn validate(&self, stats: &mut ValidateStats, monitor: &dyn ValidateMonitor) -> Result<()> {
-        let ListDirNames { mut files, mut dirs } =
-            self.transport.list_dir_names("").map_err(Error::from)?;
+        let ListDirNames {
+            mut files,
+            mut dirs,
+        } = self.transport.list_dir_names("").map_err(Error::from)?;
 
         let band_head_filename = BAND_HEAD_FILENAME.to_string();
         if !files.contains(&band_head_filename) {
-            monitor.validate_band_problem(self, &BandProblem::MissingHeadFile{ band_head_filename });
+            monitor
+                .validate_band_problem(self, &BandProblem::MissingHeadFile { band_head_filename });
             stats.missing_band_heads += 1;
         }
         remove_item(&mut files, &BAND_HEAD_FILENAME);
@@ -230,12 +233,15 @@ impl Band {
         remove_item(&mut dirs, &INDEX_DIR);
 
         if !files.is_empty() {
-            monitor.validate_band_problem(self, &BandProblem::UnexpectedFiles{ files });
+            monitor.validate_band_problem(self, &BandProblem::UnexpectedFiles { files });
             stats.unexpected_files += 1;
         }
 
         if !dirs.is_empty() {
-            monitor.validate_band_problem(self, &BandProblem::UnexpectedDirectories { directories: dirs });
+            monitor.validate_band_problem(
+                self,
+                &BandProblem::UnexpectedDirectories { directories: dirs },
+            );
             stats.unexpected_files += 1;
         }
 
