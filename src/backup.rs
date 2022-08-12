@@ -151,7 +151,7 @@ struct BackupWriter {
 
     /// The index for the last stored band, used as hints for whether newly
     /// stored files have changed.
-    basis_index: Option<crate::index::IndexEntryIter<crate::stitch::IterStitchedIndexHunks>>,
+    basis_index: crate::index::IndexEntryIter<crate::stitch::IterStitchedIndexHunks>,
 
     file_combiner: FileCombiner,
 }
@@ -164,10 +164,9 @@ impl BackupWriter {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
-        let basis_index = archive.last_band_id()?.map(|band_id| {
-            IterStitchedIndexHunks::new(archive, &band_id)
-                .iter_entries(Apath::root(), Exclude::nothing())
-        });
+        let basis_index = IterStitchedIndexHunks::new(archive, archive.last_band_id()?)
+            .iter_entries(Apath::root(), Exclude::nothing());
+
         // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;
         let index_builder = band.index_builder();
@@ -234,11 +233,7 @@ impl BackupWriter {
         self.stats.files += 1;
         let apath = source_entry.apath();
         let result;
-        if let Some(basis_entry) = self
-            .basis_index
-            .as_mut()
-            .and_then(|bi| bi.advance_to(apath))
-        {
+        if let Some(basis_entry) = self.basis_index.advance_to(apath) {
             if source_entry.is_unchanged_from(&basis_entry) {
                 self.stats.unmodified_files += 1;
                 self.index_builder.push_entry(basis_entry);

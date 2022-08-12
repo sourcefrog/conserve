@@ -33,7 +33,9 @@ use crate::*;
 
 pub struct IterStitchedIndexHunks {
     /// Current band_id: initially the requested band_id.
-    band_id: BandId,
+    /// This moves back to earlier bands when we reach the end of an incomplete band.
+    /// Might be none, if no more bands are available.
+    band_id: Option<BandId>,
 
     /// The latest (and highest-ordered) apath we have already yielded.
     last_apath: Option<Apath>,
@@ -54,10 +56,10 @@ impl IterStitchedIndexHunks {
     /// the same point in the previous band, continuing backwards recursively
     /// until either there are no more previous indexes, or a complete index
     /// is found.
-    pub(crate) fn new(archive: &Archive, band_id: &BandId) -> IterStitchedIndexHunks {
+    pub(crate) fn new(archive: &Archive, band_id: Option<BandId>) -> IterStitchedIndexHunks {
         IterStitchedIndexHunks {
             archive: archive.clone(),
-            band_id: band_id.clone(),
+            band_id,
             last_apath: None,
             index_hunks: None,
         }
@@ -79,31 +81,45 @@ impl Iterator for IterStitchedIndexHunks {
         loop {
             // If we're already reading an index, and it has more content, return that.
             if let Some(index_hunks) = &mut self.index_hunks {
+                // An index iterator must be assigned to a band.
+                debug_assert!(self.band_id.is_some());
+
                 for hunk in index_hunks {
                     if let Some(last_entry) = hunk.last() {
                         self.last_apath = Some(last_entry.apath().clone());
                         return Some(hunk);
                     } // otherwise, empty, try the next
                 }
-                if self.archive.band_is_closed(&self.band_id).unwrap_or(false) {
-                    return None;
-                }
+                // There are no more index hunks in the current band.
                 self.index_hunks = None;
-                if let Some(band_id) = previous_existing_band(&self.archive, &self.band_id) {
-                    self.band_id = band_id;
-                } else {
+
+                let band_id = self.band_id.take().expect("last band id should be present");
+                if self.archive.band_is_closed(&band_id).unwrap_or(false) {
+                    // We reached the end of a complete index in this band,
+                    // so there's no need to look at any earlier bands, and we're done iterating.
                     return None;
                 }
+
+                // self.band_id might be None afterwards, if there is no previous band.
+                // If so, we're done.
+                self.band_id = previous_existing_band(&self.archive, &band_id);
             }
-            // Start reading this new index and skip forward until after last_apath
-            let mut iter_hunks = Band::open(&self.archive, &self.band_id)
-                .expect("Failed to open band")
-                .index()
-                .iter_hunks();
-            if let Some(last) = &self.last_apath {
-                iter_hunks = iter_hunks.advance_to_after(last)
+
+            if let Some(band_id) = &self.band_id {
+                // Start reading this new index and skip forward until after last_apath
+                let mut iter_hunks = Band::open(&self.archive, band_id)
+                    .expect("Failed to open band")
+                    .index()
+                    .iter_hunks();
+
+                if let Some(last) = &self.last_apath {
+                    iter_hunks = iter_hunks.advance_to_after(last)
+                }
+                self.index_hunks = Some(iter_hunks);
+            } else {
+                // We got no more bands with possible new index information.
+                return None;
             }
-            self.index_hunks = Some(iter_hunks);
         }
     }
 }
@@ -127,7 +143,7 @@ fn previous_existing_band(archive: &Archive, band_id: &BandId) -> Option<BandId>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_fixtures::ScratchArchive;
+    use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
         IndexEntry {
@@ -141,7 +157,7 @@ mod test {
     }
 
     fn simple_ls(archive: &Archive, band_id: &BandId) -> String {
-        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, band_id)
+        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, Some(band_id.clone()))
             .flatten()
             .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
             .collect();
@@ -239,5 +255,38 @@ mod test {
         );
 
         Ok(())
+    }
+
+    /// Testing that the StitchedIndexHunks iterator does not loops forever on archives with at least one band
+    /// but no completed bands.
+    /// Reference: https://github.com/sourcefrog/conserve/pull/175
+    #[test]
+    fn issue_175() {
+        let tf = TreeFixture::new();
+        tf.create_file("file_a");
+
+        let lt = tf.live_tree();
+        let af = ScratchArchive::new();
+        backup(&af, &lt, &BackupOptions::default()).expect("backup should work");
+
+        af.transport().remove_file("b0000/BANDTAIL").unwrap();
+        let band_ids = af.list_band_ids().expect("should list bands");
+
+        let band_id = band_ids.first().expect("expected at least one band");
+
+        let mut iter = IterStitchedIndexHunks::new(&af, Some(band_id.clone()));
+        // Get the first and only index entry.
+        // `index_hunks` and `band_id` should be `Some`.
+        assert!(iter.next().is_some());
+
+        // Remove the band head. This band can not be opened anymore.
+        // If accessed this should fail the test.
+        // Note: When refactoring `.expect("Failed to open band")` this might needs refactoring as well.
+        af.transport().remove_file("b0000/BANDHEAD").unwrap();
+
+        // No more entries should follow.
+        for _ in 0..10 {
+            assert!(iter.next().is_none());
+        }
     }
 }
