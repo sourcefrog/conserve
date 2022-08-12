@@ -17,10 +17,10 @@ use std::fs::{read_link, symlink_metadata};
 use std::path::PathBuf;
 
 use filetime::{set_symlink_file_times, FileTime};
-use tempfile::TempDir;
 
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
+#[cfg(unix)]
 use conserve::unix_time::UnixTime;
 use conserve::*;
 
@@ -132,7 +132,7 @@ fn restore_symlink() {
 
     backup(&af, &srcdir.live_tree(), &Default::default()).unwrap();
 
-    let restore_dir = TempDir::new().unwrap();
+    let restore_dir = tempfile::TempDir::new().unwrap();
     restore(&af, restore_dir.path(), &Default::default()).unwrap();
 
     let restored_symlink_path = restore_dir.path().join("symlink");
