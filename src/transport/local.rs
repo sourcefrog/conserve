@@ -19,6 +19,7 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 use bytes::Bytes;
+use tracing::trace;
 
 use crate::transport::{DirEntry, Metadata, Transport};
 
@@ -77,7 +78,9 @@ impl Transport for LocalTransport {
     }
 
     fn create_dir(&self, relpath: &str) -> io::Result<()> {
-        create_dir(self.full_path(relpath)).or_else(|err| {
+        let full_path = self.full_path(relpath);
+        trace!("create_dir: {:?}", relpath);
+        create_dir(&full_path).or_else(|err| {
             if err.kind() == io::ErrorKind::AlreadyExists {
                 Ok(())
             } else {
@@ -88,6 +91,7 @@ impl Transport for LocalTransport {
 
     fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()> {
         let full_path = self.full_path(relpath);
+        trace!("write_file: {:?} {} bytes", full_path, content.len());
         let dir = full_path.parent().unwrap();
         let mut temp = tempfile::Builder::new()
             .prefix(crate::TMP_PREFIX)
@@ -105,10 +109,14 @@ impl Transport for LocalTransport {
     }
 
     fn remove_file(&self, relpath: &str) -> io::Result<()> {
-        std::fs::remove_file(self.full_path(relpath))
+        let full_path = self.full_path(relpath);
+        trace!("remove_file: {:?}", full_path);
+        std::fs::remove_file(&full_path)
     }
 
     fn remove_dir(&self, relpath: &str) -> io::Result<()> {
+        let full_path = self.full_path(relpath);
+        trace!("remove_dir: {:?}", full_path);
         std::fs::remove_dir(self.full_path(relpath))
     }
 
