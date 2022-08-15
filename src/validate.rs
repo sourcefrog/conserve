@@ -95,15 +95,13 @@ pub(crate) fn validate_bands(
             Ok((st_block_lens, st_stats)) => {
                 stats += st_stats;
                 block_lens.update(st_block_lens);
-            },
-            Err(error) => {
-                match error {
-                    BandValidateError::MetadataError(_) => stats.band_metadata_problems += 1,
-                    BandValidateError::OpenError(_) => stats.band_open_errors += 1,
-                    BandValidateError::TreeOpenError(_) => stats.tree_open_errors += 1,
-                    BandValidateError::TreeValidateError(_) => stats.tree_validate_errors += 1,
-                }
             }
+            Err(error) => match error {
+                BandValidateError::MetadataError(_) => stats.band_metadata_problems += 1,
+                BandValidateError::OpenError(_) => stats.band_open_errors += 1,
+                BandValidateError::TreeOpenError(_) => stats.tree_open_errors += 1,
+                BandValidateError::TreeValidateError(_) => stats.tree_validate_errors += 1,
+            },
         }
     }
 

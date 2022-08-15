@@ -1,7 +1,7 @@
 use crate::{
-    archive::ValidateArchiveProblem, stats::Sizes, BackupStats, Band, BandId, BandProblem,
-    BandValidateError, BlockHash, BlockMissingReason, DiffKind, Error, IndexEntry, LiveEntry,
-    ReadTree, Result, ValidateStats, validate::BlockLengths,
+    archive::ValidateArchiveProblem, stats::Sizes, validate::BlockLengths, BackupStats, Band,
+    BandId, BandProblem, BandValidateError, BlockHash, BlockMissingReason, DiffKind, Error,
+    IndexEntry, LiveEntry, ReadTree, Result, ValidateStats,
 };
 
 /// Monitor the backup progress.
@@ -27,7 +27,12 @@ pub trait ValidateMonitor: Sync {
 
     fn validate_band(&self, _band_id: &BandId) {}
     fn validate_band_problem(&self, _band: &Band, _problem: &BandProblem) {}
-    fn validate_band_result(&self, _band_id: &BandId, _result: &std::result::Result<(BlockLengths, ValidateStats), BandValidateError>) {}
+    fn validate_band_result(
+        &self,
+        _band_id: &BandId,
+        _result: &std::result::Result<(BlockLengths, ValidateStats), BandValidateError>,
+    ) {
+    }
 
     fn validate_block_missing(&self, _block_hash: &BlockHash, _reason: &BlockMissingReason) {}
     fn validate_blocks(&self) {}
@@ -78,7 +83,7 @@ pub trait RestoreMonitor {
 /// Default monitor which does nothing.
 /// Will be used when no monitor has been specified by the caller.
 pub(crate) struct NullMonitor {}
-pub(crate) const NULL_MONITOR: NullMonitor = NullMonitor{};
+pub(crate) const NULL_MONITOR: NullMonitor = NullMonitor {};
 
 impl BackupMonitor for NullMonitor {}
 impl ValidateMonitor for NullMonitor {}
@@ -90,4 +95,3 @@ impl DeleteMonitor for NullMonitor {
     }
 }
 impl RestoreMonitor for NullMonitor {}
- 

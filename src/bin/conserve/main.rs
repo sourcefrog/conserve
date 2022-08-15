@@ -20,11 +20,12 @@ use std::str::FromStr;
 
 use clap::{Parser, StructOpt, Subcommand};
 use log::{LogGuard, LoggingOptions};
-use show::{show_diff, show_versions, ShowVersionsOptions};
-use show::{
+use monitor::ValidateProgressModel;
+use monitor::{
     BackupProgressModel, DeleteProcessState, NutmegMonitor, ReferencedBlocksProgressModel,
     RestoreProgressModel, SizeProgressModel,
 };
+use show::{show_diff, show_versions, ShowVersionsOptions};
 use tracing::{error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
@@ -32,9 +33,8 @@ use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
 
-use crate::show::ValidateProgressModel;
-
 mod log;
+mod monitor;
 mod show;
 
 #[derive(Debug, Parser)]

@@ -22,7 +22,7 @@ use tracing::{debug, Level};
 
 use crate::blockdir::Address;
 use crate::io::read_with_retries;
-use crate::monitor::{NULL_MONITOR};
+use crate::monitor::NULL_MONITOR;
 use crate::stats::BackupStats;
 use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::ReadTree;

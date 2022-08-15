@@ -29,9 +29,9 @@ use std::sync::Arc;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
-use rayon::prelude::*;
 
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
@@ -285,7 +285,7 @@ impl BlockDir {
                     Ok((bytes, sizes)) => {
                         monitor.read_block_result(&hash, &Ok(sizes));
                         Some((hash, bytes.len()))
-                    },
+                    }
                     Err(error) => {
                         monitor.read_block_result(&hash, &Err(error));
                         None
