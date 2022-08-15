@@ -26,7 +26,7 @@ use conserve::ui::duration_to_hms;
 use conserve::{
     bytes_to_human_mb, Archive, BackupMonitor, Band, BandProblem, BandSelectionPolicy,
     BlockMissingReason, DeleteMonitor, DiffEntry, DiffKind, Entry, Exclude, IndexEntry, Kind,
-    ReadTree, ReferencedBlocksMonitor, RestoreMonitor, Result, TreeSizeMonitor, ValidateMonitor,
+    ReadTree, ReferencedBlocksMonitor, RestoreMonitor, Result, TreeSizeMonitor, ValidateMonitor, BandValidateError, ValidateStats, BlockLengths,
 };
 use nutmeg::{Model, View};
 use thousands::Separable;
@@ -152,11 +152,11 @@ pub fn show_diff<D: Iterator<Item = DiffEntry>>(diff: D) -> Result<()> {
 }
 
 enum NutmegMonitorState<T: nutmeg::Model> {
-    View {
+    NutmegProgress {
         view: Arc<Mutex<View<T>>>,
         _log_guard: ViewLogGuard,
     },
-    Simple {
+    NoProgress {
         state: Mutex<T>,
     },
 }
@@ -174,12 +174,12 @@ impl<T: nutmeg::Model + Send + 'static> NutmegMonitor<T> {
             )));
 
             let log_guard = log::update_terminal_target(view.clone());
-            NutmegMonitorState::View {
+            NutmegMonitorState::NutmegProgress {
                 view,
                 _log_guard: log_guard,
             }
         } else {
-            NutmegMonitorState::Simple {
+            NutmegMonitorState::NoProgress {
                 state: Mutex::new(initial_state),
             }
         };
@@ -189,11 +189,11 @@ impl<T: nutmeg::Model + Send + 'static> NutmegMonitor<T> {
 
     fn update_model<F: FnOnce(&mut T) -> R, R>(&self, update_fn: F) -> R {
         match &self.state {
-            NutmegMonitorState::View { view, .. } => {
+            NutmegMonitorState::NutmegProgress { view, .. } => {
                 let view = view.lock().expect("lock() should not fail");
                 view.update(update_fn)
             }
-            NutmegMonitorState::Simple { state } => {
+            NutmegMonitorState::NoProgress { state } => {
                 let mut state = state.lock().expect("lock() should not fail");
                 update_fn(&mut *state)
             }
@@ -292,7 +292,7 @@ enum ValidateProgressState {
         bands_total: usize,
         start: Instant,
     },
-    ListBlockes {
+    ListBlocks {
         discovered: usize,
     },
     ReadBlocks {
@@ -334,7 +334,7 @@ impl nutmeg::Model for ValidateProgressModel {
                     nutmeg::estimate_remaining(start, *bands_done, *bands_total)
                 )
             }
-            ValidateProgressState::ListBlockes { discovered } => {
+            ValidateProgressState::ListBlocks { discovered } => {
                 format!("Listing blocks ({} blocks discovered)", discovered)
             }
             ValidateProgressState::ReadBlocks {
@@ -429,7 +429,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
     fn validate_band_result(
         &self,
         _band_id: &conserve::BandId,
-        _result: &conserve::BandValidateResult,
+        _result: &std::result::Result<(BlockLengths, ValidateStats), BandValidateError>,
     ) {
         self.update_model(|model| {
             if let ValidateProgressState::ValidateBands { bands_done, .. } = &mut model.state {
@@ -459,7 +459,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
         }
 
         self.update_model(|model| {
-            model.state = ValidateProgressState::ListBlockes {
+            model.state = ValidateProgressState::ListBlocks {
                 discovered: current_count,
             }
         });
@@ -481,7 +481,7 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
     fn read_block_result(
         &self,
         _block_hash: &conserve::BlockHash,
-        result: &Result<(Vec<u8>, Sizes)>,
+        result: &Result<Sizes>,
     ) {
         self.update_model(|model| {
             if let ValidateProgressState::ReadBlocks {
@@ -490,8 +490,8 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
                 ..
             } = &mut model.state
             {
-                if let Ok((bytes, _sizes)) = result {
-                    *bytes_done += bytes.len();
+                if let Ok(sizes) = result {
+                    *bytes_done += sizes.uncompressed as usize;
                 } else {
                     // TODO: Add a fail counter.
                 }

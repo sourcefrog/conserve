@@ -574,10 +574,7 @@ fn initialize_log(args: &Args) -> std::result::Result<LogGuard, String> {
         terminal_raw: args.log_raw,
     })?;
 
-    if args.log_level == Some(tracing::Level::TRACE) {
-        trace!("tracing enabled");
-    }
-
+    trace!("tracing enabled");
     Ok(guard)
 }
 
@@ -603,14 +600,14 @@ fn main() -> ExitCode {
                 cause = c;
             }
 
-            // // TODO: Perhaps always log the traceback to a log file.
-            // // NOTE(WolverinDEV): May always log this as trace level?
+            // NOTE(WolverinDEV): Reenable this as soon the feature backtrace lands in stable.
+            //                    When doing so, logging trough tracing::trace would be recommanded.
+            //                    (See https://github.com/sourcefrog/conserve/pull/173#discussion_r945195070)
             // if let Some(bt) = e.backtrace() {
             //     if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {
             //         println!("{}", bt);
             //     }
             // }
-            // Avoid Rust redundantly printing the error.
             ExitCode::Failed
         }
         Ok(code) => code,

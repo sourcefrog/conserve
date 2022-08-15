@@ -1,7 +1,7 @@
 use crate::{
     archive::ValidateArchiveProblem, stats::Sizes, BackupStats, Band, BandId, BandProblem,
-    BandValidateResult, BlockHash, BlockMissingReason, DiffKind, Error, IndexEntry, LiveEntry,
-    ReadTree, Result,
+    BandValidateError, BlockHash, BlockMissingReason, DiffKind, Error, IndexEntry, LiveEntry,
+    ReadTree, Result, ValidateStats, validate::BlockLengths,
 };
 
 /// Monitor the backup progress.
@@ -27,7 +27,7 @@ pub trait ValidateMonitor: Sync {
 
     fn validate_band(&self, _band_id: &BandId) {}
     fn validate_band_problem(&self, _band: &Band, _problem: &BandProblem) {}
-    fn validate_band_result(&self, _band_id: &BandId, _result: &BandValidateResult) {}
+    fn validate_band_result(&self, _band_id: &BandId, _result: &std::result::Result<(BlockLengths, ValidateStats), BandValidateError>) {}
 
     fn validate_block_missing(&self, _block_hash: &BlockHash, _reason: &BlockMissingReason) {}
     fn validate_blocks(&self) {}
@@ -37,7 +37,7 @@ pub trait ValidateMonitor: Sync {
     fn list_block_names_finished(&self) {}
 
     fn read_blocks(&self, _count: usize) {}
-    fn read_block_result(&self, _block_hash: &BlockHash, _result: &Result<(Vec<u8>, Sizes)>) {}
+    fn read_block_result(&self, _block_hash: &BlockHash, _result: &Result<Sizes>) {}
     fn read_blocks_finished(&self) {}
 }
 

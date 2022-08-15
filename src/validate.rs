@@ -24,17 +24,22 @@ pub struct ValidateOptions {
     pub skip_block_hashes: bool,
 }
 
-/// Band validation result.
-pub enum BandValidateResult {
+/// Band validation error.
+pub enum BandValidateError {
     MetadataError(Error),
 
     OpenError(Error),
     TreeOpenError(Error),
 
     TreeValidateError(Error),
-
-    Valid(BlockLengths, ValidateStats),
 }
+
+impl<T> Into<std::result::Result<T, BandValidateError>> for BandValidateError {
+    fn into(self) -> std::result::Result<T, BandValidateError> {
+        Err(self)
+    }
+}
+
 pub enum BlockMissingReason {
     /// The target bock can not be found.
     NotExisting,
@@ -87,13 +92,17 @@ pub(crate) fn validate_bands(
         monitor.validate_band_result(band_id, &result);
 
         match result {
-            BandValidateResult::MetadataError(_) => stats.band_metadata_problems += 1,
-            BandValidateResult::OpenError(_) => stats.band_open_errors += 1,
-            BandValidateResult::TreeOpenError(_) => stats.tree_open_errors += 1,
-            BandValidateResult::TreeValidateError(_) => stats.tree_validate_errors += 1,
-            BandValidateResult::Valid(st_block_lens, st_stats) => {
+            Ok((st_block_lens, st_stats)) => {
                 stats += st_stats;
                 block_lens.update(st_block_lens);
+            },
+            Err(error) => {
+                match error {
+                    BandValidateError::MetadataError(_) => stats.band_metadata_problems += 1,
+                    BandValidateError::OpenError(_) => stats.band_open_errors += 1,
+                    BandValidateError::TreeOpenError(_) => stats.tree_open_errors += 1,
+                    BandValidateError::TreeValidateError(_) => stats.tree_validate_errors += 1,
+                }
             }
         }
     }
@@ -106,25 +115,25 @@ pub(crate) fn validate_band(
     stats: &mut ValidateStats,
     band_id: &BandId,
     monitor: &dyn ValidateMonitor,
-) -> BandValidateResult {
+) -> std::result::Result<(BlockLengths, ValidateStats), BandValidateError> {
     let band = match Band::open(archive, band_id) {
         Ok(band) => band,
-        Err(error) => return BandValidateResult::OpenError(error),
+        Err(error) => return BandValidateError::OpenError(error).into(),
     };
 
     if let Err(error) = band.validate(stats, monitor) {
-        return BandValidateResult::MetadataError(error);
+        return BandValidateError::MetadataError(error).into();
     }
 
     let stored_tree =
         match archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
             Ok(tree) => tree,
-            Err(error) => return BandValidateResult::TreeOpenError(error),
+            Err(error) => return BandValidateError::TreeOpenError(error).into(),
         };
 
     match validate_stored_tree(&stored_tree) {
-        Ok(result) => BandValidateResult::Valid(result.0, result.1),
-        Err(error) => BandValidateResult::TreeValidateError(error),
+        Ok(result) => Ok(result),
+        Err(error) => BandValidateError::TreeValidateError(error).into(),
     }
 }
 

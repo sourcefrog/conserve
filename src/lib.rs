@@ -74,7 +74,7 @@ pub use crate::stats::{BackupStats, DeleteStats, RestoreStats, ValidateStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};
-pub use crate::validate::{BandProblem, BandValidateResult, BlockMissingReason, ValidateOptions};
+pub use crate::validate::{BandProblem, BandValidateError, BlockLengths, BlockMissingReason, ValidateOptions};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

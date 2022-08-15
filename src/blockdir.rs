@@ -281,12 +281,16 @@ impl BlockDir {
             .into_par_iter()
             .map(|hash| {
                 let result = self.get_block_content(&hash);
-                // TODO(MH): Should we realy provide the block contents? May only return the size or the read error.
-                //           This would also allow to read the blocks in parallel and use a simple iterator where
-                //           we call the monitor.
-                monitor.read_block_result(&hash, &result);
-
-                result.map(|(bytes, _sizes)| (hash, bytes.len())).ok()
+                match result {
+                    Ok((bytes, sizes)) => {
+                        monitor.read_block_result(&hash, &Ok(sizes));
+                        Some((hash, bytes.len()))
+                    },
+                    Err(error) => {
+                        monitor.read_block_result(&hash, &Err(error));
+                        None
+                    }
+                }
             })
             .collect();
 
