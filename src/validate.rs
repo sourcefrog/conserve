@@ -34,9 +34,9 @@ pub enum BandValidateError {
     TreeValidateError(Error),
 }
 
-impl<T> Into<std::result::Result<T, BandValidateError>> for BandValidateError {
-    fn into(self) -> std::result::Result<T, BandValidateError> {
-        Err(self)
+impl<T> From<BandValidateError> for std::result::Result<T, BandValidateError> {
+    fn from(error: BandValidateError) -> Self {
+        Err(error)
     }
 }
 
