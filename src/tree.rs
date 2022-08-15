@@ -15,7 +15,7 @@
 
 use std::ops::Range;
 
-use crate::monitor::DefaultMonitor;
+use crate::monitor::NULL_MONITOR;
 use crate::stats::Sizes;
 use crate::*;
 
@@ -51,8 +51,7 @@ pub trait ReadTree {
     where
         Self: Sized,
     {
-        let mut default_monitor = DefaultMonitor {};
-        let monitor = monitor.unwrap_or(&mut default_monitor as &dyn TreeSizeMonitor<Self>);
+        let monitor = monitor.unwrap_or(&NULL_MONITOR as &dyn TreeSizeMonitor<Self>);
 
         let mut tot = 0u64;
         for e in self.iter_entries(Apath::root(), exclude)? {

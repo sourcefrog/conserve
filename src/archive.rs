@@ -30,7 +30,7 @@ use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
-use crate::monitor::{DefaultMonitor, DeleteMonitor, ReferencedBlocksMonitor};
+use crate::monitor::{DeleteMonitor, ReferencedBlocksMonitor, NULL_MONITOR};
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
@@ -203,15 +203,12 @@ impl Archive {
     }
 
     /// Returns all blocks referenced by all bands.
-    ///
-    /// Shows a progress bar as they're collected.
     pub fn referenced_blocks(
         &self,
         band_ids: &[BandId],
         monitor: Option<&dyn ReferencedBlocksMonitor>,
     ) -> Result<HashSet<BlockHash>> {
-        let default_monitor = DefaultMonitor {};
-        let monitor = monitor.unwrap_or(&default_monitor);
+        let monitor = monitor.unwrap_or(&NULL_MONITOR);
 
         let archive = self.clone();
         let current_count = AtomicUsize::new(0);
@@ -253,8 +250,7 @@ impl Archive {
         options: &DeleteOptions,
         monitor: Option<&dyn DeleteMonitor>,
     ) -> Result<DeleteStats> {
-        let default_monitor = DefaultMonitor {};
-        let monitor_ = monitor.unwrap_or(&default_monitor);
+        let monitor_ = monitor.unwrap_or(&NULL_MONITOR);
 
         let mut stats = DeleteStats::default();
         let start = Instant::now();
@@ -360,8 +356,7 @@ impl Archive {
         options: &ValidateOptions,
         monitor: Option<&dyn ValidateMonitor>,
     ) -> Result<ValidateStats> {
-        let default_monitor = DefaultMonitor {};
-        let monitor = monitor.unwrap_or(&default_monitor);
+        let monitor = monitor.unwrap_or(&NULL_MONITOR);
 
         let start = Instant::now();
         monitor.validate_archive();

@@ -22,7 +22,7 @@ use tracing::{debug, Level};
 
 use crate::blockdir::Address;
 use crate::io::read_with_retries;
-use crate::monitor::DefaultMonitor;
+use crate::monitor::{NULL_MONITOR};
 use crate::stats::BackupStats;
 use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::ReadTree;
@@ -57,8 +57,7 @@ pub fn backup(
 ) -> Result<BackupStats> {
     let _span = tracing::span!(Level::DEBUG, "backup");
 
-    let default_monitor = DefaultMonitor {};
-    let monitor = monitor.unwrap_or(&default_monitor);
+    let monitor = monitor.unwrap_or(&NULL_MONITOR);
 
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive)?;

@@ -77,15 +77,17 @@ pub trait RestoreMonitor {
 
 /// Default monitor which does nothing.
 /// Will be used when no monitor has been specified by the caller.
-pub(crate) struct DefaultMonitor {}
+pub(crate) struct NullMonitor {}
+pub(crate) const NULL_MONITOR: NullMonitor = NullMonitor{};
 
-impl BackupMonitor for DefaultMonitor {}
-impl ValidateMonitor for DefaultMonitor {}
-impl<T: ReadTree> TreeSizeMonitor<T> for DefaultMonitor {}
-impl ReferencedBlocksMonitor for DefaultMonitor {}
-impl DeleteMonitor for DefaultMonitor {
+impl BackupMonitor for NullMonitor {}
+impl ValidateMonitor for NullMonitor {}
+impl<T: ReadTree> TreeSizeMonitor<T> for NullMonitor {}
+impl ReferencedBlocksMonitor for NullMonitor {}
+impl DeleteMonitor for NullMonitor {
     fn referenced_blocks_monitor(&self) -> &dyn ReferencedBlocksMonitor {
         self
     }
 }
-impl RestoreMonitor for DefaultMonitor {}
+impl RestoreMonitor for NullMonitor {}
+ 

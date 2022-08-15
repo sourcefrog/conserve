@@ -27,7 +27,7 @@ use tracing::{debug, warn};
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
-use crate::monitor::{DefaultMonitor, RestoreMonitor};
+use crate::monitor::{RestoreMonitor, NULL_MONITOR};
 use crate::stats::RestoreStats;
 use crate::unix_time::UnixTime;
 use crate::*;
@@ -61,8 +61,7 @@ pub fn restore(
     options: &RestoreOptions,
     monitor: Option<&dyn RestoreMonitor>,
 ) -> Result<RestoreStats> {
-    let default_monitor = DefaultMonitor {};
-    let monitor = monitor.unwrap_or(&default_monitor);
+    let monitor = monitor.unwrap_or(&NULL_MONITOR);
 
     let st = archive.open_stored_tree(options.band_selection.clone())?;
     let mut rt = if options.overwrite {

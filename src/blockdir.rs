@@ -21,7 +21,6 @@
 //!
 //! The structure is: archive > blockdir > subdir > file.
 
-use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
@@ -32,6 +31,7 @@ use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
+use rayon::prelude::*;
 
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
