@@ -26,6 +26,7 @@ use std::convert::TryInto;
 use std::io;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
@@ -36,6 +37,7 @@ use tracing::{error, warn};
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
+use crate::monitor::ValidateProgress;
 use crate::stats::{BackupStats, Sizes, ValidateStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
@@ -245,16 +247,16 @@ impl BlockDir {
     pub fn block_names_set(&self, monitor: &dyn ValidateMonitor) -> Result<HashSet<BlockHash>> {
         let mut block_count = 0usize;
 
-        monitor.list_block_names(block_count);
+        monitor.progress(ValidateProgress::ListBlockNames { discovered: block_count });
         let result = self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok())
             .inspect(|_| {
                 block_count += 1;
-                monitor.list_block_names(block_count);
+                monitor.progress(ValidateProgress::ListBlockNames { discovered: block_count });
             })
             .collect();
-        monitor.list_block_names_finished();
+        monitor.progress(ValidateProgress::ListBlockNamesFinished { total: block_count });
         Ok(result)
     }
 
@@ -271,7 +273,9 @@ impl BlockDir {
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
         let blocks = self.block_names_set(monitor)?;
-        monitor.read_blocks(blocks.len());
+        let block_count_read = AtomicUsize::new(0);
+        let block_count = blocks.len();
+        monitor.progress(ValidateProgress::BlockRead { current: 0, total: block_count });
 
         stats.block_read_count = blocks.len().try_into().unwrap();
 
@@ -279,15 +283,18 @@ impl BlockDir {
         // failed, where the usize gives the uncompressed data size.
         let results: Vec<Option<(BlockHash, usize)>> = blocks
             .into_par_iter()
-            .map(|hash| {
+            .map(move |hash| {
                 let result = self.get_block_content(&hash);
+                let read_count = block_count_read.fetch_add(1, Ordering::Relaxed) + 1;
+                monitor.progress(ValidateProgress::BlockRead { current: read_count, total: block_count });
+
                 match result {
                     Ok((bytes, sizes)) => {
-                        monitor.read_block_result(&hash, &Ok(sizes));
+                        monitor.block_read_result(&hash, &Ok(sizes));
                         Some((hash, bytes.len()))
                     }
                     Err(error) => {
-                        monitor.read_block_result(&hash, &Err(error));
+                        monitor.block_read_result(&hash, &Err(error));
                         None
                     }
                 }
@@ -301,7 +308,7 @@ impl BlockDir {
             .flatten() // keep only Some values
             .collect();
 
-        monitor.read_blocks_finished();
+        monitor.progress(ValidateProgress::BlockReadFinished { total: block_count });
         Ok(len_map)
     }
 

@@ -67,7 +67,7 @@ pub use crate::merge::{MergeTrees, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
 pub use crate::monitor::{
     BackupMonitor, DeleteMonitor, ReferencedBlocksMonitor, RestoreMonitor, TreeSizeMonitor,
-    ValidateMonitor,
+    ValidateMonitor, ValidateProgress, DeleteProgress, ReferencedBlocksProgress
 };
 pub use crate::restore::{restore, RestoreOptions, RestoreTree};
 pub use crate::stats::{BackupStats, DeleteStats, RestoreStats, ValidateStats};

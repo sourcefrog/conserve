@@ -30,7 +30,7 @@ use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
-use crate::monitor::{DeleteMonitor, ReferencedBlocksMonitor, NULL_MONITOR};
+use crate::monitor::{DeleteMonitor, ReferencedBlocksMonitor, NULL_MONITOR, ValidateProgress, DeleteProgress};
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
@@ -209,6 +209,7 @@ impl Archive {
         monitor: Option<&dyn ReferencedBlocksMonitor>,
     ) -> Result<HashSet<BlockHash>> {
         let monitor = monitor.unwrap_or(&NULL_MONITOR);
+        monitor.progress(ReferencedBlocksProgress::ReferencedBlocks { discovered: 0 });
 
         let archive = self.clone();
         let current_count = AtomicUsize::new(0);
@@ -216,15 +217,15 @@ impl Archive {
         let result = band_ids
             .par_iter()
             .inspect(|_| {
-                monitor.list_referenced_blocks(current_count.fetch_add(1, Ordering::Relaxed) + 1);
+                monitor.progress(ReferencedBlocksProgress::ReferencedBlocks { discovered: current_count.fetch_add(1, Ordering::Relaxed) + 1 });
             })
             .map(move |band_id| Band::open(&archive, band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
             .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
-            .collect();
+            .collect::<HashSet<_>>();
 
-        monitor.list_referenced_blocks_finished();
+        monitor.progress(ReferencedBlocksProgress::ReferencedBlocksFinished { total: result.len() });
         Ok(result)
     }
 
@@ -269,7 +270,7 @@ impl Archive {
         let referenced =
             self.referenced_blocks(&keep_band_ids, Some(monitor_.referenced_blocks_monitor()))?;
         let unref = {
-            monitor_.find_present_blocks(0);
+            monitor_.progress(DeleteProgress::FindPresentBlocks { discovered: 0 });
 
             let mut present_block_index = 0;
             let unref = self
@@ -277,12 +278,12 @@ impl Archive {
                 .block_names()?
                 .inspect(|_| {
                     present_block_index += 1;
-                    monitor_.find_present_blocks(present_block_index);
+                    monitor_.progress(DeleteProgress::FindPresentBlocks { discovered: present_block_index });
                 })
                 .filter(|bh| !referenced.contains(bh))
                 .collect_vec();
 
-            monitor_.find_present_blocks_finished();
+            monitor_.progress(DeleteProgress::FindPresentBlocksFinished { total: present_block_index });
             unref
         };
 
@@ -290,21 +291,21 @@ impl Archive {
         stats.unreferenced_block_count = unref_count;
 
         let total_bytes = {
-            monitor_.measure_unreferenced_blocks(0, unref_count);
+            monitor_.progress(DeleteProgress::MeasureUnreferencedBlocks { current: 0, total: unref_count });
 
             let block_index = AtomicUsize::new(0);
             let total_bytes = unref
                 .par_iter()
                 .inspect(|_| {
-                    monitor_.measure_unreferenced_blocks(
-                        block_index.fetch_add(1, Ordering::Relaxed) + 1,
-                        unref_count,
-                    );
+                    monitor_.progress(DeleteProgress::MeasureUnreferencedBlocks { 
+                        current: block_index.fetch_add(1, Ordering::Relaxed) + 1, 
+                        total: unref_count
+                    });
                 })
                 .map(|block_id| block_dir.compressed_size(block_id).unwrap_or_default())
                 .sum();
 
-            monitor_.measure_unreferenced_blocks_finished();
+            monitor_.progress(DeleteProgress::MeasureUnreferencedBlocksFinished { total: unref_count });
             total_bytes
         };
 
@@ -314,36 +315,37 @@ impl Archive {
             delete_guard.check()?;
 
             {
+                monitor_.progress(DeleteProgress::DeleteBands { current: 0, total: delete_band_ids.len() });
+
                 let mut delete_band_count = 0;
-                monitor_.delete_bands(0, delete_band_ids.len());
                 for band_id in delete_band_ids {
                     delete_band_count += 1;
-                    monitor_.delete_bands(delete_band_count, delete_band_ids.len());
+                    monitor_.progress(DeleteProgress::DeleteBands { current: delete_band_count, total: delete_band_ids.len() });
 
                     Band::delete(self, band_id)?;
                     stats.deleted_band_count += 1;
                 }
-                monitor_.delete_bands_finished();
+                monitor_.progress(DeleteProgress::DeleteBandsFinished { total: delete_band_ids.len() });
             }
 
             {
-                monitor_.delete_blocks(0, unref.len());
+                monitor_.progress(DeleteProgress::DeleteBlocks { current: 0, total: unref.len() });
 
                 let delete_block_count = AtomicUsize::new(0);
                 let error_count = unref
                     .par_iter()
                     .inspect(|_| {
-                        monitor_.delete_blocks(
-                            delete_block_count.fetch_add(1, Ordering::Relaxed) + 1,
-                            unref.len(),
-                        );
+                        monitor_.progress(DeleteProgress::DeleteBlocks { 
+                            current: delete_block_count.fetch_add(1, Ordering::Relaxed) + 1, 
+                            total: unref.len() 
+                        });
                     })
                     .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
                     .count();
 
                 stats.deletion_errors += error_count;
                 stats.deleted_block_count += unref_count - error_count;
-                monitor_.delete_blocks_finished();
+                monitor_.progress(DeleteProgress::DeleteBlocksFinished { total: unref.len() });
             }
         }
 
@@ -359,22 +361,21 @@ impl Archive {
         let monitor = monitor.unwrap_or(&NULL_MONITOR);
 
         let start = Instant::now();
-        monitor.validate_archive();
+        monitor.progress(ValidateProgress::ValidateArchive);
         let mut stats = self.validate_archive_dir(monitor)?;
-        monitor.validate_archive_finished();
+        monitor.progress(ValidateProgress::ValidateArchiveFinished);
 
-        monitor.count_bands();
+        monitor.progress(ValidateProgress::CountBands);
         let band_ids = self.list_band_ids()?;
-        monitor.count_bands_result(&band_ids);
+        monitor.discovered_bands(&band_ids);
+        monitor.progress(ValidateProgress::CountBandsFinished);
 
         // 1. Walk all indexes, collecting a list of (block_hash, min_length)
         //    values referenced by all the indexes.
-        monitor.validate_bands();
         let (referenced_lens, ref_stats) = validate::validate_bands(self, &band_ids, monitor);
         stats += ref_stats;
-        monitor.validate_bands_finished();
 
-        monitor.validate_blocks();
+        monitor.progress(ValidateProgress::ValidateBlocks);
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
             // content.
@@ -385,7 +386,7 @@ impl Archive {
                 .keys()
                 .filter(|&bh| !present_blocks.contains(bh))
             {
-                monitor.validate_block_missing(block_hash, &BlockMissingReason::NotExisting);
+                monitor.block_missing(block_hash, &BlockMissingReason::NotExisting);
                 stats.block_missing_count += 1;
             }
         } else {
@@ -398,17 +399,17 @@ impl Archive {
                 if let Some(actual_len) = block_lengths.get(&block_hash) {
                     if referenced_len > (*actual_len as u64) {
                         monitor
-                            .validate_block_missing(&block_hash, &BlockMissingReason::InvalidRange);
+                            .block_missing(&block_hash, &BlockMissingReason::InvalidRange);
                         // TODO: A separate counter; this is worse than just being missing
                         stats.block_missing_count += 1;
                     }
                 } else {
-                    monitor.validate_block_missing(&block_hash, &BlockMissingReason::NotExisting);
+                    monitor.block_missing(&block_hash, &BlockMissingReason::NotExisting);
                     stats.block_missing_count += 1;
                 }
             }
         }
-        monitor.validate_blocks_finished();
+        monitor.progress(ValidateProgress::ValidateBlocksFinished);
 
         stats.elapsed = start.elapsed();
         Ok(stats)
@@ -430,7 +431,7 @@ impl Archive {
                     Kind::Dir => dirs.push(name),
                     Kind::File => files.push(name),
                     other_kind => {
-                        monitor.validate_archive_problem(
+                        monitor.archive_problem(
                             &ValidateArchiveProblem::UnexpectedFileType {
                                 name,
                                 kind: other_kind,
@@ -440,7 +441,7 @@ impl Archive {
                     }
                 },
                 Err(source) => {
-                    monitor.validate_archive_problem(&ValidateArchiveProblem::DirectoryListError {
+                    monitor.archive_problem(&ValidateArchiveProblem::DirectoryListError {
                         error: source,
                     });
                     stats.io_errors += 1;
@@ -451,7 +452,7 @@ impl Archive {
         if !files.is_empty() {
             // TODO: Ignore .DS_Store
             stats.unexpected_files += 1;
-            monitor.validate_archive_problem(&ValidateArchiveProblem::UnexpectedFiles {
+            monitor.archive_problem(&ValidateArchiveProblem::UnexpectedFiles {
                 path: format!("{:?}", self.transport),
                 files,
             });
@@ -463,7 +464,7 @@ impl Archive {
             if let Ok(b) = d.parse() {
                 if bs.contains(&b) {
                     stats.structure_problems += 1;
-                    monitor.validate_archive_problem(&ValidateArchiveProblem::DuplicateBand {
+                    monitor.archive_problem(&ValidateArchiveProblem::DuplicateBand {
                         path: format!("{:?}", self.transport),
                         directory: d.clone(),
                     });
@@ -472,7 +473,7 @@ impl Archive {
                 }
             } else {
                 stats.structure_problems += 1;
-                monitor.validate_archive_problem(&ValidateArchiveProblem::UnexpectedDirectory {
+                monitor.archive_problem(&ValidateArchiveProblem::UnexpectedDirectory {
                     path: format!("{:?}", self.transport),
                     directory: d.clone(),
                 });

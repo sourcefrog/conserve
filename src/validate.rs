@@ -15,6 +15,7 @@ use std::collections::HashMap;
 
 use crate::blockdir::Address;
 use crate::*;
+use crate::monitor::ValidateProgress;
 
 pub struct BlockLengths(pub HashMap<BlockHash, u64>);
 
@@ -85,11 +86,12 @@ pub(crate) fn validate_bands(
 ) -> (BlockLengths, ValidateStats) {
     let mut stats = ValidateStats::default();
     let mut block_lens = BlockLengths::new();
+    let mut band_index = 0;
 
     for band_id in band_ids {
-        monitor.validate_band(band_id);
+        monitor.progress(ValidateProgress::ValidateBands { current: band_index, total: band_ids.len() });
         let result = validate_band(archive, &mut stats, band_id, monitor);
-        monitor.validate_band_result(band_id, &result);
+        monitor.band_validate_result(band_id, &result);
 
         match result {
             Ok((st_block_lens, st_stats)) => {
@@ -103,8 +105,10 @@ pub(crate) fn validate_bands(
                 BandValidateError::TreeValidateError(_) => stats.tree_validate_errors += 1,
             },
         }
+        band_index += 1;
     }
 
+    monitor.progress(ValidateProgress::ValidateBandsFinished { total: band_ids.len() });
     (block_lens, stats)
 }
 

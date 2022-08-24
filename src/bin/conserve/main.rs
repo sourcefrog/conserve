@@ -22,7 +22,7 @@ use clap::{Parser, StructOpt, Subcommand};
 use log::{LogGuard, LoggingOptions};
 use monitor::ValidateProgressModel;
 use monitor::{
-    BackupProgressModel, DeleteProcessState, NutmegMonitor, ReferencedBlocksProgressModel,
+    BackupProgressModel, DeleteProcessModel, NutmegMonitor, ReferencedBlocksProgressModel,
     RestoreProgressModel, SizeProgressModel,
 };
 use show::{show_diff, show_versions, ShowVersionsOptions};
@@ -353,7 +353,7 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let monitor = NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
+                let monitor = NutmegMonitor::new(DeleteProcessModel::default(), !args.no_progress);
                 let stats = Archive::open(open_transport(archive)?)?.delete_bands(
                     backup,
                     &DeleteOptions {
@@ -392,7 +392,7 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let monitor = NutmegMonitor::new(DeleteProcessState::default(), !args.no_progress);
+                let monitor = NutmegMonitor::new(DeleteProcessModel::default(), !args.no_progress);
 
                 let archive = Archive::open(open_transport(archive)?)?;
                 let stats = archive.delete_bands(

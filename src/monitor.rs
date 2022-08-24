@@ -13,37 +13,44 @@ pub trait BackupMonitor {
     fn finished(&self, _stats: &BackupStats) {}
 }
 
+#[derive(Debug, Clone)]
+pub enum ValidateProgress {
+    CountBands,
+    CountBandsFinished,
+    
+    ValidateArchive,
+    ValidateArchiveFinished,
+
+    ValidateBands { current: usize, total: usize },
+    ValidateBandsFinished { total: usize },
+
+    ListBlockNames { discovered: usize },
+    ListBlockNamesFinished { total: usize },
+
+    BlockRead { current: usize, total: usize },
+    BlockReadFinished { total: usize },
+
+    ValidateBlocks,
+    ValidateBlocksFinished,
+}
+
+
 /// Monitor the validation progress.
 pub trait ValidateMonitor: Sync {
-    fn count_bands(&self) {}
-    fn count_bands_result(&self, _bands: &[BandId]) {}
+    /// Will be called with the current state of validating the target archive.
+    fn progress(&self, _state: ValidateProgress) {}
 
-    fn validate_archive(&self) {}
-    fn validate_archive_problem(&self, _problem: &ValidateArchiveProblem) {}
-    fn validate_archive_finished(&self) {}
+    fn discovered_bands(&self, _bands: &[BandId]) {}
 
-    fn validate_bands(&self) {}
-    fn validate_bands_finished(&self) {}
-
-    fn validate_band(&self, _band_id: &BandId) {}
-    fn validate_band_problem(&self, _band: &Band, _problem: &BandProblem) {}
-    fn validate_band_result(
+    fn archive_problem(&self, _problem: &ValidateArchiveProblem) {}
+    fn band_problem(&self, _band: &Band, _problem: &BandProblem) {}
+    fn band_validate_result(
         &self,
         _band_id: &BandId,
         _result: &std::result::Result<(BlockLengths, ValidateStats), BandValidateError>,
-    ) {
-    }
-
-    fn validate_block_missing(&self, _block_hash: &BlockHash, _reason: &BlockMissingReason) {}
-    fn validate_blocks(&self) {}
-    fn validate_blocks_finished(&self) {}
-
-    fn list_block_names(&self, _current_count: usize) {}
-    fn list_block_names_finished(&self) {}
-
-    fn read_blocks(&self, _count: usize) {}
-    fn read_block_result(&self, _block_hash: &BlockHash, _result: &Result<Sizes>) {}
-    fn read_blocks_finished(&self) {}
+    ) { }
+    fn block_missing(&self, _block_hash: &BlockHash, _reason: &BlockMissingReason) {}
+    fn block_read_result(&self, _block_hash: &BlockHash, _result: &Result<Sizes>) {}
 }
 
 /// Monitor for iterating trees.
@@ -51,27 +58,38 @@ pub trait TreeSizeMonitor<T: ReadTree> {
     fn entry_discovered(&self, _entry: &T::Entry, _size: &Option<u64>) {}
 }
 
+#[derive(Debug, Clone)]
+pub enum ReferencedBlocksProgress {
+    ReferencedBlocks { discovered: usize },
+    ReferencedBlocksFinished { total: usize }
+}
+
 /// Monitor for iterating referenced blocks.
 pub trait ReferencedBlocksMonitor: Sync {
-    fn list_referenced_blocks(&self, _current_count: usize) {}
-    fn list_referenced_blocks_finished(&self) {}
+    fn progress(&self, _state: ReferencedBlocksProgress) {}
+}
+
+#[derive(Debug, Clone)]
+pub enum DeleteProgress {
+    FindPresentBlocks { discovered: usize },
+    FindPresentBlocksFinished { total: usize },
+
+    MeasureUnreferencedBlocks { current: usize, total: usize },
+    MeasureUnreferencedBlocksFinished { total: usize },
+
+    DeleteBands { current: usize, total: usize },
+    DeleteBandsFinished { total: usize },
+
+    DeleteBlocks { current: usize, total: usize },
+    DeleteBlocksFinished { total: usize },
 }
 
 /// Monitor for deleting backups/blocks.
 pub trait DeleteMonitor: Sync {
     fn referenced_blocks_monitor(&self) -> &dyn ReferencedBlocksMonitor;
 
-    fn find_present_blocks(&self, _current_count: usize) {}
-    fn find_present_blocks_finished(&self) {}
-
-    fn measure_unreferenced_blocks(&self, _current_count: usize, _target_count: usize) {}
-    fn measure_unreferenced_blocks_finished(&self) {}
-
-    fn delete_bands(&self, _current_count: usize, _target_count: usize) {}
-    fn delete_bands_finished(&self) {}
-
-    fn delete_blocks(&self, _current_count: usize, _target_count: usize) {}
-    fn delete_blocks_finished(&self) {}
+    fn progress(&self, _state: DeleteProgress) {}
+    // TODO: May encountered delete errors?
 }
 
 /// Monitor the progress of restoring files.

@@ -225,7 +225,7 @@ impl Band {
         let band_head_filename = BAND_HEAD_FILENAME.to_string();
         if !files.contains(&band_head_filename) {
             monitor
-                .validate_band_problem(self, &BandProblem::MissingHeadFile { band_head_filename });
+                .band_problem(self, &BandProblem::MissingHeadFile { band_head_filename });
             stats.missing_band_heads += 1;
         }
         remove_item(&mut files, &BAND_HEAD_FILENAME);
@@ -233,12 +233,12 @@ impl Band {
         remove_item(&mut dirs, &INDEX_DIR);
 
         if !files.is_empty() {
-            monitor.validate_band_problem(self, &BandProblem::UnexpectedFiles { files });
+            monitor.band_problem(self, &BandProblem::UnexpectedFiles { files });
             stats.unexpected_files += 1;
         }
 
         if !dirs.is_empty() {
-            monitor.validate_band_problem(
+            monitor.band_problem(
                 self,
                 &BandProblem::UnexpectedDirectories { directories: dirs },
             );
