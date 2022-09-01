@@ -109,7 +109,7 @@ impl BlockDir {
     }
 
     /// Returns the number of compressed bytes.
-    pub(crate) fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
+    pub(crate) fn compress_and_store(&self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
         // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
         let mut compressor = Compressor::new();
         let compressed = compressor.compress(in_buf)?;
@@ -138,7 +138,7 @@ impl BlockDir {
     }
 
     pub(crate) fn store_or_deduplicate(
-        &mut self,
+        &self,
         block_data: &[u8],
         stats: &mut BackupStats,
     ) -> Result<BlockHash> {

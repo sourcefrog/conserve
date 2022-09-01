@@ -15,9 +15,12 @@
 //! into an archive.
 
 use std::io::prelude::*;
+use std::iter::from_fn;
+use std::sync::Mutex;
 use std::{convert::TryInto, time::Instant};
 
 use itertools::Itertools;
+use rayon::prelude::{ParallelBridge, ParallelIterator};
 
 use crate::blockdir::Address;
 use crate::io::read_with_retries;
@@ -94,13 +97,14 @@ pub fn backup(
     options: &BackupOptions,
 ) -> Result<BackupStats> {
     let start = Instant::now();
-    let mut writer = BackupWriter::begin(archive)?;
+    let writer = BackupWriter::begin(archive)?;
     let mut stats = BackupStats::default();
     let mut view = nutmeg::View::new(ProgressModel::default(), ui::nutmeg_options());
 
     let entry_iter = source.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
+            dbg!(&entry);
             view.update(|model| {
                 model.filename = entry.apath().to_string();
                 match entry.kind() {
@@ -145,15 +149,15 @@ pub fn backup(
 /// Accepts files to write in the archive (in apath order.)
 struct BackupWriter {
     band: Band,
-    index_builder: IndexWriter,
-    stats: BackupStats,
+    index_builder: Mutex<IndexWriter>,
+    stats: Mutex<BackupStats>,
     block_dir: BlockDir,
 
     /// The index for the last stored band, used as hints for whether newly
     /// stored files have changed.
-    basis_index: crate::index::IndexEntryIter<crate::stitch::IterStitchedIndexHunks>,
+    basis_index: Mutex<crate::index::IndexEntryIter<crate::stitch::IterStitchedIndexHunks>>,
 
-    file_combiner: FileCombiner,
+    file_combiner: Mutex<FileCombiner>,
 }
 
 impl BackupWriter {
@@ -164,37 +168,42 @@ impl BackupWriter {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
-        let basis_index = IterStitchedIndexHunks::new(archive, archive.last_band_id()?)
-            .iter_entries(Apath::root(), Exclude::nothing());
+        let basis_index = Mutex::new(
+            IterStitchedIndexHunks::new(archive, archive.last_band_id()?)
+                .iter_entries(Apath::root(), Exclude::nothing()),
+        );
 
         // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;
-        let index_builder = band.index_builder();
+        let index_builder = Mutex::new(band.index_builder());
         Ok(BackupWriter {
             band,
             index_builder,
             block_dir: archive.block_dir().clone(),
-            stats: BackupStats::default(),
+            stats: Mutex::new(BackupStats::default()),
             basis_index,
-            file_combiner: FileCombiner::new(archive.block_dir().clone()),
+            file_combiner: Mutex::new(FileCombiner::new(archive.block_dir().clone())),
         })
     }
 
     fn finish(self) -> Result<BackupStats> {
-        let index_builder_stats = self.index_builder.finish()?;
+        let index_builder_stats = self.index_builder.into_inner().unwrap().finish()?;
         self.band.close(index_builder_stats.index_hunks as u64)?;
         Ok(BackupStats {
             index_builder_stats,
-            ..self.stats
+            ..self.stats.lock().unwrap().clone()
         })
     }
 
     /// Write out any pending data blocks, and then the pending index entries.
-    fn flush_group(&mut self) -> Result<()> {
-        let (stats, mut entries) = self.file_combiner.drain()?;
-        self.stats += stats;
-        self.index_builder.append_entries(&mut entries);
-        self.index_builder.finish_hunk()
+    fn flush_group(&self) -> Result<()> {
+        let (stats, mut entries) = self.file_combiner.lock().unwrap().drain()?;
+        *self.stats.lock().unwrap() += stats;
+        self.index_builder
+            .lock()
+            .unwrap()
+            .append_entries(&mut entries);
+        self.index_builder.lock().unwrap().finish_hunk()
     }
 
     /// Add one entry to the backup.
@@ -202,13 +211,13 @@ impl BackupWriter {
     /// Return an indication of whether it changed (if it's a file), or
     /// None for non-plain-file types where that information is not currently
     /// calculated.
-    fn copy_entry(&mut self, entry: &LiveEntry, source: &LiveTree) -> Result<Option<DiffKind>> {
+    fn copy_entry(&self, entry: &LiveEntry, source: &LiveTree) -> Result<Option<DiffKind>> {
         match entry.kind() {
             Kind::Dir => self.copy_dir(entry),
             Kind::File => self.copy_file(entry, source),
             Kind::Symlink => self.copy_symlink(entry),
             Kind::Unknown => {
-                self.stats.unknown_kind += 1;
+                self.stats.lock().unwrap().unknown_kind += 1;
                 // TODO: Perhaps eventually we could backup and restore pipes,
                 // sockets, etc. Or at least count them. For now, silently skip.
                 // https://github.com/sourcefrog/conserve/issues/82
@@ -217,66 +226,70 @@ impl BackupWriter {
         }
     }
 
-    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
-        self.stats.directories += 1;
+    fn copy_dir<E: Entry>(&self, source_entry: &E) -> Result<Option<DiffKind>> {
+        self.stats.lock().unwrap().directories += 1;
         self.index_builder
+            .lock()
+            .unwrap()
             .push_entry(IndexEntry::metadata_from(source_entry));
         Ok(None) // TODO: See if it changed from the basis?
     }
 
     /// Copy in the contents of a file from another tree.
     fn copy_file(
-        &mut self,
+        &self,
         source_entry: &LiveEntry,
         from_tree: &LiveTree,
     ) -> Result<Option<DiffKind>> {
-        self.stats.files += 1;
+        self.stats.lock().unwrap().files += 1;
         let apath = source_entry.apath();
         let result;
-        if let Some(basis_entry) = self.basis_index.advance_to(apath) {
+        if let Some(basis_entry) = self.basis_index.lock().unwrap().advance_to(apath) {
             if source_entry.is_unchanged_from(&basis_entry) {
-                self.stats.unmodified_files += 1;
-                self.index_builder.push_entry(basis_entry);
+                self.stats.lock().unwrap().unmodified_files += 1;
+                self.index_builder.lock().unwrap().push_entry(basis_entry);
                 return Ok(Some(DiffKind::Unchanged));
             } else {
-                self.stats.modified_files += 1;
+                self.stats.lock().unwrap().modified_files += 1;
                 result = Some(DiffKind::Changed);
             }
         } else {
-            self.stats.new_files += 1;
+            self.stats.lock().unwrap().new_files += 1;
             result = Some(DiffKind::New);
         }
         let mut read_source = from_tree.file_contents(source_entry)?;
         let size = source_entry.size().expect("LiveEntry has a size");
         if size == 0 {
             self.index_builder
+                .lock()
+                .unwrap()
                 .push_entry(IndexEntry::metadata_from(source_entry));
-            self.stats.empty_files += 1;
+            self.stats.lock().unwrap().empty_files += 1;
             return Ok(result);
         }
         if size <= SMALL_FILE_CAP {
             self.file_combiner
+                .lock()
+                .unwrap()
                 .push_file(source_entry, &mut read_source)?;
             return Ok(result);
         }
-        let addrs = store_file_content(
-            apath,
-            &mut read_source,
-            &mut self.block_dir,
-            &mut self.stats,
-        )?;
-        self.index_builder.push_entry(IndexEntry {
+        let (addrs, stats) = store_file_content(apath, &mut read_source, &self.block_dir)?;
+        *self.stats.lock().unwrap() += stats;
+        self.index_builder.lock().unwrap().push_entry(IndexEntry {
             addrs,
             ..IndexEntry::metadata_from(source_entry)
         });
         Ok(result)
     }
 
-    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
+    fn copy_symlink<E: Entry>(&self, source_entry: &E) -> Result<Option<DiffKind>> {
         let target = source_entry.symlink_target().clone();
-        self.stats.symlinks += 1;
+        self.stats.lock().unwrap().symlinks += 1;
         assert!(target.is_some());
         self.index_builder
+            .lock()
+            .unwrap()
             .push_entry(IndexEntry::metadata_from(source_entry));
         Ok(None)
     }
@@ -284,35 +297,54 @@ impl BackupWriter {
 
 fn store_file_content(
     apath: &Apath,
-    from_file: &mut dyn Read,
-    block_dir: &mut BlockDir,
-    stats: &mut BackupStats,
-) -> Result<Vec<Address>> {
-    let mut buffer = Vec::new();
-    let mut addresses = Vec::<Address>::with_capacity(1);
-    loop {
-        read_with_retries(&mut buffer, MAX_BLOCK_SIZE, from_file).map_err(|source| {
-            Error::StoreFile {
+    from_file: &mut (dyn Read + Send),
+    block_dir: &BlockDir,
+) -> Result<(Vec<Address>, BackupStats)> {
+    let blocks = from_fn(|| {
+        let mut buffer = Vec::new();
+        read_with_retries(&mut buffer, MAX_BLOCK_SIZE, from_file)
+            .map_err(|source| Error::StoreFile {
                 apath: apath.to_owned(),
                 source,
-            }
-        })?;
+            })
+            .unwrap();
+        dbg!(&buffer.len());
         if buffer.is_empty() {
-            break;
+            return None;
         }
-        let hash = block_dir.store_or_deduplicate(buffer.as_slice(), stats)?;
-        addresses.push(Address {
-            hash,
-            start: 0,
-            len: buffer.len() as u64,
-        });
+        Some(buffer)
+    });
+
+    let stats = Mutex::new(BackupStats::default());
+
+    let addresses: Vec<_> = blocks
+        .par_bridge()
+        .map(|buffer| {
+            let mut stats_update = BackupStats::default();
+            println!("begin store {}", buffer.len());
+            let hash = block_dir
+                .store_or_deduplicate(buffer.as_slice(), &mut stats_update)
+                .unwrap();
+            println!("end store {}, {:?}", buffer.len(), hash);
+            *stats.lock().unwrap() += stats_update;
+            Address {
+                hash,
+                start: 0,
+                len: buffer.len() as u64,
+            }
+        })
+        .collect();
+
+    {
+        let mut stats = stats.lock().unwrap();
+        match addresses.len() {
+            0 => stats.empty_files += 1,
+            1 => stats.single_block_files += 1,
+            _ => stats.multi_block_files += 1,
+        }
     }
-    match addresses.len() {
-        0 => stats.empty_files += 1,
-        1 => stats.single_block_files += 1,
-        _ => stats.multi_block_files += 1,
-    }
-    Ok(addresses)
+
+    Ok((addresses, stats.into_inner().unwrap()))
 }
 
 /// Combines multiple small files into a single block.
