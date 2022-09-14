@@ -3,7 +3,6 @@
 <https://github.com/sourcefrog/conserve/>
 
 [![GitHub build status](https://github.com/sourcefrog/conserve/workflows/Rust/badge.svg?branch=main)](https://github.com/sourcefrog/conserve/actions?query=workflow%3ARust)
-[![cargo-audit](https://github.com/sourcefrog/conserve/actions/workflows/cargo-audit.yml/badge.svg)](https://github.com/sourcefrog/conserve/actions/workflows/cargo-audit.yml)
 [![crates.io](https://img.shields.io/crates/v/conserve.svg)](https://crates.io/crates/conserve)
 ![Maturity: Beta](https://img.shields.io/badge/maturity-beta-yellow.svg)
 
