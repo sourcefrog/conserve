@@ -90,11 +90,21 @@ There is a single master key for the archive, set at archive creation time and n
 
 The passphrase may be provided as a filename, or by an identifier for a system keyring key.
 
+Some random salt for the master key is stored in the archive head metadata.
+
 The master passphrase is an ASCII string with no trailing whitespace, from which a master key is derived.
+
+    master_key = argon2(passphrase, salt, ???)
 
 An archive metadata file stores a random string and the keyed hash of that random string using the master key. This is used to detect whether the correct master key has been provided for later operations.
 
+    master_key_check = blake3("master_key_check", key=master_key)
+
 From the master key three separate keys are derived for hashing, block encryption, and blocklist encryption. This is used as a best practice and is not believed to be strictly necessary.
+
+    hash_key = blake3("hash_key", key=master_key)
+    block_key = blake3("block_key" key=master_key)
+    blocklist_key = blake3("blocklist_key", key=master_key)
 
 ### Block hashes
 
@@ -112,17 +122,39 @@ To write a block, it is first hashed. If the hash is already present, that's eno
 
 To read a block with a given hash, the file identified by the hash is first decrypted using the encryption key and using the block hash as the IV. It is then decompressed. The decompressed content is then hashed again to check that it matches the expected content.
 
+Specifically, the blocks are encrypted using AES-256-GCM, using the derived `block_key`, and using the first 12 bytes of the block hash as the nonce.
+
+### Blocklist encryption
+
+In the planned new format 7, the band directory contains one or more "blocklists" which contain lists of hashes of index protos.
+
+The block hashes are not considered secret, because they are visible on disk. However we do want to protect against tampering with the blocklists, so that an attacker cannot add or remove blocks from the index.
+
+Blocklists are written as an outer protobuf
+
+    message BlocklistEnvelope {
+        bytes previous_keyed_hash = 1;
+        bytes blocklist_proto = 2;
+        bytes keyed_hash_of_blocklist_proto = 3;
+    }
+
+    message Blocklist {
+        repeated Hash index_hashes = 1;
+    }
+
+Each blocklist after the first includes a keyed hash of the previous blocklist, so that deletions or rearrangements are detectable.
+
+The blocklist files are repeatedly rewritten during the backup after each index block is added, to allow recovery from an interrupted backup.
+
+There is a limit on the number of blocks in each blocklist file (say 1000), after which the backup spills over to a new blocklist file, and the older blocklist is no longer modified.
+
 ### Backup metadata
 
 The band head and tail files are not encrypted; they include the start time and other non-secret metadata.
 
-In the planned new format, the root object of the backup is a list of blocks which are concatenated to form the index.
+The band tail file includes the number of blocklist files, to detect if one of them is accidentally lost.
 
-This can spill over several numbered files if the index is very large.
-
-These blocklist files are encrypted using the blocklist encryption key, with an IV derived from the band id and the bandlist sequence number.
-
-When the band is finished, each of the blocklist files is hashed, keyed by the hash key. This list of keyed hashes is then written into the band tail.
+The band tail includes a keyed hash of the concatenation of all of the blocklist files, to detect corruption or tampering.
 
 ## Assessment
 
