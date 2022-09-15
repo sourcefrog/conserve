@@ -50,10 +50,18 @@ In 0.6, the index hunks are stored in a specific index directory. In 7, they are
 
 Index hunks will initially hold a limited number of entries, as they do in 0.6. In future there is room to improve this by splitting the index so that unchanged hunks align with previous backups, and only changed hunks are stored.
 
+The band directory contains, as well as the head and tail, some _blocklist_ files. These are protos containing a list of hashes of index blocks. Each blocklist contains up to some limited number of blocks, say 1000.
+
+As index blocks are written, the blocklist containing them is repeatedly rewritten, so that if the backup is interrupted all the data written so far will still be retrievable. This is an exception to the general design rule that files are each only written once, but they are only rewritten within a limited time window within a single backup.
+
+(This desire to recover from interrupted backups explains why there is a simple linear list of blocks at the top of each backup, rather than a tree that rolls up to a single hash root.)
+
 ### zstd compression
 
 A new block directory will be introduced within which blocks are zstd-compressed. The addressing is the same as at present: the BLAKE2b hash of the uncompressed content.
 
 When reading, Conserve will try the zstd directory first and then fall back to the existing Snappy directory.
 
-Whereas the current `d` directory has up to 4096 3-hex-digit subdirectories, the `dzstd` will have 256 2-hex-digit subdirectories, and they will all be created when the `dzstd` directory is created. This is to avoid the need to create subdirectories on the fly, which is slow. We still keep
+Whereas the current `d` directory has up to 4096 3-hex-digit subdirectories, the `dzstd` will have 256 2-hex-digit subdirectories, and they will all be created when the `dzstd` directory is created. This is to avoid the need to create subdirectories on the fly or check whether they exist.
+
+We will still keep multiple subdirectories primarily to allow reading them in parallel; secondarily to avoid problems with too many files in one directory on filesystems that don't scale so well.
