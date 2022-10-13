@@ -549,8 +549,8 @@ checksum = "5916d2ae698f6de9bfb891ad7a8d65c09d232dc58cc4ac433c7da3b2fd84bc2b"
 
 [[package]]
 name = "libssh2-sys"
-version = "0.2.23"
-source = "git+https://github.com/sourcefrog/ssh2-rs.git?branch=readdir-buffer#6a6289627ba4ce348ed34a150e8f3513164a86bd"
+version = "0.3.0"
+source = "git+https://github.com/alexcrichton/ssh2-rs.git#f10329d2cd372f88149ebb2b63454cba9c0b8ad4"
 dependencies = [
  "cc",
  "libc",
@@ -1164,8 +1164,8 @@ checksum = "45456094d1983e2ee2a18fdfebce3189fa451699d0502cb8e3b49dba5ba41451"
 
 [[package]]
 name = "ssh2"
-version = "0.9.3"
-source = "git+https://github.com/sourcefrog/ssh2-rs.git?branch=readdir-buffer#6a6289627ba4ce348ed34a150e8f3513164a86bd"
+version = "0.9.4"
+source = "git+https://github.com/alexcrichton/ssh2-rs.git#f10329d2cd372f88149ebb2b63454cba9c0b8ad4"
 dependencies = [
  "bitflags",
  "libc",
