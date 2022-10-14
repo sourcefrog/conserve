@@ -205,3 +205,5 @@ This attack is, for now, accepted as unlikely due to the combination of Chad and
 This design does not provide for periodic key rotation, because it is a goal of Conserve never to rewrite existing data.
 
 If the passphrase is suspected to be compromised users should make a new archive for new backups and, potentially, delete the old archive or move it offline.
+
+TODO: Perhaps there should be space for gradual key rotation. Cyphertext could be marked with the ID of the key that should be used to retrieve it. The main challenge seems to be in the block hashes.
