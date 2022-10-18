@@ -2,9 +2,9 @@
 
 **⚠️ This is not implemented yet and not even necessarily a final design.**
 
-The approach described below is similar to SIV ("Synthetic IV") mode of deterministic authenticated encryption, adapted to the needs of Conserve for access and reference to blocks by hashes.
+The overall goal of archive encryption is to protect the confidentiality and integrity of the archive from an attacker who can read or change the archive, and who does not have access to the process that makes or restores backups or to the encryption key.
 
-A general drawback of SIV is that it is not streamable: the entire plaintext must be held in temporary storage to be first hashed and then encrypted. However, since all blocks in Conserve are of bounded size and are already held in memory for hashing and compression, this is not a problem.
+The tradeoff of enabling encryption is that the user must safeguard a key. If the key is lost the backup cannot be restored; if the key is obtained by an attacker they can read the archive.
 
 ## Threat model
 
@@ -63,13 +63,17 @@ The key can be stored in a file for noninteractive scheduled backups.
 
 The key can optionally be stored in some kind of system keyring, so that it is somewhat harder to steal, e.g. so that it is only unlocked when the user is logged in. (At the price of only being available to make backups when the user is logged in, in that case.)
 
-It's important that users keep a copy of the key in a place where it will not be lost if the backup source is lost, e.g. typically not on the same machine. The key should be concisely representable as text.
-
-Users can also choose to enter a passphrase in the terminal for manual backups or restores.
-
-Users should have the option to choose their own passphrase so that they can memorize it, or write it on paper.
+It's important that users keep a copy of the key in a place where it will not be lost if the backup source is lost, e.g. typically not on the same machine. The key should be concisely representable as text. These backups of the key must also be stored somewhere that the user feels is significantly less likely to be compromised than the backup storage itself, otherwise the encrytion is adding no value.
 
 Test restores or validation should allow the user to try presenting the key as if they were doing a recovery, e.g. by typing it in or using a non-default file, even if it is normally read from a file or keyring.
+
+It would be good to support key rotation: new keys are used to write new versions, while old data remains encrypted with an accessible through the key originally used to store it. This limits the damage if an older version of the backup key is leaked: data after it was rotated out is not readable.
+
+If the user presents the wrong keyset this give a clear error message that it's the wrong key. (This might be in tension with allowing recovery even if some keys are missing?)
+
+### Resilience
+
+If one key from the keyset is lost or unavailable it should still be possible to read other backups, or even partial backups? In other words failure to decrypt one file should be loudly flagged but should not abort the whole process: the same as if one file was missing or corrupt.
 
 ### Non-goals
 
@@ -78,71 +82,73 @@ There is no need to support a mode where the backup program cannot read what was
 There is also no need to allow decryption without the ability to write new content.
 This is probably better done by denying permission to write. Again I can conceive that in some cases the agent that restores would not need to be trusted to write, but it does seem niche.
 
-There is no need to support rewriting an archive to use different keys. We could have eventually, instead, “copy trees from one archive to another, in unlike formats or encryption.”
+There is no need to support rewriting an archive to use different keys. We could have eventually, instead, have a feature to copy trees from one archive to another, in unlike formats or encryption.
+
+There is, tentatively, no need to directly support passphrases on keys. In many cases backups should be made by cron jobs and then it's not helpful to rely on the user to enter a passphrase. For desktop/laptop machines the key can be stored in the system keyring which already supports passphrase unlock.
 
 ## Approach
 
-The format below is predicated on first migrating to format 7, which will store index hunks as hash-addressed blocks.
+The format below is predicated on first migrating to storing index hunks as blocks, rather than directly in the index directory.
+
+All blocks and hunks written by Conserve are of bounded size and will fit in memory. There is no need for streaming encryption.
+
+This approach builds on the Tink key management abstractions.
+
+If the archive is marked encrypted at creation, all backups into it are encrypted and encryption options must be set on all backups, restores, and other operations. (The encryption option may be set in client-local configuration, but the archive's assertions about whether encryption is expected must not be trusted, to prevent downgrade attacks.)
 
 ### Keys
 
-There is a single master key for the archive, set at archive creation time and never changed. If the archive is marked encrypted at creation, all backups into it are encrypted and encryption options must be set on all backups, restores, and other operations. (The encryption option may be set in client-local configuration, but the archive's assertions about whether encryption is expected must not be trusted, to prevent downgrade attacks.)
+An archive is encrypted and authenticated by a single Tink key set. (A Tink key set can contain multiple keys, of which one is primary and used to write new data, and all of them can be used to read existing data.)
 
-The passphrase may be provided as a filename, or by an identifier for a system keyring key.
+A keyset is created with
 
-Some random salt for the master key is stored in the archive head metadata.
+    ; conserve create-keyset --output-file backup_home.keyset.json
+    WARNING: Keep a safe copy of backup_home.keyset.json; if it is lost the archive will be unreadable.
 
-The master passphrase is an ASCII string with no trailing whitespace, from which a master key is derived.
+Keysets are stored in files as json.
 
-    master_key = argon2(passphrase, salt, ???)
+TODO: It would be good to also write the key to the system keyring, at least for cases where backups run while the user is logged in and the keyring is unlocked. However, it is typically very important that the user also makes a copy of the key somewhere off the source machine. Perhaps it should be written to the keyring and also to a file, so that the user can copy the file?
 
-An archive metadata file stores a random string and the keyed hash of that random string using the master key. This is used to detect whether the correct master key has been provided for later operations.
+TODO: Will this also support storage in a cloud KMS?
 
-    master_key_check = blake3("master_key_check", key=master_key)
+The keyset files are compatible with Tinkey.
 
-From the master key three separate keys are derived for hashing, block encryption, and blocklist encryption. This is used as a best practice and is not believed to be strictly necessary.
+A new key can be appended to the keyset and set as primary.
 
-    hash_key = blake3("hash_key", key=master_key)
-    block_key = blake3("block_key" key=master_key)
-    blocklist_key = blake3("blocklist_key", key=master_key)
+    ; conserve add-key
+
+TODO: Does Tink require separate keys for encryption and hashing, with no way to convert between them? Can we avoid exposing two keys to the user?
 
 ### Block hashes
 
-In an encrypted archive, blocks are always identified by a keyed hash using the derived hash key.
+In an encrypted archive, blocks are always identified by a keyed hash using the hash key.
 (In unencrypted archives blocks are identified by an unkeyed hash.)
 The block hash is the hash of the uncompressed, unencrypted block content.
 
-Specifically for encrypted archives we will use the built-in keying parameter for the BLAKE3 hash.
+Specifically, the hash of a block is the Tink PRF.
+(The MAC interface warns that it should be used only as an authenticator and not to generate random bytes, which seems to be what is needed here.)
 
 This keyed hash is used in block file names and within index hunks.
 
+When the keys are rotated, existing blocks in unchanged files can still match against their old hash. However, newly-written blocks that happen to have the same content as an existing block will get a new hash, and so will be written out as a new block.
+
 ### Block encryption
 
-To write a block, it is first hashed. If the hash is already present, that's enough. Otherwise, the block content is first compressed, and then encrypted using the encryption key and using the block hash as an IV.
+To write a block, it is first hashed. If the hash is already present, that's enough. Otherwise, the block content is first compressed, and then encrypted.
 
-To read a block with a given hash, the file identified by the hash is first decrypted using the encryption key and using the block hash as the IV. It is then decompressed. The decompressed content is then hashed again to check that it matches the expected content.
+Encryption is done using the Tink AEAD primitive, with the `AES256_GCM` key type. Tink internally generates a random IV. The encrypted file includes the Tink keyid.
 
-Specifically, the blocks are encrypted using AES-256-GCM, using the derived `block_key`, and using the first 12 bytes of the block hash as the nonce.
+The previously-computed hash is passed as the associated data.
+
+To read a block with a given hash, the file identified by the hash is decrypted using the keyset. Tink will attempt to find any matching key using the keyid. The hash included as associated data validates that the file content corresponds to the filename.
+
+(When reading unencrypted block files, Conserve hashes the file after it's read to check that the data is uncorrupted and matches the filename. For encrypted block files, this is unnecessary because the AEAD including the hash performs the same function.)
 
 ### Blocklist encryption
 
-In the planned new format 7, the band directory contains one or more "blocklists" which contain lists of hashes of index protos.
+In the planned new format 7, the band directory contains one or more "blocklists" which contain lists of hashes of index protos. The blocklist itself is a proto containing a list of hashes.
 
-The block hashes are not considered secret, because they are visible on disk. However we do want to protect against tampering with the blocklists, so that an attacker cannot add or remove blocks from the index.
-
-Blocklists are written as an outer protobuf
-
-    message BlocklistEnvelope {
-        bytes previous_keyed_hash = 1;
-        bytes blocklist_proto = 2;
-        bytes keyed_hash_of_blocklist_proto = 3;
-    }
-
-    message Blocklist {
-        repeated Hash index_hashes = 1;
-    }
-
-Each blocklist after the first includes a keyed hash of the previous blocklist, so that deletions or rearrangements are detectable.
+Blocklists are also encrypted with AEAD. The associated data is filename of the blocklist relative to the archive root, with forward slashes.
 
 The blocklist files are repeatedly rewritten during the backup after each index block is added, to allow recovery from an interrupted backup.
 
@@ -150,7 +156,9 @@ There is a limit on the number of blocks in each blocklist file (say 1000), afte
 
 ### Backup metadata
 
-The band head and tail files are not encrypted; they include the start time and other non-secret metadata.
+The band head and tail files are also AEAD encrypted. (They contain non-secret metadata including start and end times and per-format metadata, but are encrypted anyhow.)
+
+TODO: Do we want any per-format flags to be visible prior to decryption?
 
 The band tail file includes the number of blocklist files, to detect if one of them is accidentally lost.
 
@@ -168,11 +176,7 @@ Since the hash is keyed, Eve cannot determine the correct hash for a block, and 
 
 Since each block is encrypted and all file content and filenames are stored in blocks, Eve cannot read file content or tree structure.
 
-Since only one block file is written for each block hash, the block hash IV is never reused.
-
-Since there is only one blocklist file per band
-
-Since separate encryption keys are used for blocklists and blocks, reuse of IVs between them would be harmless.
+Since Tink generates a random IV for each block, IVs are never reused.
 
 ### Assessment: tampering
 
@@ -200,10 +204,3 @@ Chad and Eve can also observe changing block sizes which may allow CRIME-like at
 
 This attack is, for now, accepted as unlikely due to the combination of Chad and Eve, and the apparent need for a simple file tree to make it practical.
 
-### Assessment: Key rotation
-
-This design does not provide for periodic key rotation, because it is a goal of Conserve never to rewrite existing data.
-
-If the passphrase is suspected to be compromised users should make a new archive for new backups and, potentially, delete the old archive or move it offline.
-
-TODO: Perhaps there should be space for gradual key rotation. Cyphertext could be marked with the ID of the key that should be used to retrieve it. The main challenge seems to be in the block hashes.
