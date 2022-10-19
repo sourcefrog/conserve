@@ -541,7 +541,7 @@ mod tests {
             index_json,
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
-             \"mtime\":1461736377
+             \"mtime\":1461736377,\
              \"dac\":{\"mode\":436}}]"
         );
     }
