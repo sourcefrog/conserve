@@ -17,6 +17,7 @@
 use std::fmt::Debug;
 
 use crate::kind::Kind;
+use crate::permissions::Permissions;
 use crate::unix_time::UnixTime;
 use crate::*;
 
@@ -26,6 +27,7 @@ pub trait Entry: Debug + Eq + PartialEq {
     fn mtime(&self) -> UnixTime;
     fn size(&self) -> Option<u64>;
     fn symlink_target(&self) -> &Option<String>;
+    fn dac(&self) -> Permissions;
 
     /// True if the metadata supports an assumption the file contents have
     /// not changed.
@@ -33,5 +35,6 @@ pub trait Entry: Debug + Eq + PartialEq {
         basis_entry.kind() == self.kind()
             && basis_entry.mtime() == self.mtime()
             && basis_entry.size() == self.size()
+            && basis_entry.dac() == self.dac()
     }
 }

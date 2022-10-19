@@ -22,6 +22,7 @@ use std::vec;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
+use crate::permissions::Permissions;
 use crate::stats::{IndexReadStats, IndexWriterStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
@@ -48,6 +49,9 @@ pub struct IndexEntry {
     /// File modification time, in whole seconds past the Unix epoch.
     #[serde(default)]
     pub mtime: i64,
+
+    /// Discretionary Access Control permissions (such as read/write/execute on unix)
+    pub dac: Permissions,
 
     /// Fractional nanoseconds for modification time.
     ///
@@ -103,6 +107,10 @@ impl Entry for IndexEntry {
     fn symlink_target(&self) -> &Option<String> {
         &self.target
     }
+
+    fn dac(&self) -> Permissions {
+        self.dac
+    }
 }
 
 impl IndexEntry {
@@ -120,6 +128,7 @@ impl IndexEntry {
             target: source.symlink_target().clone(),
             mtime: mtime.secs,
             mtime_nanos: mtime.nanosecs,
+            dac: source.dac(),
         }
     }
 }
@@ -511,6 +520,7 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            dac: Permissions::default(),
         }
     }
 
@@ -523,6 +533,7 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            dac: Permissions::default(),
         }];
         let index_json = serde_json::to_string(&entries).unwrap();
         println!("{}", index_json);

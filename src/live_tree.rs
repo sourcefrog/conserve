@@ -18,6 +18,7 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
+use crate::permissions::Permissions;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_time::UnixTime;
 use crate::*;
@@ -55,6 +56,7 @@ pub struct LiveEntry {
     mtime: UnixTime,
     size: Option<u64>,
     symlink_target: Option<String>,
+    dac: Permissions,
 }
 
 impl tree::ReadTree for LiveTree {
@@ -102,6 +104,10 @@ impl Entry for LiveEntry {
     fn symlink_target(&self) -> &Option<String> {
         &self.symlink_target
     }
+
+    fn dac(&self) -> Permissions {
+        self.dac
+    }
 }
 
 impl LiveEntry {
@@ -120,12 +126,14 @@ impl LiveEntry {
         } else {
             None
         };
+        let dac = Permissions::from(metadata.permissions());
         LiveEntry {
             apath,
             kind: metadata.file_type().into(),
             mtime,
             symlink_target,
             size,
+            dac,
         }
     }
 }

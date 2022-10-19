@@ -143,7 +143,10 @@ fn previous_existing_band(archive: &Archive, band_id: &BandId) -> Option<BandId>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_fixtures::{ScratchArchive, TreeFixture};
+    use crate::{
+        permissions::Permissions,
+        test_fixtures::{ScratchArchive, TreeFixture},
+    };
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
         IndexEntry {
@@ -153,6 +156,7 @@ mod test {
             mtime: 0,
             mtime_nanos: 0,
             addrs: Vec::new(),
+            dac: Permissions::default(),
         }
     }
 
