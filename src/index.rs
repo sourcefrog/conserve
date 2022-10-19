@@ -541,7 +541,8 @@ mod tests {
             index_json,
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
-             \"mtime\":1461736377}]"
+             \"mtime\":1461736377
+             \"dac\":{\"mode\":436}}]"
         );
     }
 
@@ -596,7 +597,7 @@ mod tests {
         assert_eq!(stats.index_hunks, 1);
         assert!(stats.compressed_index_bytes > 30);
         assert!(
-            stats.compressed_index_bytes < 70,
+            stats.compressed_index_bytes < 90,
             "expected shorter compressed index: {}",
             stats.compressed_index_bytes
         );
