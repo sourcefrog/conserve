@@ -34,7 +34,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Permissions {
-    mode: u32,
+    pub mode: u32,
 }
 impl Default for Permissions {
     fn default() -> Self {
