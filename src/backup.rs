@@ -117,7 +117,7 @@ pub fn backup(
                 }
                 Ok(Some(diff_kind)) => {
                     if options.print_filenames && diff_kind != DiffKind::Unchanged {
-                        writeln!(view, "{} {} {:o}", diff_kind.as_sigil(), entry.apath(), entry.dac().mode)?;
+                        writeln!(view, "{} {} 0o{:o}", diff_kind.as_sigil(), entry.apath(), entry.dac().mode)?;
                     }
                     view.update(|model| match diff_kind {
                         DiffKind::Changed => model.entries_changed += 1,
