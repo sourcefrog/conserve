@@ -54,7 +54,7 @@ fn exclude_simple_glob() {
         .arg(&af.path())
         .arg(&src.path())
         .assert()
-        .stdout("+ /src/hello.c\n")
+        .stdout("+ /src/hello.c 0o100644\n")
         .success();
 
     run_conserve()
@@ -80,7 +80,7 @@ fn exclude_glob_only_in_root() {
         .arg(&af.path())
         .arg(&src.path())
         .assert()
-        .stdout("+ /src/hello.c\n+ /src/hello.o\n")
+        .stdout("+ /src/hello.c 0o100644\n+ /src/hello.o 0o100644\n")
         .success();
 
     run_conserve()

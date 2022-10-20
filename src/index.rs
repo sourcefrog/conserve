@@ -51,6 +51,7 @@ pub struct IndexEntry {
     pub mtime: i64,
 
     /// Discretionary Access Control permissions (such as read/write/execute on unix)
+    #[serde(default)]
     pub dac: Permissions,
 
     /// Fractional nanoseconds for modification time.
@@ -542,7 +543,7 @@ mod tests {
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
              \"mtime\":1461736377,\
-             \"dac\":{\"mode\":436}}]"
+             \"dac\":{\"mode\":33279}}]"
         );
     }
 
@@ -597,7 +598,7 @@ mod tests {
         assert_eq!(stats.index_hunks, 1);
         assert!(stats.compressed_index_bytes > 30);
         assert!(
-            stats.compressed_index_bytes < 90,
+            stats.compressed_index_bytes <= 90,
             "expected shorter compressed index: {}",
             stats.compressed_index_bytes
         );

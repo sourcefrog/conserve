@@ -38,7 +38,7 @@ pub struct Permissions {
 }
 impl Default for Permissions {
     fn default() -> Self {
-        Self { mode: 0o664 }
+        Self { mode: 0o100777 }
     }
 }
 #[cfg(not(unix))]
@@ -48,8 +48,8 @@ impl From<std::fs::Permissions> for Permissions {
             // set the user class write bit based on readonly status
             // the rest of the bits are left in the default state
             mode: match p.readonly() {
-                true => 0o444,
-                false => 0o664,
+                true => 0o100444,
+                false => 0o100664,
             },
         }
     }

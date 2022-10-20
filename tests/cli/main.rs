@@ -220,10 +220,10 @@ fn basic_backup() {
         .success()
         .stderr(predicate::str::is_empty())
         .stdout(predicate::str::starts_with(
-            "/\n\
-             /hello\n\
-             /subdir\n\
-             /subdir/subfile\n\
+            "/ 0o40775\n\
+             /hello 0o100664\n\
+             /subdir 0o40775\n\
+             /subdir/subfile 0o100664\n\
              Restore complete.\n",
         ));
 

@@ -31,5 +31,5 @@ fn backup_verbose() {
         .arg(src.path())
         .assert()
         .success()
-        .stdout("+ /subdir/a\n+ /subdir/b\n");
+        .stdout("+ /subdir/a 0o100644\n+ /subdir/b 0o100644\n");
 }
