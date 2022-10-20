@@ -105,7 +105,7 @@ pub fn restore(
     )?;
     for entry in entry_iter {
         if options.print_filenames {
-            progress_bar.message(&format!("{}\n", entry.apath()));
+            progress_bar.message(&format!("{} 0o{:o}\n", entry.apath(), entry.dac().mode));
         }
         progress_bar.update(|model| model.filename = entry.apath().to_string());
         if let Err(e) = match entry.kind() {
