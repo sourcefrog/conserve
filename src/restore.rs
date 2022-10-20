@@ -23,6 +23,7 @@ use filetime::{set_file_handle_times, set_symlink_file_times};
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
+use crate::permissions::Permissions;
 use crate::stats::RestoreStats;
 use crate::unix_time::UnixTime;
 use crate::*;
@@ -148,6 +149,7 @@ pub fn restore(
 pub struct RestoreTree {
     path: PathBuf,
 
+    dir_permissions: Vec<(PathBuf, Permissions)>,
     dir_mtimes: Vec<(PathBuf, UnixTime)>,
 }
 
@@ -156,6 +158,7 @@ impl RestoreTree {
         RestoreTree {
             path,
             dir_mtimes: Vec::new(),
+            dir_permissions: Vec::new(),
         }
     }
 
@@ -182,6 +185,11 @@ impl RestoreTree {
     }
 
     fn finish(self) -> Result<RestoreStats> {
+        for (path, dac) in self.dir_permissions {
+            if let Err(err) = fs::set_permissions(path, dac.into()) {
+                ui::problem(&format!("Failed to set directory permissions: {:?}", err));
+            }
+        }
         for (path, time) in self.dir_mtimes {
             if let Err(err) = filetime::set_file_mtime(path, time.into()) {
                 ui::problem(&format!("Failed to set directory mtime: {:?}", err));
@@ -197,7 +205,8 @@ impl RestoreTree {
                 return Err(Error::Restore { path, source });
             }
         }
-        self.dir_mtimes.push((path, entry.mtime()));
+        self.dir_mtimes.push((path.clone(), entry.mtime()));
+        self.dir_permissions.push((path, entry.dac()));
         Ok(())
     }
 
@@ -207,7 +216,6 @@ impl RestoreTree {
         source_entry: &R::Entry,
         from_tree: &R,
     ) -> Result<RestoreStats> {
-        // TODO: Restore permissions.
         let path = self.rooted_path(source_entry.apath());
         let restore_err = |source| Error::Restore {
             path: path.clone(),
@@ -226,6 +234,9 @@ impl RestoreTree {
                 source,
             }
         })?;
+        // Restore permissions
+        let dac = source_entry.dac();
+        fs::set_permissions(path, dac.into())?;
 
         // TODO: Accumulate more stats.
         Ok(RestoreStats {

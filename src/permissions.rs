@@ -45,6 +45,8 @@ impl Default for Permissions {
 impl From<std::fs::Permissions> for Permissions {
     fn from(p: std::fs::Permissions) -> Self {
         Self {
+            // set the user class write bit based on readonly status
+            // the rest of the bits are left in the default state
             mode: match p.readonly() {
                 true => 0o444,
                 false => 0o664,
@@ -52,10 +54,25 @@ impl From<std::fs::Permissions> for Permissions {
         }
     }
 }
+#[cfg(windows)]
+impl Into<std::fs::Permissions> for Permissions {
+    fn into(self) -> std::fs::Permissions {
+        // TODO: Actually implement the windows compatibility
+        // basically we just need to extract the readonly bit from the mode,
+        // but I can't figure out how to instantiate
+        std::fs::Permissions::from(std::sys::windows::fs_imp::FilePermissions::new(self.readonly))
+    }
+}
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 impl From<std::fs::Permissions> for Permissions {
     fn from(p: std::fs::Permissions) -> Self {
         Self { mode: p.mode() }
+    }
+}
+#[cfg(unix)]
+impl From<Permissions> for std::fs::Permissions {
+    fn from(p: Permissions) -> Self {
+        std::fs::Permissions::from_mode(p.mode)
     }
 }
