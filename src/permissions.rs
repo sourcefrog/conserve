@@ -29,6 +29,7 @@
 //! On windows systems, files can be either read-only or writeable. For cross-compatibility,
 //! the mode is always stored using the unix format, where the read-only state is stored
 //! using the write bit in the user class.
+//! TODO: Implement windows compatibility.
 //!
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +39,21 @@ pub struct Permissions {
 }
 impl Default for Permissions {
     fn default() -> Self {
+        // created with full permission so that restoring old archives works properly
+        // might want to rework the tests so that this isn't necessary
         Self { mode: 0o100777 }
+    }
+}
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+impl From<std::fs::Permissions> for Permissions {
+    fn from(p: std::fs::Permissions) -> Self {
+        Self { mode: p.mode() }
+    }
+}
+impl From<Permissions> for std::fs::Permissions {
+    fn from(p: Permissions) -> Self {
+        std::fs::Permissions::from_mode(p.mode)
     }
 }
 #[cfg(not(unix))]
@@ -47,6 +62,7 @@ impl From<std::fs::Permissions> for Permissions {
         Self {
             // set the user class write bit based on readonly status
             // the rest of the bits are left in the default state
+            // TODO: fix this and test on windows
             mode: match p.readonly() {
                 true => 0o100444,
                 false => 0o100664,
@@ -61,18 +77,5 @@ impl Into<std::fs::Permissions> for Permissions {
         // basically we just need to extract the readonly bit from the mode,
         // but I can't figure out how to instantiate
         std::fs::Permissions::from(std::sys::windows::fs_imp::FilePermissions::new(self.readonly))
-    }
-}
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-impl From<std::fs::Permissions> for Permissions {
-    fn from(p: std::fs::Permissions) -> Self {
-        Self { mode: p.mode() }
-    }
-}
-#[cfg(unix)]
-impl From<Permissions> for std::fs::Permissions {
-    fn from(p: Permissions) -> Self {
-        std::fs::Permissions::from_mode(p.mode)
     }
 }
