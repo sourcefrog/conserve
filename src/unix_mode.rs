@@ -43,7 +43,7 @@ impl Default for UnixMode {
     fn default() -> Self {
         // created with full permission so that restoring old archives works properly
         // TODO: might want to rework the tests so that this isn't necessary
-        Self { mode: 0o100777 }
+        Self { mode: 0o100775 }
     }
 }
 impl fmt::Display for UnixMode {

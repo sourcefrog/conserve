@@ -543,7 +543,7 @@ mod tests {
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
              \"mtime\":1461736377,\
-             \"umode\":{\"mode\":33279}}]"
+             \"umode\":{\"mode\":33277}}]"
         );
     }
 
