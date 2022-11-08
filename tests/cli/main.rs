@@ -104,10 +104,10 @@ fn basic_backup() {
         .success()
         .stderr(predicate::str::is_empty())
         .stdout(
-            "/\n\
-             /hello\n\
-             /subdir\n\
-             /subdir/subfile\n",
+            "rwxrwxr-x /\n\
+             rw-rw-r-- /hello\n\
+             rwxrwxr-x /subdir\n\
+             rw-rw-r-- /subdir/subfile\n",
         );
 
     run_conserve()
@@ -199,10 +199,10 @@ fn basic_backup() {
         .success()
         .stderr(predicate::str::is_empty())
         .stdout(
-            "/\n\
-             /hello\n\
-             /subdir\n\
-             /subdir/subfile\n",
+            "rwxrwxr-x /\n\
+             rw-rw-r-- /hello\n\
+             rwxrwxr-x /subdir\n\
+             rw-rw-r-- /subdir/subfile\n",
         );
 
     // TODO: Factor out comparison to expected tree.
@@ -220,10 +220,10 @@ fn basic_backup() {
         .success()
         .stderr(predicate::str::is_empty())
         .stdout(predicate::str::starts_with(
-            "/ 0o40775\n\
-             /hello 0o100664\n\
-             /subdir 0o40775\n\
-             /subdir/subfile 0o100664\n\
+            "rwxrwxr-x /\n\
+             rw-rw-r-- /hello\n\
+             rwxrwxr-x /subdir\n\
+             rw-rw-r-- /subdir/subfile\n\
              Restore complete.\n",
         ));
 

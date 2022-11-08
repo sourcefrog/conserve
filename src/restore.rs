@@ -105,7 +105,7 @@ pub fn restore(
     )?;
     for entry in entry_iter {
         if options.print_filenames {
-            progress_bar.message(&format!("{} 0o{:o}\n", entry.apath(), entry.umode().mode));
+            progress_bar.message(&format!("{} {}\n", entry.umode(), entry.apath()));
         }
         progress_bar.update(|model| model.filename = entry.apath().to_string());
         if let Err(e) = match entry.kind() {
@@ -235,8 +235,8 @@ impl RestoreTree {
             }
         })?;
         // Restore permissions
-        let dac = source_entry.umode();
-        fs::set_permissions(path, dac.into())?;
+        let umode = source_entry.umode();
+        fs::set_permissions(path, umode.into())?;
 
         // TODO: Accumulate more stats.
         Ok(RestoreStats {

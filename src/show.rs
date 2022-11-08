@@ -120,7 +120,7 @@ pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
 pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(it: I, w: &mut dyn Write) -> Result<()> {
     let mut bw = BufWriter::new(w);
     for entry in it {
-        writeln!(bw, "{}", entry.apath())?;
+        writeln!(bw, "{} {}", entry.umode(), entry.apath())?;
     }
     Ok(())
 }
