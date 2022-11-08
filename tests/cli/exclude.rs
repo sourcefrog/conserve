@@ -54,7 +54,7 @@ fn exclude_simple_glob() {
         .arg(&af.path())
         .arg(&src.path())
         .assert()
-        .stdout("+ -rw-rw-r-- /src/hello.c\n")
+        .stdout("+ rw-rw-r-- /src/hello.c\n")
         .success();
 
     run_conserve()
@@ -80,7 +80,7 @@ fn exclude_glob_only_in_root() {
         .arg(&af.path())
         .arg(&src.path())
         .assert()
-        .stdout("+ -rw-rw-r-- /src/hello.c\n+ -rw-rw-r-- /src/hello.o\n")
+        .stdout("+ rw-rw-r-- /src/hello.c\n+ rw-rw-r-- /src/hello.o\n")
         .success();
 
     run_conserve()

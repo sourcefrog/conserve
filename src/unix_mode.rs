@@ -33,7 +33,7 @@
 //! TODO: Implement the sticky bit, SUID, SGID
 //!
 use serde::{Deserialize, Serialize};
-use std::{fs::Permissions, fmt};
+use std::{fmt, fs::Permissions};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct UnixMode {
@@ -48,19 +48,41 @@ impl Default for UnixMode {
 }
 impl fmt::Display for UnixMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let owner = (self.mode & 0o700)>>6;
-        let group = (self.mode & 0o070)>>3;
-        let all = self.mode & 0o007;
+        let sss = (self.mode & 0o7000) >> 9;
+        let owner = (self.mode & 0o0700) >> 6;
+        let group = (self.mode & 0o0070) >> 3;
+        let other = self.mode & 0o0007;
 
-        write!(f, "-")?;
-        let display_mode = &mut |bits: u32| -> fmt::Result {
-            write!(f, "{}", if (bits & 0b100) > 0 {'r'} else {'-'})?;
-            write!(f, "{}", if (bits & 0b010) > 0 {'w'} else {'-'})?;
-            write!(f, "{}", if (bits & 0b001) > 0 {'x'} else {'-'})
-        };
-        display_mode(owner)?;
-        display_mode(group)?;
-        display_mode(all)
+        // write!(f, "-")?; // describes type of entry - d for dir, l for link, etc.
+
+        // owner permissions
+        write!(f, "{}", if owner & 0b100 > 0 { 'r' } else { '-' })?;
+        write!(f, "{}", if owner & 0b010 > 0 { 'w' } else { '-' })?;
+        if sss == 0b100 {// Set UID
+            write!(f, "{}", if owner & 0b001 > 0 { 's' } else { 'S' })?;
+        } else {
+            write!(f, "{}", if owner & 0b001 > 0 { 'x' } else { '-' })?;
+        }
+
+        // group permissions
+        write!(f, "{}", if group & 0b100 > 0 { 'r' } else { '-' })?;
+        write!(f, "{}", if group & 0b010 > 0 { 'w' } else { '-' })?;
+        if sss == 0b010 {// Set GID
+            write!(f, "{}", if group & 0b001 > 0 { 's' } else { 'S' })?;
+        } else {
+            write!(f, "{}", if group & 0b001 > 0 { 'x' } else { '-' })?;
+        }
+
+        // other permissions
+        write!(f, "{}", if other & 0b100 > 0 { 'r' } else { '-' })?;
+        write!(f, "{}", if other & 0b010 > 0 { 'w' } else { '-' })?;
+        if sss == 0b001 {// sticky
+            write!(f, "{}", if other & 0b001 > 0 { 't' } else { 'T' })?;
+        } else {
+            write!(f, "{}", if other & 0b001 > 0 { 'x' } else { '-' })?;
+        }
+
+        Ok(())
     }
 }
 #[cfg(unix)]
@@ -70,7 +92,8 @@ impl From<Permissions> for UnixMode {
     fn from(p: Permissions) -> Self {
         Self { mode: p.mode() }
     }
-}impl From<u32> for UnixMode {
+}
+impl From<u32> for UnixMode {
     fn from(mode: u32) -> Self {
         Self { mode }
     }
@@ -108,9 +131,15 @@ mod tests {
     use crate::unix_mode::UnixMode;
     #[test]
     fn display_unix_modes() {
-        assert_eq!("-rwxrwxr--", format!("{}", UnixMode::from(0o774)));
-        assert_eq!("-rwxr-xr-x", format!("{}", UnixMode::from(0o755)));
-        assert_eq!("-rwxr---wx", format!("{}", UnixMode::from(0o743)));
-        assert_eq!("----r---wx", format!("{}", UnixMode::from(0o043)));
+        assert_eq!("rwxrwxr--", format!("{}", UnixMode::from(0o774)));
+        assert_eq!("rwxr-xr-x", format!("{}", UnixMode::from(0o755)));
+        assert_eq!("rwxr---wx", format!("{}", UnixMode::from(0o743)));
+        assert_eq!("---r---wx", format!("{}", UnixMode::from(0o043)));
+        assert_eq!("rwsr-xr-x", format!("{}", UnixMode::from(0o4755)));
+        assert_eq!("rwxr-sr-x", format!("{}", UnixMode::from(0o2755)));
+        assert_eq!("rwxr-xr-t", format!("{}", UnixMode::from(0o1755)));
+        assert_eq!("rwxrwxr-T", format!("{}", UnixMode::from(0o1774)));
+        assert_eq!("rwxr-S-wx", format!("{}", UnixMode::from(0o2743)));
+        assert_eq!("--Sr---wx", format!("{}", UnixMode::from(0o4043)));
     }
 }
