@@ -144,7 +144,7 @@ fn previous_existing_band(archive: &Archive, band_id: &BandId) -> Option<BandId>
 mod test {
     use super::*;
     use crate::{
-        permissions::Permissions,
+        unix_mode::UnixMode,
         test_fixtures::{ScratchArchive, TreeFixture},
     };
 
@@ -156,7 +156,7 @@ mod test {
             mtime: 0,
             mtime_nanos: 0,
             addrs: Vec::new(),
-            dac: Permissions::default(),
+            umode: UnixMode::default(),
         }
     }
 

@@ -29,36 +29,60 @@
 //! On windows systems, files can be either read-only or writeable. For cross-compatibility,
 //! the mode is always stored using the unix format, where the read-only state is stored
 //! using the write bit in the user class.
-//! TODO: Implement windows compatibility.
+//! TODO: Properly implement and test Windows compatibility.
+//! TODO: Implement the sticky bit, SUID, SGID
 //!
 use serde::{Deserialize, Serialize};
+use std::{fs::Permissions, fmt};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Permissions {
+pub struct UnixMode {
     pub mode: u32,
 }
-impl Default for Permissions {
+impl Default for UnixMode {
     fn default() -> Self {
         // created with full permission so that restoring old archives works properly
-        // might want to rework the tests so that this isn't necessary
+        // TODO: might want to rework the tests so that this isn't necessary
         Self { mode: 0o100777 }
+    }
+}
+impl fmt::Display for UnixMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let owner = (self.mode & 0o700)>>6;
+        let group = (self.mode & 0o070)>>3;
+        let all = self.mode & 0o007;
+
+        write!(f, "-")?;
+        let display_mode = &mut |bits: u32| -> fmt::Result {
+            write!(f, "{}", if (bits & 0b100) > 0 {'r'} else {'-'})?;
+            write!(f, "{}", if (bits & 0b010) > 0 {'w'} else {'-'})?;
+            write!(f, "{}", if (bits & 0b001) > 0 {'x'} else {'-'})
+        };
+        display_mode(owner)?;
+        display_mode(group)?;
+        display_mode(all)
     }
 }
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-impl From<std::fs::Permissions> for Permissions {
-    fn from(p: std::fs::Permissions) -> Self {
+
+impl From<Permissions> for UnixMode {
+    fn from(p: Permissions) -> Self {
         Self { mode: p.mode() }
     }
+}impl From<u32> for UnixMode {
+    fn from(mode: u32) -> Self {
+        Self { mode }
+    }
 }
-impl From<Permissions> for std::fs::Permissions {
-    fn from(p: Permissions) -> Self {
-        std::fs::Permissions::from_mode(p.mode)
+impl From<UnixMode> for Permissions {
+    fn from(p: UnixMode) -> Self {
+        Permissions::from_mode(p.mode)
     }
 }
 #[cfg(not(unix))]
-impl From<std::fs::Permissions> for Permissions {
-    fn from(p: std::fs::Permissions) -> Self {
+impl From<Permissions> for UnixMode {
+    fn from(p: Permissions) -> Self {
         Self {
             // set the user class write bit based on readonly status
             // the rest of the bits are left in the default state
@@ -71,11 +95,22 @@ impl From<std::fs::Permissions> for Permissions {
     }
 }
 #[cfg(windows)]
-impl Into<std::fs::Permissions> for Permissions {
-    fn into(self) -> std::fs::Permissions {
-        // TODO: Actually implement the windows compatibility
-        // basically we just need to extract the readonly bit from the mode,
-        // but I can't figure out how to instantiate
-        std::fs::Permissions::from(std::sys::windows::fs_imp::FilePermissions::new(self.readonly))
+use std::sys::windows::fs_imp::FilePermissions;
+#[cfg(windows)]
+impl Into<Permissions> for UnixMode {
+    fn into(self) -> Permissions {
+        Permissions::from(FilePermissions::new(self.readonly))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::unix_mode::UnixMode;
+    #[test]
+    fn display_unix_modes() {
+        assert_eq!("-rwxrwxr--", format!("{}", UnixMode::from(0o774)));
+        assert_eq!("-rwxr-xr-x", format!("{}", UnixMode::from(0o755)));
+        assert_eq!("-rwxr---wx", format!("{}", UnixMode::from(0o743)));
+        assert_eq!("----r---wx", format!("{}", UnixMode::from(0o043)));
     }
 }

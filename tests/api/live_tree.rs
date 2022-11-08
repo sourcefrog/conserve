@@ -53,7 +53,7 @@ fn list_simple_directory() {
     );
 
     let repr = format!("{:?}", &result[6]);
-    let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: UnixTime \{ [^)]* \}, size: Some\(8\), symlink_target: None, dac: Permissions \{ mode: [0-9]+ \} \}"#).unwrap();
+    let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: UnixTime \{ [^)]* \}, size: Some\(8\), symlink_target: None, umode: UnixMode \{ mode: [0-9]+ \} \}"#).unwrap();
     assert!(re.is_match(&repr));
 
     // TODO: Somehow get the stats out of the iterator.

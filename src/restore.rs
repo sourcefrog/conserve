@@ -23,7 +23,7 @@ use filetime::{set_file_handle_times, set_symlink_file_times};
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
-use crate::permissions::Permissions;
+use crate::unix_mode::UnixMode;
 use crate::stats::RestoreStats;
 use crate::unix_time::UnixTime;
 use crate::*;
@@ -105,7 +105,7 @@ pub fn restore(
     )?;
     for entry in entry_iter {
         if options.print_filenames {
-            progress_bar.message(&format!("{} 0o{:o}\n", entry.apath(), entry.dac().mode));
+            progress_bar.message(&format!("{} 0o{:o}\n", entry.apath(), entry.umode().mode));
         }
         progress_bar.update(|model| model.filename = entry.apath().to_string());
         if let Err(e) = match entry.kind() {
@@ -149,7 +149,7 @@ pub fn restore(
 pub struct RestoreTree {
     path: PathBuf,
 
-    dir_permissions: Vec<(PathBuf, Permissions)>,
+    dir_umodes: Vec<(PathBuf, UnixMode)>,
     dir_mtimes: Vec<(PathBuf, UnixTime)>,
 }
 
@@ -158,7 +158,7 @@ impl RestoreTree {
         RestoreTree {
             path,
             dir_mtimes: Vec::new(),
-            dir_permissions: Vec::new(),
+            dir_umodes: Vec::new(),
         }
     }
 
@@ -185,8 +185,8 @@ impl RestoreTree {
     }
 
     fn finish(self) -> Result<RestoreStats> {
-        for (path, dac) in self.dir_permissions {
-            if let Err(err) = fs::set_permissions(path, dac.into()) {
+        for (path, umode) in self.dir_umodes {
+            if let Err(err) = fs::set_permissions(path, umode.into()) {
                 ui::problem(&format!("Failed to set directory permissions: {:?}", err));
             }
         }
@@ -206,7 +206,7 @@ impl RestoreTree {
             }
         }
         self.dir_mtimes.push((path.clone(), entry.mtime()));
-        self.dir_permissions.push((path, entry.dac()));
+        self.dir_umodes.push((path, entry.umode()));
         Ok(())
     }
 
@@ -235,7 +235,7 @@ impl RestoreTree {
             }
         })?;
         // Restore permissions
-        let dac = source_entry.dac();
+        let dac = source_entry.umode();
         fs::set_permissions(path, dac.into())?;
 
         // TODO: Accumulate more stats.

@@ -33,7 +33,6 @@ pub mod kind;
 pub mod live_tree;
 mod merge;
 pub(crate) mod misc;
-mod permissions;
 pub mod restore;
 pub mod show;
 pub mod stats;
@@ -44,6 +43,7 @@ pub mod test_fixtures;
 pub mod transport;
 mod tree;
 pub mod ui;
+mod unix_mode;
 pub mod unix_time;
 mod validate;
 

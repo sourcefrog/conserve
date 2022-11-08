@@ -22,7 +22,7 @@ use std::vec;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::permissions::Permissions;
+use crate::unix_mode::UnixMode;
 use crate::stats::{IndexReadStats, IndexWriterStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
@@ -52,7 +52,7 @@ pub struct IndexEntry {
 
     /// Discretionary Access Control permissions (such as read/write/execute on unix)
     #[serde(default)]
-    pub dac: Permissions,
+    pub umode: UnixMode,
 
     /// Fractional nanoseconds for modification time.
     ///
@@ -109,8 +109,8 @@ impl Entry for IndexEntry {
         &self.target
     }
 
-    fn dac(&self) -> Permissions {
-        self.dac
+    fn umode(&self) -> UnixMode {
+        self.umode
     }
 }
 
@@ -129,7 +129,7 @@ impl IndexEntry {
             target: source.symlink_target().clone(),
             mtime: mtime.secs,
             mtime_nanos: mtime.nanosecs,
-            dac: source.dac(),
+            umode: source.umode(),
         }
     }
 }
@@ -521,7 +521,7 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            dac: Permissions::default(),
+            umode: UnixMode::default(),
         }
     }
 
@@ -534,7 +534,7 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            dac: Permissions::default(),
+            umode: UnixMode::default(),
         }];
         let index_json = serde_json::to_string(&entries).unwrap();
         println!("{}", index_json);
@@ -543,7 +543,7 @@ mod tests {
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
              \"mtime\":1461736377,\
-             \"dac\":{\"mode\":33279}}]"
+             \"umode\":{\"mode\":33279}}]"
         );
     }
 
