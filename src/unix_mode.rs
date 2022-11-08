@@ -30,7 +30,6 @@
 //! the mode is always stored using the unix format, where the read-only state is stored
 //! using the write bit in the user class.
 //! TODO: Properly implement and test Windows compatibility.
-//! TODO: Implement the sticky bit, SUID, SGID
 //!
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs::Permissions};
@@ -41,8 +40,8 @@ pub struct UnixMode {
 }
 impl Default for UnixMode {
     fn default() -> Self {
-        // created with full permission so that restoring old archives works properly
-        // TODO: might want to rework the tests so that this isn't necessary
+        // created with execute permission so that restoring old archives works properly
+        // TODO: ideally we would set this based on the inode type read from the archive
         Self { mode: 0o100775 }
     }
 }
@@ -52,8 +51,6 @@ impl fmt::Display for UnixMode {
         let owner = (self.mode & 0o0700) >> 6;
         let group = (self.mode & 0o0070) >> 3;
         let other = self.mode & 0o0007;
-
-        // write!(f, "-")?; // describes type of entry - d for dir, l for link, etc.
 
         // owner permissions
         write!(f, "{}", if owner & 0b100 > 0 { 'r' } else { '-' })?;
