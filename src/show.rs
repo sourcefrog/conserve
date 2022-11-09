@@ -117,10 +117,18 @@ pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
         .map_err(|source| Error::SerializeIndex { source })
 }
 
-pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(it: I, w: &mut dyn Write) -> Result<()> {
+pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(
+    it: I,
+    w: &mut dyn Write,
+    long_listing: bool,
+) -> Result<()> {
     let mut bw = BufWriter::new(w);
     for entry in it {
-        writeln!(bw, "{} {}", entry.umode(), entry.apath())?;
+        if long_listing {
+            writeln!(bw, "{} {}", entry.umode(), entry.apath())?;
+        } else {
+            writeln!(bw, "{}", entry.apath())?;
+        }
     }
     Ok(())
 }

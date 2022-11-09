@@ -23,8 +23,8 @@ use filetime::{set_file_handle_times, set_symlink_file_times};
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
-use crate::unix_mode::UnixMode;
 use crate::stats::RestoreStats;
+use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
 use crate::*;
 
@@ -38,6 +38,8 @@ pub struct RestoreOptions {
     pub overwrite: bool,
     // The band to select, or by default the last complete one.
     pub band_selection: BandSelectionPolicy,
+    /// If printing filenames, include metadata such as file permissions
+    pub long_listing: bool,
 }
 
 impl Default for RestoreOptions {
@@ -48,6 +50,7 @@ impl Default for RestoreOptions {
             band_selection: BandSelectionPolicy::LatestClosed,
             exclude: Exclude::nothing(),
             only_subtree: None,
+            long_listing: false,
         }
     }
 }
@@ -105,7 +108,11 @@ pub fn restore(
     )?;
     for entry in entry_iter {
         if options.print_filenames {
-            progress_bar.message(&format!("{} {}\n", entry.umode(), entry.apath()));
+            if options.long_listing {
+                progress_bar.message(&format!("{} {}\n", entry.umode(), entry.apath()));
+            } else {
+                progress_bar.message(&format!("{}\n", entry.apath()));
+            }
         }
         progress_bar.update(|model| model.filename = entry.apath().to_string());
         if let Err(e) = match entry.kind() {

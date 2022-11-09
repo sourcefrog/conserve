@@ -54,14 +54,14 @@ fn exclude_simple_glob() {
         .arg(&af.path())
         .arg(&src.path())
         .assert()
-        .stdout("+ rw-r--r-- /src/hello.c\n")
+        .stdout("+ /src/hello.c\n")
         .success();
 
     run_conserve()
         .args(&["ls"])
         .arg(&af.path())
         .assert()
-        .stdout("rwxr-xr-x /\nrwxr-xr-x /src\nrw-r--r-- /src/hello.c\n")
+        .stdout("/\n/src\n/src/hello.c\n")
         .success();
 }
 
@@ -80,14 +80,14 @@ fn exclude_glob_only_in_root() {
         .arg(&af.path())
         .arg(&src.path())
         .assert()
-        .stdout("+ rw-r--r-- /src/hello.c\n+ rw-r--r-- /src/hello.o\n")
+        .stdout("+ /src/hello.c\n+ /src/hello.o\n")
         .success();
 
     run_conserve()
         .args(&["ls"])
         .arg(&af.path())
         .assert()
-        .stdout("rwxr-xr-x /\nrwxr-xr-x /src\nrw-r--r-- /src/hello.c\nrw-r--r-- /src/hello.o\n")
+        .stdout("/\n/src\n/src/hello.c\n/src/hello.o\n")
         .success();
 }
 
@@ -117,7 +117,7 @@ fn exclude_suffix_pattern() {
         .args(&["ls"])
         .arg(&af.path())
         .assert()
-        .stdout("rwxr-xr-x /\nrwxr-xr-x /release\nrwxr-xr-x /src\nrwxr-xr-x /subproj\nrwxr-xr-x /target\nrw-r--r-- /src/hello.rs\nrwxr-xr-x /subproj/target\n")
+        .stdout("/\n/release\n/src\n/subproj\n/target\n/src/hello.rs\n/subproj/target\n")
         .success();
 }
 

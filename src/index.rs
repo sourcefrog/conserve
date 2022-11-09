@@ -22,10 +22,10 @@ use std::vec;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::unix_mode::UnixMode;
 use crate::stats::{IndexReadStats, IndexWriterStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
+use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
 use crate::*;
 

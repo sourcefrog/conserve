@@ -144,8 +144,8 @@ fn previous_existing_band(archive: &Archive, band_id: &BandId) -> Option<BandId>
 mod test {
     use super::*;
     use crate::{
-        unix_mode::UnixMode,
         test_fixtures::{ScratchArchive, TreeFixture},
+        unix_mode::UnixMode,
     };
 
     fn symlink(name: &str, target: &str) -> IndexEntry {

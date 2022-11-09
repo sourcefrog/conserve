@@ -55,7 +55,8 @@ impl fmt::Display for UnixMode {
         // owner permissions
         write!(f, "{}", if owner & 0b100 > 0 { 'r' } else { '-' })?;
         write!(f, "{}", if owner & 0b010 > 0 { 'w' } else { '-' })?;
-        if sss == 0b100 {// Set UID
+        if sss == 0b100 {
+            // Set UID
             write!(f, "{}", if owner & 0b001 > 0 { 's' } else { 'S' })?;
         } else {
             write!(f, "{}", if owner & 0b001 > 0 { 'x' } else { '-' })?;
@@ -64,7 +65,8 @@ impl fmt::Display for UnixMode {
         // group permissions
         write!(f, "{}", if group & 0b100 > 0 { 'r' } else { '-' })?;
         write!(f, "{}", if group & 0b010 > 0 { 'w' } else { '-' })?;
-        if sss == 0b010 {// Set GID
+        if sss == 0b010 {
+            // Set GID
             write!(f, "{}", if group & 0b001 > 0 { 's' } else { 'S' })?;
         } else {
             write!(f, "{}", if group & 0b001 > 0 { 'x' } else { '-' })?;
@@ -73,7 +75,8 @@ impl fmt::Display for UnixMode {
         // other permissions
         write!(f, "{}", if other & 0b100 > 0 { 'r' } else { '-' })?;
         write!(f, "{}", if other & 0b010 > 0 { 'w' } else { '-' })?;
-        if sss == 0b001 {// sticky
+        if sss == 0b001 {
+            // sticky
             write!(f, "{}", if other & 0b001 > 0 { 't' } else { 'T' })?;
         } else {
             write!(f, "{}", if other & 0b001 > 0 { 'x' } else { '-' })?;

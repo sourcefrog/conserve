@@ -18,8 +18,8 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use crate::unix_mode::UnixMode;
 use crate::stats::LiveTreeIterStats;
+use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
 use crate::*;
 
