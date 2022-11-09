@@ -275,6 +275,85 @@ fn basic_backup() {
 }
 
 #[test]
+/// Verify the long listing "-l" option displays correctly, and that permissions
+/// and owner are backed up and restored correctly on unix
+#[cfg(unix)]
+fn long_listing() {
+    let testdir = TempDir::new().unwrap();
+    let arch_dir = testdir.path().join("a");
+
+    // conserve init
+    run_conserve()
+        .arg("init")
+        .arg(&arch_dir)
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with("Created new archive"));
+
+    let src: PathBuf = "./testdata/tree/minimal".into();
+    assert!(src.is_dir());
+
+    use conserve::owner::Owner;
+    use conserve::unix_mode::UnixMode;
+    use std::os::unix::fs::MetadataExt;
+
+    fn get_user_group(metadata: &std::fs::Metadata) -> (String, String) {
+        (
+            match users::get_user_by_uid(metadata.uid()) {
+                Some(user) => user.name().to_string_lossy().to_string(),
+                None => "none".to_string(),
+            },
+            match users::get_group_by_gid(metadata.gid()) {
+                Some(group) => group.name().to_string_lossy().to_string(),
+                None => "none".to_string(),
+            },
+        )
+    }
+
+    let mut path = src.clone();
+    let mut mdata = std::fs::metadata(&path).expect("Unable to read / metadata");
+
+    let mut expected = format!(
+        "{} {} /\n",
+        UnixMode::from(mdata.permissions()),
+        Owner::from(&mdata)
+    );
+    path.push("hello");
+    mdata = std::fs::metadata(&path).expect("Unable to read /hello metadata");
+    expected.push_str(&format!(
+        "{} {} /hello\n",
+        UnixMode::from(mdata.permissions()),
+        Owner::from(&mdata)
+    ));
+
+    path.pop();
+    path.push("subdir");
+    mdata = std::fs::metadata(&path).expect("Unable to read /subdir metadata");
+    expected.push_str(&format!(
+        "{} {} /subdir\n",
+        UnixMode::from(mdata.permissions()),
+        Owner::from(&mdata)
+    ));
+
+    path.push("subfile");
+    mdata = std::fs::metadata(&path).expect("Unable to read /subdir/subfile metadata");
+    expected.push_str(&format!(
+        "{} {} /subdir/subfile\n",
+        UnixMode::from(mdata.permissions()),
+        Owner::from(&mdata)
+    ));
+
+    run_conserve()
+        .args(&["ls", "-l", "--source"])
+        .arg(&src)
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(expected);
+}
+
+#[test]
 fn empty_archive() {
     let tempdir = TempDir::new().unwrap();
     let adir = tempdir.path().join("archive");

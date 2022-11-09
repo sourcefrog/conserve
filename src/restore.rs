@@ -264,9 +264,12 @@ impl RestoreTree {
                 None
             };
             // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
-            unistd::chown(&path, uid.map(unistd::Uid::from_raw), gid.map(unistd::Gid::from_raw)).map_err(|err| {
-                std::io::Error::from(err)
-            })?;
+            unistd::chown(
+                &path,
+                uid.map(unistd::Uid::from_raw),
+                gid.map(unistd::Gid::from_raw),
+            )
+            .map_err(|err| std::io::Error::from(err))?;
         }
 
         // TODO: Accumulate more stats.

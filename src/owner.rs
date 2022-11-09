@@ -69,3 +69,5 @@ impl From<&Metadata> for Owner {
         }
     }
 }
+
+pub const UNAME_REGEX: &'static str = "[a-z_][a-z0-9_-]*[$]? ";
