@@ -12,6 +12,11 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+//! Stores the user and group as Strings in the archive.
+//! There is potentially a more efficient way to do this, but this approach works
+//! better than just saving the uid and gid, so that backups may potentially
+//! be restored on a different system.
+
 use serde::{Deserialize, Serialize};
 
 #[cfg(unix)]
