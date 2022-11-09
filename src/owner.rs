@@ -66,7 +66,7 @@ impl From<&Metadata> for Owner {
         Self { user, group }
     }
     #[cfg(not(unix))]
-    fn from(_: Metadata) -> Self {
+    fn from(_: &Metadata) -> Self {
         // TODO: Implement Windows user/group functionality
         Self {
             user: None,
