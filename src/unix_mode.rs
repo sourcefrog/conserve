@@ -45,6 +45,11 @@ impl Default for UnixMode {
         Self { mode: 0o100775 }
     }
 }
+impl UnixMode {
+    pub fn readonly(self) -> bool {
+        self.mode & 0o000400 > 0
+    }
+}
 impl fmt::Display for UnixMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let sss = (self.mode & 0o7000) >> 9;
@@ -137,12 +142,6 @@ impl From<Permissions> for UnixMode {
                 false => 0o100775,
             },
         }
-    }
-}
-#[cfg(not(unix))]
-impl From<UnixMode> for Permissions {
-    fn from(p: UnixMode) -> Self {
-        Permissions::from(p.mode & 0o000400 > 0)
     }
 }
 
