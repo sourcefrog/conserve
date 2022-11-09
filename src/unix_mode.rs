@@ -90,6 +90,24 @@ impl From<u32> for UnixMode {
         Self { mode }
     }
 }
+impl From<&str> for UnixMode {
+    // TODO: fix this - it won't work properly as is
+    fn from(s: &str) -> Self {
+        let mut mode = 0;
+        for c in s.chars() {
+            mode += match c {
+                'r' => 0b100,
+                'w' => 0b010,
+                'x' => 0b001,
+                _ => 0
+            };
+        }
+
+        Self {
+            mode
+        }
+    }
+}
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
