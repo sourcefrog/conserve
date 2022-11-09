@@ -201,14 +201,18 @@ impl RestoreTree {
             }
             #[cfg(not(unix))]
             {
-                fn set_permissions(path: PathBuf, readonly: bool) -> io::Result<()> {
-                    let mut p = std::fs::File::open(&path)?.metadata()?.permissions();
-                    p.set_readonly(readonly);
-                    fs::set_permissions(path, p)
-                }
-                if let Err(err) = set_permissions(path, umode.readonly()) {
-                    ui::problem(&format!("Failed to set directory permissions: {:?}", err));
-                }
+                ui::problem(&format!("Can't restore permissions on non-Unix: {}", path));
+                // TODO: Figure out why we're getting "NotFound" and "PermissionDenied"
+                // errors on windows.
+
+                // fn set_permissions(path: PathBuf, readonly: bool) -> io::Result<()> {
+                //     let mut p = std::fs::File::open(&path)?.metadata()?.permissions();
+                //     p.set_readonly(readonly);
+                //     fs::set_permissions(path, p)
+                // }
+                // if let Err(err) = set_permissions(path, umode.readonly()) {
+                //     ui::problem(&format!("Failed to set directory permissions: {:?}", err));
+                // }
             }
         }
         for (path, time) in self.dir_mtimes {
@@ -261,12 +265,16 @@ impl RestoreTree {
         fs::set_permissions(path, umode.into())?;
         #[cfg(not(unix))]
         {
-            fn set_permissions(path: PathBuf, readonly: bool) -> io::Result<()> {
-                let mut p = std::fs::File::open(&path)?.metadata()?.permissions();
-                p.set_readonly(readonly);
-                fs::set_permissions(path, p)
-            }
-            set_permissions(path, umode.readonly())?;
+            ui::problem(&format!("Can't restore permissions on non-Unix: {}", path));
+            // TODO: Figure out why we're getting "NotFound" and "PermissionDenied"
+            // errors on windows.
+
+            // fn set_permissions(path: PathBuf, readonly: bool) -> io::Result<()> {
+            //     let mut p = std::fs::File::open(&path)?.metadata()?.permissions();
+            //     p.set_readonly(readonly);
+            //     fs::set_permissions(path, p)
+            // }
+            // set_permissions(path, umode.readonly())?;
         }
 
         // TODO: Accumulate more stats.
