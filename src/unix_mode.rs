@@ -99,13 +99,11 @@ impl From<&str> for UnixMode {
                 'r' => 0b100,
                 'w' => 0b010,
                 'x' => 0b001,
-                _ => 0
+                _ => 0,
             };
         }
 
-        Self {
-            mode
-        }
+        Self { mode }
     }
 }
 
