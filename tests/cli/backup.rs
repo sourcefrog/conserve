@@ -26,10 +26,10 @@ fn backup_verbose() {
     src.create_file("subdir/b");
 
     run_conserve()
-        .args(&["backup", "--no-stats", "-v", "-l"])
+        .args(&["backup", "--no-stats", "-v"])
         .arg(af.path())
         .arg(src.path())
         .assert()
         .success()
-        .stdout("+ rw-r--r-- /subdir/a\n+ rw-r--r-- /subdir/b\n");
+        .stdout("+ /subdir/a\n+ /subdir/b\n");
 }
