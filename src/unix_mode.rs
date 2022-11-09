@@ -85,6 +85,12 @@ impl fmt::Display for UnixMode {
         Ok(())
     }
 }
+impl From<u32> for UnixMode {
+    fn from(mode: u32) -> Self {
+        Self { mode }
+    }
+}
+
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
@@ -92,6 +98,12 @@ use std::os::unix::fs::PermissionsExt;
 impl From<Permissions> for UnixMode {
     fn from(p: Permissions) -> Self {
         Self { mode: p.mode() }
+    }
+}
+#[cfg(unix)]
+impl From<UnixMode> for Permissions {
+    fn from(p: UnixMode) -> Self {
+        Permissions::from_mode(p.mode)
     }
 }
 #[cfg(not(unix))]
@@ -106,17 +118,6 @@ impl From<Permissions> for UnixMode {
                 false => 0o100775,
             },
         }
-    }
-}
-impl From<u32> for UnixMode {
-    fn from(mode: u32) -> Self {
-        Self { mode }
-    }
-}
-#[cfg(unix)]
-impl From<UnixMode> for Permissions {
-    fn from(p: UnixMode) -> Self {
-        Permissions::from_mode(p.mode)
     }
 }
 
