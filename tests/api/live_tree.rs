@@ -53,7 +53,6 @@ fn list_simple_directory() {
     );
 
     let repr = format!("{:?}", &result[6]);
-    println!("{}", repr);
     let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: UnixTime \{ [^)]* \}, size: Some\(8\), symlink_target: None, umode: UnixMode \{ mode: [0-9]+ \}, owner: Owner \{ user: (Some\("[a-z_][a-z0-9_-]*[$]?"\)|None), group: (Some\("[a-z_][a-z0-9_-]*[$]?"\)|None) \} \}"#).unwrap();
     assert!(re.is_match(&repr));
 
