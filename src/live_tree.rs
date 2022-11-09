@@ -18,6 +18,7 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
+use crate::owner::Owner;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
@@ -57,6 +58,7 @@ pub struct LiveEntry {
     size: Option<u64>,
     symlink_target: Option<String>,
     umode: UnixMode,
+    owner: Owner,
 }
 
 impl tree::ReadTree for LiveTree {
@@ -108,6 +110,10 @@ impl Entry for LiveEntry {
     fn umode(&self) -> UnixMode {
         self.umode
     }
+
+    fn owner(&self) -> Owner {
+        self.owner.clone()
+    }
 }
 
 impl LiveEntry {
@@ -126,6 +132,7 @@ impl LiveEntry {
         } else {
             None
         };
+        let owner = Owner::from(metadata);
         let umode = UnixMode::from(metadata.permissions());
         LiveEntry {
             apath,
@@ -134,6 +141,7 @@ impl LiveEntry {
             symlink_target,
             size,
             umode,
+            owner,
         }
     }
 }

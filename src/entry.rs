@@ -17,6 +17,7 @@
 use std::fmt::Debug;
 
 use crate::kind::Kind;
+use crate::owner::Owner;
 use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
 use crate::*;
@@ -28,6 +29,7 @@ pub trait Entry: Debug + Eq + PartialEq {
     fn size(&self) -> Option<u64>;
     fn symlink_target(&self) -> &Option<String>;
     fn umode(&self) -> UnixMode;
+    fn owner(&self) -> Owner;
 
     /// True if the metadata supports an assumption the file contents have
     /// not changed.

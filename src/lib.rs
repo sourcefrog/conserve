@@ -33,6 +33,7 @@ pub mod kind;
 pub mod live_tree;
 mod merge;
 pub(crate) mod misc;
+mod owner;
 pub mod restore;
 pub mod show;
 pub mod stats;

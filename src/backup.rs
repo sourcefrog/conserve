@@ -124,9 +124,10 @@ pub fn backup(
                         if options.long_listing {
                             writeln!(
                                 view,
-                                "{} {} {}",
+                                "{} {} {} {}",
                                 diff_kind.as_sigil(),
                                 entry.umode(),
+                                entry.owner(),
                                 entry.apath()
                             )?;
                         } else {

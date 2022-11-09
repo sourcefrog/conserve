@@ -22,6 +22,7 @@ use std::vec;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
+use crate::owner::Owner;
 use crate::stats::{IndexReadStats, IndexWriterStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
@@ -53,6 +54,10 @@ pub struct IndexEntry {
     /// Discretionary Access Control permissions (such as read/write/execute on unix)
     #[serde(default)]
     pub umode: UnixMode,
+
+    /// User and Group names of the owners of the file
+    #[serde(default)]
+    pub owner: Owner,
 
     /// Fractional nanoseconds for modification time.
     ///
@@ -112,6 +117,10 @@ impl Entry for IndexEntry {
     fn umode(&self) -> UnixMode {
         self.umode
     }
+
+    fn owner(&self) -> Owner {
+        self.owner.clone()
+    }
 }
 
 impl IndexEntry {
@@ -130,6 +139,7 @@ impl IndexEntry {
             mtime: mtime.secs,
             mtime_nanos: mtime.nanosecs,
             umode: source.umode(),
+            owner: source.owner(),
         }
     }
 }
@@ -521,7 +531,8 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            umode: UnixMode::default(),
+            umode: Default::default(),
+            owner: Default::default(),
         }
     }
 
@@ -534,7 +545,8 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            umode: UnixMode::default(),
+            umode: Default::default(),
+            owner: Default::default(),
         }];
         let index_json = serde_json::to_string(&entries).unwrap();
         println!("{}", index_json);
@@ -543,7 +555,8 @@ mod tests {
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
              \"mtime\":1461736377,\
-             \"umode\":{\"mode\":33277}}]"
+             \"umode\":{\"mode\":33277},\
+             \"owner\":{\"user\":null,\"group\":null}}]"
         );
     }
 
@@ -598,12 +611,16 @@ mod tests {
         assert_eq!(stats.index_hunks, 1);
         assert!(stats.compressed_index_bytes > 30);
         assert!(
-            stats.compressed_index_bytes <= 90,
+            stats.compressed_index_bytes <= 122,
             "expected shorter compressed index: {}",
             stats.compressed_index_bytes
         );
         assert!(stats.uncompressed_index_bytes > 100);
-        assert!(stats.uncompressed_index_bytes < 200);
+        assert!(
+            stats.uncompressed_index_bytes < 250,
+            "expected shorter uncompressed index: {}",
+            stats.uncompressed_index_bytes
+        );
 
         assert!(
             std::fs::metadata(testdir.path().join("00000").join("000000000"))
