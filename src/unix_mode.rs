@@ -120,6 +120,12 @@ impl From<Permissions> for UnixMode {
         }
     }
 }
+#[cfg(not(unix))]
+impl From<UnixMode> for Permissions {
+    fn from(p: UnixMode) -> Self {
+        Permissions::from(self.mode & 0o000400 > 0)
+    }
+}
 
 #[cfg(test)]
 mod tests {
