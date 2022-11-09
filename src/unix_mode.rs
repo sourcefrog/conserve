@@ -47,7 +47,8 @@ impl Default for UnixMode {
 }
 impl UnixMode {
     pub fn readonly(self) -> bool {
-        self.mode & 0o000400 > 0
+        // determine if a file is readonly based on whether the owner can write it
+        self.mode & 0o000200 == 0
     }
 }
 impl fmt::Display for UnixMode {
