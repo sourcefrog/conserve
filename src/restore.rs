@@ -113,7 +113,12 @@ pub fn restore(
     for entry in entry_iter {
         if options.print_filenames {
             if options.long_listing {
-                progress_bar.message(&format!("{} {} {}\n", entry.umode(), entry.owner(), entry.apath()));
+                progress_bar.message(&format!(
+                    "{} {} {}\n",
+                    entry.umode(),
+                    entry.owner(),
+                    entry.apath()
+                ));
             } else {
                 progress_bar.message(&format!("{}\n", entry.apath()));
             }
@@ -269,7 +274,7 @@ impl RestoreTree {
                 uid.map(unistd::Uid::from_raw),
                 gid.map(unistd::Gid::from_raw),
             )
-            .map_err(|err| std::io::Error::from(err))?;
+            .map_err(std::io::Error::from)?;
         }
 
         // TODO: Accumulate more stats.
