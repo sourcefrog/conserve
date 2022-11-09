@@ -275,10 +275,8 @@ fn basic_backup() {
 }
 
 #[test]
-/// Verify the long listing "-l" option displays correctly, and that permissions
-/// and owner are backed up and restored correctly on unix
 #[cfg(unix)]
-fn long_listing() {
+fn backup_user_and_permissions() {
     let testdir = TempDir::new().unwrap();
     let arch_dir = testdir.path().join("a");
 
@@ -298,38 +296,40 @@ fn long_listing() {
     use conserve::unix_mode::UnixMode;
 
     let mut path = src.clone();
-    let mut mdata = std::fs::metadata(&path).expect("Unable to read / metadata");
 
+    let mdata_root = std::fs::metadata(&path).expect("Unable to read / metadata");
     let mut expected = format!(
         "{} {} /\n",
-        UnixMode::from(mdata.permissions()),
-        Owner::from(&mdata)
+        UnixMode::from(mdata_root.permissions()),
+        Owner::from(&mdata_root)
     );
     path.push("hello");
-    mdata = std::fs::metadata(&path).expect("Unable to read /hello metadata");
+    let mdata_hello = std::fs::metadata(&path).expect("Unable to read /hello metadata");
     expected.push_str(&format!(
         "{} {} /hello\n",
-        UnixMode::from(mdata.permissions()),
-        Owner::from(&mdata)
+        UnixMode::from(mdata_hello.permissions()),
+        Owner::from(&mdata_hello)
     ));
 
     path.pop();
     path.push("subdir");
-    mdata = std::fs::metadata(&path).expect("Unable to read /subdir metadata");
+    let mdata_subdir = std::fs::metadata(&path).expect("Unable to read /subdir metadata");
     expected.push_str(&format!(
         "{} {} /subdir\n",
-        UnixMode::from(mdata.permissions()),
-        Owner::from(&mdata)
+        UnixMode::from(mdata_subdir.permissions()),
+        Owner::from(&mdata_subdir)
     ));
 
     path.push("subfile");
-    mdata = std::fs::metadata(&path).expect("Unable to read /subdir/subfile metadata");
+    let mdata_subdir_subfile =
+        std::fs::metadata(&path).expect("Unable to read /subdir/subfile metadata");
     expected.push_str(&format!(
         "{} {} /subdir/subfile\n",
-        UnixMode::from(mdata.permissions()),
-        Owner::from(&mdata)
+        UnixMode::from(mdata_subdir_subfile.permissions()),
+        Owner::from(&mdata_subdir_subfile)
     ));
 
+    // verify ls command
     run_conserve()
         .args(&["ls", "-l", "--source"])
         .arg(&src)
@@ -337,6 +337,54 @@ fn long_listing() {
         .success()
         .stderr(predicate::str::is_empty())
         .stdout(expected);
+
+    // backup
+    run_conserve()
+        .args(&["backup"])
+        .arg(&arch_dir)
+        .arg(&src)
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with("Backup complete.\n"));
+
+    let restore_dir = TempDir::new().unwrap();
+
+    // restore
+    run_conserve()
+        .args(["restore", "-v", "-l", "--no-progress"])
+        .arg(&arch_dir)
+        .arg(restore_dir.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with(format!(
+            "{} {} /\n\
+             {} {} /hello\n\
+             {} {} /subdir\n\
+             {} {} /subdir/subfile\n\
+             Restore complete.\n",
+            UnixMode::from(mdata_root.permissions()),
+            Owner::from(&mdata_root),
+            UnixMode::from(mdata_hello.permissions()),
+            Owner::from(&mdata_hello),
+            UnixMode::from(mdata_subdir.permissions()),
+            Owner::from(&mdata_subdir),
+            UnixMode::from(mdata_subdir_subfile.permissions()),
+            Owner::from(&mdata_subdir_subfile)
+        )));
+
+    restore_dir
+        .child("subdir")
+        .assert(predicate::path::is_dir());
+    restore_dir
+        .child("hello")
+        .assert(predicate::path::is_file())
+        .assert("hello world\n");
+    restore_dir
+        .child("subdir")
+        .child("subfile")
+        .assert("I like Rust\n");
 }
 
 #[test]

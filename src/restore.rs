@@ -113,7 +113,7 @@ pub fn restore(
     for entry in entry_iter {
         if options.print_filenames {
             if options.long_listing {
-                progress_bar.message(&format!("{} {}\n", entry.umode(), entry.apath()));
+                progress_bar.message(&format!("{} {} {}\n", entry.umode(), entry.owner(), entry.apath()));
             } else {
                 progress_bar.message(&format!("{}\n", entry.apath()));
             }
