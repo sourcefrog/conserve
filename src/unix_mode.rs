@@ -88,19 +88,10 @@ impl fmt::Display for UnixMode {
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
+#[cfg(unix)]
 impl From<Permissions> for UnixMode {
     fn from(p: Permissions) -> Self {
         Self { mode: p.mode() }
-    }
-}
-impl From<u32> for UnixMode {
-    fn from(mode: u32) -> Self {
-        Self { mode }
-    }
-}
-impl From<UnixMode> for Permissions {
-    fn from(p: UnixMode) -> Self {
-        Permissions::from_mode(p.mode)
     }
 }
 #[cfg(not(unix))]
@@ -111,18 +102,21 @@ impl From<Permissions> for UnixMode {
             // the rest of the bits are left in the default state
             // TODO: fix this and test on windows
             mode: match p.readonly() {
-                true => 0o100444,
-                false => 0o100664,
+                true => 0o100555,
+                false => 0o100775,
             },
         }
     }
 }
-#[cfg(windows)]
-use std::sys::windows::fs_imp::FilePermissions;
-#[cfg(windows)]
-impl Into<Permissions> for UnixMode {
-    fn into(self) -> Permissions {
-        Permissions::from(FilePermissions::new(self.readonly))
+impl From<u32> for UnixMode {
+    fn from(mode: u32) -> Self {
+        Self { mode }
+    }
+}
+#[cfg(unix)]
+impl From<UnixMode> for Permissions {
+    fn from(p: UnixMode) -> Self {
+        Permissions::from_mode(p.mode)
     }
 }
 
