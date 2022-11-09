@@ -91,10 +91,13 @@ impl From<u32> for UnixMode {
     }
 }
 impl From<&str> for UnixMode {
-    // TODO: fix this - it won't work properly as is
+    // TODO: implement set uid, set gid, and sticky
     fn from(s: &str) -> Self {
-        let mut mode = 0;
-        for c in s.chars() {
+        let mut mode: u32 = 0;
+        for (n, c) in s.chars().enumerate() {
+            if n % 3 == 0 {
+                mode <<= 3;
+            }
             mode += match c {
                 'r' => 0b100,
                 'w' => 0b010,
@@ -139,7 +142,7 @@ impl From<Permissions> for UnixMode {
 #[cfg(not(unix))]
 impl From<UnixMode> for Permissions {
     fn from(p: UnixMode) -> Self {
-        Permissions::from(self.mode & 0o000400 > 0)
+        Permissions::from(p.mode & 0o000400 > 0)
     }
 }
 
@@ -158,5 +161,12 @@ mod tests {
         assert_eq!("rwxrwxr-T", format!("{}", UnixMode::from(0o1774)));
         assert_eq!("rwxr-S-wx", format!("{}", UnixMode::from(0o2743)));
         assert_eq!("--Sr---wx", format!("{}", UnixMode::from(0o4043)));
+    }
+    #[test]
+    fn from_str() {
+        assert_eq!(UnixMode::from("rwxrwxr--"), UnixMode { mode: 0o774 });
+        assert_eq!(UnixMode::from("rwxr-xr-x"), UnixMode { mode: 0o755 });
+        assert_eq!(UnixMode::from("rwxr---wx"), UnixMode { mode: 0o743 });
+        assert_eq!(UnixMode::from("---r---wx"), UnixMode { mode: 0o043 });
     }
 }
