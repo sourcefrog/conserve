@@ -201,7 +201,7 @@ impl RestoreTree {
             }
             #[cfg(not(unix))]
             {
-                ui::problem(&format!("Can't restore permissions on non-Unix: {}", path));
+                ui::problem(&format!("Can't restore permissions on non-Unix: {:?}", path));
                 // TODO: Figure out why we're getting "NotFound" and "PermissionDenied"
                 // errors on windows.
 
@@ -265,7 +265,7 @@ impl RestoreTree {
         fs::set_permissions(path, umode.into())?;
         #[cfg(not(unix))]
         {
-            ui::problem(&format!("Can't restore permissions on non-Unix: {}", path));
+            ui::problem(&format!("Can't restore permissions on non-Unix: {:?}", path));
             // TODO: Figure out why we're getting "NotFound" and "PermissionDenied"
             // errors on windows.
 
