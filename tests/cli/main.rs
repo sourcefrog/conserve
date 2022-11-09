@@ -296,20 +296,6 @@ fn long_listing() {
 
     use conserve::owner::Owner;
     use conserve::unix_mode::UnixMode;
-    use std::os::unix::fs::MetadataExt;
-
-    fn get_user_group(metadata: &std::fs::Metadata) -> (String, String) {
-        (
-            match users::get_user_by_uid(metadata.uid()) {
-                Some(user) => user.name().to_string_lossy().to_string(),
-                None => "none".to_string(),
-            },
-            match users::get_group_by_gid(metadata.gid()) {
-                Some(group) => group.name().to_string_lossy().to_string(),
-                None => "none".to_string(),
-            },
-        )
-    }
 
     let mut path = src.clone();
     let mut mdata = std::fs::metadata(&path).expect("Unable to read / metadata");
