@@ -257,7 +257,17 @@ impl RestoreTree {
         })?;
         // Restore permissions
         let umode = source_entry.umode();
+        #[cfg(unix)]
         fs::set_permissions(path, umode.into())?;
+        #[cfg(not(unix))]
+        {
+            fn set_permissions(path: PathBuf, readonly: bool) -> io::Result<()> {
+                let mut p = std::fs::File::open(&path)?.metadata()?.permissions();
+                p.set_readonly(readonly);
+                fs::set_permissions(path, p)
+            }
+            set_permissions(path, umode.readonly())?;
+        }
 
         // TODO: Accumulate more stats.
         Ok(RestoreStats {
