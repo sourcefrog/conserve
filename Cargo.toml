@@ -45,6 +45,7 @@ url = "2.2.2"
 
 [target.'cfg(unix)'.dependencies]
 users = "0.11"
+nix = "0.25"
 
 [dev-dependencies]
 assert_cmd = "2.0"

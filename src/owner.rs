@@ -20,8 +20,8 @@ use std::{fmt::Display, fs::Metadata};
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Owner {
-    user: Option<String>,
-    group: Option<String>,
+    pub user: Option<String>,
+    pub group: Option<String>,
 }
 
 impl Display for Owner {

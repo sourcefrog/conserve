@@ -21,6 +21,8 @@ use std::{fs, time::Instant};
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
+#[cfg(unix)]
+use nix::unistd;
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
@@ -194,24 +196,10 @@ impl RestoreTree {
     }
 
     fn finish(self) -> Result<RestoreStats> {
+        #[cfg(unix)]
         for (path, umode) in self.dir_umodes {
-            #[cfg(unix)]
             if let Err(err) = fs::set_permissions(path, umode.into()) {
                 ui::problem(&format!("Failed to set directory permissions: {:?}", err));
-            }
-            #[cfg(not(unix))]
-            {
-                // TODO: Figure out why we're getting "NotFound" and "PermissionDenied"
-                // errors on windows.
-
-                // fn set_permissions(path: PathBuf, readonly: bool) -> io::Result<()> {
-                //     let mut p = std::fs::File::open(&path)?.metadata()?.permissions();
-                //     p.set_readonly(readonly);
-                //     fs::set_permissions(path, p)
-                // }
-                // if let Err(err) = set_permissions(path, umode.readonly()) {
-                //     ui::problem(&format!("Failed to set directory permissions: {:?}", err));
-                // }
             }
         }
         for (path, time) in self.dir_mtimes {
@@ -258,21 +246,27 @@ impl RestoreTree {
                 source,
             }
         })?;
-        // Restore permissions
-        let umode = source_entry.umode();
         #[cfg(unix)]
-        fs::set_permissions(path, umode.into())?;
-        #[cfg(not(unix))]
         {
-            // TODO: Figure out why we're getting "NotFound" and "PermissionDenied"
-            // errors on windows.
-
-            // fn set_permissions(path: PathBuf, readonly: bool) -> io::Result<()> {
-            //     let mut p = std::fs::File::open(&path)?.metadata()?.permissions();
-            //     p.set_readonly(readonly);
-            //     fs::set_permissions(path, p)
-            // }
-            // set_permissions(path, umode.readonly())?;
+            // Restore permissions
+            let umode = source_entry.umode();
+            fs::set_permissions(&path, umode.into())?;
+            // Restore ownership
+            let owner = source_entry.owner();
+            let uid = if let Some(username) = owner.user {
+                users::get_user_by_name(&username).map(|user| user.uid())
+            } else {
+                None
+            };
+            let gid = if let Some(groupname) = owner.group {
+                users::get_group_by_name(&groupname).map(|group| group.gid())
+            } else {
+                None
+            };
+            // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
+            unistd::chown(&path, uid.map(unistd::Uid::from_raw), gid.map(unistd::Gid::from_raw)).map_err(|err| {
+                std::io::Error::from(err)
+            })?;
         }
 
         // TODO: Accumulate more stats.
