@@ -36,20 +36,19 @@ use std::{fmt, fs::Permissions};
 use unix_mode;
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct UnixMode {
-    pub mode: u32,
-}
+pub struct UnixMode(u32);
+
 impl Default for UnixMode {
     fn default() -> Self {
         // created with execute permission so that restoring old archives works properly
         // (searching directories requires them to have exec permission)
-        Self { mode: 0o775 }
+        Self(0o775)
     }
 }
 impl PartialEq for UnixMode {
     fn eq(&self, other: &Self) -> bool {
         // mask all bits other than the permissions, sticky, and set bits
-        (self.mode & 0o7777) == (other.mode & 0o7777)
+        (self.0 & 0o7777) == (other.0 & 0o7777)
     }
 }
 // Assert that equivalence is reflexive
@@ -58,18 +57,18 @@ impl Eq for UnixMode {}
 impl UnixMode {
     pub fn readonly(self) -> bool {
         // determine if a file is readonly based on whether the owner can write it
-        self.mode & 0o200 == 0
+        self.0 & 0o200 == 0
     }
 }
 impl fmt::Display for UnixMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Convert to string. Simply don't print the file type if the bits are not present.
-        write!(f, "{}", unix_mode::to_string(self.mode).trim_start_matches('?'))
+        write!(f, "{}", unix_mode::to_string(self.0).trim_start_matches('?'))
     }
 }
 impl From<u32> for UnixMode {
     fn from(mode: u32) -> Self {
-        Self { mode }
+        Self(mode)
     }
 }
 
@@ -79,27 +78,27 @@ use std::os::unix::fs::PermissionsExt;
 #[cfg(unix)]
 impl From<Permissions> for UnixMode {
     fn from(p: Permissions) -> Self {
-        Self { mode: p.mode() }
+        Self(p.mode())
     }
 }
 #[cfg(unix)]
 impl From<UnixMode> for Permissions {
-    fn from(p: UnixMode) -> Self {
-        Permissions::from_mode(p.mode)
+    fn from(u: UnixMode) -> Self {
+        Permissions::from_mode(u.0)
     }
 }
 #[cfg(not(unix))]
 impl From<Permissions> for UnixMode {
     fn from(p: Permissions) -> Self {
-        Self {
+        Self(
             // set the user class write bit based on readonly status
             // the rest of the bits are left in the default state
             // TODO: fix this and test on windows
-            mode: match p.readonly() {
-                true => 0o100555,
-                false => 0o100775,
-            },
-        }
+            match p.readonly() {
+                true => 0o555,
+                false => 0o775,
+            }
+        )
     }
 }
 
