@@ -38,6 +38,7 @@ use unix_mode;
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct UnixMode(u32);
 
+// TODO: do we want to set permissions based on inode type?
 impl Default for UnixMode {
     fn default() -> Self {
         // created with execute permission so that restoring old archives works properly
