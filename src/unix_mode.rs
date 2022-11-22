@@ -34,7 +34,7 @@
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs::Permissions};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct UnixMode {
     pub mode: u32,
 }
@@ -42,9 +42,18 @@ impl Default for UnixMode {
     fn default() -> Self {
         // created with execute permission so that restoring old archives works properly
         // TODO: ideally we would set this based on the inode type read from the archive
-        Self { mode: 0o100775 }
+        Self { mode: 0o775 }
     }
 }
+impl PartialEq for UnixMode {
+    fn eq(&self, other: &Self) -> bool {
+        // mask all bits other than the permissions, sticky, and set bits
+        (self.mode & 0o7777) == (other.mode & 0o7777)
+    }
+}
+// Assert that equivalence is reflexive
+impl Eq for UnixMode {}
+
 impl UnixMode {
     pub fn readonly(self) -> bool {
         // determine if a file is readonly based on whether the owner can write it
