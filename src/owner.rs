@@ -32,7 +32,7 @@ pub struct Owner {
 }
 impl Owner {
     pub fn is_none(&self) -> bool {
-        self.user.is_none() && self.group.is_none() 
+        self.user.is_none() && self.group.is_none()
     }
 }
 
