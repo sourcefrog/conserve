@@ -72,25 +72,6 @@ impl From<u32> for UnixMode {
         Self { mode }
     }
 }
-impl From<&str> for UnixMode {
-    // TODO: implement set uid, set gid, and sticky
-    fn from(s: &str) -> Self {
-        let mut mode: u32 = 0;
-        for (n, c) in s.chars().enumerate() {
-            if n % 3 == 0 {
-                mode <<= 3;
-            }
-            mode += match c {
-                'r' => 0b100,
-                'w' => 0b010,
-                'x' => 0b001,
-                _ => 0,
-            };
-        }
-
-        Self { mode }
-    }
-}
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -137,12 +118,5 @@ mod tests {
         assert_eq!("rwxrwxr-T", format!("{}", UnixMode::from(0o1774)));
         assert_eq!("rwxr-S-wx", format!("{}", UnixMode::from(0o2743)));
         assert_eq!("--Sr---wx", format!("{}", UnixMode::from(0o4043)));
-    }
-    #[test]
-    fn from_str() {
-        assert_eq!(UnixMode::from("rwxrwxr--"), UnixMode { mode: 0o774 });
-        assert_eq!(UnixMode::from("rwxr-xr-x"), UnixMode { mode: 0o755 });
-        assert_eq!(UnixMode::from("rwxr---wx"), UnixMode { mode: 0o743 });
-        assert_eq!(UnixMode::from("---r---wx"), UnixMode { mode: 0o043 });
     }
 }
