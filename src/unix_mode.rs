@@ -41,7 +41,7 @@ pub struct UnixMode {
 impl Default for UnixMode {
     fn default() -> Self {
         // created with execute permission so that restoring old archives works properly
-        // TODO: ideally we would set this based on the inode type read from the archive
+        // (searching directories requires them to have exec permission)
         Self { mode: 0o775 }
     }
 }
