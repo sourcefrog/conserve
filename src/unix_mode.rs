@@ -63,7 +63,11 @@ impl UnixMode {
 impl fmt::Display for UnixMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Convert to string. Simply don't print the file type if the bits are not present.
-        write!(f, "{}", unix_mode::to_string(self.0).trim_start_matches('?'))
+        write!(
+            f,
+            "{}",
+            unix_mode::to_string(self.0).trim_start_matches('?')
+        )
     }
 }
 impl From<u32> for UnixMode {
@@ -97,7 +101,7 @@ impl From<Permissions> for UnixMode {
             match p.readonly() {
                 true => 0o555,
                 false => 0o775,
-            }
+            },
         )
     }
 }

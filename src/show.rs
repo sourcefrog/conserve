@@ -125,7 +125,13 @@ pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(
     let mut bw = BufWriter::new(w);
     for entry in it {
         if long_listing {
-            writeln!(bw, "{} {} {}", entry.unix_mode(), entry.owner(), entry.apath())?;
+            writeln!(
+                bw,
+                "{} {} {}",
+                entry.unix_mode(),
+                entry.owner(),
+                entry.apath()
+            )?;
         } else {
             writeln!(bw, "{}", entry.apath())?;
         }

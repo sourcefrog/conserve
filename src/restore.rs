@@ -231,7 +231,7 @@ impl RestoreTree {
     fn copy_file<R: ReadTree>(
         &mut self,
         source_entry: &R::Entry,
-        from_tree: &R
+        from_tree: &R,
     ) -> Result<RestoreStats> {
         let path = self.rooted_path(source_entry.apath());
         let restore_err = |source| Error::Restore {
@@ -242,7 +242,8 @@ impl RestoreTree {
         let mut restore_file = File::create(&path).map_err(restore_err)?;
         // TODO: Read one block at a time: don't pull all the contents into memory.
         let content = &mut from_tree.file_contents(source_entry)?;
-        stats.uncompressed_file_bytes = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
+        stats.uncompressed_file_bytes =
+            std::io::copy(content, &mut restore_file).map_err(restore_err)?;
         restore_file.flush().map_err(restore_err)?;
 
         let mtime = Some(source_entry.mtime().into());
