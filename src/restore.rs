@@ -115,7 +115,7 @@ pub fn restore(
             if options.long_listing {
                 progress_bar.message(&format!(
                     "{} {} {}\n",
-                    entry.umode(),
+                    entry.unix_mode(),
                     entry.owner(),
                     entry.apath()
                 ));
@@ -165,7 +165,7 @@ pub fn restore(
 pub struct RestoreTree {
     path: PathBuf,
 
-    dir_umodes: Vec<(PathBuf, UnixMode)>,
+    dir_unix_modes: Vec<(PathBuf, UnixMode)>,
     dir_mtimes: Vec<(PathBuf, UnixTime)>,
 }
 
@@ -174,7 +174,7 @@ impl RestoreTree {
         RestoreTree {
             path,
             dir_mtimes: Vec::new(),
-            dir_umodes: Vec::new(),
+            dir_unix_modes: Vec::new(),
         }
     }
 
@@ -202,8 +202,8 @@ impl RestoreTree {
 
     fn finish(self) -> Result<RestoreStats> {
         #[cfg(unix)]
-        for (path, umode) in self.dir_umodes {
-            if let Err(err) = fs::set_permissions(path, umode.into()) {
+        for (path, unix_mode) in self.dir_unix_modes {
+            if let Err(err) = fs::set_permissions(path, unix_mode.into()) {
                 ui::problem(&format!("Failed to set directory permissions: {:?}", err));
             }
         }
@@ -223,7 +223,7 @@ impl RestoreTree {
             }
         }
         self.dir_mtimes.push((path.clone(), entry.mtime()));
-        self.dir_umodes.push((path, entry.umode()));
+        self.dir_unix_modes.push((path, entry.unix_mode()));
         Ok(())
     }
 
@@ -254,8 +254,8 @@ impl RestoreTree {
         #[cfg(unix)]
         {
             // Restore permissions
-            let umode = source_entry.umode();
-            fs::set_permissions(&path, umode.into())?;
+            let unix_mode = source_entry.unix_mode();
+            fs::set_permissions(&path, unix_mode.into())?;
             // Restore ownership
             let owner = source_entry.owner();
             let uid = if let Some(username) = owner.user {

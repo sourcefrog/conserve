@@ -153,7 +153,7 @@ mod test {
             mtime: 0,
             mtime_nanos: 0,
             addrs: Vec::new(),
-            umode: Default::default(),
+            unix_mode: Default::default(),
             owner: Default::default(),
         }
     }

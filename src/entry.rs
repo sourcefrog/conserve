@@ -28,7 +28,7 @@ pub trait Entry: Debug + Eq + PartialEq {
     fn mtime(&self) -> UnixTime;
     fn size(&self) -> Option<u64>;
     fn symlink_target(&self) -> &Option<String>;
-    fn umode(&self) -> UnixMode;
+    fn unix_mode(&self) -> UnixMode;
     fn owner(&self) -> Owner;
 
     /// True if the metadata supports an assumption the file contents have
@@ -37,7 +37,7 @@ pub trait Entry: Debug + Eq + PartialEq {
         basis_entry.kind() == self.kind()
             && basis_entry.mtime() == self.mtime()
             && basis_entry.size() == self.size()
-            && basis_entry.umode() == self.umode()
+            && basis_entry.unix_mode() == self.unix_mode()
             && basis_entry.owner() == self.owner()
     }
 }

@@ -53,7 +53,7 @@ pub struct IndexEntry {
 
     /// Discretionary Access Control permissions (such as read/write/execute on unix)
     #[serde(default)]
-    pub umode: UnixMode,
+    pub unix_mode: UnixMode,
 
     /// User and Group names of the owners of the file
     #[serde(default)]
@@ -114,8 +114,8 @@ impl Entry for IndexEntry {
         &self.target
     }
 
-    fn umode(&self) -> UnixMode {
-        self.umode
+    fn unix_mode(&self) -> UnixMode {
+        self.unix_mode
     }
 
     fn owner(&self) -> Owner {
@@ -138,7 +138,7 @@ impl IndexEntry {
             target: source.symlink_target().clone(),
             mtime: mtime.secs,
             mtime_nanos: mtime.nanosecs,
-            umode: source.umode(),
+            unix_mode: source.unix_mode(),
             owner: source.owner(),
         }
     }
@@ -531,7 +531,7 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            umode: Default::default(),
+            unix_mode: Default::default(),
             owner: Default::default(),
         }
     }
@@ -545,7 +545,7 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
-            umode: Default::default(),
+            unix_mode: Default::default(),
             owner: Default::default(),
         }];
         let index_json = serde_json::to_string(&entries).unwrap();
@@ -555,7 +555,7 @@ mod tests {
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
              \"mtime\":1461736377,\
-             \"umode\":{\"mode\":509},\
+             \"unix_mode\":{\"mode\":509},\
              \"owner\":{\"user\":null,\"group\":null}}]"
         );
     }
@@ -611,7 +611,7 @@ mod tests {
         assert_eq!(stats.index_hunks, 1);
         assert!(stats.compressed_index_bytes > 30);
         assert!(
-            stats.compressed_index_bytes <= 122,
+            stats.compressed_index_bytes <= 125,
             "expected shorter compressed index: {}",
             stats.compressed_index_bytes
         );

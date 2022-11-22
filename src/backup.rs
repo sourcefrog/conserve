@@ -126,7 +126,7 @@ pub fn backup(
                                 view,
                                 "{} {} {} {}",
                                 diff_kind.as_sigil(),
-                                entry.umode(),
+                                entry.unix_mode(),
                                 entry.owner(),
                                 entry.apath()
                             )?;

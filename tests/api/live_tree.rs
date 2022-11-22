@@ -56,7 +56,7 @@ fn list_simple_directory() {
 
     let re_str = r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: "#.to_owned()
         + r#"File, mtime: UnixTime \{ [^)]* \}, size: Some\(8\), symlink_target: None, "#
-        + r#"umode: UnixMode \{ mode: [0-9]+ \}, "#
+        + r#"unix_mode: UnixMode \{ mode: [0-9]+ \}, "#
         + r#"owner: Owner \{ user: (Some\("[a-z_][a-z0-9_-]*[$]?"\)|None), "#
         + r#"group: (Some\("[a-z_][a-z0-9_-]*[$]?"\)|None) \} \}"#;
 

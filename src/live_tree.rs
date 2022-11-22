@@ -57,7 +57,7 @@ pub struct LiveEntry {
     mtime: UnixTime,
     size: Option<u64>,
     symlink_target: Option<String>,
-    umode: UnixMode,
+    unix_mode: UnixMode,
     owner: Owner,
 }
 
@@ -107,8 +107,8 @@ impl Entry for LiveEntry {
         &self.symlink_target
     }
 
-    fn umode(&self) -> UnixMode {
-        self.umode
+    fn unix_mode(&self) -> UnixMode {
+        self.unix_mode
     }
 
     fn owner(&self) -> Owner {
@@ -133,14 +133,14 @@ impl LiveEntry {
             None
         };
         let owner = Owner::from(metadata);
-        let umode = UnixMode::from(metadata.permissions());
+        let unix_mode = UnixMode::from(metadata.permissions());
         LiveEntry {
             apath,
             kind: metadata.file_type().into(),
             mtime,
             symlink_target,
             size,
-            umode,
+            unix_mode,
             owner,
         }
     }
