@@ -53,8 +53,14 @@ fn list_simple_directory() {
     );
 
     let repr = format!("{:?}", &result[6]);
-    // TODO: use the owner::UNAME_REGEX constant instead of duplicating it here
-    let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: UnixTime \{ [^)]* \}, size: Some\(8\), symlink_target: None, umode: UnixMode \{ mode: [0-9]+ \}, owner: Owner \{ user: (Some\("[a-z_][a-z0-9_-]*[$]?"\)|None), group: (Some\("[a-z_][a-z0-9_-]*[$]?"\)|None) \} \}"#).unwrap();
+
+    let re_str = r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: "#.to_owned()
+        + r#"File, mtime: UnixTime \{ [^)]* \}, size: Some\(8\), symlink_target: None, "#
+        + r#"umode: UnixMode \{ mode: [0-9]+ \}, "#
+        + r#"owner: Owner \{ user: (Some\("[a-z_][a-z0-9_-]*[$]?"\)|None), "#
+        + r#"group: (Some\("[a-z_][a-z0-9_-]*[$]?"\)|None) \} \}"#;
+
+    let re = Regex::new(&re_str).unwrap();
     assert!(re.is_match(&repr));
 
     // TODO: Somehow get the stats out of the iterator.
