@@ -56,7 +56,7 @@ pub struct IndexEntry {
     pub unix_mode: UnixMode,
 
     /// User and Group names of the owners of the file
-    #[serde(default)]
+    #[serde(default, flatten, skip_serializing_if = "Owner::is_none")]
     pub owner: Owner,
 
     /// Fractional nanoseconds for modification time.
@@ -555,8 +555,7 @@ mod tests {
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
              \"mtime\":1461736377,\
-             \"unix_mode\":509,\
-             \"owner\":{\"user\":null,\"group\":null}}]"
+             \"unix_mode\":509}]"
         );
     }
 

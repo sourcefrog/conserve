@@ -23,10 +23,17 @@ use serde::{Deserialize, Serialize};
 use std::os::unix::fs::MetadataExt;
 use std::{fmt::Display, fs::Metadata};
 
+// TODO: maybe set the default to the current user and group?
+// do we want to do that in our default impl here?
 #[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Owner {
     pub user: Option<String>,
     pub group: Option<String>,
+}
+impl Owner {
+    pub fn is_none(&self) -> bool {
+        self.user.is_none() && self.group.is_none() 
+    }
 }
 
 impl Display for Owner {
