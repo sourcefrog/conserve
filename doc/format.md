@@ -212,6 +212,9 @@ An index entry is a json dict with keys
 - `mtime`: integer seconds past the Unix epoch
 - `mtime_nanos`: (optional) fractional part of the mtime, as nanoseconds.
 - `kind`: one of `"File"`, `"Dir"`, `"Symlink"`
+- `unix_mode`: the unix mode bits consisting of the sticky bit, set uid bit, 
+    set gid bit, and permission bits
+- `owner`: struct of strings containing the name of the owning user and group
 - `addrs`: a list of tuples of:
   - `hash`: data block hash: from the current or any parent directory
   - `start`: the offset within the uncompressed content of the block for the
