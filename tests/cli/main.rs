@@ -276,7 +276,116 @@ fn basic_backup() {
 
 #[test]
 #[cfg(unix)]
+fn backup_unix_permissions() {
+    use std::fs::Permissions;
+
+    let testdir = TempDir::new().unwrap();
+    let arch_dir = testdir.path().join("a");
+    let data_dir = testdir.path().join("data");
+
+    // conserve init
+    run_conserve()
+        .arg("init")
+        .arg(&arch_dir)
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with("Created new archive"));
+
+    // copy the appropriate testdata into the testdir
+    let src: PathBuf = "./testdata/tree/minimal".into();
+    assert!(src.is_dir());
+
+    // imports for this test
+    use std::fs::set_permissions;
+    use std::os::unix::fs::MetadataExt;
+    use std::os::unix::fs::PermissionsExt;
+
+    // set up test directory
+    cp_r::CopyOptions::new()
+        .copy_tree(&src, &data_dir)
+        .expect("Failed to copy files into test dir");
+
+    // set subdir as group-writable
+    set_permissions(data_dir.join("subdir"), Permissions::from_mode(0o775))
+        .expect("Error setting file permissions");
+    // set subdir/subfile as executable
+    set_permissions(
+        data_dir.join("subdir").join("subfile"),
+        Permissions::from_mode(0o755),
+    )
+    .expect("Error setting file permissions");
+    // set hello as readonly
+    set_permissions(data_dir.join("hello"), Permissions::from_mode(0o444))
+        .expect("Error setting file permissions");
+
+    let mdata = std::fs::metadata(&src).expect("Unable to read file metadata");
+    let user = users::get_user_by_uid(mdata.uid())
+        .expect("Unable to find user by uid")
+        .name()
+        .to_str()
+        .unwrap()
+        .to_string();
+    let group = users::get_group_by_gid(mdata.gid())
+        .expect("Unable to find user by uid")
+        .name()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    // backup
+    run_conserve()
+        .args(&["backup", "-v", "-l"])
+        .arg(&arch_dir)
+        .arg(&data_dir)
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with(format!(
+            "+ -r--r--r-- {user} {group} /hello\n\
+             + -rwxr-xr-x {user} {group} /subdir/subfile\n\
+             Backup complete."
+        )));
+
+    // verify file permissions in stored archive
+    run_conserve()
+        .args(&["ls", "-l"])
+        .arg(&arch_dir)
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with(format!(
+            "drwxr-xr-x {user} {group} /\n\
+             -r--r--r-- {user} {group} /hello\n\
+             drwxrwxr-x {user} {group} /subdir\n\
+             -rwxr-xr-x {user} {group} /subdir/subfile"
+        )));
+
+    // create a directory to restore to
+    let restore_dir = TempDir::new().unwrap();
+
+    // verify permissions are restored correctly
+    run_conserve()
+        .args(&["restore", "-v", "-l"])
+        .arg(&arch_dir)
+        .arg(&*restore_dir)
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with(format!(
+            "drwxr-xr-x {user} {group} /\n\
+             -r--r--r-- {user} {group} /hello\n\
+             drwxrwxr-x {user} {group} /subdir\n\
+             -rwxr-xr-x {user} {group} /subdir/subfile\n\
+             Restore complete."
+        )));
+}
+
+#[test]
+#[cfg(unix)]
 fn backup_user_and_permissions() {
+    // TODO: rewrite this test to properly test user and group somehow
+
     let testdir = TempDir::new().unwrap();
     let arch_dir = testdir.path().join("a");
 
