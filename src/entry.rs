@@ -38,5 +38,6 @@ pub trait Entry: Debug + Eq + PartialEq {
             && basis_entry.mtime() == self.mtime()
             && basis_entry.size() == self.size()
             && basis_entry.umode() == self.umode()
+            && basis_entry.owner() == self.owner()
     }
 }
