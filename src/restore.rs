@@ -231,17 +231,18 @@ impl RestoreTree {
     fn copy_file<R: ReadTree>(
         &mut self,
         source_entry: &R::Entry,
-        from_tree: &R,
+        from_tree: &R
     ) -> Result<RestoreStats> {
         let path = self.rooted_path(source_entry.apath());
         let restore_err = |source| Error::Restore {
             path: path.clone(),
             source,
         };
+        let mut stats = RestoreStats::default();
         let mut restore_file = File::create(&path).map_err(restore_err)?;
         // TODO: Read one block at a time: don't pull all the contents into memory.
         let content = &mut from_tree.file_contents(source_entry)?;
-        let bytes_copied = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
+        stats.uncompressed_file_bytes = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
         restore_file.flush().map_err(restore_err)?;
 
         let mtime = Some(source_entry.mtime().into());
@@ -255,7 +256,12 @@ impl RestoreTree {
         {
             // Restore permissions
             let unix_mode = source_entry.unix_mode();
-            fs::set_permissions(&path, unix_mode.into())?;
+            fs::set_permissions(&path, unix_mode.into())
+                .map_err(|e| {
+                    ui::show_error(&e);
+                    stats.errors += 1;
+                })
+                .ok();
             // Restore ownership
             let owner = source_entry.owner();
             let uid = if let Some(username) = owner.user {
@@ -274,14 +280,15 @@ impl RestoreTree {
                 uid.map(unistd::Uid::from_raw),
                 gid.map(unistd::Gid::from_raw),
             )
-            .map_err(std::io::Error::from)?;
+            .map_err(|e| {
+                ui::show_error(&e);
+                stats.errors += 1;
+            })
+            .ok();
         }
 
         // TODO: Accumulate more stats.
-        Ok(RestoreStats {
-            uncompressed_file_bytes: bytes_copied,
-            ..RestoreStats::default()
-        })
+        Ok(stats)
     }
 
     #[cfg(unix)]
