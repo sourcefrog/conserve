@@ -33,6 +33,7 @@
 //!
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs::Permissions};
+use unix_mode;
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct UnixMode {
@@ -57,47 +58,13 @@ impl Eq for UnixMode {}
 impl UnixMode {
     pub fn readonly(self) -> bool {
         // determine if a file is readonly based on whether the owner can write it
-        self.mode & 0o000200 == 0
+        self.mode & 0o200 == 0
     }
 }
 impl fmt::Display for UnixMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let sss = (self.mode & 0o7000) >> 9;
-        let owner = (self.mode & 0o0700) >> 6;
-        let group = (self.mode & 0o0070) >> 3;
-        let other = self.mode & 0o0007;
-
-        // owner permissions
-        write!(f, "{}", if owner & 0b100 > 0 { 'r' } else { '-' })?;
-        write!(f, "{}", if owner & 0b010 > 0 { 'w' } else { '-' })?;
-        if sss == 0b100 {
-            // Set UID
-            write!(f, "{}", if owner & 0b001 > 0 { 's' } else { 'S' })?;
-        } else {
-            write!(f, "{}", if owner & 0b001 > 0 { 'x' } else { '-' })?;
-        }
-
-        // group permissions
-        write!(f, "{}", if group & 0b100 > 0 { 'r' } else { '-' })?;
-        write!(f, "{}", if group & 0b010 > 0 { 'w' } else { '-' })?;
-        if sss == 0b010 {
-            // Set GID
-            write!(f, "{}", if group & 0b001 > 0 { 's' } else { 'S' })?;
-        } else {
-            write!(f, "{}", if group & 0b001 > 0 { 'x' } else { '-' })?;
-        }
-
-        // other permissions
-        write!(f, "{}", if other & 0b100 > 0 { 'r' } else { '-' })?;
-        write!(f, "{}", if other & 0b010 > 0 { 'w' } else { '-' })?;
-        if sss == 0b001 {
-            // sticky
-            write!(f, "{}", if other & 0b001 > 0 { 't' } else { 'T' })?;
-        } else {
-            write!(f, "{}", if other & 0b001 > 0 { 'x' } else { '-' })?;
-        }
-
-        Ok(())
+        // Convert to string. Simply don't print the file type if the bits are not present.
+        write!(f, "{}", unix_mode::to_string(self.mode).trim_start_matches('?'))
     }
 }
 impl From<u32> for UnixMode {
