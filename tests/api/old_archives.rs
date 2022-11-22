@@ -87,6 +87,39 @@ fn validate_archive() {
 }
 
 #[test]
+fn long_listing_old_archive() {
+    for ver in MINIMAL_ARCHIVE_VERSIONS {
+        let dest = TempDir::new().unwrap();
+        println!("restore {} to {:?}", ver, dest.path());
+
+        let archive = open_old_archive(ver, "minimal");
+        let mut stdout = Vec::<u8>::new();
+
+        // show archive contents
+        show::show_entry_names(
+            archive
+                .open_stored_tree(BandSelectionPolicy::Latest)
+                .unwrap()
+                .iter_entries(Apath::root(), Exclude::nothing())
+                .unwrap(),
+            &mut stdout,
+            true,
+        )
+        .unwrap();
+
+        // ensure that the default permissions and owner data are restored,
+        // as the old archives were not archived with unix_mode or owner metadata
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            "rwxrwxr-x none none /\n\
+             rwxrwxr-x none none /hello\n\
+             rwxrwxr-x none none /subdir\n\
+             rwxrwxr-x none none /subdir/subfile\n"
+        );
+    }
+}
+
+#[test]
 fn restore_old_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         let dest = TempDir::new().unwrap();
