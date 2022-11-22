@@ -555,7 +555,7 @@ mod tests {
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
              \"mtime\":1461736377,\
-             \"umode\":{\"mode\":33277},\
+             \"umode\":{\"mode\":509},\
              \"owner\":{\"user\":null,\"group\":null}}]"
         );
     }
