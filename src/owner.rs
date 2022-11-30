@@ -41,7 +41,7 @@ impl Display for Owner {
         let none = "none".to_string();
         write!(
             f,
-            "{} {}",
+            "{:<10} {:<10}",
             if let Some(user) = &self.user {
                 user
             } else {
