@@ -555,7 +555,7 @@ mod tests {
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
              \"mtime\":1461736377,\
-             \"unix_mode\":509}]"
+             \"unix_mode\":null}]"
         );
     }
 

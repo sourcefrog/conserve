@@ -32,22 +32,38 @@
 //! TODO: Properly implement and test Windows compatibility.
 //!
 use serde::{Deserialize, Serialize};
-use std::{fmt, fs::Permissions};
+use std::{fmt, fs::{self, Permissions}, io, path::Path};
 use unix_mode;
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct UnixMode(u32);
+#[derive(Debug, Default, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct UnixMode(Option<u32>);
 
 // bit mask for the bits in the unix mode that this struct will store.
 // masks all bits other than the permissions, sticky, and set bits
 const MODE_BITS: u32 = 0o7777;
 
-// TODO: do we want to set permissions based on inode type?
-impl Default for UnixMode {
-    fn default() -> Self {
-        // created with execute permission so that restoring old archives works properly
-        // (searching directories requires them to have exec permission)
-        Self(0o775)
+impl UnixMode {
+    #[cfg(unix)]
+    /// Invoke std::fs::set_permissions if the mode bits for this mode are set,
+    /// otherwise do nothing.
+    pub fn set_permissions<P>(self, path: P) -> io::Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        if let Some(mode) = self.0 {
+            let permissions = Permissions::from_mode(mode);
+            fs::set_permissions(&path, permissions)
+        } else {
+            Ok(())
+        }
+    }
+    #[cfg(not(unix))]
+    /// TODO: Not yet implemented on non-unix operating systems
+    pub fn set_permissions<P>(self, _path: P) -> io::Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        Ok(())
     }
 }
 impl PartialEq for UnixMode {
@@ -61,23 +77,26 @@ impl Eq for UnixMode {}
 impl UnixMode {
     pub fn readonly(self) -> bool {
         // determine if a file is readonly based on whether the owning user can write to it
-        self.0 & 0o200 == 0
+        // if the mode is None, then we assume it is not readonly
+        match self.0 {
+            Some(mode) => mode & 0o200 == 0,
+            None => false,
+        }
     }
 }
 impl fmt::Display for UnixMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Convert to string. Since the file type bits are stripped, there will
         // be a leading question mark from unix_mode::to_string, which we will strip.
-        write!(
-            f,
-            "{}",
-            unix_mode::to_string(self.0).trim_start_matches('?')
-        )
+        match self.0 {
+            Some(mode) => write!(f, "{:<9}", unix_mode::to_string(mode).trim_start_matches('?')),
+            None => write!(f, "{:<9}", "none"),
+        }
     }
 }
 impl From<u32> for UnixMode {
     fn from(mode: u32) -> Self {
-        Self(mode & MODE_BITS)
+        Self(Some(mode & MODE_BITS))
     }
 }
 
@@ -87,13 +106,7 @@ use std::os::unix::fs::PermissionsExt;
 #[cfg(unix)]
 impl From<Permissions> for UnixMode {
     fn from(p: Permissions) -> Self {
-        Self(p.mode() & MODE_BITS)
-    }
-}
-#[cfg(unix)]
-impl From<UnixMode> for Permissions {
-    fn from(u: UnixMode) -> Self {
-        Permissions::from_mode(u.0)
+        Self(Some(p.mode() & MODE_BITS))
     }
 }
 #[cfg(not(unix))]

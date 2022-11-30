@@ -111,10 +111,10 @@ fn long_listing_old_archive() {
         // as the old archives were not archived with unix_mode or owner metadata
         assert_eq!(
             String::from_utf8(stdout).unwrap(),
-            "rwxrwxr-x none       none       /\n\
-             rwxrwxr-x none       none       /hello\n\
-             rwxrwxr-x none       none       /subdir\n\
-             rwxrwxr-x none       none       /subdir/subfile\n"
+            "none      none       none       /\n\
+             none      none       none       /hello\n\
+             none      none       none       /subdir\n\
+             none      none       none       /subdir/subfile\n"
         );
     }
 }

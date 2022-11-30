@@ -203,7 +203,7 @@ impl RestoreTree {
     fn finish(self) -> Result<RestoreStats> {
         #[cfg(unix)]
         for (path, unix_mode) in self.dir_unix_modes {
-            if let Err(err) = fs::set_permissions(path, unix_mode.into()) {
+            if let Err(err) = unix_mode.set_permissions(path) {
                 ui::problem(&format!("Failed to set directory permissions: {:?}", err));
             }
         }
@@ -255,9 +255,8 @@ impl RestoreTree {
         })?;
         #[cfg(unix)]
         {
-            // Restore permissions
-            let unix_mode = source_entry.unix_mode();
-            fs::set_permissions(&path, unix_mode.into())
+            // Restore permissions only if there are mode bits stored in the archive
+            source_entry.unix_mode().set_permissions(&path)
                 .map_err(|e| {
                     ui::show_error(&e);
                     stats.errors += 1;
