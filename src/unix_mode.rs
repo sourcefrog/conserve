@@ -126,8 +126,8 @@ impl From<Permissions> for UnixMode {
             // the rest of the bits are left in the default state
             // TODO: fix this and test on windows
             match p.readonly() {
-                true => 0o555,
-                false => 0o775,
+                true => Some(0o555),
+                false => Some(0o775),
             },
         )
     }
