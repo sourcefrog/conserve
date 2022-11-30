@@ -126,8 +126,8 @@ fn delete_nonexistent_band() {
         .unwrap();
 
     run_conserve()
-        .args(&["delete"])
-        .args(&["-b", "b0000"])
+        .args(["delete"])
+        .args(["-b", "b0000"])
         .arg(af.path())
         .assert()
         .stdout(pred_fn)
