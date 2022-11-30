@@ -32,7 +32,12 @@
 //! TODO: Properly implement and test Windows compatibility.
 //!
 use serde::{Deserialize, Serialize};
-use std::{fmt, fs::{self, Permissions}, io, path::Path};
+use std::{
+    fmt,
+    fs::{self, Permissions},
+    io,
+    path::Path,
+};
 use unix_mode;
 
 #[derive(Debug, Default, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
@@ -89,7 +94,11 @@ impl fmt::Display for UnixMode {
         // Convert to string. Since the file type bits are stripped, there will
         // be a leading question mark from unix_mode::to_string, which we will strip.
         match self.0 {
-            Some(mode) => write!(f, "{:<9}", unix_mode::to_string(mode).trim_start_matches('?')),
+            Some(mode) => write!(
+                f,
+                "{:<9}",
+                unix_mode::to_string(mode).trim_start_matches('?')
+            ),
             None => write!(f, "{:<9}", "none"),
         }
     }

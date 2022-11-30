@@ -256,7 +256,9 @@ impl RestoreTree {
         #[cfg(unix)]
         {
             // Restore permissions only if there are mode bits stored in the archive
-            source_entry.unix_mode().set_permissions(&path)
+            source_entry
+                .unix_mode()
+                .set_permissions(&path)
                 .map_err(|e| {
                     ui::show_error(&e);
                     stats.errors += 1;
