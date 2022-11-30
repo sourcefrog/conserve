@@ -98,7 +98,7 @@ fn basic_backup() {
     assert!(src.is_dir());
 
     run_conserve()
-        .args(&["ls", "--source"])
+        .args(["ls", "--source"])
         .arg(&src)
         .assert()
         .success()
@@ -111,7 +111,7 @@ fn basic_backup() {
         );
 
     run_conserve()
-        .args(&["size", "-s"])
+        .args(["size", "-s"])
         .arg(&src)
         .assert()
         .success()
@@ -130,7 +130,7 @@ fn basic_backup() {
     // TODO: Now inspect the archive.
 
     run_conserve()
-        .args(&["size"])
+        .args(["size"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -138,7 +138,7 @@ fn basic_backup() {
         .stdout("0 MB\n"); // "contents"
 
     run_conserve()
-        .args(&["versions", "--short"])
+        .args(["versions", "--short"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -156,7 +156,7 @@ fn basic_backup() {
     };
 
     run_conserve()
-        .args(&["debug", "blocks"])
+        .args(["debug", "blocks"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -164,7 +164,7 @@ fn basic_backup() {
         .stdout(predicate::function(is_expected_blocks));
 
     run_conserve()
-        .args(&["debug", "referenced"])
+        .args(["debug", "referenced"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -172,7 +172,7 @@ fn basic_backup() {
         .stdout(predicate::function(is_expected_blocks));
 
     run_conserve()
-        .args(&["debug", "unreferenced"])
+        .args(["debug", "unreferenced"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -180,7 +180,7 @@ fn basic_backup() {
         .stdout("");
 
     run_conserve()
-        .args(&["debug", "index"])
+        .args(["debug", "index"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -254,7 +254,7 @@ fn basic_backup() {
         let restore_dir2 = TempDir::new().unwrap();
         // Try to restore again over the same directory: should decline.
         run_conserve()
-            .args(&["restore", "-b", "b0"])
+            .args(["restore", "-b", "b0"])
             .arg(&arch_dir)
             .arg(restore_dir2.path())
             .assert()
@@ -335,7 +335,7 @@ fn backup_unix_permissions() {
 
     // backup
     run_conserve()
-        .args(&["backup", "-v", "-l"])
+        .args(["backup", "-v", "-l"])
         .arg(&arch_dir)
         .arg(&data_dir)
         .assert()
@@ -349,7 +349,7 @@ fn backup_unix_permissions() {
 
     // verify file permissions in stored archive
     run_conserve()
-        .args(&["ls", "-l"])
+        .args(["ls", "-l"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -366,7 +366,7 @@ fn backup_unix_permissions() {
 
     // verify permissions are restored correctly
     run_conserve()
-        .args(&["restore", "-v", "-l"])
+        .args(["restore", "-v", "-l"])
         .arg(&arch_dir)
         .arg(&*restore_dir)
         .assert()
@@ -440,7 +440,7 @@ fn backup_user_and_permissions() {
 
     // verify ls command
     run_conserve()
-        .args(&["ls", "-l", "--source"])
+        .args(["ls", "-l", "--source"])
         .arg(&src)
         .assert()
         .success()
@@ -449,7 +449,7 @@ fn backup_user_and_permissions() {
 
     // backup
     run_conserve()
-        .args(&["backup"])
+        .args(["backup"])
         .arg(&arch_dir)
         .arg(&src)
         .assert()
@@ -561,7 +561,7 @@ fn incomplete_version() {
 #[test]
 fn validate_non_fatal_problems_nonzero_result() {
     run_conserve()
-        .args(&["validate", "testdata/damaged/missing-block/"])
+        .args(["validate", "testdata/damaged/missing-block/"])
         .assert()
         .stdout(predicate::str::contains("Archive has some problems."))
         .code(2);
@@ -571,7 +571,7 @@ fn validate_non_fatal_problems_nonzero_result() {
 fn restore_only_subtree() {
     let dest = TempDir::new().unwrap();
     run_conserve()
-        .args(&[
+        .args([
             "restore",
             "testdata/archive/minimal/v0.6.3/",
             "--only",
@@ -597,9 +597,9 @@ fn size_exclude() {
     source.create_file_with_contents("junk", b"01234567890123456789");
 
     run_conserve()
-        .args(&["size", "--bytes", "--source"])
+        .args(["size", "--bytes", "--source"])
         .arg(&source.path())
-        .args(&["--exclude=/junk"])
+        .args(["--exclude=/junk"])
         .assert()
         .success()
         .stdout("10\n");
