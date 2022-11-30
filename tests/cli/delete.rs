@@ -29,9 +29,9 @@ fn delete_both_bands() {
     af.store_two_versions();
 
     run_conserve()
-        .args(&["delete"])
-        .args(&["-b", "b0000"])
-        .args(&["-b", "b0001"])
+        .args(["delete"])
+        .args(["-b", "b0000"])
+        .args(["-b", "b0001"])
         .arg(af.path())
         .assert()
         .success();
@@ -46,8 +46,8 @@ fn delete_first_version() {
     af.store_two_versions();
 
     run_conserve()
-        .args(&["delete"])
-        .args(&["-b", "b0"])
+        .args(["delete"])
+        .args(["-b", "b0"])
         .arg(af.path())
         .assert()
         .success();
@@ -83,8 +83,8 @@ fn delete_second_version() {
     af.store_two_versions();
 
     run_conserve()
-        .args(&["delete"])
-        .args(&["-b", "b1"])
+        .args(["delete"])
+        .args(["-b", "b1"])
         .arg(af.path())
         .assert()
         .success();
