@@ -74,7 +74,7 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
                     let j = j % live_files.len();
                     let name = &live_files[j];
                     let content = format!("changed content of {} from step {}", j, i).into_bytes();
-                    fs::write(tf.path().join(&name), content).unwrap();
+                    fs::write(tf.path().join(name), content).unwrap();
                 }
             }
             RemoveFile(j) => {
@@ -96,7 +96,7 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
                 backup(&archive, &tf.live_tree(), &options).unwrap();
                 let snapshot = TempDir::new().unwrap();
                 cp_r::CopyOptions::default()
-                    .copy_tree(&tf.path(), snapshot.path())
+                    .copy_tree(tf.path(), snapshot.path())
                     .unwrap();
                 backup_contents.push(snapshot);
             }

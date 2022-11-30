@@ -265,7 +265,7 @@ fn basic_backup() {
     // Validate
     run_conserve()
         .arg("validate")
-        .arg(&arch_dir)
+        .arg(arch_dir)
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
