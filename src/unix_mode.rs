@@ -38,6 +38,10 @@ use unix_mode;
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct UnixMode(u32);
 
+// bit mask for the bits in the unix mode that this struct will store.
+// masks all bits other than the permissions, sticky, and set bits
+const MODE_BITS: u32 = 0o7777;
+
 // TODO: do we want to set permissions based on inode type?
 impl Default for UnixMode {
     fn default() -> Self {
@@ -48,8 +52,7 @@ impl Default for UnixMode {
 }
 impl PartialEq for UnixMode {
     fn eq(&self, other: &Self) -> bool {
-        // mask all bits other than the permissions, sticky, and set bits
-        (self.0 & 0o7777) == (other.0 & 0o7777)
+        self.0 == other.0
     }
 }
 // Assert that equivalence is reflexive
@@ -57,13 +60,14 @@ impl Eq for UnixMode {}
 
 impl UnixMode {
     pub fn readonly(self) -> bool {
-        // determine if a file is readonly based on whether the owner can write it
+        // determine if a file is readonly based on whether the owning user can write to it
         self.0 & 0o200 == 0
     }
 }
 impl fmt::Display for UnixMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Convert to string. Simply don't print the file type if the bits are not present.
+        // Convert to string. Since the file type bits are stripped, there will
+        // be a leading question mark from unix_mode::to_string, which we will strip.
         write!(
             f,
             "{}",
@@ -73,7 +77,7 @@ impl fmt::Display for UnixMode {
 }
 impl From<u32> for UnixMode {
     fn from(mode: u32) -> Self {
-        Self(mode)
+        Self(mode & MODE_BITS)
     }
 }
 
@@ -83,7 +87,7 @@ use std::os::unix::fs::PermissionsExt;
 #[cfg(unix)]
 impl From<Permissions> for UnixMode {
     fn from(p: Permissions) -> Self {
-        Self(p.mode())
+        Self(p.mode() & MODE_BITS)
     }
 }
 #[cfg(unix)]

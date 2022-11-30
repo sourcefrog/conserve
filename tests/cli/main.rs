@@ -342,8 +342,8 @@ fn backup_unix_permissions() {
         .success()
         .stderr(predicate::str::is_empty())
         .stdout(predicate::str::starts_with(format!(
-            "+ -r--r--r-- {user} {group} /hello\n\
-             + -rwxr-xr-x {user} {group} /subdir/subfile\n\
+            "+ r--r--r-- {user} {group} /hello\n\
+             + rwxr-xr-x {user} {group} /subdir/subfile\n\
              Backup complete."
         )));
 
@@ -355,10 +355,10 @@ fn backup_unix_permissions() {
         .success()
         .stderr(predicate::str::is_empty())
         .stdout(predicate::str::starts_with(format!(
-            "drwxr-xr-x {user} {group} /\n\
-             -r--r--r-- {user} {group} /hello\n\
-             drwxrwxr-x {user} {group} /subdir\n\
-             -rwxr-xr-x {user} {group} /subdir/subfile"
+            "rwxr-xr-x {user} {group} /\n\
+             r--r--r-- {user} {group} /hello\n\
+             rwxrwxr-x {user} {group} /subdir\n\
+             rwxr-xr-x {user} {group} /subdir/subfile"
         )));
 
     // create a directory to restore to
@@ -373,10 +373,10 @@ fn backup_unix_permissions() {
         .success()
         .stderr(predicate::str::is_empty())
         .stdout(predicate::str::starts_with(format!(
-            "drwxr-xr-x {user} {group} /\n\
-             -r--r--r-- {user} {group} /hello\n\
-             drwxrwxr-x {user} {group} /subdir\n\
-             -rwxr-xr-x {user} {group} /subdir/subfile\n\
+            "rwxr-xr-x {user} {group} /\n\
+             r--r--r-- {user} {group} /hello\n\
+             rwxrwxr-x {user} {group} /subdir\n\
+             rwxr-xr-x {user} {group} /subdir/subfile\n\
              Restore complete."
         )));
 }
