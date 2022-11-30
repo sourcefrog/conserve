@@ -104,7 +104,7 @@ fn exclude_files() {
     let restore_archive = Archive::open_path(af.path()).unwrap();
     let options = RestoreOptions {
         overwrite: true,
-        exclude: Exclude::from_strings(&["/**/subfile"]).unwrap(),
+        exclude: Exclude::from_strings(["/**/subfile"]).unwrap(),
         ..RestoreOptions::default()
     };
     let stats = restore(&restore_archive, destdir.path(), &options).expect("restore");
