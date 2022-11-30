@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn rooted_pattern() {
-        let exclude = Exclude::from_strings(&["/exc"]).unwrap();
+        let exclude = Exclude::from_strings(["/exc"]).unwrap();
 
         assert!(exclude.matches("/exc"));
         assert!(!exclude.matches("/excellent"));
@@ -171,14 +171,14 @@ mod tests {
 
     #[test]
     fn path_parse() {
-        let exclude = Exclude::from_strings(&["fo*/bar/baz*"]).unwrap();
+        let exclude = Exclude::from_strings(["fo*/bar/baz*"]).unwrap();
         assert!(exclude.matches("/foo/bar/baz.rs"))
     }
 
     #[test]
     fn extended_pattern_parse() {
         // Note that these are globs, not regexps, so "fo?" means "fo" followed by one character.
-        let exclude = Exclude::from_strings(&["fo?", "ba[abc]", "[!a-z]"]).unwrap();
+        let exclude = Exclude::from_strings(["fo?", "ba[abc]", "[!a-z]"]).unwrap();
         assert!(exclude.matches("/foo"));
         assert!(!exclude.matches("/fo"));
         assert!(exclude.matches("/baa"));
