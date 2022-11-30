@@ -577,7 +577,7 @@ fn restore_only_subtree() {
             "--only",
             "/subdir",
         ])
-        .arg(&dest.path())
+        .arg(dest.path())
         .assert()
         .success();
 
@@ -598,7 +598,7 @@ fn size_exclude() {
 
     run_conserve()
         .args(["size", "--bytes", "--source"])
-        .arg(&source.path())
+        .arg(source.path())
         .args(["--exclude=/junk"])
         .assert()
         .success()
