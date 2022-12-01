@@ -72,7 +72,7 @@ fn exclude_entries_directory() {
     tf.create_file("baz/bas");
     tf.create_file("baz/test");
 
-    let exclude = Exclude::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
+    let exclude = Exclude::from_strings(["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let names = entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), exclude).unwrap());
@@ -123,7 +123,7 @@ fn exclude_cachedir() {
     tf.create_file("a");
     let cache_dir = tf.create_dir("cache");
     tf.create_dir("cache/1");
-    cachedir::add_tag(&cache_dir).unwrap();
+    cachedir::add_tag(cache_dir).unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let names =

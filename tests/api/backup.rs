@@ -61,7 +61,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     srcdir.create_file("bar");
     srcdir.create_file("baz");
     // TODO: Include a symlink only on Unix.
-    let exclude = Exclude::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
+    let exclude = Exclude::from_strings(["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
     let source = srcdir.live_tree();
     let options = BackupOptions {
         exclude,
@@ -117,7 +117,7 @@ pub fn backup_more_excludes() {
     srcdir.create_file("baz");
     srcdir.create_file("bar");
 
-    let exclude = Exclude::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
+    let exclude = Exclude::from_strings(["/**/foo*", "/**/baz"]).unwrap();
     let source = srcdir.live_tree();
     let options = BackupOptions {
         exclude,
@@ -238,7 +238,7 @@ fn mtime_before_epoch() {
     let file_path = tf.create_file("old_file");
 
     let t1969 = FileTime::from_unix_time(-36_000, 0);
-    set_file_mtime(&file_path, t1969).expect("Failed to set file times");
+    set_file_mtime(file_path, t1969).expect("Failed to set file times");
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let entries = lt
