@@ -209,8 +209,8 @@ impl AsRef<Path> for Apath {
 /// equal strings imply equal apaths.
 impl Ord for Apath {
     fn cmp(&self, b: &Apath) -> Ordering {
-        let &Apath(ref a) = self;
-        let &Apath(ref b) = b;
+        let Apath(a) = self;
+        let Apath(b) = b;
         let mut ait = a.split('/');
         let mut bit = b.split('/');
         let mut oa = ait.next().expect("paths must not be empty");
