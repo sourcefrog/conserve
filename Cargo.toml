@@ -19,7 +19,6 @@ blake2-rfc = "0.2.18"
 bytes = "1.1.0"
 cachedir = "0.3"
 chrono = "0.4.19"
-clap = { version = "4.0", features = ["derive"] }
 derive_more = "0.99"
 filetime = "0.2"
 globset = "0.4.5"
@@ -42,6 +41,10 @@ tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3.11", features = ["env-filter", "fmt"] }
 url = "2.2.2"
+
+[dependencies.clap]
+version = "4.0"
+features = ["derive", "deprecated", "wrap_help"]
 
 [dev-dependencies]
 assert_cmd = "2.0"

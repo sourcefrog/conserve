@@ -193,6 +193,7 @@ dependencies = [
  "once_cell",
  "strsim",
  "termcolor",
+ "terminal_size",
 ]
 
 [[package]]
