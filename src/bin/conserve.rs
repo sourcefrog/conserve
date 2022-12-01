@@ -16,7 +16,7 @@
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
-use clap::{Parser, StructOpt, Subcommand};
+use clap::{Parser, Subcommand};
 use tracing::trace;
 
 use conserve::backup::BackupOptions;
@@ -25,6 +25,7 @@ use conserve::RestoreOptions;
 use conserve::*;
 
 #[derive(Debug, Parser)]
+#[command(author, about, version)]
 #[clap(
     name = "conserve",
     about = "A robust backup tool <https://github.com/sourcefrog/conserve/>",
@@ -32,7 +33,7 @@ use conserve::*;
     version
 )]
 struct Args {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     command: Command,
 
     /// No progress bars.
@@ -44,7 +45,7 @@ struct Args {
     debug: bool,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Debug, Subcommand)]
 enum Command {
     /// Copy source directory into an archive.
     Backup {
@@ -71,12 +72,13 @@ enum Command {
         /// Archive to delete from.
         archive: String,
         /// Backup to delete.
-        #[clap(
+        #[arg(
             long,
             short,
-            multiple_occurrences(true),
+            value_delimiter = ',',
+            // multiple_occurrences(true),
             required(true),
-            number_of_values(1)
+            // number_of_values(1)
         )]
         backup: Vec<BandId>,
         /// Don't actually delete, just check what could be deleted.
@@ -201,7 +203,7 @@ enum Command {
     },
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct StoredTreeOrSource {
     #[clap(required_unless_present = "source")]
     archive: Option<String>,

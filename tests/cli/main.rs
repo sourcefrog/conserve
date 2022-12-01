@@ -41,7 +41,7 @@ fn no_args() {
         .assert()
         .failure()
         .stdout(predicate::str::is_empty())
-        .stderr(predicate::str::contains("USAGE:"));
+        .stderr(predicate::str::contains("Usage:"));
 }
 
 #[test]
