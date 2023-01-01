@@ -305,6 +305,7 @@ fn backup_unix_permissions() {
     cp_r::CopyOptions::new()
         .copy_tree(&src, &data_dir)
         .expect("Failed to copy files into test dir");
+    set_permissions(&data_dir, Permissions::from_mode(0o755)).unwrap();
 
     // set subdir as group-writable
     set_permissions(data_dir.join("subdir"), Permissions::from_mode(0o775))
@@ -354,11 +355,11 @@ fn backup_unix_permissions() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with(format!(
+        .stdout(predicate::str::diff(format!(
             "rwxr-xr-x {user:<10} {group:<10} /\n\
              r--r--r-- {user:<10} {group:<10} /hello\n\
              rwxrwxr-x {user:<10} {group:<10} /subdir\n\
-             rwxr-xr-x {user:<10} {group:<10} /subdir/subfile"
+             rwxr-xr-x {user:<10} {group:<10} /subdir/subfile\n"
         )));
 
     // create a directory to restore to
@@ -377,7 +378,7 @@ fn backup_unix_permissions() {
              r--r--r-- {user:<10} {group:<10} /hello\n\
              rwxrwxr-x {user:<10} {group:<10} /subdir\n\
              rwxr-xr-x {user:<10} {group:<10} /subdir/subfile\n\
-             Restore complete."
+             Restore complete.\n"
         )));
 }
 
