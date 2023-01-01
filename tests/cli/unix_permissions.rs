@@ -241,7 +241,7 @@ fn list_testdata_with_permissions() {
     let archive_path = Path::new("testdata/archive/minimal/v0.6.17");
     run_conserve()
         .args(["ls", "-l"])
-        .arg(&archive_path)
+        .arg(archive_path)
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
