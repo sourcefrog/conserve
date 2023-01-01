@@ -179,7 +179,7 @@ impl Iter {
     /// Construct a new iter that will visit everything below this root path,
     /// subject to some exclusions
     fn new(root_path: &Path, subtree: Apath, exclude: Exclude) -> Result<Iter> {
-        let start_metadata = fs::symlink_metadata(&subtree.below(root_path))?;
+        let start_metadata = fs::symlink_metadata(subtree.below(root_path))?;
         // Preload iter to return the root and then recurse into it.
         let entry_deque: VecDeque<LiveEntry> = [LiveEntry::from_fs_metadata(
             subtree.clone(),

@@ -237,7 +237,7 @@ mod test {
         assert_eq!(stats.index_hunks, 1);
         // incomplete
 
-        std::fs::remove_dir_all(&af.path().join("b0003"))?;
+        std::fs::remove_dir_all(af.path().join("b0003"))?;
 
         let archive = Archive::open_path(af.path())?;
         assert_eq!(simple_ls(&archive, &BandId::new(&[0])), "/0:b0 /1:b0 /2:b0");

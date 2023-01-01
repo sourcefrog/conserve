@@ -467,7 +467,7 @@ mod tests {
         assert!(af.path().join("d").is_dir());
 
         let header_path = af.path().join("CONSERVE");
-        let mut header_file = fs::File::open(&header_path).unwrap();
+        let mut header_file = fs::File::open(header_path).unwrap();
         let mut contents = String::new();
         header_file.read_to_string(&mut contents).unwrap();
         assert_eq!(contents, "{\"conserve_archive_version\":\"0.6\"}\n");

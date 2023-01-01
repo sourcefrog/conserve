@@ -207,10 +207,10 @@ impl Band {
         Ok(Info {
             id: self.band_id.clone(),
             is_closed: tail_option.is_some(),
-            start_time: Utc.timestamp(self.head.start_time, 0),
+            start_time: Utc.timestamp_opt(self.head.start_time, 0).unwrap(),
             end_time: tail_option
                 .as_ref()
-                .map(|tail| Utc.timestamp(tail.end_time, 0)),
+                .map(|tail| Utc.timestamp_opt(tail.end_time, 0).unwrap()),
             index_hunk_count: tail_option.as_ref().and_then(|tail| tail.index_hunk_count),
         })
     }

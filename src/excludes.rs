@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn simple_globs() {
         let vec = vec!["fo*", "foo", "bar*"];
-        let exclude = Exclude::from_strings(&vec).unwrap();
+        let exclude = Exclude::from_strings(vec).unwrap();
 
         // Matches in the root
         assert!(exclude.matches("/foo"));

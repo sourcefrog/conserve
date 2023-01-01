@@ -42,7 +42,7 @@ fn simple_restore() {
     assert!(dest.join("subdir").is_dir());
     assert!(dest.join("subdir").join("subfile").is_file());
     if SYMLINKS_SUPPORTED {
-        let dest = std::fs::read_link(&dest.join("link")).unwrap();
+        let dest = std::fs::read_link(dest.join("link")).unwrap();
         assert_eq!(dest.to_string_lossy(), "target");
     }
 
@@ -128,7 +128,7 @@ fn restore_symlink() {
         nanosecs: 0,
     };
     let mtime: FileTime = years_ago.into();
-    set_symlink_file_times(&srcdir.path().join("symlink"), mtime, mtime).unwrap();
+    set_symlink_file_times(srcdir.path().join("symlink"), mtime, mtime).unwrap();
 
     backup(&af, &srcdir.live_tree(), &Default::default()).unwrap();
 

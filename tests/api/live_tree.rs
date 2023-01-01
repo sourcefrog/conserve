@@ -130,7 +130,7 @@ fn exclude_cachedir() {
     tf.create_file("a");
     let cache_dir = tf.create_dir("cache");
     tf.create_dir("cache/1");
-    cachedir::add_tag(&cache_dir).unwrap();
+    cachedir::add_tag(cache_dir).unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let names =
