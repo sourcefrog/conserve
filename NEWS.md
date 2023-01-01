@@ -1,5 +1,12 @@
 # Conserve release history
 
+## v0.6.17
+
+Not released yet!
+
+- New: Support for storing, restoring, and listing Unix owner, group, and permissions.
+  Thanks to @believeinlain.
+  
 ## v0.6.16
 
 Released 2022-08-12
