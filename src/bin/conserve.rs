@@ -56,6 +56,9 @@ enum Command {
         exclude_from: Vec<String>,
         #[arg(long)]
         no_stats: bool,
+        /// Show permissions, owner, and group in verbose output.
+        #[arg(long, short = 'l')]
+        long_listing: bool,
     },
 
     #[command(subcommand)]
@@ -123,6 +126,10 @@ enum Command {
         exclude: Vec<String>,
         #[arg(long, short = 'E')]
         exclude_from: Vec<String>,
+
+        /// Show permissions, owner, and group.
+        #[arg(short = 'l')]
+        long_listing: bool,
     },
 
     /// Copy a stored tree to a restore directory.
@@ -143,6 +150,9 @@ enum Command {
         only_subtree: Option<Apath>,
         #[arg(long)]
         no_stats: bool,
+        /// Show permissions, owner, and group in verbose output.
+        #[arg(long, short = 'l')]
+        long_listing: bool,
     },
 
     /// Show the total size of files in a stored tree or source directory, with exclusions.
@@ -248,12 +258,14 @@ impl Command {
                 exclude,
                 exclude_from,
                 no_stats,
+                long_listing,
             } => {
                 let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let source = &LiveTree::open(source)?;
                 let options = BackupOptions {
                     print_filenames: *verbose,
                     exclude,
+                    long_listing: *long_listing,
                     ..Default::default()
                 };
                 let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
@@ -348,6 +360,7 @@ impl Command {
                 stos,
                 exclude,
                 exclude_from,
+                long_listing,
             } => {
                 let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 if let Some(archive) = &stos.archive {
@@ -356,12 +369,14 @@ impl Command {
                         stored_tree_from_opt(archive, &stos.backup)?
                             .iter_entries(Apath::root(), exclude)?,
                         &mut stdout,
+                        *long_listing,
                     )?;
                 } else {
                     show::show_entry_names(
                         LiveTree::open(stos.source.clone().unwrap())?
                             .iter_entries(Apath::root(), exclude)?,
                         &mut stdout,
+                        *long_listing,
                     )?;
                 }
             }
@@ -375,6 +390,7 @@ impl Command {
                 exclude_from,
                 only_subtree,
                 no_stats,
+                long_listing,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open(open_transport(archive)?)?;
@@ -385,6 +401,7 @@ impl Command {
                     only_subtree: only_subtree.clone(),
                     band_selection,
                     overwrite: *force_overwrite,
+                    long_listing: *long_listing,
                 };
 
                 let stats = restore(&archive, destination, &options)?;

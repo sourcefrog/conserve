@@ -160,7 +160,7 @@ The current data format (called "0.6") will be readable by future releases for a
 
 Be aware Conserve is developed as a part-time non-commercial project and there's no guarantee of support or reliability. Bug reports are welcome but I cannot promise they will receive a resolution within any particular time frame.
 
-As of October 2022 I am primarily spending my open-souce time on [cargo-mutants](https://github.com/sourcefrog/cargo-mutants). When that is feature complete, which is anticipated by early-mid 2023, I will likely come back to working more on Conserve.
+As of October 2022 I am primarily spending my open-source time on [cargo-mutants](https://github.com/sourcefrog/cargo-mutants). When that is feature complete, which is anticipated by early-mid 2023, I will likely come back to working more on Conserve.
 
 There is still room for several performance improvements and features. See the [issue tracker][issues] for a list.
 

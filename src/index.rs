@@ -22,9 +22,11 @@ use std::vec;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
+use crate::owner::Owner;
 use crate::stats::{IndexReadStats, IndexWriterStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
+use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
 use crate::*;
 
@@ -48,6 +50,14 @@ pub struct IndexEntry {
     /// File modification time, in whole seconds past the Unix epoch.
     #[serde(default)]
     pub mtime: i64,
+
+    /// Discretionary Access Control permissions (such as read/write/execute on unix)
+    #[serde(default)]
+    pub unix_mode: UnixMode,
+
+    /// User and Group names of the owners of the file
+    #[serde(default, flatten, skip_serializing_if = "Owner::is_none")]
+    pub owner: Owner,
 
     /// Fractional nanoseconds for modification time.
     ///
@@ -103,6 +113,14 @@ impl Entry for IndexEntry {
     fn symlink_target(&self) -> &Option<String> {
         &self.target
     }
+
+    fn unix_mode(&self) -> UnixMode {
+        self.unix_mode
+    }
+
+    fn owner(&self) -> Owner {
+        self.owner.clone()
+    }
 }
 
 impl IndexEntry {
@@ -120,6 +138,8 @@ impl IndexEntry {
             target: source.symlink_target().clone(),
             mtime: mtime.secs,
             mtime_nanos: mtime.nanosecs,
+            unix_mode: source.unix_mode(),
+            owner: source.owner(),
         }
     }
 }
@@ -511,6 +531,8 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            unix_mode: Default::default(),
+            owner: Default::default(),
         }
     }
 
@@ -523,6 +545,8 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            unix_mode: Default::default(),
+            owner: Default::default(),
         }];
         let index_json = serde_json::to_string(&entries).unwrap();
         println!("{}", index_json);
@@ -530,7 +554,8 @@ mod tests {
             index_json,
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
-             \"mtime\":1461736377}]"
+             \"mtime\":1461736377,\
+             \"unix_mode\":null}]"
         );
     }
 
@@ -585,12 +610,16 @@ mod tests {
         assert_eq!(stats.index_hunks, 1);
         assert!(stats.compressed_index_bytes > 30);
         assert!(
-            stats.compressed_index_bytes < 70,
+            stats.compressed_index_bytes <= 125,
             "expected shorter compressed index: {}",
             stats.compressed_index_bytes
         );
         assert!(stats.uncompressed_index_bytes > 100);
-        assert!(stats.uncompressed_index_bytes < 200);
+        assert!(
+            stats.uncompressed_index_bytes < 250,
+            "expected shorter uncompressed index: {}",
+            stats.uncompressed_index_bytes
+        );
 
         assert!(
             std::fs::metadata(testdir.path().join("00000").join("000000000"))

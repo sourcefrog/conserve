@@ -28,6 +28,8 @@ mod backup;
 mod delete;
 mod diff;
 mod exclude;
+#[cfg(unix)]
+mod unix_permissions;
 mod versions;
 
 fn run_conserve() -> Command {
@@ -265,7 +267,7 @@ fn basic_backup() {
     // Validate
     run_conserve()
         .arg("validate")
-        .arg(&arch_dir)
+        .arg(arch_dir)
         .assert()
         .success()
         .stderr(predicate::str::is_empty())

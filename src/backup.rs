@@ -35,6 +35,9 @@ pub struct BackupOptions {
     /// Exclude these globs from the backup.
     pub exclude: Exclude,
 
+    /// If printing filenames, include metadata such as file permissions
+    pub long_listing: bool,
+
     pub max_entries_per_hunk: usize,
 }
 
@@ -44,6 +47,7 @@ impl Default for BackupOptions {
             print_filenames: false,
             exclude: Exclude::nothing(),
             max_entries_per_hunk: crate::index::MAX_ENTRIES_PER_HUNK,
+            long_listing: false,
         }
     }
 }
@@ -117,7 +121,18 @@ pub fn backup(
                 }
                 Ok(Some(diff_kind)) => {
                     if options.print_filenames && diff_kind != DiffKind::Unchanged {
-                        writeln!(view, "{} {}", diff_kind.as_sigil(), entry.apath())?;
+                        if options.long_listing {
+                            writeln!(
+                                view,
+                                "{} {} {} {}",
+                                diff_kind.as_sigil(),
+                                entry.unix_mode(),
+                                entry.owner(),
+                                entry.apath()
+                            )?;
+                        } else {
+                            writeln!(view, "{} {}", diff_kind.as_sigil(), entry.apath())?;
+                        }
                     }
                     view.update(|model| match diff_kind {
                         DiffKind::Changed => model.entries_changed += 1,

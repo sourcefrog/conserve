@@ -41,7 +41,12 @@ thousands = "0.2.0"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3.11", features = ["env-filter", "fmt"] }
+unix_mode = "0.1"
 url = "2.2.2"
+
+[target.'cfg(unix)'.dependencies]
+users = "0.11"
+nix = "0.25"
 
 [dependencies.clap]
 version = "4.0"

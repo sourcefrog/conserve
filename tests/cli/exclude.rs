@@ -34,7 +34,7 @@ fn exclude_option_ordering() {
 
     run_conserve()
         .args(["backup", "--exclude", "**/target"])
-        .arg(&arch_dir)
+        .arg(arch_dir)
         .arg(src.path())
         .assert()
         .success();
@@ -138,7 +138,7 @@ fn exclude_from_file() {
 
     run_conserve()
         .args(["backup", "-v", "--exclude-from"])
-        .arg(&src.path().join("exclude"))
+        .arg(src.path().join("exclude"))
         .arg(af.path())
         .args(["--exclude=*~"])
         .arg(src.path())
