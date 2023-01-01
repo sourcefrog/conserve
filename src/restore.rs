@@ -264,29 +264,27 @@ impl RestoreTree {
                     stats.errors += 1;
                 })
                 .ok();
-            // Restore ownership
+            // Restore ownership if possible.
+            // TODO: Stats and warnings if a user or group is specified in the index but
+            // does not exist on the local system.
             let owner = source_entry.owner();
-            let uid = if let Some(username) = owner.user {
-                users::get_user_by_name(&username).map(|user| user.uid())
-            } else {
-                None
-            };
-            let gid = if let Some(groupname) = owner.group {
-                users::get_group_by_name(&groupname).map(|group| group.gid())
-            } else {
-                None
-            };
+            let uid_opt = owner
+                .user
+                .and_then(|user| users::get_user_by_name(&user))
+                .map(|user| user.uid())
+                .map(unistd::Uid::from_raw);
+            let gid_opt = owner
+                .group
+                .and_then(|group| users::get_group_by_name(&group))
+                .map(|group| group.gid())
+                .map(unistd::Gid::from_raw);
             // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
-            unistd::chown(
-                &path,
-                uid.map(unistd::Uid::from_raw),
-                gid.map(unistd::Gid::from_raw),
-            )
-            .map_err(|e| {
-                ui::show_error(&e);
-                stats.errors += 1;
-            })
-            .ok();
+            unistd::chown(&path, uid_opt, gid_opt)
+                .map_err(|e| {
+                    ui::show_error(&e);
+                    stats.errors += 1;
+                })
+                .ok();
         }
 
         // TODO: Accumulate more stats.
