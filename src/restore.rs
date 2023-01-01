@@ -204,12 +204,12 @@ impl RestoreTree {
         #[cfg(unix)]
         for (path, unix_mode) in self.dir_unix_modes {
             if let Err(err) = unix_mode.set_permissions(path) {
-                ui::problem(&format!("Failed to set directory permissions: {:?}", err));
+                ui::problem(&format!("Failed to set directory permissions: {err:?}"));
             }
         }
         for (path, time) in self.dir_mtimes {
             if let Err(err) = filetime::set_file_mtime(path, time.into()) {
-                ui::problem(&format!("Failed to set directory mtime: {:?}", err));
+                ui::problem(&format!("Failed to set directory mtime: {err:?}"));
             }
         }
         Ok(RestoreStats::default())

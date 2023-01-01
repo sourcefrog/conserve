@@ -33,7 +33,7 @@ fn open_old_archive(ver: &str, name: &str) -> Archive {
 }
 
 fn archive_testdata_path(name: &str, ver: &str) -> String {
-    format!("testdata/archive/{}/v{}/", name, ver)
+    format!("testdata/archive/{name}/v{ver}/")
 }
 
 #[test]
@@ -47,7 +47,7 @@ fn all_archive_versions_are_tested() {
         present_subdirs,
         MINIMAL_ARCHIVE_VERSIONS
             .iter()
-            .map(|s| format!("v{}", s))
+            .map(|s| format!("v{s}"))
             .collect::<HashSet<String>>()
     );
 }
@@ -55,7 +55,7 @@ fn all_archive_versions_are_tested() {
 #[test]
 fn examine_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
-        println!("examine {}", ver);
+        println!("examine {ver}");
         let archive = open_old_archive(ver, "minimal");
 
         let band_ids = archive.list_band_ids().expect("Failed to list band ids");
@@ -74,7 +74,7 @@ fn examine_archive() {
 #[test]
 fn validate_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
-        println!("validate {}", ver);
+        println!("validate {ver}");
         let archive = open_old_archive(ver, "minimal");
 
         let stats = archive

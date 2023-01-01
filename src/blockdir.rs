@@ -123,8 +123,7 @@ impl BlockDir {
                 if io_err.kind() == io::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
                     ui::problem(&format!(
-                        "Unexpected late detection of existing block {:?}",
-                        hex_hash
+                        "Unexpected late detection of existing block {hex_hash:?}"
                     ));
                     Ok(())
                 } else {
@@ -206,8 +205,7 @@ impl BlockDir {
                 true
             } else {
                 ui::problem(&format!(
-                    "Unexpected subdirectory in blockdir: {:?}",
-                    dirname
+                    "Unexpected subdirectory in blockdir: {dirname:?}"
                 ));
                 false
             }

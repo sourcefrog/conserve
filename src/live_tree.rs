@@ -233,8 +233,7 @@ impl Iter {
                 Some(c) => c,
                 None => {
                     ui::problem(&format!(
-                        "Couldn't decode filename {:?} in {:?}",
-                        child_osstr, dir_path,
+                        "Couldn't decode filename {child_osstr:?} in {dir_path:?}",
                     ));
                     continue;
                 }
@@ -250,8 +249,7 @@ impl Iter {
                 Ok(ft) => ft,
                 Err(e) => {
                     ui::problem(&format!(
-                        "Error getting type of {:?} during iteration: {}",
-                        child_apath, e
+                        "Error getting type of {child_apath:?} during iteration: {e}"
                     ));
                     continue;
                 }
@@ -264,8 +262,7 @@ impl Iter {
                     Ok(false) => (),
                     Err(e) => {
                         ui::problem(&format!(
-                            "Error checking CACHEDIR.TAG in {:?}: {}",
-                            dir_entry, e
+                            "Error checking CACHEDIR.TAG in {dir_entry:?}: {e}"
                         ));
                     }
                 }
@@ -279,14 +276,12 @@ impl Iter {
                             // Fairly harmless, and maybe not even worth logging. Just a race
                             // between listing the directory and looking at the contents.
                             ui::problem(&format!(
-                                "File disappeared during iteration: {:?}: {}",
-                                child_apath, e
+                                "File disappeared during iteration: {child_apath:?}: {e}"
                             ));
                         }
                         _ => {
                             ui::problem(&format!(
-                                "Failed to read source metadata from {:?}: {}",
-                                child_apath, e
+                                "Failed to read source metadata from {child_apath:?}: {e}"
                             ));
                             self.stats.metadata_error += 1;
                         }
@@ -302,8 +297,7 @@ impl Iter {
                     Ok(t) => t,
                     Err(e) => {
                         ui::problem(&format!(
-                            "Failed to read target of symlink {:?}: {}",
-                            child_apath, e
+                            "Failed to read target of symlink {child_apath:?}: {e}"
                         ));
                         continue;
                     }
@@ -312,8 +306,7 @@ impl Iter {
                     Ok(t) => Some(t),
                     Err(e) => {
                         ui::problem(&format!(
-                            "Failed to decode target of symlink {:?}: {:?}",
-                            child_apath, e
+                            "Failed to decode target of symlink {child_apath:?}: {e:?}"
                         ));
                         continue;
                     }

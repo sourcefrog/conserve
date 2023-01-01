@@ -341,8 +341,7 @@ impl Iterator for IndexHunkIter {
                 Err(err) => {
                     self.stats.errors += 1;
                     ui::problem(&format!(
-                        "Error reading index hunk {:?}: {:?} ",
-                        hunk_number, err
+                        "Error reading index hunk {hunk_number:?}: {err:?} "
                     ));
                     continue;
                 }
@@ -549,7 +548,7 @@ mod tests {
             owner: Default::default(),
         }];
         let index_json = serde_json::to_string(&entries).unwrap();
-        println!("{}", index_json);
+        println!("{index_json}");
         assert_eq!(
             index_json,
             "[{\"apath\":\"/a/b\",\
@@ -796,7 +795,7 @@ mod tests {
     fn no_final_empty_hunk() -> Result<()> {
         let (testdir, mut ib) = setup();
         for i in 0..MAX_ENTRIES_PER_HUNK {
-            ib.push_entry(sample_entry(&format!("/{:0>10}", i)));
+            ib.push_entry(sample_entry(&format!("/{i:0>10}")));
         }
         ib.finish_hunk()?;
         // Think about, but don't actually add some files

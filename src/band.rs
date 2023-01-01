@@ -318,8 +318,7 @@ mod tests {
         let e_str = e.unwrap_err().to_string();
         assert!(
             e_str.contains("Band version \"0.8.8\" in"),
-            "bad band version: {:#?}",
-            e_str
+            "bad band version: {e_str:#?}"
         );
     }
 }

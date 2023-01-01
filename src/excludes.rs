@@ -88,7 +88,7 @@ impl ExcludeBuilder {
         let pat: Cow<str> = if pat.starts_with('/') {
             Cow::Borrowed(pat)
         } else {
-            Cow::Owned(format!("**/{}", pat))
+            Cow::Owned(format!("**/{pat}"))
         };
         let glob = GlobBuilder::new(&pat)
             .literal_separator(true)

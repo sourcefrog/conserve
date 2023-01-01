@@ -322,7 +322,7 @@ impl Archive {
                 .keys()
                 .filter(|&bh| !present_blocks.contains(bh))
             {
-                ui::problem(&format!("Block {:?} is missing", block_hash));
+                ui::problem(&format!("Block {block_hash:?} is missing"));
                 stats.block_missing_count += 1;
             }
         } else {
@@ -334,12 +334,12 @@ impl Archive {
             for (block_hash, referenced_len) in referenced_lens.0 {
                 if let Some(actual_len) = block_lengths.get(&block_hash) {
                     if referenced_len > (*actual_len as u64) {
-                        ui::problem(&format!("Block {:?} is too short", block_hash,));
+                        ui::problem(&format!("Block {block_hash:?} is too short",));
                         // TODO: A separate counter; this is worse than just being missing
                         stats.block_missing_count += 1;
                     }
                 } else {
-                    ui::problem(&format!("Block {:?} is missing", block_hash));
+                    ui::problem(&format!("Block {block_hash:?} is missing"));
                     stats.block_missing_count += 1;
                 }
             }
@@ -367,14 +367,13 @@ impl Archive {
                     Kind::File => files.push(name),
                     other_kind => {
                         ui::problem(&format!(
-                            "Unexpected file kind in archive directory: {:?} of kind {:?}",
-                            name, other_kind
+                            "Unexpected file kind in archive directory: {name:?} of kind {other_kind:?}"
                         ));
                         stats.unexpected_files += 1;
                     }
                 },
                 Err(source) => {
-                    ui::problem(&format!("Error listing archive directory: {:?}", source));
+                    ui::problem(&format!("Error listing archive directory: {source:?}"));
                     stats.io_errors += 1;
                 }
             }

@@ -49,22 +49,22 @@ pub fn show_versions(
     }
     for band_id in band_ids {
         if !(options.tree_size || options.start_time || options.backup_duration) {
-            writeln!(w, "{}", band_id)?;
+            writeln!(w, "{band_id}")?;
             continue;
         }
         let mut l: Vec<String> = Vec::new();
-        l.push(format!("{:<20}", band_id));
+        l.push(format!("{band_id:<20}"));
         let band = match Band::open(archive, &band_id) {
             Ok(band) => band,
             Err(e) => {
-                ui::problem(&format!("Failed to open band {:?}: {:?}", band_id, e));
+                ui::problem(&format!("Failed to open band {band_id:?}: {e:?}"));
                 continue;
             }
         };
         let info = match band.get_info() {
             Ok(info) => info,
             Err(e) => {
-                ui::problem(&format!("Failed to read band tail {:?}: {:?}", band_id, e));
+                ui::problem(&format!("Failed to read band tail {band_id:?}: {e:?}"));
                 continue;
             }
         };
@@ -78,7 +78,7 @@ pub fn show_versions(
                     .with_timezone(&chrono::Local)
                     .format(crate::TIMESTAMP_FORMAT)
             };
-            l.push(format!("{:<10}", start_time_str));
+            l.push(format!("{start_time_str:<10}"));
         }
 
         if options.backup_duration {
@@ -91,7 +91,7 @@ pub fn show_versions(
             } else {
                 Cow::Borrowed("incomplete")
             };
-            l.push(format!("{:>10}", duration_str));
+            l.push(format!("{duration_str:>10}"));
         }
 
         if options.tree_size {
@@ -101,7 +101,7 @@ pub fn show_versions(
                     .size(Exclude::nothing())?
                     .file_bytes,
             );
-            l.push(format!("{:>14}", tree_mb_str,));
+            l.push(format!("{tree_mb_str:>14}",));
         }
 
         writeln!(w, "{}", l.join(" "))?;
@@ -145,7 +145,7 @@ pub fn show_diff<D: Iterator<Item = DiffEntry>>(diff: D, w: &mut dyn Write) -> R
     // TODO: Optionally include unchanged files.
     let mut bw = BufWriter::new(w);
     for de in diff {
-        writeln!(bw, "{}", de)?;
+        writeln!(bw, "{de}")?;
     }
     Ok(())
 }

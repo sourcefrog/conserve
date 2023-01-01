@@ -270,7 +270,7 @@ impl Command {
                 };
                 let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
                 if !no_stats {
-                    ui::println(&format!("Backup complete.\n{}", stats));
+                    ui::println(&format!("Backup complete.\n{stats}"));
                 }
             }
             Command::Debug(Debug::Blocks { archive }) => {
@@ -279,7 +279,7 @@ impl Command {
                     .block_dir()
                     .block_names()?
                 {
-                    writeln!(bw, "{}", hash)?;
+                    writeln!(bw, "{hash}")?;
                 }
             }
             Command::Debug(Debug::Index { archive, backup }) => {
@@ -290,13 +290,13 @@ impl Command {
                 let mut bw = BufWriter::new(stdout);
                 let archive = Archive::open(open_transport(archive)?)?;
                 for hash in archive.referenced_blocks(&archive.list_band_ids()?)? {
-                    writeln!(bw, "{}", hash)?;
+                    writeln!(bw, "{hash}")?;
                 }
             }
             Command::Debug(Debug::Unreferenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks()? {
-                    writeln!(bw, "{}", hash)?;
+                    writeln!(bw, "{hash}")?;
                 }
             }
             Command::Delete {
@@ -314,7 +314,7 @@ impl Command {
                     },
                 )?;
                 if !no_stats {
-                    ui::println(&format!("{}", stats));
+                    ui::println(&format!("{stats}"));
                 }
             }
             Command::Diff {
@@ -349,7 +349,7 @@ impl Command {
                     },
                 )?;
                 if !no_stats {
-                    ui::println(&format!("{}", stats));
+                    ui::println(&format!("{stats}"));
                 }
             }
             Command::Init { archive } => {
@@ -406,7 +406,7 @@ impl Command {
 
                 let stats = restore(&archive, destination, &options)?;
                 if !no_stats {
-                    ui::println(&format!("Restore complete.\n{}", stats));
+                    ui::println(&format!("Restore complete.\n{stats}"));
                 }
             }
             Command::Size {
@@ -426,7 +426,7 @@ impl Command {
                         .file_bytes
                 };
                 if *bytes {
-                    ui::println(&format!("{}", size));
+                    ui::println(&format!("{size}"));
                 } else {
                     ui::println(&conserve::bytes_to_human_mb(size));
                 }
@@ -441,7 +441,7 @@ impl Command {
                 };
                 let stats = Archive::open(open_transport(archive)?)?.validate(&options)?;
                 if !no_stats {
-                    println!("{}", stats);
+                    println!("{stats}");
                 }
                 if stats.has_problems() {
                     ui::problem("Archive has some problems.");
