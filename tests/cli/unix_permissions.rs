@@ -1,6 +1,6 @@
 //! Tests for Unix permissions, run only on Unix.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
@@ -229,4 +229,28 @@ fn backup_user_and_permissions() {
         .child("subdir")
         .child("subfile")
         .assert("I like Rust\n");
+}
+
+#[test]
+/// List an archive with particular encoded permissions, from the first version tha tracked
+/// ownership and permissions.
+///
+/// This should succeed even, and especially, if the machine running the tests does
+/// not have users/groups matching those in the archive.
+fn list_testdata_with_permissions() {
+    let archive_path = Path::new("testdata/archive/minimal/v0.6.17");
+    run_conserve()
+        .args(["ls", "-l"])
+        .arg(&archive_path)
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::diff(
+            "\
+            rwxrwxr-x mbp        mbp        /\n\
+            rw-rw-r-- mbp        mbp        /hello\n\
+            rwxrwxr-x mbp        mbp        /subdir\n\
+            rw-rw-r-- mbp        mbp        /subdir/subfile\n\
+            ",
+        ));
 }
