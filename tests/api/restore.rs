@@ -12,16 +12,8 @@
 
 //! Tests focussed on restore.
 
-#[cfg(unix)]
-use std::fs::{read_link, symlink_metadata};
-use std::path::PathBuf;
-
-use filetime::{set_symlink_file_times, FileTime};
-use tempfile::TempDir;
-
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
-use conserve::unix_time::UnixTime;
 use conserve::*;
 
 #[test]
@@ -119,6 +111,14 @@ fn exclude_files() {
 #[test]
 #[cfg(unix)]
 fn restore_symlink() {
+    use std::path::PathBuf;
+    use std::fs::{read_link, symlink_metadata};
+
+    use tempfile::TempDir;
+    use filetime::{set_symlink_file_times, FileTime};
+    
+    use conserve::unix_time::UnixTime;
+    
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
 

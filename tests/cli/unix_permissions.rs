@@ -19,6 +19,7 @@ fn backup_unix_permissions() {
 
     // conserve init
     run_conserve()
+        .arg("-R")
         .arg("init")
         .arg(&arch_dir)
         .assert()
@@ -70,7 +71,7 @@ fn backup_unix_permissions() {
 
     // backup
     run_conserve()
-        .args(["backup", "-v", "-l"])
+        .args(["-R", "backup", "-v", "-l"])
         .arg(&arch_dir)
         .arg(&data_dir)
         .assert()
@@ -84,7 +85,7 @@ fn backup_unix_permissions() {
 
     // verify file permissions in stored archive
     run_conserve()
-        .args(["ls", "-l"])
+        .args(["-R", "ls", "-l"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -101,7 +102,7 @@ fn backup_unix_permissions() {
 
     // verify permissions are restored correctly
     run_conserve()
-        .args(["restore", "-v", "-l"])
+        .args(["-R", "restore", "-v", "-l"])
         .arg(&arch_dir)
         .arg(&*restore_dir)
         .assert()
@@ -126,6 +127,7 @@ fn backup_user_and_permissions() {
 
     // conserve init
     run_conserve()
+        .arg("-R")
         .arg("init")
         .arg(&arch_dir)
         .assert()
@@ -175,7 +177,7 @@ fn backup_user_and_permissions() {
 
     // verify ls command
     run_conserve()
-        .args(["ls", "-l", "--source"])
+        .args(["-R", "ls", "-l", "--source"])
         .arg(&src)
         .assert()
         .success()
@@ -184,7 +186,7 @@ fn backup_user_and_permissions() {
 
     // backup
     run_conserve()
-        .args(["backup"])
+        .args(["-R", "backup"])
         .arg(&arch_dir)
         .arg(&src)
         .assert()
@@ -196,7 +198,7 @@ fn backup_user_and_permissions() {
 
     // restore
     run_conserve()
-        .args(["restore", "-v", "-l", "--no-progress"])
+        .args(["-R", "restore", "-v", "-l", "--no-progress"])
         .arg(&arch_dir)
         .arg(restore_dir.path())
         .assert()
@@ -240,7 +242,7 @@ fn backup_user_and_permissions() {
 fn list_testdata_with_permissions() {
     let archive_path = Path::new("testdata/archive/minimal/v0.6.17");
     run_conserve()
-        .args(["ls", "-l"])
+        .args(["-R", "ls", "-l"])
         .arg(archive_path)
         .assert()
         .success()
