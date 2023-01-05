@@ -502,7 +502,7 @@ impl RestoreMonitor for NutmegMonitor<RestoreProgressModel> {
             FileListVerbosity::NameOnly => info!("{}", entry.apath()),
             FileListVerbosity::Full => {
                 info!(
-                    "{} {} {}\n",
+                    "{} {} {}",
                     entry.unix_mode(),
                     entry.owner(),
                     entry.apath()
