@@ -19,10 +19,10 @@ use std::path::{Path, PathBuf};
 use std::{fs, time::Instant};
 
 use filetime::set_file_handle_times;
+use tracing::{debug, warn};
 
 #[cfg(unix)]
-use filetime::set_symlink_file_times;
-use tracing::{debug, warn};
+use nix::unistd;
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
@@ -223,7 +223,7 @@ impl RestoreTree {
                 .unix_mode()
                 .set_permissions(&path)
                 .map_err(|e| {
-                    ui::show_error(&e);
+                    error!("Failed to set permissions on {path}: {}", ui::format_error_causes(&e));
                     stats.errors += 1;
                 })
                 .ok();
@@ -244,7 +244,7 @@ impl RestoreTree {
             // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
             unistd::chown(&path, uid_opt, gid_opt)
                 .map_err(|e| {
-                    ui::show_error(&e);
+                    error!("Failed to change owner on {path}: {}", ui::format_error_causes(&e));
                     stats.errors += 1;
                 })
                 .ok();
