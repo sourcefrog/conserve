@@ -105,7 +105,7 @@ impl fmt::Display for BandId {
         let mut result = String::with_capacity(self.seqs.len() * 5);
         result.push('b');
         for s in &self.seqs {
-            let _ = write!(result, "{:04}-", s);
+            let _ = write!(result, "{s:04}-");
         }
         result.pop(); // remove the last dash
         result.shrink_to_fit();
@@ -194,8 +194,8 @@ mod tests {
     #[test]
     fn format() {
         let a_bandid = BandId::from_str("b0001-0234").unwrap();
-        assert_eq!(format!("{}", a_bandid), "b0001-0234");
+        assert_eq!(format!("{a_bandid}"), "b0001-0234");
         // Implements padding correctly
-        assert_eq!(format!("{:<15}", a_bandid), "b0001-0234     ");
+        assert_eq!(format!("{a_bandid:<15}"), "b0001-0234     ");
     }
 }

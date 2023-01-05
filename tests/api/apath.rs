@@ -55,7 +55,7 @@ pub fn invalid() {
         "/hello\0",
     ];
     for v in invalid_cases.iter() {
-        assert!(!Apath::is_valid(v), "{:?} incorrectly marked valid", v);
+        assert!(!Apath::is_valid(v), "{v:?} incorrectly marked valid");
     }
 }
 
@@ -91,18 +91,17 @@ pub fn valid_and_ordered() {
         "/b/b/b/{zz}",
     ];
     for (i, a) in ordered.iter().enumerate() {
-        assert!(Apath::is_valid(a), "{:?} incorrectly marked invalid", a);
+        assert!(Apath::is_valid(a), "{a:?} incorrectly marked invalid");
         let ap = Apath::from(*a);
         // Check it can be formatted
-        assert_eq!(format!("{}", ap), *a);
+        assert_eq!(format!("{ap}"), *a);
         for (j, b) in ordered.iter().enumerate() {
             let expected_order = i.cmp(&j);
             let bp = Apath::from(*b);
             let r = ap.cmp(&bp);
             assert_eq!(
                 r, expected_order,
-                "cmp({:?}, {:?}): returned {:?} expected {:?}", // GRCOV_EXCLUDE
-                ap, bp, r, expected_order
+                "cmp({ap:?}, {bp:?}): returned {r:?} expected {expected_order:?}"
             );
         }
     }

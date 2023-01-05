@@ -18,13 +18,13 @@ use std::path::PathBuf;
 use std::process::Termination;
 use std::str::FromStr;
 
-use clap::{Parser, StructOpt, Subcommand};
+use clap::{Parser, Subcommand};
 use log::{LogGuard, LoggingOptions};
-use monitor::ValidateProgressModel;
 use monitor::{
     BackupProgressModel, DeleteProcessModel, NutmegMonitor, ReferencedBlocksProgressModel,
     RestoreProgressModel, SizeProgressModel,
 };
+use monitor::{FileListVerbosity, ValidateProgressModel};
 use show::{show_diff, show_versions, ShowVersionsOptions};
 use tracing::{error, info, trace, warn, Level};
 
@@ -38,38 +38,33 @@ mod monitor;
 mod show;
 
 #[derive(Debug, Parser)]
-#[clap(
-    name = "conserve",
-    about = "A robust backup tool <https://github.com/sourcefrog/conserve/>",
-    author,
-    version
-)]
+#[command(author, about, version)]
 struct Args {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     command: Command,
 
     /// No progress bars.
-    #[clap(long, short = 'P', global = true)]
+    #[arg(long, short = 'P', global = true)]
     no_progress: bool,
 
     /// Show debug trace to stdout.
-    #[clap(long, short = 'D', global = true)]
+    #[arg(long, short = 'D', global = true)]
     debug: bool,
 
     /// Don't show log timestamps and levels for the terminal output.
-    #[clap(long, short = 'R', global = true)]
+    #[arg(long, short = 'R', global = true)]
     log_raw: bool,
 
     /// Set the log level to trace
-    #[clap(long, short = 'L', global = true)]
+    #[arg(long, short = 'L', global = true)]
     log_level: Option<tracing::Level>,
 
     /// Path to the output log file
-    #[clap(long, short = 'F', global = true)]
+    #[arg(long, short = 'F', global = true)]
     log_file: Option<String>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Debug, Subcommand)]
 enum Command {
     /// Copy source directory into an archive.
     Backup {
@@ -78,39 +73,36 @@ enum Command {
         /// Source directory to copy from.
         source: PathBuf,
         /// Print copied file names.
-        #[clap(long, short)]
+        #[arg(long, short)]
         verbose: bool,
-        #[clap(long, short, number_of_values = 1)]
+        #[arg(long, short)]
         exclude: Vec<String>,
-        #[clap(long, short = 'E', number_of_values = 1)]
+        #[arg(long, short = 'E')]
         exclude_from: Vec<String>,
-        #[clap(long)]
+        #[arg(long)]
         no_stats: bool,
+        /// Show permissions, owner, and group in verbose output.
+        #[arg(long, short = 'l')]
+        long_listing: bool,
     },
 
-    #[clap(subcommand)]
+    #[command(subcommand)]
     Debug(Debug),
 
     /// Delete backups from an archive.
     Delete {
         /// Archive to delete from.
         archive: String,
-        /// Backup to delete.
-        #[clap(
-            long,
-            short,
-            multiple_occurrences(true),
-            required(true),
-            number_of_values(1)
-        )]
+        /// Backup to delete, as an id like 'b1'. May be repeated with commas.
+        #[arg(long, short, value_delimiter = ',', required(true))]
         backup: Vec<BandId>,
         /// Don't actually delete, just check what could be deleted.
-        #[clap(long)]
+        #[arg(long)]
         dry_run: bool,
         /// Break a lock left behind by a previous interrupted gc operation, and then gc.
-        #[clap(long)]
+        #[arg(long)]
         break_lock: bool,
-        #[clap(long)]
+        #[arg(long)]
         no_stats: bool,
     },
 
@@ -118,13 +110,13 @@ enum Command {
     Diff {
         archive: String,
         source: PathBuf,
-        #[clap(long, short)]
+        #[arg(long, short)]
         backup: Option<BandId>,
-        #[clap(long, short, number_of_values = 1)]
+        #[arg(long, short)]
         exclude: Vec<String>,
-        #[clap(long, short = 'E', number_of_values = 1)]
+        #[arg(long, short = 'E')]
         exclude_from: Vec<String>,
-        #[clap(long)]
+        #[arg(long)]
         include_unchanged: bool,
     },
 
@@ -141,58 +133,65 @@ enum Command {
         /// Archive to delete from.
         archive: String,
         /// Don't actually delete, just check what could be deleted.
-        #[clap(long)]
+        #[arg(long)]
         dry_run: bool,
         /// Break a lock left behind by a previous interrupted gc operation, and then gc.
-        #[clap(long)]
+        #[arg(long)]
         break_lock: bool,
-        #[clap(long)]
+        #[arg(long)]
         no_stats: bool,
     },
 
     /// List files in a stored tree or source directory, with exclusions.
     Ls {
-        #[clap(flatten)]
+        #[command(flatten)]
         stos: StoredTreeOrSource,
 
-        #[clap(long, short, number_of_values = 1)]
+        #[arg(long, short)]
         exclude: Vec<String>,
-        #[clap(long, short = 'E', number_of_values = 1)]
+        #[arg(long, short = 'E')]
         exclude_from: Vec<String>,
+
+        /// Show permissions, owner, and group.
+        #[arg(short = 'l')]
+        long_listing: bool,
     },
 
     /// Copy a stored tree to a restore directory.
     Restore {
         archive: String,
         destination: PathBuf,
-        #[clap(long, short)]
+        #[arg(long, short)]
         backup: Option<BandId>,
-        #[clap(long, short)]
+        #[arg(long, short)]
         force_overwrite: bool,
-        #[clap(long, short)]
+        #[arg(long, short)]
         verbose: bool,
-        #[clap(long, short, number_of_values = 1)]
+        #[arg(long, short)]
         exclude: Vec<String>,
-        #[clap(long, short = 'E', number_of_values = 1)]
+        #[arg(long, short = 'E')]
         exclude_from: Vec<String>,
-        #[clap(long = "only", short = 'i', number_of_values = 1)]
+        #[arg(long = "only", short = 'i')]
         only_subtree: Option<Apath>,
-        #[clap(long)]
+        #[arg(long)]
         no_stats: bool,
+        /// Show permissions, owner, and group in verbose output.
+        #[arg(long, short = 'l')]
+        long_listing: bool,
     },
 
     /// Show the total size of files in a stored tree or source directory, with exclusions.
     Size {
-        #[clap(flatten)]
+        #[command(flatten)]
         stos: StoredTreeOrSource,
 
         /// Count in bytes, not megabytes.
-        #[clap(long)]
+        #[arg(long)]
         bytes: bool,
 
-        #[clap(long, short, number_of_values = 1)]
+        #[arg(long, short)]
         exclude: Vec<String>,
-        #[clap(long, short = 'E', number_of_values = 1)]
+        #[arg(long, short = 'E')]
         exclude_from: Vec<String>,
     },
 
@@ -202,9 +201,9 @@ enum Command {
         archive: String,
 
         /// Skip reading and checking the content of data blocks.
-        #[clap(long, short = 'q')]
+        #[arg(long, short = 'q')]
         quick: bool,
-        #[clap(long)]
+        #[arg(long)]
         no_stats: bool,
     },
 
@@ -212,27 +211,27 @@ enum Command {
     Versions {
         archive: String,
         /// Show only version names.
-        #[clap(long, short = 'q')]
+        #[arg(long, short = 'q')]
         short: bool,
         /// Sort bands to show most recent first.
-        #[clap(long, short = 'n')]
+        #[arg(long, short = 'n')]
         newest: bool,
         /// Show size of stored trees.
-        #[clap(long, short = 'z', conflicts_with = "short")]
+        #[arg(long, short = 'z', conflicts_with = "short")]
         sizes: bool,
         /// Show times in UTC.
-        #[clap(long)]
+        #[arg(long)]
         utc: bool,
     },
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct StoredTreeOrSource {
-    #[clap(required_unless_present = "source")]
+    #[arg(required_unless_present = "source")]
     archive: Option<String>,
 
     /// List files in a source directory rather than an archive.
-    #[clap(
+    #[arg(
         long,
         short,
         conflicts_with = "archive",
@@ -240,7 +239,7 @@ struct StoredTreeOrSource {
     )]
     source: Option<PathBuf>,
 
-    #[clap(long, short, conflicts_with = "source")]
+    #[arg(long, short, conflicts_with = "source")]
     backup: Option<BandId>,
 }
 
@@ -253,7 +252,7 @@ enum Debug {
         archive: String,
 
         /// Backup version number.
-        #[clap(long, short)]
+        #[arg(long, short)]
         backup: Option<BandId>,
     },
 
@@ -290,6 +289,7 @@ impl Command {
                 exclude,
                 exclude_from,
                 no_stats,
+                long_listing,
             } => {
                 let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let source = &LiveTree::open(source)?;
@@ -299,7 +299,11 @@ impl Command {
                 };
 
                 let mut model = BackupProgressModel::default();
-                model.verbose = *verbose;
+                if *long_listing {
+                    model.file_list = FileListVerbosity::Full;
+                } else if *verbose {
+                    model.file_list = FileListVerbosity::NameOnly;
+                }
 
                 let monitor = NutmegMonitor::new(model, !args.no_progress);
                 let stats = backup(
@@ -417,6 +421,7 @@ impl Command {
                 stos,
                 exclude,
                 exclude_from,
+                long_listing,
             } => {
                 let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 if let Some(archive) = &stos.archive {
@@ -424,11 +429,13 @@ impl Command {
                     show::show_entry_names(
                         stored_tree_from_opt(archive, &stos.backup)?
                             .iter_entries(Apath::root(), exclude)?,
+                        *long_listing,
                     )?;
                 } else {
                     show::show_entry_names(
                         LiveTree::open(stos.source.clone().unwrap())?
                             .iter_entries(Apath::root(), exclude)?,
+                        *long_listing,
                     )?;
                 }
             }
@@ -442,6 +449,7 @@ impl Command {
                 exclude_from,
                 only_subtree,
                 no_stats,
+                long_listing,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open(open_transport(archive)?)?;
@@ -453,8 +461,16 @@ impl Command {
                     overwrite: *force_overwrite,
                 };
 
+                let file_list = if *long_listing {
+                    FileListVerbosity::Full
+                } else if *verbose {
+                    FileListVerbosity::NameOnly
+                } else {
+                    FileListVerbosity::None
+                };
+
                 let monitor =
-                    NutmegMonitor::new(RestoreProgressModel::new(*verbose), !args.no_progress);
+                    NutmegMonitor::new(RestoreProgressModel::new(file_list), !args.no_progress);
                 let stats = restore(&archive, destination, &options, Some(&monitor))?;
                 if !no_stats {
                     info!("Restore complete.");

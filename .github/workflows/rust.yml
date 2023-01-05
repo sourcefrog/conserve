@@ -41,7 +41,10 @@ jobs:
         run: cargo build --all-targets
       - name: Test
         run: cargo test -- --include-ignored
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D clippy::all
-      - name: rustfmt
-        run: cargo fmt --all -- --check
+      # Clippy and rustfmt are excellent tools but are turned off here because it's too
+      # easy for PRs to fail due to irrelevant changes including Clippy flagging problems
+      # that it did not notice before.
+      # - name: clippy
+      #   run: cargo clippy --all-targets -- -d clippy::all
+      # - name: rustfmt
+      #   run: cargo fmt --all -- --check

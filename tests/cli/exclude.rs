@@ -33,9 +33,9 @@ fn exclude_option_ordering() {
     src.create_dir("subdir");
 
     run_conserve()
-        .args(&["backup", "--exclude", "**/target"])
-        .arg(&arch_dir)
-        .arg(&src.path())
+        .args(["backup", "--exclude", "**/target"])
+        .arg(arch_dir)
+        .arg(src.path())
         .assert()
         .success();
 }
@@ -50,16 +50,16 @@ fn exclude_simple_glob() {
     src.create_file("src/hello.o");
 
     run_conserve()
-        .args(&["-R", "backup", "-v", "--exclude", "*.o", "--no-stats"])
-        .arg(&af.path())
-        .arg(&src.path())
+        .args(["-R", "backup", "-v", "--exclude", "*.o", "--no-stats"])
+        .arg(af.path())
+        .arg(src.path())
         .assert()
         .stdout("+ /src/hello.c\n")
         .success();
 
     run_conserve()
-        .args(&["-R", "ls"])
-        .arg(&af.path())
+        .args(["-R", "ls"])
+        .arg(af.path())
         .assert()
         .stdout("/\n/src\n/src/hello.c\n")
         .success();
@@ -76,16 +76,16 @@ fn exclude_glob_only_in_root() {
     src.create_file("src/hello.o");
 
     run_conserve()
-        .args(&["-R", "backup", "-v", "--exclude", "/*.o", "--no-stats"])
-        .arg(&af.path())
-        .arg(&src.path())
+        .args(["-R", "backup", "-v", "--exclude", "/*.o", "--no-stats"])
+        .arg(af.path())
+        .arg(src.path())
         .assert()
         .stdout("+ /src/hello.c\n+ /src/hello.o\n")
         .success();
 
     run_conserve()
-        .args(&["-R", "ls"])
-        .arg(&af.path())
+        .args(["-R", "ls"])
+        .arg(af.path())
         .assert()
         .stdout("/\n/src\n/src/hello.c\n/src/hello.o\n")
         .success();
@@ -107,15 +107,15 @@ fn exclude_suffix_pattern() {
     src.create_dir("subproj/target/release");
 
     run_conserve()
-        .args(&["backup", "-v", "--exclude", "target/{release,debug}"])
-        .arg(&af.path())
-        .arg(&src.path())
+        .args(["backup", "-v", "--exclude", "target/{release,debug}"])
+        .arg(af.path())
+        .arg(src.path())
         .assert()
         .success();
 
     run_conserve()
-        .args(&["-R", "ls"])
-        .arg(&af.path())
+        .args(["-R", "ls"])
+        .arg(af.path())
         .assert()
         .stdout("/\n/release\n/src\n/subproj\n/target\n/src/hello.rs\n/subproj/target\n")
         .success();
@@ -137,11 +137,11 @@ fn exclude_from_file() {
     );
 
     run_conserve()
-        .args(&["backup", "-v", "--exclude-from"])
-        .arg(&src.path().join("exclude"))
-        .arg(&af.path())
-        .args(&["--exclude=*~"])
-        .arg(&src.path())
+        .args(["backup", "-v", "--exclude-from"])
+        .arg(src.path().join("exclude"))
+        .arg(af.path())
+        .args(["--exclude=*~"])
+        .arg(src.path())
         .assert()
         .success();
 }

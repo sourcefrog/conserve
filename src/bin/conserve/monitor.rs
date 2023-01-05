@@ -5,14 +5,33 @@ use conserve::archive::ValidateArchiveProblem;
 use conserve::stats::Sizes;
 use conserve::{
     BackupMonitor, Band, BandProblem, BandValidateError, BlockLengths, BlockMissingReason,
-    DeleteMonitor, DiffKind, Entry, IndexEntry, Kind, ReadTree, ReferencedBlocksMonitor,
-    RestoreMonitor, Result, TreeSizeMonitor, ValidateMonitor, ValidateStats, ValidateProgress, DeleteProgress, ReferencedBlocksProgress,
+    DeleteMonitor, DeleteProgress, DiffKind, Entry, IndexEntry, Kind, ReadTree,
+    ReferencedBlocksMonitor, ReferencedBlocksProgress, RestoreMonitor, Result, TreeSizeMonitor,
+    ValidateMonitor, ValidateProgress, ValidateStats,
 };
 use nutmeg::{Model, View};
 use thousands::Separable;
-use tracing::{error, info, warn, debug};
+use tracing::{debug, error, info, warn};
 
 use crate::log::{self, ViewLogGuard};
+
+#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
+pub enum FileListVerbosity {
+    /// Do not print a file list
+    None,
+
+    /// Only print the files name
+    NameOnly,
+
+    /// Print the file name alonw with owner and permissions
+    Full,
+}
+
+impl Default for FileListVerbosity {
+    fn default() -> Self {
+        FileListVerbosity::None
+    }
+}
 
 enum NutmegMonitorState<T: nutmeg::Model> {
     NutmegProgress {
@@ -68,7 +87,7 @@ impl<T: nutmeg::Model + Send + 'static> NutmegMonitor<T> {
             NutmegMonitorState::NutmegProgress { view, .. } => {
                 let view = view.lock().expect("lock() should not fail");
                 view.inspect_model(inspect_fn)
-            },
+            }
             NutmegMonitorState::NoProgress { state } => {
                 let mut state = state.lock().expect("lock() should not fail");
                 inspect_fn(&mut *state)
@@ -93,7 +112,7 @@ impl<T: nutmeg::Model + Send + 'static> NutmegMonitor<T> {
 
 #[derive(Default)]
 pub struct BackupProgressModel {
-    pub verbose: bool,
+    pub file_list: FileListVerbosity,
     filename: String,
 
     scanned_file_bytes: u64,
@@ -133,7 +152,7 @@ impl BackupMonitor for NutmegMonitor<BackupProgressModel> {
 
     fn copy_result(&self, entry: &conserve::LiveEntry, result: &Option<conserve::DiffKind>) {
         if let Some(diff_kind) = result.as_ref() {
-            let verbose = self.update_model(|model| {
+            let file_list = self.update_model(|model| {
                 match diff_kind {
                     DiffKind::Changed => model.entries_changed += 1,
                     DiffKind::New => model.entries_new += 1,
@@ -141,11 +160,21 @@ impl BackupMonitor for NutmegMonitor<BackupProgressModel> {
                     DiffKind::Deleted => model.entries_deleted += 1,
                 };
 
-                model.verbose
+                model.file_list
             });
 
-            if verbose {
-                info!("{} {}", diff_kind.as_sigil(), entry.apath());
+            match file_list {
+                FileListVerbosity::None => {}
+                FileListVerbosity::NameOnly => info!("{} {}", diff_kind.as_sigil(), entry.apath()),
+                FileListVerbosity::Full => {
+                    info!(
+                        "{} {} {} {}",
+                        diff_kind.as_sigil(),
+                        entry.unix_mode(),
+                        entry.owner(),
+                        entry.apath()
+                    );
+                }
             }
         }
 
@@ -176,7 +205,7 @@ impl nutmeg::Model for ValidateProgressModel {
     fn render(&mut self, _width: usize) -> String {
         let state = match &self.progress {
             Some(state) => state,
-            None => return "Validating, please wait...".to_string()
+            None => return "Validating, please wait...".to_string(),
         };
 
         match state {
@@ -184,16 +213,26 @@ impl nutmeg::Model for ValidateProgressModel {
             ValidateProgress::CountBandsFinished => "Finished counting bands".to_string(),
 
             ValidateProgress::ValidateArchive => "Validating archive integrity".to_string(),
-            ValidateProgress::ValidateArchiveFinished => "Finished validating archive integrity".to_string(),
+            ValidateProgress::ValidateArchiveFinished => {
+                "Finished validating archive integrity".to_string()
+            }
 
             ValidateProgress::ValidateBlocks => format!("Validating blocks"),
             ValidateProgress::ValidateBlocksFinished => format!("Blocks validated"),
 
-            ValidateProgress::ValidateBands { current, total } => format!("Validating band {}/{}", current, total),
-            ValidateProgress::ValidateBandsFinished { total } => format!("{} bands validated", total),
+            ValidateProgress::ValidateBands { current, total } => {
+                format!("Validating band {}/{}", current, total)
+            }
+            ValidateProgress::ValidateBandsFinished { total } => {
+                format!("{} bands validated", total)
+            }
 
-            ValidateProgress::ListBlockNames { discovered } => format!("Listing blocks ({} blocks discovered)", discovered),
-            ValidateProgress::ListBlockNamesFinished { total } => format!("Discovered {} blocks", total),
+            ValidateProgress::ListBlockNames { discovered } => {
+                format!("Listing blocks ({} blocks discovered)", discovered)
+            }
+            ValidateProgress::ListBlockNamesFinished { total } => {
+                format!("Discovered {} blocks", total)
+            }
 
             ValidateProgress::BlockRead { total, .. } => {
                 // Note: We're using our own read block counter (`read_blocks_count`) since the current argument in ValidateProgress::BlockRead
@@ -207,8 +246,10 @@ impl nutmeg::Model for ValidateProgressModel {
                     self.read_blocks_bytes / 1_000_000,
                     nutmeg::estimate_remaining(start, self.read_blocks_count, *total)
                 )
-            },
-            ValidateProgress::BlockReadFinished { total } => format!("Finished reading {} blocks", total),
+            }
+            ValidateProgress::BlockReadFinished { total } => {
+                format!("Finished reading {} blocks", total)
+            }
         }
     }
 }
@@ -222,20 +263,18 @@ impl ValidateMonitor for NutmegMonitor<ValidateProgressModel> {
                 if *discovered == 0 {
                     info!("Count blocks...");
                 }
-            },
+            }
             ValidateProgress::ValidateBands { .. } => {
                 self.update_model(|state| {
                     if state.bands_start.is_none() {
                         state.bands_start = Some(Instant::now());
                     }
                 });
-            },
+            }
             ValidateProgress::ValidateBandsFinished { .. } => {
-                let start = self.inspect_model(
-                    |state| state.bands_start.unwrap_or(Instant::now())
-                );
+                let start = self.inspect_model(|state| state.bands_start.unwrap_or(Instant::now()));
                 info!("Finished validating bands in {:#?}.", start.elapsed());
-            },
+            }
             ValidateProgress::BlockRead { current, .. } => {
                 if *current == 0 {
                     info!("Check {} blocks...", current.separate_with_commas());
@@ -367,32 +406,45 @@ impl Default for DeleteProcessModel {
     }
 }
 
-
 impl Model for DeleteProcessModel {
     fn render(&mut self, _width: usize) -> String {
         match self {
-            Self::List(state) => {
-                match state {
-                    ReferencedBlocksProgress::ReferencedBlocks { discovered } => format!("Find referenced blocks in band ({} discovered)", discovered),
-                    ReferencedBlocksProgress::ReferencedBlocksFinished { total } => format!("Discovered {} referenced blocks in band", total)
+            Self::List(state) => match state {
+                ReferencedBlocksProgress::ReferencedBlocks { discovered } => {
+                    format!("Find referenced blocks in band ({} discovered)", discovered)
+                }
+                ReferencedBlocksProgress::ReferencedBlocksFinished { total } => {
+                    format!("Discovered {} referenced blocks in band", total)
                 }
             },
-            Self::Delete(state) => {
-                match state {
-                    DeleteProgress::FindPresentBlocks { discovered } => format!("Find present blocks ({} discovered)", discovered),
-                    DeleteProgress::FindPresentBlocksFinished { total } => format!("Found {} present blocks", total),
-                    
-                    DeleteProgress::MeasureUnreferencedBlocks { current, total } => format!("Measure unreferenced blocks ({}/{})", current, total),
-                    DeleteProgress::MeasureUnreferencedBlocksFinished { .. } => format!("Measured unreferenced blocks"),
-        
-                    DeleteProgress::DeleteBands { current, total } => format!("Delete bands ({}/{})", current, total),
-                    DeleteProgress::DeleteBandsFinished { total } => format!("Deleted {} bands", total),
-        
-                    DeleteProgress::DeleteBlocks { current, total } => format!("Delete blocks ({}/{})", current, total),
-                    DeleteProgress::DeleteBlocksFinished { total } => format!("Deleted {} blocks", total)
+            Self::Delete(state) => match state {
+                DeleteProgress::FindPresentBlocks { discovered } => {
+                    format!("Find present blocks ({} discovered)", discovered)
+                }
+                DeleteProgress::FindPresentBlocksFinished { total } => {
+                    format!("Found {} present blocks", total)
+                }
+
+                DeleteProgress::MeasureUnreferencedBlocks { current, total } => {
+                    format!("Measure unreferenced blocks ({}/{})", current, total)
+                }
+                DeleteProgress::MeasureUnreferencedBlocksFinished { .. } => {
+                    format!("Measured unreferenced blocks")
+                }
+
+                DeleteProgress::DeleteBands { current, total } => {
+                    format!("Delete bands ({}/{})", current, total)
+                }
+                DeleteProgress::DeleteBandsFinished { total } => format!("Deleted {} bands", total),
+
+                DeleteProgress::DeleteBlocks { current, total } => {
+                    format!("Delete blocks ({}/{})", current, total)
+                }
+                DeleteProgress::DeleteBlocksFinished { total } => {
+                    format!("Deleted {} blocks", total)
                 }
             },
-            Self::Unset => "Deleting, please wait...".to_string()
+            Self::Unset => "Deleting, please wait...".to_string(),
         }
     }
 }
@@ -413,15 +465,15 @@ impl ReferencedBlocksMonitor for NutmegMonitor<DeleteProcessModel> {
 }
 
 pub struct RestoreProgressModel {
-    print_filenames: bool,
+    file_list: FileListVerbosity,
     filename: String,
     bytes_done: u64,
 }
 
 impl RestoreProgressModel {
-    pub fn new(print_filenames: bool) -> Self {
+    pub fn new(file_list: FileListVerbosity) -> Self {
         Self {
-            print_filenames,
+            file_list,
             filename: "".to_string(),
             bytes_done: 0,
         }
@@ -440,13 +492,22 @@ impl nutmeg::Model for RestoreProgressModel {
 
 impl RestoreMonitor for NutmegMonitor<RestoreProgressModel> {
     fn restore_entry(&self, entry: &IndexEntry) {
-        let print_filename = self.update_model(|view| {
+        let file_list = self.update_model(|view| {
             view.filename = entry.apath().to_string();
-            view.print_filenames
+            view.file_list
         });
 
-        if print_filename {
-            info!("{}", entry.apath());
+        match file_list {
+            FileListVerbosity::None => {}
+            FileListVerbosity::NameOnly => info!("{}", entry.apath()),
+            FileListVerbosity::Full => {
+                info!(
+                    "{} {} {}\n",
+                    entry.unix_mode(),
+                    entry.owner(),
+                    entry.apath()
+                );
+            }
         }
     }
 
@@ -466,12 +527,16 @@ impl Model for ReferencedBlocksProgressModel {
     fn render(&mut self, _width: usize) -> String {
         let state = match &self.progress {
             Some(state) => state,
-            None => return "Listing referenced blocks, please wait...".to_string()
+            None => return "Listing referenced blocks, please wait...".to_string(),
         };
 
         match state {
-            ReferencedBlocksProgress::ReferencedBlocks { discovered } => format!("Find referenced blocks in band ({} discovered)", discovered),
-            ReferencedBlocksProgress::ReferencedBlocksFinished { total } => format!("Discovered {} referenced blocks in band", total)
+            ReferencedBlocksProgress::ReferencedBlocks { discovered } => {
+                format!("Find referenced blocks in band ({} discovered)", discovered)
+            }
+            ReferencedBlocksProgress::ReferencedBlocksFinished { total } => {
+                format!("Discovered {} referenced blocks in band", total)
+            }
         }
     }
 }

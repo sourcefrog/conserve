@@ -26,7 +26,7 @@ fn backup_verbose() {
     src.create_file("subdir/b");
 
     run_conserve()
-        .args(&["backup", "--no-stats", "-v", "-R"])
+        .args(["backup", "--no-stats", "-v", "-R"])
         .arg(af.path())
         .arg(src.path())
         .assert()

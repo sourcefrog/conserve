@@ -30,7 +30,9 @@ use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::misc::remove_item;
-use crate::monitor::{DeleteMonitor, ReferencedBlocksMonitor, NULL_MONITOR, ValidateProgress, DeleteProgress};
+use crate::monitor::{
+    DeleteMonitor, DeleteProgress, ReferencedBlocksMonitor, ValidateProgress, NULL_MONITOR,
+};
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
@@ -217,7 +219,9 @@ impl Archive {
         let result = band_ids
             .par_iter()
             .inspect(|_| {
-                monitor.progress(ReferencedBlocksProgress::ReferencedBlocks { discovered: current_count.fetch_add(1, Ordering::Relaxed) + 1 });
+                monitor.progress(ReferencedBlocksProgress::ReferencedBlocks {
+                    discovered: current_count.fetch_add(1, Ordering::Relaxed) + 1,
+                });
             })
             .map(move |band_id| Band::open(&archive, band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
@@ -225,7 +229,9 @@ impl Archive {
             .map(|addr| addr.hash)
             .collect::<HashSet<_>>();
 
-        monitor.progress(ReferencedBlocksProgress::ReferencedBlocksFinished { total: result.len() });
+        monitor.progress(ReferencedBlocksProgress::ReferencedBlocksFinished {
+            total: result.len(),
+        });
         Ok(result)
     }
 
@@ -278,12 +284,16 @@ impl Archive {
                 .block_names()?
                 .inspect(|_| {
                     present_block_index += 1;
-                    monitor_.progress(DeleteProgress::FindPresentBlocks { discovered: present_block_index });
+                    monitor_.progress(DeleteProgress::FindPresentBlocks {
+                        discovered: present_block_index,
+                    });
                 })
                 .filter(|bh| !referenced.contains(bh))
                 .collect_vec();
 
-            monitor_.progress(DeleteProgress::FindPresentBlocksFinished { total: present_block_index });
+            monitor_.progress(DeleteProgress::FindPresentBlocksFinished {
+                total: present_block_index,
+            });
             unref
         };
 
@@ -291,21 +301,25 @@ impl Archive {
         stats.unreferenced_block_count = unref_count;
 
         let total_bytes = {
-            monitor_.progress(DeleteProgress::MeasureUnreferencedBlocks { current: 0, total: unref_count });
+            monitor_.progress(DeleteProgress::MeasureUnreferencedBlocks {
+                current: 0,
+                total: unref_count,
+            });
 
             let block_index = AtomicUsize::new(0);
             let total_bytes = unref
                 .par_iter()
                 .inspect(|_| {
-                    monitor_.progress(DeleteProgress::MeasureUnreferencedBlocks { 
-                        current: block_index.fetch_add(1, Ordering::Relaxed) + 1, 
-                        total: unref_count
+                    monitor_.progress(DeleteProgress::MeasureUnreferencedBlocks {
+                        current: block_index.fetch_add(1, Ordering::Relaxed) + 1,
+                        total: unref_count,
                     });
                 })
                 .map(|block_id| block_dir.compressed_size(block_id).unwrap_or_default())
                 .sum();
 
-            monitor_.progress(DeleteProgress::MeasureUnreferencedBlocksFinished { total: unref_count });
+            monitor_
+                .progress(DeleteProgress::MeasureUnreferencedBlocksFinished { total: unref_count });
             total_bytes
         };
 
@@ -315,29 +329,40 @@ impl Archive {
             delete_guard.check()?;
 
             {
-                monitor_.progress(DeleteProgress::DeleteBands { current: 0, total: delete_band_ids.len() });
+                monitor_.progress(DeleteProgress::DeleteBands {
+                    current: 0,
+                    total: delete_band_ids.len(),
+                });
 
                 let mut delete_band_count = 0;
                 for band_id in delete_band_ids {
                     delete_band_count += 1;
-                    monitor_.progress(DeleteProgress::DeleteBands { current: delete_band_count, total: delete_band_ids.len() });
+                    monitor_.progress(DeleteProgress::DeleteBands {
+                        current: delete_band_count,
+                        total: delete_band_ids.len(),
+                    });
 
                     Band::delete(self, band_id)?;
                     stats.deleted_band_count += 1;
                 }
-                monitor_.progress(DeleteProgress::DeleteBandsFinished { total: delete_band_ids.len() });
+                monitor_.progress(DeleteProgress::DeleteBandsFinished {
+                    total: delete_band_ids.len(),
+                });
             }
 
             {
-                monitor_.progress(DeleteProgress::DeleteBlocks { current: 0, total: unref.len() });
+                monitor_.progress(DeleteProgress::DeleteBlocks {
+                    current: 0,
+                    total: unref.len(),
+                });
 
                 let delete_block_count = AtomicUsize::new(0);
                 let error_count = unref
                     .par_iter()
                     .inspect(|_| {
-                        monitor_.progress(DeleteProgress::DeleteBlocks { 
-                            current: delete_block_count.fetch_add(1, Ordering::Relaxed) + 1, 
-                            total: unref.len() 
+                        monitor_.progress(DeleteProgress::DeleteBlocks {
+                            current: delete_block_count.fetch_add(1, Ordering::Relaxed) + 1,
+                            total: unref.len(),
                         });
                     })
                     .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
@@ -398,8 +423,7 @@ impl Archive {
             for (block_hash, referenced_len) in referenced_lens.0 {
                 if let Some(actual_len) = block_lengths.get(&block_hash) {
                     if referenced_len > (*actual_len as u64) {
-                        monitor
-                            .block_missing(&block_hash, &BlockMissingReason::InvalidRange);
+                        monitor.block_missing(&block_hash, &BlockMissingReason::InvalidRange);
                         // TODO: A separate counter; this is worse than just being missing
                         stats.block_missing_count += 1;
                     }
@@ -431,12 +455,10 @@ impl Archive {
                     Kind::Dir => dirs.push(name),
                     Kind::File => files.push(name),
                     other_kind => {
-                        monitor.archive_problem(
-                            &ValidateArchiveProblem::UnexpectedFileType {
-                                name,
-                                kind: other_kind,
-                            },
-                        );
+                        monitor.archive_problem(&ValidateArchiveProblem::UnexpectedFileType {
+                            name,
+                            kind: other_kind,
+                        });
                         stats.unexpected_files += 1;
                     }
                 },
@@ -536,7 +558,7 @@ mod tests {
         assert!(af.path().join("d").is_dir());
 
         let header_path = af.path().join("CONSERVE");
-        let mut header_file = fs::File::open(&header_path).unwrap();
+        let mut header_file = fs::File::open(header_path).unwrap();
         let mut contents = String::new();
         header_file.read_to_string(&mut contents).unwrap();
         assert_eq!(contents, "{\"conserve_archive_version\":\"0.6\"}\n");

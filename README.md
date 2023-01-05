@@ -3,7 +3,6 @@
 <https://github.com/sourcefrog/conserve/>
 
 [![GitHub build status](https://github.com/sourcefrog/conserve/workflows/Rust/badge.svg?branch=main)](https://github.com/sourcefrog/conserve/actions?query=workflow%3ARust)
-[![cargo-audit](https://github.com/sourcefrog/conserve/actions/workflows/cargo-audit.yml/badge.svg)](https://github.com/sourcefrog/conserve/actions/workflows/cargo-audit.yml)
 [![crates.io](https://img.shields.io/crates/v/conserve.svg)](https://crates.io/crates/conserve)
 ![Maturity: Beta](https://img.shields.io/badge/maturity-beta-yellow.svg)
 
@@ -149,23 +148,21 @@ use an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers):
 
 - [Release notes](NEWS.md)
 
-## Limitations
+## Performance on Windows
 
-Conserve can reasonably be used for backups today: the format is stable, in my
-use it's reliable, and the basic features are complete.
+Windows Defender and Windows Search Indexing can severely slow down any program that does intensive file IO, including Conserve. I recommend you exclude the backup directory from both systems.
 
-Be aware that Conserve is developed as a part-time non-commercial project and
-there's no guarantee of support.
+## Project status
 
-Some other limitations:
+Conserve is at a reasonable level of maturity; the format is stable and the basic features are complete. I have used it as a primary backup system for over a year.
 
-- [Permissions and ownership are not stored](https://github.com/sourcefrog/conserve/issues/46).
+The current data format (called "0.6") will be readable by future releases for at least two years.
 
-For more future features, see
-<https://github.com/sourcefrog/conserve/wiki/Ideas>.
+Be aware Conserve is developed as a part-time non-commercial project and there's no guarantee of support or reliability. Bug reports are welcome but I cannot promise they will receive a resolution within any particular time frame.
 
-Prior to 1.0, data formats may change on each minor version number change (0.x):
-you should restore using the same version that you used to make the backup.
+As of October 2022 I am primarily spending my open-source time on [cargo-mutants](https://github.com/sourcefrog/cargo-mutants). When that is feature complete, which is anticipated by early-mid 2023, I will likely come back to working more on Conserve.
+
+There is still room for several performance improvements and features. See the [issue tracker][issues] for a list.
 
 [5]: https://github.com/sourcefrog/conserve/issues/5
 [8]: https://github.com/sourcefrog/conserve/issues/8
@@ -174,18 +171,12 @@ you should restore using the same version that you used to make the backup.
 [42]: https://github.com/sourcefrog/conserve/issues/42
 [43]: https://github.com/sourcefrog/conserve/issues/43
 
-For a longer list see the [issue tracker][issues] and [milestones][milestones].
-
 [issues]: https://github.com/sourcefrog/conserve/issues
 [milestones]: https://github.com/sourcefrog/conserve/milestones
 
-Windows Defender and Windows Search Indexing can slow the system down severely
-when Conserve is making a backup. I recommend you exclude the backup directory
-from both systems.
-
 ## Licence and non-warranty
 
-Copyright 2012-2021 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
+Copyright 2012-2022 Martin Pool.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software

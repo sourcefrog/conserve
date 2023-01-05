@@ -22,7 +22,7 @@ pub(crate) fn format_error_causes(error: &dyn std::error::Error) -> String {
     let mut buf = error.to_string();
     let mut cause = error;
     while let Some(c) = cause.source() {
-        write!(&mut buf, "\n  caused by: {}", c).expect("Failed to format error cause");
+        write!(&mut buf, "\n  caused by: {c}").expect("Failed to format error cause");
         cause = c;
     }
     buf
@@ -81,6 +81,6 @@ mod tests {
             compressed: 2000,
             uncompressed: 4000,
         });
-        assert_eq!(format!("{:3.1}x", ratio), "2.0x");
+        assert_eq!(format!("{ratio:3.1}x"), "2.0x");
     }
 }

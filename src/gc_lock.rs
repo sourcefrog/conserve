@@ -100,7 +100,7 @@ impl Drop for GarbageCollectionLock {
         if let Err(err) = self.archive.transport().remove_file(GC_LOCK) {
             // Print directly to stderr, in case the UI structure is in a
             // bad state during unwind.
-            eprintln!("Failed to delete GC_LOCK: {:?}", err)
+            eprintln!("Failed to delete GC_LOCK: {err:?}")
         }
     }
 }
@@ -174,7 +174,7 @@ mod test {
         let lock2_result = GarbageCollectionLock::new(&archive);
         match lock2_result {
             Err(Error::GarbageCollectionLockHeld) => (),
-            other => panic!("unexpected result {:?}", other),
+            other => panic!("unexpected result {other:?}"),
         };
     }
 

@@ -25,8 +25,8 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::Path;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
@@ -247,13 +247,17 @@ impl BlockDir {
     pub fn block_names_set(&self, monitor: &dyn ValidateMonitor) -> Result<HashSet<BlockHash>> {
         let mut block_count = 0usize;
 
-        monitor.progress(ValidateProgress::ListBlockNames { discovered: block_count });
+        monitor.progress(ValidateProgress::ListBlockNames {
+            discovered: block_count,
+        });
         let result = self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok())
             .inspect(|_| {
                 block_count += 1;
-                monitor.progress(ValidateProgress::ListBlockNames { discovered: block_count });
+                monitor.progress(ValidateProgress::ListBlockNames {
+                    discovered: block_count,
+                });
             })
             .collect();
         monitor.progress(ValidateProgress::ListBlockNamesFinished { total: block_count });
@@ -275,7 +279,10 @@ impl BlockDir {
         let blocks = self.block_names_set(monitor)?;
         let block_count_read = AtomicUsize::new(0);
         let block_count = blocks.len();
-        monitor.progress(ValidateProgress::BlockRead { current: 0, total: block_count });
+        monitor.progress(ValidateProgress::BlockRead {
+            current: 0,
+            total: block_count,
+        });
 
         stats.block_read_count = blocks.len().try_into().unwrap();
 
@@ -286,7 +293,10 @@ impl BlockDir {
             .map(move |hash| {
                 let result = self.get_block_content(&hash);
                 let read_count = block_count_read.fetch_add(1, Ordering::Relaxed) + 1;
-                monitor.progress(ValidateProgress::BlockRead { current: read_count, total: block_count });
+                monitor.progress(ValidateProgress::BlockRead {
+                    current: read_count,
+                    total: block_count,
+                });
 
                 match result {
                     Ok((bytes, sizes)) => {

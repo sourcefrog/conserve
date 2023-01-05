@@ -13,17 +13,19 @@
 
 //! Read archives written by older versions.
 
+use std::collections::HashSet;
 use std::fs::{self, metadata, read_dir};
 use std::path::Path;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use predicates::prelude::*;
+use pretty_assertions::assert_eq;
 
 use conserve::unix_time::UnixTime;
 use conserve::*;
 
-const MINIMAL_ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.10", "0.6.2", "0.6.3", "0.6.9"];
+const MINIMAL_ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.10", "0.6.2", "0.6.3", "0.6.9", "0.6.17"];
 
 fn open_old_archive(ver: &str, name: &str) -> Archive {
     Archive::open_path(Path::new(&archive_testdata_path(name, ver)))
@@ -31,30 +33,29 @@ fn open_old_archive(ver: &str, name: &str) -> Archive {
 }
 
 fn archive_testdata_path(name: &str, ver: &str) -> String {
-    format!("testdata/archive/{}/v{}/", name, ver)
+    format!("testdata/archive/{name}/v{ver}/")
 }
 
 #[test]
 fn all_archive_versions_are_tested() {
-    let mut present_subdirs: Vec<String> = read_dir("testdata/archive/minimal")
+    let present_subdirs: HashSet<String> = read_dir("testdata/archive/minimal")
         .unwrap()
         .map(|direntry| direntry.unwrap().file_name().to_string_lossy().into_owned())
         .filter(|n| n != ".gitattributes")
         .collect();
-    present_subdirs.sort();
     assert_eq!(
         present_subdirs,
         MINIMAL_ARCHIVE_VERSIONS
             .iter()
-            .map(|s| format!("v{}", s))
-            .collect::<Vec<String>>()
+            .map(|s| format!("v{s}"))
+            .collect::<HashSet<String>>()
     );
 }
 
 #[test]
 fn examine_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
-        println!("examine {}", ver);
+        println!("examine {ver}");
         let archive = open_old_archive(ver, "minimal");
 
         let band_ids = archive.list_band_ids().expect("Failed to list band ids");
@@ -73,7 +74,7 @@ fn examine_archive() {
 #[test]
 fn validate_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
-        println!("validate {}", ver);
+        println!("validate {ver}");
         let archive = open_old_archive(ver, "minimal");
 
         let stats = archive
@@ -85,6 +86,51 @@ fn validate_archive() {
         assert!(!stats.has_problems());
     }
 }
+
+// #[test]
+// fn long_listing_old_archive() {
+//     let first_with_perms = semver::VersionReq::parse(">=0.6.17").unwrap();
+
+//     for ver in MINIMAL_ARCHIVE_VERSIONS {
+//         let dest = TempDir::new().unwrap();
+//         println!("restore {} to {:?}", ver, dest.path());
+
+//         let archive = open_old_archive(ver, "minimal");
+//         let mut stdout = Vec::<u8>::new();
+
+//         // show archive contents
+//         show::show_entry_names(
+//             archive
+//                 .open_stored_tree(BandSelectionPolicy::Latest)
+//                 .unwrap()
+//                 .iter_entries(Apath::root(), Exclude::nothing())
+//                 .unwrap(),
+//             &mut stdout,
+//             true,
+//         )
+//         .unwrap();
+
+//         if first_with_perms.matches(&semver::Version::parse(ver).unwrap()) {
+//             assert_eq!(
+//                 String::from_utf8(stdout).unwrap(),
+//                 "\
+//                     rwxrwxr-x mbp        mbp        /\n\
+//                     rw-rw-r-- mbp        mbp        /hello\n\
+//                     rwxrwxr-x mbp        mbp        /subdir\n\
+//                     rw-rw-r-- mbp        mbp        /subdir/subfile\n",
+//             );
+//         } else {
+//             assert_eq!(
+//                 String::from_utf8(stdout).unwrap(),
+//                 "\
+//                     none      none       none       /\n\
+//                     none      none       none       /hello\n\
+//                     none      none       none       /subdir\n\
+//                     none      none       none       /subdir/subfile\n",
+//             );
+//         }
+//     }
+// }
 
 #[test]
 fn restore_old_archive() {

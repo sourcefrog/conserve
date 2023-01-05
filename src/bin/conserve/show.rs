@@ -124,9 +124,16 @@ pub fn show_index_json(band: &Band) -> Result<()> {
     Ok(())
 }
 
-pub fn show_entry_names<E: conserve::Entry, I: Iterator<Item = E>>(it: I) -> Result<()> {
+pub fn show_entry_names<E: conserve::Entry, I: Iterator<Item = E>>(
+    it: I,
+    long_listing: bool,
+) -> Result<()> {
     for entry in it {
-        info!("{}", entry.apath());
+        if long_listing {
+            info!("{} {} {}", entry.unix_mode(), entry.owner(), entry.apath());
+        } else {
+            info!("{}", entry.apath());
+        }
     }
     Ok(())
 }

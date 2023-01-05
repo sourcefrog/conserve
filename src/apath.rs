@@ -147,14 +147,14 @@ impl<'a> From<&'a Apath> for &'a str {
 
 impl<'a> From<&'a str> for Apath {
     fn from(s: &'a str) -> Apath {
-        assert!(Apath::is_valid(s), "invalid apath: {:?}", s);
+        assert!(Apath::is_valid(s), "invalid apath: {s:?}");
         Apath(s.to_string())
     }
 }
 
 impl From<String> for Apath {
     fn from(s: String) -> Apath {
-        assert!(Apath::is_valid(&s), "invalid apath: {:?}", s);
+        assert!(Apath::is_valid(&s), "invalid apath: {s:?}");
         Apath(s)
     }
 }
@@ -209,8 +209,8 @@ impl AsRef<Path> for Apath {
 /// equal strings imply equal apaths.
 impl Ord for Apath {
     fn cmp(&self, b: &Apath) -> Ordering {
-        let &Apath(ref a) = self;
-        let &Apath(ref b) = b;
+        let Apath(a) = self;
+        let Apath(b) = b;
         let mut ait = a.split('/');
         let mut bit = b.split('/');
         let mut oa = ait.next().expect("paths must not be empty");
@@ -270,9 +270,7 @@ impl CheckOrder {
         if let Some(ref last_apath) = self.last_apath {
             assert!(
                 last_apath < a,
-                "apaths out of order: {:?} should be before {:?}",
-                last_apath,
-                a
+                "apaths out of order: {last_apath:?} should be before {a:?}"
             );
         }
         self.last_apath = Some(a.clone());

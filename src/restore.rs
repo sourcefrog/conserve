@@ -29,6 +29,7 @@ use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::monitor::{RestoreMonitor, NULL_MONITOR};
 use crate::stats::RestoreStats;
+use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
 use crate::*;
 
@@ -127,6 +128,7 @@ pub fn restore(
 pub struct RestoreTree {
     path: PathBuf,
 
+    dir_unix_modes: Vec<(PathBuf, UnixMode)>,
     dir_mtimes: Vec<(PathBuf, UnixTime)>,
 }
 
@@ -135,6 +137,7 @@ impl RestoreTree {
         RestoreTree {
             path,
             dir_mtimes: Vec::new(),
+            dir_unix_modes: Vec::new(),
         }
     }
 
@@ -161,6 +164,12 @@ impl RestoreTree {
     }
 
     fn finish(self) -> Result<RestoreStats> {
+        #[cfg(unix)]
+        for (path, unix_mode) in self.dir_unix_modes {
+            if let Err(err) = unix_mode.set_permissions(path) {
+                ui::problem(&format!("Failed to set directory permissions: {err:?}"));
+            }
+        }
         for (path, time) in self.dir_mtimes {
             if let Err(err) = filetime::set_file_mtime(path, time.into()) {
                 warn!("Failed to set directory mtime: {:?}", err);
@@ -176,7 +185,8 @@ impl RestoreTree {
                 return Err(Error::Restore { path, source });
             }
         }
-        self.dir_mtimes.push((path, entry.mtime()));
+        self.dir_mtimes.push((path.clone(), entry.mtime()));
+        self.dir_unix_modes.push((path, entry.unix_mode()));
         Ok(())
     }
 
@@ -186,16 +196,17 @@ impl RestoreTree {
         source_entry: &R::Entry,
         from_tree: &R,
     ) -> Result<RestoreStats> {
-        // TODO: Restore permissions.
         let path = self.rooted_path(source_entry.apath());
         let restore_err = |source| Error::Restore {
             path: path.clone(),
             source,
         };
+        let mut stats = RestoreStats::default();
         let mut restore_file = File::create(&path).map_err(restore_err)?;
         // TODO: Read one block at a time: don't pull all the contents into memory.
         let content = &mut from_tree.file_contents(source_entry)?;
-        let bytes_copied = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
+        stats.uncompressed_file_bytes =
+            std::io::copy(content, &mut restore_file).map_err(restore_err)?;
         restore_file.flush().map_err(restore_err)?;
 
         let mtime = Some(source_entry.mtime().into());
@@ -205,12 +216,42 @@ impl RestoreTree {
                 source,
             }
         })?;
+        #[cfg(unix)]
+        {
+            // Restore permissions only if there are mode bits stored in the archive
+            source_entry
+                .unix_mode()
+                .set_permissions(&path)
+                .map_err(|e| {
+                    ui::show_error(&e);
+                    stats.errors += 1;
+                })
+                .ok();
+            // Restore ownership if possible.
+            // TODO: Stats and warnings if a user or group is specified in the index but
+            // does not exist on the local system.
+            let owner = source_entry.owner();
+            let uid_opt = owner
+                .user
+                .and_then(|user| users::get_user_by_name(&user))
+                .map(|user| user.uid())
+                .map(unistd::Uid::from_raw);
+            let gid_opt = owner
+                .group
+                .and_then(|group| users::get_group_by_name(&group))
+                .map(|group| group.gid())
+                .map(unistd::Gid::from_raw);
+            // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
+            unistd::chown(&path, uid_opt, gid_opt)
+                .map_err(|e| {
+                    ui::show_error(&e);
+                    stats.errors += 1;
+                })
+                .ok();
+        }
 
         // TODO: Accumulate more stats.
-        Ok(RestoreStats {
-            uncompressed_file_bytes: bytes_copied,
-            ..RestoreStats::default()
-        })
+        Ok(stats)
     }
 
     #[cfg(unix)]

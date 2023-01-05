@@ -28,6 +28,8 @@ mod backup;
 mod delete;
 mod diff;
 mod exclude;
+#[cfg(unix)]
+mod unix_permissions;
 mod versions;
 
 fn run_conserve() -> Command {
@@ -41,7 +43,7 @@ fn no_args() {
         .assert()
         .failure()
         .stdout(predicate::str::is_empty())
-        .stderr(predicate::str::contains("USAGE:"));
+        .stderr(predicate::str::contains("Usage:"));
 }
 
 #[test]
@@ -99,7 +101,7 @@ fn basic_backup() {
     assert!(src.is_dir());
 
     run_conserve()
-        .args(&["-R", "ls", "--source"])
+        .args(["-R", "ls", "--source"])
         .arg(&src)
         .assert()
         .success()
@@ -112,7 +114,7 @@ fn basic_backup() {
         );
 
     run_conserve()
-        .args(&["-R", "size", "-s"])
+        .args(["-R", "size", "-s"])
         .arg(&src)
         .assert()
         .success()
@@ -132,7 +134,7 @@ fn basic_backup() {
     // TODO: Now inspect the archive.
 
     run_conserve()
-        .args(&["-R", "size"])
+        .args(["-R", "size"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -140,7 +142,7 @@ fn basic_backup() {
         .stdout("0 MB\n"); // "contents"
 
     run_conserve()
-        .args(&["-R", "versions", "--short"])
+        .args(["-R", "versions", "--short"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -158,7 +160,7 @@ fn basic_backup() {
     };
 
     run_conserve()
-        .args(&["-R", "debug", "blocks"])
+        .args(["-R", "debug", "blocks"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -166,7 +168,7 @@ fn basic_backup() {
         .stdout(predicate::function(is_expected_blocks));
 
     run_conserve()
-        .args(&["-R", "debug", "referenced"])
+        .args(["-R", "debug", "referenced"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -174,7 +176,7 @@ fn basic_backup() {
         .stdout(predicate::function(is_expected_blocks));
 
     run_conserve()
-        .args(&["debug", "unreferenced"])
+        .args(["debug", "unreferenced"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -182,7 +184,7 @@ fn basic_backup() {
         .stdout("");
 
     run_conserve()
-        .args(&["debug", "index"])
+        .args(["debug", "index"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -258,7 +260,7 @@ fn basic_backup() {
         let restore_dir2 = TempDir::new().unwrap();
         // Try to restore again over the same directory: should decline.
         run_conserve()
-            .args(&["restore", "-b", "b0"])
+            .args(["restore", "-b", "b0"])
             .arg(&arch_dir)
             .arg(restore_dir2.path())
             .assert()
@@ -269,7 +271,7 @@ fn basic_backup() {
     // Validate
     run_conserve()
         .arg("validate")
-        .arg(&arch_dir)
+        .arg(arch_dir)
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
@@ -343,7 +345,7 @@ fn incomplete_version() {
 #[test]
 fn validate_non_fatal_problems_nonzero_result() {
     run_conserve()
-        .args(&["validate", "testdata/damaged/missing-block/"])
+        .args(["validate", "testdata/damaged/missing-block/"])
         .assert()
         .stdout(predicate::str::contains("Archive has some problems."))
         .code(2);
@@ -353,13 +355,13 @@ fn validate_non_fatal_problems_nonzero_result() {
 fn restore_only_subtree() {
     let dest = TempDir::new().unwrap();
     run_conserve()
-        .args(&[
+        .args([
             "restore",
             "testdata/archive/minimal/v0.6.3/",
             "--only",
             "/subdir",
         ])
-        .arg(&dest.path())
+        .arg(dest.path())
         .assert()
         .success();
 
@@ -379,9 +381,9 @@ fn size_exclude() {
     source.create_file_with_contents("junk", b"01234567890123456789");
 
     run_conserve()
-        .args(&["-R", "size", "--bytes", "--source"])
-        .arg(&source.path())
-        .args(&["--exclude=/junk"])
+        .args(["-R", "size", "--bytes", "--source"])
+        .arg(source.path())
+        .args(["--exclude=/junk"])
         .assert()
         .success()
         .stdout("10\n");

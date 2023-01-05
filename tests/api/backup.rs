@@ -67,7 +67,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     srcdir.create_file("bar");
     srcdir.create_file("baz");
     // TODO: Include a symlink only on Unix.
-    let exclude = Exclude::from_strings(&["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
+    let exclude = Exclude::from_strings(["/**/baz", "/**/bar", "/**/fooo*"]).unwrap();
     let source = srcdir.live_tree();
     let options = BackupOptions {
         exclude,
@@ -128,7 +128,7 @@ pub fn backup_more_excludes() {
     srcdir.create_file("baz");
     srcdir.create_file("bar");
 
-    let exclude = Exclude::from_strings(&["/**/foo*", "/**/baz"]).unwrap();
+    let exclude = Exclude::from_strings(["/**/foo*", "/**/baz"]).unwrap();
     let source = srcdir.live_tree();
     let options = BackupOptions {
         exclude,
@@ -254,7 +254,7 @@ fn mtime_before_epoch() {
     let file_path = tf.create_file("old_file");
 
     let t1969 = FileTime::from_unix_time(-36_000, 0);
-    set_file_mtime(&file_path, t1969).expect("Failed to set file times");
+    set_file_mtime(file_path, t1969).expect("Failed to set file times");
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let entries = lt
@@ -435,9 +435,9 @@ fn many_small_files_combined_to_one_block() {
     // files in 2 hunks of 1000 entries.
     for i in 0..1999 {
         srcdir.create_file_of_length_with_prefix(
-            &format!("file{:04}", i),
+            &format!("file{i:04}"),
             200,
-            format!("something about {}", i).as_bytes(),
+            format!("something about {i}").as_bytes(),
         );
     }
     let stats = backup(&af, &srcdir.live_tree(), &BackupOptions::default(), None).expect("backup");
@@ -462,7 +462,7 @@ fn many_small_files_combined_to_one_block() {
         .unwrap();
     assert_eq!(entry_iter.next().unwrap().apath(), "/");
     for (i, entry) in entry_iter.enumerate() {
-        assert_eq!(entry.apath().to_string(), format!("/file{:04}", i));
+        assert_eq!(entry.apath().to_string(), format!("/file{i:04}"));
     }
     assert_eq!(
         tree.iter_entries(Apath::root(), Exclude::nothing())
@@ -479,7 +479,7 @@ pub fn mixed_medium_small_files_two_hunks() {
     const MEDIUM_LENGTH: u64 = 150_000;
     // Make some files large enough not to be grouped together as small files.
     for i in 0..1999 {
-        let name = format!("file{:04}", i);
+        let name = format!("file{i:04}");
         if i % 100 == 0 {
             srcdir.create_file_of_length_with_prefix(&name, MEDIUM_LENGTH, b"something");
         } else {
@@ -508,7 +508,7 @@ pub fn mixed_medium_small_files_two_hunks() {
         .unwrap();
     assert_eq!(entry_iter.next().unwrap().apath(), "/");
     for (i, entry) in entry_iter.enumerate() {
-        assert_eq!(entry.apath().to_string(), format!("/file{:04}", i));
+        assert_eq!(entry.apath().to_string(), format!("/file{i:04}"));
     }
     assert_eq!(
         tree.iter_entries(Apath::root(), Exclude::nothing())

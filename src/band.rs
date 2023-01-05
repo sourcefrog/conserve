@@ -208,10 +208,10 @@ impl Band {
         Ok(Info {
             id: self.band_id.clone(),
             is_closed: tail_option.is_some(),
-            start_time: Utc.timestamp(self.head.start_time, 0),
+            start_time: Utc.timestamp_opt(self.head.start_time, 0).unwrap(),
             end_time: tail_option
                 .as_ref()
-                .map(|tail| Utc.timestamp(tail.end_time, 0)),
+                .map(|tail| Utc.timestamp_opt(tail.end_time, 0).unwrap()),
             index_hunk_count: tail_option.as_ref().and_then(|tail| tail.index_hunk_count),
         })
     }
@@ -224,8 +224,7 @@ impl Band {
 
         let band_head_filename = BAND_HEAD_FILENAME.to_string();
         if !files.contains(&band_head_filename) {
-            monitor
-                .band_problem(self, &BandProblem::MissingHeadFile { band_head_filename });
+            monitor.band_problem(self, &BandProblem::MissingHeadFile { band_head_filename });
             stats.missing_band_heads += 1;
         }
         remove_item(&mut files, &BAND_HEAD_FILENAME);
@@ -326,8 +325,7 @@ mod tests {
         let e_str = e.unwrap_err().to_string();
         assert!(
             e_str.contains("Band version \"0.8.8\" in"),
-            "bad band version: {:#?}",
-            e_str
+            "bad band version: {e_str:#?}"
         );
     }
 }

@@ -59,10 +59,10 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
     // Trees containing a naive copy of the source at each backup.
     let mut backup_contents: Vec<TempDir> = Vec::new();
     for (i, c) in changes.iter().enumerate() {
-        println!("{}: {:?}", i, c);
+        println!("{i}: {c:?}");
         match c {
             AddFile => {
-                let content = format!("initial content of {}", next_file).into_bytes();
+                let content = format!("initial content of {next_file}").into_bytes();
                 let name = next_file.to_string();
                 tf.create_file_with_contents(&name, &content);
                 live_files.push(name.clone());
@@ -73,8 +73,8 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
                 if !live_files.is_empty() {
                     let j = j % live_files.len();
                     let name = &live_files[j];
-                    let content = format!("changed content of {} from step {}", j, i).into_bytes();
-                    fs::write(tf.path().join(&name), content).unwrap();
+                    let content = format!("changed content of {j} from step {i}").into_bytes();
+                    fs::write(tf.path().join(name), content).unwrap();
                 }
             }
             RemoveFile(j) => {
@@ -96,7 +96,7 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
                 backup(&archive, &tf.live_tree(), &options, None).unwrap();
                 let snapshot = TempDir::new().unwrap();
                 cp_r::CopyOptions::default()
-                    .copy_tree(&tf.path(), snapshot.path())
+                    .copy_tree(tf.path(), snapshot.path())
                     .unwrap();
                 backup_contents.push(snapshot);
             }

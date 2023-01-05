@@ -117,7 +117,7 @@ mod test {
         let af = ScratchArchive::new();
         match af.open_stored_tree(BandSelectionPolicy::Latest) {
             Err(Error::ArchiveEmpty) => (),
-            Err(other) => panic!("unexpected result {:?}", other),
+            Err(other) => panic!("unexpected result {other:?}"),
             Ok(_) => panic!("unexpected success"),
         }
     }

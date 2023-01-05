@@ -60,7 +60,7 @@ impl Transport for LocalTransport {
     }
 
     fn read_file(&self, relpath: &str) -> io::Result<Bytes> {
-        let mut file = File::open(&self.full_path(relpath))?;
+        let mut file = File::open(self.full_path(relpath))?;
         let estimated_len: usize = file.metadata()?.len().try_into().unwrap();
         let mut out_buf = Vec::with_capacity(estimated_len);
         let actual_len = file.read_to_end(&mut out_buf)?;

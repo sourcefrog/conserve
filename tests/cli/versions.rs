@@ -23,7 +23,7 @@ use crate::run_conserve;
 #[test]
 fn utc() {
     run_conserve()
-        .args(&["versions", "--utc", "testdata/archive/simple/v0.6.10", "-R"])
+        .args(["versions", "--utc", "testdata/archive/simple/v0.6.10", "-R"])
         .assert()
         .success()
         .stdout(
@@ -38,7 +38,7 @@ b0002                2021-03-04 13:27:28       0:00
 #[test]
 fn newest_first() {
     run_conserve()
-        .args(&[
+        .args([
             "versions",
             "--newest",
             "--utc",
@@ -62,7 +62,7 @@ fn local_time() {
     // Without --utc we don't know exactly what times will be produced,
     // and it's hard to control the timezone for tests on Windows.
     run_conserve()
-        .args(&["versions", "testdata/archive/simple/v0.6.10", "-R"])
+        .args(["versions", "testdata/archive/simple/v0.6.10", "-R"])
         .assert()
         .success()
         .stdout(function(|s: &str| s.lines().count() == 3));
@@ -71,7 +71,7 @@ fn local_time() {
 #[test]
 fn short() {
     run_conserve()
-        .args(&[
+        .args([
             "versions",
             "--short",
             "testdata/archive/simple/v0.6.10",
@@ -91,7 +91,7 @@ b0002
 #[test]
 fn tree_sizes() {
     run_conserve()
-        .args(&[
+        .args([
             "versions",
             "--sizes",
             "--utc",
@@ -115,7 +115,7 @@ fn short_newest_first() {
     af.store_two_versions();
 
     run_conserve()
-        .args(&["versions", "--short", "--newest", "-R"])
+        .args(["versions", "--short", "--newest", "-R"])
         .arg(af.path())
         .assert()
         .success()

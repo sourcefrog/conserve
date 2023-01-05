@@ -103,7 +103,7 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
     let backup_result = backup(&archive, &tf.live_tree(), &BackupOptions::default(), None);
     match backup_result {
         Err(Error::GarbageCollectionLockHeld) => (),
-        other => panic!("unexpected result {:?}", other),
+        other => panic!("unexpected result {other:?}"),
     };
 
     // Leak the lock, then gc breaking the lock.

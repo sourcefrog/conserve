@@ -17,7 +17,7 @@ pub trait BackupMonitor {
 pub enum ValidateProgress {
     CountBands,
     CountBandsFinished,
-    
+
     ValidateArchive,
     ValidateArchiveFinished,
 
@@ -34,7 +34,6 @@ pub enum ValidateProgress {
     ValidateBlocksFinished,
 }
 
-
 /// Monitor the validation progress.
 pub trait ValidateMonitor: Sync {
     /// Will be called with the current state of validating the target archive.
@@ -48,7 +47,8 @@ pub trait ValidateMonitor: Sync {
         &self,
         _band_id: &BandId,
         _result: &std::result::Result<(BlockLengths, ValidateStats), BandValidateError>,
-    ) { }
+    ) {
+    }
     fn block_missing(&self, _block_hash: &BlockHash, _reason: &BlockMissingReason) {}
     fn block_read_result(&self, _block_hash: &BlockHash, _result: &Result<Sizes>) {}
 }
@@ -61,7 +61,7 @@ pub trait TreeSizeMonitor<T: ReadTree> {
 #[derive(Debug, Clone)]
 pub enum ReferencedBlocksProgress {
     ReferencedBlocks { discovered: usize },
-    ReferencedBlocksFinished { total: usize }
+    ReferencedBlocksFinished { total: usize },
 }
 
 /// Monitor for iterating referenced blocks.

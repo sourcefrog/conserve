@@ -14,8 +14,8 @@ use std::cmp::max;
 use std::collections::HashMap;
 
 use crate::blockdir::Address;
-use crate::*;
 use crate::monitor::ValidateProgress;
+use crate::*;
 
 pub struct BlockLengths(pub HashMap<BlockHash, u64>);
 
@@ -89,7 +89,10 @@ pub(crate) fn validate_bands(
     let mut band_index = 0;
 
     for band_id in band_ids {
-        monitor.progress(ValidateProgress::ValidateBands { current: band_index, total: band_ids.len() });
+        monitor.progress(ValidateProgress::ValidateBands {
+            current: band_index,
+            total: band_ids.len(),
+        });
         let result = validate_band(archive, &mut stats, band_id, monitor);
         monitor.band_validate_result(band_id, &result);
 
@@ -108,7 +111,9 @@ pub(crate) fn validate_bands(
         band_index += 1;
     }
 
-    monitor.progress(ValidateProgress::ValidateBandsFinished { total: band_ids.len() });
+    monitor.progress(ValidateProgress::ValidateBandsFinished {
+        total: band_ids.len(),
+    });
     (block_lens, stats)
 }
 

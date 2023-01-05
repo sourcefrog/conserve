@@ -165,7 +165,7 @@ mod tests {
                 assert_eq!(ae.apath(), "/");
                 assert_eq!(be.apath(), "/");
             }
-            other => panic!("unexpected {:#?}", other),
+            other => panic!("unexpected {other:#?}"),
         }
     }
 

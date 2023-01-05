@@ -34,6 +34,7 @@ pub mod live_tree;
 mod merge;
 pub(crate) mod misc;
 pub(crate) mod monitor;
+pub mod owner;
 pub mod restore;
 pub mod stats;
 mod stitch;
@@ -43,6 +44,7 @@ pub mod test_fixtures;
 pub mod transport;
 mod tree;
 pub mod ui;
+pub mod unix_mode;
 pub mod unix_time;
 mod validate;
 
@@ -66,8 +68,8 @@ pub use crate::live_tree::{LiveEntry, LiveTree};
 pub use crate::merge::{MergeTrees, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
 pub use crate::monitor::{
-    BackupMonitor, DeleteMonitor, ReferencedBlocksMonitor, RestoreMonitor, TreeSizeMonitor,
-    ValidateMonitor, ValidateProgress, DeleteProgress, ReferencedBlocksProgress
+    BackupMonitor, DeleteMonitor, DeleteProgress, ReferencedBlocksMonitor,
+    ReferencedBlocksProgress, RestoreMonitor, TreeSizeMonitor, ValidateMonitor, ValidateProgress,
 };
 pub use crate::restore::{restore, RestoreOptions, RestoreTree};
 pub use crate::stats::{BackupStats, DeleteStats, RestoreStats, ValidateStats};
