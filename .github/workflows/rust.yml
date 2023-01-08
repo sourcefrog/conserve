@@ -29,14 +29,6 @@ jobs:
           rustup show
           cargo --version
           rustc --version
-      - name: Cache Cargo
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
       - name: Build
         run: cargo build --all-targets
       - name: Test
