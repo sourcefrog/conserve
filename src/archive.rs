@@ -349,67 +349,64 @@ impl Archive {
     }
 
     fn validate_archive_dir(&self) -> Result<ValidateStats> {
-        // TODO: Tests for the problems detected here.
+        // TODO: More tests for the problems detected here.
         let mut stats = ValidateStats::default();
         ui::println("Check archive top-level directory...");
-
-        let mut extra_files: Vec<String> = Vec::new();
-        let mut dirs: Vec<String> = Vec::new();
+        let mut seen_bands = HashSet::<BandId>::new();
         for entry_result in self
             .transport
             .iter_dir_entries("")
             .map_err(|source| Error::ListBands { source })?
         {
             match entry_result {
-                Ok(DirEntry { name, kind, .. }) => match kind {
-                    Kind::Dir if !name.eq_ignore_ascii_case(BLOCK_DIR) => dirs.push(name),
-                    Kind::File
-                        if name != HEADER_FILENAME
-                            && name != crate::gc_lock::GC_LOCK
-                            && !name.eq_ignore_ascii_case(".DS_Store") =>
-                    {
-                        extra_files.push(name)
-                    }
-                    Kind::File | Kind::Dir => (),
-                    other_kind => {
-                        ui::problem(&format!(
-                            "Unexpected file kind in archive directory: {name:?} of kind {other_kind:?}"
-                        ));
+                Ok(DirEntry {
+                    kind: Kind::Dir,
+                    name,
+                    ..
+                }) => {
+                    if name.eq_ignore_ascii_case(BLOCK_DIR) {
+                    } else if let Ok(band_id) = name.parse() {
+                        if !seen_bands.insert(band_id) {
+                            stats.structure_problems += 1;
+                            ui::problem(&format!(
+                                "Duplicated band directory in {:?}: {name:?}",
+                                self.transport,
+                            ));
+                        }
+                    } else {
                         stats.unexpected_files += 1;
+                        ui::problem(&format!(
+                            "Unexpected directory in {:?}: {name:?}",
+                            self.transport,
+                        ));
                     }
-                },
+                }
+                Ok(DirEntry {
+                    kind: Kind::File,
+                    name,
+                    ..
+                }) => {
+                    if !name.eq_ignore_ascii_case(HEADER_FILENAME)
+                        && !name.eq_ignore_ascii_case(crate::gc_lock::GC_LOCK)
+                        && !name.eq_ignore_ascii_case(".DS_Store")
+                    {
+                        stats.unexpected_files += 1;
+                        ui::problem(&format!(
+                            "Unexpected file in archive directory {:?}: {name:?}",
+                            self.transport,
+                        ));
+                    }
+                }
+                Ok(DirEntry { kind, name, .. }) => {
+                    ui::problem(&format!(
+                        "Unexpected file kind in archive directory: {name:?} of kind {kind:?}"
+                    ));
+                    stats.unexpected_files += 1;
+                }
                 Err(source) => {
                     ui::problem(&format!("Error listing archive directory: {source:?}"));
                     stats.io_errors += 1;
                 }
-            }
-        }
-        if !extra_files.is_empty() {
-            stats.unexpected_files += extra_files.len();
-            ui::problem(&format!(
-                "Unexpected files in archive directory {:?}: {extra_files:?}",
-                self.transport,
-            ));
-        }
-        dirs.sort();
-        let mut bs = HashSet::<BandId>::new();
-        for d in dirs.iter() {
-            if let Ok(b) = d.parse() {
-                if bs.contains(&b) {
-                    stats.structure_problems += 1;
-                    ui::problem(&format!(
-                        "Duplicated band directory in {:?}: {:?}",
-                        self.transport, d
-                    ));
-                } else {
-                    bs.insert(b);
-                }
-            } else {
-                stats.structure_problems += 1;
-                ui::problem(&format!(
-                    "Unexpected directory in {:?}: {:?}",
-                    self.transport, d
-                ));
             }
         }
         Ok(stats)
