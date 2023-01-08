@@ -29,7 +29,6 @@ use crate::blockhash::BlockHash;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
-use crate::misc::remove_item;
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
@@ -354,7 +353,7 @@ impl Archive {
         let mut stats = ValidateStats::default();
         ui::println("Check archive top-level directory...");
 
-        let mut files: Vec<String> = Vec::new();
+        let mut extra_files: Vec<String> = Vec::new();
         let mut dirs: Vec<String> = Vec::new();
         for entry_result in self
             .transport
@@ -363,8 +362,15 @@ impl Archive {
         {
             match entry_result {
                 Ok(DirEntry { name, kind, .. }) => match kind {
-                    Kind::Dir => dirs.push(name),
-                    Kind::File => files.push(name),
+                    Kind::Dir if !name.eq_ignore_ascii_case(BLOCK_DIR) => dirs.push(name),
+                    Kind::File
+                        if name != HEADER_FILENAME
+                            && name != crate::gc_lock::GC_LOCK
+                            && !name.eq_ignore_ascii_case(".DS_Store") =>
+                    {
+                        extra_files.push(name)
+                    }
+                    Kind::File | Kind::Dir => (),
                     other_kind => {
                         ui::problem(&format!(
                             "Unexpected file kind in archive directory: {name:?} of kind {other_kind:?}"
@@ -378,16 +384,13 @@ impl Archive {
                 }
             }
         }
-        remove_item(&mut files, &HEADER_FILENAME);
-        if !files.is_empty() {
-            // TODO: Ignore .DS_Store
-            stats.unexpected_files += 1;
+        if !extra_files.is_empty() {
+            stats.unexpected_files += extra_files.len();
             ui::problem(&format!(
-                "Unexpected files in archive directory {:?}: {:?}",
-                self.transport, files
+                "Unexpected files in archive directory {:?}: {extra_files:?}",
+                self.transport,
             ));
         }
-        remove_item(&mut dirs, &BLOCK_DIR);
         dirs.sort();
         let mut bs = HashSet::<BandId>::new();
         for d in dirs.iter() {

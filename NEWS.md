@@ -9,6 +9,8 @@
 
 - Fixed: `--exclude /a` now also excludes everything under `/a` from listing, diff, restore, etc.
   (Previously you would have to write `/a/**`.)
+
+- Fixed: `validate` should not complain about `GC_LOCK` or `.DS_Store` files in the archive directory.
   
 ## v0.6.16
 

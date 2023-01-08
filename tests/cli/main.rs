@@ -30,6 +30,7 @@ mod diff;
 mod exclude;
 #[cfg(unix)]
 mod unix_permissions;
+mod validate;
 mod versions;
 
 fn run_conserve() -> Command {

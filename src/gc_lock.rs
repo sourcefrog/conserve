@@ -33,7 +33,7 @@
 
 use crate::*;
 
-const GC_LOCK: &str = "GC_LOCK";
+pub static GC_LOCK: &str = "GC_LOCK";
 
 #[derive(Debug)]
 pub struct GarbageCollectionLock {
