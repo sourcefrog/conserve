@@ -206,11 +206,9 @@ impl Band {
         };
         let start_time = OffsetDateTime::from_unix_timestamp(self.head.start_time)
             .expect("invalid band start timestamp");
-        let end_time = if let Some(tail) = &tail_option {
-            Some(OffsetDateTime::from_unix_timestamp(tail.end_time).expect("invalid end timestamp"))
-        } else {
-            None
-        };
+        let end_time = tail_option.as_ref().map(|tail| {
+            OffsetDateTime::from_unix_timestamp(tail.end_time).expect("invalid end timestamp")
+        });
         Ok(Info {
             id: self.band_id.clone(),
             is_closed: tail_option.is_some(),
