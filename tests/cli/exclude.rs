@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2016-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,7 +12,10 @@
 // GNU General Public License for more details.
 
 use assert_cmd::prelude::*;
+use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use indoc::indoc;
+use predicates::prelude::*;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
@@ -144,4 +147,51 @@ fn exclude_from_file() {
         .arg(src.path())
         .assert()
         .success();
+}
+
+/// `--exclude /subtree` should also exclude everything under it.
+///
+/// <https://github.com/sourcefrog/conserve/issues/160>
+#[test]
+fn ls_exclude_excludes_subtrees() {
+    run_conserve()
+        .args([
+            "ls",
+            "--exclude",
+            "/subdir",
+            "testdata/archive/simple/v0.6.10",
+        ])
+        .assert()
+        .success()
+        .stdout(indoc! { "
+            /
+            /hello
+        "})
+        .stderr("");
+}
+
+/// `--exclude /subtree` should also exclude everything under it.
+///
+/// <https://github.com/sourcefrog/conserve/issues/160>
+#[test]
+fn restore_exclude_excludes_subtrees() {
+    let dest = TempDir::new().unwrap();
+    run_conserve()
+        .args([
+            "restore",
+            "-v",
+            "--no-stats",
+            "--exclude",
+            "/subdir",
+            "testdata/archive/simple/v0.6.10",
+        ])
+        .arg(dest.path())
+        .assert()
+        .success()
+        .stdout(indoc! { "
+            /
+            /hello
+        "})
+        .stderr("");
+    dest.child("subdir").assert(predicate::path::missing());
 }

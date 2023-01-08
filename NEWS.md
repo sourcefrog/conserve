@@ -6,6 +6,9 @@ Not released yet!
 
 - New: Support for storing, restoring, and listing Unix owner, group, and permissions.
   Thanks to @believeinlain.
+
+- Fixed: `--exclude /a` now also excludes everything under `/a` from listing, diff, restore, etc.
+  (Previously you would have to write `/a/**`.)
   
 ## v0.6.16
 

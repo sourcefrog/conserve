@@ -260,11 +260,10 @@ impl Command {
                 no_stats,
                 long_listing,
             } => {
-                let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let source = &LiveTree::open(source)?;
                 let options = BackupOptions {
                     print_filenames: *verbose,
-                    exclude,
+                    exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     long_listing: *long_listing,
                     ..Default::default()
                 };
@@ -325,11 +324,10 @@ impl Command {
                 exclude_from,
                 include_unchanged,
             } => {
-                let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let st = stored_tree_from_opt(archive, backup)?;
                 let lt = LiveTree::open(source)?;
                 let options = DiffOptions {
-                    exclude,
+                    exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     include_unchanged: *include_unchanged,
                 };
                 show_diff(diff(&st, &lt, &options)?, &mut stdout)?;
@@ -362,7 +360,7 @@ impl Command {
                 exclude_from,
                 long_listing,
             } => {
-                let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
+                let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
                 if let Some(archive) = &stos.archive {
                     // TODO: Option for subtree.
                     show::show_entry_names(
@@ -394,10 +392,9 @@ impl Command {
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open(open_transport(archive)?)?;
-                let exclude = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
                 let options = RestoreOptions {
                     print_filenames: *verbose,
-                    exclude,
+                    exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     only_subtree: only_subtree.clone(),
                     band_selection,
                     overwrite: *force_overwrite,
@@ -415,14 +412,14 @@ impl Command {
                 exclude,
                 exclude_from,
             } => {
-                let excludes = ExcludeBuilder::from_args(exclude, exclude_from)?.build()?;
+                let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
-                        .size(excludes)?
+                        .size(exclude)?
                         .file_bytes
                 } else {
                     LiveTree::open(stos.source.as_ref().unwrap())?
-                        .size(excludes)?
+                        .size(exclude)?
                         .file_bytes
                 };
                 if *bytes {

@@ -43,6 +43,7 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3.11", features = ["env-filter", "fmt"] }
 unix_mode = "0.1"
 url = "2.2.2"
+indoc = "1.0.8"
 
 [target.'cfg(unix)'.dependencies]
 users = "0.11"

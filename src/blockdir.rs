@@ -204,9 +204,7 @@ impl BlockDir {
             if dirname.len() == SUBDIR_NAME_CHARS {
                 true
             } else {
-                ui::problem(&format!(
-                    "Unexpected subdirectory in blockdir: {dirname:?}"
-                ));
+                ui::problem(&format!("Unexpected subdirectory in blockdir: {dirname:?}"));
                 false
             }
         });

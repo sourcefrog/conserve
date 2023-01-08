@@ -1,5 +1,5 @@
 // Copyright 2017 Julian Raufelder.
-// Copyright 2020, 2021, 2022 Martin Pool.
+// Copyright 2020-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,8 +20,8 @@
 //! path.
 
 use std::borrow::Cow;
-use std::fs::File;
-use std::io::Read;
+use std::fs;
+use std::iter::empty;
 use std::path::Path;
 
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
@@ -40,12 +40,30 @@ impl Exclude {
     ///
     /// The globs match against the apath, which will
     /// always start with a `/`.
+    ///
+    /// Globs are extended to also match any children of matching paths.
     pub fn from_strings<I: IntoIterator<Item = S>, S: AsRef<str>>(excludes: I) -> Result<Exclude> {
-        let mut builder = ExcludeBuilder::new();
-        for s in excludes {
-            builder.add(s.as_ref())?;
+        Exclude::from_patterns_and_files(excludes, empty::<&Path>())
+    }
+
+    /// Build from a list of exclusion patterns and a list of files containing more patterns.
+    pub fn from_patterns_and_files<I1, A, I2, P>(exclude: I1, exclude_from: I2) -> Result<Exclude>
+    where
+        I1: IntoIterator<Item = A>,
+        A: AsRef<str>,
+        I2: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let mut gsb = GlobSetBuilder::new();
+        for pat in exclude {
+            add_pattern(&mut gsb, pat.as_ref())?;
         }
-        builder.build()
+        for path in exclude_from {
+            add_patterns_from_file(&mut gsb, path.as_ref())?;
+        }
+        Ok(Exclude {
+            globset: gsb.build()?,
+        })
     }
 
     /// Exclude nothing, even items that might be excluded by default.
@@ -66,75 +84,37 @@ impl Exclude {
     }
 }
 
-/// Construct Exclude object.
-pub struct ExcludeBuilder {
-    gsb: GlobSetBuilder,
-}
-
-impl ExcludeBuilder {
-    pub fn new() -> ExcludeBuilder {
-        ExcludeBuilder {
-            gsb: GlobSetBuilder::new(),
-        }
-    }
-
-    pub fn build(&self) -> Result<Exclude> {
-        Ok(Exclude {
-            globset: self.gsb.build()?,
-        })
-    }
-
-    pub fn add(&mut self, pat: &str) -> Result<&mut ExcludeBuilder> {
-        let pat: Cow<str> = if pat.starts_with('/') {
-            Cow::Borrowed(pat)
-        } else {
-            Cow::Owned(format!("**/{pat}"))
-        };
-        let glob = GlobBuilder::new(&pat)
+/// Add one pattern with Conserve's semantics.
+fn add_pattern(gsb: &mut GlobSetBuilder, pattern: &str) -> Result<()> {
+    let pattern: Cow<str> = if pattern.starts_with('/') {
+        Cow::Borrowed(pattern)
+    } else {
+        Cow::Owned(format!("**/{pattern}"))
+    };
+    gsb.add(
+        GlobBuilder::new(&pattern)
             .literal_separator(true)
             .build()
-            .map_err(|source| Error::ParseGlob { source })?;
-        self.gsb.add(glob);
-        Ok(self)
-    }
-
-    pub fn add_file(&mut self, path: &Path) -> Result<&mut ExcludeBuilder> {
-        self.add_from_read(&mut File::open(path)?)
-    }
-
-    /// Create a [GlobSet] from lines in a file, with one pattern per line.
-    ///
-    /// Lines starting with `#` are comments, and leading and trailing whitespace is removed.
-    pub fn add_from_read(&mut self, f: &mut dyn Read) -> Result<&mut ExcludeBuilder> {
-        let mut b = String::new();
-        f.read_to_string(&mut b)?;
-        for pat in b
-            .lines()
-            .map(str::trim)
-            .filter(|s| !s.starts_with('#') && !s.is_empty())
-        {
-            self.add(pat)?;
-        }
-        Ok(self)
-    }
-
-    /// Build from command line arguments of patterns and filenames.
-    pub fn from_args(exclude: &[String], exclude_from: &[String]) -> Result<ExcludeBuilder> {
-        let mut builder = ExcludeBuilder::new();
-        for pat in exclude {
-            builder.add(pat)?;
-        }
-        for path in exclude_from {
-            builder.add_file(Path::new(path))?;
-        }
-        Ok(builder)
-    }
+            .map_err(|source| Error::ParseGlob { source })?,
+    );
+    gsb.add(
+        GlobBuilder::new(&format!("{pattern}/**"))
+            .literal_separator(true)
+            .build()
+            .map_err(|source| Error::ParseGlob { source })?,
+    );
+    Ok(())
 }
 
-impl Default for ExcludeBuilder {
-    fn default() -> Self {
-        ExcludeBuilder::new()
+fn add_patterns_from_file(gsb: &mut GlobSetBuilder, path: &Path) -> Result<()> {
+    for pat in fs::read_to_string(path)?
+        .lines()
+        .map(str::trim)
+        .filter(|s| !s.starts_with('#') && !s.is_empty())
+    {
+        add_pattern(gsb, pat)?;
     }
+    Ok(())
 }
 
 #[cfg(test)]
