@@ -133,6 +133,10 @@ impl Transport for LocalTransport {
     fn url_scheme(&self) -> &'static str {
         "file"
     }
+
+    fn url(&self) -> String {
+        self.root.to_string_lossy().into()
+    }
 }
 
 impl AsRef<dyn Transport> for LocalTransport {

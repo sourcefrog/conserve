@@ -1,4 +1,4 @@
-// Copyright 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2017-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,12 +12,149 @@
 
 use std::cmp::max;
 use std::collections::HashMap;
+use std::fmt;
+use std::fmt::Debug;
+use std::io::{Sink, Write};
 use std::time::Instant;
+
+use serde::Serialize;
+use tracing::{info, warn};
 
 use crate::blockdir::Address;
 use crate::*;
 
-pub(crate) struct BlockLengths(pub(crate) HashMap<BlockHash, u64>);
+/// A ValidateMonitor collects progress and problem findings during validation.
+///
+/// These can be, for example, drawn into a UI, written to logs, or written
+/// out as structured data.
+pub trait ValidateMonitor {
+    /// The monitor is informed that a problem was found in the archive.
+    fn problem(&mut self, problem: Problem) -> Result<()>;
+
+    /// The monitor is informed that a phase of validation has started.
+    fn start_phase(&mut self, phase: ValidatePhase);
+}
+
+/// A ValidateMonitor that logs messages, collects problems in memory, optionally
+/// writes problems to a json file, and draws console progress bars.
+#[derive(Debug)]
+pub struct GeneralValidateMonitor<JF>
+where
+    JF: Write + Debug,
+{
+    pub progress_bars: bool,
+    /// Optionally write all problems as json to this file as they're discovered.
+    pub problems_json: Option<Box<JF>>,
+    pub log_problems: bool,
+    pub log_phases: bool,
+    /// Accumulates all problems seen.
+    pub problems: Vec<Problem>,
+}
+
+impl<JF> GeneralValidateMonitor<JF>
+where
+    JF: Write + Debug,
+{
+    pub fn new(problems_json: Option<JF>) -> Self {
+        GeneralValidateMonitor {
+            progress_bars: true,
+            problems_json: problems_json.map(|x| Box::new(x)),
+            log_problems: true,
+            log_phases: true,
+            problems: Vec::new(),
+        }
+    }
+}
+
+impl GeneralValidateMonitor<Sink> {
+    pub fn without_file() -> GeneralValidateMonitor<Sink> {
+        GeneralValidateMonitor::new(None::<Sink>)
+    }
+}
+
+impl<JF> ValidateMonitor for GeneralValidateMonitor<JF>
+where
+    JF: Write + Debug,
+{
+    fn problem(&mut self, problem: Problem) -> Result<()> {
+        if self.log_problems {
+            warn!("{problem:?}"); // TODO: impl Display for Problem
+        }
+        if let Some(f) = self.problems_json.as_mut() {
+            serde_json::to_writer_pretty(f, &problem)
+                .map_err(|source| Error::SerializeProblem { source })?;
+        }
+        self.problems.push(problem);
+        Ok(())
+    }
+
+    fn start_phase(&mut self, phase: ValidatePhase) {
+        if self.log_phases {
+            info!("{phase}");
+        }
+    }
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ValidatePhase {
+    CheckArchiveDirectory,
+    ListBlocks,
+    ListBands,
+    CheckIndexes(usize),
+    CheckBlockContent { n_blocks: usize },
+}
+
+impl fmt::Display for ValidatePhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValidatePhase::CheckArchiveDirectory => write!(f, "Check archive directory"),
+            ValidatePhase::ListBlocks => write!(f, "List blocks"),
+            ValidatePhase::ListBands => write!(f, "List bands"),
+            ValidatePhase::CheckIndexes(n) => write!(f, "Check {n} indexes"),
+            ValidatePhase::CheckBlockContent { n_blocks } => {
+                write!(f, "Check content of {n_blocks} blocks")
+            }
+        }
+    }
+}
+
+/// A type of problem in the archive that can be found during validation.
+///
+/// A problem is distinct from an error that it does not immediately terminate
+/// validation.
+///
+/// This enum squashes error messages to strings so that they're easily serialized.
+#[non_exhaustive]
+#[derive(Debug, Serialize)]
+pub enum Problem {
+    BandOpenFailed {
+        band_id: BandId,
+        error_message: String,
+    },
+    BlockMissing(BlockHash),
+    BlockCorrupt(BlockHash),
+    ShortBlock {
+        block_hash: BlockHash,
+        actual_len: u64,
+        referenced_len: u64,
+    },
+    UnexpectedFile(String),
+    DuplicateBandDirectory(BandId),
+    IoError {
+        error_message: String,
+        url: String,
+    },
+}
+
+impl Problem {
+    pub fn io_error(error: &dyn std::error::Error, transport: &dyn Transport) -> Self {
+        Problem::IoError {
+            error_message: error.to_string(),
+            url: transport.url(),
+        }
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct ValidateOptions {
@@ -25,9 +162,13 @@ pub struct ValidateOptions {
     pub skip_block_hashes: bool,
 }
 
-impl BlockLengths {
-    fn new() -> BlockLengths {
-        BlockLengths(HashMap::new())
+// TODO: maybe this doesn't need to be a struct, but just a map updated by
+// some functions...
+pub(crate) struct ReferencedBlockLengths(pub(crate) HashMap<BlockHash, u64>);
+
+impl ReferencedBlockLengths {
+    fn new() -> ReferencedBlockLengths {
+        ReferencedBlockLengths(HashMap::new())
     }
 
     fn add(&mut self, addr: Address) {
@@ -39,7 +180,7 @@ impl BlockLengths {
         }
     }
 
-    fn update(&mut self, b: BlockLengths) {
+    fn update(&mut self, b: ReferencedBlockLengths) {
         for (bh, bl) in b.0 {
             self.0
                 .entry(bh)
@@ -52,9 +193,9 @@ impl BlockLengths {
 pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
-) -> (BlockLengths, ValidateStats) {
+) -> (ReferencedBlockLengths, ValidateStats) {
     let mut stats = ValidateStats::default();
-    let mut block_lens = BlockLengths::new();
+    let mut block_lens = ReferencedBlockLengths::new();
     struct ProgressModel {
         bands_done: usize,
         bands_total: usize,
@@ -104,8 +245,8 @@ pub(crate) fn validate_bands(
     (block_lens, stats)
 }
 
-pub(crate) fn validate_stored_tree(st: &StoredTree) -> Result<(BlockLengths, ValidateStats)> {
-    let mut block_lens = BlockLengths::new();
+fn validate_stored_tree(st: &StoredTree) -> Result<(ReferencedBlockLengths, ValidateStats)> {
+    let mut block_lens = ReferencedBlockLengths::new();
     let stats = ValidateStats::default();
     for entry in st
         .iter_entries(Apath::root(), Exclude::nothing())?

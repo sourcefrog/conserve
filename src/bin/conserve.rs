@@ -13,6 +13,7 @@
 
 //! Command-line entry point for Conserve backups.
 
+use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
@@ -180,6 +181,10 @@ enum Command {
         quick: bool,
         #[arg(long)]
         no_stats: bool,
+
+        /// Write a list of problems as json to this file.
+        #[arg(long)]
+        problems_json: Option<PathBuf>,
     },
 
     /// List backup versions in an archive.
@@ -432,14 +437,23 @@ impl Command {
                 archive,
                 quick,
                 no_stats,
+                problems_json,
             } => {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                let stats = Archive::open(open_transport(archive)?)?.validate(&options)?;
+                let problems_json = problems_json
+                    .as_ref()
+                    .map(File::create)
+                    .transpose()?
+                    .map(BufWriter::new);
+                let mut monitor = conserve::validate::GeneralValidateMonitor::new(problems_json);
+                let stats =
+                    Archive::open(open_transport(archive)?)?.validate(&options, &mut monitor)?;
                 if !no_stats {
                     println!("{stats}");
                 }
+                // TODO: Instead look at accumulated problems in the monitor.
                 if stats.has_problems() {
                     ui::problem("Archive has some problems.");
                     return Ok(ExitCode::PartialCorruption);

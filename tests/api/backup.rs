@@ -14,6 +14,7 @@
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use conserve::validate::GeneralValidateMonitor;
 use filetime::{set_file_mtime, FileTime};
 
 use conserve::kind::Kind;
@@ -98,7 +99,12 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     // TODO: Check index stats.
     // TODO: Check what was restored.
 
-    let validate_stats = af.validate(&ValidateOptions::default()).unwrap();
+    let validate_stats = af
+        .validate(
+            &ValidateOptions::default(),
+            &mut GeneralValidateMonitor::without_file(),
+        )
+        .unwrap();
     assert!(!validate_stats.has_problems());
     Ok(())
 }

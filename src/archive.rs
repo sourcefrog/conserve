@@ -32,6 +32,7 @@ use crate::kind::Kind;
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
+use crate::validate::{Problem, ValidateMonitor, ValidatePhase};
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -297,13 +298,17 @@ impl Archive {
         Ok(stats)
     }
 
-    pub fn validate(&self, options: &ValidateOptions) -> Result<ValidateStats> {
+    pub fn validate(
+        &self,
+        options: &ValidateOptions,
+        monitor: &mut dyn ValidateMonitor,
+    ) -> Result<ValidateStats> {
         let start = Instant::now();
-        let mut stats = self.validate_archive_dir()?;
+        let mut stats = self.validate_archive_dir(monitor)?;
 
-        ui::println("Count indexes...");
+        monitor.start_phase(ValidatePhase::ListBands);
         let band_ids = self.list_band_ids()?;
-        ui::println(&format!("Checking {} indexes...", band_ids.len()));
+        monitor.start_phase(ValidatePhase::CheckIndexes(band_ids.len()));
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
@@ -313,45 +318,43 @@ impl Archive {
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
             // content.
-            ui::println("List present blocks...");
-            // TODO: Just validate blockdir structure.
+            monitor.start_phase(ValidatePhase::ListBlocks);
+            // TODO: Check for unexpected files or directories in the blockdir.
             let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
-            for block_hash in referenced_lens
-                .0
-                .keys()
-                .filter(|&bh| !present_blocks.contains(bh))
-            {
-                ui::problem(&format!("Block {block_hash:?} is missing"));
-                stats.block_missing_count += 1;
+            for block_hash in referenced_lens.0.keys() {
+                if !present_blocks.contains(block_hash) {
+                    monitor.problem(Problem::BlockMissing(block_hash.clone()))?;
+                }
             }
         } else {
             // 2. Check the hash of all blocks are correct, and remember how long
             //    the uncompressed data is.
-            ui::println("Check blockdir...");
-            let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
+            let block_lengths: HashMap<BlockHash, usize> =
+                self.block_dir.validate(&mut stats, monitor)?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (block_hash, referenced_len) in referenced_lens.0 {
                 if let Some(actual_len) = block_lengths.get(&block_hash) {
-                    if referenced_len > (*actual_len as u64) {
-                        ui::problem(&format!("Block {block_hash:?} is too short",));
-                        // TODO: A separate counter; this is worse than just being missing
-                        stats.block_missing_count += 1;
+                    let actual_len = *actual_len as u64;
+                    if referenced_len > actual_len {
+                        monitor.problem(Problem::ShortBlock {
+                            block_hash,
+                            actual_len,
+                            referenced_len,
+                        })?;
                     }
                 } else {
-                    ui::problem(&format!("Block {block_hash:?} is missing"));
-                    stats.block_missing_count += 1;
+                    monitor.problem(Problem::BlockMissing(block_hash))?;
                 }
             }
         }
-
         stats.elapsed = start.elapsed();
         Ok(stats)
     }
 
-    fn validate_archive_dir(&self) -> Result<ValidateStats> {
+    fn validate_archive_dir(&self, monitor: &mut dyn ValidateMonitor) -> Result<ValidateStats> {
         // TODO: More tests for the problems detected here.
         let mut stats = ValidateStats::default();
-        ui::println("Check archive top-level directory...");
+        monitor.start_phase(ValidatePhase::CheckArchiveDirectory);
         let mut seen_bands = HashSet::<BandId>::new();
         for entry_result in self
             .transport
@@ -365,20 +368,14 @@ impl Archive {
                     ..
                 }) => {
                     if name.eq_ignore_ascii_case(BLOCK_DIR) {
-                    } else if let Ok(band_id) = name.parse() {
-                        if !seen_bands.insert(band_id) {
-                            stats.structure_problems += 1;
-                            ui::problem(&format!(
-                                "Duplicated band directory in {:?}: {name:?}",
-                                self.transport,
-                            ));
+                    } else if let Ok(band_id) = name.parse::<BandId>() {
+                        if !seen_bands.insert(band_id.clone()) {
+                            monitor.problem(Problem::DuplicateBandDirectory(band_id))?;
                         }
                     } else {
+                        // TODO: The whole path not just the filename
+                        monitor.problem(Problem::UnexpectedFile(name.to_owned()))?;
                         stats.unexpected_files += 1;
-                        ui::problem(&format!(
-                            "Unexpected directory in {:?}: {name:?}",
-                            self.transport,
-                        ));
                     }
                 }
                 Ok(DirEntry {
@@ -390,22 +387,18 @@ impl Archive {
                         && !name.eq_ignore_ascii_case(crate::gc_lock::GC_LOCK)
                         && !name.eq_ignore_ascii_case(".DS_Store")
                     {
+                        // TODO: The whole path not just the filename
+                        monitor.problem(Problem::UnexpectedFile(name.to_owned()))?;
                         stats.unexpected_files += 1;
-                        ui::problem(&format!(
-                            "Unexpected file in archive directory {:?}: {name:?}",
-                            self.transport,
-                        ));
                     }
                 }
-                Ok(DirEntry { kind, name, .. }) => {
-                    ui::problem(&format!(
-                        "Unexpected file kind in archive directory: {name:?} of kind {kind:?}"
-                    ));
+                Ok(DirEntry { name, .. }) => {
+                    // TODO: The whole path not just the filename
+                    monitor.problem(Problem::UnexpectedFile(name.to_owned()))?;
                     stats.unexpected_files += 1;
                 }
                 Err(source) => {
-                    ui::problem(&format!("Error listing archive directory: {source:?}"));
-                    stats.io_errors += 1;
+                    monitor.problem(Problem::io_error(&source, self.transport.as_ref()))?;
                 }
             }
         }

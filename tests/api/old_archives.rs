@@ -19,6 +19,7 @@ use std::path::Path;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use conserve::validate::GeneralValidateMonitor;
 use predicates::prelude::*;
 use pretty_assertions::assert_eq;
 
@@ -77,8 +78,9 @@ fn validate_archive() {
         println!("validate {ver}");
         let archive = open_old_archive(ver, "minimal");
 
+        let mut monitor = GeneralValidateMonitor::without_file();
         let stats = archive
-            .validate(&ValidateOptions::default())
+            .validate(&ValidateOptions::default(), &mut monitor)
             .expect("validate archive");
         assert_eq!(stats.structure_problems, 0);
         assert_eq!(stats.io_errors, 0);

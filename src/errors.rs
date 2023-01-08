@@ -167,6 +167,9 @@ pub enum Error {
     #[error("Unsupported URL scheme {:?}", scheme)]
     UrlScheme { scheme: String },
 
+    #[error("Failed to serialize problem")]
+    SerializeProblem { source: serde_json::Error },
+
     /// Generic IO error.
     #[error(transparent)]
     IOError {

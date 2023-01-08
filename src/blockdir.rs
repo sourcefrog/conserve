@@ -41,6 +41,7 @@ use crate::kind::Kind;
 use crate::stats::{BackupStats, Sizes, ValidateStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
+use crate::validate::{ValidateMonitor, ValidatePhase};
 use crate::*;
 
 const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
@@ -260,17 +261,21 @@ impl BlockDir {
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub fn validate(&self, stats: &mut ValidateStats) -> Result<HashMap<BlockHash, usize>> {
+    pub fn validate(
+        &self,
+        stats: &mut ValidateStats,
+        monitor: &mut dyn ValidateMonitor,
+    ) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
-        ui::println("Count blocks...");
+        monitor.start_phase(ValidatePhase::ListBlocks);
         let blocks = self.block_names_set()?;
-        crate::ui::println(&format!(
-            "Check {} blocks...",
-            blocks.len().separate_with_commas()
-        ));
+        monitor.start_phase(ValidatePhase::CheckBlockContent {
+            n_blocks: blocks.len(),
+        });
         stats.block_read_count = blocks.len().try_into().unwrap();
+        // TODO: Move to GeneralValidateModel.
         struct ProgressModel {
             total_blocks: usize,
             blocks_done: usize,
