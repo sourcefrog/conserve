@@ -36,7 +36,13 @@ there are no promises of stability for the library API.
 
 ## Versioning strategy
 
-Conserve release versioning is primarily time-based: after 0.6.16 releases will be numbered `YY.MM`, with no leading zeros on the month,
+In this situation of gradual and backward compatible evolution and improvement,
+there is no obvious place for a 1.0 release nor for a 2.0. Instead of staying
+in 0.6 forever, I've decided to switch to CalVer versioning.  (<https://
+nick.groenen.me/posts/switching-obsidian-export-to-calver/> makes a similar
+case.)
+
+After 0.6.16 releases will be numbered `YY.MM`, with no leading zeros on the month,
 as described in <https://calver.org/>.
 
 Patch releases are expected to be rare but may be numbered as `YY.MM.pp`.
