@@ -47,7 +47,7 @@ indoc = "1.0.8"
 
 [target.'cfg(unix)'.dependencies]
 users = "0.11"
-nix = "0.25"
+nix = "0.26"
 
 [dependencies.clap]
 version = "4.0"
