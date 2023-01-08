@@ -99,9 +99,6 @@ const SMALL_FILE_CAP: u64 = 100_000;
 /// Target maximum uncompressed size for combined blocks.
 const TARGET_COMBINED_BLOCK_SIZE: usize = MAX_BLOCK_SIZE;
 
-/// ISO timestamp, for https://docs.rs/chrono/0.4.11/chrono/format/strftime/.
-const TIMESTAMP_FORMAT: &str = "%F %T";
-
 /// Temporary files in the archive have this prefix.
 const TMP_PREFIX: &str = "tmp";
 

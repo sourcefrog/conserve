@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2018, 2020, 2021 Martin Pool.
+// Copyright 2018, 2020, 2021, 2022 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,7 +17,11 @@
 //! file (typically stdout).
 
 use std::borrow::Cow;
+use std::convert::TryInto;
 use std::io::{BufWriter, Write};
+
+use time::format_description::well_known::Rfc3339;
+use time::UtcOffset;
 
 use crate::*;
 
@@ -47,6 +51,7 @@ pub fn show_versions(
     if options.newest_first {
         band_ids.reverse();
     }
+    let local_offset = UtcOffset::current_local_offset().expect("get local time offset");
     for band_id in band_ids {
         if !(options.tree_size || options.start_time || options.backup_duration) {
             writeln!(w, "{band_id}")?;
@@ -70,24 +75,28 @@ pub fn show_versions(
         };
 
         if options.start_time {
-            let start_time = info.start_time;
-            let start_time_str = if options.utc {
-                start_time.format(crate::TIMESTAMP_FORMAT)
-            } else {
-                start_time
-                    .with_timezone(&chrono::Local)
-                    .format(crate::TIMESTAMP_FORMAT)
-            };
-            l.push(format!("{start_time_str:<10}"));
+            let mut start_time = info.start_time;
+            if !options.utc {
+                start_time = start_time.to_offset(local_offset);
+            }
+            l.push(format!(
+                "{date:<25}", // "yyyy-mm-ddThh:mm:ss+oooo" => 25
+                date = start_time.format(&Rfc3339).unwrap(),
+            ));
         }
 
         if options.backup_duration {
             let duration_str: Cow<str> = if info.is_closed {
-                info.end_time
-                    .and_then(|et| (et - info.start_time).to_std().ok())
-                    .map(crate::ui::duration_to_hms)
-                    .map(Cow::Owned)
-                    .unwrap_or(Cow::Borrowed("unknown"))
+                if let Some(end_time) = info.end_time {
+                    let duration = end_time - info.start_time;
+                    if let Ok(duration) = duration.try_into() {
+                        crate::ui::duration_to_hms(duration).into()
+                    } else {
+                        Cow::Borrowed("negative")
+                    }
+                } else {
+                    Cow::Borrowed("unknown")
+                }
             } else {
                 Cow::Borrowed("incomplete")
             };

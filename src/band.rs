@@ -21,8 +21,8 @@
 //! To read a consistent tree possibly composed from several incremental backups, use
 //! StoredTree rather than the Band itself.
 
-use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
@@ -96,10 +96,10 @@ pub struct Info {
     pub is_closed: bool,
 
     /// Time Conserve started writing this band.
-    pub start_time: DateTime<Utc>,
+    pub start_time: OffsetDateTime,
 
     /// Time this band was completed, if it is complete.
-    pub end_time: Option<DateTime<Utc>>,
+    pub end_time: Option<OffsetDateTime>,
 
     /// Number of hunks present in the index, if that is known.
     pub index_hunk_count: Option<u64>,
@@ -121,7 +121,7 @@ impl Band {
             .and_then(|()| transport.create_dir(INDEX_DIR))
             .map_err(|source| Error::CreateBand { source })?;
         let head = Head {
-            start_time: Utc::now().timestamp(),
+            start_time: OffsetDateTime::now_utc().unix_timestamp(),
             band_format_version: Some(BAND_FORMAT_VERSION.to_owned()),
         };
         write_json(&transport, BAND_HEAD_FILENAME, &head)?;
@@ -138,7 +138,7 @@ impl Band {
             &self.transport,
             BAND_TAIL_FILENAME,
             &Tail {
-                end_time: Utc::now().timestamp(),
+                end_time: OffsetDateTime::now_utc().unix_timestamp(),
                 index_hunk_count: Some(index_hunk_count),
             },
         )
@@ -204,13 +204,18 @@ impl Band {
             Err(Error::MetadataNotFound { .. }) => None,
             Err(err) => return Err(err),
         };
+        let start_time = OffsetDateTime::from_unix_timestamp(self.head.start_time)
+            .expect("invalid band start timestamp");
+        let end_time = if let Some(tail) = &tail_option {
+            Some(OffsetDateTime::from_unix_timestamp(tail.end_time).expect("invalid end timestamp"))
+        } else {
+            None
+        };
         Ok(Info {
             id: self.band_id.clone(),
             is_closed: tail_option.is_some(),
-            start_time: Utc.timestamp_opt(self.head.start_time, 0).unwrap(),
-            end_time: tail_option
-                .as_ref()
-                .map(|tail| Utc.timestamp_opt(tail.end_time, 0).unwrap()),
+            start_time,
+            end_time,
             index_hunk_count: tail_option.as_ref().and_then(|tail| tail.index_hunk_count),
         })
     }
@@ -249,8 +254,8 @@ impl Band {
 mod tests {
     use std::fs;
     use std::str::FromStr;
+    use std::time::Duration;
 
-    use chrono::Duration;
     use serde_json::json;
 
     use crate::test_fixtures::ScratchArchive;
@@ -287,7 +292,7 @@ mod tests {
         let dur = info.end_time.expect("info has an end_time") - info.start_time;
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)
-        assert!(dur < Duration::seconds(5));
+        assert!(dur < Duration::from_secs(5));
     }
 
     #[test]

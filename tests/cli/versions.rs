@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2021 Martin Pool.
+// Copyright 2021-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
 
 use assert_cmd::prelude::*;
 use conserve::test_fixtures::ScratchArchive;
+use indoc::indoc;
 use predicates::function::function;
 use predicates::prelude::*;
 
@@ -26,13 +27,11 @@ fn utc() {
         .args(["versions", "--utc", "testdata/archive/simple/v0.6.10"])
         .assert()
         .success()
-        .stdout(
-            "\
-b0000                2021-03-04 13:21:15       0:00
-b0001                2021-03-04 13:21:30       0:00
-b0002                2021-03-04 13:27:28       0:00
-",
-        );
+        .stdout(indoc! { "
+            b0000                2021-03-04T13:21:15Z            0:00
+            b0001                2021-03-04T13:21:30Z            0:00
+            b0002                2021-03-04T13:27:28Z            0:00
+            "});
 }
 
 #[test]
@@ -47,13 +46,11 @@ fn newest_first() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(
-            "\
-b0002                2021-03-04 13:27:28       0:00
-b0001                2021-03-04 13:21:30       0:00
-b0000                2021-03-04 13:21:15       0:00
-",
-        );
+        .stdout(indoc! { "
+            b0002                2021-03-04T13:27:28Z            0:00
+            b0001                2021-03-04T13:21:30Z            0:00
+            b0000                2021-03-04T13:21:15Z            0:00
+        "});
 }
 
 #[test]
@@ -93,13 +90,11 @@ fn tree_sizes() {
         ])
         .assert()
         .success()
-        .stdout(
-            "\
-b0000                2021-03-04 13:21:15       0:00           0 MB
-b0001                2021-03-04 13:21:30       0:00           0 MB
-b0002                2021-03-04 13:27:28       0:00           0 MB
-",
-        );
+        .stdout(indoc! { "
+            b0000                2021-03-04T13:21:15Z            0:00           0 MB
+            b0001                2021-03-04T13:21:30Z            0:00           0 MB
+            b0002                2021-03-04T13:27:28Z            0:00           0 MB
+            "});
 }
 
 #[test]

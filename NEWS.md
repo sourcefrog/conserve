@@ -1,5 +1,10 @@
 # Conserve release history
 
+## 23.1.1
+
+- Changed: Timestamps in `conserve versions` are now in RFC 3339 format, including a `T` between
+  the date and the time, and a timezone indicator.
+
 ## 23.1.0
 
 - Switched to CalVer versioning.
@@ -11,7 +16,7 @@
   (Previously you would have to write `/a/**`.)
 
 - Fixed: `validate` should not complain about `GC_LOCK` or `.DS_Store` files in the archive directory.
-  
+
 ## v0.6.16
 
 Released 2022-08-12
@@ -26,7 +31,7 @@ Released 2022-08-12
   or changed files (and currently only plain files), and the file state is shown
   by a single-character prefix similar to `conserve diff`, rather than a suffix.
 
-- Changed to use [Nutmeg](https://libs.rs/nutmeg) to draw progress bars, 
+- Changed to use [Nutmeg](https://libs.rs/nutmeg) to draw progress bars,
   which changes their appearance somewhat.
 
 - Added a `--no-progress` option.
