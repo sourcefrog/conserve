@@ -1,8 +1,8 @@
 # Conserve release history
 
-## v0.6.17
+## 23.1.0
 
-Not released yet!
+- Switched to CalVer versioning.
 
 - New: Support for storing, restoring, and listing Unix owner, group, and permissions.
   Thanks to @believeinlain.

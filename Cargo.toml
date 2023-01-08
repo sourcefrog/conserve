@@ -8,7 +8,7 @@ license = "GPL-2.0"
 name = "conserve"
 readme = "README.md"
 repository = "https://github.com/sourcefrog/conserve/"
-version = "0.6.17-pre"
+version = "23.1.0-pre"
 rust-version = "1.63"
 
 [[bin]]
