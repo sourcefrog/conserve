@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,7 +18,8 @@ use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use tracing::trace;
+#[allow(unused_imports)]
+use tracing::{error, info, trace};
 
 use conserve::backup::BackupOptions;
 use conserve::ReadTree;
@@ -447,18 +448,17 @@ impl Command {
                     .map(File::create)
                     .transpose()?
                     .map(BufWriter::new);
-                let mut monitor = conserve::validate::GeneralValidateMonitor::new(problems_json);
+                let mut monitor = conserve::ui::TerminalValidateMonitor::new(problems_json);
                 let stats =
                     Archive::open(open_transport(archive)?)?.validate(&options, &mut monitor)?;
                 if !no_stats {
                     println!("{stats}");
                 }
-                // TODO: Instead look at accumulated problems in the monitor.
-                if stats.has_problems() {
-                    ui::problem("Archive has some problems.");
+                if monitor.saw_problems() {
+                    println!("Archive has some problems.");
                     return Ok(ExitCode::PartialCorruption);
                 } else {
-                    ui::println("Archive is OK.");
+                    println!("Archive is OK.");
                 }
             }
             Command::Versions {

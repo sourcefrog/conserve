@@ -23,6 +23,7 @@ use crate::*;
 type IOError = std::io::Error;
 
 /// Conserve specific error.
+#[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Block file {hash:?} corrupt; actual hash {actual_hash:?}")]
@@ -31,11 +32,24 @@ pub enum Error {
     #[error("{address:?} extends beyond decompressed block length {actual_len:?}")]
     AddressTooLong { address: Address, actual_len: usize },
 
+    // TODO: Merge with AddressTooLong
+    #[error(
+        "block {block_hash} actual length is {actual_len} but indexes reference {referenced_len}"
+    )]
+    ShortBlock {
+        block_hash: BlockHash,
+        actual_len: usize,
+        referenced_len: u64,
+    },
+
     #[error("Failed to write block {hash:?}")]
     WriteBlock { hash: String, source: IOError },
 
     #[error("Failed to read block {hash:?}")]
     ReadBlock { hash: String, source: IOError },
+
+    #[error("Block {block_hash} is missing")]
+    BlockMissing { block_hash: BlockHash },
 
     #[error("Failed to list block files")]
     ListBlocks { source: IOError },
@@ -74,6 +88,9 @@ pub enum Error {
     #[error("Failed to create band")]
     CreateBand { source: std::io::Error },
 
+    #[error("Band {band_id} head file missing")]
+    BandHeadMissing { band_id: BandId },
+
     #[error("Failed to create block directory")]
     CreateBlockDir { source: std::io::Error },
 
@@ -82,6 +99,9 @@ pub enum Error {
 
     #[error("Band {} is incomplete", band_id)]
     BandIncomplete { band_id: BandId },
+
+    #[error("Duplicated band directory for {band_id}")]
+    DuplicateBandDirectory { band_id: BandId },
 
     #[error(
         "Can't delete blocks because the last band ({}) is incomplete and may be in use",
@@ -169,6 +189,9 @@ pub enum Error {
 
     #[error("Failed to serialize problem")]
     SerializeProblem { source: serde_json::Error },
+
+    #[error("Unexpected file {path:?} in archive directory")]
+    UnexpectedFile { path: String },
 
     /// Generic IO error.
     #[error(transparent)]

@@ -13,13 +13,17 @@
 
 //! Console UI.
 
-use std::fmt::Write;
+use std::fmt::Debug;
+use std::io;
 use std::sync::Mutex;
 use std::time::Duration;
 
 use lazy_static::lazy_static;
+use tracing::{info, warn};
 
 use crate::stats::Sizes;
+use crate::validate::{ValidateMonitor, ValidatePhase};
+use crate::{Error, Result};
 
 /// A terminal/text UI.
 ///
@@ -59,6 +63,7 @@ where
 }
 
 pub(crate) fn format_error_causes(error: &dyn std::error::Error) -> String {
+    use std::fmt::Write;
     let mut buf = error.to_string();
     let mut cause = error;
     while let Some(c) = cause.source() {
@@ -156,6 +161,64 @@ impl UIState {
 
 pub(crate) fn nutmeg_options() -> nutmeg::Options {
     nutmeg::Options::default().progress_enabled(UI_STATE.lock().unwrap().progress_enabled)
+}
+
+/// A ValidateMonitor that logs messages, collects problems in memory, optionally
+/// writes problems to a json file, and draws console progress bars.
+#[derive(Debug)]
+pub struct TerminalValidateMonitor<JF>
+where
+    JF: io::Write + Debug,
+{
+    pub progress_bars: bool,
+    /// Optionally write all problems as json to this file as they're discovered.
+    pub problems_json: Option<Box<JF>>,
+    pub log_problems: bool,
+    pub n_problems: usize,
+    pub log_phases: bool,
+}
+
+impl<JF> TerminalValidateMonitor<JF>
+where
+    JF: io::Write + Debug,
+{
+    pub fn new(problems_json: Option<JF>) -> Self {
+        TerminalValidateMonitor {
+            progress_bars: true,
+            problems_json: problems_json.map(|x| Box::new(x)),
+            log_problems: true,
+            log_phases: true,
+            n_problems: 0,
+        }
+    }
+
+    pub fn saw_problems(&self) -> bool {
+        self.n_problems > 0
+    }
+}
+
+impl<JF> ValidateMonitor for TerminalValidateMonitor<JF>
+where
+    JF: io::Write + Debug,
+{
+    fn problem(&mut self, problem: Error) -> Result<()> {
+        if self.log_problems {
+            warn!("{problem}");
+        }
+        if let Some(f) = self.problems_json.as_mut() {
+            // TODO: Structured serialization, not just a string.
+            serde_json::to_writer_pretty(f, &problem.to_string())
+                .map_err(|source| Error::SerializeProblem { source })?;
+        }
+        self.n_problems += 1;
+        Ok(())
+    }
+
+    fn start_phase(&mut self, phase: ValidatePhase) {
+        if self.log_phases {
+            info!("{phase}");
+        }
+    }
 }
 
 #[cfg(test)]

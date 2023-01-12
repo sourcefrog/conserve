@@ -14,12 +14,13 @@
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use conserve::validate::GeneralValidateMonitor;
+use assert_matches::assert_matches;
 use filetime::{set_file_mtime, FileTime};
 
 use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
+use conserve::validate::CollectValidateMonitor;
 use conserve::*;
 
 const HELLO_HASH: &str =
@@ -99,13 +100,11 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     // TODO: Check index stats.
     // TODO: Check what was restored.
 
-    let validate_stats = af
-        .validate(
-            &ValidateOptions::default(),
-            &mut GeneralValidateMonitor::without_file(),
-        )
+    let mut monitor = CollectValidateMonitor::new();
+    let _validate_stats = af
+        .validate(&ValidateOptions::default(), &mut monitor)
         .unwrap();
-    assert!(!validate_stats.has_problems());
+    assert_matches!(monitor.problems[..], []);
     Ok(())
 }
 

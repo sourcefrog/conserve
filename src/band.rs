@@ -27,6 +27,7 @@ use time::OffsetDateTime;
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
 use crate::transport::{ListDirNames, Transport};
+use crate::validate::ValidateMonitor;
 use crate::*;
 
 static INDEX_DIR: &str = "i";
@@ -218,12 +219,17 @@ impl Band {
         })
     }
 
-    pub fn validate(&self, stats: &mut ValidateStats) -> Result<()> {
+    pub fn validate(
+        &self,
+        stats: &mut ValidateStats,
+        monitor: &mut dyn ValidateMonitor,
+    ) -> Result<()> {
         let ListDirNames { mut files, dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
-            ui::problem(&format!("No band head file in {:?}", self.transport));
-            stats.missing_band_heads += 1;
+            monitor.problem(Error::BandHeadMissing {
+                band_id: self.band_id.clone(),
+            })?;
         }
         remove_item(&mut files, &BAND_HEAD_FILENAME);
         remove_item(&mut files, &BAND_TAIL_FILENAME);

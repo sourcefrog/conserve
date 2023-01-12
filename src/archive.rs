@@ -32,7 +32,7 @@ use crate::kind::Kind;
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
-use crate::validate::{Problem, ValidateMonitor, ValidatePhase};
+use crate::validate::{ValidateMonitor, ValidatePhase};
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -312,7 +312,7 @@ impl Archive {
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
-        let (referenced_lens, ref_stats) = validate::validate_bands(self, &band_ids);
+        let (referenced_lens, ref_stats) = validate::validate_bands(self, &band_ids, monitor)?;
         stats += ref_stats;
 
         if options.skip_block_hashes {
@@ -321,9 +321,9 @@ impl Archive {
             monitor.start_phase(ValidatePhase::ListBlocks);
             // TODO: Check for unexpected files or directories in the blockdir.
             let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
-            for block_hash in referenced_lens.0.keys() {
-                if !present_blocks.contains(block_hash) {
-                    monitor.problem(Problem::BlockMissing(block_hash.clone()))?;
+            for block_hash in referenced_lens.0.keys().cloned() {
+                if !present_blocks.contains(&block_hash) {
+                    monitor.problem(Error::BlockMissing { block_hash })?;
                 }
             }
         } else {
@@ -333,17 +333,16 @@ impl Archive {
                 self.block_dir.validate(&mut stats, monitor)?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (block_hash, referenced_len) in referenced_lens.0 {
-                if let Some(actual_len) = block_lengths.get(&block_hash) {
-                    let actual_len = *actual_len as u64;
-                    if referenced_len > actual_len {
-                        monitor.problem(Problem::ShortBlock {
+                if let Some(&actual_len) = block_lengths.get(&block_hash) {
+                    if referenced_len > actual_len as u64 {
+                        monitor.problem(Error::ShortBlock {
                             block_hash,
                             actual_len,
                             referenced_len,
                         })?;
                     }
                 } else {
-                    monitor.problem(Problem::BlockMissing(block_hash))?;
+                    monitor.problem(Error::BlockMissing { block_hash })?;
                 }
             }
         }
@@ -370,11 +369,13 @@ impl Archive {
                     if name.eq_ignore_ascii_case(BLOCK_DIR) {
                     } else if let Ok(band_id) = name.parse::<BandId>() {
                         if !seen_bands.insert(band_id.clone()) {
-                            monitor.problem(Problem::DuplicateBandDirectory(band_id))?;
+                            monitor.problem(Error::DuplicateBandDirectory { band_id })?;
                         }
                     } else {
                         // TODO: The whole path not just the filename
-                        monitor.problem(Problem::UnexpectedFile(name.to_owned()))?;
+                        monitor.problem(Error::UnexpectedFile {
+                            path: name.to_owned(),
+                        })?;
                         stats.unexpected_files += 1;
                     }
                 }
@@ -388,17 +389,21 @@ impl Archive {
                         && !name.eq_ignore_ascii_case(".DS_Store")
                     {
                         // TODO: The whole path not just the filename
-                        monitor.problem(Problem::UnexpectedFile(name.to_owned()))?;
+                        monitor.problem(Error::UnexpectedFile {
+                            path: name.to_owned(),
+                        })?;
                         stats.unexpected_files += 1;
                     }
                 }
                 Ok(DirEntry { name, .. }) => {
                     // TODO: The whole path not just the filename
-                    monitor.problem(Problem::UnexpectedFile(name.to_owned()))?;
+                    monitor.problem(Error::UnexpectedFile {
+                        path: name.to_owned(),
+                    })?;
                     stats.unexpected_files += 1;
                 }
                 Err(source) => {
-                    monitor.problem(Problem::io_error(&source, self.transport.as_ref()))?;
+                    monitor.problem(Error::from(source))?;
                 }
             }
         }

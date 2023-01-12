@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2020, Martin Pool.
+// Copyright 2020-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,32 +15,29 @@
 
 use std::path::Path;
 
-use conserve::{validate::GeneralValidateMonitor, *};
+use assert_matches::assert_matches;
+
+use conserve::{validate::CollectValidateMonitor, *};
 
 #[test]
 fn missing_block() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
-
-    let validate_stats = archive.validate(
-        &ValidateOptions::default(),
-        &mut GeneralValidateMonitor::without_file(),
-    )?;
-    assert!(validate_stats.has_problems());
-    assert_eq!(validate_stats.block_missing_count, 1);
+    let mut monitor = CollectValidateMonitor::new();
+    let _validate_stats = archive.validate(&ValidateOptions::default(), &mut monitor)?;
+    assert_matches!(monitor.problems[..], [Error::BlockMissing { .. }]);
     Ok(())
 }
 
 #[test]
 fn missing_block_skip_block_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
-
-    let validate_stats = archive.validate(
+    let mut monitor = CollectValidateMonitor::new();
+    let _validate_stats = archive.validate(
         &ValidateOptions {
             skip_block_hashes: true,
         },
-        &mut GeneralValidateMonitor::without_file(),
+        &mut monitor,
     )?;
-    assert!(validate_stats.has_problems());
-    assert_eq!(validate_stats.block_missing_count, 1);
+    assert_matches!(monitor.problems[..], [Error::BlockMissing { .. }]);
     Ok(())
 }

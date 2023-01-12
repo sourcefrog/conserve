@@ -69,15 +69,6 @@ pub struct Sizes {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Add, AddAssign, Sum)]
 pub struct ValidateStats {
-    /// Count of files in the wrong place.
-    pub structure_problems: usize,
-    pub io_errors: usize,
-
-    /// Failed to open a band.
-    pub band_open_errors: usize,
-    pub band_metadata_problems: usize,
-    pub missing_band_heads: usize,
-
     /// Failed to open a stored tree.
     pub tree_open_errors: usize,
     pub tree_validate_errors: usize,
@@ -97,17 +88,6 @@ pub struct ValidateStats {
 
 impl fmt::Display for ValidateStats {
     fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.has_problems() {
-            writeln!(w, "VALIDATION FOUND PROBLEMS")?;
-        } else {
-            writeln!(w, "No problems found in archive")?;
-        }
-
-        write_count(w, "structure problems", self.structure_problems);
-        write_count(w, "IO errors", self.io_errors);
-        write_count(w, "band open errors", self.band_open_errors);
-        write_count(w, "band metadata errors", self.band_metadata_problems);
-        write_count(w, "missing band heads", self.missing_band_heads);
         write_count(w, "tree open errors", self.tree_open_errors);
         write_count(w, "tree validate errors", self.tree_validate_errors);
         write_count(w, "unexpected files", self.unexpected_files);
@@ -121,12 +101,6 @@ impl fmt::Display for ValidateStats {
         write_duration(w, "elapsed", self.elapsed)?;
 
         Ok(())
-    }
-}
-
-impl ValidateStats {
-    pub fn has_problems(&self) -> bool {
-        self.block_error_count > 0 || self.io_errors > 0 || self.block_missing_count > 0
     }
 }
 

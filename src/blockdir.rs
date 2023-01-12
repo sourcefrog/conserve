@@ -33,7 +33,6 @@ use blake2_rfc::blake2b::Blake2b;
 use nutmeg::models::UnboundedModel;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use thousands::Separable;
 
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
