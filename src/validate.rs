@@ -129,8 +129,7 @@ pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
     monitor: &mut dyn ValidateMonitor,
-) -> Result<(ReferencedBlockLengths, ValidateStats)> {
-    let mut stats = ValidateStats::default();
+) -> Result<ReferencedBlockLengths> {
     let mut block_lens = ReferencedBlockLengths::new();
     struct ProgressModel {
         bands_done: usize,
@@ -166,8 +165,7 @@ pub(crate) fn validate_bands(
         };
         match archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
             Ok(st) => {
-                if let Ok((st_block_lens, st_stats)) = validate_stored_tree(&st, monitor) {
-                    stats += st_stats;
+                if let Ok(st_block_lens) = validate_stored_tree(&st, monitor) {
                     block_lens.update(st_block_lens);
                 }
             }
@@ -178,15 +176,14 @@ pub(crate) fn validate_bands(
         }
         view.update(|model| model.bands_done += 1);
     }
-    Ok((block_lens, stats))
+    Ok(block_lens)
 }
 
 fn validate_stored_tree(
     st: &StoredTree,
     _monitor: &mut dyn ValidateMonitor,
-) -> Result<(ReferencedBlockLengths, ValidateStats)> {
+) -> Result<ReferencedBlockLengths> {
     let mut block_lens = ReferencedBlockLengths::new();
-    let stats = ValidateStats::default();
     for entry in st
         .iter_entries(Apath::root(), Exclude::nothing())?
         .filter(|entry| entry.kind() == Kind::File)
@@ -195,5 +192,5 @@ fn validate_stored_tree(
             block_lens.add(addr)
         }
     }
-    Ok((block_lens, stats))
+    Ok(block_lens)
 }

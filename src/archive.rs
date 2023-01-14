@@ -313,8 +313,7 @@ impl Archive {
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
-        let (referenced_lens, ref_stats) = validate::validate_bands(self, &band_ids, monitor)?;
-        stats += ref_stats;
+        let referenced_lens = validate::validate_bands(self, &band_ids, monitor)?;
 
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
