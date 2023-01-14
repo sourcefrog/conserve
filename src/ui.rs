@@ -168,7 +168,7 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
 #[derive(Debug)]
 pub struct TerminalValidateMonitor<JF>
 where
-    JF: io::Write + Debug,
+    JF: io::Write + Debug + Send,
 {
     pub progress_bars: bool,
     /// Optionally write all problems as json to this file as they're discovered.
@@ -180,7 +180,7 @@ where
 
 impl<JF> TerminalValidateMonitor<JF>
 where
-    JF: io::Write + Debug,
+    JF: io::Write + Debug + Send,
 {
     pub fn new(problems_json: Option<JF>) -> Self {
         TerminalValidateMonitor {
@@ -199,7 +199,7 @@ where
 
 impl<JF> ValidateMonitor for TerminalValidateMonitor<JF>
 where
-    JF: io::Write + Debug,
+    JF: io::Write + Debug + Send,
 {
     fn problem(&mut self, problem: Error) -> Result<()> {
         if self.log_problems {

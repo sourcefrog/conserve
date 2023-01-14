@@ -10,7 +10,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-use std::fmt;
+use std::fmt::{self, Debug};
 
 use crate::{Error, Result};
 
@@ -18,7 +18,7 @@ use crate::{Error, Result};
 ///
 /// These can be, for example, drawn into a UI, written to logs, or written
 /// out as structured data.
-pub trait ValidateMonitor {
+pub trait ValidateMonitor: Debug + Send {
     /// The monitor is informed that a non-fatal error occurred while validating the
     /// archive.
     fn problem(&mut self, problem: Error) -> Result<()>;
@@ -29,6 +29,7 @@ pub trait ValidateMonitor {
 
 /// A ValidateMonitor that collects all events without drawing anything,
 /// for use in tests.
+#[derive(Debug)]
 pub struct CollectValidateMonitor {
     pub problems: Vec<Error>,
     pub phases: Vec<ValidatePhase>,
