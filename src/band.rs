@@ -26,8 +26,8 @@ use time::OffsetDateTime;
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
+use crate::monitor::ValidateMonitor;
 use crate::transport::{ListDirNames, Transport};
-use crate::validate::ValidateMonitor;
 use crate::*;
 
 static INDEX_DIR: &str = "i";

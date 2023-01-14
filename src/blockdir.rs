@@ -37,10 +37,10 @@ use serde::{Deserialize, Serialize};
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
+use crate::monitor::{ValidateMonitor, ValidatePhase};
 use crate::stats::{BackupStats, Sizes, ValidateStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
-use crate::validate::{ValidateMonitor, ValidatePhase};
 use crate::*;
 
 const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;

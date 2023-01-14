@@ -21,8 +21,8 @@ use std::time::Duration;
 use lazy_static::lazy_static;
 use tracing::{info, warn};
 
+use crate::monitor::{ValidateMonitor, ValidatePhase};
 use crate::stats::Sizes;
-use crate::validate::{ValidateMonitor, ValidatePhase};
 use crate::{Error, Result};
 
 /// A terminal/text UI.

@@ -17,7 +17,8 @@ use std::path::Path;
 
 use assert_matches::assert_matches;
 
-use conserve::{validate::CollectValidateMonitor, *};
+use conserve::monitor::CollectValidateMonitor;
+use conserve::*;
 
 #[test]
 fn missing_block() -> Result<()> {

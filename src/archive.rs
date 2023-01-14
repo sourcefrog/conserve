@@ -29,10 +29,10 @@ use crate::blockhash::BlockHash;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
+use crate::monitor::{ValidateMonitor, ValidatePhase};
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
-use crate::validate::{ValidateMonitor, ValidatePhase};
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";

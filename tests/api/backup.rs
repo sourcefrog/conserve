@@ -18,9 +18,9 @@ use assert_matches::assert_matches;
 use filetime::{set_file_mtime, FileTime};
 
 use conserve::kind::Kind;
+use conserve::monitor::CollectValidateMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
-use conserve::validate::CollectValidateMonitor;
 use conserve::*;
 
 const HELLO_HASH: &str =

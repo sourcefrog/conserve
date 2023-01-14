@@ -12,79 +12,15 @@
 
 use std::cmp::max;
 use std::collections::HashMap;
-use std::fmt::{self, Debug};
+use std::fmt::Debug;
 use std::time::Instant;
 
 #[allow(unused_imports)]
 use tracing::{info, warn};
 
 use crate::blockdir::Address;
-use crate::Error;
+use crate::monitor::ValidateMonitor;
 use crate::*;
-
-/// A ValidateMonitor collects progress and problem findings during validation.
-///
-/// These can be, for example, drawn into a UI, written to logs, or written
-/// out as structured data.
-pub trait ValidateMonitor {
-    /// The monitor is informed that a non-fatal error occurred while validating the
-    /// archive.
-    fn problem(&mut self, problem: Error) -> Result<()>;
-
-    /// The monitor is informed that a phase of validation has started.
-    fn start_phase(&mut self, phase: ValidatePhase);
-}
-
-/// A ValidateMonitor that collects all events without drawing anything,
-/// for use in tests.
-pub struct CollectValidateMonitor {
-    pub problems: Vec<Error>,
-    pub phases: Vec<ValidatePhase>,
-}
-
-impl CollectValidateMonitor {
-    pub fn new() -> Self {
-        CollectValidateMonitor {
-            problems: Vec::new(),
-            phases: Vec::new(),
-        }
-    }
-}
-
-impl ValidateMonitor for CollectValidateMonitor {
-    fn problem(&mut self, problem: Error) -> Result<()> {
-        self.problems.push(problem);
-        Ok(())
-    }
-
-    fn start_phase(&mut self, phase: ValidatePhase) {
-        self.phases.push(phase)
-    }
-}
-
-#[non_exhaustive]
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum ValidatePhase {
-    CheckArchiveDirectory,
-    ListBlocks,
-    ListBands,
-    CheckIndexes(usize),
-    CheckBlockContent { n_blocks: usize },
-}
-
-impl fmt::Display for ValidatePhase {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ValidatePhase::CheckArchiveDirectory => write!(f, "Check archive directory"),
-            ValidatePhase::ListBlocks => write!(f, "List blocks"),
-            ValidatePhase::ListBands => write!(f, "List bands"),
-            ValidatePhase::CheckIndexes(n) => write!(f, "Check {n} indexes"),
-            ValidatePhase::CheckBlockContent { n_blocks } => {
-                write!(f, "Check content of {n_blocks} blocks")
-            }
-        }
-    }
-}
 
 /// Options to [Archive::validate].
 #[derive(Debug, Default)]

@@ -19,7 +19,7 @@ use std::path::Path;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use conserve::validate::CollectValidateMonitor;
+use conserve::monitor::CollectValidateMonitor;
 use predicates::prelude::*;
 use pretty_assertions::assert_eq;
 
