@@ -302,29 +302,28 @@ impl BlockDir {
             },
             ui::nutmeg_options(),
         );
-        // Make a vec of Some(usize) if the block could be read, or None if it
-        // failed, where the usize gives the uncompressed data size.
-        let results: Vec<Option<(BlockHash, usize)>> = blocks
+        // TODO: Report to the monitor from inside the par_iter, rather than only at the end.
+        let results: Vec<Result<(BlockHash, usize)>> = blocks
             .into_par_iter()
-            // .into_iter()
             .map(|hash| {
-                let r = self
-                    .get_block_content(&hash)
-                    .map(|(bytes, _sizes)| (hash, bytes.len()))
-                    .ok();
-                let bytes = r.as_ref().map(|x| x.1).unwrap_or_default();
+                let (bytes, _sizes) = self.get_block_content(&hash)?;
+                let len = bytes.len();
                 progress_bar.update(|model| {
                     model.blocks_done += 1;
-                    model.bytes_done += bytes
+                    model.bytes_done += len
                 });
-                r
+                Ok((hash, len))
             })
             .collect();
-        stats.block_error_count += results.iter().filter(|o| o.is_none()).count();
-        let len_map: HashMap<BlockHash, usize> = results
-            .into_iter()
-            .flatten() // keep only Some values
-            .collect();
+        let mut len_map: HashMap<BlockHash, usize> = HashMap::new();
+        for r in results {
+            match r {
+                Ok((hash, len)) => {
+                    len_map.insert(hash, len);
+                }
+                Err(err) => monitor.problem(err)?,
+            }
+        }
         Ok(len_map)
     }
 

@@ -304,7 +304,8 @@ impl Archive {
         monitor: &mut dyn ValidateMonitor,
     ) -> Result<ValidateStats> {
         let start = Instant::now();
-        let mut stats = self.validate_archive_dir(monitor)?;
+        let mut stats = ValidateStats::default();
+        self.validate_archive_dir(monitor)?;
 
         monitor.start_phase(ValidatePhase::ListBands);
         let band_ids = self.list_band_ids()?;
@@ -350,9 +351,8 @@ impl Archive {
         Ok(stats)
     }
 
-    fn validate_archive_dir(&self, monitor: &mut dyn ValidateMonitor) -> Result<ValidateStats> {
+    fn validate_archive_dir(&self, monitor: &mut dyn ValidateMonitor) -> Result<()> {
         // TODO: More tests for the problems detected here.
-        let mut stats = ValidateStats::default();
         monitor.start_phase(ValidatePhase::CheckArchiveDirectory);
         let mut seen_bands = HashSet::<BandId>::new();
         for entry_result in self
@@ -376,7 +376,6 @@ impl Archive {
                         monitor.problem(Error::UnexpectedFile {
                             path: name.to_owned(),
                         })?;
-                        stats.unexpected_files += 1;
                     }
                 }
                 Ok(DirEntry {
@@ -392,7 +391,6 @@ impl Archive {
                         monitor.problem(Error::UnexpectedFile {
                             path: name.to_owned(),
                         })?;
-                        stats.unexpected_files += 1;
                     }
                 }
                 Ok(DirEntry { name, .. }) => {
@@ -400,14 +398,13 @@ impl Archive {
                     monitor.problem(Error::UnexpectedFile {
                         path: name.to_owned(),
                     })?;
-                    stats.unexpected_files += 1;
                 }
                 Err(source) => {
                     monitor.problem(Error::from(source))?;
                 }
             }
         }
-        Ok(stats)
+        Ok(())
     }
 }
 

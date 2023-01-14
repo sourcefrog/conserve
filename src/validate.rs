@@ -15,7 +15,6 @@ use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::time::Instant;
 
-use serde::Serialize;
 #[allow(unused_imports)]
 use tracing::{info, warn};
 
@@ -157,24 +156,25 @@ pub(crate) fn validate_bands(
         },
         ui::nutmeg_options(),
     );
-    for band_id in band_ids {
+    'band: for band_id in band_ids {
         match Band::open(archive, band_id) {
-            Ok(band) => band.validate(&mut stats, monitor)?,
+            Ok(band) => band.validate(monitor)?,
             Err(err) => {
                 monitor.problem(err)?;
                 continue;
             }
         };
-        if let Ok(st) = archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
-            if let Ok((st_block_lens, st_stats)) = validate_stored_tree(&st, monitor) {
-                stats += st_stats;
-                block_lens.update(st_block_lens);
-            } else {
-                stats.tree_validate_errors += 1
+        match archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
+            Ok(st) => {
+                if let Ok((st_block_lens, st_stats)) = validate_stored_tree(&st, monitor) {
+                    stats += st_stats;
+                    block_lens.update(st_block_lens);
+                }
             }
-        } else {
-            stats.tree_open_errors += 1;
-            continue;
+            Err(err) => {
+                monitor.problem(err)?;
+                continue 'band;
+            }
         }
         view.update(|model| model.bands_done += 1);
     }

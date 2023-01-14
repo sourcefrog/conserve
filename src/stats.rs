@@ -69,37 +69,16 @@ pub struct Sizes {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Add, AddAssign, Sum)]
 pub struct ValidateStats {
-    /// Failed to open a stored tree.
-    pub tree_open_errors: usize,
-    pub tree_validate_errors: usize,
-
-    /// Count of files not expected to be in the archive.
-    pub unexpected_files: usize,
-
     /// Number of blocks read.
     pub block_read_count: u64,
-    /// Number of blocks that failed to read back.
-    pub block_error_count: usize,
-    pub block_missing_count: usize,
-    pub block_too_short: usize,
 
     pub elapsed: Duration,
 }
 
 impl fmt::Display for ValidateStats {
     fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_count(w, "tree open errors", self.tree_open_errors);
-        write_count(w, "tree validate errors", self.tree_validate_errors);
-        write_count(w, "unexpected files", self.unexpected_files);
-        writeln!(w).unwrap();
-        write_count(w, "block errors", self.block_error_count);
-        write_count(w, "blocks missing", self.block_too_short);
-        write_count(w, "blocks too short", self.block_missing_count);
-        writeln!(w).unwrap();
-
         write_count(w, "blocks read", self.block_read_count as usize);
         write_duration(w, "elapsed", self.elapsed)?;
-
         Ok(())
     }
 }
