@@ -104,7 +104,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     let _validate_stats = af
         .validate(&ValidateOptions::default(), &mut monitor)
         .unwrap();
-    assert_matches!(monitor.problems[..], []);
+    assert_matches!(monitor.into_problems().as_slice(), []);
     Ok(())
 }
 

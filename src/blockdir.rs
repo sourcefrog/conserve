@@ -302,28 +302,23 @@ impl BlockDir {
             },
             ui::nutmeg_options(),
         );
-        // TODO: Report to the monitor from inside the par_iter, rather than only at the end.
-        let results: Vec<Result<(BlockHash, usize)>> = blocks
+        let len_map: HashMap<BlockHash, usize> = blocks
             .into_par_iter()
-            .map(|hash| {
-                let (bytes, _sizes) = self.get_block_content(&hash)?;
-                let len = bytes.len();
-                progress_bar.update(|model| {
-                    model.blocks_done += 1;
-                    model.bytes_done += len
-                });
-                Ok((hash, len))
+            .flat_map(|hash| match self.get_block_content(&hash) {
+                Ok((bytes, _sizes)) => {
+                    let len = bytes.len();
+                    progress_bar.update(|model| {
+                        model.blocks_done += 1;
+                        model.bytes_done += len
+                    });
+                    Some((hash, len))
+                }
+                Err(err) => {
+                    monitor.problem(err).unwrap();
+                    None
+                }
             })
             .collect();
-        let mut len_map: HashMap<BlockHash, usize> = HashMap::new();
-        for r in results {
-            match r {
-                Ok((hash, len)) => {
-                    len_map.insert(hash, len);
-                }
-                Err(err) => monitor.problem(err)?,
-            }
-        }
         Ok(len_map)
     }
 

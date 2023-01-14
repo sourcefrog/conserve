@@ -25,7 +25,10 @@ fn missing_block() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
     let mut monitor = CollectValidateMonitor::new();
     let _validate_stats = archive.validate(&ValidateOptions::default(), &mut monitor)?;
-    assert_matches!(monitor.problems[..], [Error::BlockMissing { .. }]);
+    assert_matches!(
+        monitor.into_problems().as_slice(),
+        [Error::BlockMissing { .. }]
+    );
     Ok(())
 }
 
@@ -39,6 +42,9 @@ fn missing_block_skip_block_hashes() -> Result<()> {
         },
         &mut monitor,
     )?;
-    assert_matches!(monitor.problems[..], [Error::BlockMissing { .. }]);
+    assert_matches!(
+        monitor.into_problems().as_slice(),
+        [Error::BlockMissing { .. }]
+    );
     Ok(())
 }

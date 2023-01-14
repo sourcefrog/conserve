@@ -15,6 +15,7 @@
 
 use std::fmt::Debug;
 use std::io;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -170,12 +171,12 @@ pub struct TerminalValidateMonitor<JF>
 where
     JF: io::Write + Debug + Send,
 {
-    pub progress_bars: bool,
+    // pub progress_bars: bool,
     /// Optionally write all problems as json to this file as they're discovered.
-    pub problems_json: Option<Box<JF>>,
-    pub log_problems: bool,
-    pub n_problems: usize,
-    pub log_phases: bool,
+    pub problems_json: Mutex<Option<Box<JF>>>,
+    // pub log_problems: bool,
+    pub n_problems: AtomicUsize,
+    // pub log_phases: bool,
 }
 
 impl<JF> TerminalValidateMonitor<JF>
@@ -184,16 +185,16 @@ where
 {
     pub fn new(problems_json: Option<JF>) -> Self {
         TerminalValidateMonitor {
-            progress_bars: true,
-            problems_json: problems_json.map(|x| Box::new(x)),
-            log_problems: true,
-            log_phases: true,
-            n_problems: 0,
+            // progress_bars: true,
+            problems_json: Mutex::new(problems_json.map(|x| Box::new(x))),
+            // log_problems: true,
+            // log_phases: true,
+            n_problems: 0.into(),
         }
     }
 
     pub fn saw_problems(&self) -> bool {
-        self.n_problems > 0
+        self.n_problems.load(Ordering::Relaxed) > 0
     }
 }
 
@@ -201,21 +202,23 @@ impl<JF> ValidateMonitor for TerminalValidateMonitor<JF>
 where
     JF: io::Write + Debug + Send,
 {
-    fn problem(&mut self, problem: Error) -> Result<()> {
-        if self.log_problems {
+    fn problem(&self, problem: Error) -> Result<()> {
+        if true {
+            // self.log_problems {
             warn!("{problem}");
         }
-        if let Some(f) = self.problems_json.as_mut() {
+        if let Some(f) = self.problems_json.lock().unwrap().as_mut() {
             // TODO: Structured serialization, not just a string.
             serde_json::to_writer_pretty(f, &problem.to_string())
                 .map_err(|source| Error::SerializeProblem { source })?;
         }
-        self.n_problems += 1;
+        self.n_problems.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
 
     fn start_phase(&mut self, phase: ValidatePhase) {
-        if self.log_phases {
+        if true {
+            // self.log_phases {
             info!("{phase}");
         }
     }

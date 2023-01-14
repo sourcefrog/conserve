@@ -11,6 +11,7 @@
 // GNU General Public License for more details.
 
 use std::fmt::{self, Debug};
+use std::sync::Mutex;
 
 use crate::{Error, Result};
 
@@ -18,40 +19,44 @@ use crate::{Error, Result};
 ///
 /// These can be, for example, drawn into a UI, written to logs, or written
 /// out as structured data.
-pub trait ValidateMonitor: Debug + Send {
+pub trait ValidateMonitor: Debug + Send + Sync {
     /// The monitor is informed that a non-fatal error occurred while validating the
     /// archive.
-    fn problem(&mut self, problem: Error) -> Result<()>;
+    fn problem(&self, problem: Error) -> Result<()>;
 
     /// The monitor is informed that a phase of validation has started.
     fn start_phase(&mut self, phase: ValidatePhase);
 }
 
-/// A ValidateMonitor that collects all events without drawing anything,
+/// A ValidateMonitor that collects all problems without drawing anything,
 /// for use in tests.
 #[derive(Debug)]
 pub struct CollectValidateMonitor {
-    pub problems: Vec<Error>,
-    pub phases: Vec<ValidatePhase>,
+    pub problems: Mutex<Vec<Error>>,
+    // pub phases: Vec<ValidatePhase>,
 }
 
 impl CollectValidateMonitor {
     pub fn new() -> Self {
         CollectValidateMonitor {
-            problems: Vec::new(),
-            phases: Vec::new(),
+            problems: Mutex::new(Vec::new()),
+            // phases: Vec::new(),
         }
+    }
+
+    pub fn into_problems(self) -> Vec<Error> {
+        self.problems.into_inner().unwrap()
     }
 }
 
 impl ValidateMonitor for CollectValidateMonitor {
-    fn problem(&mut self, problem: Error) -> Result<()> {
-        self.problems.push(problem);
+    fn problem(&self, problem: Error) -> Result<()> {
+        self.problems.lock().unwrap().push(problem);
         Ok(())
     }
 
-    fn start_phase(&mut self, phase: ValidatePhase) {
-        self.phases.push(phase)
+    fn start_phase(&mut self, _phase: ValidatePhase) {
+        // self.phases.push(phase)
     }
 }
 
