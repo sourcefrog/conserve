@@ -19,7 +19,7 @@ use std::time::Instant;
 use tracing::{info, warn};
 
 use crate::blockdir::Address;
-use crate::monitor::{Progress, ValidateMonitor};
+use crate::monitor::{Monitor, Progress};
 use crate::*;
 
 /// Options to [Archive::validate].
@@ -61,7 +61,7 @@ impl ReferencedBlockLengths {
 ///
 /// Returns the lengths of all blocks that were referenced, so that the caller can check
 /// that all blocks are present and long enough.
-pub(crate) fn validate_bands<MO: ValidateMonitor>(
+pub(crate) fn validate_bands<MO: Monitor>(
     archive: &Archive,
     band_ids: &[BandId],
     monitor: &mut MO,
@@ -84,7 +84,6 @@ pub(crate) fn validate_bands<MO: ValidateMonitor>(
             monitor.problem(err)?;
             continue 'band;
         }
-
         monitor.progress(Progress::ValidateBands {
             total_bands,
             bands_done,

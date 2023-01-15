@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::monitor::{Progress, ValidateMonitor, ValidatePhase};
+use crate::monitor::{Monitor, Phase, Progress};
 use crate::stats::{BackupStats, Sizes, ValidateStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
@@ -264,15 +264,15 @@ impl BlockDir {
     pub fn validate(
         &self,
         stats: &mut ValidateStats,
-        monitor: &mut dyn ValidateMonitor,
+        monitor: &mut dyn Monitor,
     ) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
-        monitor.start_phase(ValidatePhase::ListBlocks);
+        monitor.start_phase(Phase::ListBlocks);
         let blocks = self.block_names_set()?;
         let total_blocks = blocks.len();
-        monitor.start_phase(ValidatePhase::CheckBlockContent {
+        monitor.start_phase(Phase::CheckBlockContent {
             n_blocks: blocks.len(),
         });
         stats.block_read_count = blocks.len().try_into().unwrap();

@@ -22,7 +22,7 @@ use std::time::Duration;
 use lazy_static::lazy_static;
 use tracing::{info, warn};
 
-use crate::monitor::{Progress, ValidateMonitor, ValidatePhase};
+use crate::monitor::{Monitor, Phase, Progress};
 use crate::stats::Sizes;
 use crate::{Error, Result};
 
@@ -199,7 +199,7 @@ where
     }
 }
 
-impl<JF> ValidateMonitor for TerminalValidateMonitor<JF>
+impl<JF> Monitor for TerminalValidateMonitor<JF>
 where
     JF: io::Write + Debug + Send,
 {
@@ -217,7 +217,7 @@ where
         Ok(())
     }
 
-    fn start_phase(&mut self, phase: ValidatePhase) {
+    fn start_phase(&mut self, phase: Phase) {
         if true {
             // self.log_phases {
             info!("{phase}");

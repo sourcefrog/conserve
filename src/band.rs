@@ -26,7 +26,7 @@ use time::OffsetDateTime;
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
-use crate::monitor::ValidateMonitor;
+use crate::monitor::Monitor;
 use crate::transport::{ListDirNames, Transport};
 use crate::*;
 
@@ -219,7 +219,7 @@ impl Band {
         })
     }
 
-    pub fn validate(&self, monitor: &mut dyn ValidateMonitor) -> Result<()> {
+    pub fn validate(&self, monitor: &mut dyn Monitor) -> Result<()> {
         let ListDirNames { mut files, dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {

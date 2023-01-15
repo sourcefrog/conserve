@@ -17,13 +17,13 @@ use std::path::Path;
 
 use assert_matches::assert_matches;
 
-use conserve::monitor::CollectValidateMonitor;
+use conserve::monitor::CollectMonitor;
 use conserve::*;
 
 #[test]
 fn missing_block() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
-    let mut monitor = CollectValidateMonitor::new();
+    let mut monitor = CollectMonitor::new();
     let _validate_stats = archive.validate(&ValidateOptions::default(), &mut monitor)?;
     assert_matches!(
         monitor.into_problems().as_slice(),
@@ -35,7 +35,7 @@ fn missing_block() -> Result<()> {
 #[test]
 fn missing_block_skip_block_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
-    let mut monitor = CollectValidateMonitor::new();
+    let mut monitor = CollectMonitor::new();
     let _validate_stats = archive.validate(
         &ValidateOptions {
             skip_block_hashes: true,

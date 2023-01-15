@@ -16,18 +16,19 @@ use std::time::Instant;
 
 use crate::{Error, Result};
 
-/// A ValidateMonitor collects progress and problem findings during validation.
+/// A Monitor collects progress and problem findings during some high-level
+/// operation such as a backup or validation.
 ///
-/// These can be, for example, drawn into a UI, written to logs, or written
+/// Events reported to the Monitor can be, for example, drawn into a UI,
+/// written to logs, or written
 /// out as structured data.
-pub trait ValidateMonitor: Send + Sync {
-    /// The monitor is informed that a non-fatal error occurred while validating the
-    /// archive.
+pub trait Monitor: Send + Sync {
+    /// The monitor is informed that a non-fatal error occurred.
     fn problem(&self, problem: Error) -> Result<()>;
 
-    /// A task has started: there can be several tasks in progress at any
-    /// time.
-    fn start_phase(&mut self, phase: ValidatePhase);
+    /// The task entered a new high-level phase; there's only one phase
+    /// at a time.
+    fn start_phase(&mut self, phase: Phase);
 
     /// Update that some progress has been made on a task.
     fn progress(&self, progress: Progress);
@@ -53,14 +54,14 @@ pub enum Progress {
 /// A ValidateMonitor that collects all problems without drawing anything,
 /// for use in tests.
 #[derive(Debug)]
-pub struct CollectValidateMonitor {
+pub struct CollectMonitor {
     pub problems: Mutex<Vec<Error>>,
     // pub phases: Vec<ValidatePhase>,
 }
 
-impl CollectValidateMonitor {
+impl CollectMonitor {
     pub fn new() -> Self {
-        CollectValidateMonitor {
+        CollectMonitor {
             problems: Mutex::new(Vec::new()),
             // phases: Vec::new(),
         }
@@ -71,20 +72,20 @@ impl CollectValidateMonitor {
     }
 }
 
-impl ValidateMonitor for CollectValidateMonitor {
+impl Monitor for CollectMonitor {
     fn problem(&self, problem: Error) -> Result<()> {
         self.problems.lock().unwrap().push(problem);
         Ok(())
     }
 
-    fn start_phase(&mut self, _phase: ValidatePhase) {}
+    fn start_phase(&mut self, _phase: Phase) {}
 
     fn progress(&self, _progress: Progress) {}
 }
 
 #[non_exhaustive]
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum ValidatePhase {
+pub enum Phase {
     CheckArchiveDirectory,
     ListBlocks,
     ListBands,
@@ -92,14 +93,14 @@ pub enum ValidatePhase {
     CheckBlockContent { n_blocks: usize },
 }
 
-impl fmt::Display for ValidatePhase {
+impl fmt::Display for Phase {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ValidatePhase::CheckArchiveDirectory => write!(f, "Check archive directory"),
-            ValidatePhase::ListBlocks => write!(f, "List blocks"),
-            ValidatePhase::ListBands => write!(f, "List bands"),
-            ValidatePhase::CheckIndexes(n) => write!(f, "Check {n} indexes"),
-            ValidatePhase::CheckBlockContent { n_blocks } => {
+            Phase::CheckArchiveDirectory => write!(f, "Check archive directory"),
+            Phase::ListBlocks => write!(f, "List blocks"),
+            Phase::ListBands => write!(f, "List bands"),
+            Phase::CheckIndexes(n) => write!(f, "Check {n} indexes"),
+            Phase::CheckBlockContent { n_blocks } => {
                 write!(f, "Check content of {n_blocks} blocks")
             }
         }

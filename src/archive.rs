@@ -29,7 +29,7 @@ use crate::blockhash::BlockHash;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
-use crate::monitor::{ValidateMonitor, ValidatePhase};
+use crate::monitor::{Monitor, Phase};
 use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
@@ -298,7 +298,7 @@ impl Archive {
         Ok(stats)
     }
 
-    pub fn validate<MO: ValidateMonitor>(
+    pub fn validate<MO: Monitor>(
         &self,
         options: &ValidateOptions,
         monitor: &mut MO,
@@ -307,9 +307,9 @@ impl Archive {
         let mut stats = ValidateStats::default();
         self.validate_archive_dir(monitor)?;
 
-        monitor.start_phase(ValidatePhase::ListBands);
+        monitor.start_phase(Phase::ListBands);
         let band_ids = self.list_band_ids()?;
-        monitor.start_phase(ValidatePhase::CheckIndexes(band_ids.len()));
+        monitor.start_phase(Phase::CheckIndexes(band_ids.len()));
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
@@ -318,7 +318,7 @@ impl Archive {
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
             // content.
-            monitor.start_phase(ValidatePhase::ListBlocks);
+            monitor.start_phase(Phase::ListBlocks);
             // TODO: Check for unexpected files or directories in the blockdir.
             let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
             for block_hash in referenced_lens.0.keys().cloned() {
@@ -350,9 +350,9 @@ impl Archive {
         Ok(stats)
     }
 
-    fn validate_archive_dir(&self, monitor: &mut dyn ValidateMonitor) -> Result<()> {
+    fn validate_archive_dir(&self, monitor: &mut dyn Monitor) -> Result<()> {
         // TODO: More tests for the problems detected here.
-        monitor.start_phase(ValidatePhase::CheckArchiveDirectory);
+        monitor.start_phase(Phase::CheckArchiveDirectory);
         let mut seen_bands = HashSet::<BandId>::new();
         for entry_result in self
             .transport

@@ -18,7 +18,7 @@ use assert_matches::assert_matches;
 use filetime::{set_file_mtime, FileTime};
 
 use conserve::kind::Kind;
-use conserve::monitor::CollectValidateMonitor;
+use conserve::monitor::CollectMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;
@@ -100,7 +100,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     // TODO: Check index stats.
     // TODO: Check what was restored.
 
-    let mut monitor = CollectValidateMonitor::new();
+    let mut monitor = CollectMonitor::new();
     let _validate_stats = af
         .validate(&ValidateOptions::default(), &mut monitor)
         .unwrap();
