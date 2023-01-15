@@ -13,9 +13,9 @@
 
 //! Console UI.
 
-use std::fmt::{Debug, Write};
+use std::fmt::Debug;
 use std::io;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
@@ -24,44 +24,30 @@ use tracing::{error, info};
 use crate::monitor::{Counters, Monitor, Phase, Progress};
 use crate::{Error, Result};
 
-/// A terminal/text UI.
-///
-/// This manages interleaving log-type messages (info and error), interleaved
-/// with progress bars.
-///
-/// Progress bars are only drawn when the application requests them with
-/// `enable_progress` and the output destination is a tty that's capable
-/// of redrawing.
-///
-/// So this class also works when stdout is redirected to a file, in
-/// which case it will get only messages and no progress bar junk.
-#[derive(Default)]
-pub(crate) struct UIState {
-    /// Should a progress bar be drawn?
-    progress_enabled: bool,
+// TODO: A const_default in Nutmeg, then this can be non-lazy.
+lazy_static! {
+    /// A global Nutmeg view.
+    ///
+    /// This is global to reflect that there is globally one stdout/stderr:
+    /// this object manages it.
+    static ref NUTMEG_VIEW: nutmeg::View<Progress> =
+        nutmeg::View::new(Progress::None, nutmeg::Options::default());
 }
 
-lazy_static! {
-    static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState::default());
-}
+/// Should progress be enabled for ad-hoc created Nutmeg views.
+// (These should migrate to NUTMEG_VIEW.)
+static PROGRESS_ENABLED: AtomicBool = AtomicBool::new(false);
 
 pub fn println(s: &str) {
-    with_locked_ui(|ui| ui.println(s))
+    NUTMEG_VIEW.message(format!("{s}\n"));
 }
 
 pub fn problem(s: &str) {
-    with_locked_ui(|ui| ui.problem(s));
-}
-
-pub(crate) fn with_locked_ui<F>(mut cb: F)
-where
-    F: FnMut(&mut UIState),
-{
-    use std::ops::DerefMut;
-    cb(UI_STATE.lock().unwrap().deref_mut())
+    NUTMEG_VIEW.message(format!("conserve error: {s}\n"));
 }
 
 pub(crate) fn format_error_causes(error: &dyn std::error::Error) -> String {
+    use std::fmt::Write;
     let mut buf = error.to_string();
     let mut cause = error;
     while let Some(c) = cause.source() {
@@ -83,25 +69,17 @@ pub fn show_error(e: &dyn std::error::Error) {
 ///
 /// Progress bars are off by default.
 pub fn enable_progress(enabled: bool) {
-    let mut ui = UI_STATE.lock().unwrap();
-    ui.progress_enabled = enabled;
-}
-impl UIState {
-    pub(crate) fn println(&mut self, s: &str) {
-        // TODO: Go through Nutmeg instead...
-        // self.clear_progress();
-        println!("{s}");
-    }
-
-    fn problem(&mut self, s: &str) {
-        // TODO: Go through Nutmeg instead...
-        // self.clear_progress();
-        println!("conserve error: {s}");
+    PROGRESS_ENABLED.store(enabled, Ordering::Relaxed);
+    if enabled {
+        NUTMEG_VIEW.resume();
+    } else {
+        NUTMEG_VIEW.suspend();
     }
 }
 
+// #[deprecated]
 pub(crate) fn nutmeg_options() -> nutmeg::Options {
-    nutmeg::Options::default().progress_enabled(UI_STATE.lock().unwrap().progress_enabled)
+    nutmeg::Options::default().progress_enabled(PROGRESS_ENABLED.load(Ordering::Relaxed))
 }
 
 /// A ValidateMonitor that logs messages, collects problems in memory, optionally
@@ -114,7 +92,6 @@ where
     pub problems_json: Mutex<Option<Box<JF>>>,
     /// Number of problems observed.
     n_problems: AtomicUsize,
-    nutmeg_view: nutmeg::View<Progress>,
     counters: Counters,
 }
 
@@ -123,11 +100,9 @@ where
     JF: io::Write + Debug + Send,
 {
     pub fn new(problems_json: Option<JF>) -> Self {
-        let nutmeg_view = nutmeg::View::new(Progress::None, nutmeg_options());
         TerminalMonitor {
             problems_json: Mutex::new(problems_json.map(Box::new)),
             n_problems: 0.into(),
-            nutmeg_view,
             counters: Counters::default(),
         }
     }
@@ -160,11 +135,11 @@ where
 
     fn progress(&self, progress: Progress) {
         if matches!(progress, Progress::None) {
-            self.nutmeg_view.suspend();
-            self.nutmeg_view.update(|model| *model = progress);
+            NUTMEG_VIEW.suspend();
+            NUTMEG_VIEW.update(|model| *model = progress);
         } else {
-            self.nutmeg_view.update(|model| *model = progress);
-            self.nutmeg_view.resume();
+            NUTMEG_VIEW.update(|model| *model = progress);
+            NUTMEG_VIEW.resume();
         }
     }
 
