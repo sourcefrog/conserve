@@ -17,13 +17,11 @@ use std::fmt::{Debug, Write};
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
-use std::time::Duration;
 
 use lazy_static::lazy_static;
 use tracing::{error, info};
 
 use crate::monitor::{Counters, Monitor, Phase, Progress};
-use crate::stats::Sizes;
 use crate::{Error, Result};
 
 /// A terminal/text UI.
@@ -88,50 +86,6 @@ pub fn enable_progress(enabled: bool) {
     let mut ui = UI_STATE.lock().unwrap();
     ui.progress_enabled = enabled;
 }
-
-#[allow(unused)]
-pub(crate) fn compression_percent(s: &Sizes) -> i64 {
-    if s.uncompressed > 0 {
-        100i64 - (100 * s.compressed / s.uncompressed) as i64
-    } else {
-        0
-    }
-}
-
-pub fn duration_to_hms(d: Duration) -> String {
-    let elapsed_secs = d.as_secs();
-    if elapsed_secs >= 3600 {
-        format!(
-            "{:2}:{:02}:{:02}",
-            elapsed_secs / 3600,
-            (elapsed_secs / 60) % 60,
-            elapsed_secs % 60
-        )
-    } else {
-        format!("   {:2}:{:02}", (elapsed_secs / 60) % 60, elapsed_secs % 60)
-    }
-}
-
-#[allow(unused)]
-pub(crate) fn mbps_rate(bytes: u64, elapsed: Duration) -> f64 {
-    let secs = elapsed.as_secs() as f64 + f64::from(elapsed.subsec_millis()) / 1000.0;
-    if secs > 0.0 {
-        bytes as f64 / secs / 1e6
-    } else {
-        0f64
-    }
-}
-
-/// Describe the compression ratio: higher is better.
-#[allow(unused)]
-pub(crate) fn compression_ratio(s: &Sizes) -> f64 {
-    if s.compressed > 0 {
-        s.uncompressed as f64 / s.compressed as f64
-    } else {
-        0f64
-    }
-}
-
 impl UIState {
     pub(crate) fn println(&mut self, s: &str) {
         // TODO: Go through Nutmeg instead...
@@ -250,19 +204,5 @@ impl nutmeg::Model for Progress {
                 nutmeg::estimate_remaining(&start, bands_done, total_bands)
             ),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    pub fn test_compression_ratio() {
-        let ratio = compression_ratio(&Sizes {
-            compressed: 2000,
-            uncompressed: 4000,
-        });
-        assert_eq!(format!("{ratio:3.1}x"), "2.0x");
     }
 }

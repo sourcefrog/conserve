@@ -19,8 +19,8 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
+use conserve::misc::duration_to_hms;
 use conserve::monitor::Monitor;
-use conserve::ui::duration_to_hms;
 #[allow(unused_imports)]
 use tracing::{error, info, trace};
 

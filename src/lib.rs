@@ -32,7 +32,7 @@ mod jsonio;
 pub mod kind;
 pub mod live_tree;
 mod merge;
-pub(crate) mod misc;
+pub mod misc;
 pub mod monitor;
 pub mod owner;
 pub mod restore;

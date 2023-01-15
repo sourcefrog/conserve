@@ -23,6 +23,7 @@ use std::io::{BufWriter, Write};
 use time::format_description::well_known::Rfc3339;
 use time::UtcOffset;
 
+use crate::misc::duration_to_hms;
 use crate::*;
 
 /// Options controlling the behavior of `show_versions`.
@@ -90,7 +91,7 @@ pub fn show_versions(
                 if let Some(end_time) = info.end_time {
                     let duration = end_time - info.start_time;
                     if let Ok(duration) = duration.try_into() {
-                        crate::ui::duration_to_hms(duration).into()
+                        duration_to_hms(duration).into()
                     } else {
                         Cow::Borrowed("negative")
                     }

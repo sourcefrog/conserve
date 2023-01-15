@@ -17,7 +17,7 @@ use std::time::Duration;
 use derive_more::{Add, AddAssign};
 use thousands::Separable;
 
-use crate::ui::duration_to_hms;
+use crate::misc::duration_to_hms;
 
 pub fn mb_string(s: u64) -> String {
     (s / 1_000_000).separate_with_commas()
