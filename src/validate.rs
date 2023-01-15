@@ -1,4 +1,4 @@
-// Copyright 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2017-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,10 +14,7 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::time::Instant;
 
-use crate::blockdir::Address;
 use crate::*;
-
-pub(crate) struct BlockLengths(pub(crate) HashMap<BlockHash, u64>);
 
 #[derive(Debug, Default)]
 pub struct ValidateOptions {
@@ -25,36 +22,12 @@ pub struct ValidateOptions {
     pub skip_block_hashes: bool,
 }
 
-impl BlockLengths {
-    fn new() -> BlockLengths {
-        BlockLengths(HashMap::new())
-    }
-
-    fn add(&mut self, addr: Address) {
-        let end = addr.start + addr.len;
-        if let Some(al) = self.0.get_mut(&addr.hash) {
-            *al = max(*al, end)
-        } else {
-            self.0.insert(addr.hash, end);
-        }
-    }
-
-    fn update(&mut self, b: BlockLengths) {
-        for (bh, bl) in b.0 {
-            self.0
-                .entry(bh)
-                .and_modify(|al| *al = max(*al, bl))
-                .or_insert(bl);
-        }
-    }
-}
-
 pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
-) -> (BlockLengths, ValidateStats) {
+) -> (HashMap<BlockHash, u64>, ValidateStats) {
     let mut stats = ValidateStats::default();
-    let mut block_lens = BlockLengths::new();
+    let mut block_lens = HashMap::new();
     struct ProgressModel {
         bands_done: usize,
         bands_total: usize,
@@ -91,7 +64,12 @@ pub(crate) fn validate_bands(
         if let Ok(st) = archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
             if let Ok((st_block_lens, st_stats)) = validate_stored_tree(&st) {
                 stats += st_stats;
-                block_lens.update(st_block_lens);
+                for (bh, bl) in st_block_lens {
+                    block_lens
+                        .entry(bh)
+                        .and_modify(|al| *al = max(*al, bl))
+                        .or_insert(bl);
+                }
             } else {
                 stats.tree_validate_errors += 1
             }
@@ -104,15 +82,21 @@ pub(crate) fn validate_bands(
     (block_lens, stats)
 }
 
-pub(crate) fn validate_stored_tree(st: &StoredTree) -> Result<(BlockLengths, ValidateStats)> {
-    let mut block_lens = BlockLengths::new();
+pub(crate) fn validate_stored_tree(
+    st: &StoredTree,
+) -> Result<(HashMap<BlockHash, u64>, ValidateStats)> {
+    let mut block_lens = HashMap::new();
     let stats = ValidateStats::default();
     for entry in st
         .iter_entries(Apath::root(), Exclude::nothing())?
         .filter(|entry| entry.kind() == Kind::File)
     {
         for addr in entry.addrs {
-            block_lens.add(addr)
+            let end = addr.start + addr.len;
+            block_lens
+                .entry(addr.hash.clone())
+                .and_modify(|l| *l = max(*l, end))
+                .or_insert(end);
         }
     }
     Ok((block_lens, stats))

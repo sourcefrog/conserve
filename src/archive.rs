@@ -317,7 +317,6 @@ impl Archive {
             // TODO: Just validate blockdir structure.
             let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
             for block_hash in referenced_lens
-                .0
                 .keys()
                 .filter(|&bh| !present_blocks.contains(bh))
             {
@@ -330,7 +329,7 @@ impl Archive {
             ui::println("Check blockdir...");
             let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
             // 3b. Check that all referenced ranges are inside the present data.
-            for (block_hash, referenced_len) in referenced_lens.0 {
+            for (block_hash, referenced_len) in referenced_lens {
                 if let Some(actual_len) = block_lengths.get(&block_hash) {
                     if referenced_len > (*actual_len as u64) {
                         ui::problem(&format!("Block {block_hash:?} is too short",));
