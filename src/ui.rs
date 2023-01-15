@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
-use tracing::{error, info, trace, Level};
+use tracing::{debug, error, info, trace, Level};
 
 use crate::monitor::{Counters, Monitor, Phase, Progress};
 use crate::{Error, Result};
@@ -150,7 +150,7 @@ where
     }
 
     fn start_phase(&mut self, phase: Phase) {
-        info!("{phase}");
+        debug!("{phase}");
     }
 
     fn progress(&self, progress: Progress) {
