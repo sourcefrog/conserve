@@ -187,11 +187,13 @@ impl<JF> Monitor for TerminalValidateMonitor<JF>
 where
     JF: io::Write + Debug + Send,
 {
-    fn problem(&self, problem: Error) -> Result<()> {
-        error!("{problem}");
+    fn problem(&self, err: Error) -> Result<()> {
+        let problem_str = err.to_string();
+        error!("{problem_str}");
+        problem(&problem_str); // TODO: Unify with logging
         if let Some(f) = self.problems_json.lock().unwrap().as_mut() {
             // TODO: Structured serialization, not just a string.
-            serde_json::to_writer_pretty(f, &problem.to_string())
+            serde_json::to_writer_pretty(f, &problem_str)
                 .map_err(|source| Error::SerializeProblem { source })?;
         }
         self.n_problems.fetch_add(1, Ordering::Relaxed);
