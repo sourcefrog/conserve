@@ -72,24 +72,19 @@ pub(crate) fn validate_bands<MO: ValidateMonitor>(
     let mut bands_done = 0;
     'band: for band_id in band_ids {
         bands_done += 1;
-        match Band::open(archive, band_id) {
-            Ok(band) => band.validate(monitor)?,
-            Err(err) => {
-                monitor.problem(err)?;
-                continue;
-            }
+        if let Err(err) = Band::open(archive, band_id).and_then(|band| band.validate(monitor)) {
+            monitor.problem(err)?;
+            continue 'band;
         };
-        match archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
-            Ok(st) => {
-                if let Ok(st_block_lens) = validate_stored_tree(&st) {
-                    block_lens.update(st_block_lens);
-                }
-            }
-            Err(err) => {
-                monitor.problem(err)?;
-                continue 'band;
-            }
+        if let Err(err) = archive
+            .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))
+            .and_then(|st| validate_stored_tree(&st))
+            .map(|st_block_lens| block_lens.update(st_block_lens))
+        {
+            monitor.problem(err)?;
+            continue 'band;
         }
+
         monitor.progress(Progress::ValidateBands {
             total_bands,
             bands_done,
