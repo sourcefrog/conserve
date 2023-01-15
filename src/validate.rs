@@ -61,10 +61,10 @@ impl ReferencedBlockLengths {
 ///
 /// Returns the lengths of all blocks that were referenced, so that the caller can check
 /// that all blocks are present and long enough.
-pub(crate) fn validate_bands(
+pub(crate) fn validate_bands<MO: ValidateMonitor>(
     archive: &Archive,
     band_ids: &[BandId],
-    monitor: &mut dyn ValidateMonitor,
+    monitor: &mut MO,
 ) -> Result<ReferencedBlockLengths> {
     let mut block_lens = ReferencedBlockLengths::new();
     let start = Instant::now();
@@ -81,7 +81,7 @@ pub(crate) fn validate_bands(
         };
         match archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
             Ok(st) => {
-                if let Ok(st_block_lens) = validate_stored_tree(&st, monitor) {
+                if let Ok(st_block_lens) = validate_stored_tree(&st) {
                     block_lens.update(st_block_lens);
                 }
             }
@@ -100,11 +100,9 @@ pub(crate) fn validate_bands(
     Ok(block_lens)
 }
 
-fn validate_stored_tree(
-    st: &StoredTree,
-    _monitor: &mut dyn ValidateMonitor,
-) -> Result<ReferencedBlockLengths> {
+fn validate_stored_tree(st: &StoredTree) -> Result<ReferencedBlockLengths> {
     let mut block_lens = ReferencedBlockLengths::new();
+    // TODO: Maybe check entry ordering and other invariants.
     for entry in st
         .iter_entries(Apath::root(), Exclude::nothing())?
         .filter(|entry| entry.kind() == Kind::File)

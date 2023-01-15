@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -298,10 +298,10 @@ impl Archive {
         Ok(stats)
     }
 
-    pub fn validate(
+    pub fn validate<MO: ValidateMonitor>(
         &self,
         options: &ValidateOptions,
-        monitor: &mut dyn ValidateMonitor,
+        monitor: &mut MO,
     ) -> Result<ValidateStats> {
         let start = Instant::now();
         let mut stats = ValidateStats::default();
