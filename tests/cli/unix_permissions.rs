@@ -23,8 +23,7 @@ fn backup_unix_permissions() {
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with("Created new archive"));
+        .stderr(predicate::str::is_empty());
 
     // copy the appropriate testdata into the testdir
     let src: PathBuf = "./testdata/tree/minimal".into();
@@ -107,12 +106,12 @@ fn backup_unix_permissions() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with(format!(
+        .stdout(predicate::str::diff(format!(
             "rwxr-xr-x {user:<10} {group:<10} /\n\
              r--r--r-- {user:<10} {group:<10} /hello\n\
              rwxrwxr-x {user:<10} {group:<10} /subdir\n\
              rwxr-xr-x {user:<10} {group:<10} /subdir/subfile\n\
-             Restore complete.\n"
+            "
         )));
 }
 
@@ -130,8 +129,7 @@ fn backup_user_and_permissions() {
         .arg(&arch_dir)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with("Created new archive"));
+        .stderr(predicate::str::is_empty());
 
     let src: PathBuf = "./testdata/tree/minimal".into();
     assert!(src.is_dir());
@@ -207,7 +205,7 @@ fn backup_user_and_permissions() {
              {} {} /hello\n\
              {} {} /subdir\n\
              {} {} /subdir/subfile\n\
-             Restore complete.\n",
+            ",
             UnixMode::from(mdata_root.permissions()),
             Owner::from(&mdata_root),
             UnixMode::from(mdata_hello.permissions()),

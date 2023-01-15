@@ -355,12 +355,12 @@ impl Command {
                     },
                 )?;
                 if !no_stats {
-                    ui::println(&format!("{stats}"));
+                    info!(%stats);
                 }
             }
             Command::Init { archive } => {
                 Archive::create(open_transport(archive)?)?;
-                ui::println(&format!("Created new archive in {:?}", &archive));
+                debug!("Created new archive in {archive:?}");
             }
             Command::Ls {
                 stos,
@@ -408,10 +408,10 @@ impl Command {
                     overwrite: *force_overwrite,
                     long_listing: *long_listing,
                 };
-
                 let stats = restore(&archive, destination, &options)?;
+                debug!("Restore complete");
                 if !no_stats {
-                    ui::println(&format!("Restore complete.\n{stats}"));
+                    debug!(%stats);
                 }
             }
             Command::Size {
@@ -503,6 +503,7 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
 
 fn main() {
     let args = Args::parse();
+    let start_time = Instant::now();
     ui::enable_progress(!args.no_progress);
     ui::enable_tracing(if args.debug {
         Level::TRACE
@@ -510,6 +511,7 @@ fn main() {
         Level::INFO
     });
     let result = args.command.run();
+    debug!(elapsed = ?start_time.elapsed());
     match result {
         Err(ref e) => {
             ui::show_error(e);

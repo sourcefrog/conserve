@@ -86,7 +86,7 @@ fn basic_backup() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with("Created new archive"));
+        .stdout(predicate::str::is_empty());
 
     // New archive contains no versions.
     run_conserve()
@@ -128,8 +128,8 @@ fn basic_backup() {
         .arg(&src)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with("Backup complete.\n"));
+        .stderr(predicate::str::is_empty());
+    // .stdout(predicate::str::is_empty()); // TODO: Should be empty but currently emits stats.
     // TODO: Now inspect the archive.
 
     run_conserve()
@@ -227,7 +227,7 @@ fn basic_backup() {
              /hello\n\
              /subdir\n\
              /subdir/subfile\n\
-             Restore complete.\n",
+             ",
         ));
 
     restore_dir

@@ -19,6 +19,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
+#[allow(unused_imports)]
 use tracing::{debug, error, info, trace, Level};
 
 use crate::monitor::{Counters, Monitor, Phase, Progress};
