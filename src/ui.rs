@@ -20,7 +20,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use lazy_static::lazy_static;
-use tracing::{info, warn};
+use tracing::{error, info};
 
 use crate::monitor::{Counters, Monitor, Phase, Progress};
 use crate::stats::Sizes;
@@ -143,19 +143,6 @@ impl UIState {
         // TODO: Go through Nutmeg instead...
         // self.clear_progress();
         println!("conserve error: {s}");
-        // Drawing this way makes messages leak from tests, for unclear reasons.
-
-        // queue!(
-        //     stdout,
-        //     style::SetForegroundColor(style::Color::Red),
-        //     style::SetAttribute(style::Attribute::Bold),
-        //     style::Print("conserve error: "),
-        //     style::SetAttribute(style::Attribute::Reset),
-        //     style::Print(s),
-        //     style::Print("\n"),
-        //     style::ResetColor,
-        // )
-        // .unwrap();
     }
 }
 
@@ -201,7 +188,7 @@ where
     JF: io::Write + Debug + Send,
 {
     fn problem(&self, problem: Error) -> Result<()> {
-        warn!("{problem}"); // TODO: Maybe error!?
+        error!("{problem}");
         if let Some(f) = self.problems_json.lock().unwrap().as_mut() {
             // TODO: Structured serialization, not just a string.
             serde_json::to_writer_pretty(f, &problem.to_string())
