@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,7 +13,7 @@
 
 //! Console UI.
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Write};
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -22,7 +22,7 @@ use std::time::Duration;
 use lazy_static::lazy_static;
 use tracing::{info, warn};
 
-use crate::monitor::{ValidateMonitor, ValidatePhase};
+use crate::monitor::{Progress, ValidateMonitor, ValidatePhase};
 use crate::stats::Sizes;
 use crate::{Error, Result};
 
@@ -64,7 +64,6 @@ where
 }
 
 pub(crate) fn format_error_causes(error: &dyn std::error::Error) -> String {
-    use std::fmt::Write;
     let mut buf = error.to_string();
     let mut cause = error;
     while let Some(c) = cause.source() {
@@ -166,7 +165,6 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
 
 /// A ValidateMonitor that logs messages, collects problems in memory, optionally
 /// writes problems to a json file, and draws console progress bars.
-#[derive(Debug)]
 pub struct TerminalValidateMonitor<JF>
 where
     JF: io::Write + Debug + Send,
@@ -177,6 +175,7 @@ where
     // pub log_problems: bool,
     pub n_problems: AtomicUsize,
     // pub log_phases: bool,
+    nutmeg_view: nutmeg::View<Progress>,
 }
 
 impl<JF> TerminalValidateMonitor<JF>
@@ -184,12 +183,14 @@ where
     JF: io::Write + Debug + Send,
 {
     pub fn new(problems_json: Option<JF>) -> Self {
+        let nutmeg_view = nutmeg::View::new(Progress::None, nutmeg_options());
         TerminalValidateMonitor {
             // progress_bars: true,
             problems_json: Mutex::new(problems_json.map(|x| Box::new(x))),
             // log_problems: true,
             // log_phases: true,
             n_problems: 0.into(),
+            nutmeg_view,
         }
     }
 
@@ -220,6 +221,50 @@ where
         if true {
             // self.log_phases {
             info!("{phase}");
+        }
+    }
+
+    fn progress(&self, progress: Progress) {
+        if matches!(progress, Progress::None) {
+            self.nutmeg_view.suspend();
+            self.nutmeg_view.update(|model| *model = progress);
+        } else {
+            self.nutmeg_view.update(|model| *model = progress);
+            self.nutmeg_view.resume();
+        }
+    }
+}
+
+impl nutmeg::Model for Progress {
+    fn render(&mut self, _width: usize) -> String {
+        match *self {
+            Progress::None => String::new(),
+            Progress::ValidateBlocks {
+                blocks_done,
+                total_blocks,
+                bytes_done,
+                start,
+            } => {
+                format!(
+                    "Check block {}/{}: {} done, {} MB checked, {} remaining",
+                    blocks_done,
+                    total_blocks,
+                    nutmeg::percent_done(blocks_done, total_blocks),
+                    bytes_done / 1_000_000,
+                    nutmeg::estimate_remaining(&start, blocks_done, total_blocks)
+                )
+            }
+            Progress::ValidateBands {
+                total_bands,
+                bands_done,
+                start,
+            } => format!(
+                "Check index {}/{}, {} done, {} remaining",
+                bands_done,
+                total_bands,
+                nutmeg::percent_done(bands_done, total_bands),
+                nutmeg::estimate_remaining(&start, bands_done, total_bands)
+            ),
         }
     }
 }

@@ -19,7 +19,7 @@ use std::time::Instant;
 use tracing::{info, warn};
 
 use crate::blockdir::Address;
-use crate::monitor::ValidateMonitor;
+use crate::monitor::{Progress, ValidateMonitor};
 use crate::*;
 
 /// Options to [Archive::validate].
@@ -67,31 +67,11 @@ pub(crate) fn validate_bands(
     monitor: &mut dyn ValidateMonitor,
 ) -> Result<ReferencedBlockLengths> {
     let mut block_lens = ReferencedBlockLengths::new();
-    struct ProgressModel {
-        bands_done: usize,
-        bands_total: usize,
-        start: Instant,
-    }
-    impl nutmeg::Model for ProgressModel {
-        fn render(&mut self, _width: usize) -> String {
-            format!(
-                "Check index {}/{}, {} done, {} remaining",
-                self.bands_done,
-                self.bands_total,
-                nutmeg::percent_done(self.bands_done, self.bands_total),
-                nutmeg::estimate_remaining(&self.start, self.bands_done, self.bands_total)
-            )
-        }
-    }
-    let view = nutmeg::View::new(
-        ProgressModel {
-            start: Instant::now(),
-            bands_done: 0,
-            bands_total: band_ids.len(),
-        },
-        ui::nutmeg_options(),
-    );
+    let start = Instant::now();
+    let total_bands = band_ids.len();
+    let mut bands_done = 0;
     'band: for band_id in band_ids {
+        bands_done += 1;
         match Band::open(archive, band_id) {
             Ok(band) => band.validate(monitor)?,
             Err(err) => {
@@ -110,8 +90,13 @@ pub(crate) fn validate_bands(
                 continue 'band;
             }
         }
-        view.update(|model| model.bands_done += 1);
+        monitor.progress(Progress::ValidateBands {
+            total_bands,
+            bands_done,
+            start,
+        });
     }
+    monitor.progress(Progress::None);
     Ok(block_lens)
 }
 

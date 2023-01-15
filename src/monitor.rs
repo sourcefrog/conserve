@@ -12,6 +12,7 @@
 
 use std::fmt::{self, Debug};
 use std::sync::Mutex;
+use std::time::Instant;
 
 use crate::{Error, Result};
 
@@ -19,13 +20,34 @@ use crate::{Error, Result};
 ///
 /// These can be, for example, drawn into a UI, written to logs, or written
 /// out as structured data.
-pub trait ValidateMonitor: Debug + Send + Sync {
+pub trait ValidateMonitor: Send + Sync {
     /// The monitor is informed that a non-fatal error occurred while validating the
     /// archive.
     fn problem(&self, problem: Error) -> Result<()>;
 
-    /// The monitor is informed that a phase of validation has started.
+    /// A task has started: there can be several tasks in progress at any
+    /// time.
     fn start_phase(&mut self, phase: ValidatePhase);
+
+    /// Update that some progress has been made on a task.
+    fn progress(&self, progress: Progress);
+}
+
+/// Overall progress state communicated from Conserve core to the monitor.
+#[derive(Clone)]
+pub enum Progress {
+    None,
+    ValidateBands {
+        total_bands: usize,
+        bands_done: usize,
+        start: Instant,
+    },
+    ValidateBlocks {
+        blocks_done: usize,
+        total_blocks: usize,
+        bytes_done: u64,
+        start: Instant,
+    },
 }
 
 /// A ValidateMonitor that collects all problems without drawing anything,
@@ -55,9 +77,9 @@ impl ValidateMonitor for CollectValidateMonitor {
         Ok(())
     }
 
-    fn start_phase(&mut self, _phase: ValidatePhase) {
-        // self.phases.push(phase)
-    }
+    fn start_phase(&mut self, _phase: ValidatePhase) {}
+
+    fn progress(&self, _progress: Progress) {}
 }
 
 #[non_exhaustive]

@@ -25,6 +25,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -37,7 +38,7 @@ use serde::{Deserialize, Serialize};
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::monitor::{ValidateMonitor, ValidatePhase};
+use crate::monitor::{Progress, ValidateMonitor, ValidatePhase};
 use crate::stats::{BackupStats, Sizes, ValidateStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
@@ -270,46 +271,25 @@ impl BlockDir {
         // TODO: Test having a block with the right compression but the wrong contents.
         monitor.start_phase(ValidatePhase::ListBlocks);
         let blocks = self.block_names_set()?;
+        let total_blocks = blocks.len();
         monitor.start_phase(ValidatePhase::CheckBlockContent {
             n_blocks: blocks.len(),
         });
         stats.block_read_count = blocks.len().try_into().unwrap();
-        // TODO: Move to GeneralValidateModel.
-        struct ProgressModel {
-            total_blocks: usize,
-            blocks_done: usize,
-            bytes_done: usize,
-            start: Instant,
-        }
-        impl nutmeg::Model for ProgressModel {
-            fn render(&mut self, _width: usize) -> String {
-                format!(
-                    "Check block {}/{}: {} done, {} MB checked, {} remaining",
-                    self.blocks_done,
-                    self.total_blocks,
-                    nutmeg::percent_done(self.blocks_done, self.total_blocks),
-                    self.bytes_done / 1_000_000,
-                    nutmeg::estimate_remaining(&self.start, self.blocks_done, self.total_blocks)
-                )
-            }
-        }
-        let progress_bar = nutmeg::View::new(
-            ProgressModel {
-                total_blocks: blocks.len(),
-                blocks_done: 0,
-                bytes_done: 0,
-                start: Instant::now(),
-            },
-            ui::nutmeg_options(),
-        );
-        let len_map: HashMap<BlockHash, usize> = blocks
+        let blocks_done = AtomicUsize::new(0);
+        let bytes_done = AtomicU64::new(0);
+        let start = Instant::now();
+        let block_lens = blocks
             .into_par_iter()
             .flat_map(|hash| match self.get_block_content(&hash) {
                 Ok((bytes, _sizes)) => {
                     let len = bytes.len();
-                    progress_bar.update(|model| {
-                        model.blocks_done += 1;
-                        model.bytes_done += len
+                    monitor.progress(Progress::ValidateBlocks {
+                        blocks_done: blocks_done.fetch_add(1, Ordering::Relaxed) + 1,
+                        total_blocks,
+                        bytes_done: bytes_done.fetch_add(len as u64, Ordering::Relaxed)
+                            + len as u64,
+                        start,
                     });
                     Some((hash, len))
                 }
@@ -319,7 +299,8 @@ impl BlockDir {
                 }
             })
             .collect();
-        Ok(len_map)
+        monitor.progress(Progress::None);
+        Ok(block_lens)
     }
 
     /// Return the entire contents of the block.
