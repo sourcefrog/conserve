@@ -18,7 +18,6 @@ use std::time::Instant;
 #[allow(unused_imports)]
 use tracing::{info, warn};
 
-use crate::blockdir::Address;
 use crate::monitor::{Monitor, Progress};
 use crate::*;
 
@@ -29,34 +28,6 @@ pub struct ValidateOptions {
     pub skip_block_hashes: bool,
 }
 
-// TODO: maybe this doesn't need to be a struct, but just a map updated by
-// some functions...
-pub(crate) struct ReferencedBlockLengths(pub(crate) HashMap<BlockHash, u64>);
-
-impl ReferencedBlockLengths {
-    fn new() -> ReferencedBlockLengths {
-        ReferencedBlockLengths(HashMap::new())
-    }
-
-    fn add(&mut self, addr: Address) {
-        let end = addr.start + addr.len;
-        if let Some(al) = self.0.get_mut(&addr.hash) {
-            *al = max(*al, end)
-        } else {
-            self.0.insert(addr.hash, end);
-        }
-    }
-
-    fn update(&mut self, b: ReferencedBlockLengths) {
-        for (bh, bl) in b.0 {
-            self.0
-                .entry(bh)
-                .and_modify(|al| *al = max(*al, bl))
-                .or_insert(bl);
-        }
-    }
-}
-
 /// Validate the indexes of all bands.
 ///
 /// Returns the lengths of all blocks that were referenced, so that the caller can check
@@ -65,8 +36,8 @@ pub(crate) fn validate_bands<MO: Monitor>(
     archive: &Archive,
     band_ids: &[BandId],
     monitor: &mut MO,
-) -> Result<ReferencedBlockLengths> {
-    let mut block_lens = ReferencedBlockLengths::new();
+) -> Result<HashMap<BlockHash, u64>> {
+    let mut block_lens = HashMap::new();
     let start = Instant::now();
     let total_bands = band_ids.len();
     let mut bands_done = 0;
@@ -79,7 +50,7 @@ pub(crate) fn validate_bands<MO: Monitor>(
         if let Err(err) = archive
             .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))
             .and_then(|st| validate_stored_tree(&st))
-            .map(|st_block_lens| block_lens.update(st_block_lens))
+            .map(|st_block_lens| merge_block_lens(&mut block_lens, &st_block_lens))
         {
             monitor.problem(err)?;
             continue 'band;
@@ -94,15 +65,26 @@ pub(crate) fn validate_bands<MO: Monitor>(
     Ok(block_lens)
 }
 
-fn validate_stored_tree(st: &StoredTree) -> Result<ReferencedBlockLengths> {
-    let mut block_lens = ReferencedBlockLengths::new();
-    // TODO: Maybe check entry ordering and other invariants.
+fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash, u64>) {
+    for (bh, bl) in from {
+        into.entry(bh.clone())
+            .and_modify(|l| *l = max(*l, *bl))
+            .or_insert(*bl);
+    }
+}
+
+fn validate_stored_tree(st: &StoredTree) -> Result<HashMap<BlockHash, u64>> {
+    let mut block_lens = HashMap::new();
     for entry in st
         .iter_entries(Apath::root(), Exclude::nothing())?
         .filter(|entry| entry.kind() == Kind::File)
     {
         for addr in entry.addrs {
-            block_lens.add(addr)
+            let end = addr.start + addr.len;
+            block_lens
+                .entry(addr.hash.clone())
+                .and_modify(|l| *l = max(*l, end))
+                .or_insert(end);
         }
     }
     Ok(block_lens)
