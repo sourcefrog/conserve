@@ -16,8 +16,11 @@
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+use std::time::Instant;
 
 use clap::{Parser, Subcommand};
+use conserve::monitor::Monitor;
+use conserve::ui::duration_to_hms;
 #[allow(unused_imports)]
 use tracing::{error, info, trace};
 
@@ -440,6 +443,7 @@ impl Command {
                 no_stats,
                 problems_json,
             } => {
+                let start = Instant::now();
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
@@ -449,10 +453,10 @@ impl Command {
                     .transpose()?
                     .map(BufWriter::new);
                 let mut monitor = conserve::ui::TerminalValidateMonitor::new(problems_json);
-                let stats =
-                    Archive::open(open_transport(archive)?)?.validate(&options, &mut monitor)?;
+                Archive::open(open_transport(archive)?)?.validate(&options, &mut monitor)?;
                 if !no_stats {
-                    println!("{stats}");
+                    ui::println(&format!("{:#?}", monitor.counters()));
+                    ui::println(&format!("{} elapsed", duration_to_hms(start.elapsed())));
                 }
                 if monitor.saw_problems() {
                     println!("Archive has some problems.");

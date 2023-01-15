@@ -30,7 +30,6 @@ use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::monitor::{Monitor, Phase};
-use crate::stats::ValidateStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -298,13 +297,7 @@ impl Archive {
         Ok(stats)
     }
 
-    pub fn validate<MO: Monitor>(
-        &self,
-        options: &ValidateOptions,
-        monitor: &mut MO,
-    ) -> Result<ValidateStats> {
-        let start = Instant::now();
-        let mut stats = ValidateStats::default();
+    pub fn validate<MO: Monitor>(&self, options: &ValidateOptions, monitor: &mut MO) -> Result<()> {
         self.validate_archive_dir(monitor)?;
 
         monitor.start_phase(Phase::ListBands);
@@ -329,8 +322,7 @@ impl Archive {
         } else {
             // 2. Check the hash of all blocks are correct, and remember how long
             //    the uncompressed data is.
-            let block_lengths: HashMap<BlockHash, usize> =
-                self.block_dir.validate(&mut stats, monitor)?;
+            let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(monitor)?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (block_hash, referenced_len) in referenced_lens.0 {
                 if let Some(&actual_len) = block_lengths.get(&block_hash) {
@@ -346,8 +338,7 @@ impl Archive {
                 }
             }
         }
-        stats.elapsed = start.elapsed();
-        Ok(stats)
+        Ok(())
     }
 
     fn validate_archive_dir(&self, monitor: &mut dyn Monitor) -> Result<()> {

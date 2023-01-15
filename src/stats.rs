@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 use std::fmt;
 use std::time::Duration;
 
-use derive_more::{Add, AddAssign, Sum};
+use derive_more::{Add, AddAssign};
 use thousands::Separable;
 
 use crate::ui::duration_to_hms;
@@ -65,22 +65,6 @@ fn write_duration(w: &mut fmt::Formatter<'_>, label: &str, duration: Duration) -
 pub struct Sizes {
     pub compressed: u64,
     pub uncompressed: u64,
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq, Add, AddAssign, Sum)]
-pub struct ValidateStats {
-    /// Number of blocks read.
-    pub block_read_count: u64,
-
-    pub elapsed: Duration,
-}
-
-impl fmt::Display for ValidateStats {
-    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_count(w, "blocks read", self.block_read_count as usize);
-        write_duration(w, "elapsed", self.elapsed)?;
-        Ok(())
-    }
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]

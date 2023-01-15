@@ -70,7 +70,7 @@ pub use crate::merge::{MergeTrees, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
 pub use crate::restore::{restore, RestoreOptions, RestoreTree};
 pub use crate::show::{show_diff, show_versions, ShowVersionsOptions};
-pub use crate::stats::{BackupStats, DeleteStats, RestoreStats, ValidateStats};
+pub use crate::stats::{BackupStats, DeleteStats, RestoreStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};

@@ -22,7 +22,7 @@ use std::time::Duration;
 use lazy_static::lazy_static;
 use tracing::{info, warn};
 
-use crate::monitor::{Monitor, Phase, Progress};
+use crate::monitor::{Counters, Monitor, Phase, Progress};
 use crate::stats::Sizes;
 use crate::{Error, Result};
 
@@ -98,7 +98,7 @@ pub(crate) fn compression_percent(s: &Sizes) -> i64 {
     }
 }
 
-pub(crate) fn duration_to_hms(d: Duration) -> String {
+pub fn duration_to_hms(d: Duration) -> String {
     let elapsed_secs = d.as_secs();
     if elapsed_secs >= 3600 {
         format!(
@@ -169,13 +169,12 @@ pub struct TerminalValidateMonitor<JF>
 where
     JF: io::Write + Debug + Send,
 {
-    // pub progress_bars: bool,
     /// Optionally write all problems as json to this file as they're discovered.
     pub problems_json: Mutex<Option<Box<JF>>>,
-    // pub log_problems: bool,
-    pub n_problems: AtomicUsize,
-    // pub log_phases: bool,
+    /// Number of problems observed.
+    n_problems: AtomicUsize,
     nutmeg_view: nutmeg::View<Progress>,
+    counters: Counters,
 }
 
 impl<JF> TerminalValidateMonitor<JF>
@@ -185,12 +184,10 @@ where
     pub fn new(problems_json: Option<JF>) -> Self {
         let nutmeg_view = nutmeg::View::new(Progress::None, nutmeg_options());
         TerminalValidateMonitor {
-            // progress_bars: true,
-            problems_json: Mutex::new(problems_json.map(|x| Box::new(x))),
-            // log_problems: true,
-            // log_phases: true,
+            problems_json: Mutex::new(problems_json.map(Box::new)),
             n_problems: 0.into(),
             nutmeg_view,
+            counters: Counters::default(),
         }
     }
 
@@ -204,10 +201,7 @@ where
     JF: io::Write + Debug + Send,
 {
     fn problem(&self, problem: Error) -> Result<()> {
-        if true {
-            // self.log_problems {
-            warn!("{problem}");
-        }
+        warn!("{problem}"); // TODO: Maybe error!?
         if let Some(f) = self.problems_json.lock().unwrap().as_mut() {
             // TODO: Structured serialization, not just a string.
             serde_json::to_writer_pretty(f, &problem.to_string())
@@ -218,10 +212,7 @@ where
     }
 
     fn start_phase(&mut self, phase: Phase) {
-        if true {
-            // self.log_phases {
-            info!("{phase}");
-        }
+        info!("{phase}");
     }
 
     fn progress(&self, progress: Progress) {
@@ -232,6 +223,10 @@ where
             self.nutmeg_view.update(|model| *model = progress);
             self.nutmeg_view.resume();
         }
+    }
+
+    fn counters(&self) -> &Counters {
+        &self.counters
     }
 }
 

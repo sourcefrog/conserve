@@ -11,6 +11,7 @@
 // GNU General Public License for more details.
 
 use std::fmt::{self, Debug};
+use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -32,6 +33,10 @@ pub trait Monitor: Send + Sync {
 
     /// Update that some progress has been made on a task.
     fn progress(&self, progress: Progress);
+
+    /// Return a reference to a counter struct holding atomic performance
+    /// counters.
+    fn counters(&self) -> &Counters;
 }
 
 /// Overall progress state communicated from Conserve core to the monitor.
@@ -56,14 +61,14 @@ pub enum Progress {
 #[derive(Debug)]
 pub struct CollectMonitor {
     pub problems: Mutex<Vec<Error>>,
-    // pub phases: Vec<ValidatePhase>,
+    counters: Counters,
 }
 
 impl CollectMonitor {
     pub fn new() -> Self {
         CollectMonitor {
             problems: Mutex::new(Vec::new()),
-            // phases: Vec::new(),
+            counters: Counters::default(),
         }
     }
 
@@ -81,6 +86,10 @@ impl Monitor for CollectMonitor {
     fn start_phase(&mut self, _phase: Phase) {}
 
     fn progress(&self, _progress: Progress) {}
+
+    fn counters(&self) -> &Counters {
+        &self.counters
+    }
 }
 
 #[non_exhaustive]
@@ -105,4 +114,13 @@ impl fmt::Display for Phase {
             }
         }
     }
+}
+
+/// Counters of interesting performance events during an operation.
+///
+/// All the members are atomic so they can be updated through a shared
+/// reference at any time.
+#[derive(Default, Debug)]
+pub struct Counters {
+    pub blocks_read: AtomicUsize,
 }

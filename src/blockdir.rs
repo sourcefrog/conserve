@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
 use crate::monitor::{Monitor, Phase, Progress};
-use crate::stats::{BackupStats, Sizes, ValidateStats};
+use crate::stats::{BackupStats, Sizes};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
 use crate::*;
@@ -261,11 +261,7 @@ impl BlockDir {
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub fn validate(
-        &self,
-        stats: &mut ValidateStats,
-        monitor: &mut dyn Monitor,
-    ) -> Result<HashMap<BlockHash, usize>> {
+    pub fn validate<MO: Monitor>(&self, monitor: &mut MO) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
@@ -275,7 +271,6 @@ impl BlockDir {
         monitor.start_phase(Phase::CheckBlockContent {
             n_blocks: blocks.len(),
         });
-        stats.block_read_count = blocks.len().try_into().unwrap();
         let blocks_done = AtomicUsize::new(0);
         let bytes_done = AtomicU64::new(0);
         let start = Instant::now();
@@ -291,6 +286,10 @@ impl BlockDir {
                             + len as u64,
                         start,
                     });
+                    monitor
+                        .counters()
+                        .blocks_read
+                        .fetch_add(1, Ordering::Relaxed);
                     Some((hash, len))
                 }
                 Err(err) => {
