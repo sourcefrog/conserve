@@ -452,7 +452,7 @@ impl Command {
                     .map(File::create)
                     .transpose()?
                     .map(BufWriter::new);
-                let mut monitor = conserve::ui::TerminalValidateMonitor::new(problems_json);
+                let mut monitor = conserve::ui::TerminalMonitor::new(problems_json);
                 Archive::open(open_transport(archive)?)?.validate(&options, &mut monitor)?;
                 if !no_stats {
                     ui::println(&format!("{:#?}", monitor.counters()));

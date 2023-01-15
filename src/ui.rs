@@ -106,7 +106,7 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
 
 /// A ValidateMonitor that logs messages, collects problems in memory, optionally
 /// writes problems to a json file, and draws console progress bars.
-pub struct TerminalValidateMonitor<JF>
+pub struct TerminalMonitor<JF>
 where
     JF: io::Write + Debug + Send,
 {
@@ -118,13 +118,13 @@ where
     counters: Counters,
 }
 
-impl<JF> TerminalValidateMonitor<JF>
+impl<JF> TerminalMonitor<JF>
 where
     JF: io::Write + Debug + Send,
 {
     pub fn new(problems_json: Option<JF>) -> Self {
         let nutmeg_view = nutmeg::View::new(Progress::None, nutmeg_options());
-        TerminalValidateMonitor {
+        TerminalMonitor {
             problems_json: Mutex::new(problems_json.map(Box::new)),
             n_problems: 0.into(),
             nutmeg_view,
@@ -137,7 +137,7 @@ where
     }
 }
 
-impl<JF> Monitor for TerminalValidateMonitor<JF>
+impl<JF> Monitor for TerminalMonitor<JF>
 where
     JF: io::Write + Debug + Send,
 {
