@@ -19,10 +19,9 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
-use conserve::misc::duration_to_hms;
 use conserve::monitor::Monitor;
 #[allow(unused_imports)]
-use tracing::{error, info, trace};
+use tracing::{debug, error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
 use conserve::ReadTree;
@@ -455,14 +454,14 @@ impl Command {
                 let mut monitor = conserve::ui::TerminalMonitor::new(problems_json);
                 Archive::open(open_transport(archive)?)?.validate(&options, &mut monitor)?;
                 if !no_stats {
-                    ui::println(&format!("{:#?}", monitor.counters()));
-                    ui::println(&format!("{} elapsed", duration_to_hms(start.elapsed())));
+                    debug!(counters = ?monitor.counters());
+                    debug!(elapsed = ?start.elapsed());
                 }
                 if monitor.saw_problems() {
-                    println!("Archive has some problems.");
+                    warn!("Archive has some problems.");
                     return Ok(ExitCode::PartialCorruption);
                 } else {
-                    println!("Archive is OK.");
+                    info!("Archive is OK.");
                 }
             }
             Command::Versions {
@@ -504,13 +503,12 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
 
 fn main() {
     let args = Args::parse();
-    ui::enable_progress(!args.no_progress && !args.debug);
-    if args.debug {
-        tracing_subscriber::fmt::Subscriber::builder()
-            .with_max_level(tracing::Level::TRACE)
-            .init();
-        trace!("tracing enabled");
-    }
+    ui::enable_progress(!args.no_progress);
+    ui::enable_tracing(if args.debug {
+        Level::TRACE
+    } else {
+        Level::INFO
+    });
     let result = args.command.run();
     match result {
         Err(ref e) => {

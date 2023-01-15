@@ -19,17 +19,17 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
-use tracing::{error, info};
+use tracing::{error, info, trace, Level};
 
 use crate::monitor::{Counters, Monitor, Phase, Progress};
 use crate::{Error, Result};
 
-// TODO: A const_default in Nutmeg, then this can be non-lazy.
 lazy_static! {
     /// A global Nutmeg view.
     ///
     /// This is global to reflect that there is globally one stdout/stderr:
     /// this object manages it.
+    // TODO: A const_default in Nutmeg, then this can be non-lazy.
     static ref NUTMEG_VIEW: nutmeg::View<Progress> =
         nutmeg::View::new(Progress::None, nutmeg::Options::default());
 }
@@ -37,6 +37,27 @@ lazy_static! {
 /// Should progress be enabled for ad-hoc created Nutmeg views.
 // (These should migrate to NUTMEG_VIEW.)
 static PROGRESS_ENABLED: AtomicBool = AtomicBool::new(false);
+
+pub fn enable_tracing(console_level: Level) {
+    tracing_subscriber::fmt::Subscriber::builder()
+        .with_max_level(console_level)
+        .with_writer(|| WriteToNutmeg())
+        .init();
+    trace!("tracing enabled");
+}
+
+struct WriteToNutmeg();
+
+impl io::Write for WriteToNutmeg {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        NUTMEG_VIEW.message(std::str::from_utf8(buf).unwrap());
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 pub fn println(s: &str) {
     NUTMEG_VIEW.message(format!("{s}\n"));
@@ -77,7 +98,7 @@ pub fn enable_progress(enabled: bool) {
     }
 }
 
-// #[deprecated]
+// #[deprecated]: Use the global view instead.
 pub(crate) fn nutmeg_options() -> nutmeg::Options {
     nutmeg::Options::default().progress_enabled(PROGRESS_ENABLED.load(Ordering::Relaxed))
 }
@@ -119,7 +140,6 @@ where
     fn problem(&self, err: Error) -> Result<()> {
         let problem_str = err.to_string();
         error!("{problem_str}");
-        problem(&problem_str); // TODO: Unify with logging
         if let Some(f) = self.problems_json.lock().unwrap().as_mut() {
             // TODO: Structured serialization, not just a string.
             serde_json::to_writer_pretty(f, &problem_str)
