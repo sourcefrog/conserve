@@ -13,12 +13,14 @@
 //! Access to an archive on the local filesystem.
 
 use std::convert::TryInto;
-use std::fs::{create_dir, File};
+use std::fs::{create_dir, rename, File};
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 use bytes::Bytes;
+use rand::distributions::{Alphanumeric, DistString};
+use rand::thread_rng;
 
 use crate::transport::{DirEntry, Metadata, Transport};
 
@@ -89,19 +91,14 @@ impl Transport for LocalTransport {
     fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()> {
         let full_path = self.full_path(relpath);
         let dir = full_path.parent().unwrap();
-        let mut temp = tempfile::Builder::new()
-            .prefix(crate::TMP_PREFIX)
-            .tempfile_in(dir)?;
-        if let Err(err) = temp.write_all(content) {
-            let _ = temp.close();
-            return Err(err);
-        }
-        if let Err(persist_error) = temp.persist(&full_path) {
-            persist_error.file.close()?;
-            Err(persist_error.error)
-        } else {
-            Ok(())
-        }
+        let temp = Alphanumeric.sample_string(&mut thread_rng(), 12);
+        let temp_path = dir.join(&temp);
+        let mut temp = File::create(&temp_path)?;
+        temp.write_all(content)?;
+        temp.flush()?;
+        drop(temp);
+        rename(temp_path, full_path)?;
+        Ok(())
     }
 
     fn remove_file(&self, relpath: &str) -> io::Result<()> {
