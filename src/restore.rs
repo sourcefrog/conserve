@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -253,8 +253,11 @@ impl RestoreTree {
                 source,
             }
         })?;
+
         #[cfg(unix)]
         {
+            use crate::owner::USERS_CACHE;
+            use users::{Groups, Users};
             // Restore permissions only if there are mode bits stored in the archive
             source_entry
                 .unix_mode()
@@ -268,14 +271,15 @@ impl RestoreTree {
             // TODO: Stats and warnings if a user or group is specified in the index but
             // does not exist on the local system.
             let owner = source_entry.owner();
+            let users_cache = USERS_CACHE.lock().unwrap();
             let uid_opt = owner
                 .user
-                .and_then(|user| users::get_user_by_name(&user))
+                .and_then(|user| users_cache.get_user_by_name(&user))
                 .map(|user| user.uid())
                 .map(unistd::Uid::from_raw);
             let gid_opt = owner
                 .group
-                .and_then(|group| users::get_group_by_name(&group))
+                .and_then(|group| users_cache.get_group_by_name(&group))
                 .map(|group| group.gid())
                 .map(unistd::Gid::from_raw);
             // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
