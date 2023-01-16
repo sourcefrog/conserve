@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -101,8 +101,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     // TODO: Check what was restored.
 
     let mut monitor = CollectMonitor::new();
-    let _validate_stats = af
-        .validate(&ValidateOptions::default(), &mut monitor)
+    af.validate(&ValidateOptions::default(), &mut monitor)
         .unwrap();
     assert_matches!(monitor.into_problems().as_slice(), []);
     Ok(())

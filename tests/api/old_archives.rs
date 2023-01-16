@@ -79,7 +79,7 @@ fn validate_archive() {
         let archive = open_old_archive(ver, "minimal");
 
         let mut monitor = CollectMonitor::new();
-        let _stats = archive
+        archive
             .validate(&ValidateOptions::default(), &mut monitor)
             .expect("validate archive");
         let problems = monitor.into_problems();

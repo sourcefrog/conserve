@@ -24,7 +24,7 @@ use conserve::*;
 fn missing_block() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
     let mut monitor = CollectMonitor::new();
-    let _validate_stats = archive.validate(&ValidateOptions::default(), &mut monitor)?;
+    archive.validate(&ValidateOptions::default(), &mut monitor)?;
     assert_matches!(
         monitor.into_problems().as_slice(),
         [Error::BlockMissing { .. }]
@@ -36,7 +36,7 @@ fn missing_block() -> Result<()> {
 fn missing_block_skip_block_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
     let mut monitor = CollectMonitor::new();
-    let _validate_stats = archive.validate(
+    archive.validate(
         &ValidateOptions {
             skip_block_hashes: true,
         },
