@@ -174,6 +174,9 @@ pub enum Error {
         source: IOError,
     },
 
+    #[error("Failed to set owner of {path:?}")]
+    SetOwner { source: IOError, path: PathBuf },
+
     #[error(transparent)]
     SnapCompressionError {
         #[from]
