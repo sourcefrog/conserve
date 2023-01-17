@@ -181,7 +181,7 @@ dependencies = [
 
 [[package]]
 name = "conserve"
-version = "23.1.1-pre"
+version = "23.1.2-pre"
 dependencies = [
  "assert_cmd",
  "assert_fs",
