@@ -34,11 +34,12 @@ use blake2_rfc::blake2b::Blake2b;
 use nutmeg::models::UnboundedModel;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::monitor::{Monitor, Phase, Progress};
+use crate::monitor::{Monitor, Progress};
 use crate::stats::{BackupStats, Sizes};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
@@ -265,12 +266,10 @@ impl BlockDir {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
-        monitor.start_phase(Phase::ListBlocks);
+        debug!("Start list blocks");
         let blocks = self.block_names_set()?;
         let total_blocks = blocks.len();
-        monitor.start_phase(Phase::CheckBlockContent {
-            n_blocks: blocks.len(),
-        });
+        debug!("Check {total_blocks} blocks");
         let blocks_done = AtomicUsize::new(0);
         let bytes_done = AtomicU64::new(0);
         let start = Instant::now();

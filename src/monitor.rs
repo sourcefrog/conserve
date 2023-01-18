@@ -10,7 +10,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-use std::fmt::{self, Debug};
+use std::fmt::Debug;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 use std::time::Instant;
@@ -26,10 +26,6 @@ use crate::{Error, Result};
 pub trait Monitor: Send + Sync {
     /// The monitor is informed that a non-fatal error occurred.
     fn problem(&self, problem: Error) -> Result<()>;
-
-    /// The task entered a new high-level phase; there's only one phase
-    /// at a time.
-    fn start_phase(&mut self, phase: Phase);
 
     /// Update that some progress has been made on a task.
     fn progress(&self, progress: Progress);
@@ -83,36 +79,10 @@ impl Monitor for CollectMonitor {
         Ok(())
     }
 
-    fn start_phase(&mut self, _phase: Phase) {}
-
     fn progress(&self, _progress: Progress) {}
 
     fn counters(&self) -> &Counters {
         &self.counters
-    }
-}
-
-#[non_exhaustive]
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Phase {
-    CheckArchiveDirectory,
-    ListBlocks,
-    ListBands,
-    CheckIndexes(usize),
-    CheckBlockContent { n_blocks: usize },
-}
-
-impl fmt::Display for Phase {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Phase::CheckArchiveDirectory => write!(f, "Check archive directory"),
-            Phase::ListBlocks => write!(f, "List blocks"),
-            Phase::ListBands => write!(f, "List bands"),
-            Phase::CheckIndexes(n) => write!(f, "Check {n} indexes"),
-            Phase::CheckBlockContent { n_blocks } => {
-                write!(f, "Check content of {n_blocks} blocks")
-            }
-        }
     }
 }
 

@@ -22,7 +22,7 @@ use lazy_static::lazy_static;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, Level};
 
-use crate::monitor::{Counters, Monitor, Phase, Progress};
+use crate::monitor::{Counters, Monitor, Progress};
 use crate::{Error, Result};
 
 lazy_static! {
@@ -148,10 +148,6 @@ where
         }
         self.n_problems.fetch_add(1, Ordering::Relaxed);
         Ok(())
-    }
-
-    fn start_phase(&mut self, phase: Phase) {
-        debug!("{phase}");
     }
 
     fn progress(&self, progress: Progress) {

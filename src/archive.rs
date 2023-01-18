@@ -24,12 +24,13 @@ use itertools::Itertools;
 use nutmeg::models::{LinearModel, UnboundedModel};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::blockhash::BlockHash;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
-use crate::monitor::{Monitor, Phase};
+use crate::monitor::Monitor;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -300,9 +301,9 @@ impl Archive {
     pub fn validate<MO: Monitor>(&self, options: &ValidateOptions, monitor: &mut MO) -> Result<()> {
         self.validate_archive_dir(monitor)?;
 
-        monitor.start_phase(Phase::ListBands);
+        debug!("List bands...");
         let band_ids = self.list_band_ids()?;
-        monitor.start_phase(Phase::CheckIndexes(band_ids.len()));
+        debug!("Check {} bands...", band_ids.len());
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
@@ -311,7 +312,7 @@ impl Archive {
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
             // content.
-            monitor.start_phase(Phase::ListBlocks);
+            debug!("List blocks...");
             // TODO: Check for unexpected files or directories in the blockdir.
             let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
             for block_hash in referenced_lens.keys().cloned() {
@@ -343,7 +344,7 @@ impl Archive {
 
     fn validate_archive_dir(&self, monitor: &mut dyn Monitor) -> Result<()> {
         // TODO: More tests for the problems detected here.
-        monitor.start_phase(Phase::CheckArchiveDirectory);
+        debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
         for entry_result in self
             .transport
