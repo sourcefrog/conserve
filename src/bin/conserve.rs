@@ -442,7 +442,6 @@ impl Command {
                 no_stats,
                 problems_json,
             } => {
-                let start = Instant::now();
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
@@ -455,7 +454,6 @@ impl Command {
                 Archive::open(open_transport(archive)?)?.validate(&options, &mut monitor)?;
                 if !no_stats {
                     debug!(counters = ?monitor.counters());
-                    debug!(elapsed = ?start.elapsed());
                 }
                 if monitor.saw_problems() {
                     warn!("Archive has some problems.");
