@@ -26,7 +26,6 @@ hex = "0.4.2"
 itertools = "0.10"
 lazy_static = "1.4.0"
 mutants = "0.0.3"
-nutmeg = "0.1"
 rayon = "1.3.0"
 readahead-iterator = "0.1.1"
 regex = "1.3.9"
@@ -53,6 +52,10 @@ nix = "0.26"
 [dependencies.clap]
 version = "4.0"
 features = ["derive", "deprecated", "wrap_help"]
+
+[dependencies.nutmeg]
+version = "0.1.3-pre"
+git = "https://github.com/sourcefrog/nutmeg"
 
 [dev-dependencies]
 assert_cmd = "2.0"

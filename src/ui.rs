@@ -51,7 +51,7 @@ struct WriteToNutmeg();
 
 impl io::Write for WriteToNutmeg {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        NUTMEG_VIEW.message(std::str::from_utf8(buf).unwrap());
+        NUTMEG_VIEW.message_bytes(buf);
         Ok(buf.len())
     }
 
