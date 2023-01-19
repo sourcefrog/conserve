@@ -271,8 +271,8 @@ fn basic_backup() {
         .arg(arch_dir)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::contains("Archive is OK.\n"));
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("Archive is OK.\n"));
 
     // TODO: Compare vs source tree.
 }
@@ -344,7 +344,7 @@ fn validate_non_fatal_problems_nonzero_result() {
     run_conserve()
         .args(["validate", "testdata/damaged/missing-block/"])
         .assert()
-        .stdout(predicate::str::contains("Archive has some problems."))
+        .stderr(predicate::str::contains("Archive has some problems."))
         .code(2);
 }
 

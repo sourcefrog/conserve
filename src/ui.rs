@@ -32,7 +32,8 @@ lazy_static! {
     /// this object manages it.
     // TODO: A const_default in Nutmeg, then this can be non-lazy.
     static ref NUTMEG_VIEW: nutmeg::View<Progress> =
-        nutmeg::View::new(Progress::None, nutmeg::Options::default());
+        nutmeg::View::new(Progress::None, nutmeg::Options::default()
+            .destination(nutmeg::Destination::Stderr));
 }
 
 /// Should progress be enabled for ad-hoc created Nutmeg views.
@@ -61,11 +62,16 @@ impl io::Write for WriteToNutmeg {
 }
 
 pub fn println(s: &str) {
-    NUTMEG_VIEW.message(format!("{s}\n"));
+    // TODO: Reconsider callers; some should move to logging, others to a
+    // new bulk output API?
+    NUTMEG_VIEW.clear();
+    println!("{s}");
 }
 
 pub fn problem(s: &str) {
-    NUTMEG_VIEW.message(format!("conserve error: {s}\n"));
+    // TODO: Migrate callers to logging or to Monitor::problem.
+    NUTMEG_VIEW.clear();
+    println!("conserve error: {s}\n");
 }
 
 pub(crate) fn format_error_causes(error: &dyn std::error::Error) -> String {
