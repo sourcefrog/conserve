@@ -86,6 +86,12 @@ impl Monitor for CollectMonitor {
     }
 }
 
+impl Default for CollectMonitor {
+    fn default() -> Self {
+        CollectMonitor::new()
+    }
+}
+
 /// Counters of interesting performance events during an operation.
 ///
 /// All the members are atomic so they can be updated through a shared
