@@ -25,6 +25,15 @@ use tracing::{debug, error, info, trace, Level};
 use crate::monitor::{Counters, Monitor, Progress};
 use crate::{Error, Result};
 
+/// Chosen style of timestamp prefix on trace lines.
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum TraceTimeStyle {
+    None,
+    Utc,
+    Uptime,
+    Local,
+}
+
 lazy_static! {
     /// A global Nutmeg view.
     ///
@@ -40,11 +49,20 @@ lazy_static! {
 // (These should migrate to NUTMEG_VIEW.)
 static PROGRESS_ENABLED: AtomicBool = AtomicBool::new(false);
 
-pub fn enable_tracing(console_level: Level) {
-    tracing_subscriber::fmt::Subscriber::builder()
+pub fn enable_tracing(time_style: &TraceTimeStyle, console_level: Level) {
+    use tracing_subscriber::fmt::time;
+    let builder = tracing_subscriber::fmt::Subscriber::builder()
         .with_max_level(console_level)
-        .with_writer(WriteToNutmeg)
-        .init();
+        .with_writer(WriteToNutmeg);
+    match time_style {
+        TraceTimeStyle::None => builder.without_time().init(),
+        TraceTimeStyle::Utc => builder.with_timer(time::UtcTime::rfc_3339()).init(),
+        TraceTimeStyle::Uptime => builder.with_timer(time::uptime()).init(),
+        TraceTimeStyle::Local => todo!(),
+        // builder
+        //     .with_timer(time::OffsetTime::local_rfc_3339().unwrap())
+        //     .init(),
+    }
     trace!("Tracing enabled");
 }
 
@@ -157,6 +175,8 @@ where
 
     fn progress(&self, progress: Progress) {
         if matches!(progress, Progress::None) {
+            // Hide the progress bar.
+            // TODO: suspend and update may not be needed if it renders to nothing?
             NUTMEG_VIEW.suspend();
             NUTMEG_VIEW.update(|model| *model = progress);
         } else {

@@ -41,6 +41,10 @@ struct Args {
     /// Show debug trace to stdout.
     #[arg(long, short = 'D', global = true)]
     debug: bool,
+
+    /// Control prefixes on trace lines.
+    #[arg(long, value_enum, global = true)]
+    trace_time: Option<conserve::ui::TraceTimeStyle>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -503,11 +507,15 @@ fn main() {
     let args = Args::parse();
     let start_time = Instant::now();
     ui::enable_progress(!args.no_progress);
-    ui::enable_tracing(if args.debug {
+    let trace_level = if args.debug {
         Level::TRACE
     } else {
         Level::INFO
-    });
+    };
+    ui::enable_tracing(
+        &args.trace_time.unwrap_or(ui::TraceTimeStyle::Utc),
+        trace_level,
+    );
     let result = args.command.run();
     debug!(elapsed = ?start_time.elapsed());
     match result {

@@ -39,7 +39,7 @@ thousands = "0.2.0"
 time = { version = "0.3", features = ["local-offset"] }
 tracing = "0.1"
 tracing-appender = "0.2"
-tracing-subscriber = { version = "0.3.11", features = ["env-filter", "fmt"] }
+tracing-subscriber = { version = "0.3.16", features = ["env-filter", "fmt", "time"] }
 unix_mode = "0.1"
 url = "2.2.2"
 indoc = "1.0.8"
