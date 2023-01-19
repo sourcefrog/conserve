@@ -219,7 +219,7 @@ impl Band {
         })
     }
 
-    pub fn validate(&self, monitor: &mut dyn Monitor) -> Result<()> {
+    pub fn validate<MO: Monitor>(&self, monitor: &mut MO) -> Result<()> {
         let ListDirNames { mut files, dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {

@@ -342,7 +342,7 @@ impl Archive {
         Ok(())
     }
 
-    fn validate_archive_dir(&self, monitor: &mut dyn Monitor) -> Result<()> {
+    fn validate_archive_dir<MO: Monitor>(&self, monitor: &mut MO) -> Result<()> {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
