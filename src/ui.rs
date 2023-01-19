@@ -148,8 +148,7 @@ where
         let problem_str = err.to_string();
         error!("{problem_str}");
         if let Some(f) = self.problems_json.lock().unwrap().as_mut() {
-            // TODO: Structured serialization, not just a string.
-            serde_json::to_writer_pretty(f, &problem_str)
+            serde_json::to_writer_pretty(f, &err)
                 .map_err(|source| Error::SerializeProblem { source })?;
         }
         self.n_problems.fetch_add(1, Ordering::Relaxed);
