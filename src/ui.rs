@@ -43,9 +43,9 @@ static PROGRESS_ENABLED: AtomicBool = AtomicBool::new(false);
 pub fn enable_tracing(console_level: Level) {
     tracing_subscriber::fmt::Subscriber::builder()
         .with_max_level(console_level)
-        .with_writer(|| WriteToNutmeg())
+        .with_writer(WriteToNutmeg)
         .init();
-    trace!("tracing enabled");
+    trace!("Tracing enabled");
 }
 
 struct WriteToNutmeg();
