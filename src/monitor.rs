@@ -98,5 +98,7 @@ impl Default for CollectMonitor {
 /// reference at any time.
 #[derive(Default, Debug)]
 pub struct Counters {
+    // CAUTION: Don't use AtomicU64 here because it won't exist on
+    // 32-bit platforms.
     pub blocks_read: AtomicUsize,
 }
