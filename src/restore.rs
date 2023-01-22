@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@ use filetime::set_file_handle_times;
 use filetime::set_symlink_file_times;
 #[cfg(unix)]
 use nix::unistd;
+use tracing::error;
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
@@ -124,7 +125,7 @@ pub fn restore(
             }
         }
         progress_bar.update(|model| model.filename = entry.apath().to_string());
-        if let Err(e) = match entry.kind() {
+        if let Err(err) = match entry.kind() {
             Kind::Dir => {
                 stats.directories += 1;
                 rt.copy_dir(&entry)
@@ -149,7 +150,11 @@ pub fn restore(
                 continue;
             }
         } {
-            ui::show_error(&e);
+            // TODO: Migrate to a monitor when that is passed down
+            error!(
+                "error restoring {apath}: {err}",
+                apath = entry.apath().to_string()
+            );
             stats.errors += 1;
             continue;
         }
@@ -259,8 +264,9 @@ impl RestoreTree {
             source_entry
                 .unix_mode()
                 .set_permissions(&path)
-                .map_err(|e| {
-                    ui::show_error(&e);
+                .map_err(|err| {
+                    // TODO: Migrate to monitor once that is passed down.
+                    error!("error restoring unix permissions on {path:?}: {err}",);
                     stats.errors += 1;
                 })
                 .ok();
@@ -280,8 +286,9 @@ impl RestoreTree {
                 .map(unistd::Gid::from_raw);
             // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
             unistd::chown(&path, uid_opt, gid_opt)
-                .map_err(|e| {
-                    ui::show_error(&e);
+                .map_err(|err| {
+                    // TODO: Migrate to monitor once that is passed down.
+                    error!("error restoring ownership on {path:?}: {err}");
                     stats.errors += 1;
                 })
                 .ok();

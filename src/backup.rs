@@ -18,6 +18,7 @@ use std::io::prelude::*;
 use std::{convert::TryInto, time::Instant};
 
 use itertools::Itertools;
+use tracing::error;
 
 use crate::blockdir::Address;
 use crate::io::read_with_retries;
@@ -114,8 +115,8 @@ pub fn backup(
                 }
             });
             match writer.copy_entry(&entry, source) {
-                Err(e) => {
-                    writeln!(view, "{}", ui::format_error_causes(&e))?;
+                Err(err) => {
+                    error!("Error copying entry {entry:?} to backup: {err}"); // TODO: Migrate to monitor
                     stats.errors += 1;
                     continue;
                 }
