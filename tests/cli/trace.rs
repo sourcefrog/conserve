@@ -1,3 +1,7 @@
+// Copyright 2023 Martin Pool
+
+//! Tests for trace-related options and behaviors of the Conserve CLI.
+
 use assert_fs::prelude::*;
 use predicates::prelude::*;
 
@@ -12,8 +16,8 @@ fn no_trace_timestamps_by_default() {
         .args(["-D", "init"])
         .arg(temp_dir.child("archive").path())
         .assert()
-        .success();
-    // .stderr(predicate::str::contains(
-    //     "TRACE conserve::ui: Tracing enabled",
-    // ));
+        .success()
+        .stderr(predicate::str::contains(
+            "TRACE conserve::ui: Tracing enabled",
+        ));
 }
