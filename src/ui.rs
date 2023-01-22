@@ -139,10 +139,6 @@ impl TerminalMonitor {
             counters: Counters::default(),
         })
     }
-
-    pub fn had_errors(&self) -> bool {
-        self.n_errors.load(Ordering::Relaxed) > 0
-    }
 }
 
 impl Monitor for TerminalMonitor {
@@ -170,6 +166,10 @@ impl Monitor for TerminalMonitor {
 
     fn counters(&self) -> &Counters {
         &self.counters
+    }
+
+    fn had_errors(&self) -> bool {
+        self.n_errors.load(Ordering::Relaxed) > 0
     }
 }
 
