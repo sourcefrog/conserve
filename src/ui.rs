@@ -57,6 +57,7 @@ pub fn enable_tracing(time_style: &TraceTimeStyle, console_level: Level) {
     use tracing_subscriber::fmt::time;
     let builder = tracing_subscriber::fmt::Subscriber::builder()
         .with_max_level(console_level)
+        .with_ansi(clicolors_control::colors_enabled())
         .with_writer(WriteToNutmeg);
     match time_style {
         TraceTimeStyle::None => builder.without_time().init(),
