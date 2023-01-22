@@ -364,7 +364,7 @@ impl Archive {
                         }
                     } else {
                         // TODO: The whole path not just the filename
-                        monitor.error(Error::UnexpectedFile {
+                        monitor.warning(Error::UnexpectedFile {
                             path: name.to_owned(),
                         })?;
                     }
@@ -379,14 +379,14 @@ impl Archive {
                         && !name.eq_ignore_ascii_case(".DS_Store")
                     {
                         // TODO: The whole path not just the filename
-                        monitor.error(Error::UnexpectedFile {
+                        monitor.warning(Error::UnexpectedFile {
                             path: name.to_owned(),
                         })?;
                     }
                 }
                 Ok(DirEntry { name, .. }) => {
                     // TODO: The whole path not just the filename
-                    monitor.error(Error::UnexpectedFile {
+                    monitor.warning(Error::UnexpectedFile {
                         path: name.to_owned(),
                     })?;
                 }

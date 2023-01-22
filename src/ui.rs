@@ -21,6 +21,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
+use tracing::warn;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, Level};
 
@@ -120,7 +121,7 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
 pub struct TerminalMonitor {
     /// Optionally write all errors and warnings as json to this file as they're discovered.
     pub errors_json: Mutex<Option<BufWriter<File>>>,
-    /// Number of errors observed.
+    /// Number of errors (and warnings) observed.
     n_errors: AtomicUsize,
     counters: Counters,
 }
@@ -139,15 +140,27 @@ impl TerminalMonitor {
             counters: Counters::default(),
         })
     }
+
+    fn write_error(&self, err: &Error) -> Result<()> {
+        if let Some(f) = self.errors_json.lock().unwrap().as_mut() {
+            serde_json::to_writer_pretty(f, err)
+                .map_err(|source| Error::SerializeError { source })?;
+        }
+        Ok(())
+    }
 }
 
 impl Monitor for TerminalMonitor {
     fn error(&self, err: Error) -> Result<()> {
         error!("{err}");
-        if let Some(f) = self.errors_json.lock().unwrap().as_mut() {
-            serde_json::to_writer_pretty(f, &err)
-                .map_err(|source| Error::SerializeError { source })?;
-        }
+        self.write_error(&err)?;
+        self.n_errors.fetch_add(1, Ordering::Relaxed);
+        Ok(())
+    }
+
+    fn warning(&self, err: Error) -> Result<()> {
+        warn!("{err}");
+        self.write_error(&err)?;
         self.n_errors.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
