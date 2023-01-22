@@ -272,7 +272,7 @@ pub enum Error {
     UrlScheme { scheme: String },
 
     #[error("Failed to serialize problem")]
-    SerializeProblem {
+    SerializeError {
         #[serde(serialize_with = "serialize_generic_error")]
         source: serde_json::Error,
     },

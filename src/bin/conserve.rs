@@ -442,7 +442,7 @@ impl Command {
                     skip_block_hashes: *quick,
                 };
                 Archive::open(open_transport(archive)?)?.validate(&options, monitor)?;
-                if monitor.saw_problems() {
+                if monitor.had_errors() {
                     warn!("Archive has some problems.");
                 } else {
                     info!("Archive is OK.");
@@ -507,7 +507,7 @@ fn main() -> Result<ExitCode> {
             err = source;
         }
         Ok(ExitCode::FAILURE)
-    } else if monitor.saw_problems() {
+    } else if monitor.had_errors() {
         Ok(ExitCode::FAILURE)
     } else {
         debug_assert_matches!(result, Ok(()));

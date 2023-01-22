@@ -317,7 +317,7 @@ impl Archive {
             let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
             for block_hash in referenced_lens.keys().cloned() {
                 if !present_blocks.contains(&block_hash) {
-                    monitor.problem(Error::BlockMissing { block_hash })?;
+                    monitor.error(Error::BlockMissing { block_hash })?;
                 }
             }
         } else {
@@ -328,14 +328,14 @@ impl Archive {
             for (block_hash, referenced_len) in referenced_lens {
                 if let Some(&actual_len) = block_lengths.get(&block_hash) {
                     if referenced_len > actual_len as u64 {
-                        monitor.problem(Error::ShortBlock {
+                        monitor.error(Error::ShortBlock {
                             block_hash,
                             actual_len,
                             referenced_len,
                         })?;
                     }
                 } else {
-                    monitor.problem(Error::BlockMissing { block_hash })?;
+                    monitor.error(Error::BlockMissing { block_hash })?;
                 }
             }
         }
@@ -360,11 +360,11 @@ impl Archive {
                     if name.eq_ignore_ascii_case(BLOCK_DIR) {
                     } else if let Ok(band_id) = name.parse::<BandId>() {
                         if !seen_bands.insert(band_id.clone()) {
-                            monitor.problem(Error::DuplicateBandDirectory { band_id })?;
+                            monitor.error(Error::DuplicateBandDirectory { band_id })?;
                         }
                     } else {
                         // TODO: The whole path not just the filename
-                        monitor.problem(Error::UnexpectedFile {
+                        monitor.error(Error::UnexpectedFile {
                             path: name.to_owned(),
                         })?;
                     }
@@ -379,19 +379,19 @@ impl Archive {
                         && !name.eq_ignore_ascii_case(".DS_Store")
                     {
                         // TODO: The whole path not just the filename
-                        monitor.problem(Error::UnexpectedFile {
+                        monitor.error(Error::UnexpectedFile {
                             path: name.to_owned(),
                         })?;
                     }
                 }
                 Ok(DirEntry { name, .. }) => {
                     // TODO: The whole path not just the filename
-                    monitor.problem(Error::UnexpectedFile {
+                    monitor.error(Error::UnexpectedFile {
                         path: name.to_owned(),
                     })?;
                 }
                 Err(source) => {
-                    monitor.problem(Error::from(source))?;
+                    monitor.error(Error::from(source))?;
                 }
             }
         }

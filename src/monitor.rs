@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use crate::{Error, Result};
 
-/// A Monitor collects progress and problem findings during some high-level
+/// A Monitor collects progress and error findings during some high-level
 /// operation such as a backup or validation.
 ///
 /// Events reported to the Monitor can be, for example, drawn into a UI,
@@ -25,7 +25,7 @@ use crate::{Error, Result};
 /// out as structured data.
 pub trait Monitor: Send + Sync {
     /// The monitor is informed that a non-fatal error occurred.
-    fn problem(&self, problem: Error) -> Result<()>;
+    fn error(&self, err: Error) -> Result<()>;
 
     /// Update that some progress has been made on a task.
     fn progress(&self, progress: Progress);
@@ -52,30 +52,30 @@ pub enum Progress {
     },
 }
 
-/// A ValidateMonitor that collects all problems without drawing anything,
+/// A ValidateMonitor that collects all errors without drawing anything,
 /// for use in tests.
 #[derive(Debug)]
 pub struct CollectMonitor {
-    pub problems: Mutex<Vec<Error>>,
+    pub errors: Mutex<Vec<Error>>,
     counters: Counters,
 }
 
 impl CollectMonitor {
     pub fn new() -> Self {
         CollectMonitor {
-            problems: Mutex::new(Vec::new()),
+            errors: Mutex::new(Vec::new()),
             counters: Counters::default(),
         }
     }
 
-    pub fn into_problems(self) -> Vec<Error> {
-        self.problems.into_inner().unwrap()
+    pub fn into_errors(self) -> Vec<Error> {
+        self.errors.into_inner().unwrap()
     }
 }
 
 impl Monitor for CollectMonitor {
-    fn problem(&self, problem: Error) -> Result<()> {
-        self.problems.lock().unwrap().push(problem);
+    fn error(&self, err: Error) -> Result<()> {
+        self.errors.lock().unwrap().push(err);
         Ok(())
     }
 

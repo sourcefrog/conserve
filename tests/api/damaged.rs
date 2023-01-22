@@ -26,7 +26,7 @@ fn missing_block() -> Result<()> {
     let mut monitor = CollectMonitor::new();
     archive.validate(&ValidateOptions::default(), &mut monitor)?;
     assert_matches!(
-        monitor.into_problems().as_slice(),
+        monitor.into_errors().as_slice(),
         [Error::BlockMissing { .. }]
     );
     Ok(())
@@ -43,7 +43,7 @@ fn missing_block_skip_block_hashes() -> Result<()> {
         &mut monitor,
     )?;
     assert_matches!(
-        monitor.into_problems().as_slice(),
+        monitor.into_errors().as_slice(),
         [Error::BlockMissing { .. }]
     );
     Ok(())

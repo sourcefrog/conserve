@@ -103,7 +103,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     let mut monitor = CollectMonitor::new();
     af.validate(&ValidateOptions::default(), &mut monitor)
         .unwrap();
-    assert_matches!(monitor.into_problems().as_slice(), []);
+    assert_matches!(monitor.into_errors().as_slice(), []);
     Ok(())
 }
 

@@ -223,7 +223,7 @@ impl Band {
         let ListDirNames { mut files, dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
-            monitor.problem(Error::BandHeadMissing {
+            monitor.error(Error::BandHeadMissing {
                 band_id: self.band_id.clone(),
             })?;
         }

@@ -115,45 +115,44 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
     nutmeg::Options::default().progress_enabled(PROGRESS_ENABLED.load(Ordering::Relaxed))
 }
 
-/// A ValidateMonitor that logs messages, collects problems in memory, optionally
-/// writes problems to a json file, and draws console progress bars.
+/// A ValidateMonitor that logs messages, draws to the ternminal, and optionally
+/// writes errors to a json file.
 pub struct TerminalMonitor {
-    /// Optionally write all problems as json to this file as they're discovered.
-    pub problems_json: Mutex<Option<BufWriter<File>>>,
-    /// Number of problems observed.
-    n_problems: AtomicUsize,
+    /// Optionally write all errors and warnings as json to this file as they're discovered.
+    pub errors_json: Mutex<Option<BufWriter<File>>>,
+    /// Number of errors observed.
+    n_errors: AtomicUsize,
     counters: Counters,
 }
 
 impl TerminalMonitor {
-    pub fn new(problems_json_path: Option<&PathBuf>) -> Result<Self> {
-        let problems_json = Mutex::new(
-            problems_json_path
+    pub fn new(errors_json_path: Option<&PathBuf>) -> Result<Self> {
+        let errors_json = Mutex::new(
+            errors_json_path
                 .map(File::create)
                 .transpose()?
                 .map(BufWriter::new),
         );
         Ok(TerminalMonitor {
-            problems_json,
-            n_problems: 0.into(),
+            errors_json,
+            n_errors: 0.into(),
             counters: Counters::default(),
         })
     }
 
-    pub fn saw_problems(&self) -> bool {
-        self.n_problems.load(Ordering::Relaxed) > 0
+    pub fn had_errors(&self) -> bool {
+        self.n_errors.load(Ordering::Relaxed) > 0
     }
 }
 
 impl Monitor for TerminalMonitor {
-    fn problem(&self, err: Error) -> Result<()> {
-        let problem_str = err.to_string();
-        error!("{problem_str}");
-        if let Some(f) = self.problems_json.lock().unwrap().as_mut() {
+    fn error(&self, err: Error) -> Result<()> {
+        error!("{err}");
+        if let Some(f) = self.errors_json.lock().unwrap().as_mut() {
             serde_json::to_writer_pretty(f, &err)
-                .map_err(|source| Error::SerializeProblem { source })?;
+                .map_err(|source| Error::SerializeError { source })?;
         }
-        self.n_problems.fetch_add(1, Ordering::Relaxed);
+        self.n_errors.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
 
