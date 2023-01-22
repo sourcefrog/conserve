@@ -22,6 +22,7 @@ use std::io::{BufWriter, Write};
 
 use time::format_description::well_known::Rfc3339;
 use time::UtcOffset;
+use tracing::error;
 
 use crate::misc::duration_to_hms;
 use crate::*;
@@ -62,15 +63,15 @@ pub fn show_versions(
         l.push(format!("{band_id:<20}"));
         let band = match Band::open(archive, &band_id) {
             Ok(band) => band,
-            Err(e) => {
-                ui::problem(&format!("Failed to open band {band_id:?}: {e:?}"));
+            Err(err) => {
+                error!("Failed to open band {band_id:?}: {err}");
                 continue;
             }
         };
         let info = match band.get_info() {
             Ok(info) => info,
-            Err(e) => {
-                ui::problem(&format!("Failed to read band tail {band_id:?}: {e:?}"));
+            Err(err) => {
+                error!("Failed to read band tail {band_id:?}: {err}");
                 continue;
             }
         };

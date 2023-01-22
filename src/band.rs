@@ -23,6 +23,8 @@
 
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
+#[allow(unused_imports)]
+use tracing::warn;
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
@@ -229,20 +231,16 @@ impl Band {
         }
         remove_item(&mut files, &BAND_HEAD_FILENAME);
         remove_item(&mut files, &BAND_TAIL_FILENAME);
-        if !files.is_empty() {
-            ui::problem(&format!(
-                "Unexpected files in band directory {:?}: {:?}",
-                self.transport, files
-            ));
+        for unexpected in files {
+            monitor.warning(Error::UnexpectedFile {
+                path: unexpected.clone(),
+            })?;
         }
-
-        if dirs != [INDEX_DIR.to_string()] {
-            ui::problem(&format!(
-                "Incongruous directories in band directory {:?}: {:?}",
-                self.transport, dirs
-            ));
+        for unexpected in dirs.iter().filter(|n| n != &INDEX_DIR) {
+            monitor.warning(Error::UnexpectedFile {
+                path: unexpected.clone(),
+            })?;
         }
-
         Ok(())
     }
 }

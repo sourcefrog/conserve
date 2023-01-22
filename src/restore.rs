@@ -208,13 +208,13 @@ impl RestoreTree {
     fn finish(self) -> Result<RestoreStats> {
         #[cfg(unix)]
         for (path, unix_mode) in self.dir_unix_modes {
-            if let Err(err) = unix_mode.set_permissions(path) {
-                ui::problem(&format!("Failed to set directory permissions: {err:?}"));
+            if let Err(err) = unix_mode.set_permissions(&path) {
+                error!("Failed to set directory permissions on {path:?}: {err}");
             }
         }
         for (path, time) in self.dir_mtimes {
-            if let Err(err) = filetime::set_file_mtime(path, time.into()) {
-                ui::problem(&format!("Failed to set directory mtime: {err:?}"));
+            if let Err(err) = filetime::set_file_mtime(&path, time.into()) {
+                error!("Failed to set directory mtime on {path:?}: {err}");
             }
         }
         Ok(RestoreStats::default())
@@ -312,7 +312,7 @@ impl RestoreTree {
             }
         } else {
             // TODO: Treat as an error.
-            ui::problem(&format!("No target in symlink entry {}", entry.apath()));
+            error!("No target in symlink entry {:?}", entry.apath());
         }
         Ok(())
     }
@@ -321,10 +321,7 @@ impl RestoreTree {
     fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()> {
         // TODO: Add a test with a canned index containing a symlink, and expect
         // it cannot be restored on Windows and can be on Unix.
-        ui::problem(&format!(
-            "Can't restore symlinks on non-Unix: {}",
-            entry.apath()
-        ));
+        warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
         Ok(())
     }
 }

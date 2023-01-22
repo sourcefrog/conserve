@@ -34,7 +34,8 @@ use blake2_rfc::blake2b::Blake2b;
 use nutmeg::models::UnboundedModel;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
+#[allow(unused_imports)]
+use tracing::{debug, error, info, warn};
 
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
@@ -124,9 +125,7 @@ impl BlockDir {
             .or_else(|io_err| {
                 if io_err.kind() == io::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
-                    ui::problem(&format!(
-                        "Unexpected late detection of existing block {hex_hash:?}"
-                    ));
+                    debug!("Unexpected late detection of existing block {hex_hash:?}");
                     Ok(())
                 } else {
                     Err(Error::WriteBlock {
@@ -206,7 +205,7 @@ impl BlockDir {
             if dirname.len() == SUBDIR_NAME_CHARS {
                 true
             } else {
-                ui::problem(&format!("Unexpected subdirectory in blockdir: {dirname:?}"));
+                warn!("Unexpected subdirectory in blockdir: {dirname:?}");
                 false
             }
         });
@@ -221,14 +220,14 @@ impl BlockDir {
             .map(move |subdir_name| transport.iter_dir_entries(&subdir_name))
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
-                    ui::problem(&format!("Error listing block directory: {:?}", &err));
+                    error!("Error listing block subdirectory: {err}");
                 }
                 iter_or.ok()
             })
             .flatten()
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
-                    ui::problem(&format!("Error listing block subdirectory: {:?}", &err));
+                    error!("Error listing block subdirectory: {err}");
                 }
                 iter_or.ok()
             })
@@ -323,10 +322,7 @@ impl BlockDir {
             decompressed_bytes,
         ));
         if actual_hash != *hash {
-            ui::problem(&format!(
-                "Block file {:?} has actual decompressed hash {}",
-                &block_relpath, actual_hash
-            ));
+            error!("Block file {block_relpath:?} has actual decompressed hash {actual_hash}");
             return Err(Error::BlockCorrupt {
                 hash: hash.to_string(),
                 actual_hash: actual_hash.to_string(),

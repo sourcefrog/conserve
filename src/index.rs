@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@ use std::iter::Peekable;
 use std::path::Path;
 use std::sync::Arc;
 use std::vec;
+
+use tracing::error;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
@@ -340,9 +342,8 @@ impl Iterator for IndexHunkIter {
                 Ok(Some(entries)) => entries,
                 Err(err) => {
                     self.stats.errors += 1;
-                    ui::problem(&format!(
-                        "Error reading index hunk {hunk_number:?}: {err:?} "
-                    ));
+                    // TODO: Report to monitor.
+                    error!("Error reading index hunk {hunk_number:?}: {err}");
                     continue;
                 }
             };

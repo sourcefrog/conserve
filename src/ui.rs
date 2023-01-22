@@ -93,12 +93,6 @@ pub fn println(s: &str) {
     println!("{s}");
 }
 
-pub fn problem(s: &str) {
-    // TODO: Migrate callers to logging or to Monitor::problem.
-    NUTMEG_VIEW.clear();
-    println!("conserve error: {s}\n");
-}
-
 /// Enable drawing progress bars, only if stdout is a tty.
 ///
 /// Progress bars are off by default.
