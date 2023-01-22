@@ -24,6 +24,7 @@ use conserve::monitor::Monitor;
 use tracing::{debug, error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
+use conserve::ui::TraceTimeStyle;
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
@@ -42,9 +43,9 @@ struct Args {
     #[arg(long, short = 'D', global = true)]
     debug: bool,
 
-    /// Control prefixes on trace lines.
-    #[arg(long, value_enum, global = true)]
-    trace_time: Option<conserve::ui::TraceTimeStyle>,
+    /// Control timestamps prefixes on trace lines.
+    #[arg(long, value_enum, global = true, default_value_t = TraceTimeStyle::None)]
+    trace_time: TraceTimeStyle,
 }
 
 #[derive(Debug, Subcommand)]
@@ -512,10 +513,7 @@ fn main() {
     } else {
         Level::INFO
     };
-    ui::enable_tracing(
-        &args.trace_time.unwrap_or(ui::TraceTimeStyle::Utc),
-        trace_level,
-    );
+    ui::enable_tracing(&args.trace_time, trace_level);
     let result = args.command.run();
     debug!(elapsed = ?start_time.elapsed());
     match result {

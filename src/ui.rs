@@ -28,10 +28,14 @@ use crate::{Error, Result};
 /// Chosen style of timestamp prefix on trace lines.
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum TraceTimeStyle {
+    /// No timestamp on trace lines.
     None,
+    /// Universal time, in RFC 3339 style.
     Utc,
-    Uptime,
+    /// Local time, in RFC 3339, using the offset when the program starts.
     Local,
+    /// Time since the start of the process, in seconds.
+    Relative,
 }
 
 lazy_static! {
@@ -57,11 +61,10 @@ pub fn enable_tracing(time_style: &TraceTimeStyle, console_level: Level) {
     match time_style {
         TraceTimeStyle::None => builder.without_time().init(),
         TraceTimeStyle::Utc => builder.with_timer(time::UtcTime::rfc_3339()).init(),
-        TraceTimeStyle::Uptime => builder.with_timer(time::uptime()).init(),
-        TraceTimeStyle::Local => todo!(),
-        // builder
-        //     .with_timer(time::OffsetTime::local_rfc_3339().unwrap())
-        //     .init(),
+        TraceTimeStyle::Relative => builder.with_timer(time::uptime()).init(),
+        TraceTimeStyle::Local => builder
+            .with_timer(time::OffsetTime::local_rfc_3339().unwrap())
+            .init(),
     }
     trace!("Tracing enabled");
 }

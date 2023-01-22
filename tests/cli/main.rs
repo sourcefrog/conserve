@@ -28,6 +28,7 @@ mod backup;
 mod delete;
 mod diff;
 mod exclude;
+mod trace;
 #[cfg(unix)]
 mod unix_permissions;
 mod validate;
