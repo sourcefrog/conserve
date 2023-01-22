@@ -59,7 +59,7 @@ fn validate_non_fatal_problems_nonzero_result_and_json_problems() {
         .arg(&json_path)
         .assert()
         .stderr(predicate::str::contains("Archive has some problems."))
-        .code(2);
+        .code(1);
     let problems = read_problems(&json_path);
     assert_eq!(
         &problems,
@@ -69,4 +69,13 @@ fn validate_non_fatal_problems_nonzero_result_and_json_problems() {
             }
         })]
     );
+}
+
+#[test]
+fn validate_non_fatal_problems_nonzero_result() {
+    run_conserve()
+        .args(["validate", "testdata/damaged/missing-block/"])
+        .assert()
+        .stderr(predicate::str::contains("Archive has some problems."))
+        .code(1);
 }

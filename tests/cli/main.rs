@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2016-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -72,7 +72,7 @@ fn clean_error_on_non_archive() {
         .arg(".")
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Not a Conserve archive"));
+        .stderr(predicate::str::contains("Not a Conserve archive"));
 }
 
 #[test]
@@ -251,7 +251,7 @@ fn basic_backup() {
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Destination directory not empty"));
+        .stderr(predicate::str::contains("Destination directory not empty"));
 
     // Restore with specified band id / backup version.
     {
@@ -292,21 +292,22 @@ fn empty_archive() {
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Archive has no bands"));
+        .stderr(predicate::str::contains("Archive has no bands"));
 
     run_conserve()
         .arg("ls")
         .arg(&adir)
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Archive has no bands"));
+        .stderr(predicate::str::contains("Archive has no bands"));
 
     run_conserve()
         .arg("versions")
         .arg(&adir)
         .assert()
         .success()
-        .stdout(predicate::str::is_empty());
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::is_empty());
 
     run_conserve().arg("gc").arg(adir).assert().success();
 }
@@ -337,16 +338,7 @@ fn incomplete_version() {
         .arg(af.path())
         .assert()
         .failure()
-        .stdout(predicate::str::contains("incomplete and may be in use"));
-}
-
-#[test]
-fn validate_non_fatal_problems_nonzero_result() {
-    run_conserve()
-        .args(["validate", "testdata/damaged/missing-block/"])
-        .assert()
-        .stderr(predicate::str::contains("Archive has some problems."))
-        .code(2);
+        .stderr(predicate::str::contains("incomplete and may be in use"));
 }
 
 #[test]

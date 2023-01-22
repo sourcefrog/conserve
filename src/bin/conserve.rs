@@ -13,18 +13,22 @@
 
 //! Command-line entry point for Conserve backups.
 
+use std::error::Error;
+use std::fmt;
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::PathBuf;
+use std::process::ExitCode;
 use std::time::Instant;
 
+use assert_matches::debug_assert_matches;
 use clap::{Parser, Subcommand};
-use conserve::monitor::Monitor;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
-use conserve::ui::TraceTimeStyle;
+use conserve::monitor::Monitor;
+use conserve::ui::{TerminalMonitor, TraceTimeStyle};
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
@@ -46,6 +50,10 @@ struct Args {
     /// Control timestamps prefixes on trace lines.
     #[arg(long, value_enum, global = true, default_value_t = TraceTimeStyle::None)]
     trace_time: TraceTimeStyle,
+
+    /// Write a list of problems as json to this file.
+    #[arg(long, global = true)]
+    problems_json: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -189,10 +197,6 @@ enum Command {
         quick: bool,
         #[arg(long)]
         no_stats: bool,
-
-        /// Write a list of problems as json to this file.
-        #[arg(long)]
-        problems_json: Option<PathBuf>,
     },
 
     /// List backup versions in an archive.
@@ -254,14 +258,11 @@ enum Debug {
     Unreferenced { archive: String },
 }
 
-enum ExitCode {
-    Ok = 0,
-    Failed = 1,
-    PartialCorruption = 2,
-}
-
 impl Command {
-    fn run(&self) -> Result<ExitCode> {
+    fn run<JF>(&self, monitor: &mut TerminalMonitor<JF>) -> Result<()>
+    where
+        JF: io::Write + fmt::Debug + Send,
+    {
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -441,28 +442,13 @@ impl Command {
                     ui::println(&conserve::bytes_to_human_mb(size));
                 }
             }
-            Command::Validate {
-                archive,
-                quick,
-                no_stats,
-                problems_json,
-            } => {
+            Command::Validate { archive, quick, .. } => {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                let problems_json = problems_json
-                    .as_ref()
-                    .map(File::create)
-                    .transpose()?
-                    .map(BufWriter::new);
-                let mut monitor = conserve::ui::TerminalMonitor::new(problems_json);
-                Archive::open(open_transport(archive)?)?.validate(&options, &mut monitor)?;
-                if !no_stats {
-                    debug!(counters = ?monitor.counters());
-                }
+                Archive::open(open_transport(archive)?)?.validate(&options, monitor)?;
                 if monitor.saw_problems() {
                     warn!("Archive has some problems.");
-                    return Ok(ExitCode::PartialCorruption);
                 } else {
                     info!("Archive is OK.");
                 }
@@ -486,7 +472,7 @@ impl Command {
                 conserve::show_versions(&archive, &options, &mut stdout)?;
             }
         }
-        Ok(ExitCode::Ok)
+        Ok(())
     }
 }
 
@@ -504,7 +490,7 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
     }
 }
 
-fn main() {
+fn main() -> Result<ExitCode> {
     let args = Args::parse();
     let start_time = Instant::now();
     ui::enable_progress(!args.no_progress);
@@ -514,21 +500,29 @@ fn main() {
         Level::INFO
     };
     ui::enable_tracing(&args.trace_time, trace_level);
-    let result = args.command.run();
+    let problems_json = args
+        .problems_json
+        .as_ref()
+        .map(File::create)
+        .transpose()?
+        .map(BufWriter::new);
+    let mut monitor = TerminalMonitor::new(problems_json);
+    let result = args.command.run(&mut monitor);
+    debug!(counters = ?monitor.counters());
     debug!(elapsed = ?start_time.elapsed());
-    match result {
-        Err(ref e) => {
-            ui::show_error(e);
-            // // TODO: Perhaps always log the traceback to a log file.
-            // if let Some(bt) = e.backtrace() {
-            //     if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {
-            //         println!("{}", bt);
-            //     }
-            // }
-            // Avoid Rust redundantly printing the error.
-            std::process::exit(ExitCode::Failed as i32)
+    if let Err(err) = result {
+        error!("{err}");
+        let mut err: &dyn Error = &err;
+        while let Some(source) = err.source() {
+            error!("caused by: {source}");
+            err = source;
         }
-        Ok(code) => std::process::exit(code as i32),
+        Ok(ExitCode::FAILURE)
+    } else if monitor.saw_problems() {
+        Ok(ExitCode::FAILURE)
+    } else {
+        debug_assert_matches!(result, Ok(()));
+        Ok(ExitCode::SUCCESS)
     }
 }
 
