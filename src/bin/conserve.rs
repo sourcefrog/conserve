@@ -14,9 +14,7 @@
 //! Command-line entry point for Conserve backups.
 
 use std::error::Error;
-use std::fmt;
-use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
@@ -259,10 +257,7 @@ enum Debug {
 }
 
 impl Command {
-    fn run<JF>(&self, monitor: &mut TerminalMonitor<JF>) -> Result<()>
-    where
-        JF: io::Write + fmt::Debug + Send,
-    {
+    fn run(&self, monitor: &mut TerminalMonitor) -> Result<()> {
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -500,13 +495,7 @@ fn main() -> Result<ExitCode> {
         Level::INFO
     };
     ui::enable_tracing(&args.trace_time, trace_level);
-    let problems_json = args
-        .problems_json
-        .as_ref()
-        .map(File::create)
-        .transpose()?
-        .map(BufWriter::new);
-    let mut monitor = TerminalMonitor::new(problems_json);
+    let mut monitor = TerminalMonitor::new(args.problems_json.as_ref())?;
     let result = args.command.run(&mut monitor);
     debug!(counters = ?monitor.counters());
     debug!(elapsed = ?start_time.elapsed());

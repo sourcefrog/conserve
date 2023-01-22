@@ -14,7 +14,9 @@
 //! Console UI.
 
 use std::fmt::Debug;
-use std::io;
+use std::fs::File;
+use std::io::{self, BufWriter};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
@@ -115,27 +117,27 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
 
 /// A ValidateMonitor that logs messages, collects problems in memory, optionally
 /// writes problems to a json file, and draws console progress bars.
-pub struct TerminalMonitor<JF>
-where
-    JF: io::Write + Debug + Send,
-{
+pub struct TerminalMonitor {
     /// Optionally write all problems as json to this file as they're discovered.
-    pub problems_json: Mutex<Option<Box<JF>>>,
+    pub problems_json: Mutex<Option<BufWriter<File>>>,
     /// Number of problems observed.
     n_problems: AtomicUsize,
     counters: Counters,
 }
 
-impl<JF> TerminalMonitor<JF>
-where
-    JF: io::Write + Debug + Send,
-{
-    pub fn new(problems_json: Option<JF>) -> Self {
-        TerminalMonitor {
-            problems_json: Mutex::new(problems_json.map(Box::new)),
+impl TerminalMonitor {
+    pub fn new(problems_json_path: Option<&PathBuf>) -> Result<Self> {
+        let problems_json = Mutex::new(
+            problems_json_path
+                .map(File::create)
+                .transpose()?
+                .map(BufWriter::new),
+        );
+        Ok(TerminalMonitor {
+            problems_json,
             n_problems: 0.into(),
             counters: Counters::default(),
-        }
+        })
     }
 
     pub fn saw_problems(&self) -> bool {
@@ -143,10 +145,7 @@ where
     }
 }
 
-impl<JF> Monitor for TerminalMonitor<JF>
-where
-    JF: io::Write + Debug + Send,
-{
+impl Monitor for TerminalMonitor {
     fn problem(&self, err: Error) -> Result<()> {
         let problem_str = err.to_string();
         error!("{problem_str}");
