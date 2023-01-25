@@ -2,6 +2,9 @@
 
 ## 23.1.1
 
+- Fixed: User and group mappings are now cached in memory. This fixes a performance regression in
+  restore on the order of 10%.
+
 - Changed: Timestamps in `conserve versions` are now in RFC 3339 format, including a `T` between
   the date and the time, and a timezone indicator.
 

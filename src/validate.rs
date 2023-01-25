@@ -75,6 +75,7 @@ fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash
 
 fn validate_stored_tree(st: &StoredTree) -> Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
+    // TODO: Use Monitor; report errors validating anything here rather than aborting.
     for entry in st
         .iter_entries(Apath::root(), Exclude::nothing())?
         .filter(|entry| entry.kind() == Kind::File)

@@ -21,13 +21,12 @@ use std::{fs, time::Instant};
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
-#[cfg(unix)]
-use nix::unistd;
 use tracing::error;
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
+use crate::owner::set_owner;
 use crate::stats::RestoreStats;
 use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
@@ -258,6 +257,7 @@ impl RestoreTree {
                 source,
             }
         })?;
+
         #[cfg(unix)]
         {
             // Restore permissions only if there are mode bits stored in the archive
@@ -273,21 +273,8 @@ impl RestoreTree {
             // Restore ownership if possible.
             // TODO: Stats and warnings if a user or group is specified in the index but
             // does not exist on the local system.
-            let owner = source_entry.owner();
-            let uid_opt = owner
-                .user
-                .and_then(|user| users::get_user_by_name(&user))
-                .map(|user| user.uid())
-                .map(unistd::Uid::from_raw);
-            let gid_opt = owner
-                .group
-                .and_then(|group| users::get_group_by_name(&group))
-                .map(|group| group.gid())
-                .map(unistd::Gid::from_raw);
-            // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
-            unistd::chown(&path, uid_opt, gid_opt)
+            set_owner(&source_entry.owner(), &path)
                 .map_err(|err| {
-                    // TODO: Migrate to monitor once that is passed down.
                     error!("error restoring ownership on {path:?}: {err}");
                     stats.errors += 1;
                 })

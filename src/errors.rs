@@ -288,6 +288,13 @@ pub enum Error {
         source: io::Error,
     },
 
+    #[error("Failed to set owner of {path:?}")]
+    SetOwner {
+        #[serde(serialize_with = "serialize_io_error")]
+        source: io::Error,
+        path: PathBuf,
+    },
+
     #[error(transparent)]
     SnapCompressionError {
         // TODO: Maybe say in which file, etc.

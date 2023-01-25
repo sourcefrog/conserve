@@ -1,6 +1,6 @@
-// Copyright 2022 Stephanie Aelmore.
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2022 Stephanie Aelmore.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,19 +17,27 @@
 //! better than just saving the uid and gid, so that backups may potentially
 //! be restored on a different system.
 
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 #[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
-use std::{fmt::Display, fs::Metadata};
+mod unix;
+#[cfg(unix)]
+pub use unix::set_owner;
 
-// TODO: maybe set the default to the current user and group?
-// do we want to do that in our default impl here?
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+pub use windows::set_owner;
+
 #[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Owner {
+    /// TODO: Maybe the strings can be 'static references to the cache?
     pub user: Option<String>,
     pub group: Option<String>,
 }
+
 impl Owner {
     pub fn is_none(&self) -> bool {
         self.user.is_none() && self.group.is_none()
@@ -53,31 +61,5 @@ impl Display for Owner {
                 &none
             }
         )
-    }
-}
-
-impl From<&Metadata> for Owner {
-    #[cfg(unix)]
-    fn from(mdata: &Metadata) -> Self {
-        let user = if let Some(user) = users::get_user_by_uid(mdata.uid()) {
-            user.name().to_str().map(|name| name.to_string())
-        } else {
-            None
-        };
-        let group = if let Some(group) = users::get_group_by_gid(mdata.gid()) {
-            group.name().to_str().map(|name| name.to_string())
-        } else {
-            None
-        };
-
-        Self { user, group }
-    }
-    #[cfg(not(unix))]
-    fn from(_: &Metadata) -> Self {
-        // TODO: Implement Windows user/group functionality
-        Self {
-            user: None,
-            group: None,
-        }
     }
 }
