@@ -1,6 +1,6 @@
 # Conserve release history
 
-## Unreleased
+## 23.1.1
 
 - Fixed: User and group mappings are now cached in memory. This fixes a performance regression in
   restore on the order of 10%.
