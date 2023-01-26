@@ -21,7 +21,8 @@ use std::{fs, time::Instant};
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
-use tracing::error;
+#[allow(unused_imports)]
+use tracing::{error, warn};
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
