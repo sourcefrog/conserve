@@ -259,28 +259,26 @@ impl RestoreTree {
             }
         })?;
 
-        #[cfg(unix)]
-        {
-            // Restore permissions only if there are mode bits stored in the archive
-            source_entry
-                .unix_mode()
-                .set_permissions(&path)
-                .map_err(|err| {
-                    // TODO: Migrate to monitor once that is passed down.
-                    error!("error restoring unix permissions on {path:?}: {err}",);
-                    stats.errors += 1;
-                })
-                .ok();
-            // Restore ownership if possible.
-            // TODO: Stats and warnings if a user or group is specified in the index but
-            // does not exist on the local system.
-            set_owner(&source_entry.owner(), &path)
-                .map_err(|err| {
-                    error!("error restoring ownership on {path:?}: {err}");
-                    stats.errors += 1;
-                })
-                .ok();
-        }
+        // Restore permissions only if there are mode bits stored in the archive
+        source_entry
+            .unix_mode()
+            .set_permissions(&path)
+            .map_err(|err| {
+                // TODO: Migrate to monitor once that is passed down.
+                error!("error restoring unix permissions on {path:?}: {err}",);
+                stats.errors += 1;
+            })
+            .ok();
+
+        // Restore ownership if possible.
+        // TODO: Stats and warnings if a user or group is specified in the index but
+        // does not exist on the local system.
+        set_owner(&source_entry.owner(), &path)
+            .map_err(|err| {
+                error!("error restoring ownership on {path:?}: {err}");
+                stats.errors += 1;
+            })
+            .ok();
 
         // TODO: Accumulate more stats.
         Ok(stats)
