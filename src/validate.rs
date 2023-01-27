@@ -44,7 +44,7 @@ pub(crate) fn validate_bands<MO: Monitor>(
     'band: for band_id in band_ids {
         bands_done += 1;
         if let Err(err) = Band::open(archive, band_id).and_then(|band| band.validate(monitor)) {
-            monitor.error(err)?;
+            monitor.error(&err)?;
             continue 'band;
         };
         if let Err(err) = archive
@@ -52,7 +52,7 @@ pub(crate) fn validate_bands<MO: Monitor>(
             .and_then(|st| validate_stored_tree(&st))
             .map(|st_block_lens| merge_block_lens(&mut block_lens, &st_block_lens))
         {
-            monitor.error(err)?;
+            monitor.error(&err)?;
             continue 'band;
         }
         monitor.progress(Progress::ValidateBands {

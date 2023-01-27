@@ -383,10 +383,10 @@ impl IndexHunkIter {
     }
 
     fn read_next_hunk(&mut self) -> Result<Option<Vec<IndexEntry>>> {
-        let path = &hunk_relpath(self.next_hunk_number);
+        let path = hunk_relpath(self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
-        let compressed_bytes = match self.transport.read_file(path) {
+        let compressed_bytes = match self.transport.read_file(&path) {
             Ok(b) => b,
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // TODO: Cope with one hunk being missing, while there are still

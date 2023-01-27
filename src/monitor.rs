@@ -25,10 +25,10 @@ use crate::{Error, Result};
 /// out as structured data.
 pub trait Monitor: Send + Sync {
     /// The monitor is informed that a non-fatal error occurred.
-    fn error(&self, err: Error) -> Result<()>;
+    fn error(&self, err: &Error) -> Result<()>;
 
     /// Record a less severe error.
-    fn warning(&self, err: Error) -> Result<()>;
+    fn warning(&self, err: &Error) -> Result<()>;
 
     /// Return true if any errors were observed.
     fn had_errors(&self) -> bool;
@@ -60,9 +60,11 @@ pub enum Progress {
 
 /// A ValidateMonitor that collects all errors without drawing anything,
 /// for use in tests.
+///
+/// Errors are collected as strings, because not all of them can be cloned.
 #[derive(Default, Debug)]
 pub struct CollectMonitor {
-    pub errors: Mutex<Vec<Error>>,
+    pub error_messages: Mutex<Vec<String>>,
     counters: Counters,
 }
 
@@ -71,18 +73,18 @@ impl CollectMonitor {
         CollectMonitor::default()
     }
 
-    pub fn into_errors(self) -> Vec<Error> {
-        self.errors.into_inner().unwrap()
+    pub fn error_messages(self) -> Vec<String> {
+        self.error_messages.into_inner().unwrap()
     }
 }
 
 impl Monitor for CollectMonitor {
-    fn error(&self, err: Error) -> Result<()> {
-        self.errors.lock().unwrap().push(err);
+    fn error(&self, err: &Error) -> Result<()> {
+        self.error_messages.lock().unwrap().push(err.to_string());
         Ok(())
     }
 
-    fn warning(&self, err: Error) -> Result<()> {
+    fn warning(&self, err: &Error) -> Result<()> {
         self.error(err)
     }
 
@@ -93,7 +95,7 @@ impl Monitor for CollectMonitor {
     }
 
     fn had_errors(&self) -> bool {
-        !self.errors.lock().unwrap().is_empty()
+        !self.error_messages.lock().unwrap().is_empty()
     }
 }
 

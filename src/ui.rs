@@ -145,16 +145,16 @@ impl TerminalMonitor {
 }
 
 impl Monitor for TerminalMonitor {
-    fn error(&self, err: Error) -> Result<()> {
+    fn error(&self, err: &Error) -> Result<()> {
         error!("{err}");
-        self.write_error(&err)?;
+        self.write_error(err)?;
         self.n_errors.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
 
-    fn warning(&self, err: Error) -> Result<()> {
+    fn warning(&self, err: &Error) -> Result<()> {
         warn!("{err}");
-        self.write_error(&err)?;
+        self.write_error(err)?;
         self.n_errors.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }

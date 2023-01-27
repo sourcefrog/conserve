@@ -14,7 +14,6 @@
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use assert_matches::assert_matches;
 use filetime::{set_file_mtime, FileTime};
 
 use conserve::kind::Kind;
@@ -103,7 +102,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     let mut monitor = CollectMonitor::new();
     af.validate(&ValidateOptions::default(), &mut monitor)
         .unwrap();
-    assert_matches!(monitor.into_errors().as_slice(), []);
+    assert_eq!(monitor.error_messages(), [""; 0]);
     Ok(())
 }
 

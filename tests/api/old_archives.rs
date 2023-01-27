@@ -82,8 +82,7 @@ fn validate_archive() {
         archive
             .validate(&ValidateOptions::default(), &mut monitor)
             .expect("validate archive");
-        let problems = monitor.into_errors();
-        assert!(problems.is_empty(), "{problems:#?}");
+        assert_eq!(monitor.error_messages().join("\n"), "");
     }
 }
 
