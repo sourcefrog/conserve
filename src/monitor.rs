@@ -60,7 +60,7 @@ pub enum Progress {
 
 /// A ValidateMonitor that collects all errors without drawing anything,
 /// for use in tests.
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct CollectMonitor {
     pub errors: Mutex<Vec<Error>>,
     counters: Counters,
@@ -68,10 +68,7 @@ pub struct CollectMonitor {
 
 impl CollectMonitor {
     pub fn new() -> Self {
-        CollectMonitor {
-            errors: Mutex::new(Vec::new()),
-            counters: Counters::default(),
-        }
+        CollectMonitor::default()
     }
 
     pub fn into_errors(self) -> Vec<Error> {
@@ -97,12 +94,6 @@ impl Monitor for CollectMonitor {
 
     fn had_errors(&self) -> bool {
         !self.errors.lock().unwrap().is_empty()
-    }
-}
-
-impl Default for CollectMonitor {
-    fn default() -> Self {
-        CollectMonitor::new()
     }
 }
 
