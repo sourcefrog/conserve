@@ -18,6 +18,7 @@ use std::time::Instant;
 #[allow(unused_imports)]
 use tracing::{info, warn};
 
+use crate::misc::ResultExt;
 use crate::monitor::{Monitor, Progress};
 use crate::*;
 
@@ -49,7 +50,7 @@ pub(crate) fn validate_bands<MO: Monitor>(
         };
         if let Err(err) = archive
             .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))
-            .and_then(|st| validate_stored_tree(&st))
+            .and_then(|st| validate_stored_tree(&st, monitor))
             .map(|st_block_lens| merge_block_lens(&mut block_lens, &st_block_lens))
         {
             monitor.error(&err)?;
@@ -73,11 +74,17 @@ fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash
     }
 }
 
-fn validate_stored_tree(st: &StoredTree) -> Result<HashMap<BlockHash, u64>> {
+fn validate_stored_tree<MO: Monitor>(
+    st: &StoredTree,
+    monitor: &mut MO,
+) -> Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
     // TODO: Use Monitor; report errors validating anything here rather than aborting.
+    // TODO: Check other entry properties are correct.
+    // TODO: Check they're in apath order.
     for entry in st
-        .iter_entries(Apath::root(), Exclude::nothing())?
+        .iter_entries(Apath::root(), Exclude::nothing())
+        .our_inspect_err(|err| monitor.error(err).unwrap())?
         .filter(|entry| entry.kind() == Kind::File)
     {
         for addr in entry.addrs {
