@@ -227,19 +227,19 @@ impl Band {
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
             monitor.error(&Error::BandHeadMissing {
                 band_id: self.band_id.clone(),
-            })?;
+            });
         }
         remove_item(&mut files, &BAND_HEAD_FILENAME);
         remove_item(&mut files, &BAND_TAIL_FILENAME);
         for unexpected in files {
             monitor.warning(&Error::UnexpectedFile {
                 path: unexpected.clone(),
-            })?;
+            });
         }
         for unexpected in dirs.iter().filter(|n| n != &INDEX_DIR) {
             monitor.warning(&Error::UnexpectedFile {
                 path: unexpected.clone(),
-            })?;
+            });
         }
         Ok(())
     }

@@ -15,7 +15,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 use std::time::Instant;
 
-use crate::{Error, Result};
+use crate::Error;
 
 /// A Monitor collects progress and error findings during some high-level
 /// operation such as a backup or validation.
@@ -25,10 +25,10 @@ use crate::{Error, Result};
 /// out as structured data.
 pub trait Monitor: Send + Sync {
     /// The monitor is informed that a non-fatal error occurred.
-    fn error(&self, err: &Error) -> Result<()>;
+    fn error(&self, err: &Error);
 
     /// Record a less severe error.
-    fn warning(&self, err: &Error) -> Result<()>;
+    fn warning(&self, err: &Error);
 
     /// Return true if any errors were observed.
     fn had_errors(&self) -> bool;
@@ -79,12 +79,11 @@ impl CollectMonitor {
 }
 
 impl Monitor for CollectMonitor {
-    fn error(&self, err: &Error) -> Result<()> {
+    fn error(&self, err: &Error) {
         self.error_messages.lock().unwrap().push(err.to_string());
-        Ok(())
     }
 
-    fn warning(&self, err: &Error) -> Result<()> {
+    fn warning(&self, err: &Error) {
         self.error(err)
     }
 

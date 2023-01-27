@@ -135,28 +135,24 @@ impl TerminalMonitor {
         })
     }
 
-    fn write_error(&self, err: &Error) -> Result<()> {
+    fn write_error(&self, err: &Error) {
         if let Some(f) = self.errors_json.lock().unwrap().as_mut() {
-            serde_json::to_writer_pretty(f, err)
-                .map_err(|source| Error::SerializeError { source })?;
+            serde_json::to_writer_pretty(f, err).expect("failed to write error to json error log");
         }
-        Ok(())
     }
 }
 
 impl Monitor for TerminalMonitor {
-    fn error(&self, err: &Error) -> Result<()> {
+    fn error(&self, err: &Error) {
         error!("{err}");
-        self.write_error(err)?;
+        self.write_error(err);
         self.n_errors.fetch_add(1, Ordering::Relaxed);
-        Ok(())
     }
 
-    fn warning(&self, err: &Error) -> Result<()> {
+    fn warning(&self, err: &Error) {
         warn!("{err}");
-        self.write_error(err)?;
+        self.write_error(err);
         self.n_errors.fetch_add(1, Ordering::Relaxed);
-        Ok(())
     }
 
     fn progress(&self, progress: Progress) {

@@ -291,7 +291,7 @@ impl BlockDir {
                     Some((hash, len))
                 }
                 Err(err) => {
-                    monitor.error(&err).unwrap();
+                    monitor.error(&err);
                     None
                 }
             })
