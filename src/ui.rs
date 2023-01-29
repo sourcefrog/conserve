@@ -14,11 +14,10 @@
 //! Console UI.
 
 use std::fmt::Debug;
-use std::fs::File;
-use std::io::{self, BufWriter};
+use std::fs::OpenOptions;
+use std::io;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Mutex;
 
 use lazy_static::lazy_static;
 #[allow(unused_imports)]
@@ -76,9 +75,13 @@ pub enum TraceTimeStyle {
 // (These should migrate to NUTMEG_VIEW.)
 static PROGRESS_ENABLED: AtomicBool = AtomicBool::new(false);
 
-pub fn enable_tracing(time_style: &TraceTimeStyle, console_level: Level) {
+pub fn enable_tracing(
+    time_style: &TraceTimeStyle,
+    console_level: Level,
+    json_path: &Option<PathBuf>,
+) {
     use tracing_subscriber::fmt::time;
-    fn hookup<FT>(timer: FT, console_level: Level)
+    fn hookup<FT>(timer: FT, console_level: Level, json_path: &Option<PathBuf>)
     where
         FT: FormatTime + Send + Sync + 'static,
     {
@@ -87,16 +90,38 @@ pub fn enable_tracing(time_style: &TraceTimeStyle, console_level: Level) {
             .with_writer(WriteToNutmeg)
             .with_timer(timer)
             .with_filter(LevelFilter::from_level(console_level));
+        let json_layer = json_path
+            .as_ref()
+            .map(|path| {
+                OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .write(true)
+                    .read(false)
+                    .open(path)
+                    .expect("open json log file")
+            })
+            .map(|w| {
+                tracing_subscriber::fmt::Layer::default()
+                    .json()
+                    .with_writer(w)
+            });
         Registry::default()
             .with(console_layer)
             .with(CounterLayer())
+            .with(json_layer)
             .init();
     }
+
     match time_style {
-        TraceTimeStyle::None => hookup((), console_level),
-        TraceTimeStyle::Utc => hookup(time::UtcTime::rfc_3339(), console_level),
-        TraceTimeStyle::Relative => hookup(time::uptime(), console_level),
-        TraceTimeStyle::Local => hookup(time::OffsetTime::local_rfc_3339().unwrap(), console_level),
+        TraceTimeStyle::None => hookup((), console_level, json_path),
+        TraceTimeStyle::Utc => hookup(time::UtcTime::rfc_3339(), console_level, json_path),
+        TraceTimeStyle::Relative => hookup(time::uptime(), console_level, json_path),
+        TraceTimeStyle::Local => hookup(
+            time::OffsetTime::local_rfc_3339().unwrap(),
+            console_level,
+            json_path,
+        ),
     }
     trace!("Tracing enabled");
 }
@@ -157,45 +182,28 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
 /// A ValidateMonitor that logs messages, draws to the ternminal, and optionally
 /// writes errors to a json file.
 pub struct TerminalMonitor {
-    /// Optionally write all errors and warnings as json to this file as they're discovered.
-    pub errors_json: Mutex<Option<BufWriter<File>>>,
     /// Number of errors (and warnings) observed.
     n_errors: AtomicUsize,
     counters: Counters,
 }
 
 impl TerminalMonitor {
-    pub fn new(errors_json_path: Option<&PathBuf>) -> Result<Self> {
-        let errors_json = Mutex::new(
-            errors_json_path
-                .map(File::create)
-                .transpose()?
-                .map(BufWriter::new),
-        );
+    pub fn new() -> Result<Self> {
         Ok(TerminalMonitor {
-            errors_json,
             n_errors: 0.into(),
             counters: Counters::default(),
         })
-    }
-
-    fn write_error(&self, err: &Error) {
-        if let Some(f) = self.errors_json.lock().unwrap().as_mut() {
-            serde_json::to_writer_pretty(f, err).expect("failed to write error to json error log");
-        }
     }
 }
 
 impl Monitor for TerminalMonitor {
     fn error(&self, err: &Error) {
         error!("{err}");
-        self.write_error(err);
         self.n_errors.fetch_add(1, Ordering::Relaxed);
     }
 
     fn warning(&self, err: &Error) {
         warn!("{err}");
-        self.write_error(err);
         self.n_errors.fetch_add(1, Ordering::Relaxed);
     }
 
@@ -213,10 +221,6 @@ impl Monitor for TerminalMonitor {
 
     fn counters(&self) -> &Counters {
         &self.counters
-    }
-
-    fn had_errors(&self) -> bool {
-        self.n_errors.load(Ordering::Relaxed) > 0
     }
 }
 

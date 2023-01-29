@@ -30,9 +30,6 @@ pub trait Monitor: Send + Sync {
     /// Record a less severe error.
     fn warning(&self, err: &Error);
 
-    /// Return true if any errors were observed.
-    fn had_errors(&self) -> bool;
-
     /// Update that some progress has been made on a task.
     fn progress(&self, progress: Progress);
 
@@ -91,10 +88,6 @@ impl Monitor for CollectMonitor {
 
     fn counters(&self) -> &Counters {
         &self.counters
-    }
-
-    fn had_errors(&self) -> bool {
-        !self.error_messages.lock().unwrap().is_empty()
     }
 }
 

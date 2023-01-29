@@ -45,13 +45,13 @@ struct Args {
     #[arg(long, short = 'D', global = true)]
     debug: bool,
 
-    /// Control timestamps prefixes on trace lines.
+    /// Control timestamps prefixes on stderr.
     #[arg(long, value_enum, global = true, default_value_t = TraceTimeStyle::None)]
     trace_time: TraceTimeStyle,
 
-    /// Write a list of problems as json to this file.
+    /// Append a json formatted log to this file.
     #[arg(long, global = true)]
-    problems_json: Option<PathBuf>,
+    log_json: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -442,7 +442,7 @@ impl Command {
                     skip_block_hashes: *quick,
                 };
                 Archive::open(open_transport(archive)?)?.validate(&options, monitor)?;
-                if monitor.had_errors() {
+                if ui::global_error_count() > 0 || ui::global_warn_count() > 0 {
                     warn!("Archive has some problems.");
                 } else {
                     info!("Archive is OK.");
@@ -494,8 +494,8 @@ fn main() -> Result<ExitCode> {
     } else {
         Level::INFO
     };
-    ui::enable_tracing(&args.trace_time, trace_level);
-    let mut monitor = TerminalMonitor::new(args.problems_json.as_ref())?;
+    ui::enable_tracing(&args.trace_time, trace_level, &args.log_json);
+    let mut monitor = TerminalMonitor::new()?;
     let result = args.command.run(&mut monitor);
     debug!(counters = ?monitor.counters());
     debug!(elapsed = ?start_time.elapsed());
@@ -511,7 +511,7 @@ fn main() -> Result<ExitCode> {
             warn_count = ui::global_warn_count(),
         );
         Ok(ExitCode::FAILURE)
-    } else if monitor.had_errors() || ui::global_error_count() > 0 || ui::global_warn_count() > 0 {
+    } else if ui::global_error_count() > 0 || ui::global_warn_count() > 0 {
         debug!(
             error_count = ui::global_error_count(),
             warn_count = ui::global_warn_count(),
