@@ -506,8 +506,16 @@ fn main() -> Result<ExitCode> {
             error!("caused by: {source}");
             err = source;
         }
+        debug!(
+            error_count = ui::global_error_count(),
+            warn_count = ui::global_warn_count(),
+        );
         Ok(ExitCode::FAILURE)
-    } else if monitor.had_errors() {
+    } else if monitor.had_errors() || ui::global_error_count() > 0 || ui::global_warn_count() > 0 {
+        debug!(
+            error_count = ui::global_error_count(),
+            warn_count = ui::global_warn_count(),
+        );
         Ok(ExitCode::FAILURE)
     } else {
         debug_assert_matches!(result, Ok(()));

@@ -23,13 +23,41 @@ use std::sync::Mutex;
 use lazy_static::lazy_static;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
+use tracing::{Event, Subscriber};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::time::FormatTime;
+use tracing_subscriber::layer::{Context, Layer};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
 use crate::monitor::{Counters, Monitor, Progress};
 use crate::{Error, Result};
+
+/// Count of errors emitted to trace.
+static ERROR_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+/// Count of warnings emitted to trace.
+static WARN_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+lazy_static! {
+    /// A global Nutmeg view.
+    ///
+    /// This is global to reflect that there is globally one stdout/stderr:
+    /// this object manages it.
+    static ref NUTMEG_VIEW: nutmeg::View<Progress> =
+        nutmeg::View::new(Progress::None, nutmeg::Options::default()
+            .destination(nutmeg::Destination::Stderr));
+}
+
+/// Return the number of errors logged in the program so far.
+pub fn global_error_count() -> usize {
+    ERROR_COUNT.load(Ordering::Relaxed)
+}
+
+/// Return the number of warnings logged in the program so far.
+pub fn global_warn_count() -> usize {
+    WARN_COUNT.load(Ordering::Relaxed)
+}
 
 /// Chosen style of timestamp prefix on trace lines.
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -42,16 +70,6 @@ pub enum TraceTimeStyle {
     Local,
     /// Time since the start of the process, in seconds.
     Relative,
-}
-
-lazy_static! {
-    /// A global Nutmeg view.
-    ///
-    /// This is global to reflect that there is globally one stdout/stderr:
-    /// this object manages it.
-    static ref NUTMEG_VIEW: nutmeg::View<Progress> =
-        nutmeg::View::new(Progress::None, nutmeg::Options::default()
-            .destination(nutmeg::Destination::Stderr));
 }
 
 /// Should progress be enabled for ad-hoc created Nutmeg views.
@@ -69,7 +87,10 @@ pub fn enable_tracing(time_style: &TraceTimeStyle, console_level: Level) {
             .with_writer(WriteToNutmeg)
             .with_timer(timer)
             .with_filter(LevelFilter::from_level(console_level));
-        Registry::default().with(console_layer).init();
+        Registry::default()
+            .with(console_layer)
+            .with(CounterLayer())
+            .init();
     }
     match time_style {
         TraceTimeStyle::None => hookup((), console_level),
@@ -78,6 +99,22 @@ pub fn enable_tracing(time_style: &TraceTimeStyle, console_level: Level) {
         TraceTimeStyle::Local => hookup(time::OffsetTime::local_rfc_3339().unwrap(), console_level),
     }
     trace!("Tracing enabled");
+}
+
+/// A tracing Layer that counts errors and warnings into static counters.
+struct CounterLayer();
+
+impl<S> Layer<S> for CounterLayer
+where
+    S: Subscriber,
+{
+    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+        match *event.metadata().level() {
+            Level::ERROR => ERROR_COUNT.fetch_add(1, Ordering::Relaxed),
+            Level::WARN => WARN_COUNT.fetch_add(1, Ordering::Relaxed),
+            _ => 0,
+        };
+    }
 }
 
 struct WriteToNutmeg();
