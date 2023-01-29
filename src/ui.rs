@@ -21,9 +21,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
-use tracing::warn;
 #[allow(unused_imports)]
-use tracing::{debug, error, info, trace, Level};
+use tracing::{debug, error, info, trace, warn, Level};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::prelude::*;
@@ -50,7 +49,6 @@ lazy_static! {
     ///
     /// This is global to reflect that there is globally one stdout/stderr:
     /// this object manages it.
-    // TODO: A const_default in Nutmeg, then this can be non-lazy.
     static ref NUTMEG_VIEW: nutmeg::View<Progress> =
         nutmeg::View::new(Progress::None, nutmeg::Options::default()
             .destination(nutmeg::Destination::Stderr));
@@ -62,21 +60,23 @@ static PROGRESS_ENABLED: AtomicBool = AtomicBool::new(false);
 
 pub fn enable_tracing(time_style: &TraceTimeStyle, console_level: Level) {
     use tracing_subscriber::fmt::time;
-    // let console_time: Box<dyn FormatTime> = match time_style {
-    //     TraceTimeStyle::None => Box::new(()),
-    // TraceTimeStyle::Utc => console_layer.with_timer(time::UtcTime::rfc_3339()),
-    // TraceTimeStyle::Relative => console_layer.with_timer(time::uptime()),
-    // TraceTimeStyle::Local => {
-    //     console_layer.with_timer(time::OffsetTime::local_rfc_3339().unwrap())
-    // }
-    // };
-    let level_filter = LevelFilter::from_level(console_level);
-    let console_layer = tracing_subscriber::fmt::Layer::default()
-        .with_ansi(clicolors_control::colors_enabled())
-        .with_writer(WriteToNutmeg)
-        // .with_timer(time::uptime())
-        .with_filter(level_filter);
-    Registry::default().with(console_layer).init();
+    fn hookup<FT>(timer: FT, console_level: Level)
+    where
+        FT: FormatTime + Send + Sync + 'static,
+    {
+        let console_layer = tracing_subscriber::fmt::Layer::default()
+            .with_ansi(clicolors_control::colors_enabled())
+            .with_writer(WriteToNutmeg)
+            .with_timer(timer)
+            .with_filter(LevelFilter::from_level(console_level));
+        Registry::default().with(console_layer).init();
+    }
+    match time_style {
+        TraceTimeStyle::None => hookup((), console_level),
+        TraceTimeStyle::Utc => hookup(time::UtcTime::rfc_3339(), console_level),
+        TraceTimeStyle::Relative => hookup(time::uptime(), console_level),
+        TraceTimeStyle::Local => hookup(time::OffsetTime::local_rfc_3339().unwrap(), console_level),
+    }
     trace!("Tracing enabled");
 }
 
