@@ -24,6 +24,10 @@ use lazy_static::lazy_static;
 use tracing::warn;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, Level};
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::fmt::time::FormatTime;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::Registry;
 
 use crate::monitor::{Counters, Monitor, Progress};
 use crate::{Error, Result};
@@ -58,18 +62,21 @@ static PROGRESS_ENABLED: AtomicBool = AtomicBool::new(false);
 
 pub fn enable_tracing(time_style: &TraceTimeStyle, console_level: Level) {
     use tracing_subscriber::fmt::time;
-    let builder = tracing_subscriber::fmt::Subscriber::builder()
-        .with_max_level(console_level)
+    // let console_time: Box<dyn FormatTime> = match time_style {
+    //     TraceTimeStyle::None => Box::new(()),
+    // TraceTimeStyle::Utc => console_layer.with_timer(time::UtcTime::rfc_3339()),
+    // TraceTimeStyle::Relative => console_layer.with_timer(time::uptime()),
+    // TraceTimeStyle::Local => {
+    //     console_layer.with_timer(time::OffsetTime::local_rfc_3339().unwrap())
+    // }
+    // };
+    let level_filter = LevelFilter::from_level(console_level);
+    let console_layer = tracing_subscriber::fmt::Layer::default()
         .with_ansi(clicolors_control::colors_enabled())
-        .with_writer(WriteToNutmeg);
-    match time_style {
-        TraceTimeStyle::None => builder.without_time().init(),
-        TraceTimeStyle::Utc => builder.with_timer(time::UtcTime::rfc_3339()).init(),
-        TraceTimeStyle::Relative => builder.with_timer(time::uptime()).init(),
-        TraceTimeStyle::Local => builder
-            .with_timer(time::OffsetTime::local_rfc_3339().unwrap())
-            .init(),
-    }
+        .with_writer(WriteToNutmeg)
+        // .with_timer(time::uptime())
+        .with_filter(level_filter);
+    Registry::default().with(console_layer).init();
     trace!("Tracing enabled");
 }
 
