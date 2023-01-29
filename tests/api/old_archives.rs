@@ -25,6 +25,7 @@ use pretty_assertions::assert_eq;
 
 use conserve::unix_time::UnixTime;
 use conserve::*;
+use tracing_test::traced_test;
 
 const MINIMAL_ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.10", "0.6.2", "0.6.3", "0.6.9", "0.6.17"];
 
@@ -72,6 +73,7 @@ fn examine_archive() {
     }
 }
 
+#[traced_test]
 #[test]
 fn validate_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
@@ -82,7 +84,7 @@ fn validate_archive() {
         archive
             .validate(&ValidateOptions::default(), &mut monitor)
             .expect("validate archive");
-        assert_eq!(monitor.error_messages().join("\n"), "");
+        assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     }
 }
 

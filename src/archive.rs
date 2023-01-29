@@ -24,7 +24,7 @@ use itertools::Itertools;
 use nutmeg::models::{LinearModel, UnboundedModel};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 use crate::blockhash::BlockHash;
 use crate::errors::Error;
@@ -298,7 +298,12 @@ impl Archive {
         Ok(stats)
     }
 
+    /// Walk the archive to check all invariants.
+    ///
+    /// If problems are found, they are emitted as `warn` or `error` level
+    /// tracing messages.
     pub fn validate<MO: Monitor>(&self, options: &ValidateOptions, monitor: &mut MO) -> Result<()> {
+        // TODO: Return an error if there were problems, as well as logging them?
         self.validate_archive_dir(monitor)?;
 
         debug!("List bands...");
@@ -315,9 +320,9 @@ impl Archive {
             debug!("List blocks...");
             // TODO: Check for unexpected files or directories in the blockdir.
             let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
-            for block_hash in referenced_lens.keys().cloned() {
-                if !present_blocks.contains(&block_hash) {
-                    monitor.error(&Error::BlockMissing { block_hash });
+            for block_hash in referenced_lens.keys() {
+                if !present_blocks.contains(block_hash) {
+                    error!(%block_hash, "Referenced block missing");
                 }
             }
         } else {
@@ -328,21 +333,22 @@ impl Archive {
             for (block_hash, referenced_len) in referenced_lens {
                 if let Some(&actual_len) = block_lengths.get(&block_hash) {
                     if referenced_len > actual_len as u64 {
-                        monitor.error(&Error::ShortBlock {
-                            block_hash,
-                            actual_len,
+                        error!(
+                            %block_hash,
                             referenced_len,
-                        });
+                            actual_len,
+                            "Block is shortered than referenced length"
+                        );
                     }
                 } else {
-                    monitor.error(&Error::BlockMissing { block_hash });
+                    error!(%block_hash, "Referenced block missing");
                 }
             }
         }
         Ok(())
     }
 
-    fn validate_archive_dir<MO: Monitor>(&self, monitor: &mut MO) -> Result<()> {
+    fn validate_archive_dir<MO: Monitor>(&self, _monitor: &mut MO) -> Result<()> {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
@@ -357,12 +363,12 @@ impl Archive {
                     name,
                     ..
                 }) => {
-                    if name.eq_ignore_ascii_case(BLOCK_DIR) {
-                    } else if let Ok(band_id) = name.parse::<BandId>() {
+                    if let Ok(band_id) = name.parse::<BandId>() {
                         if !seen_bands.insert(band_id.clone()) {
-                            monitor.error(&Error::DuplicateBandDirectory { band_id });
+                            // TODO: Test this
+                            error!(%band_id, "Duplicated band directory");
                         }
-                    } else {
+                    } else if !name.eq_ignore_ascii_case(BLOCK_DIR) {
                         // TODO: The whole path not just the filename
                         warn!(path = name, "Unexpected subdirectory in archive directory");
                     }
@@ -384,8 +390,8 @@ impl Archive {
                     // TODO: The whole path not just the filename
                     warn!(path = name, "Unexpected file in archive directory");
                 }
-                Err(source) => {
-                    monitor.error(&Error::from(source));
+                Err(err) => {
+                    error!(%err, "Error listing archive directory");
                 }
             }
         }

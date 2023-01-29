@@ -6,17 +6,16 @@ use std::path::Path;
 
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
-use assert_fs::NamedTempFile;
-use assert_fs::TempDir;
+use assert_fs::{NamedTempFile, TempDir};
 use predicates::prelude::*;
-use serde_json::Deserializer;
-use serde_json::Value;
+use serde_json::json;
+use serde_json::{Deserializer, Value};
 use tracing::Level;
 
 use super::run_conserve;
 
 fn read_log_json(path: &Path) -> Vec<serde_json::Value> {
-    let json_content = std::fs::read_to_string(&path).unwrap();
+    let json_content = std::fs::read_to_string(path).unwrap();
     println!("{json_content}");
     Deserializer::from_str(&json_content)
         .into_iter::<Value>()
@@ -31,15 +30,15 @@ fn filter_by_level(logs: &[serde_json::Value], level: Level) -> Vec<&serde_json:
         .collect()
 }
 
-/// Reduce json logs to just their messages.
-fn events_to_messages<'s, I>(logs: I) -> Vec<&'s str>
-where
-    I: IntoIterator<Item = &'s serde_json::Value>,
-{
-    logs.into_iter()
-        .map(|event| event["fields"]["message"].as_str().unwrap())
-        .collect()
-}
+// /// Reduce json logs to just their messages.
+// fn events_to_messages<'s, I>(logs: I) -> Vec<&'s str>
+// where
+//     I: IntoIterator<Item = &'s serde_json::Value>,
+// {
+//     logs.into_iter()
+//         .map(|event| event["fields"]["message"].as_str().unwrap())
+//         .collect()
+// }
 
 /// <https://github.com/sourcefrog/conserve/issues/171>
 #[test]
@@ -75,11 +74,15 @@ fn validate_non_fatal_problems_nonzero_result_and_json_log() {
         .assert()
         .stderr(predicate::str::contains("Archive has some problems."))
         .code(1);
-    let expected_message =
-"Block fec91c70284c72d0d4e3684788a90de9338a5b2f47f01fedbe203cafd68708718ae5672d10eca804a8121904047d40d1d6cf11e7a76419357a9469af41f22d01 is missing";
     let events = read_log_json(log_temp.path());
     dbg!(&events);
     let errors = filter_by_level(&events, Level::ERROR);
     assert_eq!(errors.len(), 1);
-    assert_eq!(events_to_messages(errors), &[expected_message]);
+    assert_eq!(
+        errors[0]["fields"],
+        json!({
+            "block_hash": "fec91c70284c72d0d4e3684788a90de9338a5b2f47f01fedbe203cafd68708718ae5672d10eca804a8121904047d40d1d6cf11e7a76419357a9469af41f22d01",
+            "message": "Referenced block missing",
+        })
+    );
 }

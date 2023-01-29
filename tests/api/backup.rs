@@ -21,6 +21,7 @@ use conserve::monitor::CollectMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;
+use tracing_test::traced_test;
 
 const HELLO_HASH: &str =
     "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
@@ -54,6 +55,7 @@ pub fn simple_backup() {
 }
 
 #[test]
+#[traced_test]
 pub fn simple_backup_with_excludes() -> Result<()> {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
@@ -102,7 +104,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     let mut monitor = CollectMonitor::new();
     af.validate(&ValidateOptions::default(), &mut monitor)
         .unwrap();
-    assert_eq!(monitor.error_messages(), [""; 0]);
+    assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     Ok(())
 }
 

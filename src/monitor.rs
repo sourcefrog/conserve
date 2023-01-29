@@ -12,21 +12,10 @@
 
 use std::fmt::Debug;
 use std::sync::atomic::AtomicUsize;
-use std::sync::Mutex;
 use std::time::Instant;
 
-use crate::Error;
-
-/// A Monitor collects progress and error findings during some high-level
-/// operation such as a backup or validation.
-///
-/// Events reported to the Monitor can be, for example, drawn into a UI,
-/// written to logs, or written
-/// out as structured data.
+/// A Monitor is an abstracted way to show progress during an operation.
 pub trait Monitor: Send + Sync {
-    /// The monitor is informed that a non-fatal error occurred.
-    fn error(&self, err: &Error);
-
     /// Update that some progress has been made on a task.
     fn progress(&self, progress: Progress);
 
@@ -58,7 +47,6 @@ pub enum Progress {
 /// Errors are collected as strings, because not all of them can be cloned.
 #[derive(Default, Debug)]
 pub struct CollectMonitor {
-    pub error_messages: Mutex<Vec<String>>,
     counters: Counters,
 }
 
@@ -66,17 +54,9 @@ impl CollectMonitor {
     pub fn new() -> Self {
         CollectMonitor::default()
     }
-
-    pub fn error_messages(self) -> Vec<String> {
-        self.error_messages.into_inner().unwrap()
-    }
 }
 
 impl Monitor for CollectMonitor {
-    fn error(&self, err: &Error) {
-        self.error_messages.lock().unwrap().push(err.to_string());
-    }
-
     fn progress(&self, _progress: Progress) {}
 
     fn counters(&self) -> &Counters {

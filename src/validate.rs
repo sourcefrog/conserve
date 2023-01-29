@@ -16,7 +16,7 @@ use std::fmt::Debug;
 use std::time::Instant;
 
 #[allow(unused_imports)]
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::misc::ResultExt;
 use crate::monitor::{Monitor, Progress};
@@ -41,11 +41,16 @@ pub(crate) fn validate_bands<MO: Monitor>(
     let mut block_lens = HashMap::new();
     let start = Instant::now();
     let total_bands = band_ids.len();
-    let mut bands_done = 0;
-    'band: for band_id in band_ids {
-        bands_done += 1;
-        if let Err(err) = Band::open(archive, band_id).and_then(|band| band.validate(monitor)) {
-            monitor.error(&err);
+    'band: for (bands_done, band_id) in band_ids.iter().enumerate() {
+        let band = match Band::open(archive, band_id) {
+            Ok(band) => band,
+            Err(err) => {
+                error!(%err, %band_id, "Error opening band");
+                continue 'band;
+            }
+        };
+        if let Err(err) = band.validate(monitor) {
+            error!(%err, %band_id, "Error validating band");
             continue 'band;
         };
         if let Err(err) = archive
@@ -53,7 +58,7 @@ pub(crate) fn validate_bands<MO: Monitor>(
             .and_then(|st| validate_stored_tree(&st, monitor))
             .map(|st_block_lens| merge_block_lens(&mut block_lens, &st_block_lens))
         {
-            monitor.error(&err);
+            error!(%err, %band_id, "Error validating stored tree");
             continue 'band;
         }
         monitor.progress(Progress::ValidateBands {
@@ -76,15 +81,15 @@ fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash
 
 fn validate_stored_tree<MO: Monitor>(
     st: &StoredTree,
-    monitor: &mut MO,
+    _monitor: &mut MO,
 ) -> Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
-    // TODO: Use Monitor; report errors validating anything here rather than aborting.
     // TODO: Check other entry properties are correct.
     // TODO: Check they're in apath order.
+    // TODO: Count progress for index blocks within one tree?
     for entry in st
         .iter_entries(Apath::root(), Exclude::nothing())
-        .our_inspect_err(|err| monitor.error(err))?
+        .our_inspect_err(|err| error!(%err, "Error iterating index entries"))?
         .filter(|entry| entry.kind() == Kind::File)
     {
         for addr in entry.addrs {

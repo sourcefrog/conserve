@@ -30,7 +30,7 @@ use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
 use crate::monitor::{Counters, Monitor, Progress};
-use crate::{Error, Result};
+use crate::Result;
 
 /// Count of errors emitted to trace.
 static ERROR_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -179,8 +179,7 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
     nutmeg::Options::default().progress_enabled(PROGRESS_ENABLED.load(Ordering::Relaxed))
 }
 
-/// A ValidateMonitor that logs messages, draws to the ternminal, and optionally
-/// writes errors to a json file.
+/// A Monitor that draws progress bars on the terminal.
 pub struct TerminalMonitor {
     counters: Counters,
 }
@@ -194,10 +193,6 @@ impl TerminalMonitor {
 }
 
 impl Monitor for TerminalMonitor {
-    fn error(&self, err: &Error) {
-        error!("{err}");
-    }
-
     fn progress(&self, progress: Progress) {
         if matches!(progress, Progress::None) {
             // Hide the progress bar.

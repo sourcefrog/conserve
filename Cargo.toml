@@ -70,7 +70,7 @@ predicates = "2"
 pretty_assertions = "1.0"
 proptest = "1.0"
 proptest-derive = "0.3"
-tracing-test = "0.2"
+tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 [features]
 blake2_simd_asm = ["blake2-rfc/simd_asm"]
