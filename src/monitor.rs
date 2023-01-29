@@ -27,9 +27,6 @@ pub trait Monitor: Send + Sync {
     /// The monitor is informed that a non-fatal error occurred.
     fn error(&self, err: &Error);
 
-    /// Record a less severe error.
-    fn warning(&self, err: &Error);
-
     /// Update that some progress has been made on a task.
     fn progress(&self, progress: Progress);
 
@@ -78,10 +75,6 @@ impl CollectMonitor {
 impl Monitor for CollectMonitor {
     fn error(&self, err: &Error) {
         self.error_messages.lock().unwrap().push(err.to_string());
-    }
-
-    fn warning(&self, err: &Error) {
-        self.error(err)
     }
 
     fn progress(&self, _progress: Progress) {}

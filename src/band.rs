@@ -232,14 +232,10 @@ impl Band {
         remove_item(&mut files, &BAND_HEAD_FILENAME);
         remove_item(&mut files, &BAND_TAIL_FILENAME);
         for unexpected in files {
-            monitor.warning(&Error::UnexpectedFile {
-                path: unexpected.clone(),
-            });
+            warn!(path = ?unexpected, "Unexpected file in band directory");
         }
         for unexpected in dirs.iter().filter(|n| n != &INDEX_DIR) {
-            monitor.warning(&Error::UnexpectedFile {
-                path: unexpected.clone(),
-            });
+            warn!(path = ?unexpected, "Unexpected subdirectory in band directory");
         }
         Ok(())
     }

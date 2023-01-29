@@ -182,15 +182,12 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
 /// A ValidateMonitor that logs messages, draws to the ternminal, and optionally
 /// writes errors to a json file.
 pub struct TerminalMonitor {
-    /// Number of errors (and warnings) observed.
-    n_errors: AtomicUsize,
     counters: Counters,
 }
 
 impl TerminalMonitor {
     pub fn new() -> Result<Self> {
         Ok(TerminalMonitor {
-            n_errors: 0.into(),
             counters: Counters::default(),
         })
     }
@@ -199,12 +196,6 @@ impl TerminalMonitor {
 impl Monitor for TerminalMonitor {
     fn error(&self, err: &Error) {
         error!("{err}");
-        self.n_errors.fetch_add(1, Ordering::Relaxed);
-    }
-
-    fn warning(&self, err: &Error) {
-        warn!("{err}");
-        self.n_errors.fetch_add(1, Ordering::Relaxed);
     }
 
     fn progress(&self, progress: Progress) {

@@ -24,7 +24,7 @@ use itertools::Itertools;
 use nutmeg::models::{LinearModel, UnboundedModel};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::blockhash::BlockHash;
 use crate::errors::Error;
@@ -364,9 +364,7 @@ impl Archive {
                         }
                     } else {
                         // TODO: The whole path not just the filename
-                        monitor.warning(&Error::UnexpectedFile {
-                            path: name.to_owned(),
-                        });
+                        warn!(path = name, "Unexpected subdirectory in archive directory");
                     }
                 }
                 Ok(DirEntry {
@@ -379,16 +377,12 @@ impl Archive {
                         && !name.eq_ignore_ascii_case(".DS_Store")
                     {
                         // TODO: The whole path not just the filename
-                        monitor.warning(&Error::UnexpectedFile {
-                            path: name.to_owned(),
-                        });
+                        warn!(path = name, "Unexpected file in archive directory");
                     }
                 }
                 Ok(DirEntry { name, .. }) => {
                     // TODO: The whole path not just the filename
-                    monitor.warning(&Error::UnexpectedFile {
-                        path: name.to_owned(),
-                    });
+                    warn!(path = name, "Unexpected file in archive directory");
                 }
                 Err(source) => {
                     monitor.error(&Error::from(source));
