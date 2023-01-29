@@ -291,7 +291,7 @@ impl BlockDir {
                     Some((hash, len))
                 }
                 Err(err) => {
-                    monitor.error(&err);
+                    error!(%err, %hash, "Error reading block content");
                     None
                 }
             })

@@ -23,6 +23,7 @@
 
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
+use tracing::error;
 #[allow(unused_imports)]
 use tracing::warn;
 
@@ -221,13 +222,11 @@ impl Band {
         })
     }
 
-    pub fn validate<MO: Monitor>(&self, monitor: &mut MO) -> Result<()> {
+    pub fn validate<MO: Monitor>(&self, _monitor: &mut MO) -> Result<()> {
         let ListDirNames { mut files, dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
-            monitor.error(&Error::BandHeadMissing {
-                band_id: self.band_id.clone(),
-            });
+            error!(band_id = ?self.band_id, "Band head file missing");
         }
         remove_item(&mut files, &BAND_HEAD_FILENAME);
         remove_item(&mut files, &BAND_TAIL_FILENAME);
