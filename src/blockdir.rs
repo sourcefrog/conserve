@@ -31,6 +31,7 @@ use std::time::Instant;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
+use metrics::{counter, increment_counter};
 use nutmeg::models::UnboundedModel;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -120,6 +121,12 @@ impl BlockDir {
         let hex_hash = hash.to_string();
         let relpath = block_relpath(hash);
         self.transport.create_dir(subdir_relpath(&hex_hash))?;
+        increment_counter!("conserve.block.writes");
+        counter!(
+            "conserve.block.write_uncompressed_bytes",
+            in_buf.len() as u64
+        );
+        counter!("conserve.block.write_compressed_bytes", comp_len);
         self.transport
             .write_file(&relpath, compressed)
             .or_else(|io_err| {
@@ -143,9 +150,12 @@ impl BlockDir {
         stats: &mut BackupStats,
     ) -> Result<BlockHash> {
         let hash = self.hash_bytes(block_data);
+        let len = block_data.len() as u64;
         if self.contains(&hash)? {
+            increment_counter!("conserve.block.matches");
             stats.deduplicated_blocks += 1;
-            stats.deduplicated_bytes += block_data.len() as u64;
+            counter!("conserve.block.matched_bytes", len);
+            stats.deduplicated_bytes += len;
         } else {
             let comp_len = self.compress_and_store(block_data, &hash)?;
             stats.written_blocks += 1;
@@ -284,10 +294,7 @@ impl BlockDir {
                             + len as u64,
                         start,
                     });
-                    monitor
-                        .counters()
-                        .blocks_read
-                        .fetch_add(1, Ordering::Relaxed);
+                    increment_counter!("conserve.blocks.read");
                     Some((hash, len))
                 }
                 Err(err) => {

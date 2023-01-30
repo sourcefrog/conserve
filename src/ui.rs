@@ -29,7 +29,7 @@ use tracing_subscriber::layer::{Context, Layer};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
-use crate::monitor::{Counters, Monitor, Progress};
+use crate::monitor::{Monitor, Progress};
 use crate::Result;
 
 /// Count of errors emitted to trace.
@@ -180,15 +180,11 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
 }
 
 /// A Monitor that draws progress bars on the terminal.
-pub struct TerminalMonitor {
-    counters: Counters,
-}
+pub struct TerminalMonitor {}
 
 impl TerminalMonitor {
     pub fn new() -> Result<Self> {
-        Ok(TerminalMonitor {
-            counters: Counters::default(),
-        })
+        Ok(TerminalMonitor {})
     }
 }
 
@@ -203,10 +199,6 @@ impl Monitor for TerminalMonitor {
             NUTMEG_VIEW.update(|model| *model = progress);
             NUTMEG_VIEW.resume();
         }
-    }
-
-    fn counters(&self) -> &Counters {
-        &self.counters
     }
 }
 

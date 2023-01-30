@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,7 +12,6 @@
 
 //! Conserve backup system.
 
-// Conserve implementation modules.
 pub mod apath;
 pub mod archive;
 pub mod backup;
@@ -26,6 +25,7 @@ mod entry;
 pub mod errors;
 pub mod excludes;
 mod gc_lock;
+pub mod in_memory_recorder;
 pub mod index;
 mod io;
 mod jsonio;

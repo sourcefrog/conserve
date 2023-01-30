@@ -301,9 +301,9 @@ impl Archive {
     /// Walk the archive to check all invariants.
     ///
     /// If problems are found, they are emitted as `warn` or `error` level
-    /// tracing messages.
+    /// tracing messages. This function only returns an error if validation
+    /// stops due to a fatal error.
     pub fn validate<MO: Monitor>(&self, options: &ValidateOptions, monitor: &mut MO) -> Result<()> {
-        // TODO: Return an error if there were problems, as well as logging them?
         self.validate_archive_dir(monitor)?;
 
         debug!("List bands...");

@@ -18,10 +18,6 @@ use std::time::Instant;
 pub trait Monitor: Send + Sync {
     /// Update that some progress has been made on a task.
     fn progress(&self, progress: Progress);
-
-    /// Return a reference to a counter struct holding atomic performance
-    /// counters.
-    fn counters(&self) -> &Counters;
 }
 
 /// Overall progress state communicated from Conserve core to the monitor.
@@ -41,14 +37,10 @@ pub enum Progress {
     },
 }
 
-/// A ValidateMonitor that collects all errors without drawing anything,
+/// A Monitor that does nothing,
 /// for use in tests.
-///
-/// Errors are collected as strings, because not all of them can be cloned.
 #[derive(Default, Debug)]
-pub struct CollectMonitor {
-    counters: Counters,
-}
+pub struct CollectMonitor {}
 
 impl CollectMonitor {
     pub fn new() -> Self {
@@ -58,19 +50,4 @@ impl CollectMonitor {
 
 impl Monitor for CollectMonitor {
     fn progress(&self, _progress: Progress) {}
-
-    fn counters(&self) -> &Counters {
-        &self.counters
-    }
-}
-
-/// Counters of interesting performance events during an operation.
-///
-/// All the members are atomic so they can be updated through a shared
-/// reference at any time.
-#[derive(Default, Debug)]
-pub struct Counters {
-    // CAUTION: Don't use AtomicU64 here because it won't exist on
-    // 32-bit platforms.
-    pub blocks_read: AtomicUsize,
 }

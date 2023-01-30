@@ -21,6 +21,7 @@ use std::time::Instant;
 
 use assert_matches::debug_assert_matches;
 use clap::{Parser, Subcommand};
+use metrics::increment_counter;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
 
@@ -495,9 +496,12 @@ fn main() -> Result<ExitCode> {
         Level::INFO
     };
     ui::enable_tracing(&args.trace_time, trace_level, &args.log_json);
+    metrics::set_recorder(&conserve::in_memory_recorder::IN_MEMORY)
+        .expect("Failed to install recorder");
+    increment_counter!("conserve.start");
     let mut monitor = TerminalMonitor::new()?;
     let result = args.command.run(&mut monitor);
-    debug!(counters = ?monitor.counters());
+    in_memory_recorder::emit_to_trace();
     debug!(elapsed = ?start_time.elapsed());
     if let Err(err) = result {
         error!("{err}");
