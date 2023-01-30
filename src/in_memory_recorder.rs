@@ -111,7 +111,7 @@ impl<K> Storage<K> for SummaryStorage {
     }
 
     fn histogram(&self, _: &K) -> Self::Histogram {
-        Arc::new(SummaryHistogram(Mutex::new(Summary::with_defaults())))
+        Arc::new(SummaryHistogram::new())
     }
 }
 
@@ -124,7 +124,7 @@ impl HistogramFn for SummaryHistogram {
 }
 
 impl SummaryHistogram {
-    fn quantile(&self, q: f64) -> Option<f64> {
-        self.0.lock().unwrap().quantile(q)
+    fn new() -> Self {
+        SummaryHistogram(Mutex::new(Summary::with_defaults()))
     }
 }

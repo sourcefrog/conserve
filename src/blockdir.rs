@@ -289,14 +289,13 @@ impl BlockDir {
             .flat_map(|hash| match self.get_block_content(&hash) {
                 Ok((bytes, _sizes)) => {
                     let len = bytes.len();
+                    let len64 = len as u64;
                     monitor.progress(Progress::ValidateBlocks {
                         blocks_done: blocks_done.fetch_add(1, Ordering::Relaxed) + 1,
                         total_blocks,
-                        bytes_done: bytes_done.fetch_add(len as u64, Ordering::Relaxed)
-                            + len as u64,
+                        bytes_done: bytes_done.fetch_add(len64, Ordering::Relaxed) + len64,
                         start,
                     });
-                    increment_counter!("conserve.blocks.read");
                     Some((hash, len))
                 }
                 Err(err) => {
