@@ -26,7 +26,6 @@ use metrics::increment_counter;
 use tracing::{debug, error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
-use conserve::monitor::Monitor;
 use conserve::ui::{TerminalMonitor, TraceTimeStyle};
 use conserve::ReadTree;
 use conserve::RestoreOptions;

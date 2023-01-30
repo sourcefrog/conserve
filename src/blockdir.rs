@@ -31,7 +31,7 @@ use std::time::Instant;
 
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use metrics::{counter, increment_counter};
+use metrics::{counter, histogram, increment_counter};
 use nutmeg::models::UnboundedModel;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -116,17 +116,17 @@ impl BlockDir {
     pub(crate) fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
         // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
         let mut compressor = Compressor::new();
+        let uncomp_len = in_buf.len() as u64;
         let compressed = compressor.compress(in_buf)?;
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
         let relpath = block_relpath(hash);
         self.transport.create_dir(subdir_relpath(&hex_hash))?;
         increment_counter!("conserve.block.writes");
-        counter!(
-            "conserve.block.write_uncompressed_bytes",
-            in_buf.len() as u64
-        );
+        counter!("conserve.block.write_uncompressed_bytes", uncomp_len);
+        histogram!("conserve.block.write_uncompressed_bytes", uncomp_len as f64);
         counter!("conserve.block.write_compressed_bytes", comp_len);
+        histogram!("conserve.block.write_compressed_bytes", comp_len as f64);
         self.transport
             .write_file(&relpath, compressed)
             .or_else(|io_err| {
@@ -157,7 +157,9 @@ impl BlockDir {
             counter!("conserve.block.matched_bytes", len);
             stats.deduplicated_bytes += len;
         } else {
+            let start = Instant::now();
             let comp_len = self.compress_and_store(block_data, &hash)?;
+            histogram!("conserve.block.compress_and_store_seconds", start.elapsed());
             stats.written_blocks += 1;
             stats.uncompressed_bytes += block_data.len() as u64;
             stats.compressed_bytes += comp_len;
@@ -313,6 +315,8 @@ impl BlockDir {
     pub fn get_block_content(&self, hash: &BlockHash) -> Result<(Vec<u8>, Sizes)> {
         // TODO: Reuse decompressor buffer.
         // TODO: Reuse read buffer.
+        // TODO: Most importantly, cache decompressed blocks!
+        increment_counter!("conserve.block.read");
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
         let compressed_bytes =

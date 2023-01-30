@@ -11,7 +11,6 @@
 // GNU General Public License for more details.
 
 use std::fmt::Debug;
-use std::sync::atomic::AtomicUsize;
 use std::time::Instant;
 
 /// A Monitor is an abstracted way to show progress during an operation.

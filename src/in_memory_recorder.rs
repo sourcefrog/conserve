@@ -15,15 +15,19 @@
 //! earlier.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::AtomicU64;
+use std::sync::Mutex;
 use std::sync::{atomic::Ordering, Arc};
 
+use itertools::Itertools;
 use lazy_static::lazy_static;
-use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
-use metrics_util::registry::{AtomicStorage, Registry};
+use metrics::{Counter, Gauge, Histogram, HistogramFn, Key, KeyName, Recorder, SharedString, Unit};
+use metrics_util::registry::{Registry, Storage};
+use metrics_util::Summary;
 use tracing::debug;
 
 lazy_static! {
-    static ref REGISTRY: Registry<Key, AtomicStorage> = Registry::atomic();
+    static ref REGISTRY: Registry<Key, SummaryStorage> = Registry::new(SummaryStorage::new());
 }
 
 pub struct InMemory {}
@@ -50,8 +54,8 @@ impl Recorder for InMemory {
         todo!()
     }
 
-    fn register_histogram(&self, _key: &Key) -> Histogram {
-        todo!()
+    fn register_histogram(&self, key: &Key) -> Histogram {
+        REGISTRY.get_or_create_histogram(key, |g| Histogram::from_arc(Arc::clone(g)))
     }
 }
 
@@ -66,5 +70,61 @@ pub fn counter_values() -> BTreeMap<String, u64> {
 pub fn emit_to_trace() {
     for (counter_name, count) in counter_values() {
         debug!(counter_name, count);
+    }
+    for (histogram_name, histogram) in REGISTRY
+        .get_histogram_handles()
+        .into_iter()
+        .sorted_by_key(|(k, _v)| k.clone())
+    {
+        let summary = histogram.0.lock().unwrap();
+        debug!(
+            histogram = histogram_name.name(),
+            p10 = summary.quantile(0.1),
+            p50 = summary.quantile(0.5),
+            p90 = summary.quantile(0.9),
+            p99 = summary.quantile(0.99),
+            p100 = summary.quantile(1.0),
+        );
+    }
+}
+
+/// Like AtomicStorage but using a Summary.
+struct SummaryStorage {}
+
+impl SummaryStorage {
+    const fn new() -> Self {
+        SummaryStorage {}
+    }
+}
+
+impl<K> Storage<K> for SummaryStorage {
+    type Counter = Arc<AtomicU64>;
+    type Gauge = Arc<AtomicU64>;
+    type Histogram = Arc<SummaryHistogram>;
+
+    fn counter(&self, _key: &K) -> Self::Counter {
+        Arc::new(AtomicU64::new(0))
+    }
+
+    fn gauge(&self, _: &K) -> Self::Gauge {
+        Arc::new(AtomicU64::new(0))
+    }
+
+    fn histogram(&self, _: &K) -> Self::Histogram {
+        Arc::new(SummaryHistogram(Mutex::new(Summary::with_defaults())))
+    }
+}
+
+struct SummaryHistogram(Mutex<Summary>);
+
+impl HistogramFn for SummaryHistogram {
+    fn record(&self, value: f64) {
+        self.0.lock().unwrap().add(value)
+    }
+}
+
+impl SummaryHistogram {
+    fn quantile(&self, q: f64) -> Option<f64> {
+        self.0.lock().unwrap().quantile(q)
     }
 }
