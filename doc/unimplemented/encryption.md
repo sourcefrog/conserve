@@ -15,47 +15,71 @@ In all threat models we assume that attackers:
 - Cannot observe or manipulate the Conserve processes
 - Cannot exploit any implementation bugs
 
-### Confidentiality
+But we assume that attackers can:
 
-Eve can see the encrypted archive content, but does not have
-the key.
+- See the encrypted archive content
+  - For example, because they control the server to which encrypted archives are written
+  - Or because they can gain physical access to a drive holding backups
+- See how the encrypted archive changes over time
+  - For example, if they control the server hosting archives they can collect a trace of 
+    file reads and writes
+- Tamper with the encrypted archive content:
+  - Including deleting and modifying files
+  - And including modifying any unencrypted metadata files
+- Cause the client to include certain known plaintexts in the backup source
+  - For example, the attacked might email a file to the user, causing that file to be
+    included in a backup of their home directory
+  - Or, for example, the attacker might send requests to a server that are written
+    into a database or log files included in the backup source
+- Do any combination of these actions, over time, including
+  - Injecting known plaintext and then observing what is written to the archive
+  - Copying a file in the archive over another file
+  - Reverting a file to its previous state
 
-The confidentiality goal is that Eve cannot read backup tree content, filenames, permissions, or tree structure. Eve also should not be able to determine whether a block with content known to her is present in the archive. In Conserve terms this means Eve should read neither file blocks nor the index.
+### Confidentiality goals
 
-It is acceptable that Eve can observe:
+An attacker should not be able to:
+
+- Read backup file content, filenames, permissions, or metadata
+- Determine whether a particular string is present in any file, including
+  whether the entire content of a file is equal to a known value
+
+It is acceptable and apparently unavoidable that an attacker can observe:
 
 - When new backups were written
 - How much data changed or was added from one backup to the next
-
-(These are probably unavoidable if Eve can observe writes to the archive over time.)
-
-It is also acceptable for Eve to observe some Conserve metadata that doesn't relate to any tree content, including:
-
 - That the archive is a Conserve archive
 - Which versions of Conserve were used
 - Lock/lease metadata including source hostnames and process IDs
 
-### Tampering attacks
+### Integrity goals
 
-_Mallory_, an active attacker, can read and write the encrypted archive storage, including copying, deleting, truncating, and writing encrypted files.
+It is unavoidable that an attacker who can modify the archive can make some
+backups or parts of backups unrecoverable. (Conserve in general aims to recover
+as much as possible if only some files are damaged, but broad damage by Mallory
+may make the archive entirely unreadable.)
 
-It is unavoidable that Mallory can damage the archive including making some backups or parts of backups unrecoverable. (Conserve in general aims to recover as much as possible if only some files are damaged, but broad damage by Mallory may make the archive entirely unreadable.)
+It is also unavoidable that an attacker who can record the state of the archive
+at one time and rewrite it to that state later can make it as if the later
+backups never happened. This may be undetectable unless the user keeps, in
+some separate stable storage, a record of when backups were made.
 
-Mallory can also delete entire backups. Existing files are for safety reasons not modified when a new backup is added, so deleting all of the backup head/tail/index files will make it as if the backup never happened. This is not detectable, except that it may leave behind some unreferenced blocks.
+An attacker should not be able to:
 
-However it is a goal that tampering other than deleting backup heads should be detectable and should flag an error. Mallory should never be able to change the contents of a restored tree, including substituting one file for another, omitting some entries for the tree, substituting old content into new backups, or rearranging entries within a tree.
+- Silently corrupt, change, or remove data, other than reverting to a previous version of the 
+  archive, including:
+  - Copying files to different names
+  - Removing some files from the tree (other than by reverting to a moment
+    when the backup was incomplete)
+- Prevent a machine making a new correct backup. In other words, after 
+  tampering, newly written files in a new backup will still be correct.
+- Execute downgrade attacks that manipulate the backup program into 
+  writing unencrypted content or using an attacker-influenced key.
 
-Mallory should not be able to influence the behavior of machines writing new backups other than by making previous backups corrupt or removed entirely. In other words, after tampering, newly written files for a new backup should still be correct.
-
-For performance reasons Conserve does not throughly validate all existing blocks when it writes a new archive, so corruption by Mallory to existing blocks may be latent for some time. However `conserve validate` should detect this corruption.
-
-Mallory can write archive metadata files but should not be able to manipulate the backup program into writing unencrypted content. (A downgrade attack.)
-
-### Chosen-plaintext attacks
-
-_Chad_ can control the contents of some files and directories within the backup source. (For example they may be an otherwise-unprivileged user of a multiuser system, or they might send a file that a user downloads in to a directory that is backed up.)
-
-Chad should not be able to control what content is restored to directories outside of those he controls, in the backups where he controls them.
+For performance reasons Conserve does not throughly validate all existing
+blocks when it writes a new archive, so corruption of existing
+blocks may go unnoticed for some time. However `conserve validate` should detect
+this corruption.
 
 ### Key management goals
 
@@ -119,6 +143,11 @@ A new key can be appended to the keyset and set as primary.
 
 TODO: Does Tink require separate keys for encryption and hashing, with no way to convert between them? Can we avoid exposing two keys to the user?
 
+### Compression
+
+When the archive is encrypted, compression of blocks (including indexes) is disabled
+to prevent CRIME-like attacks.
+
 ### Block hashes
 
 In an encrypted archive, blocks are always identified by a keyed hash using the hash key.
@@ -134,7 +163,10 @@ When the keys are rotated, existing blocks in unchanged files can still match ag
 
 ### Block encryption
 
-To write a block, it is first hashed. If the hash is already present, that's enough. Otherwise, the block content is first compressed, and then encrypted.
+To write a block, it is first hashed, with the hash key. If the hash is already present, that's
+enough, and the keyed hash can be used to refer to the block content from the index or 
+meta-index. Otherwise, the block content is encrypted. (In unencrypted archives the block
+would be compressed at this point; in encrypted archives it is not.)
 
 Encryption is done using the Tink AEAD primitive, with the `AES256_GCM` key type. Tink internally generates a random IV. The encrypted file includes the Tink keyid.
 
@@ -146,7 +178,10 @@ To read a block with a given hash, the file identified by the hash is decrypted 
 
 ### Blocklist encryption
 
-In the planned new format 7, the band directory contains one or more "blocklists" which contain lists of hashes of index protos. The blocklist itself is a proto containing a list of hashes.
+In the planned new format 7, the band directory contains one or more
+"blocklists" (or maybe they should be called "meta-index" files) which contain
+lists of hashes of index protos. The blocklist itself is a proto containing a
+list of hashes.
 
 Blocklists are also encrypted with AEAD. The associated data is filename of the blocklist relative to the archive root, with forward slashes.
 
@@ -182,11 +217,16 @@ Since Tink generates a random IV for each block, IVs are never reused.
 
 By the same logic as for Eve, Mallory cannot decrypt block content.
 
-If Mallory blindly changes the content of a block file it is most likely that it will decrypt to garbage, and so decompression will fail, indicating that the file is incorrect. If Mallory truncates a file, similarly, decompression is likely to fail. If decompression of the corrupted data succeeds then the hash of the file will not be what it should be, which will be detected as corruption.
+If Mallory blindly changes the content of a block file or truncates it, then 
+when decrypted it will be discovered to have the wrong keyed hash, which 
+will be detected as corruption.
 
-If Mallory copies one block file in place of another the IV will be wrong, so it will also decrypt to garbage and be detected as corruption.
+If Mallory copies one block file in place of another the IV will be wrong, so
+it will also decrypt to garbage and be detected as corruption.
 
-Similarly, Eve cannot decrypt the blocklist files, and blind changes to them will make them decrypt to garbage. Rearranging blocklist files will also be caught in decryption because the IVs will be wrong.
+Similarly, Eve cannot decrypt the blocklist files, and blind changes to them
+will make them decrypt to garbage. Rearranging blocklist files will also be
+caught in decryption because the IVs will be wrong.
 
 If the band is complete (and so has a tail) then the corruption will be detectable because Eve cannot generate keyed hashes for the blocklist files.
 
@@ -194,13 +234,53 @@ If the band is complete (and so has a tail) then the corruption will be detectab
 
 It is important that the backup client must not trust the archive's assertion whether data should be encrypted or not. If a key file option is set and the archive indicates that it is not encrypted, the client should abort.
 
-### Assessment: Chad and Eve
+### Assessment: chosen-plaintext attacks
 
-If Chad collaborates with Eve, they may be able to probe whether certain content is already present in the archive by looking for signs of deduplication. This is considered acceptable because tree-wide deduplication is desirable, and because the combination of limited control on the source filesystem with observation of the backup directory seems somewhat unlikely.
+An attacker who can both inject chosen plaintext and observe writes to the archive 
+may be able to determine whether the plaintext is already present in the archive.
+For example, if the attacker injects a 1MB file (which will be written as a single
+block) and observes that no new large blocks are written, then they can infer
+that an identical block was already present at some point in the archive. 
+(It does not necessarily prove that the content is present in the most recent tree,
+only that the block was still present.)
 
-Chad's and Eve's ability to guess at collisions has some practical bounds: backups occur on some schedule (e.g. hourly) which rate-limits their guesses. They can generally only observe matches at the granularity of entire blocks on the order of one megabyte, which limits byte-at-a-time guessing.
+In this draft design, this is considered acceptable because tree-wide deduplication
+is desirable, and because the combination of limited control on the source
+filesystem with observation of the backup directory seems somewhat unlikely.
 
-Chad and Eve can also observe changing block sizes which may allow CRIME-like attacks. For example if the tree contains only two small files, and Chad controls one of them, Chad can guess at content from the other, and then Eve can observe the changing block sizes on various guesses to see if Chad has guessed correctly. (This attack is made more difficult by the fact that on later backups, the unknown file will not be rewritten into a new block unless it is changed.)
+The attacker's ability to guess at collisions has some practical bounds:
+backups occur on some schedule (e.g. hourly) which rate-limits their guesses.
 
-This attack is, for now, accepted as unlikely due to the combination of Chad and Eve, and the apparent need for a simple file tree to make it practical.
+They can generally only observe matches at the granularity of entire blocks,
+which limits their ability to do byte-at-a-time guessing. Typically blocks are
+fairly large and hold multiple files, but in some cases Conserve will emit only
+small data blocks, most obviously when only one small file has changed, but
+also when changes have to be flushed out to finalize an index block.
+
+The most favorable case for an attacker is if they're trying to guess whether 
+a particular single-byte file is present, and they can inject new single-byte
+files into an otherwise-quiescent archive. The simplest attack is to guess one
+file at a time, in which case they will likely find the answer after 255 guesses.
+Potentially the attacker could make multiple guesses per backup cycle, but 
+they then face the risk that their small files will be combined into a single 
+larger block, yielding inconclusive results. 
+
+Interestingly, this attack can  only be done once per archive, since after each
+byte is guessed it will then be present in the blockdir and future guesses will
+give no signal. (At least, this is true unless/until the  versions containing
+earlier guesses expire.)
+
+This brute force guessing attack seems infeasible for bytes of nontrivial length,
+especially considering that guesses are rate-limited by the backup cycle.
+
+If, as is planned, small files are stored inline in the index then this attack
+becomes infeasible for any file small enough to make guessing even remotely
+feasible.
+
+If blocks were compressed, it might be possible for an attacker to inject a 
+series of chosen plaintexts and gradually measure whether they compress well 
+against other files nearby in the tree. Because compression is disabled in
+encrypted archives the attacker is limited to guessing at whether whole blocks
+are present, which seems much less tractable.
+
 
