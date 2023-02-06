@@ -25,7 +25,6 @@ use filetime::set_symlink_file_times;
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
-use crate::owner::set_owner;
 use crate::stats::RestoreStats;
 use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
@@ -264,15 +263,14 @@ impl RestoreTree {
                     stats.errors += 1;
                 })
                 .ok();
-            // Restore ownership if possible.
-            // TODO: Stats and warnings if a user or group is specified in the index but
-            // does not exist on the local system.
-            set_owner(&source_entry.owner(), &path)
-                .map_err(|e| {
-                    ui::show_error(&e);
-                    stats.errors += 1;
-                })
-                .ok();
+        }
+
+        // Restore ownership if possible.
+        // TODO: Stats and warnings if a user or group is specified in the index but
+        // does not exist on the local system.
+        if let Err(err) = source_entry.owner().set_owner(&path) {
+            ui::show_error(&err);
+            stats.errors += 1;
         }
 
         // TODO: Accumulate more stats.

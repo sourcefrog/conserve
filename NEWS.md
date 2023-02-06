@@ -1,5 +1,9 @@
 # Conserve release history
 
+## Unreleased
+
+- Don't complain if unable to chown during restore; this is normal when not run as root.
+
 ## 23.1.1
 
 - Fixed: User and group mappings are now cached in memory. This fixes a performance regression in
