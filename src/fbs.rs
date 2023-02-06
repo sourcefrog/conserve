@@ -70,6 +70,10 @@ pub fn write_index(st: &StoredTree, mut out_file: File) -> Result<()> {
                 .target
                 .as_ref()
                 .map(|target| builder.create_string(target));
+            let unix_mode = entry
+                .unix_mode
+                .as_u32()
+                .map(|mode| gen::UnixMode::new(mode.try_into().expect("unix mode too large")));
             gen::Entry::create(
                 &mut builder,
                 &gen::EntryArgs {
@@ -79,7 +83,7 @@ pub fn write_index(st: &StoredTree, mut out_file: File) -> Result<()> {
                     target,
                     mtime: entry.mtime,
                     mtime_nanos: entry.mtime_nanos,
-                    unix_mode: entry.unix_mode.as_u32().unwrap_or(u32::MAX),
+                    unix_mode: unix_mode.as_ref(),
                     user,
                     group,
                 },

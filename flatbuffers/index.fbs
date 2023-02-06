@@ -14,13 +14,18 @@ table Addr {
   len: uint64;
 }
 
+// In a struct so that it we can distinguish "not set" from 0o000.
+struct UnixMode {
+  mode: uint16;
+}
+
 table Entry {
   apath:string;
   kind:Kind;
   target:string; // only for kind == Symlink
   mtime:int64;
   mtime_nanos:uint32;
-  unix_mode:uint32 = 0xffffffff; // default = unset
+  unix_mode: UnixMode;
   addrs: [Addr];
   user: string;
   group: string;

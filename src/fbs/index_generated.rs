@@ -115,6 +115,98 @@ impl<'a> flatbuffers::Verifiable for Kind {
 }
 
 impl flatbuffers::SimpleToVerifyInSlice for Kind {}
+// struct UnixMode, aligned to 2
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq)]
+pub struct UnixMode(pub [u8; 2]);
+impl Default for UnixMode { 
+  fn default() -> Self { 
+    Self([0; 2])
+  }
+}
+impl core::fmt::Debug for UnixMode {
+  fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+    f.debug_struct("UnixMode")
+      .field("mode", &self.mode())
+      .finish()
+  }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for UnixMode {}
+impl<'a> flatbuffers::Follow<'a> for UnixMode {
+  type Inner = &'a UnixMode;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    <&'a UnixMode>::follow(buf, loc)
+  }
+}
+impl<'a> flatbuffers::Follow<'a> for &'a UnixMode {
+  type Inner = &'a UnixMode;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    flatbuffers::follow_cast_ref::<UnixMode>(buf, loc)
+  }
+}
+impl<'b> flatbuffers::Push for UnixMode {
+    type Output = UnixMode;
+    #[inline]
+    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
+        let src = ::core::slice::from_raw_parts(self as *const UnixMode as *const u8, Self::size());
+        dst.copy_from_slice(src);
+    }
+}
+
+impl<'a> flatbuffers::Verifiable for UnixMode {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.in_buffer::<Self>(pos)
+  }
+}
+
+impl<'a> UnixMode {
+  #[allow(clippy::too_many_arguments)]
+  pub fn new(
+    mode: u16,
+  ) -> Self {
+    let mut s = Self([0; 2]);
+    s.set_mode(mode);
+    s
+  }
+
+  pub fn mode(&self) -> u16 {
+    let mut mem = core::mem::MaybeUninit::<<u16 as EndianScalar>::Scalar>::uninit();
+    // Safety:
+    // Created from a valid Table for this object
+    // Which contains a valid value in this slot
+    EndianScalar::from_little_endian(unsafe {
+      core::ptr::copy_nonoverlapping(
+        self.0[0..].as_ptr(),
+        mem.as_mut_ptr() as *mut u8,
+        core::mem::size_of::<<u16 as EndianScalar>::Scalar>(),
+      );
+      mem.assume_init()
+    })
+  }
+
+  pub fn set_mode(&mut self, x: u16) {
+    let x_le = x.to_little_endian();
+    // Safety:
+    // Created from a valid Table for this object
+    // Which contains a valid value in this slot
+    unsafe {
+      core::ptr::copy_nonoverlapping(
+        &x_le as *const _ as *const u8,
+        self.0[0..].as_mut_ptr(),
+        core::mem::size_of::<<u16 as EndianScalar>::Scalar>(),
+      );
+    }
+  }
+
+}
+
 pub enum AddrOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -286,7 +378,7 @@ impl<'a> Entry<'a> {
     if let Some(x) = args.group { builder.add_group(x); }
     if let Some(x) = args.user { builder.add_user(x); }
     if let Some(x) = args.addrs { builder.add_addrs(x); }
-    builder.add_unix_mode(args.unix_mode);
+    if let Some(x) = args.unix_mode { builder.add_unix_mode(x); }
     builder.add_mtime_nanos(args.mtime_nanos);
     if let Some(x) = args.target { builder.add_target(x); }
     if let Some(x) = args.apath { builder.add_apath(x); }
@@ -331,11 +423,11 @@ impl<'a> Entry<'a> {
     unsafe { self._tab.get::<u32>(Entry::VT_MTIME_NANOS, Some(0)).unwrap()}
   }
   #[inline]
-  pub fn unix_mode(&self) -> u32 {
+  pub fn unix_mode(&self) -> Option<&'a UnixMode> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u32>(Entry::VT_UNIX_MODE, Some(4294967295)).unwrap()}
+    unsafe { self._tab.get::<UnixMode>(Entry::VT_UNIX_MODE, None)}
   }
   #[inline]
   pub fn addrs(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Addr<'a>>>> {
@@ -372,7 +464,7 @@ impl flatbuffers::Verifiable for Entry<'_> {
      .visit_field::<flatbuffers::ForwardsUOffset<&str>>("target", Self::VT_TARGET, false)?
      .visit_field::<i64>("mtime", Self::VT_MTIME, false)?
      .visit_field::<u32>("mtime_nanos", Self::VT_MTIME_NANOS, false)?
-     .visit_field::<u32>("unix_mode", Self::VT_UNIX_MODE, false)?
+     .visit_field::<UnixMode>("unix_mode", Self::VT_UNIX_MODE, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<Addr>>>>("addrs", Self::VT_ADDRS, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<&str>>("user", Self::VT_USER, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<&str>>("group", Self::VT_GROUP, false)?
@@ -386,7 +478,7 @@ pub struct EntryArgs<'a> {
     pub target: Option<flatbuffers::WIPOffset<&'a str>>,
     pub mtime: i64,
     pub mtime_nanos: u32,
-    pub unix_mode: u32,
+    pub unix_mode: Option<&'a UnixMode>,
     pub addrs: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Addr<'a>>>>>,
     pub user: Option<flatbuffers::WIPOffset<&'a str>>,
     pub group: Option<flatbuffers::WIPOffset<&'a str>>,
@@ -400,7 +492,7 @@ impl<'a> Default for EntryArgs<'a> {
       target: None,
       mtime: 0,
       mtime_nanos: 0,
-      unix_mode: 4294967295,
+      unix_mode: None,
       addrs: None,
       user: None,
       group: None,
@@ -434,8 +526,8 @@ impl<'a: 'b, 'b> EntryBuilder<'a, 'b> {
     self.fbb_.push_slot::<u32>(Entry::VT_MTIME_NANOS, mtime_nanos, 0);
   }
   #[inline]
-  pub fn add_unix_mode(&mut self, unix_mode: u32) {
-    self.fbb_.push_slot::<u32>(Entry::VT_UNIX_MODE, unix_mode, 4294967295);
+  pub fn add_unix_mode(&mut self, unix_mode: &UnixMode) {
+    self.fbb_.push_slot_always::<&UnixMode>(Entry::VT_UNIX_MODE, unix_mode);
   }
   #[inline]
   pub fn add_addrs(&mut self, addrs: flatbuffers::WIPOffset<flatbuffers::Vector<'b , flatbuffers::ForwardsUOffset<Addr<'b >>>>) {
