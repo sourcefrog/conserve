@@ -111,14 +111,14 @@ pub fn restore(
     for entry in entry_iter {
         if options.print_filenames {
             if options.long_listing {
-                progress_bar.message(&format!(
+                progress_bar.message(format!(
                     "{} {} {}\n",
                     entry.unix_mode(),
                     entry.owner(),
                     entry.apath()
                 ));
             } else {
-                progress_bar.message(&format!("{}\n", entry.apath()));
+                progress_bar.message(format!("{}\n", entry.apath()));
             }
         }
         progress_bar.update(|model| model.filename = entry.apath().to_string());
