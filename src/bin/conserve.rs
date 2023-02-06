@@ -267,14 +267,25 @@ enum Debug {
         backup: Option<BandId>,
     },
 
+    WriteIndexFlatbuf {
+        archive: String,
+        out: PathBuf,
+    },
+
     /// List all blocks.
-    Blocks { archive: String },
+    Blocks {
+        archive: String,
+    },
 
     /// List all blocks referenced by any band.
-    Referenced { archive: String },
+    Referenced {
+        archive: String,
+    },
 
     /// List garbage blocks referenced by no band.
-    Unreferenced { archive: String },
+    Unreferenced {
+        archive: String,
+    },
 }
 
 enum ExitCode {
@@ -333,6 +344,15 @@ impl Command {
             Command::Debug(Debug::Index { archive, backup }) => {
                 let st = stored_tree_from_opt(archive, backup)?;
                 show::show_index_json(st.band(), &mut stdout)?;
+            }
+            Command::Debug(Debug::WriteIndexFlatbuf { archive, out }) => {
+                let st = stored_tree_from_opt(archive, &None)?;
+                let out_file = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(out)?;
+                conserve::fbs::write_index(&st, out_file)?;
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);

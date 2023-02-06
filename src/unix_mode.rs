@@ -88,6 +88,10 @@ impl UnixMode {
             None => false,
         }
     }
+
+    pub fn as_u32(&self) -> Option<u32> {
+        self.0
+    }
 }
 
 impl fmt::Display for UnixMode {

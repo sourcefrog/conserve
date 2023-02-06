@@ -1,0 +1,33 @@
+// Flatbuffers IDL for Conserve index.
+
+namespace Conserve.Index;
+
+enum Kind:byte {
+  File,
+  Dir,
+  Symlink,
+}
+
+table Addr {
+  hash: [ubyte];
+  start: uint64;
+  len: uint64;
+}
+
+table Entry {
+  apath:string;
+  kind:Kind;
+  target:string; // only for kind == Symlink
+  mtime:int64;
+  mtime_nanos:uint32;
+  unix_mode:uint32 = 0xffffffff; // default = unset
+  addrs: [Addr];
+  user: string;
+  group: string;
+}
+
+table Index {
+  entries:[Entry];
+}
+
+root_type Index;
