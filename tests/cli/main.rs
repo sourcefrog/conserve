@@ -28,10 +28,13 @@ mod backup;
 mod delete;
 mod diff;
 mod exclude;
-#[cfg(unix)]
-mod unix_permissions;
 mod validate;
 mod versions;
+
+#[cfg(unix)]
+mod unix {
+    mod permissions;
+}
 
 fn run_conserve() -> Command {
     Command::cargo_bin("conserve").expect("locate conserve binary")

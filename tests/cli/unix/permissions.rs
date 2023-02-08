@@ -1,10 +1,16 @@
+// Copyright 2023 Martin Pool
+// Copyright 2022 Stephanie Aelmore
+
 //! Tests for Unix permissions, run only on Unix.
 
+use std::fs::set_permissions;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use indoc::indoc;
 use predicates::prelude::*;
 
 use crate::run_conserve;
@@ -30,11 +36,6 @@ fn backup_unix_permissions() {
     let src: PathBuf = "./testdata/tree/minimal".into();
     assert!(src.is_dir());
 
-    // imports for this test
-    use std::fs::set_permissions;
-    use std::os::unix::fs::MetadataExt;
-    use std::os::unix::fs::PermissionsExt;
-
     // set up test directory
     cp_r::CopyOptions::new()
         .copy_tree(&src, &data_dir)
@@ -54,7 +55,9 @@ fn backup_unix_permissions() {
     set_permissions(data_dir.join("hello"), Permissions::from_mode(0o444))
         .expect("Error setting file permissions");
 
-    let mdata = std::fs::metadata(&src).expect("Unable to read file metadata");
+    // Find out which user and group is on the temporary directory.
+    let mdata = std::fs::metadata(&data_dir).expect("Unable to read file metadata");
+    dbg!(&mdata);
     let user = users::get_user_by_uid(mdata.uid())
         .expect("Unable to find user by uid")
         .name()
@@ -69,6 +72,16 @@ fn backup_unix_permissions() {
         .to_string();
 
     // backup
+    let expected = format!(
+        indoc! {"
+                + r--r--r-- {user:<10} {group:<10} /hello
+            "},
+        //  + rwxr-xr-x {user:<10} {group:<10} /subdir/subfile
+        //  Backup complete.
+        user = user,
+        group = group
+    );
+    println!("expected: {}", expected);
     run_conserve()
         .args(["backup", "-v", "-l"])
         .arg(&arch_dir)
@@ -76,11 +89,7 @@ fn backup_unix_permissions() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with(format!(
-            "+ r--r--r-- {user:<10} {group:<10} /hello\n\
-             + rwxr-xr-x {user:<10} {group:<10} /subdir/subfile\n\
-             Backup complete."
-        )));
+        .stdout(predicate::str::starts_with(expected));
 
     // verify file permissions in stored archive
     run_conserve()
@@ -117,7 +126,6 @@ fn backup_unix_permissions() {
 }
 
 #[test]
-#[cfg(unix)]
 fn backup_user_and_permissions() {
     // TODO: rewrite this test to properly test user and group somehow
 
