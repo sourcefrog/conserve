@@ -55,7 +55,8 @@ fn backup_unix_permissions() {
     set_permissions(data_dir.join("hello"), Permissions::from_mode(0o444))
         .expect("Error setting file permissions");
 
-    let mdata = std::fs::metadata(&src).expect("Unable to read file metadata");
+    // Find out which user and group is on the temporary directory.
+    let mdata = std::fs::metadata(&data_dir).expect("Unable to read file metadata");
     dbg!(&mdata);
     let user = users::get_user_by_uid(mdata.uid())
         .expect("Unable to find user by uid")
