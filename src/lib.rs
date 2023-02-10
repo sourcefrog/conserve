@@ -42,6 +42,7 @@ mod stitch;
 mod stored_file;
 mod stored_tree;
 pub mod test_fixtures;
+pub mod trace_counter;
 pub mod transport;
 mod tree;
 pub mod ui;

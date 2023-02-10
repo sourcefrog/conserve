@@ -17,26 +17,19 @@ use std::fmt::Debug;
 use std::fs::OpenOptions;
 use std::io;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use lazy_static::lazy_static;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
-use tracing::{Event, Subscriber};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::time::FormatTime;
-use tracing_subscriber::layer::{Context, Layer};
+use tracing_subscriber::layer::Layer;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
 use crate::monitor::{Monitor, Progress};
 use crate::Result;
-
-/// Count of errors emitted to trace.
-static ERROR_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-/// Count of warnings emitted to trace.
-static WARN_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 lazy_static! {
     /// A global Nutmeg view.
@@ -47,17 +40,6 @@ lazy_static! {
         nutmeg::View::new(Progress::None, nutmeg::Options::default()
             .destination(nutmeg::Destination::Stderr));
 }
-
-/// Return the number of errors logged in the program so far.
-pub fn global_error_count() -> usize {
-    ERROR_COUNT.load(Ordering::Relaxed)
-}
-
-/// Return the number of warnings logged in the program so far.
-pub fn global_warn_count() -> usize {
-    WARN_COUNT.load(Ordering::Relaxed)
-}
-
 /// Chosen style of timestamp prefix on trace lines.
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum TraceTimeStyle {
@@ -109,7 +91,7 @@ pub fn enable_tracing(
             });
         Registry::default()
             .with(console_layer)
-            .with(CounterLayer())
+            .with(crate::trace_counter::CounterLayer())
             .with(json_layer)
             .init();
     }
@@ -125,22 +107,6 @@ pub fn enable_tracing(
         ),
     }
     trace!("Tracing enabled");
-}
-
-/// A tracing Layer that counts errors and warnings into static counters.
-struct CounterLayer();
-
-impl<S> Layer<S> for CounterLayer
-where
-    S: Subscriber,
-{
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        match *event.metadata().level() {
-            Level::ERROR => ERROR_COUNT.fetch_add(1, Ordering::Relaxed),
-            Level::WARN => WARN_COUNT.fetch_add(1, Ordering::Relaxed),
-            _ => 0,
-        };
-    }
 }
 
 struct WriteToNutmeg();

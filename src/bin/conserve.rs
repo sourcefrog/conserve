@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
+use conserve::trace_counter::{global_error_count, global_warn_count};
 use metrics::increment_counter;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
@@ -452,7 +453,7 @@ impl Command {
                     skip_block_hashes: *quick,
                 };
                 Archive::open(open_transport(archive)?)?.validate(&options, monitor)?;
-                if ui::global_error_count() > 0 || ui::global_warn_count() > 0 {
+                if global_error_count() > 0 || global_warn_count() > 0 {
                     warn!("Archive has some problems.");
                 } else {
                     info!("Archive is OK.");
@@ -512,6 +513,8 @@ fn main() -> Result<ExitCode> {
     let result = args.command.run(&mut monitor);
     metric_recorder::emit_to_trace();
     debug!(elapsed = ?start_time.elapsed());
+    let error_count = global_error_count();
+    let warn_count = global_warn_count();
     match result {
         Err(err) => {
             error!("{err}");
@@ -520,17 +523,11 @@ fn main() -> Result<ExitCode> {
                 error!("caused by: {source}");
                 err = source;
             }
-            debug!(
-                error_count = ui::global_error_count(),
-                warn_count = ui::global_warn_count(),
-            );
+            debug!(error_count, warn_count,);
             Ok(ExitCode::Failure)
         }
-        Ok(ExitCode::Success) if ui::global_error_count() > 0 || ui::global_warn_count() > 0 => {
-            debug!(
-                error_count = ui::global_error_count(),
-                warn_count = ui::global_warn_count(),
-            );
+        Ok(ExitCode::Success) if error_count > 0 || warn_count > 0 => {
+            debug!(error_count, warn_count,);
             Ok(ExitCode::NonFatalErrors)
         }
         Ok(exit_code) => Ok(exit_code),
