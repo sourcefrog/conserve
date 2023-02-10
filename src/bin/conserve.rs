@@ -505,12 +505,12 @@ fn main() -> Result<ExitCode> {
         Level::INFO
     };
     ui::enable_tracing(&args.trace_time, trace_level, &args.log_json);
-    metrics::set_recorder(&conserve::in_memory_recorder::IN_MEMORY)
+    ::metrics::set_recorder(&conserve::metric_recorder::IN_MEMORY)
         .expect("Failed to install recorder");
     increment_counter!("conserve.start");
     let mut monitor = TerminalMonitor::new()?;
     let result = args.command.run(&mut monitor);
-    in_memory_recorder::emit_to_trace();
+    metric_recorder::emit_to_trace();
     debug!(elapsed = ?start_time.elapsed());
     match result {
         Err(err) => {

@@ -29,9 +29,9 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
+use ::metrics::{counter, histogram, increment_counter};
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use metrics::{counter, histogram, increment_counter};
 use nutmeg::models::UnboundedModel;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};

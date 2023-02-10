@@ -19,9 +19,11 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
 use std::sync::{atomic::Ordering, Arc};
 
+use ::metrics::{
+    Counter, Gauge, Histogram, HistogramFn, Key, KeyName, Recorder, SharedString, Unit,
+};
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use metrics::{Counter, Gauge, Histogram, HistogramFn, Key, KeyName, Recorder, SharedString, Unit};
 use metrics_util::registry::{Registry, Storage};
 use metrics_util::Summary;
 use tracing::debug;
