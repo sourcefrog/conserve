@@ -18,6 +18,6 @@ fn no_trace_timestamps_by_default() {
         .assert()
         .success()
         .stderr(predicate::str::contains(
-            "TRACE conserve::ui: Tracing enabled",
+            "TRACE conserve::ui::termui: Tracing enabled",
         ));
 }

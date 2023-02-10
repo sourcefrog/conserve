@@ -19,7 +19,7 @@ use std::time::Instant;
 use tracing::{error, info, warn};
 
 use crate::misc::ResultExt;
-use crate::monitor::{Monitor, Progress};
+use crate::progress::Progress;
 use crate::*;
 
 /// Options to [Archive::validate].
@@ -33,10 +33,9 @@ pub struct ValidateOptions {
 ///
 /// Returns the lengths of all blocks that were referenced, so that the caller can check
 /// that all blocks are present and long enough.
-pub(crate) fn validate_bands<MO: Monitor>(
+pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
-    monitor: &mut MO,
 ) -> Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
     let start = Instant::now();
@@ -49,25 +48,26 @@ pub(crate) fn validate_bands<MO: Monitor>(
                 continue 'band;
             }
         };
-        if let Err(err) = band.validate(monitor) {
+        if let Err(err) = band.validate() {
             error!(%err, %band_id, "Error validating band");
             continue 'band;
         };
         if let Err(err) = archive
             .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))
-            .and_then(|st| validate_stored_tree(&st, monitor))
+            .and_then(|st| validate_stored_tree(&st))
             .map(|st_block_lens| merge_block_lens(&mut block_lens, &st_block_lens))
         {
             error!(%err, %band_id, "Error validating stored tree");
             continue 'band;
         }
-        monitor.progress(Progress::ValidateBands {
+        Progress::ValidateBands {
             total_bands,
             bands_done,
             start,
-        });
+        }
+        .post();
     }
-    monitor.progress(Progress::None);
+    Progress::None.post();
     Ok(block_lens)
 }
 
@@ -79,10 +79,7 @@ fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash
     }
 }
 
-fn validate_stored_tree<MO: Monitor>(
-    st: &StoredTree,
-    _monitor: &mut MO,
-) -> Result<HashMap<BlockHash, u64>> {
+fn validate_stored_tree(st: &StoredTree) -> Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
     // TODO: Check other entry properties are correct.
     // TODO: Check they're in apath order.

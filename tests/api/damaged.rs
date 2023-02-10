@@ -17,15 +17,13 @@ use std::path::Path;
 
 use tracing_test::traced_test;
 
-use conserve::monitor::CollectMonitor;
 use conserve::*;
 
 #[traced_test]
 #[test]
 fn missing_block_when_checking_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
-    let mut monitor = CollectMonitor::new();
-    archive.validate(&ValidateOptions::default(), &mut monitor)?;
+    archive.validate(&ValidateOptions::default())?;
     assert!(logs_contain(
         "Referenced block missing block_hash=fec91c70284c72d0d4e3684788a90de9338a5b2f47f01fedbe203cafd68708718ae5672d10eca804a8121904047d40d1d6cf11e7a76419357a9469af41f22d01"));
     Ok(())
@@ -35,13 +33,9 @@ fn missing_block_when_checking_hashes() -> Result<()> {
 #[test]
 fn missing_block_skip_block_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
-    let mut monitor = CollectMonitor::new();
-    archive.validate(
-        &ValidateOptions {
-            skip_block_hashes: true,
-        },
-        &mut monitor,
-    )?;
+    archive.validate(&ValidateOptions {
+        skip_block_hashes: true,
+    })?;
     assert!(logs_contain(
         "Referenced block missing block_hash=fec91c70284c72d0d4e3684788a90de9338a5b2f47f01fedbe203cafd68708718ae5672d10eca804a8121904047d40d1d6cf11e7a76419357a9469af41f22d01"));
     Ok(())

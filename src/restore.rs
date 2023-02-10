@@ -150,7 +150,6 @@ pub fn restore(
                 continue;
             }
         } {
-            // TODO: Migrate to a monitor when that is passed down
             error!(
                 "error restoring {apath}: {err}",
                 apath = entry.apath().to_string()
@@ -264,7 +263,6 @@ impl RestoreTree {
             .unix_mode()
             .set_permissions(&path)
             .map_err(|err| {
-                // TODO: Migrate to monitor once that is passed down.
                 error!("error restoring unix permissions on {path:?}: {err}",);
                 stats.errors += 1;
             })

@@ -18,8 +18,7 @@ use tracing_subscriber::layer::Layer;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
-use crate::monitor::{Monitor, Progress};
-use crate::Result;
+use crate::progress::Progress;
 
 lazy_static! {
     /// A global Nutmeg view.
@@ -129,26 +128,17 @@ pub(crate) fn nutmeg_options() -> nutmeg::Options {
     nutmeg::Options::default().progress_enabled(PROGRESS_ENABLED.load(Ordering::Relaxed))
 }
 
-/// A Monitor that draws progress bars on the terminal.
-pub struct TerminalMonitor {}
-
-impl TerminalMonitor {
-    pub fn new() -> Result<Self> {
-        Ok(TerminalMonitor {})
-    }
-}
-
-impl Monitor for TerminalMonitor {
-    fn progress(&self, progress: Progress) {
-        if matches!(progress, Progress::None) {
-            // Hide the progress bar.
-            // TODO: suspend and update may not be needed if it renders to nothing?
-            NUTMEG_VIEW.suspend();
-            NUTMEG_VIEW.update(|model| *model = progress);
-        } else {
-            NUTMEG_VIEW.update(|model| *model = progress);
-            NUTMEG_VIEW.resume();
-        }
+/// Show progress on the global terminal progress bar,
+/// or clear the bar if it's [Progress::None].
+pub(crate) fn post_progress(progress: Progress) {
+    if matches!(progress, Progress::None) {
+        // Hide the progress bar.
+        // TODO: suspend and update may not be needed if it renders to nothing?
+        NUTMEG_VIEW.suspend();
+        NUTMEG_VIEW.update(|model| *model = progress);
+    } else {
+        NUTMEG_VIEW.update(|model| *model = progress);
+        NUTMEG_VIEW.resume();
     }
 }
 

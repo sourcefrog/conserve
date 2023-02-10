@@ -30,7 +30,6 @@ use crate::blockhash::BlockHash;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
-use crate::monitor::Monitor;
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -303,8 +302,8 @@ impl Archive {
     /// If problems are found, they are emitted as `warn` or `error` level
     /// tracing messages. This function only returns an error if validation
     /// stops due to a fatal error.
-    pub fn validate<MO: Monitor>(&self, options: &ValidateOptions, monitor: &mut MO) -> Result<()> {
-        self.validate_archive_dir(monitor)?;
+    pub fn validate(&self, options: &ValidateOptions) -> Result<()> {
+        self.validate_archive_dir()?;
 
         debug!("List bands...");
         let band_ids = self.list_band_ids()?;
@@ -312,7 +311,7 @@ impl Archive {
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
-        let referenced_lens = validate::validate_bands(self, &band_ids, monitor)?;
+        let referenced_lens = validate::validate_bands(self, &band_ids)?;
 
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
@@ -328,7 +327,7 @@ impl Archive {
         } else {
             // 2. Check the hash of all blocks are correct, and remember how long
             //    the uncompressed data is.
-            let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(monitor)?;
+            let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate()?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (block_hash, referenced_len) in referenced_lens {
                 if let Some(&actual_len) = block_lengths.get(&block_hash) {
@@ -348,7 +347,7 @@ impl Archive {
         Ok(())
     }
 
-    fn validate_archive_dir<MO: Monitor>(&self, _monitor: &mut MO) -> Result<()> {
+    fn validate_archive_dir(&self) -> Result<()> {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();

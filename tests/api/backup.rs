@@ -17,7 +17,6 @@ use assert_fs::TempDir;
 use filetime::{set_file_mtime, FileTime};
 
 use conserve::kind::Kind;
-use conserve::monitor::CollectMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;
@@ -101,9 +100,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     // TODO: Check index stats.
     // TODO: Check what was restored.
 
-    let mut monitor = CollectMonitor::new();
-    af.validate(&ValidateOptions::default(), &mut monitor)
-        .unwrap();
+    af.validate(&ValidateOptions::default()).unwrap();
     assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     Ok(())
 }

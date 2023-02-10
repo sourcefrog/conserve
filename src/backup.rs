@@ -116,7 +116,7 @@ pub fn backup(
             });
             match writer.copy_entry(&entry, source) {
                 Err(err) => {
-                    error!("Error copying entry {entry:?} to backup: {err}"); // TODO: Migrate to monitor
+                    error!("Error copying entry {entry:?} to backup: {err}");
                     stats.errors += 1;
                     continue;
                 }

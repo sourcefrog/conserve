@@ -29,7 +29,6 @@ use tracing::warn;
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
-use crate::monitor::Monitor;
 use crate::transport::{ListDirNames, Transport};
 use crate::*;
 
@@ -222,7 +221,7 @@ impl Band {
         })
     }
 
-    pub fn validate<MO: Monitor>(&self, _monitor: &mut MO) -> Result<()> {
+    pub fn validate(&self) -> Result<()> {
         let ListDirNames { mut files, dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {

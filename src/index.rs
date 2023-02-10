@@ -342,7 +342,6 @@ impl Iterator for IndexHunkIter {
                 Ok(Some(entries)) => entries,
                 Err(err) => {
                     self.stats.errors += 1;
-                    // TODO: Report to monitor.
                     error!("Error reading index hunk {hunk_number:?}: {err}");
                     continue;
                 }

@@ -41,7 +41,7 @@ use tracing::{debug, error, info, warn};
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::monitor::{Monitor, Progress};
+use crate::progress::Progress;
 use crate::stats::{BackupStats, Sizes};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
@@ -273,7 +273,7 @@ impl BlockDir {
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub fn validate<MO: Monitor>(&self, monitor: &mut MO) -> Result<HashMap<BlockHash, usize>> {
+    pub fn validate(&self) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
@@ -290,12 +290,13 @@ impl BlockDir {
                 Ok((bytes, _sizes)) => {
                     let len = bytes.len();
                     let len64 = len as u64;
-                    monitor.progress(Progress::ValidateBlocks {
+                    Progress::ValidateBlocks {
                         blocks_done: blocks_done.fetch_add(1, Ordering::Relaxed) + 1,
                         total_blocks,
                         bytes_done: bytes_done.fetch_add(len64, Ordering::Relaxed) + len64,
                         start,
-                    });
+                    }
+                    .post();
                     Some((hash, len))
                 }
                 Err(err) => {
@@ -304,7 +305,7 @@ impl BlockDir {
                 }
             })
             .collect();
-        monitor.progress(Progress::None);
+        Progress::None.post();
         Ok(block_lens)
     }
 

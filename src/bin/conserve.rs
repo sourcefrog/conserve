@@ -25,7 +25,7 @@ use metrics::increment_counter;
 use tracing::{debug, error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
-use conserve::ui::termui::{TerminalMonitor, TraceTimeStyle};
+use conserve::ui::termui::TraceTimeStyle;
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
@@ -268,7 +268,7 @@ impl std::process::Termination for ExitCode {
 }
 
 impl Command {
-    fn run(&self, monitor: &mut TerminalMonitor) -> Result<ExitCode> {
+    fn run(&self) -> Result<ExitCode> {
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -452,7 +452,7 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                Archive::open(open_transport(archive)?)?.validate(&options, monitor)?;
+                Archive::open(open_transport(archive)?)?.validate(&options)?;
                 if global_error_count() > 0 || global_warn_count() > 0 {
                     warn!("Archive has some problems.");
                 } else {
@@ -500,6 +500,7 @@ fn main() -> Result<ExitCode> {
     let args = Args::parse();
     let start_time = Instant::now();
     ui::enable_progress(!args.no_progress);
+    progress::ProgressImpl::Terminal.activate();
     let trace_level = if args.debug {
         Level::TRACE
     } else {
@@ -509,8 +510,7 @@ fn main() -> Result<ExitCode> {
     ::metrics::set_recorder(&conserve::metric_recorder::IN_MEMORY)
         .expect("Failed to install recorder");
     increment_counter!("conserve.start");
-    let mut monitor = TerminalMonitor::new()?;
-    let result = args.command.run(&mut monitor);
+    let result = args.command.run();
     metric_recorder::emit_to_trace();
     debug!(elapsed = ?start_time.elapsed());
     let error_count = global_error_count();
