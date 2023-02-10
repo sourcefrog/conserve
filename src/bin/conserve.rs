@@ -25,7 +25,7 @@ use metrics::increment_counter;
 use tracing::{debug, error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
-use conserve::ui::{TerminalMonitor, TraceTimeStyle};
+use conserve::ui::termui::{TerminalMonitor, TraceTimeStyle};
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
@@ -505,7 +505,7 @@ fn main() -> Result<ExitCode> {
     } else {
         Level::INFO
     };
-    ui::enable_tracing(&args.trace_time, trace_level, &args.log_json);
+    ui::termui::enable_tracing(&args.trace_time, trace_level, &args.log_json);
     ::metrics::set_recorder(&conserve::metric_recorder::IN_MEMORY)
         .expect("Failed to install recorder");
     increment_counter!("conserve.start");
