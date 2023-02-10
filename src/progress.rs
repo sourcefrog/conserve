@@ -50,6 +50,10 @@ pub enum Progress {
         bytes_done: u64,
         start: Instant,
     },
+    MeasureTree {
+        files: usize,
+        total_bytes: u64,
+    },
 }
 
 impl Progress {

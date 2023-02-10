@@ -172,6 +172,11 @@ impl nutmeg::Model for Progress {
                 nutmeg::percent_done(bands_done, total_bands),
                 nutmeg::estimate_remaining(&start, bands_done, total_bands)
             ),
+            Progress::MeasureTree { files, total_bytes } => format!(
+                "Measuring... {} files, {} MB",
+                files,
+                total_bytes / 1_000_000
+            ),
         }
     }
 }
