@@ -54,6 +54,15 @@ pub enum Progress {
         files: usize,
         total_bytes: u64,
     },
+    Backup {
+        filename: String,
+        scanned_file_bytes: u64,
+        scanned_dirs: usize,
+        scanned_files: usize,
+        entries_new: usize,
+        entries_changed: usize,
+        entries_unchanged: usize,
+    },
 }
 
 impl Progress {

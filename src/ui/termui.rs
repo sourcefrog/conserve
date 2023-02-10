@@ -144,8 +144,22 @@ pub(crate) fn post_progress(progress: Progress) {
 
 impl nutmeg::Model for Progress {
     fn render(&mut self, _width: usize) -> String {
-        match *self {
+        match self {
             Progress::None => String::new(),
+            Progress::Backup {
+                filename,
+                scanned_file_bytes,
+                scanned_dirs,
+                scanned_files,
+                entries_new,
+                entries_changed,
+                entries_unchanged,
+            } => format!("\
+                Scanned {scanned_dirs} directories, {scanned_files} files, {} MB\n\
+                {entries_new} new entries, {entries_changed} changed, {entries_unchanged} unchanged\n\
+                {filename}",
+                *scanned_file_bytes / 1_000_000,
+            ),
             Progress::ValidateBlocks {
                 blocks_done,
                 total_blocks,
@@ -156,9 +170,9 @@ impl nutmeg::Model for Progress {
                     "Check block {}/{}: {} done, {} MB checked, {} remaining",
                     blocks_done,
                     total_blocks,
-                    nutmeg::percent_done(blocks_done, total_blocks),
-                    bytes_done / 1_000_000,
-                    nutmeg::estimate_remaining(&start, blocks_done, total_blocks)
+                    nutmeg::percent_done(*blocks_done, *total_blocks),
+                    *bytes_done / 1_000_000,
+                    nutmeg::estimate_remaining(&start, *blocks_done, *total_blocks)
                 )
             }
             Progress::ValidateBands {
@@ -169,13 +183,13 @@ impl nutmeg::Model for Progress {
                 "Check index {}/{}, {} done, {} remaining",
                 bands_done,
                 total_bands,
-                nutmeg::percent_done(bands_done, total_bands),
-                nutmeg::estimate_remaining(&start, bands_done, total_bands)
+                nutmeg::percent_done(*bands_done, *total_bands),
+                nutmeg::estimate_remaining(&start, *bands_done, *total_bands)
             ),
             Progress::MeasureTree { files, total_bytes } => format!(
                 "Measuring... {} files, {} MB",
                 files,
-                total_bytes / 1_000_000
+                *total_bytes / 1_000_000
             ),
         }
     }

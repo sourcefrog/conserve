@@ -22,6 +22,7 @@ use tracing::error;
 
 use crate::blockdir::Address;
 use crate::io::read_with_retries;
+use crate::progress::Progress;
 use crate::stats::BackupStats;
 use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::ReadTree;
@@ -65,31 +66,6 @@ impl Default for BackupOptions {
 //     progress_bar.set_bytes_total(source.size()?.file_bytes as u64);
 // }
 
-#[derive(Default)]
-struct ProgressModel {
-    filename: String,
-    scanned_file_bytes: u64,
-    scanned_dirs: usize,
-    scanned_files: usize,
-    entries_new: usize,
-    entries_changed: usize,
-    entries_unchanged: usize,
-    entries_deleted: usize,
-}
-
-impl nutmeg::Model for ProgressModel {
-    fn render(&mut self, _width: usize) -> String {
-        format!(
-            "Scanned {} directories, {} files, {} MB\n{} new entries, {} changed, {} deleted, {} unchanged\n{}",
-            self.scanned_dirs,
-            self.scanned_files,
-            self.scanned_file_bytes / 1_000_000,
-            self.entries_new, self.entries_changed, self.entries_deleted, self.entries_unchanged,
-            self.filename
-        )
-    }
-}
-
 /// Backup a source directory into a new band in the archive.
 ///
 /// Returns statistics about what was copied.
@@ -101,19 +77,22 @@ pub fn backup(
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive)?;
     let mut stats = BackupStats::default();
-    let mut view = nutmeg::View::new(ProgressModel::default(), ui::nutmeg_options());
+
+    let mut scanned_dirs = 0;
+    let mut scanned_files = 0;
+    let mut scanned_file_bytes = 0;
+    let mut entries_new = 0;
+    let mut entries_changed = 0;
+    let mut entries_unchanged = 0;
 
     let entry_iter = source.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
-            view.update(|model| {
-                model.filename = entry.apath().to_string();
-                match entry.kind() {
-                    Kind::Dir => model.scanned_dirs += 1,
-                    Kind::File => model.scanned_files += 1,
-                    _ => (),
-                }
-            });
+            match entry.kind() {
+                Kind::Dir => scanned_dirs += 1,
+                Kind::File => scanned_files += 1,
+                _ => (),
+            }
             match writer.copy_entry(&entry, source) {
                 Err(err) => {
                     error!("Error copying entry {entry:?} to backup: {err}");
@@ -123,35 +102,48 @@ pub fn backup(
                 Ok(Some(diff_kind)) => {
                     if options.print_filenames && diff_kind != DiffKind::Unchanged {
                         if options.long_listing {
-                            writeln!(
-                                view,
+                            println!(
                                 "{} {} {} {}",
                                 diff_kind.as_sigil(),
                                 entry.unix_mode(),
                                 entry.owner(),
                                 entry.apath()
-                            )?;
+                            );
                         } else {
-                            writeln!(view, "{} {}", diff_kind.as_sigil(), entry.apath())?;
+                            println!("{} {}", diff_kind.as_sigil(), entry.apath());
                         }
                     }
-                    view.update(|model| match diff_kind {
-                        DiffKind::Changed => model.entries_changed += 1,
-                        DiffKind::New => model.entries_new += 1,
-                        DiffKind::Unchanged => model.entries_unchanged += 1,
-                        DiffKind::Deleted => model.entries_deleted += 1,
-                    })
+                    match diff_kind {
+                        DiffKind::Changed => entries_changed += 1,
+                        DiffKind::New => entries_new += 1,
+                        DiffKind::Unchanged => entries_unchanged += 1,
+                        // Deletions are not produced at the moment.
+                        DiffKind::Deleted => (), // model.entries_deleted += 1,
+                    }
                 }
                 Ok(_) => {}
             }
             if let Some(bytes) = entry.size() {
                 if bytes > 0 {
-                    view.update(|model| model.scanned_file_bytes += bytes)
+                    scanned_file_bytes += bytes;
+                    if !options.print_filenames {
+                        Progress::Backup {
+                            filename: entry.apath().to_string(),
+                            scanned_file_bytes,
+                            scanned_dirs,
+                            scanned_files,
+                            entries_new,
+                            entries_changed,
+                            entries_unchanged,
+                        }
+                        .post();
+                    }
                 }
             }
         }
         writer.flush_group()?;
     }
+    Progress::None.post();
     stats += writer.finish()?;
     stats.elapsed = start.elapsed();
     // TODO: Merge in stats from the source tree?
