@@ -16,10 +16,8 @@
 use std::error::Error;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
-use std::process::ExitCode;
 use std::time::Instant;
 
-use assert_matches::debug_assert_matches;
 use clap::{Parser, Subcommand};
 use metrics::increment_counter;
 #[allow(unused_imports)]
@@ -256,8 +254,20 @@ enum Debug {
     Unreferenced { archive: String },
 }
 
+enum ExitCode {
+    Success = 0,
+    Failure = 1,
+    NonFatalErrors = 2,
+}
+
+impl std::process::Termination for ExitCode {
+    fn report(self) -> std::process::ExitCode {
+        (self as u8).into()
+    }
+}
+
 impl Command {
-    fn run(&self, monitor: &mut TerminalMonitor) -> Result<()> {
+    fn run(&self, monitor: &mut TerminalMonitor) -> Result<ExitCode> {
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -467,7 +477,7 @@ impl Command {
                 conserve::show_versions(&archive, &options, &mut stdout)?;
             }
         }
-        Ok(())
+        Ok(ExitCode::Success)
     }
 }
 
@@ -502,27 +512,28 @@ fn main() -> Result<ExitCode> {
     let result = args.command.run(&mut monitor);
     in_memory_recorder::emit_to_trace();
     debug!(elapsed = ?start_time.elapsed());
-    if let Err(err) = result {
-        error!("{err}");
-        let mut err: &dyn Error = &err;
-        while let Some(source) = err.source() {
-            error!("caused by: {source}");
-            err = source;
+    match result {
+        Err(err) => {
+            error!("{err}");
+            let mut err: &dyn Error = &err;
+            while let Some(source) = err.source() {
+                error!("caused by: {source}");
+                err = source;
+            }
+            debug!(
+                error_count = ui::global_error_count(),
+                warn_count = ui::global_warn_count(),
+            );
+            Ok(ExitCode::Failure)
         }
-        debug!(
-            error_count = ui::global_error_count(),
-            warn_count = ui::global_warn_count(),
-        );
-        Ok(ExitCode::FAILURE)
-    } else if ui::global_error_count() > 0 || ui::global_warn_count() > 0 {
-        debug!(
-            error_count = ui::global_error_count(),
-            warn_count = ui::global_warn_count(),
-        );
-        Ok(ExitCode::FAILURE)
-    } else {
-        debug_assert_matches!(result, Ok(()));
-        Ok(ExitCode::SUCCESS)
+        Ok(ExitCode::Success) if ui::global_error_count() > 0 || ui::global_warn_count() > 0 => {
+            debug!(
+                error_count = ui::global_error_count(),
+                warn_count = ui::global_warn_count(),
+            );
+            Ok(ExitCode::NonFatalErrors)
+        }
+        Ok(exit_code) => Ok(exit_code),
     }
 }
 

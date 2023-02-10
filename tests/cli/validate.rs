@@ -73,7 +73,7 @@ fn validate_non_fatal_problems_nonzero_result_and_json_log() {
         .arg(log_temp.path())
         .assert()
         .stderr(predicate::str::contains("Archive has some problems."))
-        .code(1);
+        .code(2);
     let events = read_log_json(log_temp.path());
     dbg!(&events);
     let errors = filter_by_level(&events, Level::ERROR);
