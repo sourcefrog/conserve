@@ -39,6 +39,23 @@ impl ProgressImpl {
 #[derive(Clone)]
 pub enum Progress {
     None,
+    Backup {
+        filename: String,
+        scanned_file_bytes: u64,
+        scanned_dirs: usize,
+        scanned_files: usize,
+        entries_new: usize,
+        entries_changed: usize,
+        entries_unchanged: usize,
+    },
+    MeasureTree {
+        files: usize,
+        total_bytes: u64,
+    },
+    Restore {
+        filename: String,
+        bytes_done: u64,
+    },
     ValidateBands {
         total_bands: usize,
         bands_done: usize,
@@ -49,19 +66,6 @@ pub enum Progress {
         total_blocks: usize,
         bytes_done: u64,
         start: Instant,
-    },
-    MeasureTree {
-        files: usize,
-        total_bytes: u64,
-    },
-    Backup {
-        filename: String,
-        scanned_file_bytes: u64,
-        scanned_dirs: usize,
-        scanned_files: usize,
-        entries_new: usize,
-        entries_changed: usize,
-        entries_unchanged: usize,
     },
 }
 

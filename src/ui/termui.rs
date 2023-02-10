@@ -160,6 +160,16 @@ impl nutmeg::Model for Progress {
                 {filename}",
                 *scanned_file_bytes / 1_000_000,
             ),
+            Progress::MeasureTree { files, total_bytes } => format!(
+                "Measuring... {} files, {} MB",
+                files,
+                *total_bytes / 1_000_000
+            ),
+            Progress::Restore { filename, bytes_done }=>
+        format!(
+            "Restoring: {mb} MB\n{filename}",
+            mb = *bytes_done / 1_000_000,
+        ),
             Progress::ValidateBlocks {
                 blocks_done,
                 total_blocks,
@@ -185,11 +195,6 @@ impl nutmeg::Model for Progress {
                 total_bands,
                 nutmeg::percent_done(*bands_done, *total_bands),
                 nutmeg::estimate_remaining(&start, *bands_done, *total_bands)
-            ),
-            Progress::MeasureTree { files, total_bytes } => format!(
-                "Measuring... {} files, {} MB",
-                files,
-                *total_bytes / 1_000_000
             ),
         }
     }
