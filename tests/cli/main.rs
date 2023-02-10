@@ -129,8 +129,8 @@ fn basic_backup() {
         .arg(&src)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty());
-    // .stdout(predicate::str::is_empty()); // TODO: Should be empty but currently emits stats.
+        .stderr(predicate::str::contains("Backup complete."))
+        .stdout(predicate::str::is_empty());
     // TODO: Now inspect the archive.
 
     run_conserve()

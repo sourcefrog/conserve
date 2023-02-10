@@ -74,11 +74,10 @@ fn backup_unix_permissions() {
         .arg(&data_dir)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
+        .stderr(predicate::str::contains("Backup complete."))
         .stdout(predicate::str::starts_with(format!(
             "+ r--r--r-- {user:<10} {group:<10} /hello\n\
-             + rwxr-xr-x {user:<10} {group:<10} /subdir/subfile\n\
-             Backup complete."
+             + rwxr-xr-x {user:<10} {group:<10} /subdir/subfile"
         )));
 
     // verify file permissions in stored archive
@@ -187,8 +186,8 @@ fn backup_user_and_permissions() {
         .arg(&src)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with("Backup complete.\n"));
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("Backup complete.\n"));
 
     let restore_dir = TempDir::new().unwrap();
 

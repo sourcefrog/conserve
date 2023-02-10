@@ -90,6 +90,7 @@ pub fn enable_tracing(
             .with_writer(WriteToNutmeg)
             .with_timer(timer)
             .with_filter(LevelFilter::from_level(console_level));
+        // TODO: Maybe tracing_appender instead?
         let json_layer = json_path
             .as_ref()
             .map(|path| {
@@ -153,13 +154,6 @@ impl io::Write for WriteToNutmeg {
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
-}
-
-pub fn println(s: &str) {
-    // TODO: Reconsider callers; some should move to logging, others to a
-    // new bulk output API?
-    NUTMEG_VIEW.clear();
-    println!("{s}");
 }
 
 /// Enable drawing progress bars, only if stdout is a tty.

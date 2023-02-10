@@ -288,7 +288,7 @@ impl Command {
                 };
                 let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
                 if !no_stats {
-                    ui::println(&format!("Backup complete.\n{stats}"));
+                    info!("Backup complete.\n{stats}");
                 }
             }
             Command::Debug(Debug::Blocks { archive }) => {
@@ -332,7 +332,7 @@ impl Command {
                     },
                 )?;
                 if !no_stats {
-                    ui::println(&format!("{stats}"));
+                    println!("{stats}");
                 }
             }
             Command::Diff {
@@ -442,9 +442,9 @@ impl Command {
                         .file_bytes
                 };
                 if *bytes {
-                    ui::println(&format!("{size}"));
+                    println!("{size}");
                 } else {
-                    ui::println(&conserve::bytes_to_human_mb(size));
+                    println!("{}", conserve::bytes_to_human_mb(size));
                 }
             }
             Command::Validate { archive, quick, .. } => {
