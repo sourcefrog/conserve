@@ -126,7 +126,10 @@ impl nutmeg::Model for Progress {
                 blocks_done.separate_with_commas(),
                 total_blocks.separate_with_commas(),
             ),
-            Progress::ListBlocks { count } => format!("List blocks: {count}..."),
+            Progress::ListBlocks { count } => format!(
+                "List blocks: {count}...",
+                count = count.separate_with_commas(),
+            ),
             Progress::MeasureTree { files, total_bytes } => format!(
                 "Measuring... {} files, {} MB",
                 files.separate_with_commas(),
