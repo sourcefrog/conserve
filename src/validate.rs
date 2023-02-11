@@ -19,7 +19,7 @@ use std::time::Instant;
 use tracing::{error, info, warn};
 
 use crate::misc::ResultExt;
-use crate::progress::Progress;
+use crate::progress::{Bar, Progress};
 use crate::*;
 
 /// Options to [Archive::validate].
@@ -40,6 +40,7 @@ pub(crate) fn validate_bands(
     let mut block_lens = HashMap::new();
     let start = Instant::now();
     let total_bands = band_ids.len();
+    let bar = Bar::new();
     'band: for (bands_done, band_id) in band_ids.iter().enumerate() {
         let band = match Band::open(archive, band_id) {
             Ok(band) => band,
@@ -60,14 +61,12 @@ pub(crate) fn validate_bands(
             error!(%err, %band_id, "Error validating stored tree");
             continue 'band;
         }
-        Progress::ValidateBands {
+        bar.post(Progress::ValidateBands {
             total_bands,
             bands_done,
             start,
-        }
-        .post();
+        });
     }
-    Progress::None.post();
     Ok(block_lens)
 }
 

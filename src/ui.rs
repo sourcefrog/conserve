@@ -15,5 +15,5 @@
 
 pub mod termui;
 
-pub use termui::enable_progress;
+pub use crate::progress::enable_progress;
 pub(crate) use termui::nutmeg_options;

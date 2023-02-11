@@ -41,7 +41,7 @@ use tracing::{debug, error, info, warn};
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::progress::Progress;
+use crate::progress::{Bar, Progress};
 use crate::stats::{BackupStats, Sizes};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
@@ -283,19 +283,19 @@ impl BlockDir {
         let blocks_done = AtomicUsize::new(0);
         let bytes_done = AtomicU64::new(0);
         let start = Instant::now();
+        let task = Bar::new();
         let block_lens = blocks
             .into_par_iter()
             .flat_map(|hash| match self.get_block_content(&hash) {
                 Ok((bytes, _sizes)) => {
                     let len = bytes.len();
                     let len64 = len as u64;
-                    Progress::ValidateBlocks {
+                    task.post(Progress::ValidateBlocks {
                         blocks_done: blocks_done.fetch_add(1, Ordering::Relaxed) + 1,
                         total_blocks,
                         bytes_done: bytes_done.fetch_add(len64, Ordering::Relaxed) + len64,
                         start,
-                    }
-                    .post();
+                    });
                     Some((hash, len))
                 }
                 Err(err) => {
@@ -304,7 +304,6 @@ impl BlockDir {
                 }
             })
             .collect();
-        Progress::None.post();
         Ok(block_lens)
     }
 

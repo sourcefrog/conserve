@@ -28,7 +28,7 @@ use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::owner::set_owner;
-use crate::progress::Progress;
+use crate::progress::{Bar, Progress};
 use crate::stats::RestoreStats;
 use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
@@ -75,6 +75,7 @@ pub fn restore(
     }?;
     let mut stats = RestoreStats::default();
     let mut bytes_done = 0;
+    let bar = Bar::new();
     let start = Instant::now();
     // // This causes us to walk the source tree twice, which is probably an acceptable option
     // // since it's nice to see realistic overall progress. We could keep all the entries
@@ -100,11 +101,10 @@ pub fn restore(
             }
         }
         if !options.print_filenames {
-            Progress::Restore {
+            bar.post(Progress::Restore {
                 filename: entry.apath().to_string(),
                 bytes_done,
-            }
-            .post();
+            });
         }
         if let Err(err) = match entry.kind() {
             Kind::Dir => {
@@ -141,7 +141,6 @@ pub fn restore(
     }
     stats += rt.finish()?;
     stats.elapsed = start.elapsed();
-    Progress::None.post();
     // TODO: Merge in stats from the tree iter and maybe the source tree?
     Ok(stats)
 }

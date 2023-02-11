@@ -15,10 +15,15 @@
 
 // static PROGRESS_IMPL;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
 use std::time::Instant;
 
 static IMPL: RwLock<ProgressImpl> = RwLock::new(ProgressImpl::Null);
+
+static NEXT_TASK_ID: AtomicUsize = AtomicUsize::new(0);
+
+pub(crate) mod term;
 
 /// How to show progress bars?
 #[derive(Debug, Clone, Copy)]
@@ -32,10 +37,47 @@ impl ProgressImpl {
     pub fn activate(self) {
         *IMPL.write().expect("locked progress impl") = self
     }
+
+    fn remove_bar(&mut self, task: &mut Bar) {
+        match self {
+            ProgressImpl::Null => (),
+            ProgressImpl::Terminal => term::remove_bar(task.bar_id),
+        }
+    }
+
+    fn add_bar(&mut self) -> Bar {
+        let bar_id = assign_new_bar_id();
+        match self {
+            ProgressImpl::Null => (),
+            ProgressImpl::Terminal => term::add_bar(bar_id),
+        }
+        Bar { bar_id }
+    }
+
+    fn post(&self, task: &Bar, progress: Progress) {
+        match self {
+            ProgressImpl::Null => (),
+            ProgressImpl::Terminal => term::update_bar(task.bar_id, progress),
+        }
+    }
 }
 
-/// Overall progress state communicated from Conserve core to whatever progress bar
-/// impl is in use.
+/// Enable drawing progress bars, only if stdout is a tty.
+///
+/// Progress bars are off by default.
+pub fn enable_progress(enabled: bool) {
+    if enabled {
+        ProgressImpl::Terminal.activate();
+    } else {
+        ProgressImpl::Null.activate();
+    }
+}
+
+fn assign_new_bar_id() -> usize {
+    NEXT_TASK_ID.fetch_add(1, Ordering::Relaxed)
+}
+
+/// State of progress on one bar.
 #[derive(Clone)]
 pub enum Progress {
     None,
@@ -69,12 +111,32 @@ pub enum Progress {
     },
 }
 
-impl Progress {
-    /// Update the UI to show this progress state.
-    pub fn post(self) {
-        match *IMPL.read().unwrap() {
-            ProgressImpl::Null => (),
-            ProgressImpl::Terminal => crate::ui::termui::post_progress(self),
-        }
+/// A transient progress task. The UI may draw these as some kind of
+/// progress bar.
+#[derive(Debug)]
+pub struct Bar {
+    /// An opaque unique ID for each concurrent task.
+    bar_id: usize,
+}
+
+impl Bar {
+    #[must_use]
+    pub fn new() -> Self {
+        IMPL.write().expect("lock progress impl").add_bar()
+    }
+
+    pub fn post(&self, progress: Progress) {
+        IMPL.read().unwrap().post(self, progress)
+    }
+}
+
+impl Default for Bar {
+    fn default() -> Self {
+        Bar::new()
+    }
+
+impl Drop for Bar {
+    fn drop(&mut self) {
+        IMPL.write().expect("lock progress impl").remove_bar(self)
     }
 }

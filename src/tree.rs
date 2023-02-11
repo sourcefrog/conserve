@@ -15,7 +15,7 @@
 
 use std::ops::Range;
 
-use crate::progress::Progress;
+use crate::progress::{Bar, Progress};
 use crate::stats::Sizes;
 use crate::*;
 
@@ -46,12 +46,13 @@ pub trait ReadTree {
     fn size(&self, exclude: Exclude) -> Result<TreeSize> {
         let mut files = 0;
         let mut total_bytes = 0u64;
+        let bar = Bar::new();
         for e in self.iter_entries(Apath::root(), exclude)? {
             // While just measuring size, ignore directories/files we can't stat.
             if let Some(bytes) = e.size() {
                 total_bytes += bytes;
                 files += 1;
-                Progress::MeasureTree { files, total_bytes }.post();
+                bar.post(Progress::MeasureTree { files, total_bytes });
             }
         }
         Ok(TreeSize {

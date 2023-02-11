@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ use tracing::error;
 
 use crate::blockdir::Address;
 use crate::io::read_with_retries;
-use crate::progress::Progress;
+use crate::progress::{Bar, Progress};
 use crate::stats::BackupStats;
 use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::ReadTree;
@@ -77,6 +77,7 @@ pub fn backup(
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive)?;
     let mut stats = BackupStats::default();
+    let bar = Bar::new();
 
     let mut scanned_dirs = 0;
     let mut scanned_files = 0;
@@ -127,7 +128,7 @@ pub fn backup(
                 if bytes > 0 {
                     scanned_file_bytes += bytes;
                     if !options.print_filenames {
-                        Progress::Backup {
+                        bar.post(Progress::Backup {
                             filename: entry.apath().to_string(),
                             scanned_file_bytes,
                             scanned_dirs,
@@ -135,15 +136,13 @@ pub fn backup(
                             entries_new,
                             entries_changed,
                             entries_unchanged,
-                        }
-                        .post();
+                        });
                     }
                 }
             }
         }
         writer.flush_group()?;
     }
-    Progress::None.post();
     stats += writer.finish()?;
     stats.elapsed = start.elapsed();
     // TODO: Merge in stats from the source tree?
