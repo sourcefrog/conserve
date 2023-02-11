@@ -15,6 +15,7 @@ use std::io;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use thousands::Separable;
 
 use super::*;
 
@@ -39,7 +40,10 @@ pub(super) fn update_bar(bar_id: usize, progress: Progress) {
 }
 
 pub(super) fn remove_bar(bar_id: usize) {
-    NUTMEG_VIEW.update(|model| model.remove_bar(bar_id));
+    let removed_last = NUTMEG_VIEW.update(|model| model.remove_bar(bar_id));
+    if removed_last {
+        NUTMEG_VIEW.clear();
+    }
 }
 
 /// A stack of multiple Progress objects, each identified by an integer id.
@@ -69,8 +73,9 @@ impl MultiModel {
         self.0[pos].1 = progress;
     }
 
-    fn remove_bar(&mut self, bar_id: usize) {
+    fn remove_bar(&mut self, bar_id: usize) -> bool {
         self.0.retain(|(id, _)| *id != bar_id);
+        self.0.is_empty()
     }
 }
 
@@ -98,16 +103,20 @@ impl nutmeg::Model for Progress {
                 {filename}",
                 *scanned_file_bytes / 1_000_000,
             ),
+            Progress::ListBlocks { count } => format!("List blocks: {count}..."),
             Progress::MeasureTree { files, total_bytes } => format!(
                 "Measuring... {} files, {} MB",
-                files,
-                *total_bytes / 1_000_000
+                files.separate_with_commas(),
+                (*total_bytes / 1_000_000).separate_with_commas()
             ),
-            Progress::Restore { filename, bytes_done }=>
-        format!(
-            "Restoring: {mb} MB\n{filename}",
-            mb = *bytes_done / 1_000_000,
-        ),
+            Progress::ReferencedBlocks { references_found, bands_started, total_bands } => format!(
+                "Find referenced blocks: {} in {bands_started}/{total_bands} bands...",
+                references_found.separate_with_commas(),
+            ),
+            Progress::Restore { filename, bytes_done } => format!(
+                "Restoring: {mb} MB\n{filename}",
+                mb = *bytes_done / 1_000_000,
+            ),
             Progress::ValidateBlocks {
                 blocks_done,
                 total_blocks,
@@ -116,10 +125,10 @@ impl nutmeg::Model for Progress {
             } => {
                 format!(
                     "Check block {}/{}: {} done, {} MB checked, {} remaining",
-                    blocks_done,
-                    total_blocks,
+                    blocks_done.separate_with_commas(),
+                    total_blocks.separate_with_commas(),
                     nutmeg::percent_done(*blocks_done, *total_blocks),
-                    *bytes_done / 1_000_000,
+                    (*bytes_done / 1_000_000).separate_with_commas(),
                     nutmeg::estimate_remaining(start, *blocks_done, *total_blocks)
                 )
             }

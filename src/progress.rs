@@ -90,9 +90,17 @@ pub enum Progress {
         entries_changed: usize,
         entries_unchanged: usize,
     },
+    ListBlocks {
+        count: usize,
+    },
     MeasureTree {
         files: usize,
         total_bytes: u64,
+    },
+    ReferencedBlocks {
+        bands_started: usize,
+        total_bands: usize,
+        references_found: usize,
     },
     Restore {
         filename: String,
@@ -134,6 +142,7 @@ impl Default for Bar {
     fn default() -> Self {
         Bar::new()
     }
+}
 
 impl Drop for Bar {
     fn drop(&mut self) {

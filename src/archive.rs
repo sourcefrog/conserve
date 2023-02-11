@@ -18,6 +18,7 @@ use std::io::ErrorKind;
 use std::path::Path;
 use std::sync::Arc;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use itertools::Itertools;
@@ -30,6 +31,7 @@ use crate::blockhash::BlockHash;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
+use crate::progress::{Bar, Progress};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -195,17 +197,27 @@ impl Archive {
     /// Shows a progress bar as they're collected.
     pub fn referenced_blocks(&self, band_ids: &[BandId]) -> Result<HashSet<BlockHash>> {
         let archive = self.clone();
-        let progress = nutmeg::View::new(
-            LinearModel::new("Find referenced blocks in band", band_ids.len()),
-            ui::nutmeg_options(),
-        );
+        // TODO: Percentage completion based on how many bands have been checked so far.
+        let bar = Bar::new();
+        let references_found = AtomicUsize::new(0);
+        let bands_started = AtomicUsize::new(0);
+        let total_bands = band_ids.len();
         Ok(band_ids
             .par_iter()
-            .inspect(move |_| progress.update(|model| model.increment(1)))
+            .inspect(|_| {
+                bands_started.fetch_add(1, Ordering::Relaxed);
+            })
             .map(move |band_id| Band::open(&archive, band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
             .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
+            .inspect(|_hash| {
+                bar.post(Progress::ReferencedBlocks {
+                    references_found: references_found.fetch_add(1, Ordering::Relaxed),
+                    bands_started: bands_started.load(Ordering::Relaxed),
+                    total_bands,
+                })
+            })
             .collect())
     }
 
@@ -236,12 +248,17 @@ impl Archive {
         } else {
             gc_lock::GarbageCollectionLock::new(self)?
         };
+        debug!("Got gc lock");
 
         let block_dir = self.block_dir();
+        debug!("List band ids...");
         let mut keep_band_ids = self.list_band_ids()?;
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
+        debug!("List referenced blocks...");
         let referenced = self.referenced_blocks(&keep_band_ids)?;
+
+        debug!("Find present blocks...");
         let progress = nutmeg::View::new(
             UnboundedModel::new("Find present blocks"),
             ui::nutmeg_options(),

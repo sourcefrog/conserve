@@ -32,7 +32,6 @@ use std::time::Instant;
 use ::metrics::{counter, histogram, increment_counter};
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use nutmeg::models::UnboundedModel;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
@@ -260,11 +259,15 @@ impl BlockDir {
 
     /// Return all the blocknames in the blockdir.
     pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
-        let progress = nutmeg::View::new(UnboundedModel::new("List blocks"), ui::nutmeg_options());
+        let bar = Bar::new();
         Ok(self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok())
-            .inspect(|_| progress.update(|model| model.increment(1)))
+            .enumerate()
+            .map(|(count, hash)| {
+                bar.post(Progress::ListBlocks { count });
+                hash
+            })
             .collect())
     }
 
