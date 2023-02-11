@@ -9,6 +9,7 @@ use std::path::PathBuf;
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::layer::Layer;
@@ -30,13 +31,18 @@ pub enum TraceTimeStyle {
     Relative,
 }
 
+#[must_use]
 pub fn enable_tracing(
     time_style: &TraceTimeStyle,
     console_level: Level,
     json_path: &Option<PathBuf>,
-) {
+) -> Option<WorkerGuard> {
     use tracing_subscriber::fmt::time;
-    fn hookup<FT>(timer: FT, console_level: Level, json_path: &Option<PathBuf>)
+    fn hookup<FT>(
+        timer: FT,
+        console_level: Level,
+        json_path: &Option<PathBuf>,
+    ) -> Option<WorkerGuard>
     where
         FT: FormatTime + Send + Sync + 'static,
     {
@@ -45,31 +51,36 @@ pub fn enable_tracing(
             .with_writer(WriteToNutmeg)
             .with_timer(timer)
             .with_filter(LevelFilter::from_level(console_level));
-        // TODO: Maybe tracing_appender instead?
-        let json_layer = json_path
-            .as_ref()
-            .map(|path| {
-                OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .write(true)
-                    .read(false)
-                    .open(path)
-                    .expect("open json log file")
-            })
-            .map(|w| {
+        let json_layer;
+        let flush_guard;
+        if let Some(json_path) = json_path {
+            let file_writer = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .write(true)
+                .read(false)
+                .open(json_path)
+                .expect("open json log file");
+            let (non_blocking, guard) = tracing_appender::non_blocking(file_writer);
+            flush_guard = Some(guard);
+            json_layer = Some(
                 tracing_subscriber::fmt::Layer::default()
                     .json()
-                    .with_writer(w)
-            });
+                    .with_writer(non_blocking),
+            );
+        } else {
+            flush_guard = None;
+            json_layer = None;
+        }
         Registry::default()
             .with(console_layer)
             .with(crate::trace_counter::CounterLayer())
             .with(json_layer)
             .init();
+        flush_guard
     }
 
-    match time_style {
+    let flush_guard = match time_style {
         TraceTimeStyle::None => hookup((), console_level, json_path),
         TraceTimeStyle::Utc => hookup(time::UtcTime::rfc_3339(), console_level, json_path),
         TraceTimeStyle::Relative => hookup(time::uptime(), console_level, json_path),
@@ -78,6 +89,7 @@ pub fn enable_tracing(
             console_level,
             json_path,
         ),
-    }
+    };
     trace!("Tracing enabled");
+    flush_guard
 }

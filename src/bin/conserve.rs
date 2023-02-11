@@ -504,7 +504,7 @@ fn main() -> Result<ExitCode> {
     } else {
         Level::INFO
     };
-    ui::termui::enable_tracing(&args.trace_time, trace_level, &args.log_json);
+    let _flush_guard = ui::termui::enable_tracing(&args.trace_time, trace_level, &args.log_json);
     ::metrics::set_recorder(&conserve::metric_recorder::IN_MEMORY)
         .expect("Failed to install recorder");
     increment_counter!("conserve.start");
