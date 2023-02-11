@@ -10,8 +10,6 @@ use super::*;
 #[test]
 fn no_trace_timestamps_by_default() {
     let temp_dir = TempDir::new().unwrap();
-    // Maybe we should disable coloring if the destination is not a
-    // tty, but for now they are there...
     run_conserve()
         .args(["-D", "init"])
         .arg(temp_dir.child("archive").path())
