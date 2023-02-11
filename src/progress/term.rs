@@ -26,8 +26,11 @@ lazy_static! {
     /// This is global to reflect that there is globally one stdout/stderr:
     /// this object manages it.
     static ref NUTMEG_VIEW: nutmeg::View<MultiModel> =
-        nutmeg::View::new(MultiModel::new(), nutmeg::Options::default()
-            .destination(nutmeg::Destination::Stderr));
+        nutmeg::View::new(
+            MultiModel::new(),
+            nutmeg::Options::new()
+                .destination(nutmeg::Destination::Stderr)
+        );
 }
 
 pub(super) fn add_bar(bar_id: usize) {
