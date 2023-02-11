@@ -231,14 +231,14 @@ impl BlockDir {
             .map(move |subdir_name| transport.iter_dir_entries(&subdir_name))
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
-                    error!("Error listing block subdirectory: {err}");
+                    error!(%err, "Error listing block subdirectory");
                 }
                 iter_or.ok()
             })
             .flatten()
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
-                    error!("Error listing block subdirectory: {err}");
+                    error!(%err, "Error listing block subdirectory");
                 }
                 iter_or.ok()
             })

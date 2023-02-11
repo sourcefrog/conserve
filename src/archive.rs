@@ -357,7 +357,7 @@ impl Archive {
                             %block_hash,
                             referenced_len,
                             actual_len,
-                            "Block is shortered than referenced length"
+                            "Block is shorter than referenced length"
                         );
                     }
                 } else {

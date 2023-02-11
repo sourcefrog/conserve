@@ -96,7 +96,7 @@ pub fn backup(
             }
             match writer.copy_entry(&entry, source) {
                 Err(err) => {
-                    error!("Error copying entry {entry:?} to backup: {err}");
+                    error!(?entry, ?err, "Error copying entry to backup");
                     stats.errors += 1;
                     continue;
                 }
