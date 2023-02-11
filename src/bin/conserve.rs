@@ -51,6 +51,10 @@ struct Args {
     /// Append a json formatted log to this file.
     #[arg(long, global = true)]
     log_json: Option<PathBuf>,
+
+    /// Write metrics to this file.
+    #[arg(long, global = true)]
+    metrics_json: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -513,6 +517,9 @@ fn main() -> Result<ExitCode> {
     debug!(elapsed = ?start_time.elapsed());
     let error_count = global_error_count();
     let warn_count = global_warn_count();
+    if let Some(metrics_json_path) = args.metrics_json {
+        metric_recorder::write_json_metrics(&metrics_json_path)?;
+    }
     match result {
         Err(err) => {
             error!("{err}");

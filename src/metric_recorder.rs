@@ -15,6 +15,8 @@
 //! earlier.
 
 use std::collections::BTreeMap;
+use std::fs::OpenOptions;
+use std::path::Path;
 use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
 use std::sync::{atomic::Ordering, Arc};
@@ -26,7 +28,10 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use metrics_util::registry::{Registry, Storage};
 use metrics_util::Summary;
+use serde_json::json;
 use tracing::debug;
+
+use crate::{Error, Result};
 
 lazy_static! {
     static ref REGISTRY: Registry<Key, SummaryStorage> = Registry::new(SummaryStorage::new());
@@ -129,4 +134,19 @@ impl SummaryHistogram {
     fn new() -> Self {
         SummaryHistogram(Mutex::new(Summary::with_defaults()))
     }
+}
+
+pub fn write_json_metrics(path: &Path) -> Result<()> {
+    let f = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path)?;
+    let j = json!( {
+        "counters": counter_values(),
+    });
+    serde_json::to_writer_pretty(f, &j).map_err(|source| Error::SerializeJson {
+        path: path.to_string_lossy().to_string(),
+        source,
+    })
 }
