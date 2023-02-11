@@ -201,6 +201,7 @@ impl Archive {
         let references_found = AtomicUsize::new(0);
         let bands_started = AtomicUsize::new(0);
         let total_bands = band_ids.len();
+        let start = Instant::now();
         Ok(band_ids
             .par_iter()
             .inspect(|_| {
@@ -215,6 +216,7 @@ impl Archive {
                     references_found: references_found.fetch_add(1, Ordering::Relaxed),
                     bands_started: bands_started.load(Ordering::Relaxed),
                     total_bands,
+                    start,
                 })
             })
             .collect())

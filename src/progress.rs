@@ -102,6 +102,7 @@ pub enum Progress {
         bands_started: usize,
         total_bands: usize,
         references_found: usize,
+        start: Instant,
     },
     Restore {
         filename: String,

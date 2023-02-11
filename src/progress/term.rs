@@ -15,6 +15,7 @@ use std::io;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use nutmeg::estimate_remaining;
 use thousands::Separable;
 
 use super::*;
@@ -97,17 +98,31 @@ impl nutmeg::Model for Progress {
                 entries_new,
                 entries_changed,
                 entries_unchanged,
-            } => format!("\
-                Scanned {scanned_dirs} directories, {scanned_files} files, {} MB\n\
-                {entries_new} new entries, {entries_changed} changed, {entries_unchanged} unchanged\n\
+            } => format!(
+                "\
+                Scanned {dirs} directories, {files} files, {mb} MB\n\
+                {new} new entries, {changed} changed, {unchanged} unchanged\n\
                 {filename}",
-                (*scanned_file_bytes / 1_000_000).separate_with_commas(),
+                dirs = scanned_dirs.separate_with_commas(),
+                files = scanned_files.separate_with_commas(),
+                mb = (*scanned_file_bytes / 1_000_000).separate_with_commas(),
+                new = entries_new.separate_with_commas(),
+                changed = entries_changed.separate_with_commas(),
+                unchanged = entries_unchanged.separate_with_commas(),
             ),
-            Progress::DeleteBands { bands_done, total_bands } => format!("Delete bands: {}/{}...",
+            Progress::DeleteBands {
+                bands_done,
+                total_bands,
+            } => format!(
+                "Delete bands: {}/{}...",
                 bands_done.separate_with_commas(),
                 total_bands.separate_with_commas(),
             ),
-            Progress::DeleteBlocks { blocks_done, total_blocks } => format!("Delete blocks: {}/{}...",
+            Progress::DeleteBlocks {
+                blocks_done,
+                total_blocks,
+            } => format!(
+                "Delete blocks: {}/{}...",
                 blocks_done.separate_with_commas(),
                 total_blocks.separate_with_commas(),
             ),
@@ -117,16 +132,28 @@ impl nutmeg::Model for Progress {
                 files.separate_with_commas(),
                 (*total_bytes / 1_000_000).separate_with_commas()
             ),
-            Progress::MeasureUnreferenced { blocks_done, blocks_total } => format!(
+            Progress::MeasureUnreferenced {
+                blocks_done,
+                blocks_total,
+            } => format!(
                 "Measure unreferenced blocks: {}/{}...",
                 blocks_done.separate_with_commas(),
                 blocks_total.separate_with_commas(),
             ),
-            Progress::ReferencedBlocks { references_found, bands_started, total_bands } => format!(
-                "Find referenced blocks: {} in {bands_started}/{total_bands} bands...",
-                references_found.separate_with_commas(),
+            Progress::ReferencedBlocks {
+                references_found,
+                bands_started,
+                total_bands,
+                start,
+            } => format!(
+                "Find referenced blocks: {found} in {bands_started}/{total_bands} bands, {eta} remaining...",
+                found = references_found.separate_with_commas(),
+                eta = estimate_remaining(start, *bands_started, *total_bands),
             ),
-            Progress::Restore { filename, bytes_done } => format!(
+            Progress::Restore {
+                filename,
+                bytes_done,
+            } => format!(
                 "Restoring: {mb} MB\n{filename}",
                 mb = *bytes_done / 1_000_000,
             ),
