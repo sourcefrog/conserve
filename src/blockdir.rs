@@ -252,8 +252,7 @@ impl BlockDir {
 
     /// Return all the blocknames in the blockdir, in arbitrary order.
     pub fn block_names(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        let progress = nutmeg::View::new("List blocks", ui::nutmeg_options());
-        progress.update(|_| ());
+        // TODO: Report errors
         Ok(self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok()))
