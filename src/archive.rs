@@ -22,7 +22,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use itertools::Itertools;
-use nutmeg::models::{LinearModel, UnboundedModel};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, warn};
@@ -257,54 +256,57 @@ impl Archive {
 
         debug!("List referenced blocks...");
         let referenced = self.referenced_blocks(&keep_band_ids)?;
+        debug!(referenced.len = referenced.len());
 
         debug!("Find present blocks...");
-        let progress = nutmeg::View::new(
-            UnboundedModel::new("Find present blocks"),
-            ui::nutmeg_options(),
-        );
-        let unref = self
-            .block_dir()
-            .block_names()?
-            .inspect(|_| progress.update(|model| model.increment(1)))
-            .filter(|bh| !referenced.contains(bh))
-            .collect_vec();
-        drop(progress);
+        let present = self.block_dir.block_names_set()?;
+        debug!(present.len = present.len());
+
+        debug!("Find unreferenced blocks...");
+        let unref = present.difference(&referenced).collect_vec();
         let unref_count = unref.len();
+        debug!(unref_count);
         stats.unreferenced_block_count = unref_count;
 
-        let progress = nutmeg::View::new(
-            LinearModel::new("Measure unreferenced blocks", unref.len()),
-            ui::nutmeg_options(),
-        );
+        debug!("Measure unreferenced blocks...");
+        let measure_bar = Bar::new();
         let total_bytes = unref
             .par_iter()
-            .inspect(|_| progress.update(|model| model.increment(1)))
-            .map(|block_id| block_dir.compressed_size(block_id).unwrap_or_default())
+            .enumerate()
+            .inspect(|(i, _)| {
+                measure_bar.post(Progress::MeasureUnreferenced {
+                    blocks_done: *i,
+                    blocks_total: unref_count,
+                })
+            })
+            .map(|(_i, block_id)| block_dir.compressed_size(block_id).unwrap_or_default())
             .sum();
+        drop(measure_bar);
         stats.unreferenced_block_bytes = total_bytes;
 
         if !options.dry_run {
             delete_guard.check()?;
+            let bar = Bar::new();
 
-            let progress = nutmeg::View::new(
-                LinearModel::new("Delete bands", delete_band_ids.len()),
-                ui::nutmeg_options(),
-            );
-            for band_id in delete_band_ids {
+            for (bands_done, band_id) in delete_band_ids.iter().enumerate() {
                 Band::delete(self, band_id)?;
                 stats.deleted_band_count += 1;
-                progress.update(|model| model.increment(1));
+                bar.post(Progress::DeleteBands {
+                    bands_done,
+                    total_bands: delete_band_ids.len(),
+                });
             }
 
-            let progress = nutmeg::View::new(
-                LinearModel::new("Delete blocks", unref_count),
-                ui::nutmeg_options(),
-            );
             let error_count = unref
                 .par_iter()
-                .inspect(|_| progress.update(|model| model.increment(1)))
-                .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
+                .enumerate()
+                .inspect(|(blocks_done, _hash)| {
+                    bar.post(Progress::DeleteBlocks {
+                        blocks_done: *blocks_done,
+                        total_blocks: unref_count,
+                    })
+                })
+                .filter(|(_, block_hash)| block_dir.delete_block(block_hash).is_err())
                 .count();
             stats.deletion_errors += error_count;
             stats.deleted_block_count += unref_count - error_count;

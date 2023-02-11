@@ -14,6 +14,3 @@
 //! Generic UI layer.
 
 pub mod termui;
-
-pub use crate::progress::enable_progress;
-pub(crate) use termui::nutmeg_options;

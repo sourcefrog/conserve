@@ -464,7 +464,6 @@ impl Command {
                 sizes,
                 utc,
             } => {
-                ui::enable_progress(false);
                 let archive = Archive::open(open_transport(archive)?)?;
                 let options = ShowVersionsOptions {
                     newest_first: *newest,
@@ -497,8 +496,9 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
 fn main() -> Result<ExitCode> {
     let args = Args::parse();
     let start_time = Instant::now();
-    ui::enable_progress(!args.no_progress);
-    progress::ProgressImpl::Terminal.activate();
+    if !args.no_progress {
+        progress::ProgressImpl::Terminal.activate();
+    }
     let trace_level = if args.debug {
         Level::TRACE
     } else {

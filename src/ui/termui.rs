@@ -6,7 +6,6 @@
 use std::fmt::Debug;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
@@ -30,10 +29,6 @@ pub enum TraceTimeStyle {
     /// Time since the start of the process, in seconds.
     Relative,
 }
-
-/// Should progress be enabled for ad-hoc created Nutmeg views.
-// (These should migrate to NUTMEG_VIEW.)
-static PROGRESS_ENABLED: AtomicBool = AtomicBool::new(false);
 
 pub fn enable_tracing(
     time_style: &TraceTimeStyle,
@@ -85,9 +80,4 @@ pub fn enable_tracing(
         ),
     }
     trace!("Tracing enabled");
-}
-
-// #[deprecated]: Use the global view instead.
-pub(crate) fn nutmeg_options() -> nutmeg::Options {
-    nutmeg::Options::default().progress_enabled(PROGRESS_ENABLED.load(Ordering::Relaxed))
 }

@@ -101,13 +101,26 @@ impl nutmeg::Model for Progress {
                 Scanned {scanned_dirs} directories, {scanned_files} files, {} MB\n\
                 {entries_new} new entries, {entries_changed} changed, {entries_unchanged} unchanged\n\
                 {filename}",
-                *scanned_file_bytes / 1_000_000,
+                (*scanned_file_bytes / 1_000_000).separate_with_commas(),
+            ),
+            Progress::DeleteBands { bands_done, total_bands } => format!("Delete bands: {}/{}...",
+                bands_done.separate_with_commas(),
+                total_bands.separate_with_commas(),
+            ),
+            Progress::DeleteBlocks { blocks_done, total_blocks } => format!("Delete blocks: {}/{}...",
+                blocks_done.separate_with_commas(),
+                total_blocks.separate_with_commas(),
             ),
             Progress::ListBlocks { count } => format!("List blocks: {count}..."),
             Progress::MeasureTree { files, total_bytes } => format!(
                 "Measuring... {} files, {} MB",
                 files.separate_with_commas(),
                 (*total_bytes / 1_000_000).separate_with_commas()
+            ),
+            Progress::MeasureUnreferenced { blocks_done, blocks_total } => format!(
+                "Measure unreferenced blocks: {}/{}...",
+                blocks_done.separate_with_commas(),
+                blocks_total.separate_with_commas(),
             ),
             Progress::ReferencedBlocks { references_found, bands_started, total_bands } => format!(
                 "Find referenced blocks: {} in {bands_started}/{total_bands} bands...",

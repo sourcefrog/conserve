@@ -62,17 +62,6 @@ impl ProgressImpl {
     }
 }
 
-/// Enable drawing progress bars, only if stdout is a tty.
-///
-/// Progress bars are off by default.
-pub fn enable_progress(enabled: bool) {
-    if enabled {
-        ProgressImpl::Terminal.activate();
-    } else {
-        ProgressImpl::Null.activate();
-    }
-}
-
 fn assign_new_bar_id() -> usize {
     NEXT_TASK_ID.fetch_add(1, Ordering::Relaxed)
 }
@@ -90,8 +79,20 @@ pub enum Progress {
         entries_changed: usize,
         entries_unchanged: usize,
     },
+    DeleteBands {
+        bands_done: usize,
+        total_bands: usize,
+    },
+    DeleteBlocks {
+        blocks_done: usize,
+        total_blocks: usize,
+    },
     ListBlocks {
         count: usize,
+    },
+    MeasureUnreferenced {
+        blocks_done: usize,
+        blocks_total: usize,
     },
     MeasureTree {
         files: usize,

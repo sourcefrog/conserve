@@ -257,8 +257,11 @@ impl BlockDir {
             .filter_map(|de| de.name.parse().ok()))
     }
 
-    /// Return all the blocknames in the blockdir.
+    /// Return all the blocknames in the blockdir, while showing progress.
     pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
+        // TODO: We could estimate time remaining by accounting for how
+        // many prefixes are present and how many have been read.
+        // TODO: Read prefixes in parallel.
         let bar = Bar::new();
         Ok(self
             .iter_block_dir_entries()?
