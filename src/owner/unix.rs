@@ -20,6 +20,7 @@ use std::sync::Mutex;
 use std::{fs, path::Path};
 
 use lazy_static::lazy_static;
+use nix::errno::Errno;
 use nix::unistd;
 use users::{Groups, Users, UsersCache};
 
@@ -43,7 +44,7 @@ impl From<&fs::Metadata> for Owner {
     }
 }
 
-pub fn set_owner(owner: &Owner, path: &Path) -> Result<()> {
+pub(crate) fn set_owner(owner: &Owner, path: &Path) -> Result<()> {
     let users_cache = USERS_CACHE.lock().unwrap();
     let uid_opt = owner
         .user
@@ -59,8 +60,17 @@ pub fn set_owner(owner: &Owner, path: &Path) -> Result<()> {
         .map(unistd::Gid::from_raw);
     drop(users_cache);
     // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
-    unistd::chown(path, uid_opt, gid_opt).map_err(|errno| Error::SetOwner {
-        path: path.to_path_buf(),
-        source: io::Error::from_raw_os_error(errno as i32),
-    })
+    match unistd::chown(path, uid_opt, gid_opt) {
+        Ok(()) => Ok(()),
+        Err(errno) if errno == Errno::EPERM => {
+            // If the restore is not run as root (or with special capabilities)
+            // then we probably can't set ownership, and there's no point
+            // complaining
+            Ok(())
+        }
+        Err(errno) => Err(Error::SetOwner {
+            path: path.to_path_buf(),
+            source: io::Error::from_raw_os_error(errno as i32),
+        }),
+    }
 }

@@ -27,7 +27,6 @@ use tracing::{error, warn};
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
-use crate::owner::set_owner;
 use crate::progress::{Bar, Progress};
 use crate::stats::RestoreStats;
 use crate::unix_mode::UnixMode;
@@ -240,25 +239,18 @@ impl RestoreTree {
         })?;
 
         // Restore permissions only if there are mode bits stored in the archive
-        source_entry
-            .unix_mode()
-            .set_permissions(&path)
-            .map_err(|err| {
-                error!("error restoring unix permissions on {path:?}: {err}",);
-                stats.errors += 1;
-            })
-            .ok();
+        if let Err(err) = source_entry.unix_mode().set_permissions(&path) {
+            error!(?path, ?err, "Error restoring unix permissions");
+            stats.errors += 1;
+        }
 
         // Restore ownership if possible.
         // TODO: Stats and warnings if a user or group is specified in the index but
         // does not exist on the local system.
-        set_owner(&source_entry.owner(), &path)
-            .map_err(|err| {
-                error!("error restoring ownership on {path:?}: {err}");
-                stats.errors += 1;
-            })
-            .ok();
-
+        if let Err(err) = &source_entry.owner().set_owner(&path) {
+            error!(?path, ?err, "Error restoring ownership");
+            stats.errors += 1;
+        }
         // TODO: Accumulate more stats.
         Ok(stats)
     }

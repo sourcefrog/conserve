@@ -252,7 +252,7 @@ impl Iter {
             if ft.is_dir() {
                 // TODO: Count them?
                 // TODO: Perhaps an option to back them up anyhow?
-                match cachedir::is_tagged(&dir_entry.path()) {
+                match cachedir::is_tagged(dir_entry.path()) {
                     Ok(true) => continue,
                     Ok(false) => (),
                     Err(e) => {

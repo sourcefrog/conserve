@@ -18,18 +18,19 @@
 //! be restored on a different system.
 
 use std::fmt::Display;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 #[cfg(unix)]
 mod unix;
 #[cfg(unix)]
-pub use unix::set_owner;
+use unix::set_owner;
 
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
-pub use windows::set_owner;
+use windows::set_owner;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Owner {
@@ -41,6 +42,10 @@ pub struct Owner {
 impl Owner {
     pub fn is_none(&self) -> bool {
         self.user.is_none() && self.group.is_none()
+    }
+
+    pub fn set_owner<P: AsRef<Path>>(&self, path: P) -> crate::Result<()> {
+        set_owner(self, path.as_ref())
     }
 }
 
