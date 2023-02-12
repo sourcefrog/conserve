@@ -4,6 +4,8 @@
 
 - Don't complain if unable to chown during restore; this is normal when not run as root.
 
+- New `--log-json` global option to capture all logs, and `--metrics-json` to write out counters.
+
 ## 23.1.1
 
 - Fixed: User and group mappings are now cached in memory. This fixes a performance regression in
