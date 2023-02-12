@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2016-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@ mod backup;
 mod delete;
 mod diff;
 mod exclude;
+mod trace;
 mod validate;
 mod versions;
 
@@ -74,7 +75,7 @@ fn clean_error_on_non_archive() {
         .arg(".")
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Not a Conserve archive"));
+        .stderr(predicate::str::contains("Not a Conserve archive"));
 }
 
 #[test]
@@ -89,7 +90,7 @@ fn basic_backup() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with("Created new archive"));
+        .stdout(predicate::str::is_empty());
 
     // New archive contains no versions.
     run_conserve()
@@ -131,8 +132,8 @@ fn basic_backup() {
         .arg(&src)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with("Backup complete.\n"));
+        .stderr(predicate::str::contains("Backup complete."))
+        .stdout(predicate::str::is_empty());
     // TODO: Now inspect the archive.
 
     run_conserve()
@@ -230,7 +231,7 @@ fn basic_backup() {
              /hello\n\
              /subdir\n\
              /subdir/subfile\n\
-             Restore complete.\n",
+             ",
         ));
 
     restore_dir
@@ -253,7 +254,7 @@ fn basic_backup() {
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Destination directory not empty"));
+        .stderr(predicate::str::contains("Destination directory not empty"));
 
     // Restore with specified band id / backup version.
     {
@@ -274,8 +275,8 @@ fn basic_backup() {
         .arg(arch_dir)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::contains("Archive is OK.\n"));
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("Archive is OK.\n"));
 
     // TODO: Compare vs source tree.
 }
@@ -294,21 +295,22 @@ fn empty_archive() {
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Archive has no bands"));
+        .stderr(predicate::str::contains("Archive has no bands"));
 
     run_conserve()
         .arg("ls")
         .arg(&adir)
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Archive has no bands"));
+        .stderr(predicate::str::contains("Archive has no bands"));
 
     run_conserve()
         .arg("versions")
         .arg(&adir)
         .assert()
         .success()
-        .stdout(predicate::str::is_empty());
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::is_empty());
 
     run_conserve().arg("gc").arg(adir).assert().success();
 }
@@ -339,16 +341,7 @@ fn incomplete_version() {
         .arg(af.path())
         .assert()
         .failure()
-        .stdout(predicate::str::contains("incomplete and may be in use"));
-}
-
-#[test]
-fn validate_non_fatal_problems_nonzero_result() {
-    run_conserve()
-        .args(["validate", "testdata/damaged/missing-block/"])
-        .assert()
-        .stdout(predicate::str::contains("Archive has some problems."))
-        .code(2);
+        .stderr(predicate::str::contains("incomplete and may be in use"));
 }
 
 #[test]

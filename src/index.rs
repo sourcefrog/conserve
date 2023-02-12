@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,6 +19,9 @@ use std::iter::Peekable;
 use std::path::Path;
 use std::sync::Arc;
 use std::vec;
+
+use metrics::{counter, increment_counter};
+use tracing::error;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
@@ -340,9 +343,7 @@ impl Iterator for IndexHunkIter {
                 Ok(Some(entries)) => entries,
                 Err(err) => {
                     self.stats.errors += 1;
-                    ui::problem(&format!(
-                        "Error reading index hunk {hunk_number:?}: {err:?} "
-                    ));
+                    error!("Error reading index hunk {hunk_number:?}: {err}");
                     continue;
                 }
             };
@@ -382,10 +383,10 @@ impl IndexHunkIter {
     }
 
     fn read_next_hunk(&mut self) -> Result<Option<Vec<IndexEntry>>> {
-        let path = &hunk_relpath(self.next_hunk_number);
+        let path = hunk_relpath(self.next_hunk_number);
         // Whether we succeed or fail, don't try to read this hunk again.
         self.next_hunk_number += 1;
-        let compressed_bytes = match self.transport.read_file(path) {
+        let compressed_bytes = match self.transport.read_file(&path) {
             Ok(b) => b,
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // TODO: Cope with one hunk being missing, while there are still
@@ -400,15 +401,25 @@ impl IndexHunkIter {
                 });
             }
         };
+        increment_counter!("conserve.index.read.hunks");
         self.stats.index_hunks += 1;
+        counter!(
+            "conserve.index.read.compressed_bytes",
+            compressed_bytes.len() as u64
+        );
         self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
         let index_bytes = self.decompressor.decompress(&compressed_bytes)?;
+        counter!(
+            "conserve.index.read.decompressed_bytes",
+            index_bytes.len() as u64
+        );
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
         let entries: Vec<IndexEntry> =
             serde_json::from_slice(index_bytes).map_err(|source| Error::DeserializeIndex {
                 path: path.clone(),
                 source,
             })?;
+        counter!("conserve.index.read.entries", entries.len() as u64);
         if entries.is_empty() {
             // It's legal, it's just weird - and it can be produced by some old Conserve versions.
         }

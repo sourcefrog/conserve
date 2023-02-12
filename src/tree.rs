@@ -15,6 +15,7 @@
 
 use std::ops::Range;
 
+use crate::progress::{Bar, Progress};
 use crate::stats::Sizes;
 use crate::*;
 
@@ -43,38 +44,20 @@ pub trait ReadTree {
     ///
     /// This typically requires walking all entries, which may take a while.
     fn size(&self, exclude: Exclude) -> Result<TreeSize> {
-        struct Model {
-            files: usize,
-            total_bytes: u64,
-        }
-        impl nutmeg::Model for Model {
-            fn render(&mut self, _width: usize) -> String {
-                format!(
-                    "Measuring... {} files, {} MB",
-                    self.files,
-                    self.total_bytes / 1_000_000
-                )
-            }
-        }
-        let progress = nutmeg::View::new(
-            Model {
-                files: 0,
-                total_bytes: 0,
-            },
-            ui::nutmeg_options(),
-        );
-        let mut tot = 0u64;
+        let mut files = 0;
+        let mut total_bytes = 0u64;
+        let bar = Bar::new();
         for e in self.iter_entries(Apath::root(), exclude)? {
             // While just measuring size, ignore directories/files we can't stat.
             if let Some(bytes) = e.size() {
-                tot += bytes;
-                progress.update(|model| {
-                    model.files += 1;
-                    model.total_bytes += bytes;
-                });
+                total_bytes += bytes;
+                files += 1;
+                bar.post(Progress::MeasureTree { files, total_bytes });
             }
         }
-        Ok(TreeSize { file_bytes: tot })
+        Ok(TreeSize {
+            file_bytes: total_bytes,
+        })
     }
 }
 

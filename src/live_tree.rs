@@ -18,6 +18,8 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
+use tracing::{error, warn};
+
 use crate::owner::Owner;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_mode::UnixMode;
@@ -211,8 +213,8 @@ impl Iter {
         let dir_path = parent_apath.below(&self.root_path);
         let dir_iter = match fs::read_dir(&dir_path) {
             Ok(i) => i,
-            Err(e) => {
-                ui::problem(&format!("Error reading directory {:?}: {}", &dir_path, e));
+            Err(err) => {
+                error!("Error reading directory {dir_path:?}: {err}");
                 return;
             }
         };
@@ -220,11 +222,8 @@ impl Iter {
         for dir_entry in dir_iter {
             let dir_entry = match dir_entry {
                 Ok(dir_entry) => dir_entry,
-                Err(e) => {
-                    ui::problem(&format!(
-                        "Error reading next entry from directory {:?}: {}",
-                        &dir_path, e
-                    ));
+                Err(err) => {
+                    error!("Error reading next entry from directory {dir_path:?}: {err}");
                     continue;
                 }
             };
@@ -232,9 +231,7 @@ impl Iter {
             let child_name = match child_osstr.to_str() {
                 Some(c) => c,
                 None => {
-                    ui::problem(&format!(
-                        "Couldn't decode filename {child_osstr:?} in {dir_path:?}",
-                    ));
+                    error!("Couldn't decode filename {child_osstr:?} in {dir_path:?}",);
                     continue;
                 }
             };
@@ -248,9 +245,7 @@ impl Iter {
             let ft = match dir_entry.file_type() {
                 Ok(ft) => ft,
                 Err(e) => {
-                    ui::problem(&format!(
-                        "Error getting type of {child_apath:?} during iteration: {e}"
-                    ));
+                    error!("Error getting type of {child_apath:?} during iteration: {e}");
                     continue;
                 }
             };
@@ -261,9 +256,7 @@ impl Iter {
                     Ok(true) => continue,
                     Ok(false) => (),
                     Err(e) => {
-                        ui::problem(&format!(
-                            "Error checking CACHEDIR.TAG in {dir_entry:?}: {e}"
-                        ));
+                        error!("Error checking CACHEDIR.TAG in {dir_entry:?}: {e}");
                     }
                 }
             }
@@ -275,14 +268,10 @@ impl Iter {
                         ErrorKind::NotFound => {
                             // Fairly harmless, and maybe not even worth logging. Just a race
                             // between listing the directory and looking at the contents.
-                            ui::problem(&format!(
-                                "File disappeared during iteration: {child_apath:?}: {e}"
-                            ));
+                            warn!("File disappeared during iteration: {child_apath:?}: {e}");
                         }
                         _ => {
-                            ui::problem(&format!(
-                                "Failed to read source metadata from {child_apath:?}: {e}"
-                            ));
+                            error!("Failed to read source metadata from {child_apath:?}: {e}");
                             self.stats.metadata_error += 1;
                         }
                     };
@@ -296,18 +285,14 @@ impl Iter {
                 let t = match dir_path.join(dir_entry.file_name()).read_link() {
                     Ok(t) => t,
                     Err(e) => {
-                        ui::problem(&format!(
-                            "Failed to read target of symlink {child_apath:?}: {e}"
-                        ));
+                        error!("Failed to read target of symlink {child_apath:?}: {e}");
                         continue;
                     }
                 };
                 match t.into_os_string().into_string() {
                     Ok(t) => Some(t),
                     Err(e) => {
-                        ui::problem(&format!(
-                            "Failed to decode target of symlink {child_apath:?}: {e:?}"
-                        ));
+                        error!("Failed to decode target of symlink {child_apath:?}: {e:?}");
                         continue;
                     }
                 }

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,13 +13,19 @@
 
 //! Command-line entry point for Conserve backups.
 
+use std::error::Error;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+use std::time::Instant;
 
 use clap::{Parser, Subcommand};
-use tracing::trace;
+use conserve::trace_counter::{global_error_count, global_warn_count};
+use metrics::increment_counter;
+#[allow(unused_imports)]
+use tracing::{debug, error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
+use conserve::ui::termui::TraceTimeStyle;
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
@@ -37,6 +43,18 @@ struct Args {
     /// Show debug trace to stdout.
     #[arg(long, short = 'D', global = true)]
     debug: bool,
+
+    /// Control timestamps prefixes on stderr.
+    #[arg(long, value_enum, global = true, default_value_t = TraceTimeStyle::None)]
+    trace_time: TraceTimeStyle,
+
+    /// Append a json formatted log to this file.
+    #[arg(long, global = true)]
+    log_json: Option<PathBuf>,
+
+    /// Write metrics to this file.
+    #[arg(long, global = true)]
+    metrics_json: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -102,8 +120,6 @@ enum Command {
     },
 
     /// Delete blocks unreferenced by any index.
-    ///
-    /// CAUTION: Do not gc while a backup is underway.
     Gc {
         /// Archive to delete from.
         archive: String,
@@ -242,9 +258,15 @@ enum Debug {
 }
 
 enum ExitCode {
-    Ok = 0,
-    Failed = 1,
-    PartialCorruption = 2,
+    Success = 0,
+    Failure = 1,
+    NonFatalErrors = 2,
+}
+
+impl std::process::Termination for ExitCode {
+    fn report(self) -> std::process::ExitCode {
+        (self as u8).into()
+    }
 }
 
 impl Command {
@@ -269,7 +291,7 @@ impl Command {
                 };
                 let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
                 if !no_stats {
-                    ui::println(&format!("Backup complete.\n{stats}"));
+                    info!("Backup complete.\n{stats}");
                 }
             }
             Command::Debug(Debug::Blocks { archive }) => {
@@ -313,7 +335,7 @@ impl Command {
                     },
                 )?;
                 if !no_stats {
-                    ui::println(&format!("{stats}"));
+                    println!("{stats}");
                 }
             }
             Command::Diff {
@@ -347,12 +369,12 @@ impl Command {
                     },
                 )?;
                 if !no_stats {
-                    ui::println(&format!("{stats}"));
+                    info!(%stats);
                 }
             }
             Command::Init { archive } => {
                 Archive::create(open_transport(archive)?)?;
-                ui::println(&format!("Created new archive in {:?}", &archive));
+                debug!("Created new archive in {archive:?}");
             }
             Command::Ls {
                 stos,
@@ -400,10 +422,10 @@ impl Command {
                     overwrite: *force_overwrite,
                     long_listing: *long_listing,
                 };
-
                 let stats = restore(&archive, destination, &options)?;
+                debug!("Restore complete");
                 if !no_stats {
-                    ui::println(&format!("Restore complete.\n{stats}"));
+                    debug!(%stats);
                 }
             }
             Command::Size {
@@ -423,28 +445,20 @@ impl Command {
                         .file_bytes
                 };
                 if *bytes {
-                    ui::println(&format!("{size}"));
+                    println!("{size}");
                 } else {
-                    ui::println(&conserve::bytes_to_human_mb(size));
+                    println!("{}", conserve::bytes_to_human_mb(size));
                 }
             }
-            Command::Validate {
-                archive,
-                quick,
-                no_stats,
-            } => {
+            Command::Validate { archive, quick, .. } => {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                let stats = Archive::open(open_transport(archive)?)?.validate(&options)?;
-                if !no_stats {
-                    println!("{stats}");
-                }
-                if stats.has_problems() {
-                    ui::problem("Archive has some problems.");
-                    return Ok(ExitCode::PartialCorruption);
+                Archive::open(open_transport(archive)?)?.validate(&options)?;
+                if global_error_count() > 0 || global_warn_count() > 0 {
+                    warn!("Archive has some problems.");
                 } else {
-                    ui::println("Archive is OK.");
+                    info!("Archive is OK.");
                 }
             }
             Command::Versions {
@@ -454,7 +468,6 @@ impl Command {
                 sizes,
                 utc,
             } => {
-                ui::enable_progress(false);
                 let archive = Archive::open(open_transport(archive)?)?;
                 let options = ShowVersionsOptions {
                     newest_first: *newest,
@@ -466,7 +479,7 @@ impl Command {
                 conserve::show_versions(&archive, &options, &mut stdout)?;
             }
         }
-        Ok(ExitCode::Ok)
+        Ok(ExitCode::Success)
     }
 }
 
@@ -484,29 +497,45 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
     }
 }
 
-fn main() {
+fn main() -> Result<ExitCode> {
     let args = Args::parse();
-    ui::enable_progress(!args.no_progress && !args.debug);
-    if args.debug {
-        tracing_subscriber::fmt::Subscriber::builder()
-            .with_max_level(tracing::Level::TRACE)
-            .init();
-        trace!("tracing enabled");
+    let start_time = Instant::now();
+    if !args.no_progress {
+        progress::ProgressImpl::Terminal.activate();
     }
+    let trace_level = if args.debug {
+        Level::TRACE
+    } else {
+        Level::INFO
+    };
+    let _flush_guard = ui::termui::enable_tracing(&args.trace_time, trace_level, &args.log_json);
+    ::metrics::set_recorder(&conserve::metric_recorder::IN_MEMORY)
+        .expect("Failed to install recorder");
+    increment_counter!("conserve.start");
     let result = args.command.run();
+    metric_recorder::emit_to_trace();
+    debug!(elapsed = ?start_time.elapsed());
+    let error_count = global_error_count();
+    let warn_count = global_warn_count();
+    if let Some(metrics_json_path) = args.metrics_json {
+        metric_recorder::write_json_metrics(&metrics_json_path)?;
+    }
     match result {
-        Err(ref e) => {
-            ui::show_error(e);
-            // // TODO: Perhaps always log the traceback to a log file.
-            // if let Some(bt) = e.backtrace() {
-            //     if std::env::var("RUST_BACKTRACE") == Ok("1".to_string()) {
-            //         println!("{}", bt);
-            //     }
-            // }
-            // Avoid Rust redundantly printing the error.
-            std::process::exit(ExitCode::Failed as i32)
+        Err(err) => {
+            error!("{err}");
+            let mut err: &dyn Error = &err;
+            while let Some(source) = err.source() {
+                error!("caused by: {source}");
+                err = source;
+            }
+            debug!(error_count, warn_count,);
+            Ok(ExitCode::Failure)
         }
-        Ok(code) => std::process::exit(code as i32),
+        Ok(ExitCode::Success) if error_count > 0 || warn_count > 0 => {
+            debug!(error_count, warn_count,);
+            Ok(ExitCode::NonFatalErrors)
+        }
+        Ok(exit_code) => Ok(exit_code),
     }
 }
 

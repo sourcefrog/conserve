@@ -1,6 +1,6 @@
-// Copyright 2022 Stephanie Aelmore.
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2022 Stephanie Aelmore.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -31,13 +31,13 @@
 //! using the write bit in the user class.
 //! TODO: Properly implement and test Windows compatibility.
 //!
+
+use std::fmt;
+use std::fs::Permissions;
+use std::io;
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt,
-    fs::{self, Permissions},
-    io,
-    path::Path,
-};
 use unix_mode;
 
 #[derive(Debug, Default, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
@@ -57,7 +57,7 @@ impl UnixMode {
     {
         if let Some(mode) = self.0 {
             let permissions = Permissions::from_mode(mode);
-            fs::set_permissions(&path, permissions)
+            std::fs::set_permissions(&path, permissions)
         } else {
             Ok(())
         }

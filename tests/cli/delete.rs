@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2016-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -118,18 +118,17 @@ fn delete_second_version() {
 fn delete_nonexistent_band() {
     let af = ScratchArchive::new();
 
-    let pred_fn = predicate::str::is_match(
-        r"conserve error: Failed to delete band b0000
-  caused by: (No such file or directory|The system cannot find the file specified\.) \(os error \d+\)
-",
-        )
-        .unwrap();
-
     run_conserve()
         .args(["delete"])
         .args(["-b", "b0000"])
         .arg(af.path())
         .assert()
-        .stdout(pred_fn)
+        .stderr(predicate::str::contains(
+            "ERROR conserve: Failed to delete band b0000",
+        ))
+        .stderr(
+            predicate::str::is_match(r#"caused by: (File not found.|No such file or directory|The system cannot find the file specified\.) \(os error \d+\)"#)
+            .unwrap(),
+        )
         .failure();
 }

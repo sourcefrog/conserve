@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,7 +12,6 @@
 
 //! Conserve backup system.
 
-// Conserve implementation modules.
 pub mod apath;
 pub mod archive;
 pub mod backup;
@@ -32,8 +31,10 @@ mod jsonio;
 pub mod kind;
 pub mod live_tree;
 mod merge;
-pub(crate) mod misc;
+pub mod metric_recorder;
+pub mod misc;
 pub mod owner;
+pub mod progress;
 pub mod restore;
 pub mod show;
 pub mod stats;
@@ -41,12 +42,13 @@ mod stitch;
 mod stored_file;
 mod stored_tree;
 pub mod test_fixtures;
+pub mod trace_counter;
 pub mod transport;
 mod tree;
 pub mod ui;
 pub mod unix_mode;
 pub mod unix_time;
-mod validate;
+pub mod validate;
 
 pub use crate::apath::Apath;
 pub use crate::archive::Archive;
@@ -69,7 +71,7 @@ pub use crate::merge::{MergeTrees, MergedEntryKind};
 pub use crate::misc::bytes_to_human_mb;
 pub use crate::restore::{restore, RestoreOptions, RestoreTree};
 pub use crate::show::{show_diff, show_versions, ShowVersionsOptions};
-pub use crate::stats::{BackupStats, DeleteStats, RestoreStats, ValidateStats};
+pub use crate::stats::{BackupStats, DeleteStats, RestoreStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};

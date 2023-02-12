@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,18 +18,19 @@ use std::io::ErrorKind;
 use std::path::Path;
 use std::sync::Arc;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use itertools::Itertools;
-use nutmeg::models::{LinearModel, UnboundedModel};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use tracing::{debug, error, warn};
 
 use crate::blockhash::BlockHash;
 use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
-use crate::stats::ValidateStats;
+use crate::progress::{Bar, Progress};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, Transport};
 use crate::*;
@@ -195,17 +196,29 @@ impl Archive {
     /// Shows a progress bar as they're collected.
     pub fn referenced_blocks(&self, band_ids: &[BandId]) -> Result<HashSet<BlockHash>> {
         let archive = self.clone();
-        let progress = nutmeg::View::new(
-            LinearModel::new("Find referenced blocks in band", band_ids.len()),
-            ui::nutmeg_options(),
-        );
+        // TODO: Percentage completion based on how many bands have been checked so far.
+        let bar = Bar::new();
+        let references_found = AtomicUsize::new(0);
+        let bands_started = AtomicUsize::new(0);
+        let total_bands = band_ids.len();
+        let start = Instant::now();
         Ok(band_ids
             .par_iter()
-            .inspect(move |_| progress.update(|model| model.increment(1)))
+            .inspect(|_| {
+                bands_started.fetch_add(1, Ordering::Relaxed);
+            })
             .map(move |band_id| Band::open(&archive, band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
             .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
+            .inspect(|_hash| {
+                bar.post(Progress::ReferencedBlocks {
+                    references_found: references_found.fetch_add(1, Ordering::Relaxed),
+                    bands_started: bands_started.load(Ordering::Relaxed),
+                    total_bands,
+                    start,
+                })
+            })
             .collect())
     }
 
@@ -236,58 +249,66 @@ impl Archive {
         } else {
             gc_lock::GarbageCollectionLock::new(self)?
         };
+        debug!("Got gc lock");
 
         let block_dir = self.block_dir();
+        debug!("List band ids...");
         let mut keep_band_ids = self.list_band_ids()?;
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
+        debug!("List referenced blocks...");
         let referenced = self.referenced_blocks(&keep_band_ids)?;
-        let progress = nutmeg::View::new(
-            UnboundedModel::new("Find present blocks"),
-            ui::nutmeg_options(),
-        );
-        let unref = self
-            .block_dir()
-            .block_names()?
-            .inspect(|_| progress.update(|model| model.increment(1)))
-            .filter(|bh| !referenced.contains(bh))
-            .collect_vec();
-        drop(progress);
+        debug!(referenced.len = referenced.len());
+
+        debug!("Find present blocks...");
+        let present = self.block_dir.block_names_set()?;
+        debug!(present.len = present.len());
+
+        debug!("Find unreferenced blocks...");
+        let unref = present.difference(&referenced).collect_vec();
         let unref_count = unref.len();
+        debug!(unref_count);
         stats.unreferenced_block_count = unref_count;
 
-        let progress = nutmeg::View::new(
-            LinearModel::new("Measure unreferenced blocks", unref.len()),
-            ui::nutmeg_options(),
-        );
+        debug!("Measure unreferenced blocks...");
+        let measure_bar = Bar::new();
         let total_bytes = unref
             .par_iter()
-            .inspect(|_| progress.update(|model| model.increment(1)))
-            .map(|block_id| block_dir.compressed_size(block_id).unwrap_or_default())
+            .enumerate()
+            .inspect(|(i, _)| {
+                measure_bar.post(Progress::MeasureUnreferenced {
+                    blocks_done: *i,
+                    blocks_total: unref_count,
+                })
+            })
+            .map(|(_i, block_id)| block_dir.compressed_size(block_id).unwrap_or_default())
             .sum();
+        drop(measure_bar);
         stats.unreferenced_block_bytes = total_bytes;
 
         if !options.dry_run {
             delete_guard.check()?;
+            let bar = Bar::new();
 
-            let progress = nutmeg::View::new(
-                LinearModel::new("Delete bands", delete_band_ids.len()),
-                ui::nutmeg_options(),
-            );
-            for band_id in delete_band_ids {
+            for (bands_done, band_id) in delete_band_ids.iter().enumerate() {
                 Band::delete(self, band_id)?;
                 stats.deleted_band_count += 1;
-                progress.update(|model| model.increment(1));
+                bar.post(Progress::DeleteBands {
+                    bands_done,
+                    total_bands: delete_band_ids.len(),
+                });
             }
 
-            let progress = nutmeg::View::new(
-                LinearModel::new("Delete blocks", unref_count),
-                ui::nutmeg_options(),
-            );
             let error_count = unref
                 .par_iter()
-                .inspect(|_| progress.update(|model| model.increment(1)))
-                .filter(|block_hash| block_dir.delete_block(block_hash).is_err())
+                .enumerate()
+                .inspect(|(blocks_done, _hash)| {
+                    bar.post(Progress::DeleteBlocks {
+                        blocks_done: *blocks_done,
+                        total_blocks: unref_count,
+                    })
+                })
+                .filter(|(_, block_hash)| block_dir.delete_block(block_hash).is_err())
                 .count();
             stats.deletion_errors += error_count;
             stats.deleted_block_count += unref_count - error_count;
@@ -297,60 +318,59 @@ impl Archive {
         Ok(stats)
     }
 
-    pub fn validate(&self, options: &ValidateOptions) -> Result<ValidateStats> {
-        let start = Instant::now();
-        let mut stats = self.validate_archive_dir()?;
+    /// Walk the archive to check all invariants.
+    ///
+    /// If problems are found, they are emitted as `warn` or `error` level
+    /// tracing messages. This function only returns an error if validation
+    /// stops due to a fatal error.
+    pub fn validate(&self, options: &ValidateOptions) -> Result<()> {
+        self.validate_archive_dir()?;
 
-        ui::println("Count indexes...");
+        debug!("List bands...");
         let band_ids = self.list_band_ids()?;
-        ui::println(&format!("Checking {} indexes...", band_ids.len()));
+        debug!("Check {} bands...", band_ids.len());
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
-        let (referenced_lens, ref_stats) = validate::validate_bands(self, &band_ids);
-        stats += ref_stats;
+        let referenced_lens = validate::validate_bands(self, &band_ids)?;
 
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
             // content.
-            ui::println("List present blocks...");
-            // TODO: Just validate blockdir structure.
+            debug!("List blocks...");
+            // TODO: Check for unexpected files or directories in the blockdir.
             let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
-            for block_hash in referenced_lens
-                .keys()
-                .filter(|&bh| !present_blocks.contains(bh))
-            {
-                ui::problem(&format!("Block {block_hash:?} is missing"));
-                stats.block_missing_count += 1;
+            for block_hash in referenced_lens.keys() {
+                if !present_blocks.contains(block_hash) {
+                    error!(%block_hash, "Referenced block missing");
+                }
             }
         } else {
             // 2. Check the hash of all blocks are correct, and remember how long
             //    the uncompressed data is.
-            ui::println("Check blockdir...");
-            let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate(&mut stats)?;
+            let block_lengths: HashMap<BlockHash, usize> = self.block_dir.validate()?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (block_hash, referenced_len) in referenced_lens {
-                if let Some(actual_len) = block_lengths.get(&block_hash) {
-                    if referenced_len > (*actual_len as u64) {
-                        ui::problem(&format!("Block {block_hash:?} is too short",));
-                        // TODO: A separate counter; this is worse than just being missing
-                        stats.block_missing_count += 1;
+                if let Some(&actual_len) = block_lengths.get(&block_hash) {
+                    if referenced_len > actual_len as u64 {
+                        error!(
+                            %block_hash,
+                            referenced_len,
+                            actual_len,
+                            "Block is shorter than referenced length"
+                        );
                     }
                 } else {
-                    ui::problem(&format!("Block {block_hash:?} is missing"));
-                    stats.block_missing_count += 1;
+                    error!(%block_hash, "Referenced block missing");
                 }
             }
         }
-
-        stats.elapsed = start.elapsed();
-        Ok(stats)
+        Ok(())
     }
 
-    fn validate_archive_dir(&self) -> Result<ValidateStats> {
+    fn validate_archive_dir(&self) -> Result<()> {
         // TODO: More tests for the problems detected here.
-        let mut stats = ValidateStats::default();
-        ui::println("Check archive top-level directory...");
+        debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
         for entry_result in self
             .transport
@@ -363,21 +383,14 @@ impl Archive {
                     name,
                     ..
                 }) => {
-                    if name.eq_ignore_ascii_case(BLOCK_DIR) {
-                    } else if let Ok(band_id) = name.parse() {
-                        if !seen_bands.insert(band_id) {
-                            stats.structure_problems += 1;
-                            ui::problem(&format!(
-                                "Duplicated band directory in {:?}: {name:?}",
-                                self.transport,
-                            ));
+                    if let Ok(band_id) = name.parse::<BandId>() {
+                        if !seen_bands.insert(band_id.clone()) {
+                            // TODO: Test this
+                            error!(%band_id, "Duplicated band directory");
                         }
-                    } else {
-                        stats.unexpected_files += 1;
-                        ui::problem(&format!(
-                            "Unexpected directory in {:?}: {name:?}",
-                            self.transport,
-                        ));
+                    } else if !name.eq_ignore_ascii_case(BLOCK_DIR) {
+                        // TODO: The whole path not just the filename
+                        warn!(path = name, "Unexpected subdirectory in archive directory");
                     }
                 }
                 Ok(DirEntry {
@@ -389,26 +402,20 @@ impl Archive {
                         && !name.eq_ignore_ascii_case(crate::gc_lock::GC_LOCK)
                         && !name.eq_ignore_ascii_case(".DS_Store")
                     {
-                        stats.unexpected_files += 1;
-                        ui::problem(&format!(
-                            "Unexpected file in archive directory {:?}: {name:?}",
-                            self.transport,
-                        ));
+                        // TODO: The whole path not just the filename
+                        warn!(path = name, "Unexpected file in archive directory");
                     }
                 }
-                Ok(DirEntry { kind, name, .. }) => {
-                    ui::problem(&format!(
-                        "Unexpected file kind in archive directory: {name:?} of kind {kind:?}"
-                    ));
-                    stats.unexpected_files += 1;
+                Ok(DirEntry { name, .. }) => {
+                    // TODO: The whole path not just the filename
+                    warn!(path = name, "Unexpected file in archive directory");
                 }
-                Err(source) => {
-                    ui::problem(&format!("Error listing archive directory: {source:?}"));
-                    stats.io_errors += 1;
+                Err(err) => {
+                    error!(%err, "Error listing archive directory");
                 }
             }
         }
-        Ok(stats)
+        Ok(())
     }
 }
 

@@ -23,6 +23,9 @@
 
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
+use tracing::error;
+#[allow(unused_imports)]
+use tracing::warn;
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
@@ -218,32 +221,20 @@ impl Band {
         })
     }
 
-    pub fn validate(&self, stats: &mut ValidateStats) -> Result<()> {
+    pub fn validate(&self) -> Result<()> {
         let ListDirNames { mut files, dirs } =
             self.transport.list_dir_names("").map_err(Error::from)?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
-            ui::problem(&format!("No band head file in {:?}", self.transport));
-            stats.missing_band_heads += 1;
+            error!(band_id = ?self.band_id, "Band head file missing");
         }
         remove_item(&mut files, &BAND_HEAD_FILENAME);
         remove_item(&mut files, &BAND_TAIL_FILENAME);
-
-        if !files.is_empty() {
-            ui::problem(&format!(
-                "Unexpected files in band directory {:?}: {:?}",
-                self.transport, files
-            ));
-            stats.unexpected_files += 1;
+        for unexpected in files {
+            warn!(path = ?unexpected, "Unexpected file in band directory");
         }
-
-        if dirs != [INDEX_DIR.to_string()] {
-            ui::problem(&format!(
-                "Incongruous directories in band directory {:?}: {:?}",
-                self.transport, dirs
-            ));
-            stats.unexpected_files += 1;
+        for unexpected in dirs.iter().filter(|n| n != &INDEX_DIR) {
+            warn!(path = ?unexpected, "Unexpected subdirectory in band directory");
         }
-
         Ok(())
     }
 }

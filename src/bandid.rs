@@ -16,12 +16,14 @@
 use std::fmt::{self, Write};
 use std::str::FromStr;
 
+use serde::Serialize;
+
 use crate::errors::Error;
 
 /// Identifier for a band within an archive, eg 'b0001' or 'b0001-0020'.
 ///
 /// `BandId`s implement a total ordering `std::cmp::Ord`.
-#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct BandId {
     /// The sequence numbers at each tier.
     seqs: Vec<u32>,

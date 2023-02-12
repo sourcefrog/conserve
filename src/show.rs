@@ -22,7 +22,9 @@ use std::io::{BufWriter, Write};
 
 use time::format_description::well_known::Rfc3339;
 use time::UtcOffset;
+use tracing::error;
 
+use crate::misc::duration_to_hms;
 use crate::*;
 
 /// Options controlling the behavior of `show_versions`.
@@ -61,15 +63,15 @@ pub fn show_versions(
         l.push(format!("{band_id:<20}"));
         let band = match Band::open(archive, &band_id) {
             Ok(band) => band,
-            Err(e) => {
-                ui::problem(&format!("Failed to open band {band_id:?}: {e:?}"));
+            Err(err) => {
+                error!("Failed to open band {band_id:?}: {err}");
                 continue;
             }
         };
         let info = match band.get_info() {
             Ok(info) => info,
-            Err(e) => {
-                ui::problem(&format!("Failed to read band tail {band_id:?}: {e:?}"));
+            Err(err) => {
+                error!("Failed to read band tail {band_id:?}: {err}");
                 continue;
             }
         };
@@ -90,7 +92,7 @@ pub fn show_versions(
                 if let Some(end_time) = info.end_time {
                     let duration = end_time - info.start_time;
                     if let Ok(duration) = duration.try_into() {
-                        crate::ui::duration_to_hms(duration).into()
+                        duration_to_hms(duration).into()
                     } else {
                         Cow::Borrowed("negative")
                     }

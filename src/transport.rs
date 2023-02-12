@@ -146,6 +146,9 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
 
     /// Return a URL scheme describing this transport, such as "file".
     fn url_scheme(&self) -> &'static str;
+
+    /// Return a path or URL for this transport.
+    fn url(&self) -> String;
 }
 
 /// A directory entry read from a transport.

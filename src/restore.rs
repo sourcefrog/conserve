@@ -21,10 +21,13 @@ use std::{fs, time::Instant};
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
+#[allow(unused_imports)]
+use tracing::{error, warn};
 
 use crate::band::BandSelectionPolicy;
 use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
+use crate::progress::{Bar, Progress};
 use crate::stats::RestoreStats;
 use crate::unix_mode::UnixMode;
 use crate::unix_time::UnixTime;
@@ -57,21 +60,6 @@ impl Default for RestoreOptions {
     }
 }
 
-struct ProgressModel {
-    filename: String,
-    bytes_done: u64,
-}
-
-impl nutmeg::Model for ProgressModel {
-    fn render(&mut self, _width: usize) -> String {
-        format!(
-            "Restoring: {} MB\n{}",
-            self.bytes_done / 1_000_000,
-            self.filename
-        )
-    }
-}
-
 /// Restore a selected version, or by default the latest, to a destination directory.
 pub fn restore(
     archive: &Archive,
@@ -85,13 +73,8 @@ pub fn restore(
         RestoreTree::create(destination_path)
     }?;
     let mut stats = RestoreStats::default();
-    let progress_bar = nutmeg::View::new(
-        ProgressModel {
-            filename: String::new(),
-            bytes_done: 0,
-        },
-        ui::nutmeg_options(),
-    );
+    let mut bytes_done = 0;
+    let bar = Bar::new();
     let start = Instant::now();
     // // This causes us to walk the source tree twice, which is probably an acceptable option
     // // since it's nice to see realistic overall progress. We could keep all the entries
@@ -111,18 +94,18 @@ pub fn restore(
     for entry in entry_iter {
         if options.print_filenames {
             if options.long_listing {
-                progress_bar.message(format!(
-                    "{} {} {}\n",
-                    entry.unix_mode(),
-                    entry.owner(),
-                    entry.apath()
-                ));
+                println!("{} {} {}", entry.unix_mode(), entry.owner(), entry.apath());
             } else {
-                progress_bar.message(format!("{}\n", entry.apath()));
+                println!("{}", entry.apath());
             }
         }
-        progress_bar.update(|model| model.filename = entry.apath().to_string());
-        if let Err(e) = match entry.kind() {
+        if !options.print_filenames {
+            bar.post(Progress::Restore {
+                filename: entry.apath().to_string(),
+                bytes_done,
+            });
+        }
+        if let Err(err) = match entry.kind() {
             Kind::Dir => {
                 stats.directories += 1;
                 rt.copy_dir(&entry)
@@ -131,7 +114,7 @@ pub fn restore(
                 stats.files += 1;
                 let result = rt.copy_file(&entry, &st).map(|s| stats += s);
                 if let Some(bytes) = entry.size() {
-                    progress_bar.update(|model| model.bytes_done += bytes);
+                    bytes_done += bytes;
                 }
                 result
             }
@@ -147,7 +130,10 @@ pub fn restore(
                 continue;
             }
         } {
-            ui::show_error(&e);
+            error!(
+                "error restoring {apath}: {err}",
+                apath = entry.apath().to_string()
+            );
             stats.errors += 1;
             continue;
         }
@@ -201,13 +187,13 @@ impl RestoreTree {
     fn finish(self) -> Result<RestoreStats> {
         #[cfg(unix)]
         for (path, unix_mode) in self.dir_unix_modes {
-            if let Err(err) = unix_mode.set_permissions(path) {
-                ui::problem(&format!("Failed to set directory permissions: {err:?}"));
+            if let Err(err) = unix_mode.set_permissions(&path) {
+                error!("Failed to set directory permissions on {path:?}: {err}");
             }
         }
         for (path, time) in self.dir_mtimes {
-            if let Err(err) = filetime::set_file_mtime(path, time.into()) {
-                ui::problem(&format!("Failed to set directory mtime: {err:?}"));
+            if let Err(err) = filetime::set_file_mtime(&path, time.into()) {
+                error!("Failed to set directory mtime on {path:?}: {err}");
             }
         }
         Ok(RestoreStats::default())
@@ -252,27 +238,19 @@ impl RestoreTree {
             }
         })?;
 
-        #[cfg(unix)]
-        {
-            // Restore permissions only if there are mode bits stored in the archive
-            source_entry
-                .unix_mode()
-                .set_permissions(&path)
-                .map_err(|e| {
-                    ui::show_error(&e);
-                    stats.errors += 1;
-                })
-                .ok();
+        // Restore permissions only if there are mode bits stored in the archive
+        if let Err(err) = source_entry.unix_mode().set_permissions(&path) {
+            error!(?path, ?err, "Error restoring unix permissions");
+            stats.errors += 1;
         }
 
         // Restore ownership if possible.
         // TODO: Stats and warnings if a user or group is specified in the index but
         // does not exist on the local system.
-        if let Err(err) = source_entry.owner().set_owner(&path) {
-            ui::show_error(&err);
+        if let Err(err) = &source_entry.owner().set_owner(&path) {
+            error!(?path, ?err, "Error restoring ownership");
             stats.errors += 1;
         }
-
         // TODO: Accumulate more stats.
         Ok(stats)
     }
@@ -291,7 +269,7 @@ impl RestoreTree {
             }
         } else {
             // TODO: Treat as an error.
-            ui::problem(&format!("No target in symlink entry {}", entry.apath()));
+            error!("No target in symlink entry {:?}", entry.apath());
         }
         Ok(())
     }
@@ -300,10 +278,7 @@ impl RestoreTree {
     fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()> {
         // TODO: Add a test with a canned index containing a symlink, and expect
         // it cannot be restored on Windows and can be on Unix.
-        ui::problem(&format!(
-            "Can't restore symlinks on non-Unix: {}",
-            entry.apath()
-        ));
+        warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
         Ok(())
     }
 }

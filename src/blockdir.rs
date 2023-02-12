@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -25,20 +25,23 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
+use ::metrics::{counter, histogram, increment_counter};
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
-use nutmeg::models::UnboundedModel;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use thousands::Separable;
+#[allow(unused_imports)]
+use tracing::{debug, error, info, warn};
 
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::kind::Kind;
-use crate::stats::{BackupStats, Sizes, ValidateStats};
+use crate::progress::{Bar, Progress};
+use crate::stats::{BackupStats, Sizes};
 use crate::transport::local::LocalTransport;
 use crate::transport::{DirEntry, ListDirNames, Transport};
 use crate::*;
@@ -112,19 +115,23 @@ impl BlockDir {
     pub(crate) fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
         // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
         let mut compressor = Compressor::new();
+        let uncomp_len = in_buf.len() as u64;
         let compressed = compressor.compress(in_buf)?;
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
         let relpath = block_relpath(hash);
         self.transport.create_dir(subdir_relpath(&hex_hash))?;
+        increment_counter!("conserve.block.writes");
+        counter!("conserve.block.write_uncompressed_bytes", uncomp_len);
+        histogram!("conserve.block.write_uncompressed_bytes", uncomp_len as f64);
+        counter!("conserve.block.write_compressed_bytes", comp_len);
+        histogram!("conserve.block.write_compressed_bytes", comp_len as f64);
         self.transport
             .write_file(&relpath, compressed)
             .or_else(|io_err| {
                 if io_err.kind() == io::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
-                    ui::problem(&format!(
-                        "Unexpected late detection of existing block {hex_hash:?}"
-                    ));
+                    debug!("Unexpected late detection of existing block {hex_hash:?}");
                     Ok(())
                 } else {
                     Err(Error::WriteBlock {
@@ -142,11 +149,16 @@ impl BlockDir {
         stats: &mut BackupStats,
     ) -> Result<BlockHash> {
         let hash = self.hash_bytes(block_data);
+        let len = block_data.len() as u64;
         if self.contains(&hash)? {
+            increment_counter!("conserve.block.matches");
             stats.deduplicated_blocks += 1;
-            stats.deduplicated_bytes += block_data.len() as u64;
+            counter!("conserve.block.matched_bytes", len);
+            stats.deduplicated_bytes += len;
         } else {
+            let start = Instant::now();
             let comp_len = self.compress_and_store(block_data, &hash)?;
+            histogram!("conserve.block.compress_and_store_seconds", start.elapsed());
             stats.written_blocks += 1;
             stats.uncompressed_bytes += block_data.len() as u64;
             stats.compressed_bytes += comp_len;
@@ -204,7 +216,7 @@ impl BlockDir {
             if dirname.len() == SUBDIR_NAME_CHARS {
                 true
             } else {
-                ui::problem(&format!("Unexpected subdirectory in blockdir: {dirname:?}"));
+                warn!("Unexpected subdirectory in blockdir: {dirname:?}");
                 false
             }
         });
@@ -219,14 +231,14 @@ impl BlockDir {
             .map(move |subdir_name| transport.iter_dir_entries(&subdir_name))
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
-                    ui::problem(&format!("Error listing block directory: {:?}", &err));
+                    error!(%err, "Error listing block subdirectory");
                 }
                 iter_or.ok()
             })
             .flatten()
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
-                    ui::problem(&format!("Error listing block subdirectory: {:?}", &err));
+                    error!(%err, "Error listing block subdirectory");
                 }
                 iter_or.ok()
             })
@@ -239,20 +251,26 @@ impl BlockDir {
 
     /// Return all the blocknames in the blockdir, in arbitrary order.
     pub fn block_names(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        let progress = nutmeg::View::new("List blocks", ui::nutmeg_options());
-        progress.update(|_| ());
+        // TODO: Report errors
         Ok(self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok()))
     }
 
-    /// Return all the blocknames in the blockdir.
+    /// Return all the blocknames in the blockdir, while showing progress.
     pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
-        let progress = nutmeg::View::new(UnboundedModel::new("List blocks"), ui::nutmeg_options());
+        // TODO: We could estimate time remaining by accounting for how
+        // many prefixes are present and how many have been read.
+        // TODO: Read prefixes in parallel.
+        let bar = Bar::new();
         Ok(self
             .iter_block_dir_entries()?
             .filter_map(|de| de.name.parse().ok())
-            .inspect(|_| progress.update(|model| model.increment(1)))
+            .enumerate()
+            .map(|(count, hash)| {
+                bar.post(Progress::ListBlocks { count });
+                hash
+            })
             .collect())
     }
 
@@ -260,68 +278,39 @@ impl BlockDir {
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub fn validate(&self, stats: &mut ValidateStats) -> Result<HashMap<BlockHash, usize>> {
+    pub fn validate(&self) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
-        ui::println("Count blocks...");
+        debug!("Start list blocks");
         let blocks = self.block_names_set()?;
-        crate::ui::println(&format!(
-            "Check {} blocks...",
-            blocks.len().separate_with_commas()
-        ));
-        stats.block_read_count = blocks.len().try_into().unwrap();
-        struct ProgressModel {
-            total_blocks: usize,
-            blocks_done: usize,
-            bytes_done: usize,
-            start: Instant,
-        }
-        impl nutmeg::Model for ProgressModel {
-            fn render(&mut self, _width: usize) -> String {
-                format!(
-                    "Check block {}/{}: {} done, {} MB checked, {} remaining",
-                    self.blocks_done,
-                    self.total_blocks,
-                    nutmeg::percent_done(self.blocks_done, self.total_blocks),
-                    self.bytes_done / 1_000_000,
-                    nutmeg::estimate_remaining(&self.start, self.blocks_done, self.total_blocks)
-                )
-            }
-        }
-        let progress_bar = nutmeg::View::new(
-            ProgressModel {
-                total_blocks: blocks.len(),
-                blocks_done: 0,
-                bytes_done: 0,
-                start: Instant::now(),
-            },
-            ui::nutmeg_options(),
-        );
-        // Make a vec of Some(usize) if the block could be read, or None if it
-        // failed, where the usize gives the uncompressed data size.
-        let results: Vec<Option<(BlockHash, usize)>> = blocks
+        let total_blocks = blocks.len();
+        debug!("Check {total_blocks} blocks");
+        let blocks_done = AtomicUsize::new(0);
+        let bytes_done = AtomicU64::new(0);
+        let start = Instant::now();
+        let task = Bar::new();
+        let block_lens = blocks
             .into_par_iter()
-            // .into_iter()
-            .map(|hash| {
-                let r = self
-                    .get_block_content(&hash)
-                    .map(|(bytes, _sizes)| (hash, bytes.len()))
-                    .ok();
-                let bytes = r.as_ref().map(|x| x.1).unwrap_or_default();
-                progress_bar.update(|model| {
-                    model.blocks_done += 1;
-                    model.bytes_done += bytes
-                });
-                r
+            .flat_map(|hash| match self.get_block_content(&hash) {
+                Ok((bytes, _sizes)) => {
+                    let len = bytes.len();
+                    let len64 = len as u64;
+                    task.post(Progress::ValidateBlocks {
+                        blocks_done: blocks_done.fetch_add(1, Ordering::Relaxed) + 1,
+                        total_blocks,
+                        bytes_done: bytes_done.fetch_add(len64, Ordering::Relaxed) + len64,
+                        start,
+                    });
+                    Some((hash, len))
+                }
+                Err(err) => {
+                    error!(%err, %hash, "Error reading block content");
+                    None
+                }
             })
             .collect();
-        stats.block_error_count += results.iter().filter(|o| o.is_none()).count();
-        let len_map: HashMap<BlockHash, usize> = results
-            .into_iter()
-            .flatten() // keep only Some values
-            .collect();
-        Ok(len_map)
+        Ok(block_lens)
     }
 
     /// Return the entire contents of the block.
@@ -330,6 +319,8 @@ impl BlockDir {
     pub fn get_block_content(&self, hash: &BlockHash) -> Result<(Vec<u8>, Sizes)> {
         // TODO: Reuse decompressor buffer.
         // TODO: Reuse read buffer.
+        // TODO: Most importantly, cache decompressed blocks!
+        increment_counter!("conserve.block.read");
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
         let compressed_bytes =
@@ -346,10 +337,7 @@ impl BlockDir {
             decompressed_bytes,
         ));
         if actual_hash != *hash {
-            ui::problem(&format!(
-                "Block file {:?} has actual decompressed hash {}",
-                &block_relpath, actual_hash
-            ));
+            error!("Block file {block_relpath:?} has actual decompressed hash {actual_hash}");
             return Err(Error::BlockCorrupt {
                 hash: hash.to_string(),
                 actual_hash: actual_hash.to_string(),

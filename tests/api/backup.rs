@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@ use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;
+use tracing_test::traced_test;
 
 const HELLO_HASH: &str =
     "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
@@ -53,6 +54,7 @@ pub fn simple_backup() {
 }
 
 #[test]
+#[traced_test]
 pub fn simple_backup_with_excludes() -> Result<()> {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
@@ -98,8 +100,8 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     // TODO: Check index stats.
     // TODO: Check what was restored.
 
-    let validate_stats = af.validate(&ValidateOptions::default()).unwrap();
-    assert!(!validate_stats.has_problems());
+    af.validate(&ValidateOptions::default()).unwrap();
+    assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     Ok(())
 }
 
