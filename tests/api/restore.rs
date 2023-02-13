@@ -70,8 +70,12 @@ pub fn decline_to_overwrite() {
     af.store_two_versions();
     let destdir = TreeFixture::new();
     destdir.create_file("existing");
-    let restore_err_str = RestoreTree::create(destdir.path().to_owned())
-        .unwrap_err()
+    let options = RestoreOptions {
+        ..RestoreOptions::default()
+    };
+    assert!(!options.overwrite, "overwrite is false by default");
+    let restore_err_str = restore(&af, destdir.path(), &options)
+        .expect_err("restore should fail if the destination exists")
         .to_string();
     assert!(restore_err_str.contains("Destination directory not empty"));
 }
