@@ -21,6 +21,7 @@ use std::{fs, time::Instant};
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
+use metrics::{counter, increment_counter};
 use time::OffsetDateTime;
 #[allow(unused_imports)]
 use tracing::{error, warn};
@@ -116,6 +117,7 @@ pub fn restore(
         match entry.kind() {
             Kind::Dir => {
                 stats.directories += 1;
+                increment_counter!("conserve.restore.dirs");
                 if let Err(err) = fs::create_dir_all(&path) {
                     if err.kind() != io::ErrorKind::AlreadyExists {
                         error!(?path, ?err, "Failed to create directory");
@@ -131,6 +133,7 @@ pub fn restore(
             }
             Kind::File => {
                 stats.files += 1;
+                increment_counter!("conserve.restore.files");
                 match copy_file(path.clone(), &entry, &st) {
                     Err(err) => {
                         error!(?err, ?path, "Failed to restore file");
@@ -146,6 +149,7 @@ pub fn restore(
             }
             Kind::Symlink => {
                 stats.symlinks += 1;
+                increment_counter!("conserve.restore.symlinks");
                 if let Err(err) = restore_symlink(&path, &entry) {
                     error!(?path, ?err, "Failed to restore symlink");
                     stats.errors += 1;
@@ -208,8 +212,9 @@ fn copy_file<R: ReadTree>(
     let mut restore_file = File::create(&path).map_err(restore_err)?;
     // TODO: Read one block at a time: don't pull all the contents into memory.
     let content = &mut from_tree.file_contents(source_entry)?;
-    stats.uncompressed_file_bytes =
-        std::io::copy(content, &mut restore_file).map_err(restore_err)?;
+    let len = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
+    stats.uncompressed_file_bytes = len;
+    counter!("conserve.restore.file_bytes", len);
     restore_file.flush().map_err(restore_err)?;
 
     let mtime = Some(source_entry.mtime().to_file_time());
