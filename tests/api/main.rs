@@ -14,6 +14,7 @@
 
 mod apath;
 mod backup;
+mod bandid;
 mod blockhash;
 mod damaged;
 mod delete;
