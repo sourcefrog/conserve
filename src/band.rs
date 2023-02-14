@@ -36,7 +36,7 @@ static INDEX_DIR: &str = "i";
 
 /// Band format-compatibility. Bands written out by this program, can only be
 /// read correctly by versions equal or later than the stated version.
-pub const BAND_FORMAT_VERSION: &str = "0.6.3";
+pub const BAND_FORMAT_VERSION: &str = "23.2.0";
 
 /// Describes how to select a band from an archive.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -50,13 +50,13 @@ pub enum BandSelectionPolicy {
 }
 
 fn band_version_requirement() -> semver::VersionReq {
-    semver::VersionReq::parse("<=0.6.3").unwrap()
+    semver::VersionReq::parse(&format!("<={BAND_FORMAT_VERSION}")).unwrap()
 }
 
 fn band_version_supported(version: &str) -> bool {
     semver::Version::parse(version)
         .map(|sv| band_version_requirement().matches(&sv))
-        .unwrap_or(false)
+        .unwrap()
 }
 
 /// Each backup makes a new `band` containing an index directory.
@@ -300,7 +300,7 @@ mod tests {
         fs::create_dir(af.path().join("b0000")).unwrap();
         let head = json!({
             "start_time": 0,
-            "band_format_version": "0.8.8",
+            "band_format_version": "8888.8.8",
         });
         fs::write(
             af.path().join("b0000").join(BAND_HEAD_FILENAME),
@@ -311,7 +311,7 @@ mod tests {
         let e = Band::open(&af, &BandId::zero());
         let e_str = e.unwrap_err().to_string();
         assert!(
-            e_str.contains("Band version \"0.8.8\" in"),
+            e_str.contains("Band version \"8888.8.8\" in"),
             "bad band version: {e_str:#?}"
         );
     }
