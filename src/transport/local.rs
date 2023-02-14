@@ -1,4 +1,4 @@
-// Copyright 2020 Martin Pool.
+// Copyright 2020-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 use bytes::Bytes;
+use metrics::{counter, increment_counter};
 
 use crate::transport::{DirEntry, Metadata, Transport};
 
@@ -50,6 +51,7 @@ impl Transport for LocalTransport {
         // let's pass them back as lossy UTF-8 so they can be reported at a higher level, for
         // example during validation.
         let full_path = self.full_path(relpath);
+        increment_counter!("conserve.local_transport.read_dirs");
         Ok(Box::new(full_path.read_dir()?.map(move |de_result| {
             let de = de_result?;
             Ok(DirEntry {
@@ -60,19 +62,26 @@ impl Transport for LocalTransport {
     }
 
     fn read_file(&self, relpath: &str) -> io::Result<Bytes> {
+        increment_counter!("conserve.local_transport.read_files");
         let mut file = File::open(self.full_path(relpath))?;
         let estimated_len: usize = file.metadata()?.len().try_into().unwrap();
         let mut out_buf = Vec::with_capacity(estimated_len);
         let actual_len = file.read_to_end(&mut out_buf)?;
+        counter!(
+            "conserve.local_transport.read_file_bytes",
+            actual_len as u64
+        );
         out_buf.truncate(actual_len);
         Ok(out_buf.into())
     }
 
     fn is_file(&self, relpath: &str) -> io::Result<bool> {
+        increment_counter!("conserve.local_transport.metadata_reads");
         Ok(self.full_path(relpath).is_file())
     }
 
     fn is_dir(&self, relpath: &str) -> io::Result<bool> {
+        increment_counter!("conserve.local_transport.metadata_reads");
         Ok(self.full_path(relpath).is_dir())
     }
 
@@ -87,6 +96,11 @@ impl Transport for LocalTransport {
     }
 
     fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()> {
+        increment_counter!("conserve.local_transport.write_files");
+        counter!(
+            "conserve.local_transport.write_file_bytes",
+            content.len() as u64
+        );
         let full_path = self.full_path(relpath);
         let dir = full_path.parent().unwrap();
         let mut temp = tempfile::Builder::new()
@@ -123,6 +137,7 @@ impl Transport for LocalTransport {
     }
 
     fn metadata(&self, relpath: &str) -> io::Result<Metadata> {
+        increment_counter!("conserve.local_transport.metadata_reads");
         let fsmeta = self.root.join(relpath).metadata()?;
         Ok(Metadata {
             len: fsmeta.len(),
