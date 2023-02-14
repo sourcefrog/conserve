@@ -119,11 +119,6 @@ In Conserve 0.6, only bands with a single integer, called a _top level band_,
 are generated or supported. Top level bands contain an index listing every entry
 present in that tree. Top level bands are numbered sequentially from `b0000`.
 
-Bands that are not top-level are _child bands_, and their _parent band_ is the
-band with the last component of their name removed. Child bands' index contains
-only the changes relative to their parent band's index. (Child bands are not
-implemented as of Conserve 0.6.)
-
 A band can be _complete_, while it is receiving data, or _incomplete_ when
 everything from the source has been written. Bands may remain incomplete
 indefinitely, across multiple Conserve invocations, until they are finished.
@@ -158,6 +153,8 @@ The head file contains:
 - `start_time`: The Unix time, in seconds, when the band was started.
 - `band_format_version`: The minimum program version to correctly read this
   band.
+- `format_flags`: A list of strings indicating capabilities required to read
+  this band correctly. Only present from 23.2 onwards.
 
 ### Band tail file
 
@@ -169,6 +166,10 @@ Band footer contains:
 - `end_time`: The Unix time, in seconds, that the band ended.
 - `index_hunk_count`: The number of index hunks that should be present for this
   band. (Since 0.6.4.)
+
+## Format flags
+
+(None are defined yet.)
 
 ## Data block directory
 

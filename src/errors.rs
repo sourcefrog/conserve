@@ -13,6 +13,7 @@
 
 //! Conserve error types.
 
+use std::borrow::Cow;
 use std::io;
 use std::path::PathBuf;
 
@@ -106,6 +107,16 @@ pub enum Error {
         crate::version()
     )]
     UnsupportedBandVersion { band_id: BandId, version: String },
+
+    #[error(
+        "Band {band_id} has feature flags {unsupported_flags:?} \
+        not supported by Conserve {conserve_version}",
+        conserve_version = crate::version()
+    )]
+    UnsupportedBandFormatFlags {
+        band_id: BandId,
+        unsupported_flags: Vec<Cow<'static, str>>,
+    },
 
     #[error("Destination directory not empty: {:?}", path)]
     DestinationNotEmpty { path: PathBuf },

@@ -20,11 +20,19 @@ Band ids currently support a dashed-decimal syntax and are internally a `Vec<usi
 
 ### Band flags
 
-Bands gain a new `band_flags` field stored in their `BANDHEAD` file, as a list of strings. This compliments the existing `band_version` field, which is a single string. Conserve will open a band if it understands all the named flags. This allows incremental deployment of changes without knowing in advance which version will include them.
+Bands gain a new `format_flags` field stored in their `BANDHEAD` file, as a
+list of strings. This compliments the existing `band_version` field, which is a
+single string. Conserve will open a band if it understands all the named flags.
+This allows incremental deployment of changes without knowing in advance which
+version will include them.
 
-Introduction of the `band_flags` field will increment the `band_format_version`, to ensure that old Conserve versions won't open these bands. After this point, the `band_format_version` should generally not need to change.
+Introduction of the `format_flags` field will increment the
+`band_format_version`, to ensure that old Conserve versions won't open these
+bands. After this point, the `band_format_version` should generally not need
+to change.
 
-Many of the following changes can be indicated by flags, although they need not be _individual_ flags unless they ship individually.
+Many of the following changes can be indicated by flags, although they need not
+be _individual_ flags unless they ship individually.
 
 ### Archive flags
 

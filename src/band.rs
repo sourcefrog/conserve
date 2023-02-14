@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,11 +21,12 @@
 //! To read a consistent tree possibly composed from several incremental backups, use
 //! StoredTree rather than the Band itself.
 
+use std::borrow::Cow;
+
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use tracing::error;
-#[allow(unused_imports)]
-use tracing::warn;
+use tracing::{debug, error, warn};
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
@@ -37,6 +38,17 @@ static INDEX_DIR: &str = "i";
 /// Band format-compatibility. Bands written out by this program, can only be
 /// read correctly by versions equal or later than the stated version.
 pub const BAND_FORMAT_VERSION: &str = "23.2.0";
+
+/// Per-band format flags.
+pub mod flags {
+    use std::borrow::Cow;
+
+    /// Default flags for newly created bands.
+    pub static DEFAULT: &[Cow<'static, str>] = &[];
+
+    /// All the flags understood by this version of Conserve.
+    pub static SUPPORTED: &[Cow<'static, str>] = &[];
+}
 
 /// Describes how to select a band from an archive.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -79,6 +91,11 @@ struct Head {
     /// Semver string for the minimum Conserve version to read this band
     /// correctly.
     band_format_version: Option<String>,
+
+    /// Format flags that must be understood to read this band and the
+    /// referenced data correctly.
+    #[serde(default)]
+    format_flags: Vec<Cow<'static, str>>,
 }
 
 /// Format of the on-disk tail file.
@@ -115,6 +132,13 @@ impl Band {
     ///
     /// The Band gets the next id after those that already exist.
     pub fn create(archive: &Archive) -> Result<Band> {
+        Band::create_with_flags(archive, flags::DEFAULT)
+    }
+
+    pub fn create_with_flags(
+        archive: &Archive,
+        format_flags: &[Cow<'static, str>],
+    ) -> Result<Band> {
         let band_id = archive
             .last_band_id()?
             .map_or_else(BandId::zero, |b| b.next_sibling());
@@ -126,6 +150,7 @@ impl Band {
         let head = Head {
             start_time: OffsetDateTime::now_utc().unix_timestamp(),
             band_format_version: Some(BAND_FORMAT_VERSION.to_owned()),
+            format_flags: format_flags.into(),
         };
         write_json(&transport, BAND_HEAD_FILENAME, &head)?;
         Ok(Band {
@@ -159,9 +184,24 @@ impl Band {
                 });
             }
         } else {
+            debug!("Old(?) band {band_id} has no format version");
             // Unmarked, old bands, are accepted for now. In the next archive
             // version, band version markers ought to become mandatory.
         }
+
+        let unsupported_flags = head
+            .format_flags
+            .iter()
+            .filter(|f| !flags::SUPPORTED.contains(f))
+            .cloned()
+            .collect_vec();
+        if !unsupported_flags.is_empty() {
+            return Err(Error::UnsupportedBandFormatFlags {
+                band_id: band_id.clone(),
+                unsupported_flags,
+            });
+        }
+
         Ok(Band {
             band_id: band_id.to_owned(),
             head,
@@ -189,6 +229,11 @@ impl Band {
 
     pub fn id(&self) -> &BandId {
         &self.band_id
+    }
+
+    /// Get the format flags in this band, from [flags].
+    pub fn format_flags(&self) -> &[Cow<'static, str>] {
+        &self.head.format_flags
     }
 
     pub fn index_builder(&self) -> IndexWriter {
