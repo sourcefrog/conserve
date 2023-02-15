@@ -146,7 +146,7 @@ pub fn restore(
             }
             Kind::Symlink => {
                 stats.symlinks += 1;
-                if let Err(err) = restore_symlink(path.clone(), &entry) {
+                if let Err(err) = restore_symlink(&path, &entry) {
                     error!(?path, ?err, "Failed to restore symlink");
                     stats.errors += 1;
                 }
@@ -238,15 +238,21 @@ fn copy_file<R: ReadTree>(
 }
 
 #[cfg(unix)]
-fn restore_symlink<E: Entry>(path: PathBuf, entry: &E) -> Result<()> {
+fn restore_symlink<E: Entry>(path: &Path, entry: &E) -> Result<()> {
     use std::os::unix::fs as unix_fs;
     if let Some(ref target) = entry.symlink_target() {
-        if let Err(source) = unix_fs::symlink(target, &path) {
-            return Err(Error::Restore { path, source });
+        if let Err(source) = unix_fs::symlink(target, path) {
+            return Err(Error::Restore {
+                path: path.to_owned(),
+                source,
+            });
         }
         let mtime = entry.mtime().to_file_time();
-        if let Err(source) = set_symlink_file_times(&path, mtime, mtime) {
-            return Err(Error::RestoreModificationTime { path, source });
+        if let Err(source) = set_symlink_file_times(path, mtime, mtime) {
+            return Err(Error::RestoreModificationTime {
+                path: path.to_owned(),
+                source,
+            });
         }
     } else {
         error!(apath = ?entry.apath(), "No target in symlink entry");
