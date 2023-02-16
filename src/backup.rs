@@ -241,7 +241,7 @@ impl BackupWriter {
         let apath = source_entry.apath();
         let result;
         if let Some(basis_entry) = self.basis_index.advance_to(apath) {
-            if source_entry.is_unchanged_from(&basis_entry) {
+            if entry_metadata_unchanged(source_entry, &basis_entry) {
                 self.stats.unmodified_files += 1;
                 self.index_builder.push_entry(basis_entry);
                 return Ok(Some(DiffKind::Unchanged));
@@ -445,4 +445,13 @@ impl FileCombiner {
             Ok(())
         }
     }
+}
+/// True if the metadata supports an assumption the file contents have
+/// not changed.
+fn entry_metadata_unchanged<E: Entry, O: Entry>(new_entry: &E, basis_entry: &O) -> bool {
+    basis_entry.kind() == new_entry.kind()
+        && basis_entry.mtime() == new_entry.mtime()
+        && basis_entry.size() == new_entry.size()
+        && basis_entry.unix_mode() == new_entry.unix_mode()
+        && basis_entry.owner() == new_entry.owner()
 }
