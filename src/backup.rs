@@ -29,27 +29,22 @@ use crate::tree::ReadTree;
 use crate::*;
 
 /// Configuration of how to make a backup.
-#[derive(Debug, Clone)]
-pub struct BackupOptions {
-    /// Print filenames to the UI as they're copied.
-    pub print_filenames: bool,
-
+pub struct BackupOptions<'cb> {
     /// Exclude these globs from the backup.
     pub exclude: Exclude,
 
-    /// If printing filenames, include metadata such as file permissions
-    pub long_listing: bool,
-
     pub max_entries_per_hunk: usize,
+
+    // Call this callback as each entry is successfully stored.
+    pub after_entry: Option<ChangeCallback<'cb>>,
 }
 
-impl Default for BackupOptions {
-    fn default() -> BackupOptions {
+impl Default for BackupOptions<'_> {
+    fn default() -> BackupOptions<'static> {
         BackupOptions {
-            print_filenames: false,
             exclude: Exclude::nothing(),
             max_entries_per_hunk: crate::index::MAX_ENTRIES_PER_HUNK,
-            long_listing: false,
+            after_entry: None,
         }
     }
 }
@@ -101,19 +96,6 @@ pub fn backup(
                     continue;
                 }
                 Ok(Some(diff_kind)) => {
-                    if options.print_filenames && diff_kind != DiffKind::Unchanged {
-                        if options.long_listing {
-                            println!(
-                                "{} {} {} {}",
-                                diff_kind.as_sigil(),
-                                entry.unix_mode(),
-                                entry.owner(),
-                                entry.apath()
-                            );
-                        } else {
-                            println!("{} {}", diff_kind.as_sigil(), entry.apath());
-                        }
-                    }
                     match diff_kind {
                         DiffKind::Changed => entries_changed += 1,
                         DiffKind::New => entries_new += 1,
@@ -121,23 +103,24 @@ pub fn backup(
                         // Deletions are not produced at the moment.
                         DiffKind::Deleted => (), // model.entries_deleted += 1,
                     }
+                    if let Some(cb) = &options.after_entry {
+                        cb(&EntryChange::new(diff_kind, &entry))?;
+                    }
                 }
                 Ok(_) => {}
             }
             if let Some(bytes) = entry.size() {
                 if bytes > 0 {
                     scanned_file_bytes += bytes;
-                    if !options.print_filenames {
-                        bar.post(Progress::Backup {
-                            filename: entry.apath().to_string(),
-                            scanned_file_bytes,
-                            scanned_dirs,
-                            scanned_files,
-                            entries_new,
-                            entries_changed,
-                            entries_unchanged,
-                        });
-                    }
+                    bar.post(Progress::Backup {
+                        filename: entry.apath().to_string(),
+                        scanned_file_bytes,
+                        scanned_dirs,
+                        scanned_files,
+                        entries_new,
+                        entries_changed,
+                        entries_unchanged,
+                    });
                 }
             }
         }
@@ -446,6 +429,7 @@ impl FileCombiner {
         }
     }
 }
+
 /// True if the metadata supports an assumption the file contents have
 /// not changed.
 fn entry_metadata_unchanged<E: Entry, O: Entry>(new_entry: &E, basis_entry: &O) -> bool {

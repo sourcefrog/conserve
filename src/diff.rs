@@ -18,6 +18,7 @@
 use std::fmt;
 
 use readahead_iterator::IntoReadahead;
+use serde::Serialize;
 
 use crate::*;
 
@@ -41,7 +42,7 @@ impl Default for DiffOptions {
 }
 
 /// The overall state of change of an entry.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
 pub enum DiffKind {
     Unchanged,
     New,

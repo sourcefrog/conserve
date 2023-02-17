@@ -12,6 +12,7 @@
 
 //! Tests focussed on restore.
 
+use std::cell::RefCell;
 #[cfg(unix)]
 use std::fs::{read_link, symlink_metadata};
 use std::path::PathBuf;
@@ -28,12 +29,30 @@ fn simple_restore() {
     let af = ScratchArchive::new();
     af.store_two_versions();
     let destdir = TreeFixture::new();
-
-    let options = RestoreOptions::default();
     let restore_archive = Archive::open_path(af.path()).unwrap();
+    let restored_names = RefCell::new(Vec::new());
+    let options = RestoreOptions {
+        after_entry: Some(Box::new(|entry: &IndexEntry| {
+            restored_names.borrow_mut().push(entry.apath().clone())
+        })),
+        ..Default::default()
+    };
     let stats = restore(&restore_archive, destdir.path(), &options).expect("restore");
 
     assert_eq!(stats.files, 3);
+    let mut expected_names = vec![
+        "/",
+        "/hello",
+        "/hello2",
+        "/link",
+        "/subdir",
+        "/subdir/subfile",
+    ];
+    if !SYMLINKS_SUPPORTED {
+        expected_names.retain(|n| *n != "/link");
+    }
+    drop(options);
+    assert_eq!(restored_names.into_inner(), expected_names);
 
     let dest = &destdir.path();
     assert!(dest.join("hello").is_file());

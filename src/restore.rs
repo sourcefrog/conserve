@@ -36,28 +36,27 @@ use crate::unix_time::ToFileTime;
 use crate::*;
 
 /// Description of how to restore a tree.
-#[derive(Debug)]
-pub struct RestoreOptions {
-    pub print_filenames: bool,
+// #[derive(Debug)]
+pub struct RestoreOptions<'cb> {
     pub exclude: Exclude,
     /// Restore only this subdirectory.
     pub only_subtree: Option<Apath>,
     pub overwrite: bool,
     // The band to select, or by default the last complete one.
     pub band_selection: BandSelectionPolicy,
-    /// If printing filenames, include metadata such as file permissions
-    pub long_listing: bool,
+
+    // Call this callback as each entry is successfully restored.
+    pub after_entry: Option<EntryCallback<'cb>>,
 }
 
-impl Default for RestoreOptions {
+impl Default for RestoreOptions<'_> {
     fn default() -> Self {
         RestoreOptions {
-            print_filenames: false,
             overwrite: false,
             band_selection: BandSelectionPolicy::LatestClosed,
             exclude: Exclude::nothing(),
             only_subtree: None,
-            long_listing: false,
+            after_entry: None,
         }
     }
 }
@@ -101,18 +100,10 @@ pub fn restore(
     )?;
     let mut deferrals = Vec::new();
     for entry in entry_iter {
-        if options.print_filenames {
-            if options.long_listing {
-                println!("{} {} {}", entry.unix_mode(), entry.owner(), entry.apath());
-            } else {
-                println!("{}", entry.apath());
-            }
-        } else {
-            bar.post(Progress::Restore {
-                filename: entry.apath().to_string(),
-                bytes_done,
-            });
-        }
+        bar.post(Progress::Restore {
+            filename: entry.apath().to_string(),
+            bytes_done,
+        });
         let path = destination.join(&entry.apath[1..]);
         match entry.kind() {
             Kind::Dir => {
@@ -138,6 +129,7 @@ pub fn restore(
                     Err(err) => {
                         error!(?err, ?path, "Failed to restore file");
                         stats.errors += 1;
+                        continue;
                     }
                     Ok(s) => {
                         if let Some(bytes) = entry.size() {
@@ -153,6 +145,7 @@ pub fn restore(
                 if let Err(err) = restore_symlink(&path, &entry) {
                     error!(?path, ?err, "Failed to restore symlink");
                     stats.errors += 1;
+                    continue;
                 }
             }
             Kind::Unknown => {
@@ -160,6 +153,9 @@ pub fn restore(
                 warn!(apath = ?entry.apath(), "Unknown file kind");
             }
         };
+        if let Some(cb) = options.after_entry.as_ref() {
+            cb(&entry)
+        }
     }
     stats += apply_deferrals(&deferrals)?;
     stats.elapsed = start.elapsed();

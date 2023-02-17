@@ -40,7 +40,7 @@ snap = "1.0.0"
 tempfile = "3"
 thiserror = "1.0.19"
 thousands = "0.2.0"
-time = { version = "0.3", features = ["local-offset"] }
+time = { version = "0.3", features = ["local-offset", "serde"] }
 tracing = "0.1"
 tracing-appender = "0.2"
 unix_mode = "0.1"

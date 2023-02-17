@@ -123,7 +123,6 @@ pub fn backup_more_excludes() {
     let source = srcdir.live_tree();
     let options = BackupOptions {
         exclude,
-        print_filenames: false,
         ..Default::default()
     };
     let stats = backup(&af, &source, &options).expect("backup");
