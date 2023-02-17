@@ -8,6 +8,10 @@
 
 - New `--log-json` global option to capture all logs, and `--metrics-json` to write out counters.
 
+- New internal non-breaking format change: backups (in the band header) can now declare some
+  format flags needed to read the backup correctly. If any format flags are set then at least
+  Conserve 23.2.0 is needed to read the backup.
+
 ## 23.1.1
 
 - Fixed: User and group mappings are now cached in memory. This fixes a performance regression in

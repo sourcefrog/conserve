@@ -35,10 +35,6 @@ use crate::*;
 
 static INDEX_DIR: &str = "i";
 
-/// Band format-compatibility. Bands written out by this program, can only be
-/// read correctly by versions equal or later than the stated version.
-pub const BAND_FORMAT_VERSION: &str = "23.2.0";
-
 /// Per-band format flags.
 pub mod flags {
     use std::borrow::Cow;
@@ -47,7 +43,7 @@ pub mod flags {
     pub static DEFAULT: &[Cow<'static, str>] = &[];
 
     /// All the flags understood by this version of Conserve.
-    pub static SUPPORTED: &[Cow<'static, str>] = &[];
+    pub static SUPPORTED: &[&'static str] = &[];
 }
 
 /// Describes how to select a band from an archive.
@@ -62,7 +58,7 @@ pub enum BandSelectionPolicy {
 }
 
 fn band_version_requirement() -> semver::VersionReq {
-    semver::VersionReq::parse(&format!("<={BAND_FORMAT_VERSION}")).unwrap()
+    semver::VersionReq::parse(&format!("<={}", crate::VERSION)).unwrap()
 }
 
 fn band_version_supported(version: &str) -> bool {
@@ -139,6 +135,9 @@ impl Band {
         archive: &Archive,
         format_flags: &[Cow<'static, str>],
     ) -> Result<Band> {
+        format_flags
+            .iter()
+            .for_each(|f| assert!(flags::SUPPORTED.contains(&f.as_ref()), "unknown flag {f:?}"));
         let band_id = archive
             .last_band_id()?
             .map_or_else(BandId::zero, |b| b.next_sibling());
@@ -147,9 +146,14 @@ impl Band {
             .create_dir("")
             .and_then(|()| transport.create_dir(INDEX_DIR))
             .map_err(|source| Error::CreateBand { source })?;
+        let band_format_version = if format_flags.is_empty() {
+            Some("0.6.3".to_owned())
+        } else {
+            Some("23.2.0".to_owned())
+        };
         let head = Head {
             start_time: OffsetDateTime::now_utc().unix_timestamp(),
-            band_format_version: Some(BAND_FORMAT_VERSION.to_owned()),
+            band_format_version,
             format_flags: format_flags.into(),
         };
         write_json(&transport, BAND_HEAD_FILENAME, &head)?;
@@ -192,7 +196,7 @@ impl Band {
         let unsupported_flags = head
             .format_flags
             .iter()
-            .filter(|f| !flags::SUPPORTED.contains(f))
+            .filter(|f| !flags::SUPPORTED.contains(&f.as_ref()))
             .cloned()
             .collect_vec();
         if !unsupported_flags.is_empty() {
@@ -229,6 +233,11 @@ impl Band {
 
     pub fn id(&self) -> &BandId {
         &self.band_id
+    }
+
+    /// Get the minimum supported version for this band.
+    pub fn band_format_version(&self) -> Option<&str> {
+        self.head.band_format_version.as_deref()
     }
 
     /// Get the format flags in this band, from [flags].

@@ -154,7 +154,8 @@ The head file contains:
 - `band_format_version`: The minimum program version to correctly read this
   band.
 - `format_flags`: A list of strings indicating capabilities required to read
-  this band correctly. Only present from 23.2 onwards.
+  this band correctly. If this is set and non-empty, then the `band_format_version`
+  must be at least 23.2.0.
 
 ### Band tail file
 
