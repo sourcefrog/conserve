@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Better progress bars for various operations including `validate`.
+
 - Don't complain if unable to chown during restore; this is normal when not run as root.
 
 - New `--log-json` global option to capture all logs, and `--metrics-json` to write out counters.
