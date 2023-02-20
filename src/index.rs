@@ -21,6 +21,7 @@ use std::sync::Arc;
 use std::vec;
 
 use metrics::{counter, increment_counter};
+use time::OffsetDateTime;
 use tracing::error;
 
 use crate::compress::snappy::{Compressor, Decompressor};
@@ -30,7 +31,7 @@ use crate::stats::{IndexReadStats, IndexWriterStats};
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
 use crate::unix_mode::UnixMode;
-use crate::unix_time::UnixTime;
+use crate::unix_time::FromUnixAndNanos;
 use crate::*;
 
 pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
@@ -99,11 +100,8 @@ impl Entry for IndexEntry {
     }
 
     #[inline]
-    fn mtime(&self) -> UnixTime {
-        UnixTime {
-            secs: self.mtime,
-            nanosecs: self.mtime_nanos,
-        }
+    fn mtime(&self) -> OffsetDateTime {
+        OffsetDateTime::from_unix_seconds_and_nanos(self.mtime, self.mtime_nanos)
     }
 
     /// Size of the file, if it is a file. None for directories and symlinks.
@@ -139,8 +137,8 @@ impl IndexEntry {
             kind: source.kind(),
             addrs: Vec::new(),
             target: source.symlink_target().clone(),
-            mtime: mtime.secs,
-            mtime_nanos: mtime.nanosecs,
+            mtime: mtime.unix_timestamp(),
+            mtime_nanos: mtime.nanosecond(),
             unix_mode: source.unix_mode(),
             owner: source.owner(),
         }

@@ -22,8 +22,8 @@ use assert_fs::TempDir;
 use predicates::prelude::*;
 use pretty_assertions::assert_eq;
 
-use conserve::unix_time::UnixTime;
 use conserve::*;
+use time::OffsetDateTime;
 use tracing_test::traced_test;
 
 const MINIMAL_ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.10", "0.6.2", "0.6.3", "0.6.9", "0.6.17"];
@@ -154,20 +154,25 @@ fn restore_old_archive() {
 
         // Check that mtimes are restored. The sub-second times are not tested
         // because their behavior might vary depending on the local filesystem.
-        let file_mtime = UnixTime::from(
+        let file_mtime = OffsetDateTime::from(
             metadata(dest.child("hello").path())
                 .unwrap()
                 .modified()
                 .unwrap(),
         );
-        assert_eq!(file_mtime.secs, 1592266523, "mtime not restored correctly");
-        let dir_mtime = UnixTime::from(
+        assert_eq!(
+            file_mtime.unix_timestamp(),
+            1592266523,
+            "mtime not restored correctly"
+        );
+
+        let dir_mtime = OffsetDateTime::from(
             metadata(dest.child("subdir").path())
                 .unwrap()
                 .modified()
                 .unwrap(),
         );
-        assert_eq!(dir_mtime.secs, 1592266523,);
+        assert_eq!(dir_mtime.unix_timestamp(), 1592266523);
     }
 }
 

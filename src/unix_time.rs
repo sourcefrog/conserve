@@ -12,43 +12,41 @@
 // GNU General Public License for more details.
 
 //! Times relative to the Unix epoch.
+//!
+//! In particular, glue between [filetime] and [time].
 
 use filetime::FileTime;
+use time::OffsetDateTime;
 
-use std::convert::From;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-/// A Unix time, as seconds since 1970 UTC, plus fractional nanoseconds.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct UnixTime {
-    /// Whole seconds after (or if negative, before) 1 Jan 1970 UTC.
-    pub secs: i64,
-    /// Fractional nanoseconds.
-    pub nanosecs: u32,
+pub(crate) trait FromUnixAndNanos {
+    fn from_unix_seconds_and_nanos(unix_seconds: i64, nanoseconds: u32) -> Self;
 }
 
-impl From<SystemTime> for UnixTime {
-    fn from(t: SystemTime) -> UnixTime {
-        if let Ok(after) = t.duration_since(UNIX_EPOCH) {
-            UnixTime {
-                secs: after.as_secs() as i64,
-                nanosecs: after.subsec_nanos(),
-            }
-        } else {
-            let before = UNIX_EPOCH.duration_since(t).unwrap();
-            let mut secs = -(before.as_secs() as i64);
-            let mut nanosecs = before.subsec_nanos();
-            if nanosecs > 0 {
-                secs -= 1;
-                nanosecs = 1_000_000_000 - nanosecs;
-            }
-            UnixTime { secs, nanosecs }
-        }
+impl FromUnixAndNanos for OffsetDateTime {
+    fn from_unix_seconds_and_nanos(unix_seconds: i64, nanoseconds: u32) -> Self {
+        OffsetDateTime::from_unix_timestamp(unix_seconds)
+            .unwrap()
+            .replace_nanosecond(nanoseconds)
+            .unwrap()
     }
 }
 
-impl From<UnixTime> for FileTime {
-    fn from(t: UnixTime) -> FileTime {
-        FileTime::from_unix_time(t.secs, t.nanosecs)
+pub(crate) trait ToOffsetDateTime {
+    fn to_offset_date_time(&self) -> OffsetDateTime;
+}
+
+impl ToOffsetDateTime for FileTime {
+    fn to_offset_date_time(&self) -> OffsetDateTime {
+        OffsetDateTime::from_unix_seconds_and_nanos(self.unix_seconds(), self.nanoseconds())
+    }
+}
+
+pub(crate) trait ToFileTime {
+    fn to_file_time(&self) -> FileTime;
+}
+
+impl ToFileTime for OffsetDateTime {
+    fn to_file_time(&self) -> FileTime {
+        FileTime::from_unix_time(self.unix_timestamp(), self.nanosecond())
     }
 }

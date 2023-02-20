@@ -21,6 +21,7 @@ use std::{fs, time::Instant};
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
+use time::OffsetDateTime;
 #[allow(unused_imports)]
 use tracing::{error, warn};
 
@@ -30,7 +31,7 @@ use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::progress::{Bar, Progress};
 use crate::stats::RestoreStats;
 use crate::unix_mode::UnixMode;
-use crate::unix_time::UnixTime;
+use crate::unix_time::ToFileTime;
 use crate::*;
 
 /// Description of how to restore a tree.
@@ -150,7 +151,7 @@ pub struct RestoreTree {
     path: PathBuf,
 
     dir_unix_modes: Vec<(PathBuf, UnixMode)>,
-    dir_mtimes: Vec<(PathBuf, UnixTime)>,
+    dir_mtimes: Vec<(PathBuf, OffsetDateTime)>,
 }
 
 impl RestoreTree {
@@ -192,7 +193,7 @@ impl RestoreTree {
             }
         }
         for (path, time) in self.dir_mtimes {
-            if let Err(err) = filetime::set_file_mtime(&path, time.into()) {
+            if let Err(err) = filetime::set_file_mtime(&path, time.to_file_time()) {
                 error!("Failed to set directory mtime on {path:?}: {err}");
             }
         }
@@ -230,7 +231,7 @@ impl RestoreTree {
             std::io::copy(content, &mut restore_file).map_err(restore_err)?;
         restore_file.flush().map_err(restore_err)?;
 
-        let mtime = Some(source_entry.mtime().into());
+        let mtime = Some(source_entry.mtime().to_file_time());
         set_file_handle_times(&restore_file, mtime, mtime).map_err(|source| {
             Error::RestoreModificationTime {
                 path: path.clone(),
@@ -263,7 +264,7 @@ impl RestoreTree {
             if let Err(source) = unix_fs::symlink(target, &path) {
                 return Err(Error::Restore { path, source });
             }
-            let mtime = entry.mtime().into();
+            let mtime = entry.mtime().to_file_time();
             if let Err(source) = set_symlink_file_times(&path, mtime, mtime) {
                 return Err(Error::RestoreModificationTime { path, source });
             }

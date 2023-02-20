@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,12 +18,12 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
+use time::OffsetDateTime;
 use tracing::{error, warn};
 
 use crate::owner::Owner;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_mode::UnixMode;
-use crate::unix_time::UnixTime;
 use crate::*;
 
 /// A real tree on the filesystem, for use as a backup source or restore destination.
@@ -56,7 +56,7 @@ impl LiveTree {
 pub struct LiveEntry {
     apath: Apath,
     kind: Kind,
-    mtime: UnixTime,
+    mtime: OffsetDateTime,
     size: Option<u64>,
     symlink_target: Option<String>,
     unix_mode: UnixMode,
@@ -97,7 +97,7 @@ impl Entry for LiveEntry {
         self.kind
     }
 
-    fn mtime(&self) -> UnixTime {
+    fn mtime(&self) -> OffsetDateTime {
         self.mtime
     }
 

@@ -16,16 +16,17 @@
 
 use std::fmt::Debug;
 
+use time::OffsetDateTime;
+
 use crate::kind::Kind;
 use crate::owner::Owner;
 use crate::unix_mode::UnixMode;
-use crate::unix_time::UnixTime;
 use crate::*;
 
 pub trait Entry: Debug {
     fn apath(&self) -> &Apath;
     fn kind(&self) -> Kind;
-    fn mtime(&self) -> UnixTime;
+    fn mtime(&self) -> OffsetDateTime;
     fn size(&self) -> Option<u64>;
     fn symlink_target(&self) -> &Option<String>;
     fn unix_mode(&self) -> UnixMode;
