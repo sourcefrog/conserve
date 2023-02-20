@@ -19,6 +19,7 @@ use std::process::Command;
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use indoc::indoc;
 use predicates::prelude::*;
 use url::Url;
 
@@ -221,18 +222,18 @@ fn basic_backup() {
         .arg("restore")
         .arg("-v")
         .arg("--no-progress")
+        .arg("--no-stats")
         .arg(&arch_dir)
         .arg(restore_dir.path())
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with(
-            "/\n\
-             /hello\n\
-             /subdir\n\
-             /subdir/subfile\n\
-             ",
-        ));
+        .stdout(indoc! { "
+             + /
+             + /hello
+             + /subdir
+             + /subdir/subfile
+        " });
 
     restore_dir
         .child("subdir")

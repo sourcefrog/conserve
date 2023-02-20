@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use indoc::indoc;
+use indoc::{formatdoc, indoc};
 use predicates::prelude::*;
 
 use crate::run_conserve;
@@ -97,12 +97,12 @@ fn backup_unix_permissions() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::diff(format!(
-            "rwxr-xr-x {user:<10} {group:<10} /\n\
-             r--r--r-- {user:<10} {group:<10} /hello\n\
-             rwxrwxr-x {user:<10} {group:<10} /subdir\n\
-             rwxr-xr-x {user:<10} {group:<10} /subdir/subfile\n"
-        )));
+        .stdout(predicate::str::diff(formatdoc! { "
+             rwxr-xr-x {user:<10} {group:<10} /
+             r--r--r-- {user:<10} {group:<10} /hello
+             rwxrwxr-x {user:<10} {group:<10} /subdir
+             rwxr-xr-x {user:<10} {group:<10} /subdir/subfile
+        " }));
 
     // create a directory to restore to
     let restore_dir = TempDir::new().unwrap();
@@ -115,13 +115,12 @@ fn backup_unix_permissions() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::diff(format!(
-            "rwxr-xr-x {user:<10} {group:<10} /\n\
-             r--r--r-- {user:<10} {group:<10} /hello\n\
-             rwxrwxr-x {user:<10} {group:<10} /subdir\n\
-             rwxr-xr-x {user:<10} {group:<10} /subdir/subfile\n\
-            "
-        )));
+        .stdout(predicate::str::diff(formatdoc! {"
+             + rwxr-xr-x {user:<10} {group:<10} /
+             + r--r--r-- {user:<10} {group:<10} /hello
+             + rwxrwxr-x {user:<10} {group:<10} /subdir
+             + rwxr-xr-x {user:<10} {group:<10} /subdir/subfile
+        "}));
 }
 
 #[test]
@@ -202,17 +201,18 @@ fn backup_user_and_permissions() {
 
     // restore
     run_conserve()
-        .args(["restore", "-v", "-l", "--no-progress"])
+        .args(["restore", "-v", "-l", "--no-progress", "--no-stats"])
         .arg(&arch_dir)
         .arg(restore_dir.path())
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with(format!(
-            "{} {} /\n\
-             {} {} /hello\n\
-             {} {} /subdir\n\
-             {} {} /subdir/subfile\n\
+        .stdout(predicate::str::diff(formatdoc!(
+            "
+            + {} {} /
+            + {} {} /hello
+            + {} {} /subdir
+            + {} {} /subdir/subfile
             ",
             UnixMode::from(mdata_root.permissions()),
             Owner::from(&mdata_root),

@@ -36,6 +36,7 @@ impl EntryChange {
         }
     }
 
+    #[allow(unused)] // Never generated in backups at the moment
     pub(crate) fn deleted(entry: &dyn Entry) -> Self {
         EntryChange {
             apath: entry.apath().clone(),

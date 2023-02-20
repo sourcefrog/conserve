@@ -46,7 +46,7 @@ pub struct RestoreOptions<'cb> {
     pub band_selection: BandSelectionPolicy,
 
     // Call this callback as each entry is successfully restored.
-    pub after_entry: Option<EntryCallback<'cb>>,
+    pub change_callback: Option<ChangeCallback<'cb>>,
 }
 
 impl Default for RestoreOptions<'_> {
@@ -56,7 +56,7 @@ impl Default for RestoreOptions<'_> {
             band_selection: BandSelectionPolicy::LatestClosed,
             exclude: Exclude::nothing(),
             only_subtree: None,
-            after_entry: None,
+            change_callback: None,
         }
     }
 }
@@ -153,8 +153,9 @@ pub fn restore(
                 warn!(apath = ?entry.apath(), "Unknown file kind");
             }
         };
-        if let Some(cb) = options.after_entry.as_ref() {
-            cb(&entry)
+        if let Some(cb) = options.change_callback.as_ref() {
+            // Since we only restore to empty directories they're all added.
+            cb(&EntryChange::added(&entry))?;
         }
     }
     stats += apply_deferrals(&deferrals)?;

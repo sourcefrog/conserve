@@ -431,17 +431,12 @@ impl Command {
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open(open_transport(archive)?)?;
-                let mut options = RestoreOptions {
+                let options = RestoreOptions {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     only_subtree: only_subtree.clone(),
                     band_selection,
                     overwrite: *force_overwrite,
-                    after_entry: None,
-                };
-                if *long_listing {
-                    options.after_entry = Some(Box::new(print_entry_long))
-                } else if *verbose {
-                    options.after_entry = Some(Box::new(print_entry_short))
+                    change_callback: make_change_callback(*verbose, *long_listing, &None)?,
                 };
                 if *verbose || *long_listing {
                     ProgressImpl::Null.activate();
@@ -519,14 +514,6 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
     } else {
         BandSelectionPolicy::Latest
     }
-}
-
-fn print_entry_long(entry: &IndexEntry) {
-    println!("{} {} {}", entry.unix_mode(), entry.owner(), entry.apath());
-}
-
-fn print_entry_short(entry: &IndexEntry) {
-    println!("{}", entry.apath());
 }
 
 fn make_change_callback<'a>(

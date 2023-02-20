@@ -32,8 +32,9 @@ fn simple_restore() {
     let restore_archive = Archive::open_path(af.path()).unwrap();
     let restored_names = RefCell::new(Vec::new());
     let options = RestoreOptions {
-        after_entry: Some(Box::new(|entry: &IndexEntry| {
-            restored_names.borrow_mut().push(entry.apath().clone())
+        change_callback: Some(Box::new(|entry_change| {
+            restored_names.borrow_mut().push(entry_change.apath.clone());
+            Ok(())
         })),
         ..Default::default()
     };

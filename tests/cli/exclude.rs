@@ -189,8 +189,8 @@ fn restore_exclude_excludes_subtrees() {
         .assert()
         .success()
         .stdout(indoc! { "
-            /
-            /hello
+            + /
+            + /hello
         "})
         .stderr("");
     dest.child("subdir").assert(predicate::path::missing());
