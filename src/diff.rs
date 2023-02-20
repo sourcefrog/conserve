@@ -44,6 +44,7 @@ impl Default for DiffOptions {
 /// The overall state of change of an entry.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
 pub enum DiffKind {
+    // TODO: Fold into Change
     Unchanged,
     New,
     Deleted,

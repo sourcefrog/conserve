@@ -21,6 +21,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
+use conserve::change::Change;
 use conserve::progress::ProgressImpl;
 use conserve::trace_counter::{global_error_count, global_warn_count};
 use metrics::increment_counter;
@@ -548,27 +549,28 @@ fn make_change_callback<'a>(
     } else {
         None
     };
-    Ok(Some(Box::new(move |change| {
-        if change.diff_kind == DiffKind::Unchanged {
+    Ok(Some(Box::new(move |entry_change| {
+        if matches!(entry_change.change, Change::Unchanged { .. }) {
             return Ok(());
         }
         if ls_long {
+            let change_meta = entry_change.change.primary_metadata();
             println!(
                 "{} {} {} {}",
-                change.diff_kind.as_sigil(),
-                change.unix_mode,
-                change.owner,
-                change.apath
+                entry_change.change.sigil(),
+                change_meta.unix_mode,
+                change_meta.owner,
+                entry_change.apath
             );
         } else if print_changes {
-            println!("{} {}", change.diff_kind.as_sigil(), change.apath);
+            println!("{} {}", entry_change.change.sigil(), entry_change.apath);
         }
         if let Some(w) = &changes_json_writer {
             let mut w = w.borrow_mut();
             writeln!(
                 w,
                 "{}",
-                serde_json::to_string(change).expect("Failed to serialize change")
+                serde_json::to_string(entry_change).expect("Failed to serialize change")
             )?;
         }
         Ok(())

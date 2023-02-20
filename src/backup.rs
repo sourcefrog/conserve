@@ -21,6 +21,7 @@ use itertools::Itertools;
 use tracing::error;
 
 use crate::blockdir::Address;
+use crate::change::Change;
 use crate::io::read_with_retries;
 use crate::progress::{Bar, Progress};
 use crate::stats::BackupStats;
@@ -95,16 +96,16 @@ pub fn backup(
                     stats.errors += 1;
                     continue;
                 }
-                Ok(Some(diff_kind)) => {
-                    match diff_kind {
-                        DiffKind::Changed => entries_changed += 1,
-                        DiffKind::New => entries_new += 1,
-                        DiffKind::Unchanged => entries_unchanged += 1,
+                Ok(Some(entry_change)) => {
+                    match entry_change.change {
+                        Change::Changed { .. } => entries_changed += 1,
+                        Change::Added { .. } => entries_new += 1,
+                        Change::Unchanged { .. } => entries_unchanged += 1,
                         // Deletions are not produced at the moment.
-                        DiffKind::Deleted => (), // model.entries_deleted += 1,
+                        Change::Deleted { .. } => (), // model.entries_deleted += 1,
                     }
                     if let Some(cb) = &options.after_entry {
-                        cb(&EntryChange::new(diff_kind, &entry))?;
+                        cb(&entry_change)?;
                     }
                 }
                 Ok(_) => {}
@@ -192,7 +193,8 @@ impl BackupWriter {
     /// Return an indication of whether it changed (if it's a file), or
     /// None for non-plain-file types where that information is not currently
     /// calculated.
-    fn copy_entry(&mut self, entry: &LiveEntry, source: &LiveTree) -> Result<Option<DiffKind>> {
+    fn copy_entry(&mut self, entry: &LiveEntry, source: &LiveTree) -> Result<Option<EntryChange>> {
+        // TODO: Emit deletions for entries in the basis not present in the source.
         match entry.kind() {
             Kind::Dir => self.copy_dir(entry),
             Kind::File => self.copy_file(entry, source),
@@ -207,11 +209,11 @@ impl BackupWriter {
         }
     }
 
-    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
+    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<Option<EntryChange>> {
         self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
-        Ok(None) // TODO: See if it changed from the basis?
+        Ok(None) // TODO: Emit the actual change.
     }
 
     /// Copy in the contents of a file from another tree.
@@ -219,22 +221,23 @@ impl BackupWriter {
         &mut self,
         source_entry: &LiveEntry,
         from_tree: &LiveTree,
-    ) -> Result<Option<DiffKind>> {
+    ) -> Result<Option<EntryChange>> {
         self.stats.files += 1;
         let apath = source_entry.apath();
         let result;
         if let Some(basis_entry) = self.basis_index.advance_to(apath) {
             if entry_metadata_unchanged(source_entry, &basis_entry) {
                 self.stats.unmodified_files += 1;
+                let change = Some(EntryChange::unchanged(&basis_entry));
                 self.index_builder.push_entry(basis_entry);
-                return Ok(Some(DiffKind::Unchanged));
+                return Ok(change);
             } else {
                 self.stats.modified_files += 1;
-                result = Some(DiffKind::Changed);
+                result = Some(EntryChange::changed(&basis_entry, source_entry));
             }
         } else {
             self.stats.new_files += 1;
-            result = Some(DiffKind::New);
+            result = Some(EntryChange::added(source_entry));
         }
         let mut read_source = from_tree.file_contents(source_entry)?;
         let size = source_entry.size().expect("LiveEntry has a size");
@@ -262,12 +265,13 @@ impl BackupWriter {
         Ok(result)
     }
 
-    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
+    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<Option<EntryChange>> {
         let target = source_entry.symlink_target().clone();
         self.stats.symlinks += 1;
         assert!(target.is_some());
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
+        // TODO: Emit the actual change.
         Ok(None)
     }
 }

@@ -217,7 +217,7 @@ fn restore_modify_backup() {
                 after_entry: Some(Box::new(|change| {
                     emitted
                         .borrow_mut()
-                        .push((change.diff_kind, change.apath.to_string()));
+                        .push((change.change.sigil(), change.apath.to_string()));
                     Ok(())
                 })),
                 ..Default::default()
@@ -241,8 +241,8 @@ fn restore_modify_backup() {
                 working_tree.child(path).path().metadata().unwrap()
             );
         }
-        assert!(emitted.contains(&(DiffKind::New, "/empty".to_owned())));
-        assert!(emitted.contains(&(DiffKind::Changed, "/subdir/subfile".to_owned())));
+        assert!(emitted.contains(&('+', "/empty".to_owned())));
+        assert!(emitted.contains(&('*', "/subdir/subfile".to_owned())));
 
         assert_eq!(backup_stats.files, 3);
         assert!(

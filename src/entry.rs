@@ -16,7 +16,6 @@
 
 use std::fmt::Debug;
 
-use serde::Serialize;
 use time::OffsetDateTime;
 
 use crate::kind::Kind;
@@ -33,35 +32,3 @@ pub trait Entry: Debug {
     fn unix_mode(&self) -> UnixMode;
     fn owner(&self) -> Owner;
 }
-
-/// Summary of some kind of change to an entry from backup, diff, restore, etc.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
-pub struct EntryChange {
-    // TODO: Maybe give it both old and new versions of the attributes?
-    pub diff_kind: DiffKind,
-    pub apath: Apath,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<u64>,
-    pub mtime: OffsetDateTime,
-    pub owner: Owner,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub symlink_target: Option<String>,
-    pub unix_mode: UnixMode,
-}
-
-impl EntryChange {
-    pub(crate) fn new(diff_kind: DiffKind, entry: &dyn Entry) -> Self {
-        EntryChange {
-            diff_kind,
-            apath: entry.apath().clone(),
-            size: entry.size(),
-            mtime: entry.mtime(),
-            owner: entry.owner().clone(),
-            symlink_target: entry.symlink_target().clone(),
-            unix_mode: entry.unix_mode().clone(),
-        }
-    }
-}
-
-/// A callback when a changed entry is visited, e.g. during a backup.
-pub type ChangeCallback<'cb> = Box<dyn Fn(&EntryChange) -> Result<()> + 'cb>;
