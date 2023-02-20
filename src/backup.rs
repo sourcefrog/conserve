@@ -37,7 +37,7 @@ pub struct BackupOptions<'cb> {
     pub max_entries_per_hunk: usize,
 
     // Call this callback as each entry is successfully stored.
-    pub after_entry: Option<ChangeCallback<'cb>>,
+    pub change_callback: Option<ChangeCallback<'cb>>,
 }
 
 impl Default for BackupOptions<'_> {
@@ -45,7 +45,7 @@ impl Default for BackupOptions<'_> {
         BackupOptions {
             exclude: Exclude::nothing(),
             max_entries_per_hunk: crate::index::MAX_ENTRIES_PER_HUNK,
-            after_entry: None,
+            change_callback: None,
         }
     }
 }
@@ -104,7 +104,7 @@ pub fn backup(
                         // Deletions are not produced at the moment.
                         Change::Deleted { .. } => (), // model.entries_deleted += 1,
                     }
-                    if let Some(cb) = &options.after_entry {
+                    if let Some(cb) = &options.change_callback {
                         cb(&entry_change)?;
                     }
                 }

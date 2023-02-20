@@ -214,7 +214,7 @@ fn restore_modify_backup() {
             &new_archive,
             &LiveTree::open(working_tree.path()).unwrap(),
             &BackupOptions {
-                after_entry: Some(Box::new(|change| {
+                change_callback: Some(Box::new(|change| {
                     emitted
                         .borrow_mut()
                         .push((change.change.sigil(), change.apath.to_string()));

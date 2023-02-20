@@ -295,7 +295,7 @@ impl Command {
                 let source = &LiveTree::open(source)?;
                 let options = BackupOptions {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
-                    after_entry: make_change_callback(
+                    change_callback: make_change_callback(
                         *verbose,
                         *long_listing,
                         &changes_json.as_deref(),
