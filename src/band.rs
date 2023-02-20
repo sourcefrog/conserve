@@ -43,7 +43,7 @@ pub mod flags {
     pub static DEFAULT: &[Cow<'static, str>] = &[];
 
     /// All the flags understood by this version of Conserve.
-    pub static SUPPORTED: &[&'static str] = &[];
+    pub static SUPPORTED: &[&str] = &[];
 }
 
 /// Describes how to select a band from an archive.
