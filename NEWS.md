@@ -12,6 +12,8 @@
   format flags needed to read the backup correctly. If any format flags are set then at least
   Conserve 23.2.0 is needed to read the backup.
 
+- New `--changes-json` option to `restore` and `backup`.
+
 ## 23.1.1
 
 - Fixed: User and group mappings are now cached in memory. This fixes a performance regression in

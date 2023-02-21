@@ -163,6 +163,9 @@ enum Command {
         destination: PathBuf,
         #[arg(long, short)]
         backup: Option<BandId>,
+        /// Write a list of restored files to this json file.
+        #[arg(long)]
+        changes_json: Option<PathBuf>,
         #[arg(long, short)]
         force_overwrite: bool,
         #[arg(long, short)]
@@ -421,6 +424,7 @@ impl Command {
                 archive,
                 destination,
                 backup,
+                changes_json,
                 verbose,
                 force_overwrite,
                 exclude,
@@ -436,7 +440,11 @@ impl Command {
                     only_subtree: only_subtree.clone(),
                     band_selection,
                     overwrite: *force_overwrite,
-                    change_callback: make_change_callback(*verbose, *long_listing, &None)?,
+                    change_callback: make_change_callback(
+                        *verbose,
+                        *long_listing,
+                        &changes_json.as_deref(),
+                    )?,
                 };
                 if *verbose || *long_listing {
                     ProgressImpl::Null.activate();
