@@ -13,6 +13,8 @@
 
 //! A change to an entry during backup, diff, restore, etc.
 
+use std::fmt;
+
 use serde::Serialize;
 use time::OffsetDateTime;
 
@@ -64,6 +66,12 @@ impl EntryChange {
                 new: EntryMetadata::from(new),
             },
         }
+    }
+}
+
+impl fmt::Display for EntryChange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.change.sigil(), self.apath)
     }
 }
 

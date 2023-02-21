@@ -19,6 +19,7 @@ use std::cmp::Ordering;
 
 use crate::*;
 
+// TODO: Fold in to EntryChange.
 #[derive(Debug, PartialEq, Eq)]
 pub enum MergedEntryKind<AE, BE>
 where
@@ -32,6 +33,7 @@ where
 
 use self::MergedEntryKind::*;
 
+// TODO: Fold in to EntryChange.
 #[derive(Debug, PartialEq, Eq)]
 pub struct MergedEntry<AE, BE>
 where
