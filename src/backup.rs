@@ -14,9 +14,12 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
+use std::convert::TryInto;
+use std::fmt;
 use std::io::prelude::*;
-use std::{convert::TryInto, time::Instant};
+use std::time::{Duration, Instant};
 
+use derive_more::{Add, AddAssign};
 use itertools::Itertools;
 use tracing::error;
 
@@ -24,7 +27,9 @@ use crate::blockdir::Address;
 use crate::change::Change;
 use crate::io::read_with_retries;
 use crate::progress::{Bar, Progress};
-use crate::stats::BackupStats;
+use crate::stats::{
+    write_compressed_size, write_count, write_duration, write_size, IndexWriterStats,
+};
 use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::ReadTree;
 use crate::*;
@@ -442,4 +447,79 @@ fn entry_metadata_unchanged<E: Entry, O: Entry>(new_entry: &E, basis_entry: &O) 
         && basis_entry.size() == new_entry.size()
         && basis_entry.unix_mode() == new_entry.unix_mode()
         && basis_entry.owner() == new_entry.owner()
+}
+
+#[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
+pub struct BackupStats {
+    // TODO: Have separate more-specific stats for backup and restore, and then
+    // each can have a single Display method.
+    // TODO: Include source file bytes, including unmodified files.
+    pub files: usize,
+    pub symlinks: usize,
+    pub directories: usize,
+    pub unknown_kind: usize,
+
+    pub unmodified_files: usize,
+    pub modified_files: usize,
+    pub new_files: usize,
+
+    /// Bytes that matched an existing block.
+    pub deduplicated_bytes: u64,
+    /// Bytes that were stored as new blocks, before compression.
+    pub uncompressed_bytes: u64,
+    pub compressed_bytes: u64,
+
+    pub deduplicated_blocks: usize,
+    pub written_blocks: usize,
+    /// Blocks containing combined small files.
+    pub combined_blocks: usize,
+
+    pub empty_files: usize,
+    pub small_combined_files: usize,
+    pub single_block_files: usize,
+    pub multi_block_files: usize,
+
+    pub errors: usize,
+
+    pub index_builder_stats: IndexWriterStats,
+    pub elapsed: Duration,
+}
+
+impl fmt::Display for BackupStats {
+    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_count(w, "files:", self.files);
+        write_count(w, "  unmodified files", self.unmodified_files);
+        write_count(w, "  modified files", self.modified_files);
+        write_count(w, "  new files", self.new_files);
+        write_count(w, "symlinks", self.symlinks);
+        write_count(w, "directories", self.directories);
+        write_count(w, "unsupported file kind", self.unknown_kind);
+        writeln!(w).unwrap();
+
+        write_count(w, "files stored:", self.new_files + self.modified_files);
+        write_count(w, "  empty files", self.empty_files);
+        write_count(w, "  small combined files", self.small_combined_files);
+        write_count(w, "  single block files", self.single_block_files);
+        write_count(w, "  multi-block files", self.multi_block_files);
+        writeln!(w).unwrap();
+
+        write_count(w, "data blocks deduplicated:", self.deduplicated_blocks);
+        write_size(w, "  saved", self.deduplicated_bytes);
+        writeln!(w).unwrap();
+
+        write_count(w, "new data blocks written:", self.written_blocks);
+        write_count(w, "  blocks of combined files", self.combined_blocks);
+        write_compressed_size(w, self.compressed_bytes, self.uncompressed_bytes);
+        writeln!(w).unwrap();
+
+        let idx = &self.index_builder_stats;
+        write_count(w, "new index hunks", idx.index_hunks);
+        write_compressed_size(w, idx.compressed_index_bytes, idx.uncompressed_index_bytes);
+        writeln!(w).unwrap();
+
+        write_count(w, "errors", self.errors);
+        write_duration(w, "elapsed", self.elapsed)?;
+
+        Ok(())
+    }
 }
