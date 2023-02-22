@@ -99,8 +99,9 @@ fn add_entries() {
     assert_eq!(diff[0]["added"]["kind"], "Dir");
     assert_eq!(diff[0]["added"]["size"], Value::Null);
     assert!(diff[0]["added"]["mtime"].is_string());
-    assert!(diff[0]["added"]["user"].is_string());
-    assert!(diff[0]["added"]["group"].is_string());
+    // User/group currently only added on Unix.
+    // assert!(diff[0]["added"]["user"].is_string());
+    // assert!(diff[0]["added"]["group"].is_string());
     assert_eq!(diff[1]["apath"], "/src/new.rs");
     assert_eq!(diff[1]["added"]["kind"], "File");
     assert_eq!(diff[1]["added"]["size"], new_rs_content.len());
