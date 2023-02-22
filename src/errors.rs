@@ -282,8 +282,9 @@ pub enum Error {
     #[error("Unsupported URL scheme {:?}", scheme)]
     UrlScheme { scheme: String },
 
-    #[error("Failed to serialize problem")]
+    #[error("Failed to serialize object")]
     SerializeError {
+        #[from]
         #[serde(serialize_with = "serialize_generic_error")]
         source: serde_json::Error,
     },

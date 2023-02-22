@@ -120,6 +120,10 @@ enum Command {
         exclude_from: Vec<String>,
         #[arg(long)]
         include_unchanged: bool,
+
+        /// Print the diff as json.
+        #[arg(long, short)]
+        json: bool,
     },
 
     /// Create a new archive.
@@ -365,6 +369,7 @@ impl Command {
                 exclude,
                 exclude_from,
                 include_unchanged,
+                json,
             } => {
                 let st = stored_tree_from_opt(archive, backup)?;
                 let lt = LiveTree::open(source)?;
@@ -374,7 +379,11 @@ impl Command {
                 };
                 let mut bw = BufWriter::new(stdout);
                 for change in diff(&st, &lt, &options)? {
-                    writeln!(bw, "{change}")?;
+                    if *json {
+                        serde_json::to_writer(&mut bw, &change)?;
+                    } else {
+                        writeln!(bw, "{change}")?;
+                    }
                 }
             }
             Command::Gc {

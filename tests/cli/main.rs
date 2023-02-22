@@ -38,6 +38,7 @@ mod versions;
 
 #[cfg(unix)]
 mod unix {
+    mod diff;
     mod permissions;
 }
 
