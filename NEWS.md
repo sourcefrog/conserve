@@ -14,6 +14,8 @@
 
 - New `--changes-json` option to `restore` and `backup`.
 
+- `diff` output format has changed slightly to be the same as `backup`.
+
 ## 23.1.1
 
 - Fixed: User and group mappings are now cached in memory. This fixes a performance regression in

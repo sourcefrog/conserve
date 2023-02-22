@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2021 Martin Pool.
+// Copyright 2021-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
 use std::fs;
 
 use assert_cmd::prelude::*;
+use indoc::indoc;
 use predicates::prelude::*;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
@@ -71,7 +72,7 @@ fn no_changes() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout(".\t/\n.\t/hello.c\n.\t/subdir\n")
+        .stdout(". /\n. /hello.c\n. /subdir\n")
         .stderr(predicate::str::is_empty());
 }
 
@@ -87,7 +88,10 @@ fn add_entries() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout("+\t/src\n+\t/src/new.rs\n")
+        .stdout(indoc! {"
+            + /src
+            + /src/new.rs
+        "})
         .stderr(predicate::str::is_empty());
 }
 
@@ -102,7 +106,7 @@ fn remove_file() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout("-\t/hello.c\n")
+        .stdout("- /hello.c\n")
         .stderr(predicate::str::is_empty());
 
     run_conserve()
@@ -112,7 +116,7 @@ fn remove_file() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout(".\t/\n-\t/hello.c\n.\t/subdir\n")
+        .stdout(". /\n- /hello.c\n. /subdir\n")
         .stderr(predicate::str::is_empty());
 }
 
@@ -128,7 +132,9 @@ fn change_kind() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout("*\t/subdir\n")
+        .stdout(indoc! {"
+            * /subdir
+        "})
         .stderr(predicate::str::is_empty());
 
     run_conserve()
@@ -138,7 +144,11 @@ fn change_kind() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout(".\t/\n.\t/hello.c\n*\t/subdir\n")
+        .stdout(indoc! {"
+            . /
+            . /hello.c
+            * /subdir
+            "})
         .stderr(predicate::str::is_empty());
 }
 
@@ -154,7 +164,9 @@ fn change_file_content() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout("*\t/hello.c\n")
+        .stdout(indoc! {"
+            * /hello.c
+            "})
         .stderr(predicate::str::is_empty());
 
     run_conserve()
@@ -164,7 +176,11 @@ fn change_file_content() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout(".\t/\n*\t/hello.c\n.\t/subdir\n")
+        .stdout(indoc! {"
+            . /
+            * /hello.c
+            . /subdir
+            "})
         .stderr(predicate::str::is_empty());
 }
 
@@ -189,7 +205,7 @@ pub fn symlink_unchanged() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout(".\t/\n.\t/subdir\n.\t/subdir/link\n")
+        .stdout(". /\n. /subdir\n. /subdir/link\n")
         .stderr(predicate::str::is_empty());
 }
 
@@ -206,7 +222,7 @@ pub fn symlink_changed() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout("*\t/subdir/link\n")
+        .stdout("* /subdir/link\n")
         .stderr(predicate::str::is_empty());
 
     run_conserve()
@@ -216,6 +232,6 @@ pub fn symlink_changed() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout(".\t/\n.\t/subdir\n*\t/subdir/link\n")
+        .stdout(". /\n. /subdir\n* /subdir/link\n")
         .stderr(predicate::str::is_empty());
 }

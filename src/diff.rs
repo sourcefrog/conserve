@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,21 +15,20 @@
 //!
 //! See also [conserve::show_diff] to format the diff as text.
 
-use std::fmt;
+use std::io::{BufWriter, Write};
 
 use readahead_iterator::IntoReadahead;
-use serde::Serialize;
 
 use crate::*;
 
-use DiffKind::*;
-use Kind::*;
 use MergedEntryKind::*;
 
 #[derive(Debug)]
 pub struct DiffOptions {
     pub exclude: Exclude,
     pub include_unchanged: bool,
+    // TODO: An option to filter to a subtree?
+    // TODO: Optionally compare all the content?
 }
 
 impl Default for DiffOptions {
@@ -41,96 +40,46 @@ impl Default for DiffOptions {
     }
 }
 
-/// The overall state of change of an entry.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
-pub enum DiffKind {
-    // TODO: Fold into Change
-    Unchanged,
-    New,
-    Deleted,
-    Changed,
-}
-
-impl DiffKind {
-    pub fn as_sigil(self) -> char {
-        match self {
-            Unchanged => '.',
-            New => '+',
-            Deleted => '-',
-            Changed => '*',
-        }
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct DiffEntry {
-    pub apath: Apath,
-    pub kind: DiffKind,
-}
-
-impl fmt::Display for DiffEntry {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\t{}", self.kind.as_sigil(), self.apath)
-    }
-}
-
 /// Generate an iter of per-entry diffs between two trees.
 pub fn diff(
     st: &StoredTree,
     lt: &LiveTree,
     options: &DiffOptions,
-) -> Result<impl Iterator<Item = DiffEntry>> {
+) -> Result<impl Iterator<Item = EntryChange>> {
     let readahead = 1000;
-    let include_unchanged: bool = options.include_unchanged;
-    // TODO: Take an option for the subtree?
+    let include_unchanged: bool = options.include_unchanged; // Copy out to avoid lifetime problems in the callback
     let ait = st
         .iter_entries(Apath::root(), options.exclude.clone())?
         .readahead(readahead);
     let bit = lt
         .iter_entries(Apath::root(), options.exclude.clone())?
-        .filter(|le| le.kind() != Unknown)
+        .filter(|le| le.kind() != Kind::Unknown)
         .readahead(readahead);
     Ok(MergeTrees::new(ait, bit)
         .map(diff_merged_entry)
-        .filter(move |de: &DiffEntry| include_unchanged || de.kind != DiffKind::Unchanged))
+        .filter(move |c: &EntryChange| include_unchanged || !c.is_unchanged()))
 }
 
-fn diff_merged_entry<AE, BE>(me: merge::MergedEntry<AE, BE>) -> DiffEntry
+fn diff_merged_entry<AE, BE>(me: merge::MergedEntry<AE, BE>) -> EntryChange
 where
     AE: Entry,
     BE: Entry,
 {
-    let apath = me.apath;
     match me.kind {
-        Both(ae, be) => diff_common_entry(ae, be, apath),
-        LeftOnly(_) => DiffEntry {
-            kind: Deleted,
-            apath,
-        },
-        RightOnly(_) => DiffEntry { kind: New, apath },
+        Both(ae, be) => EntryChange::diff_metadata(&ae, &be),
+        LeftOnly(ae) => EntryChange::deleted(&ae),
+        RightOnly(be) => EntryChange::added(&be),
     }
 }
 
-fn diff_common_entry<AE, BE>(ae: AE, be: BE, apath: Apath) -> DiffEntry
-where
-    AE: Entry,
-    BE: Entry,
-{
-    // TODO: Actually compare content, if requested.
-    // TODO: Skip Kind::Unknown.
-    let ak = ae.kind();
-    if ak != be.kind()
-        || (ak == File && (ae.mtime() != be.mtime() || ae.size() != be.size()))
-        || (ak == Symlink && (ae.symlink_target() != be.symlink_target()))
-    {
-        DiffEntry {
-            kind: Changed,
-            apath,
-        }
-    } else {
-        DiffEntry {
-            kind: Unchanged,
-            apath,
-        }
+/// Show changes as text.
+pub fn show_diff<D: Iterator<Item = EntryChange>>(diff: D, w: &mut dyn Write) -> Result<()> {
+    // TODO: Consider whether the actual files have changed.
+    // TODO: Summarize diff.
+    // TODO: Optionally include unchanged files.
+    let mut bw = BufWriter::new(w);
+    for change in diff {
+        writeln!(bw, "{change}")?;
     }
+    Ok(())
 }

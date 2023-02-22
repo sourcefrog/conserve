@@ -149,14 +149,3 @@ pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(
     }
     Ok(())
 }
-
-pub fn show_diff<D: Iterator<Item = DiffEntry>>(diff: D, w: &mut dyn Write) -> Result<()> {
-    // TODO: Consider whether the actual files have changed.
-    // TODO: Summarize diff.
-    // TODO: Optionally include unchanged files.
-    let mut bw = BufWriter::new(w);
-    for de in diff {
-        writeln!(bw, "{de}")?;
-    }
-    Ok(())
-}

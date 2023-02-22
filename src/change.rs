@@ -29,6 +29,28 @@ pub struct EntryChange {
 }
 
 impl EntryChange {
+    pub fn is_unchanged(&self) -> bool {
+        self.change.is_unchanged()
+    }
+
+    pub(crate) fn diff_metadata(a: &dyn Entry, b: &dyn Entry) -> Self {
+        debug_assert_eq!(a.apath(), b.apath());
+        let ak = a.kind();
+        // mtime is only treated as a significant change for files, because
+        // the behavior on directories is not consistent between Unix and
+        // Windows (and maybe not across filesystems even on Unix.)
+        if ak != b.kind()
+            || a.owner() != b.owner()
+            || a.unix_mode() != b.unix_mode()
+            || (ak == Kind::File && (a.size() != b.size() || a.mtime() != b.mtime()))
+            || (ak == Kind::Symlink && (a.symlink_target() != b.symlink_target()))
+        {
+            EntryChange::changed(a, b)
+        } else {
+            EntryChange::unchanged(a)
+        }
+    }
+
     pub(crate) fn added(entry: &dyn Entry) -> Self {
         EntryChange {
             apath: entry.apath().clone(),
@@ -93,6 +115,10 @@ pub enum Change {
 }
 
 impl Change {
+    pub fn is_unchanged(&self) -> bool {
+        matches!(self, Change::Unchanged { .. })
+    }
+
     /// Return the primary metadata: the new version, unless this entry was
     /// deleted in which case the old version.
     pub fn primary_metadata(&self) -> &EntryMetadata {
@@ -105,7 +131,6 @@ impl Change {
     }
 
     pub fn sigil(&self) -> char {
-        // TODO: Fold DiffKind into this?
         match self {
             Change::Unchanged { .. } => '.',
             Change::Added { .. } => '+',
@@ -129,8 +154,8 @@ impl From<&dyn Entry> for EntryMetadata {
         EntryMetadata {
             kind: KindMetadata::from(entry),
             mtime: entry.mtime(),
-            owner: entry.owner().clone(),
-            unix_mode: entry.unix_mode().clone(),
+            owner: entry.owner(),
+            unix_mode: entry.unix_mode(),
         }
     }
 }
