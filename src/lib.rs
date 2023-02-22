@@ -68,7 +68,7 @@ pub use crate::gc_lock::GarbageCollectionLock;
 pub use crate::index::{IndexEntry, IndexRead, IndexWriter};
 pub use crate::kind::Kind;
 pub use crate::live_tree::{LiveEntry, LiveTree};
-pub use crate::merge::{MergeTrees, Which};
+pub use crate::merge::MergeTrees;
 pub use crate::misc::bytes_to_human_mb;
 pub use crate::owner::Owner;
 pub use crate::restore::{restore, RestoreOptions};

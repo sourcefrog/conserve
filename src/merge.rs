@@ -19,25 +19,14 @@ use std::cmp::Ordering;
 
 use crate::*;
 
-/// Contains two entries describing the same apath, presumably in different trees.
+/// When merging entries from two trees a particular apath might
+/// be present in either or both trees.
 ///
 /// Unlike the [Change] struct, this contains the full entry rather than
 /// just metadata, and in particular will contain the block addresses for
 /// [IndexEntry].
 #[derive(Debug, PartialEq, Eq)]
-pub struct MergedEntry<AE, BE>
-where
-    AE: Entry,
-    BE: Entry,
-{
-    pub apath: Apath,
-    pub which: Which<AE, BE>,
-}
-
-/// When merging entries from two trees a particular apath might
-/// be present in either or both trees.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Which<AE, BE>
+pub enum MatchedEntries<AE, BE>
 where
     AE: Entry,
     BE: Entry,
@@ -47,7 +36,21 @@ where
     Both(AE, BE),
 }
 
-/// Zip together entries from two trees, into an iterator of [MergedEntry].
+impl<AE, BE> MatchedEntries<AE, BE>
+where
+    AE: Entry,
+    BE: Entry,
+{
+    pub(crate) fn to_entry_change(&self) -> EntryChange {
+        match self {
+            MatchedEntries::Both(ae, be) => EntryChange::diff_metadata(ae, be),
+            MatchedEntries::Left(ae) => EntryChange::deleted(ae),
+            MatchedEntries::Right(be) => EntryChange::added(be),
+        }
+    }
+}
+
+/// Zip together entries from two trees, into an iterator of [MatchedEntries].
 ///
 /// Note that at present this only says whether files are absent from either
 /// side, not whether there is a content difference.
@@ -90,7 +93,7 @@ where
     AIT: Iterator<Item = AE>,
     BIT: Iterator<Item = BE>,
 {
-    type Item = MergedEntry<AE, BE>;
+    type Item = MatchedEntries<AE, BE>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // Preload next-A and next-B, if they're not already loaded.
@@ -102,27 +105,15 @@ where
         }
         match (&self.na, &self.nb) {
             (None, None) => None,
-            (Some(a), None) => Some(MergedEntry {
-                apath: a.apath().clone(),
-                which: Which::Left(self.na.take().unwrap()),
-            }),
-            (None, Some(b)) => Some(MergedEntry {
-                apath: b.apath().clone(),
-                which: Which::Right(self.nb.take().unwrap()),
-            }),
+            (Some(_a), None) => Some(MatchedEntries::Left(self.na.take().unwrap())),
+            (None, Some(_b)) => Some(MatchedEntries::Right(self.nb.take().unwrap())),
             (Some(a), Some(b)) => match a.apath().cmp(b.apath()) {
-                Ordering::Equal => Some(MergedEntry {
-                    apath: a.apath().clone(),
-                    which: Which::Both(self.na.take().unwrap(), self.nb.take().unwrap()),
-                }),
-                Ordering::Less => Some(MergedEntry {
-                    apath: a.apath().clone(),
-                    which: Which::Left(self.na.take().unwrap()),
-                }),
-                Ordering::Greater => Some(MergedEntry {
-                    apath: b.apath().clone(),
-                    which: Which::Right(self.nb.take().unwrap()),
-                }),
+                Ordering::Equal => Some(MatchedEntries::Both(
+                    self.na.take().unwrap(),
+                    self.nb.take().unwrap(),
+                )),
+                Ordering::Less => Some(MatchedEntries::Left(self.na.take().unwrap())),
+                Ordering::Greater => Some(MatchedEntries::Right(self.nb.take().unwrap())),
             },
         }
     }
@@ -130,9 +121,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::Which::*;
     use crate::test_fixtures::*;
     use crate::*;
+
+    use super::MatchedEntries;
 
     #[test]
     fn merge_entry_trees() {
@@ -148,9 +140,8 @@ mod tests {
         )
         .collect::<Vec<_>>();
         assert_eq!(di.len(), 1);
-        assert_eq!(di[0].apath, "/");
-        match &di[0].which {
-            Both(ae, be) => {
+        match &di[0] {
+            MatchedEntries::Both(ae, be) => {
                 assert_eq!(ae.kind(), Kind::Dir);
                 assert_eq!(be.kind(), Kind::Dir);
                 assert_eq!(ae.apath(), "/");

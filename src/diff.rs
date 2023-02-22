@@ -52,18 +52,6 @@ pub fn diff(
         .filter(|le| le.kind() != Kind::Unknown)
         .readahead(readahead);
     Ok(MergeTrees::new(ait, bit)
-        .map(diff_merged_entry)
+        .map(|me| me.to_entry_change())
         .filter(move |c: &EntryChange| include_unchanged || !c.is_unchanged()))
-}
-
-fn diff_merged_entry<AE, BE>(me: merge::MergedEntry<AE, BE>) -> EntryChange
-where
-    AE: Entry,
-    BE: Entry,
-{
-    match me.which {
-        Which::Both(ae, be) => EntryChange::diff_metadata(&ae, &be),
-        Which::Left(ae) => EntryChange::deleted(&ae),
-        Which::Right(be) => EntryChange::added(&be),
-    }
 }
