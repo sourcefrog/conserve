@@ -64,7 +64,8 @@ fn no_changes() {
 fn add_entries() {
     let (af, tf) = setup();
     tf.create_dir("src");
-    tf.create_file_with_contents("src/new.rs", b"pub fn main() {}");
+    let new_rs_content = b"pub fn main() {}";
+    tf.create_file_with_contents("src/new.rs", new_rs_content);
 
     run_conserve()
         .arg("diff")
@@ -78,6 +79,7 @@ fn add_entries() {
         "})
         .stderr(predicate::str::is_empty());
 
+    // Inspect json diff
     let command = run_conserve()
         .args(["diff", "-j"])
         .arg(af.path())
@@ -87,14 +89,22 @@ fn add_entries() {
         .stderr(predicate::str::is_empty());
     let diff_json = &command.get_output().stdout;
     println!("{}", std::str::from_utf8(diff_json).unwrap());
-    let diff: Vec<Value> = serde_json::Deserializer::from_slice(diff_json)
+    let diff = serde_json::Deserializer::from_slice(diff_json)
         .into_iter::<Value>()
         .collect::<Result<Vec<Value>, _>>()
         .unwrap();
     println!("{diff:#?}");
     assert_eq!(diff.len(), 2);
     assert_eq!(diff[0]["apath"], "/src");
+    assert_eq!(diff[0]["added"]["kind"], "Dir");
+    assert_eq!(diff[0]["added"]["size"], Value::Null);
+    assert!(diff[0]["added"]["mtime"].is_string());
+    assert!(diff[0]["added"]["user"].is_string());
+    assert!(diff[0]["added"]["group"].is_string());
     assert_eq!(diff[1]["apath"], "/src/new.rs");
+    assert_eq!(diff[1]["added"]["kind"], "File");
+    assert_eq!(diff[1]["added"]["size"], new_rs_content.len());
+    assert!(diff[1]["added"]["mtime"].is_string());
 }
 
 #[test]

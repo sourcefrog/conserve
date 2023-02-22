@@ -24,7 +24,7 @@ use crate::{Apath, Entry, Kind, Owner, Result, UnixMode};
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct EntryChange {
     pub apath: Apath,
-    // TODO: Serialization as change="new".
+    #[serde(flatten)]
     pub change: Change,
 }
 
@@ -98,6 +98,7 @@ impl fmt::Display for EntryChange {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(tag = "change")]
 pub enum Change {
     Unchanged {
         unchanged: EntryMetadata,
@@ -143,9 +144,12 @@ impl Change {
 /// Metadata about a changed entry other than its apath.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct EntryMetadata {
-    pub mtime: OffsetDateTime,
-    pub owner: Owner,
+    // TODO: Eventually unify with LiveEntry or Entry?
+    #[serde(flatten)]
     pub kind: KindMetadata,
+    pub mtime: OffsetDateTime,
+    #[serde(flatten)]
+    pub owner: Owner,
     pub unix_mode: UnixMode,
 }
 
@@ -161,6 +165,7 @@ impl From<&dyn Entry> for EntryMetadata {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind")]
 pub enum KindMetadata {
     File { size: u64 },
     Dir,
