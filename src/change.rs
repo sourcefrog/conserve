@@ -25,7 +25,7 @@ use crate::{Apath, Entry, Kind, Owner, Result, UnixMode};
 pub struct EntryChange {
     pub apath: Apath,
     #[serde(flatten)]
-    pub change: Change,
+    pub change: Change<EntryMetadata>,
 }
 
 impl EntryChange {
@@ -99,30 +99,21 @@ impl fmt::Display for EntryChange {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 #[serde(tag = "change")]
-pub enum Change {
-    Unchanged {
-        unchanged: EntryMetadata,
-    },
-    Added {
-        added: EntryMetadata,
-    },
-    Deleted {
-        deleted: EntryMetadata,
-    },
-    Changed {
-        old: EntryMetadata,
-        new: EntryMetadata,
-    },
+pub enum Change<E> {
+    Unchanged { unchanged: E },
+    Added { added: E },
+    Deleted { deleted: E },
+    Changed { old: E, new: E },
 }
 
-impl Change {
+impl<E> Change<E> {
     pub fn is_unchanged(&self) -> bool {
         matches!(self, Change::Unchanged { .. })
     }
 
     /// Return the primary metadata: the new version, unless this entry was
     /// deleted in which case the old version.
-    pub fn primary_metadata(&self) -> &EntryMetadata {
+    pub fn primary_metadata(&self) -> &E {
         match self {
             Change::Unchanged { unchanged } => unchanged,
             Change::Added { added } => added,
