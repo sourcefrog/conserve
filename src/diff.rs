@@ -15,8 +15,6 @@
 //!
 //! See also [conserve::show_diff] to format the diff as text.
 
-use std::io::{BufWriter, Write};
-
 use readahead_iterator::IntoReadahead;
 
 use crate::*;
@@ -70,16 +68,4 @@ where
         LeftOnly(ae) => EntryChange::deleted(&ae),
         RightOnly(be) => EntryChange::added(&be),
     }
-}
-
-/// Show changes as text.
-pub fn show_diff<D: Iterator<Item = EntryChange>>(diff: D, w: &mut dyn Write) -> Result<()> {
-    // TODO: Consider whether the actual files have changed.
-    // TODO: Summarize diff.
-    // TODO: Optionally include unchanged files.
-    let mut bw = BufWriter::new(w);
-    for change in diff {
-        writeln!(bw, "{change}")?;
-    }
-    Ok(())
 }

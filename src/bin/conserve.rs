@@ -372,7 +372,10 @@ impl Command {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     include_unchanged: *include_unchanged,
                 };
-                show_diff(diff(&st, &lt, &options)?, &mut stdout)?;
+                let mut bw = BufWriter::new(stdout);
+                for change in diff(&st, &lt, &options)? {
+                    writeln!(bw, "{change}")?;
+                }
             }
             Command::Gc {
                 archive,

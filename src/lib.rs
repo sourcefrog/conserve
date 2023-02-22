@@ -61,7 +61,7 @@ pub use crate::bandid::BandId;
 pub use crate::blockdir::BlockDir;
 pub use crate::blockhash::BlockHash;
 pub use crate::change::{ChangeCallback, EntryChange};
-pub use crate::diff::{diff, show_diff, DiffOptions};
+pub use crate::diff::{diff, DiffOptions};
 pub use crate::entry::Entry;
 pub use crate::errors::Error;
 pub use crate::excludes::Exclude;
