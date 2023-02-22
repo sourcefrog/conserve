@@ -80,8 +80,6 @@ pub fn backup(
     let mut stats = BackupStats::default();
     let bar = Bar::new();
 
-    let mut scanned_dirs = 0;
-    let mut scanned_files = 0;
     let mut scanned_file_bytes = 0;
     let mut entries_new = 0;
     let mut entries_changed = 0;
@@ -90,11 +88,6 @@ pub fn backup(
     let entry_iter = source.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
-            match entry.kind() {
-                Kind::Dir => scanned_dirs += 1,
-                Kind::File => scanned_files += 1,
-                _ => (),
-            }
             match writer.copy_entry(&entry, source) {
                 Err(err) => {
                     error!(?entry, ?err, "Error copying entry to backup");
@@ -115,19 +108,20 @@ pub fn backup(
                 }
                 Ok(_) => {}
             }
-            if let Some(bytes) = entry.size() {
-                if bytes > 0 {
+            match entry.size() {
+                Some(bytes) if bytes > 0 => {
                     scanned_file_bytes += bytes;
                     bar.post(Progress::Backup {
                         filename: entry.apath().to_string(),
                         scanned_file_bytes,
-                        scanned_dirs,
-                        scanned_files,
+                        scanned_dirs: stats.directories,
+                        scanned_files: stats.files,
                         entries_new,
                         entries_changed,
                         entries_unchanged,
                     });
                 }
+                _ => (),
             }
         }
         writer.flush_group()?;
