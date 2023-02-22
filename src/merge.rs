@@ -1,4 +1,4 @@
-// Copyright 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2018-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -93,47 +93,37 @@ where
     type Item = MergedEntry<AE, BE>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // Preload next-A and next-B, if they're not already
-        // loaded.
+        // Preload next-A and next-B, if they're not already loaded.
         if self.na.is_none() {
             self.na = self.ait.next();
         }
         if self.nb.is_none() {
             self.nb = self.bit.next();
         }
-        if self.na.is_none() {
-            if self.nb.is_none() {
-                None // end of both
-            } else {
-                let tb = self.nb.take().unwrap();
-                Some(MergedEntry {
-                    apath: tb.apath().clone(),
-                    which: Which::Right(tb),
-                })
-            }
-        } else if self.nb.is_none() {
-            let ta = self.na.take().unwrap();
-            Some(MergedEntry {
-                apath: ta.apath().clone(),
-                which: Which::Left(ta),
-            })
-        } else {
-            let pa = self.na.as_ref().unwrap().apath().clone();
-            let pb = self.nb.as_ref().unwrap().apath().clone();
-            match pa.cmp(&pb) {
+        match (&self.na, &self.nb) {
+            (None, None) => None,
+            (Some(a), None) => Some(MergedEntry {
+                apath: a.apath().clone(),
+                which: Which::Left(self.na.take().unwrap()),
+            }),
+            (None, Some(b)) => Some(MergedEntry {
+                apath: b.apath().clone(),
+                which: Which::Right(self.nb.take().unwrap()),
+            }),
+            (Some(a), Some(b)) => match a.apath().cmp(b.apath()) {
                 Ordering::Equal => Some(MergedEntry {
-                    apath: pa,
+                    apath: a.apath().clone(),
                     which: Which::Both(self.na.take().unwrap(), self.nb.take().unwrap()),
                 }),
                 Ordering::Less => Some(MergedEntry {
-                    apath: pa,
+                    apath: a.apath().clone(),
                     which: Which::Left(self.na.take().unwrap()),
                 }),
                 Ordering::Greater => Some(MergedEntry {
-                    apath: pb,
+                    apath: b.apath().clone(),
                     which: Which::Right(self.nb.take().unwrap()),
                 }),
-            }
+            },
         }
     }
 }
