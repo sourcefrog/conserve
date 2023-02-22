@@ -19,8 +19,6 @@ use readahead_iterator::IntoReadahead;
 
 use crate::*;
 
-use MergedEntryKind::*;
-
 #[derive(Debug)]
 pub struct DiffOptions {
     pub exclude: Exclude,
@@ -63,9 +61,9 @@ where
     AE: Entry,
     BE: Entry,
 {
-    match me.kind {
-        Both(ae, be) => EntryChange::diff_metadata(&ae, &be),
-        LeftOnly(ae) => EntryChange::deleted(&ae),
-        RightOnly(be) => EntryChange::added(&be),
+    match me.which {
+        Which::Both(ae, be) => EntryChange::diff_metadata(&ae, &be),
+        Which::Left(ae) => EntryChange::deleted(&ae),
+        Which::Right(be) => EntryChange::added(&be),
     }
 }
