@@ -299,16 +299,18 @@ impl Archive {
                 });
             }
 
+            let blocks_done: AtomicUsize = AtomicUsize::new(0);
+            let start = Instant::now();
             let error_count = unref
                 .par_iter()
-                .enumerate()
-                .inspect(|(blocks_done, _hash)| {
+                .filter(|block_hash| {
                     bar.post(Progress::DeleteBlocks {
-                        blocks_done: *blocks_done,
+                        blocks_done: blocks_done.fetch_add(1, Ordering::Relaxed),
+                        start,
                         total_blocks: unref_count,
-                    })
+                    });
+                    block_dir.delete_block(block_hash).is_err()
                 })
-                .filter(|(_, block_hash)| block_dir.delete_block(block_hash).is_err())
                 .count();
             stats.deletion_errors += error_count;
             stats.deleted_block_count += unref_count - error_count;

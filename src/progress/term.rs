@@ -124,10 +124,12 @@ impl nutmeg::Model for Progress {
             Progress::DeleteBlocks {
                 blocks_done,
                 total_blocks,
+                start,
             } => format!(
-                "Delete blocks: {}/{}...",
+                "Delete blocks: {}/{}, {eta} remaining...",
                 blocks_done.separate_with_commas(),
                 total_blocks.separate_with_commas(),
+                eta = estimate_remaining(start, *blocks_done, *total_blocks),
             ),
             Progress::ListBlocks { count } => format!(
                 "List blocks: {count}...",

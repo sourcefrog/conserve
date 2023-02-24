@@ -86,6 +86,7 @@ pub enum Progress {
     DeleteBlocks {
         blocks_done: usize,
         total_blocks: usize,
+        start: Instant,
     },
     ListBlocks {
         count: usize,
