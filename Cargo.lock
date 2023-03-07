@@ -230,6 +230,7 @@ dependencies = [
  "derive_more",
  "dir-assert",
  "filetime",
+ "flatbuffers",
  "globset",
  "hex",
  "indoc",
@@ -427,6 +428,16 @@ dependencies = [
  "libc",
  "redox_syscall",
  "windows-sys",
+]
+
+[[package]]
+name = "flatbuffers"
+version = "23.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77f5399c2c9c50ae9418e522842ad362f61ee48b346ac106807bd355a8a7c619"
+dependencies = [
+ "bitflags",
+ "rustc_version",
 ]
 
 [[package]]

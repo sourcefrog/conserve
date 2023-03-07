@@ -46,6 +46,7 @@ tracing-appender = "0.2"
 unix_mode = "0.1"
 url = "2.2.2"
 indoc = "1.0.8"
+flatbuffers = "23.1.21"
 
 [target.'cfg(unix)'.dependencies]
 users = "0.11"

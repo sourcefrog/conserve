@@ -37,6 +37,12 @@ pub struct BlockHash {
     bin: [u8; BLAKE_HASH_SIZE_BYTES],
 }
 
+impl BlockHash {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.bin
+    }
+}
+
 #[derive(Debug)]
 pub struct BlockHashParseError {
     rejected_string: String,
