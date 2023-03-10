@@ -13,6 +13,7 @@
 
 //! Read archives written by older versions.
 
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fs::{self, metadata, read_dir};
 use std::path::Path;
@@ -208,15 +209,25 @@ fn restore_modify_backup() {
         .expect("overwrite file");
 
         let new_archive = Archive::open_path(&new_archive_path).expect("Open new archive");
+        let emitted = RefCell::new(Vec::new());
         let backup_stats = backup(
             &new_archive,
             &LiveTree::open(working_tree.path()).unwrap(),
             &BackupOptions {
-                print_filenames: true,
+                change_callback: Some(Box::new(|change| {
+                    emitted
+                        .borrow_mut()
+                        .push((change.change.sigil(), change.apath.to_string()));
+                    Ok(())
+                })),
                 ..Default::default()
             },
         )
         .expect("Backup modified tree");
+
+        // Check the visited files passed to the callbacks.
+        let emitted = emitted.into_inner();
+        dbg!(&emitted);
 
         // Expected results for files:
         // "/empty" is empty and new
@@ -230,6 +241,8 @@ fn restore_modify_backup() {
                 working_tree.child(path).path().metadata().unwrap()
             );
         }
+        assert!(emitted.contains(&('+', "/empty".to_owned())));
+        assert!(emitted.contains(&('*', "/subdir/subfile".to_owned())));
 
         assert_eq!(backup_stats.files, 3);
         assert!(

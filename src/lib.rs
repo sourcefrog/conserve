@@ -19,6 +19,7 @@ mod band;
 pub mod bandid;
 mod blockdir;
 pub mod blockhash;
+pub mod change;
 pub mod compress;
 mod diff;
 mod entry;
@@ -53,13 +54,13 @@ pub mod validate;
 pub use crate::apath::Apath;
 pub use crate::archive::Archive;
 pub use crate::archive::DeleteOptions;
-pub use crate::backup::{backup, BackupOptions};
-pub use crate::band::Band;
-pub use crate::band::BandSelectionPolicy;
+pub use crate::backup::{backup, BackupOptions, BackupStats};
+pub use crate::band::{Band, BandSelectionPolicy};
 pub use crate::bandid::BandId;
 pub use crate::blockdir::BlockDir;
 pub use crate::blockhash::BlockHash;
-pub use crate::diff::{diff, DiffEntry, DiffKind, DiffOptions};
+pub use crate::change::{ChangeCallback, EntryChange};
+pub use crate::diff::{diff, DiffOptions};
 pub use crate::entry::Entry;
 pub use crate::errors::Error;
 pub use crate::excludes::Exclude;
@@ -67,14 +68,16 @@ pub use crate::gc_lock::GarbageCollectionLock;
 pub use crate::index::{IndexEntry, IndexRead, IndexWriter};
 pub use crate::kind::Kind;
 pub use crate::live_tree::{LiveEntry, LiveTree};
-pub use crate::merge::{MergeTrees, MergedEntryKind};
+pub use crate::merge::MergeTrees;
 pub use crate::misc::bytes_to_human_mb;
+pub use crate::owner::Owner;
 pub use crate::restore::{restore, RestoreOptions};
-pub use crate::show::{show_diff, show_versions, ShowVersionsOptions};
-pub use crate::stats::{BackupStats, DeleteStats, RestoreStats};
+pub use crate::show::{show_versions, ShowVersionsOptions};
+pub use crate::stats::{DeleteStats, RestoreStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};
+pub use crate::unix_mode::UnixMode;
 pub use crate::validate::ValidateOptions;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -112,3 +115,6 @@ static BAND_TAIL_FILENAME: &str = "BANDTAIL";
 
 /// Length of the binary content hash.
 pub(crate) const BLAKE_HASH_SIZE_BYTES: usize = 64;
+
+/// A callback when an entry is visited.
+pub type EntryCallback<'cb> = Box<dyn Fn(&IndexEntry) + 'cb>;

@@ -1,4 +1,4 @@
-// Copyright 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2018-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,30 +19,38 @@ use std::cmp::Ordering;
 
 use crate::*;
 
+/// When merging entries from two trees a particular apath might
+/// be present in either or both trees.
+///
+/// Unlike the [Change] struct, this contains the full entry rather than
+/// just metadata, and in particular will contain the block addresses for
+/// [IndexEntry].
 #[derive(Debug, PartialEq, Eq)]
-pub enum MergedEntryKind<AE, BE>
+pub enum MatchedEntries<AE, BE>
 where
     AE: Entry,
     BE: Entry,
 {
-    LeftOnly(AE),
-    RightOnly(BE),
+    Left(AE),
+    Right(BE),
     Both(AE, BE),
 }
 
-use self::MergedEntryKind::*;
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct MergedEntry<AE, BE>
+impl<AE, BE> MatchedEntries<AE, BE>
 where
     AE: Entry,
     BE: Entry,
 {
-    pub apath: Apath,
-    pub kind: MergedEntryKind<AE, BE>,
+    pub(crate) fn to_entry_change(&self) -> EntryChange {
+        match self {
+            MatchedEntries::Both(ae, be) => EntryChange::diff_metadata(ae, be),
+            MatchedEntries::Left(ae) => EntryChange::deleted(ae),
+            MatchedEntries::Right(be) => EntryChange::added(be),
+        }
+    }
 }
 
-/// Zip together entries from two trees, into an iterator of MergedEntryKind.
+/// Zip together entries from two trees, into an iterator of [MatchedEntries].
 ///
 /// Note that at present this only says whether files are absent from either
 /// side, not whether there is a content difference.
@@ -55,8 +63,9 @@ where
 {
     ait: AIT,
     bit: BIT,
-    // Read in advance entries from A and B.
+    /// Peeked next entry from [ait].
     na: Option<AE>,
+    /// Peeked next entry from [bit].
     nb: Option<BE>,
 }
 
@@ -84,64 +93,38 @@ where
     AIT: Iterator<Item = AE>,
     BIT: Iterator<Item = BE>,
 {
-    type Item = MergedEntry<AE, BE>;
+    type Item = MatchedEntries<AE, BE>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // TODO: Stats about the merge.
-        let ait = &mut self.ait;
-        let bit = &mut self.bit;
-        // Preload next-A and next-B, if they're not already
-        // loaded.
-        //
-        // TODO: Perhaps use `Peekable` instead of keeping a readahead here?
+        // Preload next-A and next-B, if they're not already loaded.
         if self.na.is_none() {
-            self.na = ait.next();
+            self.na = self.ait.next();
         }
         if self.nb.is_none() {
-            self.nb = bit.next();
+            self.nb = self.bit.next();
         }
-        if self.na.is_none() {
-            if self.nb.is_none() {
-                None
-            } else {
-                let tb = self.nb.take().unwrap();
-                Some(MergedEntry {
-                    apath: tb.apath().clone(),
-                    kind: RightOnly(tb),
-                })
-            }
-        } else if self.nb.is_none() {
-            let ta = self.na.take().unwrap();
-            Some(MergedEntry {
-                apath: ta.apath().clone(),
-                kind: LeftOnly(ta),
-            })
-        } else {
-            let pa = self.na.as_ref().unwrap().apath().clone();
-            let pb = self.nb.as_ref().unwrap().apath().clone();
-            match pa.cmp(&pb) {
-                Ordering::Equal => Some(MergedEntry {
-                    apath: pa,
-                    kind: Both(self.na.take().unwrap(), self.nb.take().unwrap()),
-                }),
-                Ordering::Less => Some(MergedEntry {
-                    apath: pa,
-                    kind: LeftOnly(self.na.take().unwrap()),
-                }),
-                Ordering::Greater => Some(MergedEntry {
-                    apath: pb,
-                    kind: RightOnly(self.nb.take().unwrap()),
-                }),
-            }
+        match (&self.na, &self.nb) {
+            (None, None) => None,
+            (Some(_a), None) => Some(MatchedEntries::Left(self.na.take().unwrap())),
+            (None, Some(_b)) => Some(MatchedEntries::Right(self.nb.take().unwrap())),
+            (Some(a), Some(b)) => match a.apath().cmp(b.apath()) {
+                Ordering::Equal => Some(MatchedEntries::Both(
+                    self.na.take().unwrap(),
+                    self.nb.take().unwrap(),
+                )),
+                Ordering::Less => Some(MatchedEntries::Left(self.na.take().unwrap())),
+                Ordering::Greater => Some(MatchedEntries::Right(self.nb.take().unwrap())),
+            },
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::MergedEntryKind::*;
     use crate::test_fixtures::*;
     use crate::*;
+
+    use super::MatchedEntries;
 
     #[test]
     fn merge_entry_trees() {
@@ -157,9 +140,8 @@ mod tests {
         )
         .collect::<Vec<_>>();
         assert_eq!(di.len(), 1);
-        assert_eq!(di[0].apath, "/");
-        match &di[0].kind {
-            Both(ae, be) => {
+        match &di[0] {
+            MatchedEntries::Both(ae, be) => {
                 assert_eq!(ae.kind(), Kind::Dir);
                 assert_eq!(be.kind(), Kind::Dir);
                 assert_eq!(ae.apath(), "/");

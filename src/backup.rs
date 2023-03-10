@@ -14,42 +14,43 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
+use std::convert::TryInto;
+use std::fmt;
 use std::io::prelude::*;
-use std::{convert::TryInto, time::Instant};
+use std::time::{Duration, Instant};
 
+use derive_more::{Add, AddAssign};
 use itertools::Itertools;
 use tracing::error;
 
 use crate::blockdir::Address;
+use crate::change::Change;
 use crate::io::read_with_retries;
 use crate::progress::{Bar, Progress};
-use crate::stats::BackupStats;
+use crate::stats::{
+    write_compressed_size, write_count, write_duration, write_size, IndexWriterStats,
+};
 use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::ReadTree;
 use crate::*;
 
 /// Configuration of how to make a backup.
-#[derive(Debug, Clone)]
-pub struct BackupOptions {
-    /// Print filenames to the UI as they're copied.
-    pub print_filenames: bool,
-
+pub struct BackupOptions<'cb> {
     /// Exclude these globs from the backup.
     pub exclude: Exclude,
 
-    /// If printing filenames, include metadata such as file permissions
-    pub long_listing: bool,
-
     pub max_entries_per_hunk: usize,
+
+    // Call this callback as each entry is successfully stored.
+    pub change_callback: Option<ChangeCallback<'cb>>,
 }
 
-impl Default for BackupOptions {
-    fn default() -> BackupOptions {
+impl Default for BackupOptions<'_> {
+    fn default() -> BackupOptions<'static> {
         BackupOptions {
-            print_filenames: false,
             exclude: Exclude::nothing(),
             max_entries_per_hunk: crate::index::MAX_ENTRIES_PER_HUNK,
-            long_listing: false,
+            change_callback: None,
         }
     }
 }
@@ -79,8 +80,6 @@ pub fn backup(
     let mut stats = BackupStats::default();
     let bar = Bar::new();
 
-    let mut scanned_dirs = 0;
-    let mut scanned_files = 0;
     let mut scanned_file_bytes = 0;
     let mut entries_new = 0;
     let mut entries_changed = 0;
@@ -89,56 +88,40 @@ pub fn backup(
     let entry_iter = source.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
-            match entry.kind() {
-                Kind::Dir => scanned_dirs += 1,
-                Kind::File => scanned_files += 1,
-                _ => (),
-            }
             match writer.copy_entry(&entry, source) {
                 Err(err) => {
                     error!(?entry, ?err, "Error copying entry to backup");
                     stats.errors += 1;
                     continue;
                 }
-                Ok(Some(diff_kind)) => {
-                    if options.print_filenames && diff_kind != DiffKind::Unchanged {
-                        if options.long_listing {
-                            println!(
-                                "{} {} {} {}",
-                                diff_kind.as_sigil(),
-                                entry.unix_mode(),
-                                entry.owner(),
-                                entry.apath()
-                            );
-                        } else {
-                            println!("{} {}", diff_kind.as_sigil(), entry.apath());
-                        }
-                    }
-                    match diff_kind {
-                        DiffKind::Changed => entries_changed += 1,
-                        DiffKind::New => entries_new += 1,
-                        DiffKind::Unchanged => entries_unchanged += 1,
+                Ok(Some(entry_change)) => {
+                    match entry_change.change {
+                        Change::Changed { .. } => entries_changed += 1,
+                        Change::Added { .. } => entries_new += 1,
+                        Change::Unchanged { .. } => entries_unchanged += 1,
                         // Deletions are not produced at the moment.
-                        DiffKind::Deleted => (), // model.entries_deleted += 1,
+                        Change::Deleted { .. } => (), // model.entries_deleted += 1,
+                    }
+                    if let Some(cb) = &options.change_callback {
+                        cb(&entry_change)?;
                     }
                 }
                 Ok(_) => {}
             }
-            if let Some(bytes) = entry.size() {
-                if bytes > 0 {
+            match entry.size() {
+                Some(bytes) if bytes > 0 => {
                     scanned_file_bytes += bytes;
-                    if !options.print_filenames {
-                        bar.post(Progress::Backup {
-                            filename: entry.apath().to_string(),
-                            scanned_file_bytes,
-                            scanned_dirs,
-                            scanned_files,
-                            entries_new,
-                            entries_changed,
-                            entries_unchanged,
-                        });
-                    }
+                    bar.post(Progress::Backup {
+                        filename: entry.apath().to_string(),
+                        scanned_file_bytes,
+                        scanned_dirs: stats.directories,
+                        scanned_files: stats.files,
+                        entries_new,
+                        entries_changed,
+                        entries_unchanged,
+                    });
                 }
+                _ => (),
             }
         }
         writer.flush_group()?;
@@ -209,7 +192,8 @@ impl BackupWriter {
     /// Return an indication of whether it changed (if it's a file), or
     /// None for non-plain-file types where that information is not currently
     /// calculated.
-    fn copy_entry(&mut self, entry: &LiveEntry, source: &LiveTree) -> Result<Option<DiffKind>> {
+    fn copy_entry(&mut self, entry: &LiveEntry, source: &LiveTree) -> Result<Option<EntryChange>> {
+        // TODO: Emit deletions for entries in the basis not present in the source.
         match entry.kind() {
             Kind::Dir => self.copy_dir(entry),
             Kind::File => self.copy_file(entry, source),
@@ -224,11 +208,11 @@ impl BackupWriter {
         }
     }
 
-    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
+    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<Option<EntryChange>> {
         self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
-        Ok(None) // TODO: See if it changed from the basis?
+        Ok(None) // TODO: Emit the actual change.
     }
 
     /// Copy in the contents of a file from another tree.
@@ -236,22 +220,23 @@ impl BackupWriter {
         &mut self,
         source_entry: &LiveEntry,
         from_tree: &LiveTree,
-    ) -> Result<Option<DiffKind>> {
+    ) -> Result<Option<EntryChange>> {
         self.stats.files += 1;
         let apath = source_entry.apath();
         let result;
         if let Some(basis_entry) = self.basis_index.advance_to(apath) {
             if entry_metadata_unchanged(source_entry, &basis_entry) {
                 self.stats.unmodified_files += 1;
+                let change = Some(EntryChange::unchanged(&basis_entry));
                 self.index_builder.push_entry(basis_entry);
-                return Ok(Some(DiffKind::Unchanged));
+                return Ok(change);
             } else {
                 self.stats.modified_files += 1;
-                result = Some(DiffKind::Changed);
+                result = Some(EntryChange::changed(&basis_entry, source_entry));
             }
         } else {
             self.stats.new_files += 1;
-            result = Some(DiffKind::New);
+            result = Some(EntryChange::added(source_entry));
         }
         let mut read_source = from_tree.file_contents(source_entry)?;
         let size = source_entry.size().expect("LiveEntry has a size");
@@ -279,12 +264,13 @@ impl BackupWriter {
         Ok(result)
     }
 
-    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<Option<DiffKind>> {
+    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<Option<EntryChange>> {
         let target = source_entry.symlink_target().clone();
         self.stats.symlinks += 1;
         assert!(target.is_some());
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
+        // TODO: Emit the actual change.
         Ok(None)
     }
 }
@@ -446,12 +432,90 @@ impl FileCombiner {
         }
     }
 }
+
 /// True if the metadata supports an assumption the file contents have
-/// not changed.
+/// not changed, without reading the file content.
+///
+/// Caution: this does not check the symlink target.
 fn entry_metadata_unchanged<E: Entry, O: Entry>(new_entry: &E, basis_entry: &O) -> bool {
     basis_entry.kind() == new_entry.kind()
         && basis_entry.mtime() == new_entry.mtime()
         && basis_entry.size() == new_entry.size()
         && basis_entry.unix_mode() == new_entry.unix_mode()
         && basis_entry.owner() == new_entry.owner()
+}
+
+#[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
+pub struct BackupStats {
+    // TODO: Have separate more-specific stats for backup and restore, and then
+    // each can have a single Display method.
+    // TODO: Include source file bytes, including unmodified files.
+    pub files: usize,
+    pub symlinks: usize,
+    pub directories: usize,
+    pub unknown_kind: usize,
+
+    pub unmodified_files: usize,
+    pub modified_files: usize,
+    pub new_files: usize,
+
+    /// Bytes that matched an existing block.
+    pub deduplicated_bytes: u64,
+    /// Bytes that were stored as new blocks, before compression.
+    pub uncompressed_bytes: u64,
+    pub compressed_bytes: u64,
+
+    pub deduplicated_blocks: usize,
+    pub written_blocks: usize,
+    /// Blocks containing combined small files.
+    pub combined_blocks: usize,
+
+    pub empty_files: usize,
+    pub small_combined_files: usize,
+    pub single_block_files: usize,
+    pub multi_block_files: usize,
+
+    pub errors: usize,
+
+    pub index_builder_stats: IndexWriterStats,
+    pub elapsed: Duration,
+}
+
+impl fmt::Display for BackupStats {
+    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_count(w, "files:", self.files);
+        write_count(w, "  unmodified files", self.unmodified_files);
+        write_count(w, "  modified files", self.modified_files);
+        write_count(w, "  new files", self.new_files);
+        write_count(w, "symlinks", self.symlinks);
+        write_count(w, "directories", self.directories);
+        write_count(w, "unsupported file kind", self.unknown_kind);
+        writeln!(w).unwrap();
+
+        write_count(w, "files stored:", self.new_files + self.modified_files);
+        write_count(w, "  empty files", self.empty_files);
+        write_count(w, "  small combined files", self.small_combined_files);
+        write_count(w, "  single block files", self.single_block_files);
+        write_count(w, "  multi-block files", self.multi_block_files);
+        writeln!(w).unwrap();
+
+        write_count(w, "data blocks deduplicated:", self.deduplicated_blocks);
+        write_size(w, "  saved", self.deduplicated_bytes);
+        writeln!(w).unwrap();
+
+        write_count(w, "new data blocks written:", self.written_blocks);
+        write_count(w, "  blocks of combined files", self.combined_blocks);
+        write_compressed_size(w, self.compressed_bytes, self.uncompressed_bytes);
+        writeln!(w).unwrap();
+
+        let idx = &self.index_builder_stats;
+        write_count(w, "new index hunks", idx.index_hunks);
+        write_compressed_size(w, idx.compressed_index_bytes, idx.uncompressed_index_bytes);
+        writeln!(w).unwrap();
+
+        write_count(w, "errors", self.errors);
+        write_duration(w, "elapsed", self.elapsed)?;
+
+        Ok(())
+    }
 }

@@ -13,13 +13,17 @@
 
 //! Run conserve CLI as a subprocess and test it.
 
+use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::process::Command;
 
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
+use assert_fs::NamedTempFile;
 use assert_fs::TempDir;
+use indoc::indoc;
 use predicates::prelude::*;
+use serde_json::Deserializer;
 use url::Url;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
@@ -34,6 +38,7 @@ mod versions;
 
 #[cfg(unix)]
 mod unix {
+    mod diff;
     mod permissions;
 }
 
@@ -214,6 +219,7 @@ fn basic_backup() {
 
     // TODO: Factor out comparison to expected tree.
     let restore_dir = TempDir::new().unwrap();
+    let restore_json = NamedTempFile::new("restore.json").unwrap();
 
     // Also try --no-progress here; should make no difference because these tests run
     // without a pty.
@@ -221,18 +227,20 @@ fn basic_backup() {
         .arg("restore")
         .arg("-v")
         .arg("--no-progress")
+        .arg("--no-stats")
         .arg(&arch_dir)
         .arg(restore_dir.path())
+        .arg("--changes-json")
+        .arg(restore_json.path())
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with(
-            "/\n\
-             /hello\n\
-             /subdir\n\
-             /subdir/subfile\n\
-             ",
-        ));
+        .stdout(indoc! { "
+             + /
+             + /hello
+             + /subdir
+             + /subdir/subfile
+        " });
 
     restore_dir
         .child("subdir")
@@ -245,6 +253,19 @@ fn basic_backup() {
         .child("subdir")
         .child("subfile")
         .assert("I like Rust\n");
+
+    let json = read_to_string(restore_json.path()).unwrap();
+    dbg!(&json);
+    let changes: Vec<serde_json::Value> = Deserializer::from_str(&json)
+        .into_iter::<serde_json::Value>()
+        .map(Result::unwrap)
+        .collect();
+    dbg!(&changes);
+    assert_eq!(changes.len(), 4);
+    assert_eq!(changes[0]["apath"], "/");
+    assert_eq!(changes[1]["apath"], "/hello");
+    assert_eq!(changes[2]["apath"], "/subdir");
+    assert_eq!(changes[3]["apath"], "/subdir/subfile");
 
     // Try to restore again over the same directory: should decline.
     run_conserve()

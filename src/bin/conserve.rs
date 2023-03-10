@@ -13,12 +13,16 @@
 
 //! Command-line entry point for Conserve backups.
 
+use std::cell::RefCell;
 use std::error::Error;
+use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
+use conserve::change::Change;
+use conserve::progress::ProgressImpl;
 use conserve::trace_counter::{global_error_count, global_warn_count};
 use metrics::increment_counter;
 #[allow(unused_imports)]
@@ -65,13 +69,18 @@ enum Command {
         archive: String,
         /// Source directory to copy from.
         source: PathBuf,
+        /// Write a list of changes to this file.
+        #[arg(long)]
+        changes_json: Option<PathBuf>,
         /// Print copied file names.
         #[arg(long, short)]
         verbose: bool,
         #[arg(long, short)]
         exclude: Vec<String>,
+        /// Read a list of globs to exclude from this file.
         #[arg(long, short = 'E')]
         exclude_from: Vec<String>,
+        /// Don't print statistics after the backup completes.
         #[arg(long)]
         no_stats: bool,
         /// Show permissions, owner, and group in verbose output.
@@ -111,6 +120,10 @@ enum Command {
         exclude_from: Vec<String>,
         #[arg(long)]
         include_unchanged: bool,
+
+        /// Print the diff as json.
+        #[arg(long, short)]
+        json: bool,
     },
 
     /// Create a new archive.
@@ -154,6 +167,9 @@ enum Command {
         destination: PathBuf,
         #[arg(long, short)]
         backup: Option<BandId>,
+        /// Write a list of restored files to this json file.
+        #[arg(long)]
+        changes_json: Option<PathBuf>,
         #[arg(long, short)]
         force_overwrite: bool,
         #[arg(long, short)]
@@ -275,20 +291,28 @@ impl Command {
         match self {
             Command::Backup {
                 archive,
-                source,
-                verbose,
+                changes_json,
                 exclude,
                 exclude_from,
-                no_stats,
                 long_listing,
+                no_stats,
+                source,
+                verbose,
             } => {
                 let source = &LiveTree::open(source)?;
                 let options = BackupOptions {
-                    print_filenames: *verbose,
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
-                    long_listing: *long_listing,
+                    change_callback: make_change_callback(
+                        *verbose,
+                        *long_listing,
+                        &changes_json.as_deref(),
+                    )?,
                     ..Default::default()
                 };
+                if *long_listing || *verbose {
+                    // TODO(CON-23): Really Nutmeg should coordinate stdout and stderr...
+                    ProgressImpl::Null.activate()
+                }
                 let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
                 if !no_stats {
                     info!("Backup complete.\n{stats}");
@@ -345,6 +369,7 @@ impl Command {
                 exclude,
                 exclude_from,
                 include_unchanged,
+                json,
             } => {
                 let st = stored_tree_from_opt(archive, backup)?;
                 let lt = LiveTree::open(source)?;
@@ -352,7 +377,14 @@ impl Command {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     include_unchanged: *include_unchanged,
                 };
-                show_diff(diff(&st, &lt, &options)?, &mut stdout)?;
+                let mut bw = BufWriter::new(stdout);
+                for change in diff(&st, &lt, &options)? {
+                    if *json {
+                        serde_json::to_writer(&mut bw, &change)?;
+                    } else {
+                        writeln!(bw, "{change}")?;
+                    }
+                }
             }
             Command::Gc {
                 archive,
@@ -404,6 +436,7 @@ impl Command {
                 archive,
                 destination,
                 backup,
+                changes_json,
                 verbose,
                 force_overwrite,
                 exclude,
@@ -415,13 +448,19 @@ impl Command {
                 let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open(open_transport(archive)?)?;
                 let options = RestoreOptions {
-                    print_filenames: *verbose,
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     only_subtree: only_subtree.clone(),
                     band_selection,
                     overwrite: *force_overwrite,
-                    long_listing: *long_listing,
+                    change_callback: make_change_callback(
+                        *verbose,
+                        *long_listing,
+                        &changes_json.as_deref(),
+                    )?,
                 };
+                if *verbose || *long_listing {
+                    ProgressImpl::Null.activate();
+                }
                 let stats = restore(&archive, destination, &options)?;
                 debug!("Restore complete");
                 if !no_stats {
@@ -495,6 +534,54 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
     } else {
         BandSelectionPolicy::Latest
     }
+}
+
+fn make_change_callback<'a>(
+    print_changes: bool,
+    ls_long: bool,
+    changes_json: &Option<&Path>,
+) -> Result<Option<ChangeCallback<'a>>> {
+    if !print_changes && !ls_long && changes_json.is_none() {
+        return Ok(None);
+    };
+
+    let changes_json_writer = if let Some(path) = changes_json {
+        Some(RefCell::new(BufWriter::new(
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(path)?,
+        )))
+    } else {
+        None
+    };
+    Ok(Some(Box::new(move |entry_change| {
+        if matches!(entry_change.change, Change::Unchanged { .. }) {
+            return Ok(());
+        }
+        if ls_long {
+            let change_meta = entry_change.change.primary_metadata();
+            println!(
+                "{} {} {} {}",
+                entry_change.change.sigil(),
+                change_meta.unix_mode,
+                change_meta.owner,
+                entry_change.apath
+            );
+        } else if print_changes {
+            println!("{} {}", entry_change.change.sigil(), entry_change.apath);
+        }
+        if let Some(w) = &changes_json_writer {
+            let mut w = w.borrow_mut();
+            writeln!(
+                w,
+                "{}",
+                serde_json::to_string(entry_change).expect("Failed to serialize change")
+            )?;
+        }
+        Ok(())
+    })))
 }
 
 fn main() -> Result<ExitCode> {

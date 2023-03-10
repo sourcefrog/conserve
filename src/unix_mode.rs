@@ -89,6 +89,7 @@ impl UnixMode {
         }
     }
 }
+
 impl fmt::Display for UnixMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Convert to string. Since the file type bits are stripped, there will
@@ -103,6 +104,7 @@ impl fmt::Display for UnixMode {
         }
     }
 }
+
 impl From<u32> for UnixMode {
     fn from(mode: u32) -> Self {
         Self(Some(mode & MODE_BITS))
