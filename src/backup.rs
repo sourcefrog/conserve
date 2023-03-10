@@ -434,7 +434,9 @@ impl FileCombiner {
 }
 
 /// True if the metadata supports an assumption the file contents have
-/// not changed.
+/// not changed, without reading the file content.
+///
+/// Caution: this does not check the symlink target.
 fn entry_metadata_unchanged<E: Entry, O: Entry>(new_entry: &E, basis_entry: &O) -> bool {
     basis_entry.kind() == new_entry.kind()
         && basis_entry.mtime() == new_entry.mtime()
