@@ -10,7 +10,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Tests focussed on backup behavior.
+//! Tests focused on backup behavior.
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;

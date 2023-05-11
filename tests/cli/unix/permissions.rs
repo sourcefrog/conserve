@@ -238,7 +238,7 @@ fn backup_user_and_permissions() {
 }
 
 #[test]
-/// List an archive with particular encoded permissions, from the first version tha tracked
+/// List an archive with particular encoded permissions, from the first version that tracked
 /// ownership and permissions.
 ///
 /// This should succeed even, and especially, if the machine running the tests does

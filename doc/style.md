@@ -69,7 +69,7 @@ Code in Conserve can be tested in any of three ways:
 
 1. Key features and behaviors accessible through the command-line interface
    should be tested in `tests/cli`, which runs the `conserve` binary as a
-   subprocess and examines its output. Since Conserve is  
+   subprocess and examines its output. Since Conserve is
    primarily intended for use as a command-line tool these are the most
    important tests to add.
 
@@ -97,7 +97,7 @@ tree) won't have deterministic permissions or mtimes.
 
 Use `use crate::xyz` rather than `use super::xyz` to import other things from
 the Conserve implementation. (Either is valid and they seem just as good, but
-let's pick `crate` to be consisent.)
+let's pick `crate` to be consistent.)
 
 Conserve implementation code and integration tests can say `use crate::*` to
 include every re-exported symbol, although this isn't recommended for external

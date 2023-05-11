@@ -21,7 +21,7 @@ But we assume that attackers can:
   - For example, because they control the server to which encrypted archives are written
   - Or because they can gain physical access to a drive holding backups
 - See how the encrypted archive changes over time
-  - For example, if they control the server hosting archives they can collect a trace of 
+  - For example, if they control the server hosting archives they can collect a trace of
     file reads and writes
 - Tamper with the encrypted archive content:
   - Including deleting and modifying files
@@ -66,17 +66,17 @@ some separate stable storage, a record of when backups were made.
 
 An attacker should not be able to:
 
-- Silently corrupt, change, or remove data, other than reverting to a previous version of the 
+- Silently corrupt, change, or remove data, other than reverting to a previous version of the
   archive, including:
   - Copying files to different names
   - Removing some files from the tree (other than by reverting to a moment
     when the backup was incomplete)
-- Prevent a machine making a new correct backup. In other words, after 
+- Prevent a machine making a new correct backup. In other words, after
   tampering, newly written files in a new backup will still be correct.
-- Execute downgrade attacks that manipulate the backup program into 
+- Execute downgrade attacks that manipulate the backup program into
   writing unencrypted content or using an attacker-influenced key.
 
-For performance reasons Conserve does not throughly validate all existing
+For performance reasons Conserve does not thoroughly validate all existing
 blocks when it writes a new archive, so corruption of existing
 blocks may go unnoticed for some time. However `conserve validate` should detect
 this corruption.
@@ -87,7 +87,7 @@ The key can be stored in a file for noninteractive scheduled backups.
 
 The key can optionally be stored in some kind of system keyring, so that it is somewhat harder to steal, e.g. so that it is only unlocked when the user is logged in. (At the price of only being available to make backups when the user is logged in, in that case.)
 
-It's important that users keep a copy of the key in a place where it will not be lost if the backup source is lost, e.g. typically not on the same machine. The key should be concisely representable as text. These backups of the key must also be stored somewhere that the user feels is significantly less likely to be compromised than the backup storage itself, otherwise the encrytion is adding no value.
+It's important that users keep a copy of the key in a place where it will not be lost if the backup source is lost, e.g. typically not on the same machine. The key should be concisely representable as text. These backups of the key must also be stored somewhere that the user feels is significantly less likely to be compromised than the backup storage itself, otherwise the encryption is adding no value.
 
 Test restores or validation should allow the user to try presenting the key as if they were doing a recovery, e.g. by typing it in or using a non-default file, even if it is normally read from a file or keyring.
 
@@ -164,7 +164,7 @@ When the keys are rotated, existing blocks in unchanged files can still match ag
 ### Block encryption
 
 To write a block, it is first hashed, with the hash key. If the hash is already present, that's
-enough, and the keyed hash can be used to refer to the block content from the index or 
+enough, and the keyed hash can be used to refer to the block content from the index or
 meta-index. Otherwise, the block content is encrypted. (In unencrypted archives the block
 would be compressed at this point; in encrypted archives it is not.)
 
@@ -217,8 +217,8 @@ Since Tink generates a random IV for each block, IVs are never reused.
 
 By the same logic as for Eve, Mallory cannot decrypt block content.
 
-If Mallory blindly changes the content of a block file or truncates it, then 
-when decrypted it will be discovered to have the wrong keyed hash, which 
+If Mallory blindly changes the content of a block file or truncates it, then
+when decrypted it will be discovered to have the wrong keyed hash, which
 will be detected as corruption.
 
 If Mallory copies one block file in place of another the IV will be wrong, so
@@ -236,11 +236,11 @@ It is important that the backup client must not trust the archive's assertion wh
 
 ### Assessment: chosen-plaintext attacks
 
-An attacker who can both inject chosen plaintext and observe writes to the archive 
+An attacker who can both inject chosen plaintext and observe writes to the archive
 may be able to determine whether the plaintext is already present in the archive.
 For example, if the attacker injects a 1MB file (which will be written as a single
 block) and observes that no new large blocks are written, then they can infer
-that an identical block was already present at some point in the archive. 
+that an identical block was already present at some point in the archive.
 (It does not necessarily prove that the content is present in the most recent tree,
 only that the block was still present.)
 
@@ -257,13 +257,13 @@ fairly large and hold multiple files, but in some cases Conserve will emit only
 small data blocks, most obviously when only one small file has changed, but
 also when changes have to be flushed out to finalize an index block.
 
-The most favorable case for an attacker is if they're trying to guess whether 
+The most favorable case for an attacker is if they're trying to guess whether
 a particular single-byte file is present, and they can inject new single-byte
 files into an otherwise-quiescent archive. The simplest attack is to guess one
 file at a time, in which case they will likely find the answer after 255 guesses.
-Potentially the attacker could make multiple guesses per backup cycle, but 
-they then face the risk that their small files will be combined into a single 
-larger block, yielding inconclusive results. 
+Potentially the attacker could make multiple guesses per backup cycle, but
+they then face the risk that their small files will be combined into a single
+larger block, yielding inconclusive results.
 
 Interestingly, this attack can  only be done once per archive, since after each
 byte is guessed it will then be present in the blockdir and future guesses will
@@ -277,10 +277,8 @@ If, as is planned, small files are stored inline in the index then this attack
 becomes infeasible for any file small enough to make guessing even remotely
 feasible.
 
-If blocks were compressed, it might be possible for an attacker to inject a 
-series of chosen plaintexts and gradually measure whether they compress well 
+If blocks were compressed, it might be possible for an attacker to inject a
+series of chosen plaintexts and gradually measure whether they compress well
 against other files nearby in the tree. Because compression is disabled in
 encrypted archives the attacker is limited to guessing at whether whole blocks
 are present, which seems much less tractable.
-
-

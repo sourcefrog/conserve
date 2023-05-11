@@ -10,7 +10,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Tests focussed on restore.
+//! Tests focused on restore.
 
 use std::cell::RefCell;
 #[cfg(unix)]
