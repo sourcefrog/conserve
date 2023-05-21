@@ -16,8 +16,11 @@ use assert_fs::TempDir;
 // use predicates::prelude::*;
 
 use conserve::backup;
+use conserve::restore;
 use conserve::Archive;
 use conserve::BackupOptions;
+use conserve::RestoreOptions;
+use dir_assert::assert_paths;
 use tracing_test::traced_test;
 
 mod strategy;
@@ -29,8 +32,7 @@ use strategy::Damage;
 
 #[traced_test]
 #[test]
-#[should_panic(expected = "Failed to open band: DeserializeJson")] // TODO: Should pass!
-fn truncated_band_head() {
+fn backup_after_damage() {
     let archive_dir = TempDir::new().unwrap();
     let source_dir = TempDir::new().unwrap();
 
@@ -50,7 +52,15 @@ fn truncated_band_head() {
         .child("file")
         .write_str("content in second backup")
         .unwrap();
-
     backup(&archive, source_dir.path(), &backup_options)
         .expect("write second backup even though first bandhead is damaged");
+
+    // Can restore the second backup
+    let restore_dir = TempDir::new().unwrap();
+    restore(&archive, restore_dir.path(), &RestoreOptions::default())
+        .expect("restore second backup");
+
+    // Since the second backup rewrote the single file in the backup (and the root dir),
+    // we should get all the content back out.
+    assert_paths!(source_dir.path(), restore_dir.path());
 }
