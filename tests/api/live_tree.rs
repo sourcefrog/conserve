@@ -12,6 +12,7 @@
 
 use pretty_assertions::assert_eq;
 
+use conserve::entry::EntryValue;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;
 
@@ -32,11 +33,11 @@ fn list_simple_directory() {
     tf.create_dir("jelly");
     tf.create_dir("jam/.etc");
     let lt = LiveTree::open(tf.path()).unwrap();
-    let result: Vec<LiveEntry> = lt
+    let result: Vec<EntryValue> = lt
         .iter_entries(Apath::root(), Exclude::nothing())
         .unwrap()
         .collect();
-    let names = entry_iter_to_apath_strings(result.clone());
+    let names = entry_iter_to_apath_strings(&result);
     // First one is the root
     assert_eq!(
         names,
@@ -53,7 +54,7 @@ fn list_simple_directory() {
 
     let repr = format!("{:?}", &result[6]);
     println!("{repr}");
-    assert!(repr.starts_with("LiveEntry {"));
+    assert!(repr.starts_with("EntryValue {"));
     assert!(repr.contains("Apath(\"/jam/apricot\")"));
 
     // TODO: Somehow get the stats out of the iterator.

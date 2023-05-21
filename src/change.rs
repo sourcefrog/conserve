@@ -135,7 +135,7 @@ impl<E> Change<E> {
 /// Metadata about a changed entry other than its apath.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct EntryMetadata {
-    // TODO: Eventually unify with LiveEntry or Entry?
+    // TODO: Eventually unify with EntryValue or Entry?
     #[serde(flatten)]
     pub kind: KindMetadata,
     pub mtime: OffsetDateTime,
@@ -149,7 +149,7 @@ impl From<&dyn Entry> for EntryMetadata {
         EntryMetadata {
             kind: KindMetadata::from(entry),
             mtime: entry.mtime(),
-            owner: entry.owner(),
+            owner: entry.owner().clone(),
             unix_mode: entry.unix_mode(),
         }
     }

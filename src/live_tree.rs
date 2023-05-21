@@ -18,9 +18,9 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use time::OffsetDateTime;
 use tracing::{error, warn};
 
+use crate::entry::EntryValue;
 use crate::owner::Owner;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_mode::UnixMode;
@@ -51,20 +51,8 @@ impl LiveTree {
     }
 }
 
-/// An in-memory Entry describing a file/dir/symlink in a live tree.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LiveEntry {
-    apath: Apath,
-    kind: Kind,
-    mtime: OffsetDateTime,
-    size: Option<u64>,
-    symlink_target: Option<String>,
-    unix_mode: UnixMode,
-    owner: Owner,
-}
-
 impl tree::ReadTree for LiveTree {
-    type Entry = LiveEntry;
+    type Entry = EntryValue;
     type R = std::fs::File;
     type IT = Iter;
 
@@ -72,7 +60,7 @@ impl tree::ReadTree for LiveTree {
         Iter::new(&self.path, subtree, exclude)
     }
 
-    fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
+    fn file_contents(&self, entry: &EntryValue) -> Result<Self::R> {
         assert_eq!(entry.kind(), Kind::File);
         let path = self.relative_path(&entry.apath);
         fs::File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
@@ -88,63 +76,31 @@ impl tree::ReadTree for LiveTree {
     }
 }
 
-impl Entry for LiveEntry {
-    fn apath(&self) -> &Apath {
-        &self.apath
-    }
-
-    fn kind(&self) -> Kind {
-        self.kind
-    }
-
-    fn mtime(&self) -> OffsetDateTime {
-        self.mtime
-    }
-
-    fn size(&self) -> Option<u64> {
-        self.size
-    }
-
-    fn symlink_target(&self) -> &Option<String> {
-        &self.symlink_target
-    }
-
-    fn unix_mode(&self) -> UnixMode {
-        self.unix_mode
-    }
-
-    fn owner(&self) -> Owner {
-        self.owner.clone()
-    }
-}
-
-impl LiveEntry {
-    fn from_fs_metadata(
-        apath: Apath,
-        metadata: &fs::Metadata,
-        symlink_target: Option<String>,
-    ) -> LiveEntry {
-        // TODO: Could we read the symlink target here, rather than in the caller?
-        let mtime = metadata
-            .modified()
-            .expect("Failed to get file mtime")
-            .into();
-        let size = if metadata.is_file() {
-            Some(metadata.len())
-        } else {
-            None
-        };
-        let owner = Owner::from(metadata);
-        let unix_mode = UnixMode::from(metadata.permissions());
-        LiveEntry {
-            apath,
-            kind: metadata.file_type().into(),
-            mtime,
-            symlink_target,
-            size,
-            unix_mode,
-            owner,
-        }
+fn entry_from_fs_metadata(
+    apath: Apath,
+    metadata: &fs::Metadata,
+    symlink_target: Option<String>,
+) -> EntryValue {
+    // TODO: Could we read the symlink target here, rather than in the caller?
+    let mtime = metadata
+        .modified()
+        .expect("Failed to get file mtime")
+        .into();
+    let size = if metadata.is_file() {
+        Some(metadata.len())
+    } else {
+        None
+    };
+    let owner = Owner::from(metadata);
+    let unix_mode = UnixMode::from(metadata.permissions());
+    EntryValue {
+        apath,
+        kind: metadata.file_type().into(),
+        mtime,
+        symlink_target,
+        size,
+        unix_mode,
+        owner,
     }
 }
 
@@ -166,7 +122,7 @@ pub struct Iter {
 
     /// All entries that have been seen but not yet returned by the iterator, in the order they
     /// should be returned.
-    entry_deque: VecDeque<LiveEntry>,
+    entry_deque: VecDeque<EntryValue>,
 
     /// Check that emitted paths are in the right order.
     check_order: apath::DebugCheckOrder,
@@ -183,7 +139,7 @@ impl Iter {
     fn new(root_path: &Path, subtree: Apath, exclude: Exclude) -> Result<Iter> {
         let start_metadata = fs::symlink_metadata(subtree.below(root_path))?;
         // Preload iter to return the root and then recurse into it.
-        let entry_deque: VecDeque<LiveEntry> = [LiveEntry::from_fs_metadata(
+        let entry_deque: VecDeque<EntryValue> = [entry_from_fs_metadata(
             subtree.clone(),
             &start_metadata,
             None,
@@ -209,7 +165,7 @@ impl Iter {
     fn visit_next_directory(&mut self, parent_apath: &Apath) {
         self.stats.directories_visited += 1;
         // Tuples of (name, entry) so that we can sort children by name.
-        let mut children = Vec::<(String, LiveEntry)>::new();
+        let mut children = Vec::<(String, EntryValue)>::new();
         let dir_path = parent_apath.below(&self.root_path);
         let dir_iter = match fs::read_dir(&dir_path) {
             Ok(i) => i,
@@ -279,7 +235,7 @@ impl Iter {
                 }
             };
 
-            // TODO: Move this into LiveEntry::from_fs_metadata, once there's a
+            // TODO: Move this into entry_from_fs_metadata, once there's a
             // global way for it to complain about errors.
             let target: Option<String> = if ft.is_symlink() {
                 let t = match dir_path.join(dir_entry.file_name()).read_link() {
@@ -304,7 +260,7 @@ impl Iter {
             }
             children.push((
                 child_name.to_string(),
-                LiveEntry::from_fs_metadata(child_apath, &metadata, target),
+                entry_from_fs_metadata(child_apath, &metadata, target),
             ));
         }
         // To get the right overall tree ordering, any new subdirectories
@@ -332,9 +288,9 @@ impl Iter {
 // subdirectories are then visited, also in sorted order, before returning to
 // any higher-level directories.
 impl Iterator for Iter {
-    type Item = LiveEntry;
+    type Item = EntryValue;
 
-    fn next(&mut self) -> Option<LiveEntry> {
+    fn next(&mut self) -> Option<EntryValue> {
         loop {
             if let Some(entry) = self.entry_deque.pop_front() {
                 // Have already found some entries, so just return the first.

@@ -119,8 +119,8 @@ impl Entry for IndexEntry {
         self.unix_mode
     }
 
-    fn owner(&self) -> Owner {
-        self.owner.clone()
+    fn owner(&self) -> &Owner {
+        &self.owner
     }
 }
 
@@ -140,7 +140,7 @@ impl IndexEntry {
             mtime: mtime.unix_timestamp(),
             mtime_nanos: mtime.nanosecond(),
             unix_mode: source.unix_mode(),
-            owner: source.owner(),
+            owner: source.owner().to_owned(),
         }
     }
 }

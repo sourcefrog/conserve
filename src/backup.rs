@@ -26,6 +26,7 @@ use tracing::error;
 
 use crate::blockdir::Address;
 use crate::change::Change;
+use crate::entry::EntryValue;
 use crate::io::read_with_retries;
 use crate::progress::{Bar, Progress};
 use crate::stats::{
@@ -195,7 +196,7 @@ impl BackupWriter {
     /// Return an indication of whether it changed (if it's a file), or
     /// None for non-plain-file types where that information is not currently
     /// calculated.
-    fn copy_entry(&mut self, entry: &LiveEntry, source: &LiveTree) -> Result<Option<EntryChange>> {
+    fn copy_entry(&mut self, entry: &EntryValue, source: &LiveTree) -> Result<Option<EntryChange>> {
         // TODO: Emit deletions for entries in the basis not present in the source.
         match entry.kind() {
             Kind::Dir => self.copy_dir(entry),
@@ -221,7 +222,7 @@ impl BackupWriter {
     /// Copy in the contents of a file from another tree.
     fn copy_file(
         &mut self,
-        source_entry: &LiveEntry,
+        source_entry: &EntryValue,
         from_tree: &LiveTree,
     ) -> Result<Option<EntryChange>> {
         self.stats.files += 1;
@@ -242,7 +243,7 @@ impl BackupWriter {
             result = Some(EntryChange::added(source_entry));
         }
         let mut read_source = from_tree.file_contents(source_entry)?;
-        let size = source_entry.size().expect("LiveEntry has a size");
+        let size = source_entry.size().expect("source entry has a size");
         if size == 0 {
             self.index_builder
                 .push_entry(IndexEntry::metadata_from(source_entry));
@@ -393,14 +394,14 @@ impl FileCombiner {
     /// Add the contents of a small file into this combiner.
     ///
     /// `entry` should be an IndexEntry that's complete apart from the block addresses.
-    fn push_file(&mut self, live_entry: &LiveEntry, from_file: &mut dyn Read) -> Result<()> {
+    fn push_file(&mut self, entry: &EntryValue, from_file: &mut dyn Read) -> Result<()> {
         let start = self.buf.len();
-        let expected_len: usize = live_entry
+        let expected_len: usize = entry
             .size()
             .expect("small file has no length")
             .try_into()
             .unwrap();
-        let index_entry = IndexEntry::metadata_from(live_entry);
+        let index_entry = IndexEntry::metadata_from(entry);
         if expected_len == 0 {
             self.stats.empty_files += 1;
             self.finished.push(index_entry);
@@ -410,7 +411,7 @@ impl FileCombiner {
         let len = from_file
             .read(&mut self.buf[start..])
             .map_err(|source| Error::StoreFile {
-                apath: live_entry.apath().to_owned(),
+                apath: entry.apath().to_owned(),
                 source,
             })?;
         self.buf.truncate(start + len);
