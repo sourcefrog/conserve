@@ -27,7 +27,8 @@ use tracing_test::traced_test;
 mod strategy;
 use strategy::Damage;
 
-// TODO: Also test other files.
+// TODO: Also test damage to other files: band tail, index hunks, data blocks, etc.
+// TODO: Test that you can delete a damaged backup.
 
 #[rstest]
 #[traced_test]
@@ -63,4 +64,7 @@ fn backup_after_damage(#[values(Damage::Delete, Damage::Truncate)] damage: Damag
     // Since the second backup rewrote the single file in the backup (and the root dir),
     // we should get all the content back out.
     assert_paths!(source_dir.path(), restore_dir.path());
+
+    // TODO: List versions.
+    // TODO: List contents of second backup.
 }
