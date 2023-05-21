@@ -93,7 +93,7 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
                     max_entries_per_hunk: 3,
                     ..BackupOptions::default()
                 };
-                backup(&archive, &tf.live_tree(), &options).unwrap();
+                backup(&archive, tf.path(), &options).unwrap();
                 let snapshot = TempDir::new().unwrap();
                 cp_r::CopyOptions::default()
                     .copy_tree(tf.path(), snapshot.path())

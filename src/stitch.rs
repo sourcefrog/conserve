@@ -267,9 +267,8 @@ mod test {
         let tf = TreeFixture::new();
         tf.create_file("file_a");
 
-        let lt = tf.live_tree();
         let af = ScratchArchive::new();
-        backup(&af, &lt, &BackupOptions::default()).expect("backup should work");
+        backup(&af, tf.path(), &BackupOptions::default()).expect("backup should work");
 
         af.transport().remove_file("b0000/BANDTAIL").unwrap();
         let band_ids = af.list_band_ids().expect("should list bands");

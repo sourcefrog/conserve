@@ -17,6 +17,7 @@
 use std::convert::TryInto;
 use std::fmt;
 use std::io::prelude::*;
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use derive_more::{Add, AddAssign};
@@ -72,23 +73,24 @@ impl Default for BackupOptions<'_> {
 /// Returns statistics about what was copied.
 pub fn backup(
     archive: &Archive,
-    source: &LiveTree,
+    source_path: &Path,
     options: &BackupOptions,
 ) -> Result<BackupStats> {
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive)?;
     let mut stats = BackupStats::default();
     let bar = Bar::new();
+    let source_tree = LiveTree::open(source_path)?;
 
     let mut scanned_file_bytes = 0;
     let mut entries_new = 0;
     let mut entries_changed = 0;
     let mut entries_unchanged = 0;
 
-    let entry_iter = source.iter_entries(Apath::root(), options.exclude.clone())?;
+    let entry_iter = source_tree.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
-            match writer.copy_entry(&entry, source) {
+            match writer.copy_entry(&entry, &source_tree) {
                 Err(err) => {
                     error!(?entry, ?err, "Error copying entry to backup");
                     stats.errors += 1;
