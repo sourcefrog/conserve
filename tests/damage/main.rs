@@ -22,7 +22,10 @@ use tracing_test::traced_test;
 // use predicates::prelude::*;
 
 use conserve::show::show_entry_names;
-use conserve::{backup, restore, Apath, Archive, BackupOptions, BandId, ReadTree, RestoreOptions};
+use conserve::{
+    backup, restore, Apath, Archive, BackupOptions, BandId, ReadTree, RestoreOptions,
+    ValidateOptions,
+};
 
 mod strategy;
 use strategy::Damage;
@@ -91,4 +94,10 @@ fn backup_after_damage(#[values(Damage::Delete, Damage::Truncate)] damage: Damag
             /file
         "}
     );
+
+    // Validation completes although with warnings.
+    // TODO: This should return problems that we can inspect.
+    archive
+        .validate(&ValidateOptions::default())
+        .expect("validate");
 }
