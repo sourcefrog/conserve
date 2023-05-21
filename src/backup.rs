@@ -71,6 +71,7 @@ impl Default for BackupOptions<'_> {
 /// Backup a source directory into a new band in the archive.
 ///
 /// Returns statistics about what was copied.
+// TODO: Maybe this should take a Path and the LiveTree should be an implementation detail?
 pub fn backup(
     archive: &Archive,
     source_path: &Path,
