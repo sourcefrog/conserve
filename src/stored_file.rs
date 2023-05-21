@@ -10,7 +10,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-///! Access a file stored in the archive.
+//! Access a file stored in the archive.
 use crate::stats::Sizes;
 use crate::*;
 

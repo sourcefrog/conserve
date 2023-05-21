@@ -23,7 +23,7 @@ fn diff_unchanged() {
 
     tf.create_file_with_contents("thing", b"contents of thing");
     let lt = tf.live_tree();
-    let stats = backup(&a, &lt, &BackupOptions::default()).unwrap();
+    let stats = backup(&a, tf.path(), &BackupOptions::default()).unwrap();
     assert_eq!(stats.new_files, 1);
 
     let st = a.open_stored_tree(BandSelectionPolicy::Latest).unwrap();

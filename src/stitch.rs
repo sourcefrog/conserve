@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -27,6 +27,8 @@
 //! * The next-older index might end at an earlier apath than we've already
 //!   seen.
 //! * Bands might be deleted, so their numbers are not contiguous.
+
+use tracing::warn;
 
 use crate::index::IndexEntryIter;
 use crate::*;
@@ -79,6 +81,7 @@ impl Iterator for IterStitchedIndexHunks {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
+            // Until we find the next hunk or run out of bands.
             // If we're already reading an index, and it has more content, return that.
             if let Some(index_hunks) = &mut self.index_hunks {
                 // An index iterator must be assigned to a band.
@@ -106,12 +109,16 @@ impl Iterator for IterStitchedIndexHunks {
             }
 
             if let Some(band_id) = &self.band_id {
+                let band = match Band::open(&self.archive, band_id) {
+                    Ok(band) => band,
+                    Err(err) => {
+                        warn!(?err, ?band_id, "Failed to open band, skipping it");
+                        self.band_id = previous_existing_band(&self.archive, band_id);
+                        continue;
+                    }
+                };
                 // Start reading this new index and skip forward until after last_apath
-                let mut iter_hunks = Band::open(&self.archive, band_id)
-                    .expect("Failed to open band")
-                    .index()
-                    .iter_hunks();
-
+                let mut iter_hunks = band.index().iter_hunks();
                 if let Some(last) = &self.last_apath {
                     iter_hunks = iter_hunks.advance_to_after(last)
                 }
@@ -267,9 +274,8 @@ mod test {
         let tf = TreeFixture::new();
         tf.create_file("file_a");
 
-        let lt = tf.live_tree();
         let af = ScratchArchive::new();
-        backup(&af, &lt, &BackupOptions::default()).expect("backup should work");
+        backup(&af, tf.path(), &BackupOptions::default()).expect("backup should work");
 
         af.transport().remove_file("b0000/BANDTAIL").unwrap();
         let band_ids = af.list_band_ids().expect("should list bands");

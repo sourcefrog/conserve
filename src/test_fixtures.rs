@@ -65,10 +65,10 @@ impl ScratchArchive {
         }
 
         let options = &BackupOptions::default();
-        backup(&self.archive, &srcdir.live_tree(), options).unwrap();
+        backup(&self.archive, srcdir.path(), options).unwrap();
 
         srcdir.create_file("hello2");
-        backup(&self.archive, &srcdir.live_tree(), options).unwrap();
+        backup(&self.archive, srcdir.path(), options).unwrap();
     }
 
     pub fn transport(&self) -> &dyn Transport {

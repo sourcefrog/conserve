@@ -212,7 +212,7 @@ fn restore_modify_backup() {
         let emitted = RefCell::new(Vec::new());
         let backup_stats = backup(
             &new_archive,
-            &LiveTree::open(working_tree.path()).unwrap(),
+            working_tree.path(),
             &BackupOptions {
                 change_callback: Some(Box::new(|change| {
                     emitted
