@@ -56,7 +56,7 @@ users = "0.11"
 nix = "0.26"
 
 [dependencies.clap]
-version = "4.0"
+version = "4.3"
 features = ["derive", "deprecated", "wrap_help"]
 
 [dependencies.nutmeg]
