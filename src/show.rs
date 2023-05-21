@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2018, 2020, 2021, 2022 Martin Pool.
+// Copyright 2018-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by

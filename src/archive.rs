@@ -132,6 +132,17 @@ impl Archive {
             .map_err(Error::from)
     }
 
+    /// Return an iterator of entries in a selected version.
+    pub fn iter_entries(
+        &self,
+        band_selection: BandSelectionPolicy,
+        subtree: Apath,
+        exclude: Exclude,
+    ) -> Result<impl Iterator<Item = IndexEntry>> {
+        let stored_tree = self.open_stored_tree(band_selection)?;
+        stored_tree.iter_entries(subtree, exclude)
+    }
+
     /// Returns a vector of band ids, in sorted order from first to last.
     pub fn list_band_ids(&self) -> Result<Vec<BandId>> {
         let mut band_ids: Vec<BandId> = self.iter_band_ids_unsorted()?.collect();

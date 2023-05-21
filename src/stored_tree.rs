@@ -59,6 +59,7 @@ impl ReadTree for StoredTree {
     type IT = index::IndexEntryIter<stitch::IterStitchedIndexHunks>;
 
     /// Return an iter of index entries in this stored tree.
+    // TODO: Should return an iter of Result<Entry> so that we can inspect them...
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
         Ok(
             IterStitchedIndexHunks::new(&self.archive, Some(self.band.id().clone()))
