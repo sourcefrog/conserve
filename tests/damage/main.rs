@@ -31,7 +31,7 @@ mod strategy;
 use strategy::Damage;
 
 // TODO: Also test damage to other files: band tail, index hunks, data blocks, etc.
-// TODO: Test that you can delete a damaged backup.
+// TODO: Test that you can delete a damaged backup; then there are no problems.
 
 #[rstest]
 #[traced_test]
