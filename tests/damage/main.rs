@@ -21,18 +21,18 @@ use conserve::Archive;
 use conserve::BackupOptions;
 use conserve::RestoreOptions;
 use dir_assert::assert_paths;
+use rstest::rstest;
 use tracing_test::traced_test;
 
 mod strategy;
 use strategy::Damage;
 
 // TODO: Also test other files.
-// TODO: Also test other types of damage, including missing files,
-// permission denied (as a kind of IOError), and binary junk.
 
+#[rstest]
 #[traced_test]
 #[test]
-fn backup_after_damage() {
+fn backup_after_damage(#[values(Damage::Delete, Damage::Truncate)] damage: Damage) {
     let archive_dir = TempDir::new().unwrap();
     let source_dir = TempDir::new().unwrap();
 
@@ -45,7 +45,7 @@ fn backup_after_damage() {
     let backup_options = BackupOptions::default();
     backup(&archive, source_dir.path(), &backup_options).expect("initial backup");
 
-    Damage::Truncate.damage(&archive_dir.child("b0000").child("BANDHEAD"));
+    damage.damage(&archive_dir.child("b0000").child("BANDHEAD"));
 
     // A second backup should succeed.
     source_dir

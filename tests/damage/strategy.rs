@@ -13,7 +13,7 @@
 
 //! Strategies for damaging files.
 
-use std::fs::OpenOptions;
+use std::fs::{remove_file, OpenOptions};
 use std::path::Path;
 
 /// A way of damaging a file in an archive.
@@ -21,6 +21,11 @@ use std::path::Path;
 pub enum Damage {
     /// Truncate the file to zero bytes.
     Truncate,
+
+    /// Delete the file.
+    Delete,
+    // TODO: Also test other types of damage, including
+    // permission denied (as a kind of IOError), and binary junk.
 }
 
 impl Damage {
@@ -28,14 +33,17 @@ impl Damage {
     ///
     /// The file must already exist.
     pub fn damage(&self, path: &Path) {
+        assert!(path.exists(), "{path:?} does not exist");
         match self {
             Damage::Truncate => {
-                assert!(path.exists(), "{path:?} does not exist");
                 OpenOptions::new()
                     .write(true)
                     .truncate(true)
                     .open(path)
                     .expect("truncate file");
+            }
+            Damage::Delete => {
+                remove_file(path).expect("delete file");
             }
         }
     }

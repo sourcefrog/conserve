@@ -40,7 +40,11 @@ snap = "1.0.0"
 tempfile = "3"
 thiserror = "1.0.19"
 thousands = "0.2.0"
-time = { version = "0.3", features = ["local-offset", "serde", "serde-human-readable"] }
+time = { version = "0.3", features = [
+    "local-offset",
+    "serde",
+    "serde-human-readable",
+] }
 tracing = "0.1"
 tracing-appender = "0.2"
 unix_mode = "0.1"
@@ -72,6 +76,7 @@ predicates = "2"
 pretty_assertions = "1.0"
 proptest = "1.0"
 proptest-derive = "0.3"
+rstest = { version = "0.17", features = [] }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 [features]
