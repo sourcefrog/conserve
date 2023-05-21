@@ -13,16 +13,16 @@
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-// use predicates::prelude::*;
-
-use conserve::backup;
-use conserve::restore;
-use conserve::Archive;
-use conserve::BackupOptions;
-use conserve::RestoreOptions;
+use conserve::Exclude;
 use dir_assert::assert_paths;
+use indoc::indoc;
+use pretty_assertions::assert_eq;
 use rstest::rstest;
 use tracing_test::traced_test;
+// use predicates::prelude::*;
+
+use conserve::show::show_entry_names;
+use conserve::{backup, restore, Apath, Archive, BackupOptions, BandId, ReadTree, RestoreOptions};
 
 mod strategy;
 use strategy::Damage;
@@ -65,6 +65,30 @@ fn backup_after_damage(#[values(Damage::Delete, Damage::Truncate)] damage: Damag
     // we should get all the content back out.
     assert_paths!(source_dir.path(), restore_dir.path());
 
-    // TODO: List versions.
-    // TODO: List contents of second backup.
+    // You can see both versions.
+    let versions = archive.list_band_ids().expect("list versions");
+    assert_eq!(versions, [BandId::zero(), BandId::new(&[1])]);
+
+    // Can list the contents of the second backup.
+    // let mut listing = String::new();
+    // TODO: Better API for this!
+    let mut listing: Vec<u8> = Vec::new();
+    show_entry_names(
+        archive
+            .open_stored_tree(conserve::BandSelectionPolicy::Latest)
+            .expect("open second backup")
+            .iter_entries(Apath::root(), Exclude::nothing())
+            .expect("list entries"),
+        &mut listing,
+        false,
+    )
+    .expect("show entry names");
+
+    assert_eq!(
+        String::from_utf8(listing).unwrap(),
+        indoc! {"
+            /
+            /file
+        "}
+    );
 }
