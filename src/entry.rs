@@ -14,6 +14,7 @@
 //! An entry representing a file, directory, etc, in either a
 //! stored tree or local tree.
 
+use std::borrow::Borrow;
 use std::fmt::Debug;
 
 use serde::Serialize;
@@ -34,82 +35,81 @@ pub trait EntryTrait: Debug {
     fn kind(&self) -> Kind;
     fn mtime(&self) -> OffsetDateTime;
     fn size(&self) -> Option<u64>;
-    fn symlink_target(&self) -> &Option<String>;
+    fn symlink_target(&self) -> Option<&str>;
     fn unix_mode(&self) -> UnixMode;
     fn owner(&self) -> &Owner;
+}
+
+/// Per-kind metadata.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind")]
+pub enum KindMeta {
+    File { size: u64 },
+    Dir,
+    Symlink { target: String },
+    Unknown,
+}
+
+impl From<&KindMeta> for Kind {
+    fn from(from: &KindMeta) -> Kind {
+        match from {
+            KindMeta::Dir => Kind::Dir,
+            KindMeta::File { .. } => Kind::File,
+            KindMeta::Symlink { .. } => Kind::Symlink,
+            KindMeta::Unknown => Kind::Unknown,
+        }
+    }
 }
 
 /// An in-memory [Entry] describing a file/dir/symlink, with no addresses.
 #[derive(Debug, Serialize, Clone, Eq, PartialEq)]
 pub struct EntryValue {
     pub(crate) apath: Apath,
-    // TODO: Maybe a KindMetadata, so that we only have a size for files
-    // and a target for symlinks?
-    pub(crate) kind: Kind,
+
+    /// Is it a file, dir, or symlink, and for files the size and for symlinks the target.
+    #[serde(flatten)]
+    pub(crate) kind_meta: KindMeta,
+
+    /// Modification time.
     pub(crate) mtime: OffsetDateTime,
-    pub(crate) size: Option<u64>,
-    pub(crate) symlink_target: Option<String>,
     pub(crate) unix_mode: UnixMode,
     #[serde(flatten)]
     pub(crate) owner: Owner,
 }
 
-impl EntryTrait for EntryValue {
+impl<B: Borrow<EntryValue> + Debug> EntryTrait for B {
     fn apath(&self) -> &Apath {
-        &self.apath
+        &self.borrow().apath
     }
 
     fn kind(&self) -> Kind {
-        self.kind
+        Kind::from(&self.borrow().kind_meta)
     }
 
     fn mtime(&self) -> OffsetDateTime {
-        self.mtime
+        self.borrow().mtime
     }
 
     fn size(&self) -> Option<u64> {
-        self.size
+        if let KindMeta::File { size } = self.borrow().kind_meta {
+            Some(size)
+        } else {
+            None
+        }
     }
 
-    fn symlink_target(&self) -> &Option<String> {
-        &self.symlink_target
-    }
-
-    fn unix_mode(&self) -> UnixMode {
-        self.unix_mode
-    }
-
-    fn owner(&self) -> &Owner {
-        &self.owner
-    }
-}
-
-impl EntryTrait for &EntryValue {
-    fn apath(&self) -> &Apath {
-        &self.apath
-    }
-
-    fn kind(&self) -> Kind {
-        self.kind
-    }
-
-    fn mtime(&self) -> OffsetDateTime {
-        self.mtime
-    }
-
-    fn size(&self) -> Option<u64> {
-        self.size
-    }
-
-    fn symlink_target(&self) -> &Option<String> {
-        &self.symlink_target
+    fn symlink_target(&self) -> Option<&str> {
+        match &self.borrow().kind_meta {
+            KindMeta::Symlink { target } => Some(target),
+            _ => None,
+        }
     }
 
     fn unix_mode(&self) -> UnixMode {
-        self.unix_mode
+        self.borrow().unix_mode
     }
 
     fn owner(&self) -> &Owner {
-        &self.owner
+        &self.borrow().owner
     }
 }

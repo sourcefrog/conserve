@@ -171,7 +171,7 @@ impl From<&dyn EntryTrait> for KindMetadata {
             },
             Kind::Dir => KindMetadata::Dir,
             Kind::Symlink => KindMetadata::Symlink {
-                target: entry.symlink_target().clone().unwrap(),
+                target: entry.symlink_target().unwrap().to_owned(),
             },
             Kind::Unknown => panic!("unexpected Kind::Unknown on {:?}", entry.apath()),
         }

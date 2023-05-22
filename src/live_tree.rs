@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 
 use tracing::{error, warn};
 
-use crate::entry::EntryValue;
+use crate::entry::{EntryValue, KindMeta};
 use crate::owner::Owner;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_mode::UnixMode;
@@ -79,30 +79,51 @@ impl tree::ReadTree for LiveTree {
 
 fn entry_from_fs_metadata(
     apath: Apath,
+    source_path: &Path,
     metadata: &fs::Metadata,
-    symlink_target: Option<String>,
-) -> EntryValue {
-    // TODO: Could we read the symlink target here, rather than in the caller?
+) -> Result<EntryValue> {
     let mtime = metadata
         .modified()
         .expect("Failed to get file mtime")
         .into();
-    let size = if metadata.is_file() {
-        Some(metadata.len())
+    let kind_meta = if metadata.is_file() {
+        KindMeta::File {
+            size: metadata.len(),
+        }
+    } else if metadata.is_dir() {
+        KindMeta::Dir
+    } else if metadata.is_symlink() {
+        let t = match source_path.read_link() {
+            Ok(t) => t,
+            Err(e) => {
+                error!("Failed to read target of symlink {source_path:?}: {e}");
+                return Err(e.into());
+            }
+        };
+        let target = match t.into_os_string().into_string() {
+            Ok(t) => t,
+            Err(e) => {
+                error!("Failed to decode target of symlink {source_path:?}: {e:?}");
+                return Err(Error::UnsupportedTargetEncoding {
+                    path: source_path.to_owned(),
+                });
+            }
+        };
+        KindMeta::Symlink { target }
     } else {
-        None
+        return Err(Error::UnsupportedSourceKind {
+            path: source_path.to_owned(),
+        });
     };
     let owner = Owner::from(metadata);
     let unix_mode = UnixMode::from(metadata.permissions());
-    EntryValue {
+    Ok(EntryValue {
         apath,
-        kind: metadata.file_type().into(),
         mtime,
-        symlink_target,
-        size,
+        kind_meta,
         unix_mode,
         owner,
-    }
+    })
 }
 
 /// Recursive iterator of the contents of a live tree.
@@ -138,13 +159,14 @@ impl Iter {
     /// Construct a new iter that will visit everything below this root path,
     /// subject to some exclusions
     fn new(root_path: &Path, subtree: Apath, exclude: Exclude) -> Result<Iter> {
-        let start_metadata = fs::symlink_metadata(subtree.below(root_path))?;
+        let start_path = subtree.below(root_path);
+        let start_metadata = fs::symlink_metadata(&start_path)?;
         // Preload iter to return the root and then recurse into it.
         let entry_deque: VecDeque<EntryValue> = [entry_from_fs_metadata(
             subtree.clone(),
+            &start_path,
             &start_metadata,
-            None,
-        )]
+        )?]
         .into();
         // TODO: Consider the case where the root is not actually a directory?
         // Should that be supported?
@@ -236,33 +258,18 @@ impl Iter {
                 }
             };
 
-            // TODO: Move this into entry_from_fs_metadata, once there's a
-            // global way for it to complain about errors.
-            let target: Option<String> = if ft.is_symlink() {
-                let t = match dir_path.join(dir_entry.file_name()).read_link() {
-                    Ok(t) => t,
-                    Err(e) => {
-                        error!("Failed to read target of symlink {child_apath:?}: {e}");
-                        continue;
-                    }
-                };
-                match t.into_os_string().into_string() {
-                    Ok(t) => Some(t),
-                    Err(e) => {
-                        error!("Failed to decode target of symlink {child_apath:?}: {e:?}");
-                        continue;
-                    }
-                }
-            } else {
-                None
-            };
             if ft.is_dir() {
                 subdir_apaths.push(child_apath.clone());
             }
-            children.push((
-                child_name.to_string(),
-                entry_from_fs_metadata(child_apath, &metadata, target),
-            ));
+            let child_path = dir_path.join(dir_entry.file_name());
+            let entry = match entry_from_fs_metadata(child_apath, &child_path, &metadata) {
+                Ok(entry) => entry,
+                Err(err) => {
+                    error!("Failed to build entry for {child_path:?}: {err:?}");
+                    continue;
+                }
+            };
+            children.push((child_name.to_string(), entry));
         }
         // To get the right overall tree ordering, any new subdirectories
         // discovered here should be visited together in apath order, but before

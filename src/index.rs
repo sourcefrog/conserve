@@ -25,7 +25,7 @@ use time::OffsetDateTime;
 use tracing::error;
 
 use crate::compress::snappy::{Compressor, Decompressor};
-use crate::entry::EntryValue;
+use crate::entry::{EntryValue, KindMeta};
 use crate::kind::Kind;
 use crate::owner::Owner;
 use crate::stats::{IndexReadStats, IndexWriterStats};
@@ -91,19 +91,26 @@ pub struct IndexEntry {
 
 impl From<IndexEntry> for EntryValue {
     fn from(index_entry: IndexEntry) -> EntryValue {
+        let kind_meta = match index_entry.kind {
+            Kind::File => KindMeta::File {
+                size: index_entry.addrs.iter().map(|a| a.len).sum(),
+            },
+            Kind::Symlink => KindMeta::Symlink {
+                // TODO: Should not be fatal
+                target: index_entry
+                    .target
+                    .expect("symlink entry should have a target"),
+            },
+            Kind::Dir => KindMeta::Dir,
+            Kind::Unknown => KindMeta::Unknown,
+        };
         EntryValue {
             apath: index_entry.apath,
-            kind: index_entry.kind,
+            kind_meta,
             mtime: OffsetDateTime::from_unix_seconds_and_nanos(
                 index_entry.mtime,
                 index_entry.mtime_nanos,
             ),
-            size: if index_entry.kind == Kind::File {
-                Some(index_entry.addrs.iter().map(|a| a.len).sum())
-            } else {
-                None
-            },
-            symlink_target: index_entry.target,
             unix_mode: index_entry.unix_mode,
             owner: index_entry.owner,
         }
@@ -133,8 +140,8 @@ impl EntryTrait for IndexEntry {
 
     /// Target of the symlink, if this is a symlink.
     #[inline]
-    fn symlink_target(&self) -> &Option<String> {
-        &self.target
+    fn symlink_target(&self) -> Option<&str> {
+        self.target.as_ref().map(String::as_str)
     }
 
     fn unix_mode(&self) -> UnixMode {
@@ -158,7 +165,7 @@ impl IndexEntry {
             apath: source.apath().clone(),
             kind: source.kind(),
             addrs: Vec::new(),
-            target: source.symlink_target().clone(),
+            target: source.symlink_target().map(|t| t.to_owned()),
             mtime: mtime.unix_timestamp(),
             mtime_nanos: mtime.nanosecond(),
             unix_mode: source.unix_mode(),

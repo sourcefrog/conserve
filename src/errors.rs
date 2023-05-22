@@ -244,6 +244,12 @@ pub enum Error {
         source: io::Error,
     },
 
+    #[error("Unsupported source file kind: {path:?}")]
+    UnsupportedSourceKind { path: PathBuf },
+
+    #[error("Unsupported symlink encoding: {path:?}")]
+    UnsupportedTargetEncoding { path: PathBuf },
+
     #[error("Failed to read source tree {:?}", path)]
     ListSourceTree {
         path: PathBuf,
