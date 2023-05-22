@@ -139,8 +139,8 @@ impl Archive {
         subtree: Apath,
         exclude: Exclude,
     ) -> Result<impl Iterator<Item = IndexEntry>> {
-        let stored_tree = self.open_stored_tree(band_selection)?;
-        stored_tree.iter_entries(subtree, exclude)
+        self.open_stored_tree(band_selection)?
+            .iter_entries(subtree, exclude)
     }
 
     /// Returns a vector of band ids, in sorted order from first to last.
