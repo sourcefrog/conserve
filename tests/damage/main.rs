@@ -70,15 +70,15 @@ fn backup_after_damage(#[values(Damage::Delete, Damage::Truncate)] damage: Damag
     assert_eq!(versions, [BandId::zero(), BandId::new(&[1])]);
 
     // Can list the contents of the second backup.
-    let apaths = archive
+    let apaths: Vec<String> = archive
         .iter_entries(
             BandSelectionPolicy::Latest,
             Apath::root(),
             Exclude::nothing(),
         )
         .expect("iter entries")
-        .map(|entry| entry.apath().to_string())
-        .collect::<Vec<String>>();
+        .map(|e| e.apath().to_string())
+        .collect();
 
     assert_eq!(apaths, ["/", "/file"]);
 

@@ -13,7 +13,7 @@
 use pretty_assertions::assert_eq;
 
 use conserve::entry::EntryValue;
-use conserve::test_fixtures::TreeFixture;
+use conserve::test_fixtures::{entry_iter_to_apath_strings, TreeFixture};
 use conserve::*;
 
 #[test]
@@ -130,18 +130,4 @@ fn exclude_cachedir() {
     let names =
         entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), Exclude::nothing()).unwrap());
     assert_eq!(names, ["/", "/a"]);
-}
-
-/// Collect apaths from an iterator into a list of string.
-///
-/// This is more loosely typed but useful for tests.
-fn entry_iter_to_apath_strings<EntryIter, E>(entry_iter: EntryIter) -> Vec<String>
-where
-    EntryIter: IntoIterator<Item = E>,
-    E: EntryTrait,
-{
-    entry_iter
-        .into_iter()
-        .map(|entry| entry.apath().clone().into())
-        .collect()
 }

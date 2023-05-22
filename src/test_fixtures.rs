@@ -186,3 +186,17 @@ impl Default for TreeFixture {
         Self::new()
     }
 }
+
+/// Collect apaths from an iterator into a list of string.
+///
+/// This is more loosely typed but useful for tests.
+pub fn entry_iter_to_apath_strings<EntryIter, E>(entry_iter: EntryIter) -> Vec<String>
+where
+    EntryIter: IntoIterator<Item = E>,
+    E: EntryTrait,
+{
+    entry_iter
+        .into_iter()
+        .map(|entry| entry.apath().clone().into())
+        .collect()
+}
