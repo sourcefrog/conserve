@@ -16,6 +16,7 @@
 
 use std::fmt::Debug;
 
+use serde::Serialize;
 use time::OffsetDateTime;
 
 use crate::kind::Kind;
@@ -39,14 +40,17 @@ pub trait EntryTrait: Debug {
 }
 
 /// An in-memory [Entry] describing a file/dir/symlink, with no addresses.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Clone, Eq, PartialEq)]
 pub struct EntryValue {
     pub(crate) apath: Apath,
+    // TODO: Maybe a KindMetadata, so that we only have a size for files
+    // and a target for symlinks?
     pub(crate) kind: Kind,
     pub(crate) mtime: OffsetDateTime,
     pub(crate) size: Option<u64>,
     pub(crate) symlink_target: Option<String>,
     pub(crate) unix_mode: UnixMode,
+    #[serde(flatten)]
     pub(crate) owner: Owner,
 }
 
