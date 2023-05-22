@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2017, 2018, 2019, 2020, 2022 Martin Pool.
+// Copyright 2017-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,8 +21,7 @@ use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
 pub trait ReadTree {
-    type Entry: Entry + 'static;
-    type R: std::io::Read;
+    type Entry: EntryTrait + 'static;
     type IT: Iterator<Item = Self::Entry>;
 
     /// Iterate, in apath order, all the entries in this tree.
@@ -31,10 +30,6 @@ pub trait ReadTree {
     /// counted, but are not treated as fatal, and don't appear as Results in the
     /// iterator.
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT>;
-
-    /// Read file contents as a `std::io::Read`.
-    // TODO: Remove this and use ReadBlocks or similar.
-    fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R>;
 
     /// Estimate the number of entries in the tree.
     /// This might do somewhat expensive IO, so isn't the Iter's `size_hint`.

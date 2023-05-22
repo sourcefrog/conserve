@@ -12,7 +12,8 @@
 
 use pretty_assertions::assert_eq;
 
-use conserve::test_fixtures::TreeFixture;
+use conserve::entry::EntryValue;
+use conserve::test_fixtures::{entry_iter_to_apath_strings, TreeFixture};
 use conserve::*;
 
 #[test]
@@ -32,11 +33,11 @@ fn list_simple_directory() {
     tf.create_dir("jelly");
     tf.create_dir("jam/.etc");
     let lt = LiveTree::open(tf.path()).unwrap();
-    let result: Vec<LiveEntry> = lt
+    let result: Vec<EntryValue> = lt
         .iter_entries(Apath::root(), Exclude::nothing())
         .unwrap()
         .collect();
-    let names = entry_iter_to_apath_strings(result.clone());
+    let names = entry_iter_to_apath_strings(&result);
     // First one is the root
     assert_eq!(
         names,
@@ -53,7 +54,7 @@ fn list_simple_directory() {
 
     let repr = format!("{:?}", &result[6]);
     println!("{repr}");
-    assert!(repr.starts_with("LiveEntry {"));
+    assert!(repr.starts_with("EntryValue {"));
     assert!(repr.contains("Apath(\"/jam/apricot\")"));
 
     // TODO: Somehow get the stats out of the iterator.
@@ -129,18 +130,4 @@ fn exclude_cachedir() {
     let names =
         entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), Exclude::nothing()).unwrap());
     assert_eq!(names, ["/", "/a"]);
-}
-
-/// Collect apaths from an iterator into a list of string.
-///
-/// This is more loosely typed but useful for tests.
-fn entry_iter_to_apath_strings<EntryIter, E>(entry_iter: EntryIter) -> Vec<String>
-where
-    EntryIter: IntoIterator<Item = E>,
-    E: Entry,
-{
-    entry_iter
-        .into_iter()
-        .map(|entry| entry.apath().clone().into())
-        .collect()
 }

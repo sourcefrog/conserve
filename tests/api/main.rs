@@ -13,6 +13,7 @@
 //! Tests for the Conserve library API.
 
 mod apath;
+mod archive;
 mod backup;
 mod bandid;
 mod blockhash;

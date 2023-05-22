@@ -25,6 +25,7 @@ use time::OffsetDateTime;
 use tracing::error;
 
 use crate::compress::snappy::{Compressor, Decompressor};
+use crate::entry::{EntryValue, KindMeta};
 use crate::kind::Kind;
 use crate::owner::Owner;
 use crate::stats::{IndexReadStats, IndexWriterStats};
@@ -88,7 +89,35 @@ pub struct IndexEntry {
 }
 // GRCOV_EXCLUDE_STOP
 
-impl Entry for IndexEntry {
+impl From<IndexEntry> for EntryValue {
+    fn from(index_entry: IndexEntry) -> EntryValue {
+        let kind_meta = match index_entry.kind {
+            Kind::File => KindMeta::File {
+                size: index_entry.addrs.iter().map(|a| a.len).sum(),
+            },
+            Kind::Symlink => KindMeta::Symlink {
+                // TODO: Should not be fatal
+                target: index_entry
+                    .target
+                    .expect("symlink entry should have a target"),
+            },
+            Kind::Dir => KindMeta::Dir,
+            Kind::Unknown => KindMeta::Unknown,
+        };
+        EntryValue {
+            apath: index_entry.apath,
+            kind_meta,
+            mtime: OffsetDateTime::from_unix_seconds_and_nanos(
+                index_entry.mtime,
+                index_entry.mtime_nanos,
+            ),
+            unix_mode: index_entry.unix_mode,
+            owner: index_entry.owner,
+        }
+    }
+}
+
+impl EntryTrait for IndexEntry {
     /// Return apath relative to the top of the tree.
     fn apath(&self) -> &Apath {
         &self.apath
@@ -111,22 +140,22 @@ impl Entry for IndexEntry {
 
     /// Target of the symlink, if this is a symlink.
     #[inline]
-    fn symlink_target(&self) -> &Option<String> {
-        &self.target
+    fn symlink_target(&self) -> Option<&str> {
+        self.target.as_deref()
     }
 
     fn unix_mode(&self) -> UnixMode {
         self.unix_mode
     }
 
-    fn owner(&self) -> Owner {
-        self.owner.clone()
+    fn owner(&self) -> &Owner {
+        &self.owner
     }
 }
 
 impl IndexEntry {
     /// Copy the metadata, but not the body content, from another entry.
-    pub(crate) fn metadata_from<E: Entry>(source: &E) -> IndexEntry {
+    pub(crate) fn metadata_from(source: &EntryValue) -> IndexEntry {
         let mtime = source.mtime();
         assert_eq!(
             source.symlink_target().is_some(),
@@ -136,11 +165,11 @@ impl IndexEntry {
             apath: source.apath().clone(),
             kind: source.kind(),
             addrs: Vec::new(),
-            target: source.symlink_target().clone(),
+            target: source.symlink_target().map(|t| t.to_owned()),
             mtime: mtime.unix_timestamp(),
             mtime_nanos: mtime.nanosecond(),
             unix_mode: source.unix_mode(),
-            owner: source.owner(),
+            owner: source.owner().to_owned(),
         }
     }
 }

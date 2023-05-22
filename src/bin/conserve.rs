@@ -153,8 +153,13 @@ enum Command {
 
         #[arg(long, short)]
         exclude: Vec<String>,
+
         #[arg(long, short = 'E')]
         exclude_from: Vec<String>,
+
+        /// Print entries as json.
+        #[arg(long, short)]
+        json: bool,
 
         /// Show permissions, owner, and group.
         #[arg(short = 'l')]
@@ -408,27 +413,33 @@ impl Command {
                 debug!("Created new archive in {archive:?}");
             }
             Command::Ls {
+                json,
                 stos,
                 exclude,
                 exclude_from,
                 long_listing,
             } => {
                 let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
-                if let Some(archive) = &stos.archive {
-                    // TODO: Option for subtree.
-                    show::show_entry_names(
-                        stored_tree_from_opt(archive, &stos.backup)?
-                            .iter_entries(Apath::root(), exclude)?,
-                        &mut stdout,
-                        *long_listing,
-                    )?;
+                let entry_iter: Box<dyn Iterator<Item = EntryValue>> =
+                    if let Some(archive) = &stos.archive {
+                        // TODO: Option for subtree.
+                        Box::new(
+                            stored_tree_from_opt(archive, &stos.backup)?
+                                .iter_entries(Apath::root(), exclude)?
+                                .map(|it| it.into()),
+                        )
+                    } else {
+                        Box::new(
+                            LiveTree::open(stos.source.clone().unwrap())?
+                                .iter_entries(Apath::root(), exclude)?,
+                        )
+                    };
+                if *json {
+                    for entry in entry_iter {
+                        println!("{}", serde_json::ser::to_string(&entry)?);
+                    }
                 } else {
-                    show::show_entry_names(
-                        LiveTree::open(stos.source.clone().unwrap())?
-                            .iter_entries(Apath::root(), exclude)?,
-                        &mut stdout,
-                        *long_listing,
-                    )?;
+                    show::show_entry_names(entry_iter, &mut stdout, *long_listing)?;
                 }
             }
             Command::Restore {

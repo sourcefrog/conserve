@@ -18,7 +18,7 @@ use std::fmt;
 use serde::Serialize;
 use time::OffsetDateTime;
 
-use crate::{Apath, Entry, Kind, Owner, Result, UnixMode};
+use crate::{Apath, EntryTrait, Kind, Owner, Result, UnixMode};
 
 /// Summary of some kind of change to an entry from backup, diff, restore, etc.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
@@ -33,7 +33,7 @@ impl EntryChange {
         self.change.is_unchanged()
     }
 
-    pub(crate) fn diff_metadata(a: &dyn Entry, b: &dyn Entry) -> Self {
+    pub(crate) fn diff_metadata<AE: EntryTrait, BE: EntryTrait>(a: &AE, b: &BE) -> Self {
         debug_assert_eq!(a.apath(), b.apath());
         let ak = a.kind();
         // mtime is only treated as a significant change for files, because
@@ -51,7 +51,7 @@ impl EntryChange {
         }
     }
 
-    pub(crate) fn added(entry: &dyn Entry) -> Self {
+    pub(crate) fn added(entry: &dyn EntryTrait) -> Self {
         EntryChange {
             apath: entry.apath().clone(),
             change: Change::Added {
@@ -61,7 +61,7 @@ impl EntryChange {
     }
 
     #[allow(unused)] // Never generated in backups at the moment
-    pub(crate) fn deleted(entry: &dyn Entry) -> Self {
+    pub(crate) fn deleted(entry: &dyn EntryTrait) -> Self {
         EntryChange {
             apath: entry.apath().clone(),
             change: Change::Deleted {
@@ -70,7 +70,7 @@ impl EntryChange {
         }
     }
 
-    pub(crate) fn unchanged(entry: &dyn Entry) -> Self {
+    pub(crate) fn unchanged(entry: &dyn EntryTrait) -> Self {
         EntryChange {
             apath: entry.apath().clone(),
             change: Change::Unchanged {
@@ -79,7 +79,7 @@ impl EntryChange {
         }
     }
 
-    pub(crate) fn changed(old: &dyn Entry, new: &dyn Entry) -> Self {
+    pub(crate) fn changed(old: &dyn EntryTrait, new: &dyn EntryTrait) -> Self {
         debug_assert_eq!(old.apath(), new.apath());
         EntryChange {
             apath: old.apath().clone(),
@@ -135,7 +135,7 @@ impl<E> Change<E> {
 /// Metadata about a changed entry other than its apath.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct EntryMetadata {
-    // TODO: Eventually unify with LiveEntry or Entry?
+    // TODO: Eventually unify with EntryValue or Entry?
     #[serde(flatten)]
     pub kind: KindMetadata,
     pub mtime: OffsetDateTime,
@@ -144,12 +144,12 @@ pub struct EntryMetadata {
     pub unix_mode: UnixMode,
 }
 
-impl From<&dyn Entry> for EntryMetadata {
-    fn from(entry: &dyn Entry) -> Self {
+impl From<&dyn EntryTrait> for EntryMetadata {
+    fn from(entry: &dyn EntryTrait) -> Self {
         EntryMetadata {
             kind: KindMetadata::from(entry),
             mtime: entry.mtime(),
-            owner: entry.owner(),
+            owner: entry.owner().clone(),
             unix_mode: entry.unix_mode(),
         }
     }
@@ -163,15 +163,15 @@ pub enum KindMetadata {
     Symlink { target: String },
 }
 
-impl From<&dyn Entry> for KindMetadata {
-    fn from(entry: &dyn Entry) -> Self {
+impl From<&dyn EntryTrait> for KindMetadata {
+    fn from(entry: &dyn EntryTrait) -> Self {
         match entry.kind() {
             Kind::File => KindMetadata::File {
                 size: entry.size().unwrap(),
             },
             Kind::Dir => KindMetadata::Dir,
             Kind::Symlink => KindMetadata::Symlink {
-                target: entry.symlink_target().clone().unwrap(),
+                target: entry.symlink_target().unwrap().to_owned(),
             },
             Kind::Unknown => panic!("unexpected Kind::Unknown on {:?}", entry.apath()),
         }

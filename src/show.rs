@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2018, 2020, 2021, 2022 Martin Pool.
+// Copyright 2018-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -128,7 +128,7 @@ pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
         .map_err(|source| Error::SerializeIndex { source })
 }
 
-pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(
+pub fn show_entry_names<E: EntryTrait, I: Iterator<Item = E>>(
     it: I,
     w: &mut dyn Write,
     long_listing: bool,

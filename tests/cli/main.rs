@@ -32,6 +32,7 @@ mod backup;
 mod delete;
 mod diff;
 mod exclude;
+mod ls;
 mod trace;
 mod validate;
 mod versions;

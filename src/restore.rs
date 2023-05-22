@@ -27,7 +27,6 @@ use time::OffsetDateTime;
 use tracing::{error, warn};
 
 use crate::band::BandSelectionPolicy;
-use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::progress::{Bar, Progress};
 use crate::stats::RestoreStats;
@@ -125,7 +124,7 @@ pub fn restore(
             Kind::File => {
                 stats.files += 1;
                 increment_counter!("conserve.restore.files");
-                match copy_file(path.clone(), &entry, &st) {
+                match restore_file(path.clone(), &entry, &st) {
                     Err(err) => {
                         error!(?err, ?path, "Failed to restore file");
                         stats.errors += 1;
@@ -196,10 +195,10 @@ fn apply_deferrals(deferrals: &[DirDeferral]) -> Result<RestoreStats> {
 }
 
 /// Copy in the contents of a file from another tree.
-fn copy_file<R: ReadTree>(
+fn restore_file(
     path: PathBuf,
-    source_entry: &R::Entry,
-    from_tree: &R,
+    source_entry: &IndexEntry,
+    from_tree: &StoredTree,
 ) -> Result<RestoreStats> {
     let restore_err = |source| Error::Restore {
         path: path.clone(),
@@ -207,9 +206,10 @@ fn copy_file<R: ReadTree>(
     };
     let mut stats = RestoreStats::default();
     let mut restore_file = File::create(&path).map_err(restore_err)?;
-    // TODO: Read one block at a time: don't pull all the contents into memory.
-    let content = &mut from_tree.file_contents(source_entry)?;
-    let len = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
+    // TODO: Read one block at a time, maybe don't go through io::copy.
+    let stored_file = from_tree.open_stored_file(source_entry);
+    let len =
+        std::io::copy(&mut stored_file.into_read(), &mut restore_file).map_err(restore_err)?;
     stats.uncompressed_file_bytes = len;
     counter!("conserve.restore.file_bytes", len);
     restore_file.flush().map_err(restore_err)?;
@@ -240,7 +240,7 @@ fn copy_file<R: ReadTree>(
 }
 
 #[cfg(unix)]
-fn restore_symlink<E: Entry>(path: &Path, entry: &E) -> Result<()> {
+fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<()> {
     use std::os::unix::fs as unix_fs;
     if let Some(ref target) = entry.symlink_target() {
         if let Err(source) = unix_fs::symlink(target, path) {
@@ -263,7 +263,7 @@ fn restore_symlink<E: Entry>(path: &Path, entry: &E) -> Result<()> {
 }
 
 #[cfg(not(unix))]
-fn restore_symlink<E: Entry>(_restore_path: &Path, entry: &E) -> Result<()> {
+fn restore_symlink(_restore_path: &Path, entry: &IndexEntry) -> Result<()> {
     // TODO: Add a test with a canned index containing a symlink, and expect
     // it cannot be restored on Windows and can be on Unix.
     warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
