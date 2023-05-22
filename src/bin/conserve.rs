@@ -153,8 +153,13 @@ enum Command {
 
         #[arg(long, short)]
         exclude: Vec<String>,
+
         #[arg(long, short = 'E')]
         exclude_from: Vec<String>,
+
+        /// Print entries as json.
+        #[arg(long, short)]
+        json: bool,
 
         /// Show permissions, owner, and group.
         #[arg(short = 'l')]
@@ -408,6 +413,7 @@ impl Command {
                 debug!("Created new archive in {archive:?}");
             }
             Command::Ls {
+                json,
                 stos,
                 exclude,
                 exclude_from,
@@ -428,8 +434,13 @@ impl Command {
                                 .iter_entries(Apath::root(), exclude)?,
                         )
                     };
-
-                show::show_entry_names(entry_iter, &mut stdout, *long_listing)?;
+                if *json {
+                    for entry in entry_iter {
+                        println!("{}", serde_json::ser::to_string(&entry)?);
+                    }
+                } else {
+                    show::show_entry_names(entry_iter, &mut stdout, *long_listing)?;
+                }
             }
             Command::Restore {
                 archive,

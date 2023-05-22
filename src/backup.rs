@@ -269,7 +269,7 @@ impl BackupWriter {
     }
 
     fn copy_symlink(&mut self, source_entry: &EntryValue) -> Result<Option<EntryChange>> {
-        let target = source_entry.symlink_target().clone();
+        let target = source_entry.symlink_target();
         self.stats.symlinks += 1;
         assert!(target.is_some());
         self.index_builder

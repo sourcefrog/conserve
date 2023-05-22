@@ -16,7 +16,7 @@
 
 - `diff` output format has changed slightly to be the same as `backup`.
 
-- New `diff --json`.
+- New `diff --json` and `ls --json`.
 
 ## 23.1.1
 

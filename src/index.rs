@@ -141,7 +141,7 @@ impl EntryTrait for IndexEntry {
     /// Target of the symlink, if this is a symlink.
     #[inline]
     fn symlink_target(&self) -> Option<&str> {
-        self.target.as_ref().map(String::as_str)
+        self.target.as_deref()
     }
 
     fn unix_mode(&self) -> UnixMode {
