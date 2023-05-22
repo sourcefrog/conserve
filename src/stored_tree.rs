@@ -20,7 +20,7 @@
 
 use crate::blockdir::BlockDir;
 use crate::stitch::IterStitchedIndexHunks;
-use crate::stored_file::{ReadStoredFile, StoredFile};
+use crate::stored_file::StoredFile;
 use crate::*;
 
 /// Read index and file contents for a version stored in the archive.
@@ -48,13 +48,13 @@ impl StoredTree {
     }
 
     /// Open a file stored within this tree.
-    fn open_stored_file(&self, entry: &IndexEntry) -> StoredFile {
+    pub fn open_stored_file(&self, entry: &IndexEntry) -> StoredFile {
+        assert_eq!(entry.kind(), Kind::File);
         StoredFile::open(self.block_dir.clone(), entry.addrs.clone())
     }
 }
 
 impl ReadTree for StoredTree {
-    type R = ReadStoredFile;
     type Entry = IndexEntry;
     type IT = index::IndexEntryIter<stitch::IterStitchedIndexHunks>;
 
@@ -65,10 +65,6 @@ impl ReadTree for StoredTree {
             IterStitchedIndexHunks::new(&self.archive, Some(self.band.id().clone()))
                 .iter_entries(subtree, exclude),
         )
-    }
-
-    fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R> {
-        Ok(self.open_stored_file(entry).into_read())
     }
 
     fn estimate_count(&self) -> Result<u64> {

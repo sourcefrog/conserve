@@ -124,7 +124,7 @@ pub fn restore(
             Kind::File => {
                 stats.files += 1;
                 increment_counter!("conserve.restore.files");
-                match copy_file(path.clone(), &entry, &st) {
+                match restore_file(path.clone(), &entry, &st) {
                     Err(err) => {
                         error!(?err, ?path, "Failed to restore file");
                         stats.errors += 1;
@@ -195,10 +195,10 @@ fn apply_deferrals(deferrals: &[DirDeferral]) -> Result<RestoreStats> {
 }
 
 /// Copy in the contents of a file from another tree.
-fn copy_file<R: ReadTree>(
+fn restore_file(
     path: PathBuf,
-    source_entry: &R::Entry,
-    from_tree: &R,
+    source_entry: &IndexEntry,
+    from_tree: &StoredTree,
 ) -> Result<RestoreStats> {
     let restore_err = |source| Error::Restore {
         path: path.clone(),
@@ -206,9 +206,10 @@ fn copy_file<R: ReadTree>(
     };
     let mut stats = RestoreStats::default();
     let mut restore_file = File::create(&path).map_err(restore_err)?;
-    // TODO: Read one block at a time: don't pull all the contents into memory.
-    let content = &mut from_tree.file_contents(source_entry)?;
-    let len = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
+    // TODO: Read one block at a time, maybe don't go through io::copy.
+    let stored_file = from_tree.open_stored_file(source_entry);
+    let len =
+        std::io::copy(&mut stored_file.into_read(), &mut restore_file).map_err(restore_err)?;
     stats.uncompressed_file_bytes = len;
     counter!("conserve.restore.file_bytes", len);
     restore_file.flush().map_err(restore_err)?;

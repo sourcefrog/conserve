@@ -16,8 +16,7 @@ use crate::*;
 
 /// Returns the contents of a file stored in the archive, as an iter of byte blocks.
 ///
-/// These can be constructed through `StoredTree::open_stored_file()` or more
-/// generically through `ReadTree::file_contents`.
+/// These can be constructed through `StoredTree::open_stored_file()`.
 pub struct StoredFile {
     block_dir: BlockDir,
 
@@ -32,7 +31,7 @@ impl StoredFile {
     }
 
     /// Open a cursor on this file that implements `std::io::Read`.
-    pub(crate) fn into_read(self) -> ReadStoredFile {
+    pub fn into_read(self) -> ReadStoredFile {
         ReadStoredFile {
             remaining_addrs: self.addrs.into_iter(),
             buf: Vec::<u8>::new(),

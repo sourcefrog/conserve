@@ -300,9 +300,9 @@ pub fn empty_file_uses_zero_blocks() {
         .unwrap()
         .find(|i| &i.apath == "/empty")
         .expect("found one entry");
-    let mut sf = st.file_contents(&empty_entry).unwrap();
+    let stored_file = st.open_stored_file(&empty_entry);
     let mut s = String::new();
-    assert_eq!(sf.read_to_string(&mut s).unwrap(), 0);
+    assert_eq!(stored_file.into_read().read_to_string(&mut s).unwrap(), 0);
     assert_eq!(s.len(), 0);
 
     // Restore it

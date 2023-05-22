@@ -15,6 +15,7 @@
 
 use std::collections::vec_deque::VecDeque;
 use std::fs;
+use std::fs::File;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
@@ -49,21 +50,21 @@ impl LiveTree {
     pub fn path(&self) -> &Path {
         &self.path
     }
+
+    /// Open a file inside the tree to read.
+    pub fn open_file(&self, entry: &EntryValue) -> Result<File> {
+        assert_eq!(entry.kind(), Kind::File);
+        let path = self.relative_path(&entry.apath);
+        fs::File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
+    }
 }
 
 impl tree::ReadTree for LiveTree {
     type Entry = EntryValue;
-    type R = std::fs::File;
     type IT = Iter;
 
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
         Iter::new(&self.path, subtree, exclude)
-    }
-
-    fn file_contents(&self, entry: &EntryValue) -> Result<Self::R> {
-        assert_eq!(entry.kind(), Kind::File);
-        let path = self.relative_path(&entry.apath);
-        fs::File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
     }
 
     fn estimate_count(&self) -> Result<u64> {

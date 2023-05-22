@@ -242,7 +242,6 @@ impl BackupWriter {
             self.stats.new_files += 1;
             result = Some(EntryChange::added(source_entry));
         }
-        let mut read_source = from_tree.file_contents(source_entry)?;
         let size = source_entry.size().expect("source entry has a size");
         if size == 0 {
             self.index_builder
@@ -250,14 +249,15 @@ impl BackupWriter {
             self.stats.empty_files += 1;
             return Ok(result);
         }
+        let mut source_file = from_tree.open_file(source_entry)?;
         if size <= SMALL_FILE_CAP {
             self.file_combiner
-                .push_file(source_entry, &mut read_source)?;
+                .push_file(source_entry, &mut source_file)?;
             return Ok(result);
         }
         let addrs = store_file_content(
             apath,
-            &mut read_source,
+            &mut source_file,
             &mut self.block_dir,
             &mut self.stats,
         )?;
