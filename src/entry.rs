@@ -28,7 +28,7 @@ use crate::*;
 /// in a source tree.
 // TODO: Maybe keep this entirely in memory and explicitly look things
 // up when needed.
-pub trait Entry: Debug {
+pub trait EntryTrait: Debug {
     fn apath(&self) -> &Apath;
     fn kind(&self) -> Kind;
     fn mtime(&self) -> OffsetDateTime;
@@ -50,7 +50,7 @@ pub struct EntryValue {
     pub(crate) owner: Owner,
 }
 
-impl Entry for EntryValue {
+impl EntryTrait for EntryValue {
     fn apath(&self) -> &Apath {
         &self.apath
     }
@@ -80,7 +80,7 @@ impl Entry for EntryValue {
     }
 }
 
-impl Entry for &EntryValue {
+impl EntryTrait for &EntryValue {
     fn apath(&self) -> &Apath {
         &self.apath
     }

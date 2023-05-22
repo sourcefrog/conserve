@@ -414,22 +414,22 @@ impl Command {
                 long_listing,
             } => {
                 let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
-                if let Some(archive) = &stos.archive {
-                    // TODO: Option for subtree.
-                    show::show_entry_names(
-                        stored_tree_from_opt(archive, &stos.backup)?
-                            .iter_entries(Apath::root(), exclude)?,
-                        &mut stdout,
-                        *long_listing,
-                    )?;
-                } else {
-                    show::show_entry_names(
-                        LiveTree::open(stos.source.clone().unwrap())?
-                            .iter_entries(Apath::root(), exclude)?,
-                        &mut stdout,
-                        *long_listing,
-                    )?;
-                }
+                let entry_iter: Box<dyn Iterator<Item = EntryValue>> =
+                    if let Some(archive) = &stos.archive {
+                        // TODO: Option for subtree.
+                        Box::new(
+                            stored_tree_from_opt(archive, &stos.backup)?
+                                .iter_entries(Apath::root(), exclude)?
+                                .map(|it| it.into()),
+                        )
+                    } else {
+                        Box::new(
+                            LiveTree::open(stos.source.clone().unwrap())?
+                                .iter_entries(Apath::root(), exclude)?,
+                        )
+                    };
+
+                show::show_entry_names(entry_iter, &mut stdout, *long_listing)?;
             }
             Command::Restore {
                 archive,

@@ -128,7 +128,7 @@ pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
         .map_err(|source| Error::SerializeIndex { source })
 }
 
-pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(
+pub fn show_entry_names<E: EntryTrait, I: Iterator<Item = E>>(
     it: I,
     w: &mut dyn Write,
     long_listing: bool,

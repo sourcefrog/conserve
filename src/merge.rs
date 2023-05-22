@@ -28,8 +28,8 @@ use crate::*;
 #[derive(Debug, PartialEq, Eq)]
 pub enum MatchedEntries<AE, BE>
 where
-    AE: Entry,
-    BE: Entry,
+    AE: EntryTrait,
+    BE: EntryTrait,
 {
     Left(AE),
     Right(BE),
@@ -38,8 +38,8 @@ where
 
 impl<AE, BE> MatchedEntries<AE, BE>
 where
-    AE: Entry,
-    BE: Entry,
+    AE: EntryTrait,
+    BE: EntryTrait,
 {
     pub(crate) fn to_entry_change(&self) -> EntryChange {
         match self {
@@ -56,8 +56,8 @@ where
 /// side, not whether there is a content difference.
 pub struct MergeTrees<AE, BE, AIT, BIT>
 where
-    AE: Entry,
-    BE: Entry,
+    AE: EntryTrait,
+    BE: EntryTrait,
     AIT: Iterator<Item = AE>,
     BIT: Iterator<Item = BE>,
 {
@@ -71,8 +71,8 @@ where
 
 impl<AE, BE, AIT, BIT> MergeTrees<AE, BE, AIT, BIT>
 where
-    AE: Entry,
-    BE: Entry,
+    AE: EntryTrait,
+    BE: EntryTrait,
     AIT: Iterator<Item = AE>,
     BIT: Iterator<Item = BE>,
 {
@@ -88,8 +88,8 @@ where
 
 impl<AE, BE, AIT, BIT> Iterator for MergeTrees<AE, BE, AIT, BIT>
 where
-    AE: Entry,
-    BE: Entry,
+    AE: EntryTrait,
+    BE: EntryTrait,
     AIT: Iterator<Item = AE>,
     BIT: Iterator<Item = BE>,
 {

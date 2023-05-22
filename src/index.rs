@@ -25,6 +25,7 @@ use time::OffsetDateTime;
 use tracing::error;
 
 use crate::compress::snappy::{Compressor, Decompressor};
+use crate::entry::EntryValue;
 use crate::kind::Kind;
 use crate::owner::Owner;
 use crate::stats::{IndexReadStats, IndexWriterStats};
@@ -88,7 +89,28 @@ pub struct IndexEntry {
 }
 // GRCOV_EXCLUDE_STOP
 
-impl Entry for IndexEntry {
+impl From<IndexEntry> for EntryValue {
+    fn from(index_entry: IndexEntry) -> EntryValue {
+        EntryValue {
+            apath: index_entry.apath,
+            kind: index_entry.kind,
+            mtime: OffsetDateTime::from_unix_seconds_and_nanos(
+                index_entry.mtime,
+                index_entry.mtime_nanos,
+            ),
+            size: if index_entry.kind == Kind::File {
+                Some(index_entry.addrs.iter().map(|a| a.len).sum())
+            } else {
+                None
+            },
+            symlink_target: index_entry.target,
+            unix_mode: index_entry.unix_mode,
+            owner: index_entry.owner,
+        }
+    }
+}
+
+impl EntryTrait for IndexEntry {
     /// Return apath relative to the top of the tree.
     fn apath(&self) -> &Apath {
         &self.apath
@@ -126,7 +148,7 @@ impl Entry for IndexEntry {
 
 impl IndexEntry {
     /// Copy the metadata, but not the body content, from another entry.
-    pub(crate) fn metadata_from<E: Entry>(source: &E) -> IndexEntry {
+    pub(crate) fn metadata_from(source: &EntryValue) -> IndexEntry {
         let mtime = source.mtime();
         assert_eq!(
             source.symlink_target().is_some(),

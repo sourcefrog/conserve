@@ -212,7 +212,7 @@ impl BackupWriter {
         }
     }
 
-    fn copy_dir<E: Entry>(&mut self, source_entry: &E) -> Result<Option<EntryChange>> {
+    fn copy_dir(&mut self, source_entry: &EntryValue) -> Result<Option<EntryChange>> {
         self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
@@ -268,7 +268,7 @@ impl BackupWriter {
         Ok(result)
     }
 
-    fn copy_symlink<E: Entry>(&mut self, source_entry: &E) -> Result<Option<EntryChange>> {
+    fn copy_symlink(&mut self, source_entry: &EntryValue) -> Result<Option<EntryChange>> {
         let target = source_entry.symlink_target().clone();
         self.stats.symlinks += 1;
         assert!(target.is_some());
@@ -441,7 +441,7 @@ impl FileCombiner {
 /// not changed, without reading the file content.
 ///
 /// Caution: this does not check the symlink target.
-fn entry_metadata_unchanged<E: Entry, O: Entry>(new_entry: &E, basis_entry: &O) -> bool {
+fn entry_metadata_unchanged<E: EntryTrait, O: EntryTrait>(new_entry: &E, basis_entry: &O) -> bool {
     basis_entry.kind() == new_entry.kind()
         && basis_entry.mtime() == new_entry.mtime()
         && basis_entry.size() == new_entry.size()

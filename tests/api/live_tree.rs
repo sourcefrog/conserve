@@ -138,7 +138,7 @@ fn exclude_cachedir() {
 fn entry_iter_to_apath_strings<EntryIter, E>(entry_iter: EntryIter) -> Vec<String>
 where
     EntryIter: IntoIterator<Item = E>,
-    E: Entry,
+    E: EntryTrait,
 {
     entry_iter
         .into_iter()

@@ -20,8 +20,8 @@ use tracing_test::traced_test;
 // use predicates::prelude::*;
 
 use conserve::{
-    backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, Entry, Exclude,
-    RestoreOptions, ValidateOptions,
+    backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait,
+    Exclude, RestoreOptions, ValidateOptions,
 };
 
 mod strategy;

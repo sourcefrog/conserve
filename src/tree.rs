@@ -21,7 +21,7 @@ use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
 pub trait ReadTree {
-    type Entry: Entry + 'static;
+    type Entry: EntryTrait + 'static;
     type R: std::io::Read;
     type IT: Iterator<Item = Self::Entry>;
 

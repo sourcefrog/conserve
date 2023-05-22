@@ -27,7 +27,6 @@ use time::OffsetDateTime;
 use tracing::{error, warn};
 
 use crate::band::BandSelectionPolicy;
-use crate::entry::Entry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::progress::{Bar, Progress};
 use crate::stats::RestoreStats;
@@ -240,7 +239,7 @@ fn copy_file<R: ReadTree>(
 }
 
 #[cfg(unix)]
-fn restore_symlink<E: Entry>(path: &Path, entry: &E) -> Result<()> {
+fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<()> {
     use std::os::unix::fs as unix_fs;
     if let Some(ref target) = entry.symlink_target() {
         if let Err(source) = unix_fs::symlink(target, path) {
@@ -263,7 +262,7 @@ fn restore_symlink<E: Entry>(path: &Path, entry: &E) -> Result<()> {
 }
 
 #[cfg(not(unix))]
-fn restore_symlink<E: Entry>(_restore_path: &Path, entry: &E) -> Result<()> {
+fn restore_symlink(_restore_path: &Path, entry: &IndexEntry) -> Result<()> {
     // TODO: Add a test with a canned index containing a symlink, and expect
     // it cannot be restored on Windows and can be on Unix.
     warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
