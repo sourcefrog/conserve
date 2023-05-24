@@ -264,6 +264,11 @@ impl Iter {
             let child_path = dir_path.join(dir_entry.file_name());
             let entry = match entry_from_fs_metadata(child_apath, &child_path, &metadata) {
                 Ok(entry) => entry,
+                Err(Error::UnsupportedSourceKind { .. }) => {
+                    // It's not too surprising that there would be fifos or sockets or files
+                    // we don't support; don't log them.
+                    continue;
+                }
                 Err(err) => {
                     error!("Failed to build entry for {child_path:?}: {err:?}");
                     continue;
