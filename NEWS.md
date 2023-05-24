@@ -1,6 +1,6 @@
 # Conserve release history
 
-## Unreleased
+## 23.5.0
 
 - Better progress bars for various operations including `validate`.
 
