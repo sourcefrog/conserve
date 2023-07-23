@@ -7,8 +7,11 @@ on:
 
 jobs:
   cargo-install:
+    strategy:
+      matrix:
+        locked: ["", "--locked"]
     runs-on: ubuntu-latest
     steps:
       - name: cargo-install
         run: |
-          cargo install cargo-mutants
+          cargo install cargo-mutants ${{ matrix.locked }}
