@@ -8,7 +8,10 @@ on:
 jobs:
   cargo-install:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        features: ["", "s3"]
     steps:
       - name: cargo-install
         run: |
-          cargo install cargo-mutants
+          cargo install cargo-mutants ${{ matrix.features }}

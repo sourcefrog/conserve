@@ -21,6 +21,7 @@ jobs:
       fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
+        features: ["", "s3"]
 
     steps:
       - uses: actions/checkout@v3
@@ -31,9 +32,9 @@ jobs:
           cargo --version
           rustc --version
       - name: Build
-        run: cargo build --all-targets
+        run: cargo build --all-targets --features=${{ matrix.features }}
       - name: Test
-        run: cargo test -- --include-ignored
+        run: cargo test -- --include-ignored --features=${{ matrix.features }}
       # Clippy and rustfmt are excellent tools but are turned off here because it's too
       # easy for PRs to fail due to irrelevant changes including Clippy flagging problems
       # that it did not notice before.
