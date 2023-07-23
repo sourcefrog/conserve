@@ -10,8 +10,10 @@ jobs:
     strategy:
       matrix:
         locked: ["", "--locked"]
+        # TODO: Enable s3 when it's released
+        features: [""]
     runs-on: ubuntu-latest
     steps:
       - name: cargo-install
         run: |
-          cargo install cargo-mutants ${{ matrix.locked }}
+          cargo install cargo-mutants ${{ matrix.locked }} --features=${{ matrix.features }}
