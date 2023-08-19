@@ -25,6 +25,9 @@ use crate::*;
 pub mod local;
 use local::LocalTransport;
 
+mod error;
+pub use error::Error;
+
 /// Open a `Transport` to access a local directory.
 ///
 /// `s` may be a local path or a URL.
@@ -38,7 +41,7 @@ pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Box::new(LocalTransport::new(Path::new(s))))
             }
-            other => Err(Error::UrlScheme {
+            other => Err(crate::Error::UrlScheme {
                 scheme: other.to_owned(),
             }),
         }
