@@ -27,6 +27,9 @@ use crate::*;
 pub mod local;
 use local::LocalTransport;
 
+#[cfg(feature = "s3")]
+pub mod s3;
+
 /// Open a `Transport` to access a local directory.
 ///
 /// `s` may be a local path or a URL.
@@ -36,6 +39,7 @@ pub fn open_transport(s: &str) -> crate::Result<Arc<dyn Transport>> {
             "file" => Ok(Arc::new(LocalTransport::new(
                 &url.to_file_path().expect("extract URL file path"),
             ))),
+            "s3" => open_s3(&url).map_err(crate::Error::from),
             d if d.len() == 1 => {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Arc::new(LocalTransport::new(Path::new(s))))
@@ -47,6 +51,16 @@ pub fn open_transport(s: &str) -> crate::Result<Arc<dyn Transport>> {
     } else {
         Ok(Arc::new(LocalTransport::new(Path::new(s))))
     }
+}
+
+#[cfg(not(feature = "s3"))]
+fn open_s3(_url: &Url) -> Result<Arc<dyn Transport>> {
+    panic!("s3 not supported")
+}
+
+#[cfg(feature = "s3")]
+fn open_s3(url: &Url) -> Result<Arc<dyn Transport>> {
+    Ok(s3::S3Transport::new(url)?)
 }
 
 /// Abstracted filesystem IO to access an archive.

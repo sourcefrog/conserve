@@ -99,6 +99,7 @@ impl Archive {
             });
         }
         let block_dir = BlockDir::open(transport.sub_transport(BLOCK_DIR));
+        debug!(?header, "Opened archive");
         Ok(Archive {
             block_dir,
             transport,

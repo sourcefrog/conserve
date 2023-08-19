@@ -17,6 +17,9 @@ name = "conserve"
 
 [dependencies]
 assert_matches = "1.5.0"
+aws-config = { version = "0.56", optional = true }
+aws-sdk-s3 = { version = "0.29", optional = true }
+aws-types = { version = "0.56", optional = true }
 blake2-rfc = "0.2.18"
 bytes = "1.1.0"
 cachedir = "0.3"
@@ -45,12 +48,12 @@ time = { version = "0.3.28", features = [
     "serde",
     "serde-human-readable",
 ] }
+tokio = { version = "1", optional = true, features = ["full"] }
 tracing = "0.1"
 tracing-appender = "0.2"
 unix_mode = "0.1"
 url = "2.2.2"
 indoc = "2.0"
-aws-sdk-s3 = { version = "0.28.0", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 users = "0.11"
@@ -82,7 +85,8 @@ tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 [features]
 blake2_simd_asm = ["blake2-rfc/simd_asm"]
-s3 = ["dep:aws-sdk-s3"]
+s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-types", "dep:tokio"]
+default = ["s3"]
 
 [lib]
 doctest = false
