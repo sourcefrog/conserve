@@ -24,8 +24,6 @@ use std::path::Path;
 use thiserror::Error;
 use url::Url;
 
-// use crate::errors::serialize_io_error;
-
 /// Conserve specific error.
 #[non_exhaustive]
 #[derive(Debug, Error)]
@@ -34,10 +32,7 @@ pub enum Error {
     NotFound { url: Url },
 
     #[error("Transport IO error")]
-    OtherIoError {
-        // #[serde(serialize_with = "serialize_io_error")]
-        source: io::Error,
-    },
+    OtherIoError { source: io::Error },
 }
 
 impl Error {
