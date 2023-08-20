@@ -51,7 +51,7 @@ fn parse_location_urls() {
     assert_eq!(parsed_scheme("/backup/repo.c6"), "file");
     assert_eq!(parsed_scheme("../backup/repo.c6"), "file");
     assert_eq!(parsed_scheme("c:/backup/repo"), "file");
-    assert_eq!(parsed_scheme(r#"c:\backup\repo\"#), "file");
+    assert_eq!(parsed_scheme(r"c:\backup\repo\"), "file");
 }
 
 #[test]
