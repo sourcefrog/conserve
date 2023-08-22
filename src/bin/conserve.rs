@@ -14,7 +14,6 @@
 //! Command-line entry point for Conserve backups.
 
 use std::cell::RefCell;
-use std::error::Error;
 use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -291,7 +290,7 @@ impl std::process::Termination for ExitCode {
 }
 
 impl Command {
-    fn run(&self) -> Result<ExitCode> {
+    fn run(&self) -> anyhow::Result<ExitCode> {
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -532,10 +531,13 @@ impl Command {
     }
 }
 
-fn stored_tree_from_opt(archive_location: &str, backup: &Option<BandId>) -> Result<StoredTree> {
+fn stored_tree_from_opt(
+    archive_location: &str,
+    backup: &Option<BandId>,
+) -> anyhow::Result<StoredTree> {
     let archive = Archive::open(open_transport(archive_location)?)?;
     let policy = band_selection_policy_from_opt(backup);
-    archive.open_stored_tree(policy)
+    Ok(archive.open_stored_tree(policy)?)
 }
 
 fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolicy {
@@ -550,7 +552,7 @@ fn make_change_callback<'a>(
     print_changes: bool,
     ls_long: bool,
     changes_json: &Option<&Path>,
-) -> Result<Option<ChangeCallback<'a>>> {
+) -> anyhow::Result<Option<ChangeCallback<'a>>> {
     if !print_changes && !ls_long && changes_json.is_none() {
         return Ok(None);
     };
@@ -594,7 +596,7 @@ fn make_change_callback<'a>(
     })))
 }
 
-fn main() -> Result<ExitCode> {
+fn main() -> anyhow::Result<ExitCode> {
     let args = Args::parse();
     let start_time = Instant::now();
     if !args.no_progress {
@@ -619,12 +621,7 @@ fn main() -> Result<ExitCode> {
     }
     match result {
         Err(err) => {
-            error!("{err}");
-            let mut err: &dyn Error = &err;
-            while let Some(source) = err.source() {
-                error!("caused by: {source}");
-                err = source;
-            }
+            error!("{err:#}");
             debug!(error_count, warn_count,);
             Ok(ExitCode::Failure)
         }
