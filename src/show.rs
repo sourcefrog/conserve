@@ -48,7 +48,7 @@ pub fn show_versions(
     archive: &Archive,
     options: &ShowVersionsOptions,
     w: &mut dyn Write,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let mut band_ids = archive.list_band_ids()?;
     if options.newest_first {
         band_ids.reverse();

@@ -63,11 +63,11 @@ impl tree::ReadTree for LiveTree {
     type Entry = EntryValue;
     type IT = Iter;
 
-    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
+    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> anyhow::Result<Self::IT> {
         Iter::new(&self.path, subtree, exclude)
     }
 
-    fn estimate_count(&self) -> Result<u64> {
+    fn estimate_count(&self) -> anyhow::Result<u64> {
         // TODO: This stats the file and builds an entry about them, just to
         // throw it away. We could perhaps change the iter to optionally do
         // less work.
@@ -158,7 +158,7 @@ pub struct Iter {
 impl Iter {
     /// Construct a new iter that will visit everything below this root path,
     /// subject to some exclusions
-    fn new(root_path: &Path, subtree: Apath, exclude: Exclude) -> Result<Iter> {
+    fn new(root_path: &Path, subtree: Apath, exclude: Exclude) -> anyhow::Result<Iter> {
         let start_path = subtree.below(root_path);
         let start_metadata = fs::symlink_metadata(&start_path)?;
         // Preload iter to return the root and then recurse into it.

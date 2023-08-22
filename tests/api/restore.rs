@@ -97,7 +97,10 @@ pub fn decline_to_overwrite() {
     let restore_err_str = restore(&af, destdir.path(), &options)
         .expect_err("restore should fail if the destination exists")
         .to_string();
-    assert!(restore_err_str.contains("Destination directory not empty"));
+    assert!(
+        restore_err_str.contains("Destination directory is not empty"),
+        "Unexpected error message: {restore_err_str:?}"
+    );
 }
 
 #[test]

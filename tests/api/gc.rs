@@ -99,10 +99,10 @@ fn backup_prevented_by_gc_lock() -> anyhow::Result<()> {
 
     // Backup should fail while gc lock is held.
     let backup_result = backup(&archive, tf.path(), &BackupOptions::default());
-    match backup_result {
-        Err(Error::GarbageCollectionLockHeld) => (),
-        other => panic!("unexpected result {other:?}"),
-    };
+    assert_eq!(
+        backup_result.unwrap_err().to_string(),
+        "Archive is locked for garbage collection"
+    );
 
     // Leak the lock, then gc breaking the lock.
     std::mem::forget(lock1);

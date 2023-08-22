@@ -36,7 +36,7 @@ pub struct ValidateOptions {
 pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
-) -> Result<HashMap<BlockHash, u64>> {
+) -> anyhow::Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
     let start = Instant::now();
     let total_bands = band_ids.len();
@@ -78,7 +78,7 @@ fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash
     }
 }
 
-fn validate_stored_tree(st: &StoredTree) -> Result<HashMap<BlockHash, u64>> {
+fn validate_stored_tree(st: &StoredTree) -> anyhow::Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
     // TODO: Check other entry properties are correct.
     // TODO: Check they're in apath order.

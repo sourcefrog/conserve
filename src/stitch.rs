@@ -174,7 +174,7 @@ mod test {
     }
 
     #[test]
-    fn stitch_index() -> Result<()> {
+    fn stitch_index() -> anyhow::Result<()> {
         // This test uses private interfaces to create an index that breaks
         // across hunks in a certain way.
 

@@ -76,14 +76,16 @@ impl Transport for LocalTransport {
         Ok(out_buf.into())
     }
 
-    fn is_file(&self, relpath: &str) -> io::Result<bool> {
+    fn is_file(&self, relpath: &str) -> anyhow::Result<bool> {
         increment_counter!("conserve.local_transport.metadata_reads");
-        Ok(self.full_path(relpath).is_file())
+        let path = self.full_path(relpath);
+        Ok(path.is_file())
     }
 
-    fn is_dir(&self, relpath: &str) -> io::Result<bool> {
+    fn is_dir(&self, relpath: &str) -> anyhow::Result<bool> {
         increment_counter!("conserve.local_transport.metadata_reads");
-        Ok(self.full_path(relpath).is_dir())
+        let path = self.full_path(relpath);
+        Ok(path.is_dir())
     }
 
     fn create_dir(&self, relpath: &str) -> io::Result<()> {
@@ -119,8 +121,9 @@ impl Transport for LocalTransport {
         }
     }
 
-    fn remove_file(&self, relpath: &str) -> io::Result<()> {
-        std::fs::remove_file(self.full_path(relpath))
+    fn remove_file(&self, relpath: &str) -> anyhow::Result<()> {
+        let path = self.full_path(relpath);
+        std::fs::remove_file(&path).with_context(|| format!("Delete file {path:?}"))
     }
 
     fn remove_dir(&self, relpath: &str) -> anyhow::Result<()> {
@@ -137,9 +140,12 @@ impl Transport for LocalTransport {
         })
     }
 
-    fn metadata(&self, relpath: &str) -> io::Result<Metadata> {
+    fn metadata(&self, relpath: &str) -> anyhow::Result<Metadata> {
         increment_counter!("conserve.local_transport.metadata_reads");
-        let fsmeta = self.root.join(relpath).metadata()?;
+        let path = self.root.join(relpath);
+        let fsmeta = path
+            .metadata()
+            .with_context(|| format!("Failed to get metadata for {path:?}"))?;
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),

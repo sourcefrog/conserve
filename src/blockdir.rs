@@ -30,6 +30,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use ::metrics::{counter, histogram, increment_counter};
+use anyhow::Context;
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
@@ -148,7 +149,7 @@ impl BlockDir {
         &mut self,
         block_data: &[u8],
         stats: &mut BackupStats,
-    ) -> Result<BlockHash> {
+    ) -> anyhow::Result<BlockHash> {
         let hash = self.hash_bytes(block_data);
         let len = block_data.len() as u64;
         if self.contains(&hash)? {
@@ -168,14 +169,12 @@ impl BlockDir {
     }
 
     /// True if the named block is present in this directory.
-    pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
-        self.transport
-            .is_file(&block_relpath(hash))
-            .map_err(Error::from)
+    pub fn contains(&self, hash: &BlockHash) -> anyhow::Result<bool> {
+        self.transport.is_file(&block_relpath(hash))
     }
 
     /// Returns the compressed on-disk size of a block.
-    pub fn compressed_size(&self, hash: &BlockHash) -> Result<u64> {
+    pub fn compressed_size(&self, hash: &BlockHash) -> anyhow::Result<u64> {
         Ok(self.transport.metadata(&block_relpath(hash))?.len)
     }
 
@@ -202,10 +201,10 @@ impl BlockDir {
         }
     }
 
-    pub fn delete_block(&self, hash: &BlockHash) -> Result<()> {
+    pub fn delete_block(&self, hash: &BlockHash) -> anyhow::Result<()> {
         self.transport
             .remove_file(&block_relpath(hash))
-            .map_err(Error::from)
+            .with_context(|| format!("Failed to delete block {hash}"))
     }
 
     /// Return an iterator of block subdirectories, in arbitrary order.

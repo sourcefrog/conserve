@@ -20,6 +20,7 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+use anyhow::bail;
 use derive_more::{Add, AddAssign};
 use itertools::Itertools;
 use tracing::error;
@@ -77,7 +78,7 @@ pub fn backup(
     archive: &Archive,
     source_path: &Path,
     options: &BackupOptions,
-) -> Result<BackupStats> {
+) -> anyhow::Result<BackupStats> {
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive)?;
     let mut stats = BackupStats::default();
@@ -154,9 +155,9 @@ impl BackupWriter {
     /// Create a new BackupWriter.
     ///
     /// This currently makes a new top-level band.
-    pub fn begin(archive: &Archive) -> Result<BackupWriter> {
+    pub fn begin(archive: &Archive) -> anyhow::Result<BackupWriter> {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
-            return Err(Error::GarbageCollectionLockHeld);
+            bail!("Archive is locked for garbage collection");
         }
         let basis_index = IterStitchedIndexHunks::new(archive, archive.last_band_id()?)
             .iter_entries(Apath::root(), Exclude::nothing());
@@ -174,7 +175,7 @@ impl BackupWriter {
         })
     }
 
-    fn finish(self) -> Result<BackupStats> {
+    fn finish(self) -> anyhow::Result<BackupStats> {
         let index_builder_stats = self.index_builder.finish()?;
         self.band.close(index_builder_stats.index_hunks as u64)?;
         Ok(BackupStats {
@@ -184,7 +185,7 @@ impl BackupWriter {
     }
 
     /// Write out any pending data blocks, and then the pending index entries.
-    fn flush_group(&mut self) -> Result<()> {
+    fn flush_group(&mut self) -> anyhow::Result<()> {
         let (stats, mut entries) = self.file_combiner.drain()?;
         self.stats += stats;
         self.index_builder.append_entries(&mut entries);
@@ -196,7 +197,11 @@ impl BackupWriter {
     /// Return an indication of whether it changed (if it's a file), or
     /// None for non-plain-file types where that information is not currently
     /// calculated.
-    fn copy_entry(&mut self, entry: &EntryValue, source: &LiveTree) -> Result<Option<EntryChange>> {
+    fn copy_entry(
+        &mut self,
+        entry: &EntryValue,
+        source: &LiveTree,
+    ) -> anyhow::Result<Option<EntryChange>> {
         // TODO: Emit deletions for entries in the basis not present in the source.
         match entry.kind() {
             Kind::Dir => self.copy_dir(entry),
@@ -212,7 +217,7 @@ impl BackupWriter {
         }
     }
 
-    fn copy_dir(&mut self, source_entry: &EntryValue) -> Result<Option<EntryChange>> {
+    fn copy_dir(&mut self, source_entry: &EntryValue) -> anyhow::Result<Option<EntryChange>> {
         self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
@@ -224,7 +229,7 @@ impl BackupWriter {
         &mut self,
         source_entry: &EntryValue,
         from_tree: &LiveTree,
-    ) -> Result<Option<EntryChange>> {
+    ) -> anyhow::Result<Option<EntryChange>> {
         self.stats.files += 1;
         let apath = source_entry.apath();
         let result;
@@ -268,7 +273,7 @@ impl BackupWriter {
         Ok(result)
     }
 
-    fn copy_symlink(&mut self, source_entry: &EntryValue) -> Result<Option<EntryChange>> {
+    fn copy_symlink(&mut self, source_entry: &EntryValue) -> anyhow::Result<Option<EntryChange>> {
         let target = source_entry.symlink_target();
         self.stats.symlinks += 1;
         assert!(target.is_some());
@@ -284,7 +289,7 @@ fn store_file_content(
     from_file: &mut dyn Read,
     block_dir: &mut BlockDir,
     stats: &mut BackupStats,
-) -> Result<Vec<Address>> {
+) -> anyhow::Result<Vec<Address>> {
     let mut buffer = Vec::new();
     let mut addresses = Vec::<Address>::with_capacity(1);
     loop {
@@ -353,7 +358,7 @@ impl FileCombiner {
 
     /// Flush any pending files, and return accumulated file entries and stats.
     /// The FileCombiner is then empty and ready for reuse.
-    fn drain(&mut self) -> Result<(BackupStats, Vec<IndexEntry>)> {
+    fn drain(&mut self) -> anyhow::Result<(BackupStats, Vec<IndexEntry>)> {
         self.flush()?;
         debug_assert!(self.queue.is_empty());
         debug_assert!(self.buf.is_empty());
@@ -369,7 +374,7 @@ impl FileCombiner {
     ///
     /// After this call the FileCombiner is empty and can be reused for more files into a new
     /// block.
-    fn flush(&mut self) -> Result<()> {
+    fn flush(&mut self) -> anyhow::Result<()> {
         if self.queue.is_empty() {
             debug_assert!(self.buf.is_empty());
             return Ok(());
@@ -394,7 +399,7 @@ impl FileCombiner {
     /// Add the contents of a small file into this combiner.
     ///
     /// `entry` should be an IndexEntry that's complete apart from the block addresses.
-    fn push_file(&mut self, entry: &EntryValue, from_file: &mut dyn Read) -> Result<()> {
+    fn push_file(&mut self, entry: &EntryValue, from_file: &mut dyn Read) -> anyhow::Result<()> {
         let start = self.buf.len();
         let expected_len: usize = entry
             .size()

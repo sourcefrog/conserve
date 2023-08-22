@@ -21,7 +21,7 @@ use conserve::*;
 
 #[traced_test]
 #[test]
-fn missing_block_when_checking_hashes() -> Result<()> {
+fn missing_block_when_checking_hashes() -> anyhow::Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
     archive.validate(&ValidateOptions::default())?;
     assert!(logs_contain(
@@ -31,7 +31,7 @@ fn missing_block_when_checking_hashes() -> Result<()> {
 
 #[traced_test]
 #[test]
-fn missing_block_skip_block_hashes() -> Result<()> {
+fn missing_block_skip_block_hashes() -> anyhow::Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
     archive.validate(&ValidateOptions {
         skip_block_hashes: true,

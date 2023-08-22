@@ -223,10 +223,8 @@ impl Band {
             .with_context(|| format!("Failed to delete band {band_id}"))
     }
 
-    pub fn is_closed(&self) -> Result<bool> {
-        self.transport
-            .is_file(BAND_TAIL_FILENAME)
-            .map_err(Error::from)
+    pub fn is_closed(&self) -> anyhow::Result<bool> {
+        self.transport.is_file(BAND_TAIL_FILENAME)
     }
 
     pub fn id(&self) -> &BandId {

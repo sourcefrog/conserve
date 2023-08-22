@@ -214,7 +214,7 @@ impl IndexWriter {
     }
 
     /// Finish the last hunk of this index, and return the stats.
-    pub fn finish(mut self) -> Result<IndexWriterStats> {
+    pub fn finish(mut self) -> anyhow::Result<IndexWriterStats> {
         self.finish_hunk()?;
         Ok(self.stats)
     }
@@ -238,7 +238,7 @@ impl IndexWriter {
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the buffer to start receiving
     /// entries for the next hunk.
-    pub fn finish_hunk(&mut self) -> Result<()> {
+    pub fn finish_hunk(&mut self) -> anyhow::Result<()> {
         if self.entries.is_empty() {
             return Ok(());
         }
@@ -306,17 +306,13 @@ impl IndexRead {
     }
 
     /// Return the (1-based) number of index hunks in an index directory.
-    pub fn count_hunks(&self) -> Result<u32> {
+    pub fn count_hunks(&self) -> anyhow::Result<u32> {
         // TODO: Might be faster to list the directory than to probe for all of them.
         // TODO: Perhaps, list the directories and cope cleanly with
         // one hunk being missing.
         for i in 0.. {
             let path = hunk_relpath(i);
-            if !self
-                .transport
-                .is_file(&path)
-                .map_err(|source| Error::ReadIndex { source, path })?
-            {
+            if !self.transport.is_file(&path)? {
                 // If hunk 1 is missing, 1 hunks exists.
                 return Ok(i);
             }
@@ -324,7 +320,7 @@ impl IndexRead {
         unreachable!();
     }
 
-    pub fn estimate_entry_count(&self) -> Result<u64> {
+    pub fn estimate_entry_count(&self) -> anyhow::Result<u64> {
         Ok(u64::from(self.count_hunks()?) * (MAX_ENTRIES_PER_HUNK as u64))
     }
 
@@ -830,7 +826,7 @@ mod tests {
     ///
     /// https://github.com/sourcefrog/conserve/issues/95
     #[test]
-    fn no_final_empty_hunk() -> Result<()> {
+    fn no_final_empty_hunk() -> anyhow::Result<()> {
         let (testdir, mut ib) = setup();
         for i in 0..MAX_ENTRIES_PER_HUNK {
             ib.push_entry(sample_entry(&format!("/{i:0>10}")));

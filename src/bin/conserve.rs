@@ -537,7 +537,7 @@ fn stored_tree_from_opt(
 ) -> anyhow::Result<StoredTree> {
     let archive = Archive::open(open_transport(archive_location)?)?;
     let policy = band_selection_policy_from_opt(backup);
-    Ok(archive.open_stored_tree(policy)?)
+    archive.open_stored_tree(policy)
 }
 
 fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolicy {

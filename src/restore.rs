@@ -18,6 +18,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, time::Instant};
 
+use anyhow::{bail, Context};
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
@@ -65,18 +66,11 @@ pub fn restore(
     archive: &Archive,
     destination: &Path,
     options: &RestoreOptions,
-) -> Result<RestoreStats> {
+) -> anyhow::Result<RestoreStats> {
     let st = archive.open_stored_tree(options.band_selection.clone())?;
-    if let Err(source) = ensure_dir_exists(destination) {
-        return Err(Error::Restore {
-            path: destination.to_owned(),
-            source,
-        });
-    }
+    ensure_dir_exists(destination).context("Creating destination")?;
     if !options.overwrite && !directory_is_empty(destination)? {
-        return Err(Error::DestinationNotEmpty {
-            path: destination.to_owned(),
-        });
+        bail!("Destination directory is not empty")
     }
     let mut stats = RestoreStats::default();
     let mut bytes_done = 0;

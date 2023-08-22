@@ -21,6 +21,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
+use anyhow::anyhow;
 use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -120,16 +121,14 @@ impl Archive {
         &self.block_dir
     }
 
-    pub fn band_exists(&self, band_id: &BandId) -> Result<bool> {
+    pub fn band_exists(&self, band_id: &BandId) -> anyhow::Result<bool> {
         self.transport
             .is_file(&format!("{}/{}", band_id, crate::BAND_HEAD_FILENAME))
-            .map_err(Error::from)
     }
 
-    pub fn band_is_closed(&self, band_id: &BandId) -> Result<bool> {
+    pub fn band_is_closed(&self, band_id: &BandId) -> anyhow::Result<bool> {
         self.transport
             .is_file(&format!("{}/{}", band_id, crate::BAND_TAIL_FILENAME))
-            .map_err(Error::from)
     }
 
     /// Return an iterator of entries in a selected version.
@@ -138,7 +137,7 @@ impl Archive {
         band_selection: BandSelectionPolicy,
         subtree: Apath,
         exclude: Exclude,
-    ) -> Result<impl Iterator<Item = IndexEntry>> {
+    ) -> anyhow::Result<impl Iterator<Item = IndexEntry>> {
         self.open_stored_tree(band_selection)?
             .iter_entries(subtree, exclude)
     }
@@ -154,18 +153,21 @@ impl Archive {
         self.transport.as_ref()
     }
 
-    pub fn resolve_band_id(&self, band_selection: BandSelectionPolicy) -> Result<BandId> {
+    pub fn resolve_band_id(&self, band_selection: BandSelectionPolicy) -> anyhow::Result<BandId> {
         match band_selection {
             BandSelectionPolicy::LatestClosed => self
                 .last_complete_band()?
                 .map(|band| band.id().clone())
-                .ok_or(Error::ArchiveEmpty),
+                .ok_or(anyhow!("Archive has no complete bands")),
             BandSelectionPolicy::Specified(band_id) => Ok(band_id),
-            BandSelectionPolicy::Latest => self.last_band_id()?.ok_or(Error::ArchiveEmpty),
+            BandSelectionPolicy::Latest => self.last_band_id()?.ok_or(anyhow!("Archive is empty")),
         }
     }
 
-    pub fn open_stored_tree(&self, band_selection: BandSelectionPolicy) -> Result<StoredTree> {
+    pub fn open_stored_tree(
+        &self,
+        band_selection: BandSelectionPolicy,
+    ) -> anyhow::Result<StoredTree> {
         StoredTree::open(self, &self.resolve_band_id(band_selection)?)
     }
 
@@ -192,7 +194,7 @@ impl Archive {
     }
 
     /// Return the last completely-written band id, if any.
-    pub fn last_complete_band(&self) -> Result<Option<Band>> {
+    pub fn last_complete_band(&self) -> anyhow::Result<Option<Band>> {
         for id in self.list_band_ids()?.iter().rev() {
             let b = Band::open(self, id)?;
             if b.is_closed()? {
@@ -336,7 +338,7 @@ impl Archive {
     /// If problems are found, they are emitted as `warn` or `error` level
     /// tracing messages. This function only returns an error if validation
     /// stops due to a fatal error.
-    pub fn validate(&self, options: &ValidateOptions) -> Result<()> {
+    pub fn validate(&self, options: &ValidateOptions) -> anyhow::Result<()> {
         self.validate_archive_dir()?;
 
         debug!("List bands...");
