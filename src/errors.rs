@@ -19,29 +19,12 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
-use crate::blockdir::Address;
 use crate::*;
 
 /// Conserve specific error.
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Block file {hash:?} corrupt; actual hash {actual_hash:?}")]
-    BlockCorrupt { hash: String, actual_hash: String },
-
-    #[error("{address:?} extends beyond decompressed block length {actual_len:?}")]
-    AddressTooLong { address: Address, actual_len: usize },
-
-    // TODO: Merge with AddressTooLong
-    #[error(
-        "block {block_hash} actual length is {actual_len} but indexes reference {referenced_len}"
-    )]
-    ShortBlock {
-        block_hash: BlockHash,
-        actual_len: usize,
-        referenced_len: u64,
-    },
-
     #[error("Failed to write block {hash:?}")]
     WriteBlock { hash: String, source: io::Error },
 

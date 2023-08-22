@@ -14,8 +14,8 @@
 //!
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
-use std::io;
 use std::path::Path;
+use std::{fmt, io};
 
 use anyhow::bail;
 use bytes::Bytes;
@@ -114,7 +114,7 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// then renamed.
     ///
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
-    fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()>;
+    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
 
     /// Get metadata about a file.
     fn metadata(&self, relpath: &str) -> anyhow::Result<Metadata>;
@@ -163,3 +163,52 @@ pub struct ListDirNames {
     pub files: Vec<String>,
     pub dirs: Vec<String>,
 }
+
+/// A transport error, as a generalization of IO errors.
+#[derive(Debug)]
+pub struct Error {
+    url: Url,
+    kind: ErrorKind,
+    source: Option<anyhow::Error>,
+}
+
+impl Error {
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+
+    pub(self) fn io_error(path: &Path, source: io::Error) -> Error {
+        let kind = match source.kind() {
+            io::ErrorKind::NotFound => ErrorKind::NotFound,
+            io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
+            _ => ErrorKind::Other,
+        };
+        Error {
+            url: Url::from_file_path(path).expect("Convert path to URL"),
+            kind,
+            source: Some(source.into()),
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // source is not in the short format; maybe should be in the alternate format?
+        format!("{kind:?}: {url}", kind = self.kind, url = self.url).fmt(f)
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.source.as_ref().map(|e| e.as_ref())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ErrorKind {
+    NotFound,
+    AlreadyExists,
+    Other,
+}
+
+type Result<T> = std::result::Result<T, Error>;

@@ -63,15 +63,15 @@ pub trait ReadTree {
 /// shouldn't assume the size.
 pub trait ReadBlocks {
     /// Return a range of integers indexing the blocks (starting from 0.)
-    fn num_blocks(&self) -> Result<usize>;
+    fn num_blocks(&self) -> anyhow::Result<usize>;
 
-    fn block_range(&self) -> Result<Range<usize>> {
+    fn block_range(&self) -> anyhow::Result<Range<usize>> {
         Ok(0..self.num_blocks()?)
     }
 
     /// Read one block and return it as a byte vec. Also returns the compressed and uncompressed
     /// sizes.
-    fn read_block(&self, i: usize) -> Result<(Vec<u8>, Sizes)>;
+    fn read_block(&self, i: usize) -> anyhow::Result<(Vec<u8>, Sizes)>;
 }
 
 /// The measured size of a tree.

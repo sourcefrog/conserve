@@ -30,7 +30,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use ::metrics::{counter, histogram, increment_counter};
-use anyhow::Context;
+use anyhow::{bail, Context};
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
@@ -114,7 +114,11 @@ impl BlockDir {
     }
 
     /// Returns the number of compressed bytes.
-    pub(crate) fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
+    pub(crate) fn compress_and_store(
+        &mut self,
+        in_buf: &[u8],
+        hash: &BlockHash,
+    ) -> anyhow::Result<u64> {
         // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
         let mut compressor = Compressor::new();
         let uncomp_len = in_buf.len() as u64;
@@ -130,16 +134,13 @@ impl BlockDir {
         histogram!("conserve.block.write_compressed_bytes", comp_len as f64);
         self.transport
             .write_file(&relpath, compressed)
-            .or_else(|io_err| {
-                if io_err.kind() == io::ErrorKind::AlreadyExists {
+            .or_else(|err| {
+                if err.kind() == transport::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
                     debug!("Unexpected late detection of existing block {hex_hash:?}");
                     Ok(())
                 } else {
-                    Err(Error::WriteBlock {
-                        hash: hex_hash,
-                        source: io_err,
-                    })
+                    Err(err).with_context(|| format!("Failed to write block {hex_hash:?}"))
                 }
             })?;
         Ok(comp_len)
@@ -181,16 +182,15 @@ impl BlockDir {
     /// Read back the contents of a block, as a byte array.
     ///
     /// To read a whole file, use StoredFile instead.
-    pub fn get(&self, address: &Address) -> Result<(Vec<u8>, Sizes)> {
+    pub fn get(&self, address: &Address) -> anyhow::Result<(Vec<u8>, Sizes)> {
         let (mut decompressed, sizes) = self.get_block_content(&address.hash)?;
         let len = address.len as usize;
         let start = address.start as usize;
         let actual_len = decompressed.len();
         if (start + len) > actual_len {
-            return Err(Error::AddressTooLong {
-                address: address.to_owned(),
-                actual_len,
-            });
+            bail!("Block {address:?} is only {actual_len} bytes long but address references range {start}..{end}",
+                start = start,
+                end = start + len);
         }
         if start != 0 {
             let trimmed = decompressed[start..(start + len)].to_owned();
@@ -316,20 +316,17 @@ impl BlockDir {
     /// Return the entire contents of the block.
     ///
     /// Checks that the hash is correct with the contents.
-    pub fn get_block_content(&self, hash: &BlockHash) -> Result<(Vec<u8>, Sizes)> {
+    pub fn get_block_content(&self, hash: &BlockHash) -> anyhow::Result<(Vec<u8>, Sizes)> {
         // TODO: Reuse decompressor buffer.
         // TODO: Reuse read buffer.
         // TODO: Most importantly, cache decompressed blocks!
         increment_counter!("conserve.block.read");
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
-        let compressed_bytes =
-            self.transport
-                .read_file(&block_relpath)
-                .map_err(|source| Error::ReadBlock {
-                    source,
-                    hash: hash.to_string(),
-                })?;
+        let compressed_bytes = self
+            .transport
+            .read_file(&block_relpath)
+            .with_context(|| format!("Failed to read block {hash}"))?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::from(blake2b::blake2b(
             BLAKE_HASH_SIZE_BYTES,
@@ -337,11 +334,8 @@ impl BlockDir {
             decompressed_bytes,
         ));
         if actual_hash != *hash {
-            error!("Block file {block_relpath:?} has actual decompressed hash {actual_hash}");
-            return Err(Error::BlockCorrupt {
-                hash: hash.to_string(),
-                actual_hash: actual_hash.to_string(),
-            });
+            error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
+            bail!("Block file {block_relpath:?} has actual decompressed hash {actual_hash}");
         }
         let sizes = Sizes {
             uncompressed: decompressed_bytes.len() as u64,

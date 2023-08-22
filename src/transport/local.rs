@@ -98,7 +98,7 @@ impl Transport for LocalTransport {
         })
     }
 
-    fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()> {
+    fn write_file(&self, relpath: &str, content: &[u8]) -> super::Result<()> {
         increment_counter!("conserve.local_transport.write_files");
         counter!(
             "conserve.local_transport.write_file_bytes",
@@ -106,16 +106,18 @@ impl Transport for LocalTransport {
         );
         let full_path = self.full_path(relpath);
         let dir = full_path.parent().unwrap();
+        let context = |err| super::Error::io_error(&full_path, err);
         let mut temp = tempfile::Builder::new()
             .prefix(crate::TMP_PREFIX)
-            .tempfile_in(dir)?;
+            .tempfile_in(dir)
+            .map_err(context)?;
         if let Err(err) = temp.write_all(content) {
             let _ = temp.close();
-            return Err(err);
+            return Err(context(err));
         }
         if let Err(persist_error) = temp.persist(&full_path) {
-            persist_error.file.close()?;
-            Err(persist_error.error)
+            persist_error.file.close().map_err(context)?;
+            Err(context(persist_error.error))
         } else {
             Ok(())
         }
