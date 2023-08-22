@@ -38,7 +38,7 @@ impl ProgressImpl {
         *IMPL.write().expect("locked progress impl") = self
     }
 
-    fn remove_bar(&mut self, task: &mut Bar) {
+    fn remove_bar(&mut self, task: &Bar) {
         match self {
             ProgressImpl::Null => (),
             ProgressImpl::Terminal => term::remove_bar(task.bar_id),

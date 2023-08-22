@@ -62,7 +62,7 @@ pub(crate) fn set_owner(owner: &Owner, path: &Path) -> Result<()> {
     // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
     match unistd::chown(path, uid_opt, gid_opt) {
         Ok(()) => Ok(()),
-        Err(errno) if errno == Errno::EPERM => {
+        Err(Errno::EPERM) => {
             // If the restore is not run as root (or with special capabilities)
             // then we probably can't set ownership, and there's no point
             // complaining
