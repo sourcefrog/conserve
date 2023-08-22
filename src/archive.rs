@@ -250,7 +250,7 @@ impl Archive {
         &self,
         delete_band_ids: &[BandId],
         options: &DeleteOptions,
-    ) -> Result<DeleteStats> {
+    ) -> anyhow::Result<DeleteStats> {
         let mut stats = DeleteStats::default();
         let start = Instant::now();
 

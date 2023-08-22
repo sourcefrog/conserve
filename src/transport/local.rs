@@ -18,6 +18,7 @@ use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
+use anyhow::Context;
 use bytes::Bytes;
 use metrics::{counter, increment_counter};
 
@@ -122,12 +123,12 @@ impl Transport for LocalTransport {
         std::fs::remove_file(self.full_path(relpath))
     }
 
-    fn remove_dir(&self, relpath: &str) -> io::Result<()> {
-        std::fs::remove_dir(self.full_path(relpath))
+    fn remove_dir(&self, relpath: &str) -> anyhow::Result<()> {
+        std::fs::remove_dir(self.full_path(relpath)).context("Remove directory")
     }
 
-    fn remove_dir_all(&self, relpath: &str) -> io::Result<()> {
-        std::fs::remove_dir_all(self.full_path(relpath))
+    fn remove_dir_all(&self, relpath: &str) -> anyhow::Result<()> {
+        std::fs::remove_dir_all(self.full_path(relpath)).context("Remove directory tree")
     }
 
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport> {
@@ -305,7 +306,7 @@ mod test {
     }
 
     #[test]
-    fn remove_dir_all() -> std::io::Result<()> {
+    fn remove_dir_all() -> anyhow::Result<()> {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = LocalTransport::new(temp.path());
 

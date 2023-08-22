@@ -17,6 +17,7 @@
 use std::io;
 use std::path::Path;
 
+use anyhow::bail;
 use bytes::Bytes;
 use url::Url;
 
@@ -28,7 +29,7 @@ use local::LocalTransport;
 /// Open a `Transport` to access a local directory.
 ///
 /// `s` may be a local path or a URL.
-pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
+pub fn open_transport(s: &str) -> anyhow::Result<Box<dyn Transport>> {
     if let Ok(url) = Url::parse(s) {
         match url.scheme() {
             "file" => Ok(Box::new(LocalTransport::new(
@@ -38,9 +39,7 @@ pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Box::new(LocalTransport::new(Path::new(s))))
             }
-            other => Err(Error::UrlScheme {
-                scheme: other.to_owned(),
-            }),
+            other => bail!("Unsupported URL scheme {other:?}"),
         }
     } else {
         Ok(Box::new(LocalTransport::new(Path::new(s))))
@@ -136,10 +135,10 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     fn remove_file(&self, relpath: &str) -> io::Result<()>;
 
     /// Delete an empty directory.
-    fn remove_dir(&self, relpath: &str) -> io::Result<()>;
+    fn remove_dir(&self, relpath: &str) -> anyhow::Result<()>;
 
     /// Delete a directory and all its contents.
-    fn remove_dir_all(&self, relpath: &str) -> io::Result<()>;
+    fn remove_dir_all(&self, relpath: &str) -> anyhow::Result<()>;
 
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;

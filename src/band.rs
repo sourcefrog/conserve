@@ -23,6 +23,7 @@
 
 use std::borrow::Cow;
 
+use anyhow::Context;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -214,15 +215,12 @@ impl Band {
     }
 
     /// Delete a band.
-    pub fn delete(archive: &Archive, band_id: &BandId) -> Result<()> {
+    pub fn delete(archive: &Archive, band_id: &BandId) -> anyhow::Result<()> {
         // TODO: Count how many files were deleted, and the total size?
         archive
             .transport()
             .remove_dir_all(&band_id.to_string())
-            .map_err(|source| Error::BandDeletion {
-                band_id: band_id.clone(),
-                source,
-            })
+            .with_context(|| format!("Failed to delete band {band_id}"))
     }
 
     pub fn is_closed(&self) -> Result<bool> {
