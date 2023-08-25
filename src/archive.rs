@@ -27,7 +27,6 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, warn};
 
 use crate::blockhash::BlockHash;
-use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::progress::{Bar, Progress};
@@ -69,7 +68,9 @@ impl Archive {
         transport
             .create_dir("")
             .context("Failed to create archive directory")?;
-        let names = transport.list_dir_names("").map_err(Error::from)?;
+        let names = transport
+            .list_dir_names("")
+            .context("Failed to list new archive directory")?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
             bail!("New archive directory is not empty");
         }
@@ -135,7 +136,7 @@ impl Archive {
     }
 
     /// Returns a vector of band ids, in sorted order from first to last.
-    pub fn list_band_ids(&self) -> Result<Vec<BandId>> {
+    pub fn list_band_ids(&self) -> anyhow::Result<Vec<BandId>> {
         let mut band_ids: Vec<BandId> = self.iter_band_ids_unsorted()?.collect();
         band_ids.sort_unstable();
         Ok(band_ids)
@@ -166,13 +167,13 @@ impl Archive {
     /// Return an iterator of valid band ids in this archive, in arbitrary order.
     ///
     /// Errors reading the archive directory are logged and discarded.
-    fn iter_band_ids_unsorted(&self) -> Result<impl Iterator<Item = BandId>> {
+    fn iter_band_ids_unsorted(&self) -> anyhow::Result<impl Iterator<Item = BandId>> {
         // This doesn't check for extraneous files or directories, which should be a weird rare
         // problem. Validate does.
         Ok(self
             .transport
             .list_dir_names("")
-            .map_err(|source| Error::ListBands { source })?
+            .context("Failed to list archive directory")?
             .dirs
             .into_iter()
             .filter(|dir_name| dir_name != BLOCK_DIR)
@@ -181,7 +182,7 @@ impl Archive {
 
     /// Return the `BandId` of the highest-numbered band, or Ok(None) if there
     /// are no bands, or an Err if any occurred reading the directory.
-    pub fn last_band_id(&self) -> Result<Option<BandId>> {
+    pub fn last_band_id(&self) -> anyhow::Result<Option<BandId>> {
         Ok(self.iter_band_ids_unsorted()?.max())
     }
 
@@ -228,7 +229,7 @@ impl Archive {
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
-    pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
+    pub fn unreferenced_blocks(&self) -> anyhow::Result<impl Iterator<Item = BlockHash>> {
         let referenced = self.referenced_blocks(&self.list_band_ids()?)?;
         Ok(self
             .block_dir()
@@ -375,14 +376,14 @@ impl Archive {
         Ok(())
     }
 
-    fn validate_archive_dir(&self) -> Result<()> {
+    fn validate_archive_dir(&self) -> anyhow::Result<()> {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
         for entry_result in self
             .transport
             .iter_dir_entries("")
-            .map_err(|source| Error::ListBands { source })?
+            .context("Failed to list archive directory")?
         {
             match entry_result {
                 Ok(DirEntry {

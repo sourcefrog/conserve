@@ -25,37 +25,6 @@ use crate::*;
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to write block {hash:?}")]
-    WriteBlock { hash: String, source: io::Error },
-
-    #[error("Failed to read block {hash:?}")]
-    ReadBlock { hash: String, source: io::Error },
-
-    #[error("Block {block_hash} is missing")]
-    BlockMissing { block_hash: BlockHash },
-
-    #[error("Failed to list block files")]
-    ListBlocks { source: io::Error },
-
-    #[error("Not a Conserve archive")]
-    NotAnArchive {},
-
-    #[error("Failed to read archive header")]
-    ReadArchiveHeader { source: io::Error },
-
-    #[error(
-        "Archive version {:?} is not supported by Conserve {}",
-        version,
-        crate::version()
-    )]
-    UnsupportedArchiveVersion { version: String },
-
-    #[error(
-        "Band version {version:?} in {band_id} is not supported by Conserve {}",
-        crate::version()
-    )]
-    UnsupportedBandVersion { band_id: BandId, version: String },
-
     #[error(
         "Band {band_id} has feature flags {unsupported_flags:?} \
         not supported by Conserve {conserve_version}",
@@ -68,9 +37,6 @@ pub enum Error {
 
     #[error("Destination directory not empty: {:?}", path)]
     DestinationNotEmpty { path: PathBuf },
-
-    #[error("Archive has no bands")]
-    ArchiveEmpty,
 
     #[error("Directory for new archive is not empty")]
     NewArchiveDirectoryNotEmpty,
@@ -146,9 +112,6 @@ pub enum Error {
 
     #[error("Metadata file not found: {:?}", path)]
     MetadataNotFound { path: String, source: io::Error },
-
-    #[error("Failed to list bands")]
-    ListBands { source: io::Error },
 
     #[error("Failed to read source file {:?}", path)]
     ReadSourceFile { path: PathBuf, source: io::Error },
