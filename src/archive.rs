@@ -66,9 +66,7 @@ impl Archive {
 
     /// Make a new archive in a new directory accessed by a Transport.
     pub fn create(transport: Box<dyn Transport>) -> Result<Archive> {
-        transport
-            .create_dir("")
-            .map_err(|source| Error::CreateArchiveDirectory { source })?;
+        transport.create_dir("")?;
         let names = transport.list_dir_names("").map_err(Error::from)?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
             return Err(Error::NewArchiveDirectoryNotEmpty);

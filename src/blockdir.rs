@@ -104,9 +104,7 @@ impl BlockDir {
     }
 
     pub fn create(transport: Box<dyn Transport>) -> Result<BlockDir> {
-        transport
-            .create_dir("")
-            .map_err(|source| Error::CreateBlockDir { source })?;
+        transport.create_dir("")?;
         Ok(BlockDir {
             transport: Arc::from(transport),
         })

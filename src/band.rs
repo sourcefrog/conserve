@@ -144,8 +144,7 @@ impl Band {
         let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
         transport
             .create_dir("")
-            .and_then(|()| transport.create_dir(INDEX_DIR))
-            .map_err(|source| Error::CreateBand { source })?;
+            .and_then(|()| transport.create_dir(INDEX_DIR))?;
         let band_format_version = if format_flags.is_empty() {
             Some("0.6.3".to_owned())
         } else {

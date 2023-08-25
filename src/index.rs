@@ -258,9 +258,7 @@ impl IndexWriter {
         let json =
             serde_json::to_vec(&self.entries).map_err(|source| Error::SerializeIndex { source })?;
         if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
-            self.transport
-                .create_dir(&subdir_relpath(self.sequence))
-                .map_err(write_error)?;
+            self.transport.create_dir(&subdir_relpath(self.sequence))?;
         }
         let compressed_bytes = self.compressor.compress(&json)?;
         self.transport

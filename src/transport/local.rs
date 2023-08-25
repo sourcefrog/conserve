@@ -85,12 +85,13 @@ impl Transport for LocalTransport {
         Ok(self.full_path(relpath).is_dir())
     }
 
-    fn create_dir(&self, relpath: &str) -> io::Result<()> {
-        create_dir(self.full_path(relpath)).or_else(|err| {
+    fn create_dir(&self, relpath: &str) -> super::Result<()> {
+        let path = self.full_path(relpath);
+        create_dir(&path).or_else(|err| {
             if err.kind() == io::ErrorKind::AlreadyExists {
                 Ok(())
             } else {
-                Err(err)
+                Err(super::Error::io_error(&path, err))
             }
         })
     }
@@ -305,15 +306,14 @@ mod test {
     }
 
     #[test]
-    fn remove_dir_all() -> std::io::Result<()> {
+    fn remove_dir_all() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = LocalTransport::new(temp.path());
 
-        transport.create_dir("aaa")?;
-        transport.create_dir("aaa/bbb")?;
-        transport.create_dir("aaa/bbb/ccc")?;
+        transport.create_dir("aaa").unwrap();
+        transport.create_dir("aaa/bbb").unwrap();
+        transport.create_dir("aaa/bbb/ccc").unwrap();
 
-        transport.remove_dir_all("aaa")?;
-        Ok(())
+        transport.remove_dir_all("aaa").unwrap();
     }
 }

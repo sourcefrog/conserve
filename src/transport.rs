@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Martin Pool.
+// Copyright 2020, 2021, 2022, 2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,9 +15,10 @@
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
 use std::path::Path;
-use std::{error, fmt, io};
+use std::{error, fmt, io, result};
 
 use bytes::Bytes;
+use derive_more::Display;
 use url::Url;
 
 use crate::*;
@@ -118,7 +119,7 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// If the directory already exists, it's not an error.
     ///
     /// This function does not create missing parent directories.
-    fn create_dir(&self, relpath: &str) -> io::Result<()>;
+    fn create_dir(&self, relpath: &str) -> Result<()>;
 
     /// Write a complete file.
     ///
@@ -186,11 +187,16 @@ pub struct Error {
     pub source: Option<ErrorSource>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+/// General categories of transport errors.
+#[derive(Debug, Display, PartialEq, Eq, Clone, Copy)]
 pub enum ErrorKind {
-    // TODO: Manual Display, or maybe use a macro crate?
+    #[display(fmt = "Not found")]
     NotFound,
+    #[display(fmt = "Already exists")]
     AlreadyExists,
+    #[display(fmt = "Permission denied")]
+    PermissionDenied,
+    #[display(fmt = "Other transport error")]
     Other,
 }
 
@@ -209,6 +215,7 @@ impl Error {
         let kind = match source.kind() {
             io::ErrorKind::NotFound => ErrorKind::NotFound,
             io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
+            io::ErrorKind::PermissionDenied => ErrorKind::PermissionDenied,
             _ => ErrorKind::Other,
         };
         Error {
@@ -222,12 +229,12 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // source is not in the short format; maybe should be in the alternate format?
-        format!("{kind:?}: {url}", kind = self.kind, url = self.url).fmt(f)
+        format!("{kind}: {url}", kind = self.kind, url = self.url).fmt(f)
     }
 }
 
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self.source {
             Some(ErrorSource::Io(ref e)) => Some(e),
             // Some(ErrorSource::S3(ref e)) => Some(e),
@@ -236,10 +243,4 @@ impl std::error::Error for Error {
     }
 }
 
-type Result<T> = std::result::Result<T, Error>;
-
-// impl From<Error> for crate::Error {
-//     fn from(e: Error) -> Self {
-//         crate::Error:source:Transport { source: e }
-//     }
-// }
+type Result<T> = result::Result<T, Error>;
