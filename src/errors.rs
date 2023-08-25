@@ -219,4 +219,10 @@ pub enum Error {
         #[from]
         source: snap::Error,
     },
+
+    #[error(transparent)]
+    Transport {
+        #[from]
+        source: transport::Error,
+    },
 }

@@ -183,7 +183,21 @@ pub struct Error {
     pub url: Url,
     pub kind: ErrorKind,
     /// Might be for example an IO error or S3 error.
-    pub source: Option<Box<dyn error::Error + 'static>>,
+    pub source: Option<ErrorSource>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ErrorKind {
+    // TODO: Manual Display, or maybe use a macro crate?
+    NotFound,
+    AlreadyExists,
+    Other,
+}
+
+#[derive(Debug)]
+pub enum ErrorSource {
+    Io(io::Error),
+    // S3(s3::Error),
 }
 
 impl Error {
@@ -200,7 +214,7 @@ impl Error {
         Error {
             url: Url::from_file_path(path).expect("Convert path to URL"),
             kind,
-            source: Some(source.into()),
+            source: Some(ErrorSource::Io(source)),
         }
     }
 }
@@ -214,16 +228,18 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.source.as_ref().map(|e| e.as_ref())
+        match self.source {
+            Some(ErrorSource::Io(ref e)) => Some(e),
+            // Some(ErrorSource::S3(ref e)) => Some(e),
+            None => None,
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum ErrorKind {
-    // TODO: Manual Display, or maybe use a macro crate?
-    NotFound,
-    AlreadyExists,
-    Other,
-}
-
 type Result<T> = std::result::Result<T, Error>;
+
+// impl From<Error> for crate::Error {
+//     fn from(e: Error) -> Self {
+//         crate::Error:source:Transport { source: e }
+//     }
+// }
