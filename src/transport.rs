@@ -14,8 +14,8 @@
 //!
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
-use std::io;
 use std::path::Path;
+use std::{error, fmt, io};
 
 use bytes::Bytes;
 use url::Url;
@@ -28,7 +28,7 @@ use local::LocalTransport;
 /// Open a `Transport` to access a local directory.
 ///
 /// `s` may be a local path or a URL.
-pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
+pub fn open_transport(s: &str) -> crate::Result<Box<dyn Transport>> {
     if let Ok(url) = Url::parse(s) {
         match url.scheme() {
             "file" => Ok(Box::new(LocalTransport::new(
@@ -38,7 +38,7 @@ pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Box::new(LocalTransport::new(Path::new(s))))
             }
-            other => Err(Error::UrlScheme {
+            other => Err(crate::Error::UrlScheme {
                 scheme: other.to_owned(),
             }),
         }
@@ -176,3 +176,54 @@ pub struct ListDirNames {
     pub files: Vec<String>,
     pub dirs: Vec<String>,
 }
+
+/// A transport error, as a generalization of IO errors.
+#[derive(Debug)]
+pub struct Error {
+    pub url: Url,
+    pub kind: ErrorKind,
+    /// Might be for example an IO error or S3 error.
+    pub source: Option<Box<dyn error::Error + 'static>>,
+}
+
+impl Error {
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+
+    pub(self) fn io_error(path: &Path, source: io::Error) -> Error {
+        let kind = match source.kind() {
+            io::ErrorKind::NotFound => ErrorKind::NotFound,
+            io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
+            _ => ErrorKind::Other,
+        };
+        Error {
+            url: Url::from_file_path(path).expect("Convert path to URL"),
+            kind,
+            source: Some(source.into()),
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // source is not in the short format; maybe should be in the alternate format?
+        format!("{kind:?}: {url}", kind = self.kind, url = self.url).fmt(f)
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.source.as_ref().map(|e| e.as_ref())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ErrorKind {
+    // TODO: Manual Display, or maybe use a macro crate?
+    NotFound,
+    AlreadyExists,
+    Other,
+}
+
+type Result<T> = std::result::Result<T, Error>;
