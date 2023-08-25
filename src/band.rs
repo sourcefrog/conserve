@@ -218,9 +218,11 @@ impl Band {
         archive
             .transport()
             .remove_dir_all(&band_id.to_string())
-            .map_err(|source| Error::BandDeletion {
-                band_id: band_id.clone(),
-                source,
+            .map_err(|err| match err.kind {
+                transport::ErrorKind::NotFound => Error::BandNotFound {
+                    band_id: band_id.clone(),
+                },
+                _ => Error::from(err),
             })
     }
 

@@ -164,6 +164,9 @@ pub enum Error {
     #[error("Metadata file not found: {:?}", path)]
     MetadataNotFound { path: String, source: io::Error },
 
+    #[error("Band not found: {band_id}")]
+    BandNotFound { band_id: BandId },
+
     #[error("Failed to list bands")]
     ListBands { source: io::Error },
 
