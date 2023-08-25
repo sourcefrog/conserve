@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use bytes::Bytes;
 use metrics::{counter, increment_counter};
 
-use crate::transport::{DirEntry, Metadata, Transport};
+use super::{DirEntry, Error, Metadata, Result, Transport};
 
 #[derive(Clone, Debug)]
 pub struct LocalTransport {
@@ -75,12 +75,12 @@ impl Transport for LocalTransport {
         Ok(out_buf.into())
     }
 
-    fn is_file(&self, relpath: &str) -> io::Result<bool> {
+    fn is_file(&self, relpath: &str) -> Result<bool> {
         increment_counter!("conserve.local_transport.metadata_reads");
         Ok(self.full_path(relpath).is_file())
     }
 
-    fn is_dir(&self, relpath: &str) -> io::Result<bool> {
+    fn is_dir(&self, relpath: &str) -> Result<bool> {
         increment_counter!("conserve.local_transport.metadata_reads");
         Ok(self.full_path(relpath).is_dir())
     }
@@ -119,8 +119,9 @@ impl Transport for LocalTransport {
         }
     }
 
-    fn remove_file(&self, relpath: &str) -> io::Result<()> {
-        std::fs::remove_file(self.full_path(relpath))
+    fn remove_file(&self, relpath: &str) -> super::Result<()> {
+        let path = self.full_path(relpath);
+        std::fs::remove_file(&path).map_err(|err| super::Error::io_error(&path, err))
     }
 
     fn remove_dir(&self, relpath: &str) -> super::Result<()> {
@@ -139,9 +140,10 @@ impl Transport for LocalTransport {
         })
     }
 
-    fn metadata(&self, relpath: &str) -> io::Result<Metadata> {
+    fn metadata(&self, relpath: &str) -> Result<Metadata> {
         increment_counter!("conserve.local_transport.metadata_reads");
-        let fsmeta = self.root.join(relpath).metadata()?;
+        let path = self.root.join(relpath);
+        let fsmeta = path.metadata().map_err(|err| Error::io_error(&path, err))?;
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),

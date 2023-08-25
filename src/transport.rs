@@ -97,19 +97,19 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     fn read_file(&self, path: &str) -> io::Result<Bytes>;
 
     /// Check if a directory exists.
-    fn is_dir(&self, path: &str) -> io::Result<bool> {
+    fn is_dir(&self, path: &str) -> Result<bool> {
         match self.metadata(path) {
             Ok(metadata) => Ok(metadata.kind == Kind::Dir),
-            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
             Err(err) => Err(err),
         }
     }
 
     /// Check if a regular file exists.
-    fn is_file(&self, path: &str) -> io::Result<bool> {
+    fn is_file(&self, path: &str) -> Result<bool> {
         match self.metadata(path) {
             Ok(metadata) => Ok(metadata.kind == Kind::File),
-            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
             Err(err) => Err(err),
         }
     }
@@ -131,10 +131,10 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()>;
 
     /// Get metadata about a file.
-    fn metadata(&self, relpath: &str) -> io::Result<Metadata>;
+    fn metadata(&self, relpath: &str) -> Result<Metadata>;
 
     /// Delete a file.
-    fn remove_file(&self, relpath: &str) -> io::Result<()>;
+    fn remove_file(&self, relpath: &str) -> self::Result<()>;
 
     /// Delete an empty directory.
     fn remove_dir(&self, relpath: &str) -> self::Result<()>;

@@ -191,9 +191,6 @@ pub enum Error {
     #[error("Failed to restore modification time on {:?}", path)]
     RestoreModificationTime { path: PathBuf, source: io::Error },
 
-    #[error("Failed to delete band {}", band_id)]
-    BandDeletion { band_id: BandId, source: io::Error },
-
     #[error("Unsupported URL scheme {:?}", scheme)]
     UrlScheme { scheme: String },
 

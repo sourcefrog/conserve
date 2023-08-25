@@ -310,11 +310,7 @@ impl IndexRead {
         // one hunk being missing.
         for i in 0.. {
             let path = hunk_relpath(i);
-            if !self
-                .transport
-                .is_file(&path)
-                .map_err(|source| Error::ReadIndex { source, path })?
-            {
+            if !self.transport.is_file(&path)? {
                 // If hunk 1 is missing, 1 hunks exists.
                 return Ok(i);
             }
