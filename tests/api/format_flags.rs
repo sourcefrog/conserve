@@ -3,8 +3,6 @@
 
 //! Tests for per-band format flags.
 
-use assert_matches::assert_matches;
-
 use conserve::test_fixtures::ScratchArchive;
 use conserve::*;
 
@@ -49,9 +47,8 @@ fn unknown_format_flag_fails_to_open() {
         .unwrap();
 
     let err = Band::open(&af, &BandId::zero()).unwrap_err();
-    println!("{err}");
-    assert_matches!(err, Error::UnsupportedBandFormatFlags { .. });
-    assert!(err
-        .to_string()
-        .starts_with(r#"Band b0000 has feature flags ["wibble"] not supported by Conserve "#));
+    assert_eq!(
+        err.to_string(),
+        "Unsupported band format flags [\"wibble\"] in b0000"
+    )
 }

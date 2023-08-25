@@ -23,7 +23,7 @@
 
 use std::borrow::Cow;
 
-use anyhow::Context;
+use anyhow::{ensure, Context};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -128,14 +128,14 @@ impl Band {
     /// Make a new band (and its on-disk directory).
     ///
     /// The Band gets the next id after those that already exist.
-    pub fn create(archive: &Archive) -> Result<Band> {
+    pub fn create(archive: &Archive) -> anyhow::Result<Band> {
         Band::create_with_flags(archive, flags::DEFAULT)
     }
 
     pub fn create_with_flags(
         archive: &Archive,
         format_flags: &[Cow<'static, str>],
-    ) -> Result<Band> {
+    ) -> anyhow::Result<Band> {
         format_flags
             .iter()
             .for_each(|f| assert!(flags::SUPPORTED.contains(&f.as_ref()), "unknown flag {f:?}"));
@@ -146,7 +146,7 @@ impl Band {
         transport
             .create_dir("")
             .and_then(|()| transport.create_dir(INDEX_DIR))
-            .map_err(|source| Error::CreateBand { source })?;
+            .context("Failed to create band directory")?;
         let band_format_version = if format_flags.is_empty() {
             Some("0.6.3".to_owned())
         } else {
@@ -157,7 +157,7 @@ impl Band {
             band_format_version,
             format_flags: format_flags.into(),
         };
-        write_json(&transport, BAND_HEAD_FILENAME, &head)?;
+        write_json(&transport, BAND_HEAD_FILENAME, &head).context("Failed to write band header")?;
         Ok(Band {
             band_id,
             head,
@@ -166,7 +166,7 @@ impl Band {
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(&self, index_hunk_count: u64) -> Result<()> {
+    pub fn close(&self, index_hunk_count: u64) -> anyhow::Result<()> {
         write_json(
             &self.transport,
             BAND_TAIL_FILENAME,
@@ -175,19 +175,18 @@ impl Band {
                 index_hunk_count: Some(index_hunk_count),
             },
         )
+        .context("Failed to write band tail")
     }
 
     /// Open the band with the given id.
-    pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
+    pub fn open(archive: &Archive, band_id: &BandId) -> anyhow::Result<Band> {
         let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
         let head: Head = read_json(&transport, BAND_HEAD_FILENAME)?;
         if let Some(version) = &head.band_format_version {
-            if !band_version_supported(version) {
-                return Err(Error::UnsupportedBandVersion {
-                    band_id: band_id.to_owned(),
-                    version: version.to_owned(),
-                });
-            }
+            ensure!(
+                band_version_supported(version),
+                "Unsupported band version {version:?} in {band_id}"
+            );
         } else {
             debug!("Old(?) band {band_id} has no format version");
             // Unmarked, old bands, are accepted for now. In the next archive
@@ -200,13 +199,10 @@ impl Band {
             .filter(|f| !flags::SUPPORTED.contains(&f.as_ref()))
             .cloned()
             .collect_vec();
-        if !unsupported_flags.is_empty() {
-            return Err(Error::UnsupportedBandFormatFlags {
-                band_id: band_id.clone(),
-                unsupported_flags,
-            });
-        }
-
+        ensure!(
+            unsupported_flags.is_empty(),
+            "Unsupported band format flags {unsupported_flags:?} in {band_id}"
+        );
         Ok(Band {
             band_id: band_id.to_owned(),
             head,
@@ -251,17 +247,19 @@ impl Band {
     }
 
     /// Return info about the state of this band.
-    pub fn get_info(&self) -> Result<Info> {
+    pub fn get_info(&self) -> anyhow::Result<Info> {
         let tail_option: Option<Tail> = match read_json(&self.transport, BAND_TAIL_FILENAME) {
             Ok(tail) => Some(tail),
-            Err(Error::MetadataNotFound { .. }) => None,
-            Err(err) => return Err(err),
+            Err(jsonio::Error::NotFound { .. }) => None,
+            Err(err) => return Err(err.into()),
         };
         let start_time = OffsetDateTime::from_unix_timestamp(self.head.start_time)
-            .expect("invalid band start timestamp");
-        let end_time = tail_option.as_ref().map(|tail| {
-            OffsetDateTime::from_unix_timestamp(tail.end_time).expect("invalid end timestamp")
-        });
+            .context("invalid band start timestamp {self.head.start_time:?}")?;
+        let end_time = tail_option
+            .as_ref()
+            .map(|tail| OffsetDateTime::from_unix_timestamp(tail.end_time))
+            .transpose()
+            .context("invalid end timestamp {tail.end_time:?}")?;
         Ok(Info {
             id: self.band_id.clone(),
             is_closed: tail_option.is_some(),
@@ -361,7 +359,7 @@ mod tests {
         let e = Band::open(&af, &BandId::zero());
         let e_str = e.unwrap_err().to_string();
         assert!(
-            e_str.contains("Band version \"8888.8.8\" in"),
+            e_str.contains("Unsupported band version \"8888.8.8\" in b0000"),
             "bad band version: {e_str:#?}"
         );
     }

@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by

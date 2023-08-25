@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2018, 2020 Martin Pool.
+// Copyright 2015, 2016, 2018, 2020, 2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,12 +14,41 @@
 //! Read and write JSON files.
 
 use std::io;
+use std::path::PathBuf;
 
 use serde::de::DeserializeOwned;
 
-use crate::errors::Error;
-use crate::transport::Transport;
-use crate::Result;
+use crate::transport::{self, Transport};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("File not found: {path:?}")]
+    NotFound {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+
+    #[error("IO error")]
+    Io {
+        #[from]
+        source: io::Error,
+    },
+
+    #[error("JSON serialization error")]
+    Json {
+        #[from]
+        source: serde_json::Error,
+    },
+
+    #[error("Transport error")]
+    Transport {
+        #[from]
+        source: transport::Error,
+    },
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Write uncompressed json to a file on a Transport.
 pub(crate) fn write_json<T, TR>(transport: &TR, relpath: &str, obj: &T) -> Result<()>
@@ -27,18 +56,12 @@ where
     T: serde::Serialize,
     TR: AsRef<dyn Transport>,
 {
-    let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::SerializeJson {
-        path: relpath.to_string(),
-        source,
-    })?;
+    let mut s: String = serde_json::to_string(&obj)?;
     s.push('\n');
     transport
         .as_ref()
         .write_file(relpath, s.as_bytes())
-        .map_err(|source| Error::WriteMetadata {
-            path: relpath.to_owned(),
-            source,
-        })
+        .map_err(Error::from)
 }
 
 /// Read and deserialize uncompressed json from a Transport.
@@ -51,16 +74,13 @@ where
         .as_ref()
         .read_file(path)
         .map_err(|err| match err.kind() {
-            io::ErrorKind::NotFound => Error::MetadataNotFound {
-                path: path.to_owned(),
+            io::ErrorKind::NotFound => Error::NotFound {
+                path: PathBuf::from(path),
                 source: err,
             },
-            _ => err.into(),
+            _ => Error::from(err),
         })?;
-    serde_json::from_slice(&bytes).map_err(|source| Error::DeserializeJson {
-        source,
-        path: path.into(),
-    })
+    serde_json::from_slice(&bytes).map_err(Error::from)
 }
 
 #[cfg(test)]

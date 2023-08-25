@@ -23,7 +23,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
-use std::io;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;

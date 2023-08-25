@@ -81,7 +81,9 @@ fn clean_error_on_non_archive() {
         .arg(".")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Not a Conserve archive"));
+        .stderr(predicate::str::contains(
+            "Failed to read archive header (maybe this is not a Conserve archive?)",
+        ));
 }
 
 #[test]

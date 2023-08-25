@@ -204,7 +204,7 @@ impl std::error::Error for Error {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ErrorKind {
     NotFound,
     AlreadyExists,

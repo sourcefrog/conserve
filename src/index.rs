@@ -20,6 +20,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::vec;
 
+use anyhow::Context;
 use metrics::{counter, increment_counter};
 use time::OffsetDateTime;
 use tracing::error;
@@ -251,21 +252,17 @@ impl IndexWriter {
             self.check_order.check(&self.entries.last().unwrap().apath);
         }
         let relpath = hunk_relpath(self.sequence);
-        let write_error = |source| Error::WriteIndex {
-            path: relpath.clone(),
-            source,
-        };
         let json =
             serde_json::to_vec(&self.entries).map_err(|source| Error::SerializeIndex { source })?;
         if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
             self.transport
                 .create_dir(&subdir_relpath(self.sequence))
-                .map_err(write_error)?;
+                .context("Failed to create index subdir")?;
         }
         let compressed_bytes = self.compressor.compress(&json)?;
         self.transport
             .write_file(&relpath, compressed_bytes)
-            .map_err(write_error)?;
+            .context("Failed to write index hunk")?;
 
         self.stats.index_hunks += 1;
         self.stats.compressed_index_bytes += compressed_bytes.len() as u64;

@@ -14,14 +14,13 @@
 //! Archives holding backup material.
 
 use std::collections::{HashMap, HashSet};
-use std::io::ErrorKind;
 use std::path::Path;
 use std::sync::Arc;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, bail, ensure, Context};
 use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -61,18 +60,18 @@ pub struct DeleteOptions {
 
 impl Archive {
     /// Make a new archive in a local directory.
-    pub fn create_path(path: &Path) -> Result<Archive> {
+    pub fn create_path(path: &Path) -> anyhow::Result<Archive> {
         Archive::create(Box::new(LocalTransport::new(path)))
     }
 
     /// Make a new archive in a new directory accessed by a Transport.
-    pub fn create(transport: Box<dyn Transport>) -> Result<Archive> {
+    pub fn create(transport: Box<dyn Transport>) -> anyhow::Result<Archive> {
         transport
             .create_dir("")
-            .map_err(|source| Error::CreateArchiveDirectory { source })?;
+            .context("Failed to create archive directory")?;
         let names = transport.list_dir_names("").map_err(Error::from)?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
-            return Err(Error::NewArchiveDirectoryNotEmpty);
+            bail!("New archive directory is not empty");
         }
         let block_dir = BlockDir::create(transport.sub_transport(BLOCK_DIR))?;
         write_json(
@@ -91,25 +90,18 @@ impl Archive {
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
-    pub fn open_path(path: &Path) -> Result<Archive> {
+    pub fn open_path(path: &Path) -> anyhow::Result<Archive> {
         Archive::open(Box::new(LocalTransport::new(path)))
     }
 
-    pub fn open(transport: Box<dyn Transport>) -> Result<Archive> {
-        let header: ArchiveHeader =
-            read_json(&transport, HEADER_FILENAME).map_err(|err| match err {
-                Error::MetadataNotFound { .. } => Error::NotAnArchive {},
-                Error::IOError { source } if source.kind() == ErrorKind::NotFound => {
-                    Error::NotAnArchive {}
-                }
-                Error::IOError { source } => Error::ReadArchiveHeader { source },
-                other => other,
-            })?;
-        if header.conserve_archive_version != ARCHIVE_VERSION {
-            return Err(Error::UnsupportedArchiveVersion {
-                version: header.conserve_archive_version,
-            });
-        }
+    pub fn open(transport: Box<dyn Transport>) -> anyhow::Result<Archive> {
+        let header: ArchiveHeader = read_json(&transport, HEADER_FILENAME)
+            .context("Failed to read archive header (maybe this is not a Conserve archive?)")?;
+        ensure!(
+            header.conserve_archive_version == ARCHIVE_VERSION,
+            "Unsupported archive version {:?}",
+            header.conserve_archive_version
+        );
         let block_dir = BlockDir::open(transport.sub_transport(BLOCK_DIR));
         Ok(Archive {
             block_dir,

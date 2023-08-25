@@ -55,7 +55,7 @@ pub fn simple_backup() {
 
 #[test]
 #[traced_test]
-pub fn simple_backup_with_excludes() -> Result<()> {
+pub fn simple_backup_with_excludes() -> anyhow::Result<()> {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
