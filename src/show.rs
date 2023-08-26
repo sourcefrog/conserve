@@ -125,7 +125,7 @@ pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
     let bw = BufWriter::new(w);
     let index_entries: Vec<IndexEntry> = band.index().iter_entries().collect();
     serde_json::ser::to_writer_pretty(bw, &index_entries)
-        .map_err(|source| Error::SerializeIndex { source })
+        .map_err(|source| Error::SerializeJson { source })
 }
 
 pub fn show_entry_names<E: EntryTrait, I: Iterator<Item = E>>(

@@ -145,8 +145,5 @@ pub fn write_json_metrics(path: &Path) -> Result<()> {
     let j = json!( {
         "counters": counter_values(),
     });
-    serde_json::to_writer_pretty(f, &j).map_err(|source| Error::SerializeJson {
-        path: path.to_string_lossy().to_string(),
-        source,
-    })
+    serde_json::to_writer_pretty(f, &j).map_err(|source| Error::SerializeJson { source })
 }

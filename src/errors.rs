@@ -32,33 +32,8 @@ pub enum Error {
     #[error("{address:?} extends beyond decompressed block length {actual_len:?}")]
     AddressTooLong { address: Address, actual_len: usize },
 
-    // TODO: Merge with AddressTooLong
-    #[error(
-        "block {block_hash} actual length is {actual_len} but indexes reference {referenced_len}"
-    )]
-    ShortBlock {
-        block_hash: BlockHash,
-        actual_len: usize,
-        referenced_len: u64,
-    },
-
-    #[error("Failed to write block {hash:?}")]
-    WriteBlock { hash: String, source: io::Error },
-
-    #[error("Failed to read block {hash:?}")]
-    ReadBlock { hash: String, source: io::Error },
-
-    #[error("Block {block_hash} is missing")]
-    BlockMissing { block_hash: BlockHash },
-
-    #[error("Failed to list block files")]
-    ListBlocks { source: io::Error },
-
     #[error("Not a Conserve archive (no CONSERVE header found)")]
     NotAnArchive,
-
-    #[error("Failed to read archive header")]
-    ReadArchiveHeader { source: io::Error },
 
     #[error(
         "Archive version {:?} is not supported by Conserve {}",
@@ -91,23 +66,8 @@ pub enum Error {
     #[error("Invalid backup version number {:?}", version)]
     InvalidVersion { version: String },
 
-    #[error("Failed to create band")]
-    CreateBand { source: io::Error },
-
     #[error("Band {band_id} head file missing")]
     BandHeadMissing { band_id: BandId },
-
-    #[error("Failed to create block directory")]
-    CreateBlockDir { source: io::Error },
-
-    #[error("Failed to create archive directory")]
-    CreateArchiveDirectory { source: io::Error },
-
-    #[error("Band {} is incomplete", band_id)]
-    BandIncomplete { band_id: BandId },
-
-    #[error("Duplicated band directory for {band_id}")]
-    DuplicateBandDirectory { band_id: BandId },
 
     #[error(
         "Can't delete blocks because the last band ({}) is incomplete and may be in use",
@@ -130,33 +90,19 @@ pub enum Error {
         source: globset::Error,
     },
 
-    #[error("Failed to write index hunk {:?}", path)]
-    WriteIndex { path: String, source: io::Error },
-
-    #[error("Failed to read index hunk {:?}", path)]
-    ReadIndex { path: String, source: io::Error },
-
-    #[error("Failed to serialize index")]
-    SerializeIndex { source: serde_json::Error },
-
-    #[error("Failed to deserialize index hunk {:?}", path)]
-    DeserializeIndex {
-        path: String,
-        source: serde_json::Error,
-    },
-
     #[error("Failed to write metadata file {:?}", path)]
     WriteMetadata { path: String, source: io::Error },
 
     #[error("Failed to deserialize json from {:?}", path)]
     DeserializeJson {
-        path: PathBuf,
+        path: String,
+        #[source]
         source: serde_json::Error,
     },
 
-    #[error("Failed to serialize json to {:?}", path)]
+    #[error("Failed to serialize json")]
     SerializeJson {
-        path: String,
+        #[from]
         source: serde_json::Error,
     },
 
@@ -184,9 +130,6 @@ pub enum Error {
     #[error("Failed to read source tree {:?}", path)]
     ListSourceTree { path: PathBuf, source: io::Error },
 
-    #[error("Failed to store file {:?}", apath)]
-    StoreFile { apath: Apath, source: io::Error },
-
     #[error("Failed to restore {:?}", path)]
     Restore { path: PathBuf, source: io::Error },
 
@@ -195,12 +138,6 @@ pub enum Error {
 
     #[error("Unsupported URL scheme {:?}", scheme)]
     UrlScheme { scheme: String },
-
-    #[error("Failed to serialize object")]
-    SerializeError {
-        #[from]
-        source: serde_json::Error,
-    },
 
     #[error("Unexpected file {path:?} in archive directory")]
     UnexpectedFile { path: String },
@@ -233,7 +170,10 @@ impl From<jsonio::Error> for Error {
     fn from(value: jsonio::Error) -> Self {
         match value {
             jsonio::Error::Io { source } => Error::IOError { source },
-            jsonio::Error::Json { source, path } => Error::DeserializeJson { source, path }, // conflates serialize/deserialize
+            jsonio::Error::Json { source, path } => Error::DeserializeJson {
+                source,
+                path: path.to_string_lossy().into_owned(),
+            }, // conflates serialize/deserialize
             jsonio::Error::Transport { source } => Error::Transport { source },
         }
     }

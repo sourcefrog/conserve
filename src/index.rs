@@ -250,8 +250,7 @@ impl IndexWriter {
             self.check_order.check(&self.entries.last().unwrap().apath);
         }
         let relpath = hunk_relpath(self.sequence);
-        let json =
-            serde_json::to_vec(&self.entries).map_err(|source| Error::SerializeIndex { source })?;
+        let json = serde_json::to_vec(&self.entries)?;
         if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
             self.transport.create_dir(&subdir_relpath(self.sequence))?;
         }
@@ -423,7 +422,7 @@ impl IndexHunkIter {
         );
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
         let entries: Vec<IndexEntry> =
-            serde_json::from_slice(index_bytes).map_err(|source| Error::DeserializeIndex {
+            serde_json::from_slice(index_bytes).map_err(|source| Error::DeserializeJson {
                 path: path.clone(),
                 source,
             })?;
