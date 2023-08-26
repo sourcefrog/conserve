@@ -14,7 +14,6 @@
 //! Archives holding backup material.
 
 use std::collections::{HashMap, HashSet};
-use std::io::ErrorKind;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -93,15 +92,11 @@ impl Archive {
     }
 
     pub fn open(transport: Box<dyn Transport>) -> Result<Archive> {
-        let header: ArchiveHeader =
-            read_json(&transport, HEADER_FILENAME).map_err(|err| match err {
-                Error::MetadataNotFound { .. } => Error::NotAnArchive {},
-                Error::IOError { source } if source.kind() == ErrorKind::NotFound => {
-                    Error::NotAnArchive {}
-                }
-                Error::IOError { source } => Error::ReadArchiveHeader { source },
-                other => other,
-            })?;
+        let header: ArchiveHeader = match read_json(&transport, HEADER_FILENAME) {
+            Ok(None) => return Err(Error::NotAnArchive {}),
+            Err(err) => return Err(err),
+            Ok(Some(header)) => header,
+        };
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(Error::UnsupportedArchiveVersion {
                 version: header.conserve_archive_version,

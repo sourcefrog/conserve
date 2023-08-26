@@ -14,7 +14,6 @@
 //! Index lists the files in a band in the archive.
 
 use std::cmp::Ordering;
-use std::io;
 use std::iter::Peekable;
 use std::path::Path;
 use std::sync::Arc;
@@ -409,18 +408,13 @@ impl IndexHunkIter {
         self.next_hunk_number += 1;
         let compressed_bytes = match self.transport.read_file(&path) {
             Ok(b) => b,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            Err(err) if err.kind().is_not_found() => {
                 // TODO: Cope with one hunk being missing, while there are still
                 // later-numbered hunks. This would require reading the whole
                 // list of hunks first.
                 return Ok(None);
             }
-            Err(source) => {
-                return Err(Error::ReadIndex {
-                    path: path.clone(),
-                    source,
-                });
-            }
+            Err(source) => return Err(Error::Transport { source }),
         };
         increment_counter!("conserve.index.read.hunks");
         self.stats.index_hunks += 1;

@@ -13,12 +13,10 @@
 
 //! Read and write JSON files.
 
-use std::io;
-
 use serde::de::DeserializeOwned;
 
 use crate::errors::Error;
-use crate::transport::Transport;
+use crate::transport::{self, Transport};
 use crate::Result;
 
 /// Write uncompressed json to a file on a Transport.
@@ -41,26 +39,32 @@ where
         })
 }
 
-/// Read and deserialize uncompressed json from a Transport.
-pub(crate) fn read_json<T, TR>(transport: &TR, path: &str) -> Result<T>
+/// Read and deserialize uncompressed json from a file on a Transport.
+///
+/// Returns None if the file does not exist.
+pub(crate) fn read_json<T, TR>(transport: &TR, path: &str) -> Result<Option<T>>
 where
     T: DeserializeOwned,
     TR: AsRef<dyn Transport>,
 {
-    let bytes = transport
-        .as_ref()
-        .read_file(path)
-        .map_err(|err| match err.kind() {
-            io::ErrorKind::NotFound => Error::MetadataNotFound {
-                path: path.to_owned(),
-                source: err,
-            },
-            _ => err.into(),
-        })?;
-    serde_json::from_slice(&bytes).map_err(|source| Error::DeserializeJson {
-        source,
-        path: path.into(),
-    })
+    let bytes = match transport.as_ref().read_file(path) {
+        Ok(b) => b,
+        Err(err) => {
+            if err.kind().is_not_found() {
+                return Ok(None);
+            } else {
+                return Err(err.into());
+            }
+        }
+    };
+    match serde_json::from_slice(&bytes) {
+        Ok(t) => Ok(Some(t)),
+        Err(source) => Err(Error::DeserializeJson {
+            source,
+            // TODO: Full path from the transport?
+            path: path.into(),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -104,7 +108,9 @@ mod tests {
             .unwrap();
 
         let transport = LocalTransport::new(temp.path());
-        let content: TestContents = read_json(&transport, "test.json").unwrap();
+        let content: TestContents = read_json(&transport, "test.json")
+            .expect("no error")
+            .expect("file exists");
 
         assert_eq!(
             content,

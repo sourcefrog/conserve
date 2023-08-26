@@ -322,13 +322,7 @@ impl BlockDir {
         increment_counter!("conserve.block.read");
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
-        let compressed_bytes =
-            self.transport
-                .read_file(&block_relpath)
-                .map_err(|source| Error::ReadBlock {
-                    source,
-                    hash: hash.to_string(),
-                })?;
+        let compressed_bytes = self.transport.read_file(&block_relpath)?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::from(blake2b::blake2b(
             BLAKE_HASH_SIZE_BYTES,

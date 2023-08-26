@@ -178,7 +178,10 @@ impl Band {
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
         let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
-        let head: Head = read_json(&transport, BAND_HEAD_FILENAME)?;
+        let head: Head =
+            read_json(&transport, BAND_HEAD_FILENAME)?.ok_or_else(|| Error::BandHeadMissing {
+                band_id: band_id.clone(),
+            })?;
         if let Some(version) = &head.band_format_version {
             if !band_version_supported(version) {
                 return Err(Error::UnsupportedBandVersion {
@@ -257,11 +260,7 @@ impl Band {
 
     /// Return info about the state of this band.
     pub fn get_info(&self) -> Result<Info> {
-        let tail_option: Option<Tail> = match read_json(&self.transport, BAND_TAIL_FILENAME) {
-            Ok(tail) => Some(tail),
-            Err(Error::MetadataNotFound { .. }) => None,
-            Err(err) => return Err(err),
-        };
+        let tail_option: Option<Tail> = read_json(&self.transport, BAND_TAIL_FILENAME)?;
         let start_time = OffsetDateTime::from_unix_timestamp(self.head.start_time)
             .expect("invalid band start timestamp");
         let end_time = tail_option.as_ref().map(|tail| {

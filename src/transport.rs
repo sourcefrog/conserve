@@ -14,7 +14,7 @@
 //!
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{error, fmt, io, result};
 
 use bytes::Bytes;
@@ -94,7 +94,7 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     ///
     /// Files in the archive are of bounded size, so it's OK to always read them entirely into
     /// memory, and this is simple to support on all implementations.
-    fn read_file(&self, path: &str) -> io::Result<Bytes>;
+    fn read_file(&self, path: &str) -> Result<Bytes>;
 
     /// Check if a directory exists.
     fn is_dir(&self, path: &str) -> Result<bool> {
@@ -134,13 +134,14 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     fn metadata(&self, relpath: &str) -> Result<Metadata>;
 
     /// Delete a file.
-    fn remove_file(&self, relpath: &str) -> self::Result<()>;
+    fn remove_file(&self, relpath: &str) -> Result<()>;
 
     /// Delete an empty directory.
-    fn remove_dir(&self, relpath: &str) -> self::Result<()>;
+    // TODO: Maybe just fold this into `metadata`?
+    fn remove_dir(&self, relpath: &str) -> Result<()>;
 
     /// Delete a directory and all its contents.
-    fn remove_dir_all(&self, relpath: &str) -> self::Result<()>;
+    fn remove_dir_all(&self, relpath: &str) -> Result<()>;
 
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;
@@ -181,10 +182,9 @@ pub struct ListDirNames {
 /// A transport error, as a generalization of IO errors.
 #[derive(Debug)]
 pub struct Error {
-    pub url: Url,
     pub kind: ErrorKind,
     /// Might be for example an IO error or S3 error.
-    pub source: Option<ErrorSource>,
+    pub details: ErrorDetails,
 }
 
 /// General categories of transport errors.
@@ -200,10 +200,16 @@ pub enum ErrorKind {
     Other,
 }
 
+impl ErrorKind {
+    pub fn is_not_found(&self) -> bool {
+        *self == ErrorKind::NotFound
+    }
+}
+
 #[derive(Debug)]
-pub enum ErrorSource {
-    Io(io::Error),
-    // S3(s3::Error),
+pub enum ErrorDetails {
+    Io { source: io::Error, path: PathBuf }, // S3(s3::Error),
+    None,
 }
 
 impl Error {
@@ -219,9 +225,11 @@ impl Error {
             _ => ErrorKind::Other,
         };
         Error {
-            url: Url::from_file_path(path).expect("Convert path to URL"),
+            details: ErrorDetails::Io {
+                source,
+                path: path.to_owned(),
+            },
             kind,
-            source: Some(ErrorSource::Io(source)),
         }
     }
 }
@@ -229,16 +237,24 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // source is not in the short format; maybe should be in the alternate format?
-        format!("{kind}: {url}", kind = self.kind, url = self.url).fmt(f)
+        match &self.details {
+            ErrorDetails::Io { path, .. } => {
+                write!(f, "{}", self.kind)?;
+                if !path.as_os_str().is_empty() {
+                    write!(f, ": {}", path.display())?;
+                }
+            }
+            ErrorDetails::None => write!(f, "{}", self.kind)?,
+        }
+        Ok(())
     }
 }
 
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self.source {
-            Some(ErrorSource::Io(ref e)) => Some(e),
-            // Some(ErrorSource::S3(ref e)) => Some(e),
-            None => None,
+        match &self.details {
+            ErrorDetails::Io { source, .. } => Some(source),
+            ErrorDetails::None => None,
         }
     }
 }
