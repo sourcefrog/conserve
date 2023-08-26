@@ -542,7 +542,7 @@ fn stored_tree_from_opt(
 
 fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolicy {
     if let Some(band_id) = backup {
-        BandSelectionPolicy::Specified(band_id.clone())
+        BandSelectionPolicy::Specified(*band_id)
     } else {
         BandSelectionPolicy::Latest
     }

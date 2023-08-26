@@ -132,7 +132,7 @@ impl Iterator for IterStitchedIndexHunks {
 }
 
 fn previous_existing_band(archive: &Archive, band_id: &BandId) -> Option<BandId> {
-    let mut band_id = band_id.clone();
+    let mut band_id = *band_id;
     loop {
         // TODO: It might be faster to list the present bands and calculate
         // from that, rather than walking backwards one at a time...
@@ -166,7 +166,7 @@ mod test {
     }
 
     fn simple_ls(archive: &Archive, band_id: &BandId) -> String {
-        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, Some(band_id.clone()))
+        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, Some(*band_id))
             .flatten()
             .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
             .collect();
@@ -282,7 +282,7 @@ mod test {
 
         let band_id = band_ids.first().expect("expected at least one band");
 
-        let mut iter = IterStitchedIndexHunks::new(&af, Some(band_id.clone()));
+        let mut iter = IterStitchedIndexHunks::new(&af, Some(*band_id));
         // Get the first and only index entry.
         // `index_hunks` and `band_id` should be `Some`.
         assert!(iter.next().is_some());

@@ -57,7 +57,7 @@ impl GarbageCollectionLock {
     pub fn new(archive: &Archive) -> anyhow::Result<GarbageCollectionLock> {
         let archive = archive.clone();
         let band_id = archive.last_band_id()?;
-        if let Some(band_id) = band_id.clone() {
+        if let Some(band_id) = band_id {
             if !archive.band_is_closed(&band_id)? {
                 bail!("Can't delete blocks because the last band ({band_id}) is incomplete and may be in use" );
             }

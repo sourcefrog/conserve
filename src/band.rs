@@ -261,7 +261,7 @@ impl Band {
             .transpose()
             .context("invalid end timestamp {tail.end_time:?}")?;
         Ok(Info {
-            id: self.band_id.clone(),
+            id: self.band_id,
             is_closed: tail_option.is_some(),
             start_time,
             end_time,

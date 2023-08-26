@@ -150,7 +150,7 @@ impl Archive {
         match band_selection {
             BandSelectionPolicy::LatestClosed => self
                 .last_complete_band()?
-                .map(|band| band.id().clone())
+                .map(|band| *band.id())
                 .ok_or(anyhow!("Archive has no complete bands")),
             BandSelectionPolicy::Specified(band_id) => Ok(band_id),
             BandSelectionPolicy::Latest => self.last_band_id()?.ok_or(anyhow!("Archive is empty")),
@@ -392,7 +392,7 @@ impl Archive {
                     ..
                 }) => {
                     if let Ok(band_id) = name.parse::<BandId>() {
-                        if !seen_bands.insert(band_id.clone()) {
+                        if !seen_bands.insert(band_id) {
                             // TODO: Test this
                             error!(%band_id, "Duplicated band directory");
                         }

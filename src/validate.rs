@@ -54,7 +54,7 @@ pub(crate) fn validate_bands(
             continue 'band;
         };
         if let Err(err) = archive
-            .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))
+            .open_stored_tree(BandSelectionPolicy::Specified(*band_id))
             .and_then(|st| validate_stored_tree(&st))
             .map(|st_block_lens| merge_block_lens(&mut block_lens, &st_block_lens))
         {
