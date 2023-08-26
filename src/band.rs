@@ -286,8 +286,7 @@ impl Band {
     }
 
     pub fn validate(&self) -> Result<()> {
-        let ListDirNames { mut files, dirs } =
-            self.transport.list_dir_names("").map_err(Error::from)?;
+        let ListDirNames { mut files, dirs } = self.transport.list_dir_names("")?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
             error!(band_id = ?self.band_id, "Band head file missing");
         }

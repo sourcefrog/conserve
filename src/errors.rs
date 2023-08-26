@@ -55,7 +55,7 @@ pub enum Error {
     ListBlocks { source: io::Error },
 
     #[error("Not a Conserve archive (no CONSERVE header found)")]
-    NotAnArchive {},
+    NotAnArchive,
 
     #[error("Failed to read archive header")]
     ReadArchiveHeader { source: io::Error },

@@ -65,7 +65,7 @@ impl Archive {
     /// Make a new archive in a new directory accessed by a Transport.
     pub fn create(transport: Box<dyn Transport>) -> Result<Archive> {
         transport.create_dir("")?;
-        let names = transport.list_dir_names("").map_err(Error::from)?;
+        let names = transport.list_dir_names("")?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
             return Err(Error::NewArchiveDirectoryNotEmpty);
         }
@@ -92,7 +92,7 @@ impl Archive {
 
     pub fn open(transport: Box<dyn Transport>) -> Result<Archive> {
         let header: ArchiveHeader =
-            read_json(&transport, HEADER_FILENAME)?.ok_or(Error::NotAnArchive {})?;
+            read_json(&transport, HEADER_FILENAME)?.ok_or(Error::NotAnArchive)?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(Error::UnsupportedArchiveVersion {
                 version: header.conserve_archive_version,
