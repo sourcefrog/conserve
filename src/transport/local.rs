@@ -130,11 +130,6 @@ impl Transport for LocalTransport {
         std::fs::remove_file(&path).map_err(|err| super::Error::io_error(&path, err))
     }
 
-    fn remove_dir(&self, relpath: &str) -> super::Result<()> {
-        let path = self.full_path(relpath);
-        std::fs::remove_dir(&path).map_err(|err| super::Error::io_error(&path, err))
-    }
-
     fn remove_dir_all(&self, relpath: &str) -> super::Result<()> {
         let path = self.full_path(relpath);
         std::fs::remove_dir_all(&path).map_err(|err| super::Error::io_error(&path, err))

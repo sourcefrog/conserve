@@ -127,10 +127,6 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// Delete a file.
     fn remove_file(&self, relpath: &str) -> Result<()>;
 
-    /// Delete an empty directory.
-    // TODO: Maybe just fold this into `metadata`?
-    fn remove_dir(&self, relpath: &str) -> Result<()>;
-
     /// Delete a directory and all its contents.
     fn remove_dir_all(&self, relpath: &str) -> Result<()>;
 
