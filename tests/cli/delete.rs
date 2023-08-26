@@ -124,16 +124,7 @@ fn delete_nonexistent_band() {
         .arg(af.path())
         .assert()
         .stderr(predicate::str::contains(
-            "ERROR conserve: Failed to delete band b0000",
+            "ERROR conserve: Band not found: b0000",
         ))
-        .stderr(
-            predicate::str::is_match(
-                "(File not found\\.\
-                |No such file or directory\
-                |The system cannot find the file specified\\.) \
-                \\(os error \\d+\\)",
-            )
-            .unwrap(),
-        )
         .failure();
 }

@@ -46,8 +46,9 @@ fn fails_on_non_empty_directory() {
 
     let result = Archive::create_path(temp.path());
     assert_eq!(
-        result.unwrap_err().to_string(),
-        "New archive directory is not empty"
+        result.as_ref().unwrap_err().to_string(),
+        "Directory for new archive is not empty",
+        "{result:?}"
     );
     temp.close().unwrap();
 }

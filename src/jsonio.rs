@@ -22,13 +22,6 @@ use crate::transport::{self, Transport};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("File not found: {path:?}")]
-    NotFound {
-        path: PathBuf,
-        #[source]
-        source: io::Error,
-    },
-
     #[error("IO error")]
     Io {
         #[from]
@@ -37,8 +30,8 @@ pub enum Error {
 
     #[error("JSON serialization error")]
     Json {
-        #[from]
         source: serde_json::Error,
+        path: PathBuf,
     },
 
     #[error("Transport error")]
@@ -56,7 +49,10 @@ where
     T: serde::Serialize,
     TR: AsRef<dyn Transport>,
 {
-    let mut s: String = serde_json::to_string(&obj)?;
+    let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::Json {
+        source,
+        path: relpath.into(),
+    })?;
     s.push('\n');
     transport
         .as_ref()
@@ -64,23 +60,26 @@ where
         .map_err(Error::from)
 }
 
-/// Read and deserialize uncompressed json from a Transport.
-pub(crate) fn read_json<T, TR>(transport: &TR, path: &str) -> Result<T>
+/// Read and deserialize uncompressed json from a file on a Transport.
+///
+/// Returns None if the file does not exist.
+pub(crate) fn read_json<T, TR>(transport: &TR, path: &str) -> Result<Option<T>>
 where
     T: DeserializeOwned,
     TR: AsRef<dyn Transport>,
 {
-    let bytes = transport
-        .as_ref()
-        .read_file(path)
-        .map_err(|err| match err.kind() {
-            io::ErrorKind::NotFound => Error::NotFound {
-                path: PathBuf::from(path),
-                source: err,
-            },
-            _ => Error::from(err),
-        })?;
-    serde_json::from_slice(&bytes).map_err(Error::from)
+    let bytes = match transport.as_ref().read_file(path) {
+        Ok(b) => b,
+        Err(err) if err.is_not_found() => return Ok(None),
+        Err(err) => return Err(err.into()),
+    };
+    serde_json::from_slice(&bytes)
+        .map(|t| Some(t))
+        .map_err(|source| Error::Json {
+            source,
+            // TODO: Full path from the transport?
+            path: path.into(),
+        })
 }
 
 #[cfg(test)]
@@ -124,7 +123,9 @@ mod tests {
             .unwrap();
 
         let transport = LocalTransport::new(temp.path());
-        let content: TestContents = read_json(&transport, "test.json").unwrap();
+        let content: TestContents = read_json(&transport, "test.json")
+            .expect("no error")
+            .expect("file exists");
 
         assert_eq!(
             content,

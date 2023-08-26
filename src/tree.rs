@@ -29,16 +29,16 @@ pub trait ReadTree {
     /// Errors reading individual paths or directories are sent to the UI and
     /// counted, but are not treated as fatal, and don't appear as Results in the
     /// iterator.
-    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> anyhow::Result<Self::IT>;
+    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT>;
 
     /// Estimate the number of entries in the tree.
     /// This might do somewhat expensive IO, so isn't the Iter's `size_hint`.
-    fn estimate_count(&self) -> anyhow::Result<u64>;
+    fn estimate_count(&self) -> Result<u64>;
 
     /// Measure the tree size.
     ///
     /// This typically requires walking all entries, which may take a while.
-    fn size(&self, exclude: Exclude) -> anyhow::Result<TreeSize> {
+    fn size(&self, exclude: Exclude) -> Result<TreeSize> {
         let mut files = 0;
         let mut total_bytes = 0u64;
         let bar = Bar::new();
@@ -63,15 +63,15 @@ pub trait ReadTree {
 /// shouldn't assume the size.
 pub trait ReadBlocks {
     /// Return a range of integers indexing the blocks (starting from 0.)
-    fn num_blocks(&self) -> anyhow::Result<usize>;
+    fn num_blocks(&self) -> Result<usize>;
 
-    fn block_range(&self) -> anyhow::Result<Range<usize>> {
+    fn block_range(&self) -> Result<Range<usize>> {
         Ok(0..self.num_blocks()?)
     }
 
     /// Read one block and return it as a byte vec. Also returns the compressed and uncompressed
     /// sizes.
-    fn read_block(&self, i: usize) -> anyhow::Result<(Vec<u8>, Sizes)>;
+    fn read_block(&self, i: usize) -> Result<(Vec<u8>, Sizes)>;
 }
 
 /// The measured size of a tree.

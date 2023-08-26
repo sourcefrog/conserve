@@ -32,7 +32,7 @@ pub struct StoredTree {
 }
 
 impl StoredTree {
-    pub(crate) fn open(archive: &Archive, band_id: &BandId) -> anyhow::Result<StoredTree> {
+    pub(crate) fn open(archive: &Archive, band_id: BandId) -> Result<StoredTree> {
         Ok(StoredTree {
             band: Band::open(archive, band_id)?,
             block_dir: archive.block_dir().clone(),
@@ -44,7 +44,7 @@ impl StoredTree {
         &self.band
     }
 
-    pub fn is_closed(&self) -> anyhow::Result<bool> {
+    pub fn is_closed(&self) -> Result<bool> {
         self.band.is_closed()
     }
 
@@ -61,14 +61,14 @@ impl ReadTree for StoredTree {
 
     /// Return an iter of index entries in this stored tree.
     // TODO: Should return an iter of Result<Entry> so that we can inspect them...
-    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> anyhow::Result<Self::IT> {
+    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
         Ok(
-            IterStitchedIndexHunks::new(&self.archive, Some(*self.band.id()))
+            IterStitchedIndexHunks::new(&self.archive, Some(self.band.id()))
                 .iter_entries(subtree, exclude),
         )
     }
 
-    fn estimate_count(&self) -> anyhow::Result<u64> {
+    fn estimate_count(&self) -> Result<u64> {
         self.band.index().estimate_entry_count()
     }
 }
@@ -88,7 +88,7 @@ mod test {
         let last_band_id = af.last_band_id().unwrap().unwrap();
         let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
 
-        assert_eq!(*st.band().id(), last_band_id);
+        assert_eq!(st.band().id(), last_band_id);
 
         let names: Vec<String> = st
             .iter_entries(Apath::root(), Exclude::nothing())

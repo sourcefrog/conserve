@@ -19,24 +19,46 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+use crate::blockdir::Address;
 use crate::*;
 
 /// Conserve specific error.
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Block file {hash:?} corrupt: does not have the expected hash")]
+    BlockCorrupt { hash: BlockHash },
+
+    #[error("{address:?} extends beyond decompressed block length {actual_len:?}")]
+    AddressTooLong { address: Address, actual_len: usize },
+
+    #[error("Not a Conserve archive (no CONSERVE header found)")]
+    NotAnArchive,
+
     #[error(
-        "Band {band_id} has feature flags {unsupported_flags:?} \
-        not supported by Conserve {conserve_version}",
-        conserve_version = crate::version()
+        "Archive version {:?} is not supported by Conserve {}",
+        version,
+        crate::version()
     )]
+    UnsupportedArchiveVersion { version: String },
+
+    #[error("Unsupported band version {version:?} in {band_id}")]
+    UnsupportedBandVersion { band_id: BandId, version: String },
+
+    #[error("Archive is empty")]
+    ArchiveEmpty,
+
+    #[error("Archive has no complete bands")]
+    NoCompleteBands,
+
+    #[error("Unsupported band format flags {unsupported_flags:?} in {band_id}")]
     UnsupportedBandFormatFlags {
         band_id: BandId,
         unsupported_flags: Vec<Cow<'static, str>>,
     },
 
-    #[error("Destination directory not empty: {:?}", path)]
-    DestinationNotEmpty { path: PathBuf },
+    #[error("Destination directory is not empty")]
+    DestinationNotEmpty,
 
     #[error("Directory for new archive is not empty")]
     NewArchiveDirectoryNotEmpty,
@@ -44,23 +66,8 @@ pub enum Error {
     #[error("Invalid backup version number {:?}", version)]
     InvalidVersion { version: String },
 
-    #[error("Failed to create band")]
-    CreateBand { source: io::Error },
-
     #[error("Band {band_id} head file missing")]
     BandHeadMissing { band_id: BandId },
-
-    #[error("Failed to create block directory")]
-    CreateBlockDir { source: io::Error },
-
-    #[error("Failed to create archive directory")]
-    CreateArchiveDirectory { source: io::Error },
-
-    #[error("Band {} is incomplete", band_id)]
-    BandIncomplete { band_id: BandId },
-
-    #[error("Duplicated band directory for {band_id}")]
-    DuplicateBandDirectory { band_id: BandId },
 
     #[error(
         "Can't delete blocks because the last band ({}) is incomplete and may be in use",
@@ -74,25 +81,13 @@ pub enum Error {
     #[error("Archive is locked for garbage collection")]
     GarbageCollectionLockHeld,
 
+    #[error("A backup was created while the garbage collection lock was held; CHECK ARCHIVE NOW")]
+    GarbageCollectionLockHeldDuringBackup,
+
     #[error(transparent)]
     ParseGlob {
         #[from]
         source: globset::Error,
-    },
-
-    #[error("Failed to write index hunk {:?}", path)]
-    WriteIndex { path: String, source: io::Error },
-
-    #[error("Failed to read index hunk {:?}", path)]
-    ReadIndex { path: String, source: io::Error },
-
-    #[error("Failed to serialize index")]
-    SerializeIndex { source: serde_json::Error },
-
-    #[error("Failed to deserialize index hunk {:?}", path)]
-    DeserializeIndex {
-        path: String,
-        source: serde_json::Error,
     },
 
     #[error("Failed to write metadata file {:?}", path)]
@@ -100,18 +95,28 @@ pub enum Error {
 
     #[error("Failed to deserialize json from {:?}", path)]
     DeserializeJson {
-        path: PathBuf,
+        path: String,
+        #[source]
         source: serde_json::Error,
     },
 
-    #[error("Failed to serialize json to {:?}", path)]
+    #[error("Failed to serialize json")]
     SerializeJson {
-        path: String,
+        #[from]
         source: serde_json::Error,
     },
 
     #[error("Metadata file not found: {:?}", path)]
     MetadataNotFound { path: String, source: io::Error },
+
+    #[error("Invalid metadata: {details}")]
+    InvalidMetadata { details: String },
+
+    #[error("Band not found: {band_id}")]
+    BandNotFound { band_id: BandId },
+
+    #[error("Failed to list bands")]
+    ListBands { source: io::Error },
 
     #[error("Failed to read source file {:?}", path)]
     ReadSourceFile { path: PathBuf, source: io::Error },
@@ -125,26 +130,14 @@ pub enum Error {
     #[error("Failed to read source tree {:?}", path)]
     ListSourceTree { path: PathBuf, source: io::Error },
 
-    #[error("Failed to store file {:?}", apath)]
-    StoreFile { apath: Apath, source: io::Error },
-
     #[error("Failed to restore {:?}", path)]
     Restore { path: PathBuf, source: io::Error },
 
     #[error("Failed to restore modification time on {:?}", path)]
     RestoreModificationTime { path: PathBuf, source: io::Error },
 
-    #[error("Failed to delete band {}", band_id)]
-    BandDeletion { band_id: BandId, source: io::Error },
-
     #[error("Unsupported URL scheme {:?}", scheme)]
     UrlScheme { scheme: String },
-
-    #[error("Failed to serialize object")]
-    SerializeError {
-        #[from]
-        source: serde_json::Error,
-    },
 
     #[error("Unexpected file {path:?} in archive directory")]
     UnexpectedFile { path: String },
@@ -165,4 +158,23 @@ pub enum Error {
         #[from]
         source: snap::Error,
     },
+
+    #[error(transparent)]
+    Transport {
+        #[from]
+        source: transport::Error,
+    },
+}
+
+impl From<jsonio::Error> for Error {
+    fn from(value: jsonio::Error) -> Self {
+        match value {
+            jsonio::Error::Io { source } => Error::IOError { source },
+            jsonio::Error::Json { source, path } => Error::DeserializeJson {
+                source,
+                path: path.to_string_lossy().into_owned(),
+            }, // conflates serialize/deserialize
+            jsonio::Error::Transport { source } => Error::Transport { source },
+        }
+    }
 }

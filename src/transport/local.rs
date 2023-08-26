@@ -18,11 +18,10 @@ use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
 use bytes::Bytes;
 use metrics::{counter, increment_counter};
 
-use crate::transport::{DirEntry, Metadata, Transport};
+use super::{DirEntry, Error, Metadata, Result, Transport};
 
 #[derive(Clone, Debug)]
 pub struct LocalTransport {
@@ -62,38 +61,47 @@ impl Transport for LocalTransport {
         })))
     }
 
-    fn read_file(&self, relpath: &str) -> io::Result<Bytes> {
+    fn read_file(&self, relpath: &str) -> Result<Bytes> {
         increment_counter!("conserve.local_transport.read_files");
-        let mut file = File::open(self.full_path(relpath))?;
-        let estimated_len: usize = file.metadata()?.len().try_into().unwrap();
-        let mut out_buf = Vec::with_capacity(estimated_len);
-        let actual_len = file.read_to_end(&mut out_buf)?;
-        counter!(
-            "conserve.local_transport.read_file_bytes",
-            actual_len as u64
-        );
-        out_buf.truncate(actual_len);
-        Ok(out_buf.into())
+        fn try_block(path: &Path) -> io::Result<Bytes> {
+            let mut file = File::open(path)?;
+            let estimated_len: usize = file
+                .metadata()?
+                .len()
+                .try_into()
+                .expect("File size fits in usize");
+            let mut out_buf = Vec::with_capacity(estimated_len);
+            let actual_len = file.read_to_end(&mut out_buf)?;
+            counter!(
+                "conserve.local_transport.read_file_bytes",
+                actual_len as u64
+            );
+            out_buf.truncate(actual_len);
+            Ok(out_buf.into())
+        }
+        let path = &self.full_path(relpath);
+        try_block(path).map_err(|err| Error::io_error(path, err))
     }
 
-    fn is_file(&self, relpath: &str) -> anyhow::Result<bool> {
+    fn is_file(&self, relpath: &str) -> Result<bool> {
         increment_counter!("conserve.local_transport.metadata_reads");
         let path = self.full_path(relpath);
         Ok(path.is_file())
     }
 
-    fn is_dir(&self, relpath: &str) -> anyhow::Result<bool> {
+    fn is_dir(&self, relpath: &str) -> Result<bool> {
         increment_counter!("conserve.local_transport.metadata_reads");
         let path = self.full_path(relpath);
         Ok(path.is_dir())
     }
 
-    fn create_dir(&self, relpath: &str) -> io::Result<()> {
-        create_dir(self.full_path(relpath)).or_else(|err| {
+    fn create_dir(&self, relpath: &str) -> super::Result<()> {
+        let path = self.full_path(relpath);
+        create_dir(&path).or_else(|err| {
             if err.kind() == io::ErrorKind::AlreadyExists {
                 Ok(())
             } else {
-                Err(err)
+                Err(super::Error::io_error(&path, err))
             }
         })
     }
@@ -123,17 +131,19 @@ impl Transport for LocalTransport {
         }
     }
 
-    fn remove_file(&self, relpath: &str) -> anyhow::Result<()> {
+    fn remove_file(&self, relpath: &str) -> super::Result<()> {
         let path = self.full_path(relpath);
-        std::fs::remove_file(&path).with_context(|| format!("Delete file {path:?}"))
+        std::fs::remove_file(&path).map_err(|err| super::Error::io_error(&path, err))
     }
 
-    fn remove_dir(&self, relpath: &str) -> anyhow::Result<()> {
-        std::fs::remove_dir(self.full_path(relpath)).context("Remove directory")
+    fn remove_dir(&self, relpath: &str) -> super::Result<()> {
+        let path = self.full_path(relpath);
+        std::fs::remove_dir(&path).map_err(|err| super::Error::io_error(&path, err))
     }
 
-    fn remove_dir_all(&self, relpath: &str) -> anyhow::Result<()> {
-        std::fs::remove_dir_all(self.full_path(relpath)).context("Remove directory tree")
+    fn remove_dir_all(&self, relpath: &str) -> super::Result<()> {
+        let path = self.full_path(relpath);
+        std::fs::remove_dir_all(&path).map_err(|err| super::Error::io_error(&path, err))
     }
 
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport> {
@@ -142,12 +152,10 @@ impl Transport for LocalTransport {
         })
     }
 
-    fn metadata(&self, relpath: &str) -> anyhow::Result<Metadata> {
+    fn metadata(&self, relpath: &str) -> Result<Metadata> {
         increment_counter!("conserve.local_transport.metadata_reads");
         let path = self.root.join(relpath);
-        let fsmeta = path
-            .metadata()
-            .with_context(|| format!("Failed to get metadata for {path:?}"))?;
+        let fsmeta = path.metadata().map_err(|err| Error::io_error(&path, err))?;
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),
@@ -159,6 +167,7 @@ impl Transport for LocalTransport {
     }
 
     fn url(&self) -> String {
+        // TODO: An actual URL.
         self.root.to_string_lossy().into()
     }
 }
@@ -314,15 +323,14 @@ mod test {
     }
 
     #[test]
-    fn remove_dir_all() -> anyhow::Result<()> {
+    fn remove_dir_all() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = LocalTransport::new(temp.path());
 
-        transport.create_dir("aaa")?;
-        transport.create_dir("aaa/bbb")?;
-        transport.create_dir("aaa/bbb/ccc")?;
+        transport.create_dir("aaa").unwrap();
+        transport.create_dir("aaa/bbb").unwrap();
+        transport.create_dir("aaa/bbb/ccc").unwrap();
 
-        transport.remove_dir_all("aaa")?;
-        Ok(())
+        transport.remove_dir_all("aaa").unwrap();
     }
 }

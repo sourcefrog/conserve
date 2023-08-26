@@ -20,7 +20,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use anyhow::{anyhow, bail, ensure, Context};
 use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -59,20 +58,16 @@ pub struct DeleteOptions {
 
 impl Archive {
     /// Make a new archive in a local directory.
-    pub fn create_path(path: &Path) -> anyhow::Result<Archive> {
+    pub fn create_path(path: &Path) -> Result<Archive> {
         Archive::create(Box::new(LocalTransport::new(path)))
     }
 
     /// Make a new archive in a new directory accessed by a Transport.
-    pub fn create(transport: Box<dyn Transport>) -> anyhow::Result<Archive> {
-        transport
-            .create_dir("")
-            .context("Failed to create archive directory")?;
-        let names = transport
-            .list_dir_names("")
-            .context("Failed to list new archive directory")?;
+    pub fn create(transport: Box<dyn Transport>) -> Result<Archive> {
+        transport.create_dir("")?;
+        let names = transport.list_dir_names("")?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
-            bail!("New archive directory is not empty");
+            return Err(Error::NewArchiveDirectoryNotEmpty);
         }
         let block_dir = BlockDir::create(transport.sub_transport(BLOCK_DIR))?;
         write_json(
@@ -91,18 +86,18 @@ impl Archive {
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
-    pub fn open_path(path: &Path) -> anyhow::Result<Archive> {
+    pub fn open_path(path: &Path) -> Result<Archive> {
         Archive::open(Box::new(LocalTransport::new(path)))
     }
 
-    pub fn open(transport: Box<dyn Transport>) -> anyhow::Result<Archive> {
-        let header: ArchiveHeader = read_json(&transport, HEADER_FILENAME)
-            .context("Failed to read archive header (maybe this is not a Conserve archive?)")?;
-        ensure!(
-            header.conserve_archive_version == ARCHIVE_VERSION,
-            "Unsupported archive version {:?}",
-            header.conserve_archive_version
-        );
+    pub fn open(transport: Box<dyn Transport>) -> Result<Archive> {
+        let header: ArchiveHeader =
+            read_json(&transport, HEADER_FILENAME)?.ok_or(Error::NotAnArchive)?;
+        if header.conserve_archive_version != ARCHIVE_VERSION {
+            return Err(Error::UnsupportedArchiveVersion {
+                version: header.conserve_archive_version,
+            });
+        }
         let block_dir = BlockDir::open(transport.sub_transport(BLOCK_DIR));
         Ok(Archive {
             block_dir,
@@ -114,14 +109,16 @@ impl Archive {
         &self.block_dir
     }
 
-    pub fn band_exists(&self, band_id: &BandId) -> anyhow::Result<bool> {
+    pub fn band_exists(&self, band_id: BandId) -> Result<bool> {
         self.transport
             .is_file(&format!("{}/{}", band_id, crate::BAND_HEAD_FILENAME))
+            .map_err(Error::from)
     }
 
-    pub fn band_is_closed(&self, band_id: &BandId) -> anyhow::Result<bool> {
+    pub fn band_is_closed(&self, band_id: BandId) -> Result<bool> {
         self.transport
             .is_file(&format!("{}/{}", band_id, crate::BAND_TAIL_FILENAME))
+            .map_err(Error::from)
     }
 
     /// Return an iterator of entries in a selected version.
@@ -130,13 +127,13 @@ impl Archive {
         band_selection: BandSelectionPolicy,
         subtree: Apath,
         exclude: Exclude,
-    ) -> anyhow::Result<impl Iterator<Item = IndexEntry>> {
+    ) -> Result<impl Iterator<Item = IndexEntry>> {
         self.open_stored_tree(band_selection)?
             .iter_entries(subtree, exclude)
     }
 
     /// Returns a vector of band ids, in sorted order from first to last.
-    pub fn list_band_ids(&self) -> anyhow::Result<Vec<BandId>> {
+    pub fn list_band_ids(&self) -> Result<Vec<BandId>> {
         let mut band_ids: Vec<BandId> = self.iter_band_ids_unsorted()?.collect();
         band_ids.sort_unstable();
         Ok(band_ids)
@@ -146,34 +143,30 @@ impl Archive {
         self.transport.as_ref()
     }
 
-    pub fn resolve_band_id(&self, band_selection: BandSelectionPolicy) -> anyhow::Result<BandId> {
+    pub fn resolve_band_id(&self, band_selection: BandSelectionPolicy) -> Result<BandId> {
         match band_selection {
             BandSelectionPolicy::LatestClosed => self
                 .last_complete_band()?
-                .map(|band| *band.id())
-                .ok_or(anyhow!("Archive has no complete bands")),
+                .map(|band| band.id())
+                .ok_or(Error::NoCompleteBands),
             BandSelectionPolicy::Specified(band_id) => Ok(band_id),
-            BandSelectionPolicy::Latest => self.last_band_id()?.ok_or(anyhow!("Archive is empty")),
+            BandSelectionPolicy::Latest => self.last_band_id()?.ok_or(Error::ArchiveEmpty),
         }
     }
 
-    pub fn open_stored_tree(
-        &self,
-        band_selection: BandSelectionPolicy,
-    ) -> anyhow::Result<StoredTree> {
-        StoredTree::open(self, &self.resolve_band_id(band_selection)?)
+    pub fn open_stored_tree(&self, band_selection: BandSelectionPolicy) -> Result<StoredTree> {
+        StoredTree::open(self, self.resolve_band_id(band_selection)?)
     }
 
     /// Return an iterator of valid band ids in this archive, in arbitrary order.
     ///
     /// Errors reading the archive directory are logged and discarded.
-    fn iter_band_ids_unsorted(&self) -> anyhow::Result<impl Iterator<Item = BandId>> {
+    fn iter_band_ids_unsorted(&self) -> Result<impl Iterator<Item = BandId>> {
         // This doesn't check for extraneous files or directories, which should be a weird rare
         // problem. Validate does.
         Ok(self
             .transport
-            .list_dir_names("")
-            .context("Failed to list archive directory")?
+            .list_dir_names("")?
             .dirs
             .into_iter()
             .filter(|dir_name| dir_name != BLOCK_DIR)
@@ -182,14 +175,14 @@ impl Archive {
 
     /// Return the `BandId` of the highest-numbered band, or Ok(None) if there
     /// are no bands, or an Err if any occurred reading the directory.
-    pub fn last_band_id(&self) -> anyhow::Result<Option<BandId>> {
+    pub fn last_band_id(&self) -> Result<Option<BandId>> {
         Ok(self.iter_band_ids_unsorted()?.max())
     }
 
     /// Return the last completely-written band id, if any.
-    pub fn last_complete_band(&self) -> anyhow::Result<Option<Band>> {
-        for id in self.list_band_ids()?.iter().rev() {
-            let b = Band::open(self, id)?;
+    pub fn last_complete_band(&self) -> Result<Option<Band>> {
+        for band_id in self.list_band_ids()?.into_iter().rev() {
+            let b = Band::open(self, band_id)?;
             if b.is_closed()? {
                 return Ok(Some(b));
             }
@@ -213,7 +206,7 @@ impl Archive {
             .inspect(|_| {
                 bands_started.fetch_add(1, Ordering::Relaxed);
             })
-            .map(move |band_id| Band::open(&archive, band_id).expect("Failed to open band"))
+            .map(move |band_id| Band::open(&archive, *band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
             .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
@@ -229,7 +222,7 @@ impl Archive {
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
-    pub fn unreferenced_blocks(&self) -> anyhow::Result<impl Iterator<Item = BlockHash>> {
+    pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
         let referenced = self.referenced_blocks(&self.list_band_ids()?)?;
         Ok(self
             .block_dir()
@@ -245,7 +238,7 @@ impl Archive {
         &self,
         delete_band_ids: &[BandId],
         options: &DeleteOptions,
-    ) -> anyhow::Result<DeleteStats> {
+    ) -> Result<DeleteStats> {
         let mut stats = DeleteStats::default();
         let start = Instant::now();
 
@@ -297,7 +290,7 @@ impl Archive {
             let bar = Bar::new();
 
             for (bands_done, band_id) in delete_band_ids.iter().enumerate() {
-                Band::delete(self, band_id)?;
+                Band::delete(self, *band_id)?;
                 stats.deleted_band_count += 1;
                 bar.post(Progress::DeleteBands {
                     bands_done,
@@ -331,7 +324,7 @@ impl Archive {
     /// If problems are found, they are emitted as `warn` or `error` level
     /// tracing messages. This function only returns an error if validation
     /// stops due to a fatal error.
-    pub fn validate(&self, options: &ValidateOptions) -> anyhow::Result<()> {
+    pub fn validate(&self, options: &ValidateOptions) -> Result<()> {
         self.validate_archive_dir()?;
 
         debug!("List bands...");
@@ -376,15 +369,11 @@ impl Archive {
         Ok(())
     }
 
-    fn validate_archive_dir(&self) -> anyhow::Result<()> {
+    fn validate_archive_dir(&self) -> Result<()> {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
-        for entry_result in self
-            .transport
-            .iter_dir_entries("")
-            .context("Failed to list archive directory")?
-        {
+        for entry_result in self.transport.iter_dir_entries("")? {
             match entry_result {
                 Ok(DirEntry {
                     kind: Kind::Dir,

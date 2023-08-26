@@ -290,7 +290,7 @@ impl std::process::Termination for ExitCode {
 }
 
 impl Command {
-    fn run(&self) -> anyhow::Result<ExitCode> {
+    fn run(&self) -> Result<ExitCode> {
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -531,10 +531,7 @@ impl Command {
     }
 }
 
-fn stored_tree_from_opt(
-    archive_location: &str,
-    backup: &Option<BandId>,
-) -> anyhow::Result<StoredTree> {
+fn stored_tree_from_opt(archive_location: &str, backup: &Option<BandId>) -> Result<StoredTree> {
     let archive = Archive::open(open_transport(archive_location)?)?;
     let policy = band_selection_policy_from_opt(backup);
     archive.open_stored_tree(policy)
@@ -552,7 +549,7 @@ fn make_change_callback<'a>(
     print_changes: bool,
     ls_long: bool,
     changes_json: &Option<&Path>,
-) -> anyhow::Result<Option<ChangeCallback<'a>>> {
+) -> Result<Option<ChangeCallback<'a>>> {
     if !print_changes && !ls_long && changes_json.is_none() {
         return Ok(None);
     };
@@ -596,7 +593,7 @@ fn make_change_callback<'a>(
     })))
 }
 
-fn main() -> anyhow::Result<ExitCode> {
+fn main() -> Result<ExitCode> {
     let args = Args::parse();
     let start_time = Instant::now();
     if !args.no_progress {

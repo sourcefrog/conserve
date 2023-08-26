@@ -14,13 +14,11 @@
 //! Index lists the files in a band in the archive.
 
 use std::cmp::Ordering;
-use std::io;
 use std::iter::Peekable;
 use std::path::Path;
 use std::sync::Arc;
 use std::vec;
 
-use anyhow::Context;
 use metrics::{counter, increment_counter};
 use time::OffsetDateTime;
 use tracing::error;
@@ -215,7 +213,7 @@ impl IndexWriter {
     }
 
     /// Finish the last hunk of this index, and return the stats.
-    pub fn finish(mut self) -> anyhow::Result<IndexWriterStats> {
+    pub fn finish(mut self) -> Result<IndexWriterStats> {
         self.finish_hunk()?;
         Ok(self.stats)
     }
@@ -239,7 +237,7 @@ impl IndexWriter {
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the buffer to start receiving
     /// entries for the next hunk.
-    pub fn finish_hunk(&mut self) -> anyhow::Result<()> {
+    pub fn finish_hunk(&mut self) -> Result<()> {
         if self.entries.is_empty() {
             return Ok(());
         }
@@ -252,18 +250,12 @@ impl IndexWriter {
             self.check_order.check(&self.entries.last().unwrap().apath);
         }
         let relpath = hunk_relpath(self.sequence);
-        let json =
-            serde_json::to_vec(&self.entries).map_err(|source| Error::SerializeIndex { source })?;
+        let json = serde_json::to_vec(&self.entries)?;
         if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
-            self.transport
-                .create_dir(&subdir_relpath(self.sequence))
-                .context("Failed to create index subdir")?;
+            self.transport.create_dir(&subdir_relpath(self.sequence))?;
         }
         let compressed_bytes = self.compressor.compress(&json)?;
-        self.transport
-            .write_file(&relpath, compressed_bytes)
-            .context("Failed to write index hunk")?;
-
+        self.transport.write_file(&relpath, compressed_bytes)?;
         self.stats.index_hunks += 1;
         self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
         self.stats.uncompressed_index_bytes += json.len() as u64;
@@ -303,7 +295,7 @@ impl IndexRead {
     }
 
     /// Return the (1-based) number of index hunks in an index directory.
-    pub fn count_hunks(&self) -> anyhow::Result<u32> {
+    pub fn count_hunks(&self) -> Result<u32> {
         // TODO: Might be faster to list the directory than to probe for all of them.
         // TODO: Perhaps, list the directories and cope cleanly with
         // one hunk being missing.
@@ -317,7 +309,7 @@ impl IndexRead {
         unreachable!();
     }
 
-    pub fn estimate_entry_count(&self) -> anyhow::Result<u64> {
+    pub fn estimate_entry_count(&self) -> Result<u64> {
         Ok(u64::from(self.count_hunks()?) * (MAX_ENTRIES_PER_HUNK as u64))
     }
 
@@ -408,18 +400,13 @@ impl IndexHunkIter {
         self.next_hunk_number += 1;
         let compressed_bytes = match self.transport.read_file(&path) {
             Ok(b) => b,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            Err(err) if err.is_not_found() => {
                 // TODO: Cope with one hunk being missing, while there are still
                 // later-numbered hunks. This would require reading the whole
                 // list of hunks first.
                 return Ok(None);
             }
-            Err(source) => {
-                return Err(Error::ReadIndex {
-                    path: path.clone(),
-                    source,
-                });
-            }
+            Err(source) => return Err(Error::Transport { source }),
         };
         increment_counter!("conserve.index.read.hunks");
         self.stats.index_hunks += 1;
@@ -435,7 +422,7 @@ impl IndexHunkIter {
         );
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
         let entries: Vec<IndexEntry> =
-            serde_json::from_slice(index_bytes).map_err(|source| Error::DeserializeIndex {
+            serde_json::from_slice(index_bytes).map_err(|source| Error::DeserializeJson {
                 path: path.clone(),
                 source,
             })?;
@@ -823,7 +810,7 @@ mod tests {
     ///
     /// https://github.com/sourcefrog/conserve/issues/95
     #[test]
-    fn no_final_empty_hunk() -> anyhow::Result<()> {
+    fn no_final_empty_hunk() -> Result<()> {
         let (testdir, mut ib) = setup();
         for i in 0..MAX_ENTRIES_PER_HUNK {
             ib.push_entry(sample_entry(&format!("/{i:0>10}")));

@@ -46,7 +46,7 @@ fn unknown_format_flag_fails_to_open() {
         .write_file("BANDHEAD", &serde_json::to_vec(&head).unwrap())
         .unwrap();
 
-    let err = Band::open(&af, &BandId::zero()).unwrap_err();
+    let err = Band::open(&af, BandId::zero()).unwrap_err();
     assert_eq!(
         err.to_string(),
         "Unsupported band format flags [\"wibble\"] in b0000"

@@ -42,11 +42,11 @@ impl StoredFile {
 }
 
 impl ReadBlocks for StoredFile {
-    fn num_blocks(&self) -> anyhow::Result<usize> {
+    fn num_blocks(&self) -> Result<usize> {
         Ok(self.addrs.len())
     }
 
-    fn read_block(&self, i: usize) -> anyhow::Result<(Vec<u8>, Sizes)> {
+    fn read_block(&self, i: usize) -> Result<(Vec<u8>, Sizes)> {
         self.block_dir.get(&self.addrs[i])
     }
 }

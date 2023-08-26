@@ -31,8 +31,6 @@
 //! delete but before starting to actually delete them, we check that no
 //! new bands have been created.
 
-use anyhow::{bail, Context};
-
 use crate::*;
 
 pub static GC_LOCK: &str = "GC_LOCK";
@@ -54,16 +52,16 @@ impl GarbageCollectionLock {
     ///
     /// Returns `Err(Error::DeleteWithIncompleteBackup)` if the last
     /// backup is incomplete.
-    pub fn new(archive: &Archive) -> anyhow::Result<GarbageCollectionLock> {
+    pub fn new(archive: &Archive) -> Result<GarbageCollectionLock> {
         let archive = archive.clone();
         let band_id = archive.last_band_id()?;
         if let Some(band_id) = band_id {
-            if !archive.band_is_closed(&band_id)? {
-                bail!("Can't delete blocks because the last band ({band_id}) is incomplete and may be in use" );
+            if !archive.band_is_closed(band_id)? {
+                return Err(Error::DeleteWithIncompleteBackup { band_id });
             }
         }
         if archive.transport().is_file(GC_LOCK).unwrap_or(true) {
-            bail!("GC lock held");
+            return Err(Error::GarbageCollectionLockHeld);
         }
         archive.transport().write_file(GC_LOCK, b"{}\n")?;
         Ok(GarbageCollectionLock { archive, band_id })
@@ -73,29 +71,26 @@ impl GarbageCollectionLock {
     ///
     /// Use this only if you're confident that the process owning the lock
     /// has terminated and the lock is stale.
-    pub fn break_lock(archive: &Archive) -> anyhow::Result<GarbageCollectionLock> {
+    pub fn break_lock(archive: &Archive) -> Result<GarbageCollectionLock> {
         if GarbageCollectionLock::is_locked(archive)? {
-            archive
-                .transport()
-                .remove_file(GC_LOCK)
-                .context("Failed to remove GC_LOCK")?;
+            archive.transport().remove_file(GC_LOCK)?;
         }
-        GarbageCollectionLock::new(archive).context("Failed to take GC lock")
+        GarbageCollectionLock::new(archive)
     }
 
     /// Returns true if the archive is currently locked by a gc process.
-    pub fn is_locked(archive: &Archive) -> anyhow::Result<bool> {
-        archive.transport().is_file(GC_LOCK)
+    pub fn is_locked(archive: &Archive) -> Result<bool> {
+        archive.transport().is_file(GC_LOCK).map_err(Error::from)
     }
 
     /// Check that no new versions have been created in this archive since
     /// the guard was created.
-    pub fn check(&self) -> anyhow::Result<()> {
+    pub fn check(&self) -> Result<()> {
         let current_last_band_id = self.archive.last_band_id()?;
         if self.band_id == current_last_band_id {
             Ok(())
         } else {
-            bail!("A backup was created concurrently with GC: CHECK THE ARCHIVE INTEGRITY")
+            Err(Error::GarbageCollectionLockHeldDuringBackup)
         }
     }
 }
@@ -166,7 +161,10 @@ mod test {
         let _lock1 = GarbageCollectionLock::new(&archive).unwrap();
         // Should not be able to create a second lock while one gc is running.
         let lock2_result = GarbageCollectionLock::new(&archive);
-        assert_eq!(lock2_result.unwrap_err().to_string(), "GC lock held");
+        assert_eq!(
+            lock2_result.unwrap_err().to_string(),
+            "Archive is locked for garbage collection"
+        );
     }
 
     #[test]

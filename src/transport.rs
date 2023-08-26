@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Martin Pool.
+// Copyright 2020, 2021, 2022, 2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,11 +14,11 @@
 //!
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
-use std::path::Path;
-use std::{fmt, io};
+use std::path::{Path, PathBuf};
+use std::{error, fmt, io, result};
 
-use anyhow::bail;
 use bytes::Bytes;
+use derive_more::Display;
 use url::Url;
 
 use crate::*;
@@ -29,7 +29,7 @@ use local::LocalTransport;
 /// Open a `Transport` to access a local directory.
 ///
 /// `s` may be a local path or a URL.
-pub fn open_transport(s: &str) -> anyhow::Result<Box<dyn Transport>> {
+pub fn open_transport(s: &str) -> crate::Result<Box<dyn Transport>> {
     if let Ok(url) = Url::parse(s) {
         match url.scheme() {
             "file" => Ok(Box::new(LocalTransport::new(
@@ -39,7 +39,9 @@ pub fn open_transport(s: &str) -> anyhow::Result<Box<dyn Transport>> {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Box::new(LocalTransport::new(Path::new(s))))
             }
-            other => bail!("Unsupported URL scheme {other:?}"),
+            other => Err(crate::Error::UrlScheme {
+                scheme: other.to_owned(),
+            }),
         }
     } else {
         Ok(Box::new(LocalTransport::new(Path::new(s))))
@@ -92,20 +94,32 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     ///
     /// Files in the archive are of bounded size, so it's OK to always read them entirely into
     /// memory, and this is simple to support on all implementations.
-    fn read_file(&self, path: &str) -> io::Result<Bytes>;
+    fn read_file(&self, path: &str) -> Result<Bytes>;
 
     /// Check if a directory exists.
-    fn is_dir(&self, path: &str) -> anyhow::Result<bool>;
+    fn is_dir(&self, path: &str) -> Result<bool> {
+        match self.metadata(path) {
+            Ok(metadata) => Ok(metadata.kind == Kind::Dir),
+            Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
+            Err(err) => Err(err),
+        }
+    }
 
     /// Check if a regular file exists.
-    fn is_file(&self, path: &str) -> anyhow::Result<bool>;
+    fn is_file(&self, path: &str) -> Result<bool> {
+        match self.metadata(path) {
+            Ok(metadata) => Ok(metadata.kind == Kind::File),
+            Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
+            Err(err) => Err(err),
+        }
+    }
 
     /// Create a directory, if it does not exist.
     ///
     /// If the directory already exists, it's not an error.
     ///
     /// This function does not create missing parent directories.
-    fn create_dir(&self, relpath: &str) -> io::Result<()>;
+    fn create_dir(&self, relpath: &str) -> Result<()>;
 
     /// Write a complete file.
     ///
@@ -117,16 +131,17 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
 
     /// Get metadata about a file.
-    fn metadata(&self, relpath: &str) -> anyhow::Result<Metadata>;
+    fn metadata(&self, relpath: &str) -> Result<Metadata>;
 
     /// Delete a file.
-    fn remove_file(&self, relpath: &str) -> anyhow::Result<()>;
+    fn remove_file(&self, relpath: &str) -> Result<()>;
 
     /// Delete an empty directory.
-    fn remove_dir(&self, relpath: &str) -> anyhow::Result<()>;
+    // TODO: Maybe just fold this into `metadata`?
+    fn remove_dir(&self, relpath: &str) -> Result<()>;
 
     /// Delete a directory and all its contents.
-    fn remove_dir_all(&self, relpath: &str) -> anyhow::Result<()>;
+    fn remove_dir_all(&self, relpath: &str) -> Result<()>;
 
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;
@@ -167,9 +182,28 @@ pub struct ListDirNames {
 /// A transport error, as a generalization of IO errors.
 #[derive(Debug)]
 pub struct Error {
-    url: Url,
-    kind: ErrorKind,
-    source: Option<anyhow::Error>,
+    pub kind: ErrorKind,
+    /// Might be for example an IO error or S3 error.
+    pub details: ErrorDetails,
+}
+
+/// General categories of transport errors.
+#[derive(Debug, Display, PartialEq, Eq, Clone, Copy)]
+pub enum ErrorKind {
+    #[display(fmt = "Not found")]
+    NotFound,
+    #[display(fmt = "Already exists")]
+    AlreadyExists,
+    #[display(fmt = "Permission denied")]
+    PermissionDenied,
+    #[display(fmt = "Other transport error")]
+    Other,
+}
+
+#[derive(Debug)]
+pub enum ErrorDetails {
+    Io { source: io::Error, path: PathBuf }, // S3(s3::Error),
+    None,
 }
 
 impl Error {
@@ -181,34 +215,46 @@ impl Error {
         let kind = match source.kind() {
             io::ErrorKind::NotFound => ErrorKind::NotFound,
             io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
+            io::ErrorKind::PermissionDenied => ErrorKind::PermissionDenied,
             _ => ErrorKind::Other,
         };
         Error {
-            url: Url::from_file_path(path).expect("Convert path to URL"),
+            details: ErrorDetails::Io {
+                source,
+                path: path.to_owned(),
+            },
             kind,
-            source: Some(source.into()),
         }
+    }
+
+    pub fn is_not_found(&self) -> bool {
+        self.kind == ErrorKind::NotFound
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // source is not in the short format; maybe should be in the alternate format?
-        format!("{kind:?}: {url}", kind = self.kind, url = self.url).fmt(f)
+        match &self.details {
+            ErrorDetails::Io { path, .. } => {
+                write!(f, "{}", self.kind)?;
+                if !path.as_os_str().is_empty() {
+                    write!(f, ": {}", path.display())?;
+                }
+            }
+            ErrorDetails::None => write!(f, "{}", self.kind)?,
+        }
+        Ok(())
     }
 }
 
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.source.as_ref().map(|e| e.as_ref())
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match &self.details {
+            ErrorDetails::Io { source, .. } => Some(source),
+            ErrorDetails::None => None,
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum ErrorKind {
-    NotFound,
-    AlreadyExists,
-    Other,
-}
-
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = result::Result<T, Error>;

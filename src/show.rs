@@ -48,7 +48,7 @@ pub fn show_versions(
     archive: &Archive,
     options: &ShowVersionsOptions,
     w: &mut dyn Write,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     let mut band_ids = archive.list_band_ids()?;
     if options.newest_first {
         band_ids.reverse();
@@ -61,7 +61,7 @@ pub fn show_versions(
         }
         let mut l: Vec<String> = Vec::new();
         l.push(format!("{band_id:<20}"));
-        let band = match Band::open(archive, &band_id) {
+        let band = match Band::open(archive, band_id) {
             Ok(band) => band,
             Err(err) => {
                 error!("Failed to open band {band_id:?}: {err}");
@@ -125,7 +125,7 @@ pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
     let bw = BufWriter::new(w);
     let index_entries: Vec<IndexEntry> = band.index().iter_entries().collect();
     serde_json::ser::to_writer_pretty(bw, &index_entries)
-        .map_err(|source| Error::SerializeIndex { source })
+        .map_err(|source| Error::SerializeJson { source })
 }
 
 pub fn show_entry_names<E: EntryTrait, I: Iterator<Item = E>>(

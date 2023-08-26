@@ -90,7 +90,7 @@ fn unreferenced_blocks() {
 }
 
 #[test]
-fn backup_prevented_by_gc_lock() -> anyhow::Result<()> {
+fn backup_prevented_by_gc_lock() -> Result<()> {
     let archive = ScratchArchive::new();
     let tf = TreeFixture::new();
     tf.create_file("hello");

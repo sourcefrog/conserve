@@ -16,7 +16,6 @@ doc = false
 name = "conserve"
 
 [dependencies]
-anyhow = "1.0"
 assert_matches = "1.5.0"
 blake2-rfc = "0.2.18"
 bytes = "1.1.0"

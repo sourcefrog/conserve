@@ -36,13 +36,13 @@ pub struct ValidateOptions {
 pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
-) -> anyhow::Result<HashMap<BlockHash, u64>> {
+) -> Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
     let start = Instant::now();
     let total_bands = band_ids.len();
     let bar = Bar::new();
     'band: for (bands_done, band_id) in band_ids.iter().enumerate() {
-        let band = match Band::open(archive, band_id) {
+        let band = match Band::open(archive, *band_id) {
             Ok(band) => band,
             Err(err) => {
                 error!(%err, %band_id, "Error opening band");
@@ -78,7 +78,7 @@ fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash
     }
 }
 
-fn validate_stored_tree(st: &StoredTree) -> anyhow::Result<HashMap<BlockHash, u64>> {
+fn validate_stored_tree(st: &StoredTree) -> Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
     // TODO: Check other entry properties are correct.
     // TODO: Check they're in apath order.

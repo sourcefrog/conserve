@@ -41,7 +41,7 @@ pub fn diff(
     st: &StoredTree,
     lt: &LiveTree,
     options: &DiffOptions,
-) -> anyhow::Result<impl Iterator<Item = EntryChange>> {
+) -> Result<impl Iterator<Item = EntryChange>> {
     let readahead = 1000;
     let include_unchanged: bool = options.include_unchanged; // Copy out to avoid lifetime problems in the callback
     let ait = st

@@ -29,7 +29,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use ::metrics::{counter, histogram, increment_counter};
-use anyhow::{bail, Context};
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
 use rayon::prelude::*;
@@ -99,25 +98,19 @@ impl BlockDir {
     }
 
     /// Create a BlockDir directory and return an object accessing it.
-    pub fn create_path(path: &Path) -> anyhow::Result<BlockDir> {
+    pub fn create_path(path: &Path) -> Result<BlockDir> {
         BlockDir::create(Box::new(LocalTransport::new(path)))
     }
 
-    pub fn create(transport: Box<dyn Transport>) -> anyhow::Result<BlockDir> {
-        transport
-            .create_dir("")
-            .context("Failed to create blockdir")?;
+    pub fn create(transport: Box<dyn Transport>) -> Result<BlockDir> {
+        transport.create_dir("")?;
         Ok(BlockDir {
             transport: Arc::from(transport),
         })
     }
 
     /// Returns the number of compressed bytes.
-    pub(crate) fn compress_and_store(
-        &mut self,
-        in_buf: &[u8],
-        hash: &BlockHash,
-    ) -> anyhow::Result<u64> {
+    pub(crate) fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
         // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
         let mut compressor = Compressor::new();
         let uncomp_len = in_buf.len() as u64;
@@ -139,7 +132,7 @@ impl BlockDir {
                     debug!("Unexpected late detection of existing block {hex_hash:?}");
                     Ok(())
                 } else {
-                    Err(err).with_context(|| format!("Failed to write block {hex_hash:?}"))
+                    Err(err)
                 }
             })?;
         Ok(comp_len)
@@ -149,7 +142,7 @@ impl BlockDir {
         &mut self,
         block_data: &[u8],
         stats: &mut BackupStats,
-    ) -> anyhow::Result<BlockHash> {
+    ) -> Result<BlockHash> {
         let hash = self.hash_bytes(block_data);
         let len = block_data.len() as u64;
         if self.contains(&hash)? {
@@ -169,27 +162,30 @@ impl BlockDir {
     }
 
     /// True if the named block is present in this directory.
-    pub fn contains(&self, hash: &BlockHash) -> anyhow::Result<bool> {
-        self.transport.is_file(&block_relpath(hash))
+    pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
+        self.transport
+            .is_file(&block_relpath(hash))
+            .map_err(Error::from)
     }
 
     /// Returns the compressed on-disk size of a block.
-    pub fn compressed_size(&self, hash: &BlockHash) -> anyhow::Result<u64> {
+    pub fn compressed_size(&self, hash: &BlockHash) -> Result<u64> {
         Ok(self.transport.metadata(&block_relpath(hash))?.len)
     }
 
     /// Read back the contents of a block, as a byte array.
     ///
     /// To read a whole file, use StoredFile instead.
-    pub fn get(&self, address: &Address) -> anyhow::Result<(Vec<u8>, Sizes)> {
+    pub fn get(&self, address: &Address) -> Result<(Vec<u8>, Sizes)> {
         let (mut decompressed, sizes) = self.get_block_content(&address.hash)?;
         let len = address.len as usize;
         let start = address.start as usize;
         let actual_len = decompressed.len();
         if (start + len) > actual_len {
-            bail!("Block {address:?} is only {actual_len} bytes long but address references range {start}..{end}",
-                start = start,
-                end = start + len);
+            return Err(Error::AddressTooLong {
+                address: address.clone(),
+                actual_len,
+            });
         }
         if start != 0 {
             let trimmed = decompressed[start..(start + len)].to_owned();
@@ -200,10 +196,10 @@ impl BlockDir {
         }
     }
 
-    pub fn delete_block(&self, hash: &BlockHash) -> anyhow::Result<()> {
+    pub fn delete_block(&self, hash: &BlockHash) -> Result<()> {
         self.transport
             .remove_file(&block_relpath(hash))
-            .with_context(|| format!("Failed to delete block {hash}"))
+            .map_err(Error::from)
     }
 
     /// Return an iterator of block subdirectories, in arbitrary order.
@@ -315,17 +311,14 @@ impl BlockDir {
     /// Return the entire contents of the block.
     ///
     /// Checks that the hash is correct with the contents.
-    pub fn get_block_content(&self, hash: &BlockHash) -> anyhow::Result<(Vec<u8>, Sizes)> {
+    pub fn get_block_content(&self, hash: &BlockHash) -> Result<(Vec<u8>, Sizes)> {
         // TODO: Reuse decompressor buffer.
         // TODO: Reuse read buffer.
         // TODO: Most importantly, cache decompressed blocks!
         increment_counter!("conserve.block.read");
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
-        let compressed_bytes = self
-            .transport
-            .read_file(&block_relpath)
-            .with_context(|| format!("Failed to read block {hash}"))?;
+        let compressed_bytes = self.transport.read_file(&block_relpath)?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::from(blake2b::blake2b(
             BLAKE_HASH_SIZE_BYTES,
@@ -334,7 +327,7 @@ impl BlockDir {
         ));
         if actual_hash != *hash {
             error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
-            bail!("Block file {block_relpath:?} has actual decompressed hash {actual_hash}");
+            return Err(Error::BlockCorrupt { hash: hash.clone() });
         }
         let sizes = Sizes {
             uncompressed: decompressed_bytes.len() as u64,

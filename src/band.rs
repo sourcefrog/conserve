@@ -23,7 +23,6 @@
 
 use std::borrow::Cow;
 
-use anyhow::{ensure, Context};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -128,14 +127,14 @@ impl Band {
     /// Make a new band (and its on-disk directory).
     ///
     /// The Band gets the next id after those that already exist.
-    pub fn create(archive: &Archive) -> anyhow::Result<Band> {
+    pub fn create(archive: &Archive) -> Result<Band> {
         Band::create_with_flags(archive, flags::DEFAULT)
     }
 
     pub fn create_with_flags(
         archive: &Archive,
         format_flags: &[Cow<'static, str>],
-    ) -> anyhow::Result<Band> {
+    ) -> Result<Band> {
         format_flags
             .iter()
             .for_each(|f| assert!(flags::SUPPORTED.contains(&f.as_ref()), "unknown flag {f:?}"));
@@ -143,10 +142,8 @@ impl Band {
             .last_band_id()?
             .map_or_else(BandId::zero, |b| b.next_sibling());
         let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
-        transport
-            .create_dir("")
-            .and_then(|()| transport.create_dir(INDEX_DIR))
-            .context("Failed to create band directory")?;
+        transport.create_dir("")?;
+        transport.create_dir(INDEX_DIR)?;
         let band_format_version = if format_flags.is_empty() {
             Some("0.6.3".to_owned())
         } else {
@@ -157,7 +154,7 @@ impl Band {
             band_format_version,
             format_flags: format_flags.into(),
         };
-        write_json(&transport, BAND_HEAD_FILENAME, &head).context("Failed to write band header")?;
+        write_json(&transport, BAND_HEAD_FILENAME, &head)?;
         Ok(Band {
             band_id,
             head,
@@ -166,7 +163,7 @@ impl Band {
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(&self, index_hunk_count: u64) -> anyhow::Result<()> {
+    pub fn close(&self, index_hunk_count: u64) -> Result<()> {
         write_json(
             &self.transport,
             BAND_TAIL_FILENAME,
@@ -175,18 +172,21 @@ impl Band {
                 index_hunk_count: Some(index_hunk_count),
             },
         )
-        .context("Failed to write band tail")
+        .map_err(Error::from)
     }
 
     /// Open the band with the given id.
-    pub fn open(archive: &Archive, band_id: &BandId) -> anyhow::Result<Band> {
+    pub fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
         let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
-        let head: Head = read_json(&transport, BAND_HEAD_FILENAME)?;
+        let head: Head =
+            read_json(&transport, BAND_HEAD_FILENAME)?.ok_or(Error::BandHeadMissing { band_id })?;
         if let Some(version) = &head.band_format_version {
-            ensure!(
-                band_version_supported(version),
-                "Unsupported band version {version:?} in {band_id}"
-            );
+            if !band_version_supported(version) {
+                return Err(Error::UnsupportedBandVersion {
+                    band_id,
+                    version: version.to_owned(),
+                });
+            }
         } else {
             debug!("Old(?) band {band_id} has no format version");
             // Unmarked, old bands, are accepted for now. In the next archive
@@ -199,10 +199,12 @@ impl Band {
             .filter(|f| !flags::SUPPORTED.contains(&f.as_ref()))
             .cloned()
             .collect_vec();
-        ensure!(
-            unsupported_flags.is_empty(),
-            "Unsupported band format flags {unsupported_flags:?} in {band_id}"
-        );
+        if !unsupported_flags.is_empty() {
+            return Err(Error::UnsupportedBandFormatFlags {
+                band_id,
+                unsupported_flags,
+            });
+        }
         Ok(Band {
             band_id: band_id.to_owned(),
             head,
@@ -211,20 +213,28 @@ impl Band {
     }
 
     /// Delete a band.
-    pub fn delete(archive: &Archive, band_id: &BandId) -> anyhow::Result<()> {
+    pub fn delete(archive: &Archive, band_id: BandId) -> Result<()> {
         // TODO: Count how many files were deleted, and the total size?
         archive
             .transport()
             .remove_dir_all(&band_id.to_string())
-            .with_context(|| format!("Failed to delete band {band_id}"))
+            .map_err(|err| {
+                if err.is_not_found() {
+                    Error::BandNotFound { band_id }
+                } else {
+                    Error::from(err)
+                }
+            })
     }
 
-    pub fn is_closed(&self) -> anyhow::Result<bool> {
-        self.transport.is_file(BAND_TAIL_FILENAME)
+    pub fn is_closed(&self) -> Result<bool> {
+        self.transport
+            .is_file(BAND_TAIL_FILENAME)
+            .map_err(Error::from)
     }
 
-    pub fn id(&self) -> &BandId {
-        &self.band_id
+    pub fn id(&self) -> BandId {
+        self.band_id
     }
 
     /// Get the minimum supported version for this band.
@@ -247,19 +257,24 @@ impl Band {
     }
 
     /// Return info about the state of this band.
-    pub fn get_info(&self) -> anyhow::Result<Info> {
-        let tail_option: Option<Tail> = match read_json(&self.transport, BAND_TAIL_FILENAME) {
-            Ok(tail) => Some(tail),
-            Err(jsonio::Error::NotFound { .. }) => None,
-            Err(err) => return Err(err.into()),
-        };
-        let start_time = OffsetDateTime::from_unix_timestamp(self.head.start_time)
-            .context("invalid band start timestamp {self.head.start_time:?}")?;
+    pub fn get_info(&self) -> Result<Info> {
+        let tail_option: Option<Tail> = read_json(&self.transport, BAND_TAIL_FILENAME)?;
+        let start_time =
+            OffsetDateTime::from_unix_timestamp(self.head.start_time).map_err(|_| {
+                Error::InvalidMetadata {
+                    details: format!("Invalid band start timestamp {:?}", self.head.start_time),
+                }
+            })?;
         let end_time = tail_option
             .as_ref()
-            .map(|tail| OffsetDateTime::from_unix_timestamp(tail.end_time))
-            .transpose()
-            .context("invalid end timestamp {tail.end_time:?}")?;
+            .map(|tail| {
+                OffsetDateTime::from_unix_timestamp(tail.end_time).map_err(|_| {
+                    Error::InvalidMetadata {
+                        details: format!("Invalid band end timestamp {:?}", tail.end_time),
+                    }
+                })
+            })
+            .transpose()?;
         Ok(Info {
             id: self.band_id,
             is_closed: tail_option.is_some(),
@@ -270,8 +285,7 @@ impl Band {
     }
 
     pub fn validate(&self) -> Result<()> {
-        let ListDirNames { mut files, dirs } =
-            self.transport.list_dir_names("").map_err(Error::from)?;
+        let ListDirNames { mut files, dirs } = self.transport.list_dir_names("")?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
             error!(band_id = ?self.band_id, "Band head file missing");
         }
@@ -318,7 +332,7 @@ mod tests {
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_str("b0000").unwrap();
-        let band2 = Band::open(&af, &band_id).expect("failed to re-open band");
+        let band2 = Band::open(&af, band_id).expect("failed to re-open band");
         assert!(band2.is_closed().unwrap());
 
         // Try get_info
@@ -336,7 +350,7 @@ mod tests {
     fn delete_band() {
         let af = ScratchArchive::new();
         let _band = Band::create(&af).unwrap();
-        Band::delete(&af, &BandId::new(&[0])).expect("delete band");
+        Band::delete(&af, BandId::new(&[0])).expect("delete band");
 
         assert!(!af.transport().is_file("b0000").unwrap());
         assert!(!af.transport().is_dir("b0000").unwrap());
@@ -356,7 +370,7 @@ mod tests {
         )
         .unwrap();
 
-        let e = Band::open(&af, &BandId::zero());
+        let e = Band::open(&af, BandId::zero());
         let e_str = e.unwrap_err().to_string();
         assert!(
             e_str.contains("Unsupported band version \"8888.8.8\" in b0000"),
