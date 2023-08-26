@@ -265,17 +265,16 @@ impl Band {
                     details: format!("Invalid band start timestamp {:?}", self.head.start_time),
                 }
             })?;
-        let end_time = if let Some(tail) = &tail_option {
-            Some(
+        let end_time = tail_option
+            .as_ref()
+            .map(|tail| {
                 OffsetDateTime::from_unix_timestamp(tail.end_time).map_err(|_| {
                     Error::InvalidMetadata {
                         details: format!("Invalid band end timestamp {:?}", tail.end_time),
                     }
-                })?,
-            )
-        } else {
-            None
-        };
+                })
+            })
+            .transpose()?;
         Ok(Info {
             id: self.band_id,
             is_closed: tail_option.is_some(),
