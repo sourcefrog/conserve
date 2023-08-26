@@ -408,7 +408,7 @@ impl IndexHunkIter {
         self.next_hunk_number += 1;
         let compressed_bytes = match self.transport.read_file(&path) {
             Ok(b) => b,
-            Err(err) if err.kind().is_not_found() => {
+            Err(err) if err.is_not_found() => {
                 // TODO: Cope with one hunk being missing, while there are still
                 // later-numbered hunks. This would require reading the whole
                 // list of hunks first.

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2018, 2020 Martin Pool.
+// Copyright 2015, 2016, 2018, 2020, 2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 use serde::de::DeserializeOwned;
 
 use crate::errors::Error;
-use crate::transport::{self, Transport};
+use crate::transport::Transport;
 use crate::Result;
 
 /// Write uncompressed json to a file on a Transport.
@@ -50,7 +50,7 @@ where
     let bytes = match transport.as_ref().read_file(path) {
         Ok(b) => b,
         Err(err) => {
-            if err.kind().is_not_found() {
+            if err.is_not_found() {
                 return Ok(None);
             } else {
                 return Err(err.into());

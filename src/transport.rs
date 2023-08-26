@@ -200,11 +200,7 @@ pub enum ErrorKind {
     Other,
 }
 
-impl ErrorKind {
-    pub fn is_not_found(&self) -> bool {
-        *self == ErrorKind::NotFound
-    }
-}
+impl ErrorKind {}
 
 #[derive(Debug)]
 pub enum ErrorDetails {
@@ -231,6 +227,10 @@ impl Error {
             },
             kind,
         }
+    }
+
+    pub fn is_not_found(&self) -> bool {
+        self.kind == ErrorKind::NotFound
     }
 }
 
