@@ -20,7 +20,8 @@ jobs:
         with:
           crate: cargo-mutants
       - name: Run mutant tests
-        run: cargo mutants -j2 --no-shuffle -- --all-features
+        # Can't use --all-features here because BLAKE2 SIMD needs unstable...
+        run: cargo mutants -j2 --no-shuffle
       - name: Archive results
         uses: actions/upload-artifact@v3
         with:
