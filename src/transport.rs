@@ -96,15 +96,6 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// memory, and this is simple to support on all implementations.
     fn read_file(&self, path: &str) -> Result<Bytes>;
 
-    /// Check if a directory exists.
-    fn is_dir(&self, path: &str) -> Result<bool> {
-        match self.metadata(path) {
-            Ok(metadata) => Ok(metadata.kind == Kind::Dir),
-            Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
-            Err(err) => Err(err),
-        }
-    }
-
     /// Check if a regular file exists.
     fn is_file(&self, path: &str) -> Result<bool> {
         match self.metadata(path) {

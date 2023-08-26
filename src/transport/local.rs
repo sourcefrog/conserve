@@ -89,12 +89,6 @@ impl Transport for LocalTransport {
         Ok(path.is_file())
     }
 
-    fn is_dir(&self, relpath: &str) -> Result<bool> {
-        increment_counter!("conserve.local_transport.metadata_reads");
-        let path = self.full_path(relpath);
-        Ok(path.is_dir())
-    }
-
     fn create_dir(&self, relpath: &str) -> super::Result<()> {
         let path = self.full_path(relpath);
         create_dir(&path).or_else(|err| {

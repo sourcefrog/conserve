@@ -350,10 +350,12 @@ mod tests {
     fn delete_band() {
         let af = ScratchArchive::new();
         let _band = Band::create(&af).unwrap();
+        assert!(af.transport().is_file("b0000/BANDHEAD").unwrap());
+
         Band::delete(&af, BandId::new(&[0])).expect("delete band");
 
         assert!(!af.transport().is_file("b0000").unwrap());
-        assert!(!af.transport().is_dir("b0000").unwrap());
+        assert!(!af.transport().is_file("b0000/BANDHEAD").unwrap());
     }
 
     #[test]
