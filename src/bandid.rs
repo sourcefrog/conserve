@@ -21,8 +21,7 @@ use serde::Serialize;
 use crate::errors::Error;
 
 /// Identifier for a band within an archive, eg 'b0001'.
-// TODO: `impl Copy`, because it's just an int.
-#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct BandId(u32);
 
 impl BandId {

@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -99,10 +99,10 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
 
     // Backup should fail while gc lock is held.
     let backup_result = backup(&archive, tf.path(), &BackupOptions::default());
-    match backup_result {
-        Err(Error::GarbageCollectionLockHeld) => (),
-        other => panic!("unexpected result {other:?}"),
-    };
+    assert_eq!(
+        backup_result.unwrap_err().to_string(),
+        "Archive is locked for garbage collection"
+    );
 
     // Leak the lock, then gc breaking the lock.
     std::mem::forget(lock1);

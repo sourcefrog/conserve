@@ -128,7 +128,7 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// then renamed.
     ///
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
-    fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()>;
+    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
 
     /// Get metadata about a file.
     fn metadata(&self, relpath: &str) -> Result<Metadata>;
@@ -199,8 +199,6 @@ pub enum ErrorKind {
     #[display(fmt = "Other transport error")]
     Other,
 }
-
-impl ErrorKind {}
 
 #[derive(Debug)]
 pub enum ErrorDetails {

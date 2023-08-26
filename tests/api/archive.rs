@@ -23,7 +23,6 @@ use conserve::archive::Archive;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::Band;
 use conserve::BandId;
-use conserve::Error;
 
 #[test]
 fn create_then_open_archive() {
@@ -46,12 +45,11 @@ fn fails_on_non_empty_directory() {
     temp.child("i am already here").touch().unwrap();
 
     let result = Archive::create_path(temp.path());
-    assert!(result.is_err());
-    if let Err(Error::NewArchiveDirectoryNotEmpty) = result {
-    } else {
-        panic!("expected an error for a non-empty new archive directory")
-    }
-
+    assert_eq!(
+        result.as_ref().unwrap_err().to_string(),
+        "Directory for new archive is not empty",
+        "{result:?}"
+    );
     temp.close().unwrap();
 }
 

@@ -250,20 +250,13 @@ impl IndexWriter {
             self.check_order.check(&self.entries.last().unwrap().apath);
         }
         let relpath = hunk_relpath(self.sequence);
-        let write_error = |source| Error::WriteIndex {
-            path: relpath.clone(),
-            source,
-        };
         let json =
             serde_json::to_vec(&self.entries).map_err(|source| Error::SerializeIndex { source })?;
         if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
             self.transport.create_dir(&subdir_relpath(self.sequence))?;
         }
         let compressed_bytes = self.compressor.compress(&json)?;
-        self.transport
-            .write_file(&relpath, compressed_bytes)
-            .map_err(write_error)?;
-
+        self.transport.write_file(&relpath, compressed_bytes)?;
         self.stats.index_hunks += 1;
         self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
         self.stats.uncompressed_index_bytes += json.len() as u64;

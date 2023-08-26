@@ -23,7 +23,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
-use std::io;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -127,16 +126,13 @@ impl BlockDir {
         histogram!("conserve.block.write_compressed_bytes", comp_len as f64);
         self.transport
             .write_file(&relpath, compressed)
-            .or_else(|io_err| {
-                if io_err.kind() == io::ErrorKind::AlreadyExists {
+            .or_else(|err| {
+                if err.kind() == transport::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
                     debug!("Unexpected late detection of existing block {hex_hash:?}");
                     Ok(())
                 } else {
-                    Err(Error::WriteBlock {
-                        hash: hex_hash,
-                        source: io_err,
-                    })
+                    Err(err)
                 }
             })?;
         Ok(comp_len)
@@ -187,7 +183,7 @@ impl BlockDir {
         let actual_len = decompressed.len();
         if (start + len) > actual_len {
             return Err(Error::AddressTooLong {
-                address: address.to_owned(),
+                address: address.clone(),
                 actual_len,
             });
         }
@@ -330,11 +326,8 @@ impl BlockDir {
             decompressed_bytes,
         ));
         if actual_hash != *hash {
-            error!("Block file {block_relpath:?} has actual decompressed hash {actual_hash}");
-            return Err(Error::BlockCorrupt {
-                hash: hash.to_string(),
-                actual_hash: actual_hash.to_string(),
-            });
+            error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
+            return Err(Error::BlockCorrupt { hash: hash.clone() });
         }
         let sizes = Sizes {
             uncompressed: decompressed_bytes.len() as u64,

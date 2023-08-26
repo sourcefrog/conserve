@@ -55,13 +55,13 @@ impl GarbageCollectionLock {
     pub fn new(archive: &Archive) -> Result<GarbageCollectionLock> {
         let archive = archive.clone();
         let band_id = archive.last_band_id()?;
-        if let Some(band_id) = band_id.clone() {
+        if let Some(band_id) = band_id {
             if !archive.band_is_closed(&band_id)? {
                 return Err(Error::DeleteWithIncompleteBackup { band_id });
             }
         }
         if archive.transport().is_file(GC_LOCK).unwrap_or(true) {
-            return Err(Error::GarbageCollectionLockHeld {});
+            return Err(Error::GarbageCollectionLockHeld);
         }
         archive.transport().write_file(GC_LOCK, b"{}\n")?;
         Ok(GarbageCollectionLock { archive, band_id })
@@ -90,7 +90,7 @@ impl GarbageCollectionLock {
         if self.band_id == current_last_band_id {
             Ok(())
         } else {
-            Err(Error::DeleteWithConcurrentActivity)
+            Err(Error::GarbageCollectionLockHeldDuringBackup)
         }
     }
 }
@@ -161,10 +161,10 @@ mod test {
         let _lock1 = GarbageCollectionLock::new(&archive).unwrap();
         // Should not be able to create a second lock while one gc is running.
         let lock2_result = GarbageCollectionLock::new(&archive);
-        match lock2_result {
-            Err(Error::GarbageCollectionLockHeld) => (),
-            other => panic!("unexpected result {other:?}"),
-        };
+        assert_eq!(
+            lock2_result.unwrap_err().to_string(),
+            "Archive is locked for garbage collection"
+        );
     }
 
     #[test]

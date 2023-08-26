@@ -14,7 +14,6 @@
 //! Command-line entry point for Conserve backups.
 
 use std::cell::RefCell;
-use std::error::Error;
 use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -540,7 +539,7 @@ fn stored_tree_from_opt(archive_location: &str, backup: &Option<BandId>) -> Resu
 
 fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolicy {
     if let Some(band_id) = backup {
-        BandSelectionPolicy::Specified(band_id.clone())
+        BandSelectionPolicy::Specified(*band_id)
     } else {
         BandSelectionPolicy::Latest
     }
@@ -619,12 +618,7 @@ fn main() -> Result<ExitCode> {
     }
     match result {
         Err(err) => {
-            error!("{err}");
-            let mut err: &dyn Error = &err;
-            while let Some(source) = err.source() {
-                error!("caused by: {source}");
-                err = source;
-            }
+            error!("{err:#}");
             debug!(error_count, warn_count,);
             Ok(ExitCode::Failure)
         }

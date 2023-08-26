@@ -26,7 +26,6 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, warn};
 
 use crate::blockhash::BlockHash;
-use crate::errors::Error;
 use crate::jsonio::{read_json, write_json};
 use crate::kind::Kind;
 use crate::progress::{Bar, Progress};
@@ -148,8 +147,8 @@ impl Archive {
         match band_selection {
             BandSelectionPolicy::LatestClosed => self
                 .last_complete_band()?
-                .map(|band| band.id().clone())
-                .ok_or(Error::ArchiveEmpty),
+                .map(|band| *band.id())
+                .ok_or(Error::NoCompleteBands),
             BandSelectionPolicy::Specified(band_id) => Ok(band_id),
             BandSelectionPolicy::Latest => self.last_band_id()?.ok_or(Error::ArchiveEmpty),
         }
@@ -167,8 +166,7 @@ impl Archive {
         // problem. Validate does.
         Ok(self
             .transport
-            .list_dir_names("")
-            .map_err(|source| Error::ListBands { source })?
+            .list_dir_names("")?
             .dirs
             .into_iter()
             .filter(|dir_name| dir_name != BLOCK_DIR)
@@ -375,11 +373,7 @@ impl Archive {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
-        for entry_result in self
-            .transport
-            .iter_dir_entries("")
-            .map_err(|source| Error::ListBands { source })?
-        {
+        for entry_result in self.transport.iter_dir_entries("")? {
             match entry_result {
                 Ok(DirEntry {
                     kind: Kind::Dir,
@@ -387,7 +381,7 @@ impl Archive {
                     ..
                 }) => {
                     if let Ok(band_id) = name.parse::<BandId>() {
-                        if !seen_bands.insert(band_id.clone()) {
+                        if !seen_bands.insert(band_id) {
                             // TODO: Test this
                             error!(%band_id, "Duplicated band directory");
                         }

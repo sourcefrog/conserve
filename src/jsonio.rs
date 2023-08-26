@@ -13,11 +13,35 @@
 
 //! Read and write JSON files.
 
+use std::io;
+use std::path::PathBuf;
+
 use serde::de::DeserializeOwned;
 
-use crate::errors::Error;
-use crate::transport::Transport;
-use crate::Result;
+use crate::transport::{self, Transport};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("IO error")]
+    Io {
+        #[from]
+        source: io::Error,
+    },
+
+    #[error("JSON serialization error")]
+    Json {
+        source: serde_json::Error,
+        path: PathBuf,
+    },
+
+    #[error("Transport error")]
+    Transport {
+        #[from]
+        source: transport::Error,
+    },
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Write uncompressed json to a file on a Transport.
 pub(crate) fn write_json<T, TR>(transport: &TR, relpath: &str, obj: &T) -> Result<()>
@@ -25,18 +49,15 @@ where
     T: serde::Serialize,
     TR: AsRef<dyn Transport>,
 {
-    let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::SerializeJson {
-        path: relpath.to_string(),
+    let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::Json {
         source,
+        path: relpath.into(),
     })?;
     s.push('\n');
     transport
         .as_ref()
         .write_file(relpath, s.as_bytes())
-        .map_err(|source| Error::WriteMetadata {
-            path: relpath.to_owned(),
-            source,
-        })
+        .map_err(Error::from)
 }
 
 /// Read and deserialize uncompressed json from a file on a Transport.
@@ -54,7 +75,7 @@ where
     };
     serde_json::from_slice(&bytes)
         .map(|t| Some(t))
-        .map_err(|source| Error::DeserializeJson {
+        .map_err(|source| Error::Json {
             source,
             // TODO: Full path from the transport?
             path: path.into(),

@@ -81,7 +81,9 @@ fn clean_error_on_non_archive() {
         .arg(".")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Not a Conserve archive"));
+        .stderr(predicate::str::contains(
+            "Not a Conserve archive (no CONSERVE header found)",
+        ));
 }
 
 #[test]
@@ -276,7 +278,9 @@ fn basic_backup() {
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Destination directory not empty"));
+        .stderr(predicate::str::contains(
+            "Destination directory is not empty",
+        ));
 
     // Restore with specified band id / backup version.
     {
@@ -317,14 +321,14 @@ fn empty_archive() {
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Archive has no bands"));
+        .stderr(predicate::str::contains("Archive is empty"));
 
     run_conserve()
         .arg("ls")
         .arg(&adir)
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Archive has no bands"));
+        .stderr(predicate::str::contains("Archive is empty"));
 
     run_conserve()
         .arg("versions")

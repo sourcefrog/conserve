@@ -289,8 +289,8 @@ fn store_file_content(
     let mut addresses = Vec::<Address>::with_capacity(1);
     loop {
         read_with_retries(&mut buffer, MAX_BLOCK_SIZE, from_file).map_err(|source| {
-            Error::StoreFile {
-                apath: apath.to_owned(),
+            Error::ReadSourceFile {
+                path: apath.to_string().into(),
                 source,
             }
         })?;
@@ -408,12 +408,13 @@ impl FileCombiner {
             return Ok(());
         }
         self.buf.resize(start + expected_len, 0);
-        let len = from_file
-            .read(&mut self.buf[start..])
-            .map_err(|source| Error::StoreFile {
-                apath: entry.apath().to_owned(),
-                source,
-            })?;
+        let len =
+            from_file
+                .read(&mut self.buf[start..])
+                .map_err(|source| Error::ReadSourceFile {
+                    path: entry.apath.to_string().into(),
+                    source,
+                })?;
         self.buf.truncate(start + len);
         if len == 0 {
             self.stats.empty_files += 1;

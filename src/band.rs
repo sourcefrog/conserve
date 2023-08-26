@@ -172,19 +172,18 @@ impl Band {
                 index_hunk_count: Some(index_hunk_count),
             },
         )
+        .map_err(Error::from)
     }
 
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
         let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
-        let head: Head =
-            read_json(&transport, BAND_HEAD_FILENAME)?.ok_or_else(|| Error::BandHeadMissing {
-                band_id: band_id.clone(),
-            })?;
+        let head: Head = read_json(&transport, BAND_HEAD_FILENAME)?
+            .ok_or(Error::BandHeadMissing { band_id: *band_id })?;
         if let Some(version) = &head.band_format_version {
             if !band_version_supported(version) {
                 return Err(Error::UnsupportedBandVersion {
-                    band_id: band_id.to_owned(),
+                    band_id: *band_id,
                     version: version.to_owned(),
                 });
             }
@@ -202,11 +201,10 @@ impl Band {
             .collect_vec();
         if !unsupported_flags.is_empty() {
             return Err(Error::UnsupportedBandFormatFlags {
-                band_id: band_id.clone(),
+                band_id: *band_id,
                 unsupported_flags,
             });
         }
-
         Ok(Band {
             band_id: band_id.to_owned(),
             head,
@@ -220,11 +218,12 @@ impl Band {
         archive
             .transport()
             .remove_dir_all(&band_id.to_string())
-            .map_err(|err| match err.kind {
-                transport::ErrorKind::NotFound => Error::BandNotFound {
-                    band_id: band_id.clone(),
-                },
-                _ => Error::from(err),
+            .map_err(|err| {
+                if err.is_not_found() {
+                    Error::BandNotFound { band_id: *band_id }
+                } else {
+                    Error::from(err)
+                }
             })
     }
 
@@ -260,13 +259,25 @@ impl Band {
     /// Return info about the state of this band.
     pub fn get_info(&self) -> Result<Info> {
         let tail_option: Option<Tail> = read_json(&self.transport, BAND_TAIL_FILENAME)?;
-        let start_time = OffsetDateTime::from_unix_timestamp(self.head.start_time)
-            .expect("invalid band start timestamp");
-        let end_time = tail_option.as_ref().map(|tail| {
-            OffsetDateTime::from_unix_timestamp(tail.end_time).expect("invalid end timestamp")
-        });
+        let start_time =
+            OffsetDateTime::from_unix_timestamp(self.head.start_time).map_err(|_| {
+                Error::InvalidMetadata {
+                    details: format!("Invalid band start timestamp {:?}", self.head.start_time),
+                }
+            })?;
+        let end_time = if let Some(tail) = &tail_option {
+            Some(
+                OffsetDateTime::from_unix_timestamp(tail.end_time).map_err(|_| {
+                    Error::InvalidMetadata {
+                        details: format!("Invalid band end timestamp {:?}", tail.end_time),
+                    }
+                })?,
+            )
+        } else {
+            None
+        };
         Ok(Info {
-            id: self.band_id.clone(),
+            id: self.band_id,
             is_closed: tail_option.is_some(),
             start_time,
             end_time,
@@ -364,7 +375,7 @@ mod tests {
         let e = Band::open(&af, &BandId::zero());
         let e_str = e.unwrap_err().to_string();
         assert!(
-            e_str.contains("Band version \"8888.8.8\" in"),
+            e_str.contains("Unsupported band version \"8888.8.8\" in b0000"),
             "bad band version: {e_str:#?}"
         );
     }

@@ -24,6 +24,7 @@ use crate::stored_file::StoredFile;
 use crate::*;
 
 /// Read index and file contents for a version stored in the archive.
+#[derive(Debug)]
 pub struct StoredTree {
     band: Band,
     archive: Archive,
@@ -62,7 +63,7 @@ impl ReadTree for StoredTree {
     // TODO: Should return an iter of Result<Entry> so that we can inspect them...
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
         Ok(
-            IterStitchedIndexHunks::new(&self.archive, Some(self.band.id().clone()))
+            IterStitchedIndexHunks::new(&self.archive, Some(*self.band.id()))
                 .iter_entries(subtree, exclude),
         )
     }
@@ -112,11 +113,12 @@ mod test {
     #[test]
     pub fn cant_open_no_versions() {
         let af = ScratchArchive::new();
-        match af.open_stored_tree(BandSelectionPolicy::Latest) {
-            Err(Error::ArchiveEmpty) => (),
-            Err(other) => panic!("unexpected result {other:?}"),
-            Ok(_) => panic!("unexpected success"),
-        }
+        assert_eq!(
+            af.open_stored_tree(BandSelectionPolicy::Latest)
+                .unwrap_err()
+                .to_string(),
+            "Archive is empty"
+        );
     }
 
     #[test]

@@ -108,7 +108,7 @@ pub fn show_versions(
         if options.tree_size {
             let tree_mb_str = crate::misc::bytes_to_human_mb(
                 archive
-                    .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))?
+                    .open_stored_tree(BandSelectionPolicy::Specified(band_id))?
                     .size(Exclude::nothing())?
                     .file_bytes,
             );

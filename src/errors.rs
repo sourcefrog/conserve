@@ -26,8 +26,8 @@ use crate::*;
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Block file {hash:?} corrupt; actual hash {actual_hash:?}")]
-    BlockCorrupt { hash: String, actual_hash: String },
+    #[error("Block file {hash:?} corrupt: does not have the expected hash")]
+    BlockCorrupt { hash: BlockHash },
 
     #[error("{address:?} extends beyond decompressed block length {actual_len:?}")]
     AddressTooLong { address: Address, actual_len: usize },
@@ -54,7 +54,7 @@ pub enum Error {
     #[error("Failed to list block files")]
     ListBlocks { source: io::Error },
 
-    #[error("Not a Conserve archive")]
+    #[error("Not a Conserve archive (no CONSERVE header found)")]
     NotAnArchive {},
 
     #[error("Failed to read archive header")]
@@ -67,27 +67,23 @@ pub enum Error {
     )]
     UnsupportedArchiveVersion { version: String },
 
-    #[error(
-        "Band version {version:?} in {band_id} is not supported by Conserve {}",
-        crate::version()
-    )]
+    #[error("Unsupported band version {version:?} in {band_id}")]
     UnsupportedBandVersion { band_id: BandId, version: String },
 
-    #[error(
-        "Band {band_id} has feature flags {unsupported_flags:?} \
-        not supported by Conserve {conserve_version}",
-        conserve_version = crate::version()
-    )]
+    #[error("Archive is empty")]
+    ArchiveEmpty,
+
+    #[error("Archive has no complete bands")]
+    NoCompleteBands,
+
+    #[error("Unsupported band format flags {unsupported_flags:?} in {band_id}")]
     UnsupportedBandFormatFlags {
         band_id: BandId,
         unsupported_flags: Vec<Cow<'static, str>>,
     },
 
-    #[error("Destination directory not empty: {:?}", path)]
-    DestinationNotEmpty { path: PathBuf },
-
-    #[error("Archive has no bands")]
-    ArchiveEmpty,
+    #[error("Destination directory is not empty")]
+    DestinationNotEmpty,
 
     #[error("Directory for new archive is not empty")]
     NewArchiveDirectoryNotEmpty,
@@ -124,6 +120,9 @@ pub enum Error {
 
     #[error("Archive is locked for garbage collection")]
     GarbageCollectionLockHeld,
+
+    #[error("A backup was created while the garbage collection lock was held; CHECK ARCHIVE NOW")]
+    GarbageCollectionLockHeldDuringBackup,
 
     #[error(transparent)]
     ParseGlob {
@@ -163,6 +162,9 @@ pub enum Error {
 
     #[error("Metadata file not found: {:?}", path)]
     MetadataNotFound { path: String, source: io::Error },
+
+    #[error("Invalid metadata: {details}")]
+    InvalidMetadata { details: String },
 
     #[error("Band not found: {band_id}")]
     BandNotFound { band_id: BandId },
@@ -225,4 +227,14 @@ pub enum Error {
         #[from]
         source: transport::Error,
     },
+}
+
+impl From<jsonio::Error> for Error {
+    fn from(value: jsonio::Error) -> Self {
+        match value {
+            jsonio::Error::Io { source } => Error::IOError { source },
+            jsonio::Error::Json { source, path } => Error::DeserializeJson { source, path }, // conflates serialize/deserialize
+            jsonio::Error::Transport { source } => Error::Transport { source },
+        }
+    }
 }
