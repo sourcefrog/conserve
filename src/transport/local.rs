@@ -63,23 +63,24 @@ impl Transport for LocalTransport {
 
     fn read_file(&self, relpath: &str) -> Result<Bytes> {
         increment_counter!("conserve.local_transport.read_files");
-        let path = self.full_path(relpath);
-        let fail = |err| Error::io_error(&path, err);
-        let mut file = File::open(&path).map_err(fail)?;
-        let estimated_len: usize = file
-            .metadata()
-            .map_err(fail)?
-            .len()
-            .try_into()
-            .expect("File size fits in usize");
-        let mut out_buf = Vec::with_capacity(estimated_len);
-        let actual_len = file.read_to_end(&mut out_buf).map_err(fail)?;
-        counter!(
-            "conserve.local_transport.read_file_bytes",
-            actual_len as u64
-        );
-        out_buf.truncate(actual_len);
-        Ok(out_buf.into())
+        fn try_block(path: &Path) -> io::Result<Bytes> {
+            let mut file = File::open(path)?;
+            let estimated_len: usize = file
+                .metadata()?
+                .len()
+                .try_into()
+                .expect("File size fits in usize");
+            let mut out_buf = Vec::with_capacity(estimated_len);
+            let actual_len = file.read_to_end(&mut out_buf)?;
+            counter!(
+                "conserve.local_transport.read_file_bytes",
+                actual_len as u64
+            );
+            out_buf.truncate(actual_len);
+            Ok(out_buf.into())
+        }
+        let path = &self.full_path(relpath);
+        try_block(path).map_err(|err| Error::io_error(path, err))
     }
 
     fn is_file(&self, relpath: &str) -> Result<bool> {
