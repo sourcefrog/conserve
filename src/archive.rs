@@ -27,10 +27,9 @@ use tracing::{debug, error, warn};
 
 use crate::blockhash::BlockHash;
 use crate::jsonio::{read_json, write_json};
-use crate::kind::Kind;
 use crate::progress::{Bar, Progress};
 use crate::transport::local::LocalTransport;
-use crate::transport::{DirEntry, Transport};
+use crate::transport::Transport;
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -226,7 +225,7 @@ impl Archive {
         let referenced = self.referenced_blocks(&self.list_band_ids()?)?;
         Ok(self
             .block_dir()
-            .block_names()?
+            .iter_block_names()?
             .filter(move |h| !referenced.contains(h)))
     }
 
@@ -373,43 +372,28 @@ impl Archive {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
-        for entry_result in self.transport.iter_dir_entries("")? {
-            match entry_result {
-                Ok(DirEntry {
-                    kind: Kind::Dir,
-                    name,
-                    ..
-                }) => {
-                    if let Ok(band_id) = name.parse::<BandId>() {
-                        if !seen_bands.insert(band_id) {
-                            // TODO: Test this
-                            error!(%band_id, "Duplicated band directory");
-                        }
-                    } else if !name.eq_ignore_ascii_case(BLOCK_DIR) {
-                        // TODO: The whole path not just the filename
-                        warn!(path = name, "Unexpected subdirectory in archive directory");
-                    }
+        let list_dir = self.transport.list_dir("")?;
+        for dir_name in list_dir.dirs {
+            if let Ok(band_id) = dir_name.parse::<BandId>() {
+                if !seen_bands.insert(band_id) {
+                    // TODO: Test this
+                    error!(%band_id, "Duplicated band directory");
                 }
-                Ok(DirEntry {
-                    kind: Kind::File,
-                    name,
-                    ..
-                }) => {
-                    if !name.eq_ignore_ascii_case(HEADER_FILENAME)
-                        && !name.eq_ignore_ascii_case(crate::gc_lock::GC_LOCK)
-                        && !name.eq_ignore_ascii_case(".DS_Store")
-                    {
-                        // TODO: The whole path not just the filename
-                        warn!(path = name, "Unexpected file in archive directory");
-                    }
-                }
-                Ok(DirEntry { name, .. }) => {
-                    // TODO: The whole path not just the filename
-                    warn!(path = name, "Unexpected file in archive directory");
-                }
-                Err(err) => {
-                    error!(%err, "Error listing archive directory");
-                }
+            } else if !dir_name.eq_ignore_ascii_case(BLOCK_DIR) {
+                // TODO: The whole path not just the filename
+                warn!(
+                    path = dir_name,
+                    "Unexpected subdirectory in archive directory"
+                );
+            }
+        }
+        for name in list_dir.files {
+            if !name.eq_ignore_ascii_case(HEADER_FILENAME)
+                && !name.eq_ignore_ascii_case(crate::gc_lock::GC_LOCK)
+                && !name.eq_ignore_ascii_case(".DS_Store")
+            {
+                // TODO: The whole path not just the filename
+                warn!(path = name, "Unexpected file in archive directory");
             }
         }
         Ok(())

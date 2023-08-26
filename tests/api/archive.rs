@@ -83,7 +83,7 @@ fn empty_archive() {
             .len(),
         0
     );
-    assert_eq!(af.block_dir().block_names().unwrap().count(), 0);
+    assert_eq!(af.block_dir().iter_block_names().unwrap().count(), 0);
 }
 
 #[test]
@@ -115,5 +115,5 @@ fn create_bands() {
             .len(),
         0
     );
-    assert_eq!(af.block_dir().block_names().unwrap().count(), 0);
+    assert_eq!(af.block_dir().iter_block_names().unwrap().count(), 0);
 }

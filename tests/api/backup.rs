@@ -168,7 +168,7 @@ fn check_backup(af: &ScratchArchive) {
     );
     assert_eq!(
         af.block_dir()
-            .block_names()
+            .iter_block_names()
             .unwrap()
             .map(|h| h.to_string())
             .collect::<Vec<String>>(),
@@ -406,7 +406,7 @@ fn small_files_combined_two_backups() {
     assert_eq!(stats2.written_blocks, 1);
     assert_eq!(stats2.combined_blocks, 1);
 
-    assert_eq!(af.block_dir().block_names().unwrap().count(), 2);
+    assert_eq!(af.block_dir().iter_block_names().unwrap().count(), 2);
 }
 
 #[test]

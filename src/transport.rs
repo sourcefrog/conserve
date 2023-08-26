@@ -61,34 +61,12 @@ pub fn open_transport(s: &str) -> crate::Result<Box<dyn Transport>> {
 /// Files in Conserve archives have bounded size and fit in memory so this does not need to
 /// support streaming or partial reads and writes.
 pub trait Transport: Send + Sync + std::fmt::Debug {
-    /// Read the contents of a directory under this transport, without recursing down.
-    ///
-    /// Returned entries are in arbitrary order and may be interleaved with errors.
-    ///
-    /// The result should not contain entries for "." and "..".
-    fn iter_dir_entries(
-        &self,
-        path: &str,
-    ) -> io::Result<Box<dyn Iterator<Item = io::Result<DirEntry>>>>;
-
-    /// As a convenience, read all filenames from the directory into vecs of
-    /// dirs and files.
+    /// List a directory, separating out file and subdirectory names.
     ///
     /// Names are in the arbitrary order that they're returned from the transport.
     ///
     /// Any error during iteration causes overall failure.
-    fn list_dir(&self, relpath: &str) -> io::Result<ListDir> {
-        let mut names = ListDir::default();
-        for dir_entry in self.iter_dir_entries(relpath)? {
-            let dir_entry = dir_entry?;
-            match dir_entry.kind {
-                Kind::Dir => names.dirs.push(dir_entry.name),
-                Kind::File => names.files.push(dir_entry.name),
-                _ => (),
-            }
-        }
-        Ok(names)
-    }
+    fn list_dir(&self, relpath: &str) -> Result<ListDir>;
 
     /// Get one complete file into a caller-provided buffer.
     ///

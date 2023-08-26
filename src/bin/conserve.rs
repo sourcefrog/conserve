@@ -325,7 +325,7 @@ impl Command {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open(open_transport(archive)?)?
                     .block_dir()
-                    .block_names()?
+                    .iter_block_names()?
                 {
                     writeln!(bw, "{hash}")?;
                 }
