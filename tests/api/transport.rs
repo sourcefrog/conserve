@@ -13,7 +13,7 @@
 use assert_fs::prelude::*;
 use url::Url;
 
-use conserve::transport::{open_transport, ListDirNames};
+use conserve::transport::{open_transport, ListDir};
 
 #[test]
 fn open_local() {
@@ -33,7 +33,7 @@ fn list_dir_names() {
     let transport = open_transport(url.as_str()).unwrap();
     dbg!(&transport);
 
-    let ListDirNames { mut files, dirs } = transport.list_dir_names("").unwrap();
+    let ListDir { mut files, dirs } = transport.list_dir("").unwrap();
     assert_eq!(dirs, ["a dir"]);
     files.sort();
     assert_eq!(files, ["a file", "another file"]);

@@ -39,11 +39,10 @@ use tracing::{debug, error, info, warn};
 use crate::backup::BackupStats;
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
-use crate::kind::Kind;
 use crate::progress::{Bar, Progress};
 use crate::stats::Sizes;
 use crate::transport::local::LocalTransport;
-use crate::transport::{DirEntry, ListDirNames, Transport};
+use crate::transport::{ListDir, Transport};
 use crate::*;
 
 const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
@@ -206,7 +205,7 @@ impl BlockDir {
     ///
     /// Errors, other than failure to open the directory at all, are logged and discarded.
     fn subdirs(&self) -> Result<Vec<String>> {
-        let ListDirNames { mut dirs, .. } = self.transport.list_dir_names("")?;
+        let ListDir { mut dirs, .. } = self.transport.list_dir("")?;
         dirs.retain(|dirname| {
             if dirname.len() == SUBDIR_NAME_CHARS {
                 true
@@ -218,49 +217,32 @@ impl BlockDir {
         Ok(dirs)
     }
 
-    fn iter_block_dir_entries(&self) -> Result<impl Iterator<Item = DirEntry>> {
+    /// Return all the blocknames in the blockdir, in arbitrary order.
+    pub fn iter_block_names(&self) -> Result<impl Iterator<Item = BlockHash>> {
+        // TODO: Read subdirs in parallel.
         let transport = self.transport.clone();
         Ok(self
             .subdirs()?
             .into_iter()
-            .map(move |subdir_name| transport.iter_dir_entries(&subdir_name))
+            .map(move |subdir_name| transport.list_dir(&subdir_name))
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
                     error!(%err, "Error listing block subdirectory");
                 }
                 iter_or.ok()
             })
-            .flatten()
-            .filter_map(|iter_or| {
-                if let Err(ref err) = iter_or {
-                    error!(%err, "Error listing block subdirectory");
-                }
-                iter_or.ok()
-            })
-            .filter(|DirEntry { name, kind, .. }| {
-                *kind == Kind::File
-                    && name.len() == BLOCKDIR_FILE_NAME_LEN
-                    && !name.starts_with(TMP_PREFIX)
-            }))
-    }
-
-    /// Return all the blocknames in the blockdir, in arbitrary order.
-    pub fn block_names(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        // TODO: Report errors
-        Ok(self
-            .iter_block_dir_entries()?
-            .filter_map(|de| de.name.parse().ok()))
+            .flat_map(|ListDir { files, .. }| files)
+            .filter(|name| name.len() == BLOCKDIR_FILE_NAME_LEN && !name.starts_with(TMP_PREFIX))
+            .filter_map(|name| name.parse().ok()))
     }
 
     /// Return all the blocknames in the blockdir, while showing progress.
     pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
         // TODO: We could estimate time remaining by accounting for how
         // many prefixes are present and how many have been read.
-        // TODO: Read prefixes in parallel.
         let bar = Bar::new();
         Ok(self
-            .iter_block_dir_entries()?
-            .filter_map(|de| de.name.parse().ok())
+            .iter_block_names()?
             .enumerate()
             .map(|(count, hash)| {
                 bar.post(Progress::ListBlocks { count });
@@ -277,6 +259,7 @@ impl BlockDir {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
+        // TODO: Warn on blocks in the wrong subdir.
         debug!("Start list blocks");
         let blocks = self.block_names_set()?;
         let total_blocks = blocks.len();

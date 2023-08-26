@@ -20,8 +20,9 @@ use std::path::{Path, PathBuf};
 
 use bytes::Bytes;
 use metrics::{counter, increment_counter};
+use tracing::warn;
 
-use super::{DirEntry, Error, Metadata, Result, Transport};
+use super::{Error, ListDir, Metadata, Result, Transport};
 
 #[derive(Clone, Debug)]
 pub struct LocalTransport {
@@ -43,22 +44,29 @@ impl LocalTransport {
 }
 
 impl Transport for LocalTransport {
-    fn iter_dir_entries(
-        &self,
-        relpath: &str,
-    ) -> io::Result<Box<dyn Iterator<Item = io::Result<DirEntry>>>> {
+    fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         // Archives should never normally contain non-UTF-8 (or even non-ASCII) filenames, but
         // let's pass them back as lossy UTF-8 so they can be reported at a higher level, for
         // example during validation.
-        let full_path = self.full_path(relpath);
+        let path = self.full_path(relpath);
         increment_counter!("conserve.local_transport.read_dirs");
-        Ok(Box::new(full_path.read_dir()?.map(move |de_result| {
-            let de = de_result?;
-            Ok(DirEntry {
-                name: de.file_name().to_string_lossy().into(),
-                kind: de.file_type()?.into(),
-            })
-        })))
+        let fail = |err| Error::io_error(&path, err);
+        let mut names = ListDir::default();
+        for dir_entry in path.read_dir().map_err(fail)? {
+            let dir_entry = dir_entry.map_err(fail)?;
+            if let Ok(name) = dir_entry.file_name().into_string() {
+                match dir_entry.file_type().map_err(fail)? {
+                    t if t.is_dir() => names.dirs.push(name),
+                    t if t.is_file() => names.files.push(name),
+                    _ => (),
+                }
+            } else {
+                // These should never normally exist in archive directories, so warn
+                // and continue.
+                warn!("Non-UTF-8 filename in archive {:?}", dir_entry.file_name());
+            }
+        }
+        Ok(names)
     }
 
     fn read_file(&self, relpath: &str) -> Result<Bytes> {
@@ -87,12 +95,6 @@ impl Transport for LocalTransport {
         increment_counter!("conserve.local_transport.metadata_reads");
         let path = self.full_path(relpath);
         Ok(path.is_file())
-    }
-
-    fn is_dir(&self, relpath: &str) -> Result<bool> {
-        increment_counter!("conserve.local_transport.metadata_reads");
-        let path = self.full_path(relpath);
-        Ok(path.is_dir())
     }
 
     fn create_dir(&self, relpath: &str) -> super::Result<()> {
@@ -136,11 +138,6 @@ impl Transport for LocalTransport {
         std::fs::remove_file(&path).map_err(|err| super::Error::io_error(&path, err))
     }
 
-    fn remove_dir(&self, relpath: &str) -> super::Result<()> {
-        let path = self.full_path(relpath);
-        std::fs::remove_dir(&path).map_err(|err| super::Error::io_error(&path, err))
-    }
-
     fn remove_dir_all(&self, relpath: &str) -> super::Result<()> {
         let path = self.full_path(relpath);
         std::fs::remove_dir_all(&path).map_err(|err| super::Error::io_error(&path, err))
@@ -164,11 +161,6 @@ impl Transport for LocalTransport {
 
     fn url_scheme(&self) -> &'static str {
         "file"
-    }
-
-    fn url(&self) -> String {
-        // TODO: An actual URL.
-        self.root.to_string_lossy().into()
     }
 }
 
@@ -231,41 +223,16 @@ mod test {
             .unwrap();
 
         let transport = LocalTransport::new(temp.path());
-        let mut root_list: Vec<_> = transport
-            .iter_dir_entries(".")
-            .unwrap()
-            .map(std::io::Result::unwrap)
-            .collect();
-        assert_eq!(root_list.len(), 2);
-        root_list.sort();
-
-        assert_eq!(
-            root_list[0],
-            DirEntry {
-                name: "root file".to_owned(),
-                kind: Kind::File,
-            }
-        );
-
-        // Len is unpredictable for directories, so check the other fields.
-        assert_eq!(root_list[1].name, "subdir");
-        assert_eq!(root_list[1].kind, Kind::Dir);
+        let root_list = transport.list_dir(".").unwrap();
+        assert_eq!(root_list.files, ["root file"]);
+        assert_eq!(root_list.dirs, ["subdir"]);
 
         assert!(transport.is_file("root file").unwrap());
         assert!(!transport.is_file("nuh-uh").unwrap());
 
-        let subdir_list: Vec<_> = transport
-            .iter_dir_entries("subdir")
-            .unwrap()
-            .map(std::io::Result::unwrap)
-            .collect();
-        assert_eq!(
-            subdir_list,
-            vec![DirEntry {
-                name: "subfile".to_owned(),
-                kind: Kind::File,
-            }]
-        );
+        let subdir_list = transport.list_dir("subdir").unwrap();
+        assert_eq!(subdir_list.files, ["subfile"]);
+        assert_eq!(subdir_list.dirs, [""; 0]);
 
         temp.close().unwrap();
     }
@@ -310,14 +277,10 @@ mod test {
         transport.create_dir("aaa/bbb").unwrap();
 
         let sub_transport = transport.sub_transport("aaa");
-        let sub_list: Vec<DirEntry> = sub_transport
-            .iter_dir_entries("")
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
+        let sub_list = sub_transport.list_dir("").unwrap();
 
-        assert_eq!(sub_list.len(), 1);
-        assert_eq!(sub_list[0].name, "bbb");
+        assert_eq!(sub_list.dirs, ["bbb"]);
+        assert_eq!(sub_list.files, [""; 0]);
 
         temp.close().unwrap();
     }

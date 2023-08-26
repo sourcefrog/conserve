@@ -30,7 +30,7 @@ use tracing::{debug, error, warn};
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
-use crate::transport::{ListDirNames, Transport};
+use crate::transport::{ListDir, Transport};
 use crate::*;
 
 static INDEX_DIR: &str = "i";
@@ -285,7 +285,7 @@ impl Band {
     }
 
     pub fn validate(&self) -> Result<()> {
-        let ListDirNames { mut files, dirs } = self.transport.list_dir_names("")?;
+        let ListDir { mut files, dirs } = self.transport.list_dir("")?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
             error!(band_id = ?self.band_id, "Band head file missing");
         }
@@ -350,10 +350,12 @@ mod tests {
     fn delete_band() {
         let af = ScratchArchive::new();
         let _band = Band::create(&af).unwrap();
+        assert!(af.transport().is_file("b0000/BANDHEAD").unwrap());
+
         Band::delete(&af, BandId::new(&[0])).expect("delete band");
 
         assert!(!af.transport().is_file("b0000").unwrap());
-        assert!(!af.transport().is_dir("b0000").unwrap());
+        assert!(!af.transport().is_file("b0000/BANDHEAD").unwrap());
     }
 
     #[test]
