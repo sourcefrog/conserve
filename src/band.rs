@@ -30,7 +30,7 @@ use tracing::{debug, error, warn};
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
-use crate::transport::{ListDirNames, Transport};
+use crate::transport::{ListDir, Transport};
 use crate::*;
 
 static INDEX_DIR: &str = "i";
@@ -285,7 +285,7 @@ impl Band {
     }
 
     pub fn validate(&self) -> Result<()> {
-        let ListDirNames { mut files, dirs } = self.transport.list_dir_names("")?;
+        let ListDir { mut files, dirs } = self.transport.list_dir("")?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
             error!(band_id = ?self.band_id, "Band head file missing");
         }

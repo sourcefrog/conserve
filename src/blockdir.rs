@@ -43,7 +43,7 @@ use crate::kind::Kind;
 use crate::progress::{Bar, Progress};
 use crate::stats::Sizes;
 use crate::transport::local::LocalTransport;
-use crate::transport::{DirEntry, ListDirNames, Transport};
+use crate::transport::{DirEntry, ListDir, Transport};
 use crate::*;
 
 const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
@@ -206,7 +206,7 @@ impl BlockDir {
     ///
     /// Errors, other than failure to open the directory at all, are logged and discarded.
     fn subdirs(&self) -> Result<Vec<String>> {
-        let ListDirNames { mut dirs, .. } = self.transport.list_dir_names("")?;
+        let ListDir { mut dirs, .. } = self.transport.list_dir("")?;
         dirs.retain(|dirname| {
             if dirname.len() == SUBDIR_NAME_CHARS {
                 true

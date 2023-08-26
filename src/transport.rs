@@ -77,8 +77,8 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// Names are in the arbitrary order that they're returned from the transport.
     ///
     /// Any error during iteration causes overall failure.
-    fn list_dir_names(&self, relpath: &str) -> io::Result<ListDirNames> {
-        let mut names = ListDirNames::default();
+    fn list_dir(&self, relpath: &str) -> io::Result<ListDir> {
+        let mut names = ListDir::default();
         for dir_entry in self.iter_dir_entries(relpath)? {
             let dir_entry = dir_entry?;
             match dir_entry.kind {
@@ -158,7 +158,7 @@ pub struct Metadata {
 
 /// A list of all the files and directories in a directory.
 #[derive(Debug, Default, Eq, PartialEq)]
-pub struct ListDirNames {
+pub struct ListDir {
     pub files: Vec<String>,
     pub dirs: Vec<String>,
 }
