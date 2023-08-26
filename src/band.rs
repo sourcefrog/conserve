@@ -176,14 +176,14 @@ impl Band {
     }
 
     /// Open the band with the given id.
-    pub fn open(archive: &Archive, band_id: &BandId) -> Result<Band> {
+    pub fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
         let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
-        let head: Head = read_json(&transport, BAND_HEAD_FILENAME)?
-            .ok_or(Error::BandHeadMissing { band_id: *band_id })?;
+        let head: Head =
+            read_json(&transport, BAND_HEAD_FILENAME)?.ok_or(Error::BandHeadMissing { band_id })?;
         if let Some(version) = &head.band_format_version {
             if !band_version_supported(version) {
                 return Err(Error::UnsupportedBandVersion {
-                    band_id: *band_id,
+                    band_id,
                     version: version.to_owned(),
                 });
             }
@@ -201,7 +201,7 @@ impl Band {
             .collect_vec();
         if !unsupported_flags.is_empty() {
             return Err(Error::UnsupportedBandFormatFlags {
-                band_id: *band_id,
+                band_id,
                 unsupported_flags,
             });
         }
@@ -213,14 +213,14 @@ impl Band {
     }
 
     /// Delete a band.
-    pub fn delete(archive: &Archive, band_id: &BandId) -> Result<()> {
+    pub fn delete(archive: &Archive, band_id: BandId) -> Result<()> {
         // TODO: Count how many files were deleted, and the total size?
         archive
             .transport()
             .remove_dir_all(&band_id.to_string())
             .map_err(|err| {
                 if err.is_not_found() {
-                    Error::BandNotFound { band_id: *band_id }
+                    Error::BandNotFound { band_id }
                 } else {
                     Error::from(err)
                 }
@@ -233,8 +233,8 @@ impl Band {
             .map_err(Error::from)
     }
 
-    pub fn id(&self) -> &BandId {
-        &self.band_id
+    pub fn id(&self) -> BandId {
+        self.band_id
     }
 
     /// Get the minimum supported version for this band.
@@ -332,7 +332,7 @@ mod tests {
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_str("b0000").unwrap();
-        let band2 = Band::open(&af, &band_id).expect("failed to re-open band");
+        let band2 = Band::open(&af, band_id).expect("failed to re-open band");
         assert!(band2.is_closed().unwrap());
 
         // Try get_info
@@ -350,7 +350,7 @@ mod tests {
     fn delete_band() {
         let af = ScratchArchive::new();
         let _band = Band::create(&af).unwrap();
-        Band::delete(&af, &BandId::new(&[0])).expect("delete band");
+        Band::delete(&af, BandId::new(&[0])).expect("delete band");
 
         assert!(!af.transport().is_file("b0000").unwrap());
         assert!(!af.transport().is_dir("b0000").unwrap());
@@ -370,7 +370,7 @@ mod tests {
         )
         .unwrap();
 
-        let e = Band::open(&af, &BandId::zero());
+        let e = Band::open(&af, BandId::zero());
         let e_str = e.unwrap_err().to_string();
         assert!(
             e_str.contains("Unsupported band version \"8888.8.8\" in b0000"),

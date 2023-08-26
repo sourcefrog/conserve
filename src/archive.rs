@@ -109,13 +109,13 @@ impl Archive {
         &self.block_dir
     }
 
-    pub fn band_exists(&self, band_id: &BandId) -> Result<bool> {
+    pub fn band_exists(&self, band_id: BandId) -> Result<bool> {
         self.transport
             .is_file(&format!("{}/{}", band_id, crate::BAND_HEAD_FILENAME))
             .map_err(Error::from)
     }
 
-    pub fn band_is_closed(&self, band_id: &BandId) -> Result<bool> {
+    pub fn band_is_closed(&self, band_id: BandId) -> Result<bool> {
         self.transport
             .is_file(&format!("{}/{}", band_id, crate::BAND_TAIL_FILENAME))
             .map_err(Error::from)
@@ -147,7 +147,7 @@ impl Archive {
         match band_selection {
             BandSelectionPolicy::LatestClosed => self
                 .last_complete_band()?
-                .map(|band| *band.id())
+                .map(|band| band.id())
                 .ok_or(Error::NoCompleteBands),
             BandSelectionPolicy::Specified(band_id) => Ok(band_id),
             BandSelectionPolicy::Latest => self.last_band_id()?.ok_or(Error::ArchiveEmpty),
@@ -155,7 +155,7 @@ impl Archive {
     }
 
     pub fn open_stored_tree(&self, band_selection: BandSelectionPolicy) -> Result<StoredTree> {
-        StoredTree::open(self, &self.resolve_band_id(band_selection)?)
+        StoredTree::open(self, self.resolve_band_id(band_selection)?)
     }
 
     /// Return an iterator of valid band ids in this archive, in arbitrary order.
@@ -181,8 +181,8 @@ impl Archive {
 
     /// Return the last completely-written band id, if any.
     pub fn last_complete_band(&self) -> Result<Option<Band>> {
-        for id in self.list_band_ids()?.iter().rev() {
-            let b = Band::open(self, id)?;
+        for band_id in self.list_band_ids()?.into_iter().rev() {
+            let b = Band::open(self, band_id)?;
             if b.is_closed()? {
                 return Ok(Some(b));
             }
@@ -206,7 +206,7 @@ impl Archive {
             .inspect(|_| {
                 bands_started.fetch_add(1, Ordering::Relaxed);
             })
-            .map(move |band_id| Band::open(&archive, band_id).expect("Failed to open band"))
+            .map(move |band_id| Band::open(&archive, *band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
             .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
@@ -290,7 +290,7 @@ impl Archive {
             let bar = Bar::new();
 
             for (bands_done, band_id) in delete_band_ids.iter().enumerate() {
-                Band::delete(self, band_id)?;
+                Band::delete(self, *band_id)?;
                 stats.deleted_band_count += 1;
                 bar.post(Progress::DeleteBands {
                     bands_done,

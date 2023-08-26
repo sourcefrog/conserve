@@ -97,7 +97,7 @@ impl Iterator for IterStitchedIndexHunks {
                 self.index_hunks = None;
 
                 let band_id = self.band_id.take().expect("last band id should be present");
-                if self.archive.band_is_closed(&band_id).unwrap_or(false) {
+                if self.archive.band_is_closed(band_id).unwrap_or(false) {
                     // We reached the end of a complete index in this band,
                     // so there's no need to look at any earlier bands, and we're done iterating.
                     return None;
@@ -105,10 +105,10 @@ impl Iterator for IterStitchedIndexHunks {
 
                 // self.band_id might be None afterwards, if there is no previous band.
                 // If so, we're done.
-                self.band_id = previous_existing_band(&self.archive, &band_id);
+                self.band_id = previous_existing_band(&self.archive, band_id);
             }
 
-            if let Some(band_id) = &self.band_id {
+            if let Some(band_id) = self.band_id {
                 let band = match Band::open(&self.archive, band_id) {
                     Ok(band) => band,
                     Err(err) => {
@@ -131,14 +131,13 @@ impl Iterator for IterStitchedIndexHunks {
     }
 }
 
-fn previous_existing_band(archive: &Archive, band_id: &BandId) -> Option<BandId> {
-    let mut band_id = *band_id;
+fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<BandId> {
     loop {
         // TODO: It might be faster to list the present bands and calculate
         // from that, rather than walking backwards one at a time...
         if let Some(prev_band_id) = band_id.previous() {
             band_id = prev_band_id;
-            if archive.band_exists(&band_id).unwrap_or(false) {
+            if archive.band_exists(band_id).unwrap_or(false) {
                 return Some(band_id);
             }
         } else {
@@ -165,8 +164,8 @@ mod test {
         }
     }
 
-    fn simple_ls(archive: &Archive, band_id: &BandId) -> String {
-        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, Some(*band_id))
+    fn simple_ls(archive: &Archive, band_id: BandId) -> String {
+        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, Some(band_id))
             .flatten()
             .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
             .collect();
@@ -193,7 +192,7 @@ mod test {
         //   and 3 is carried over from b1.
 
         let band = Band::create(&af)?;
-        assert_eq!(*band.id(), BandId::zero());
+        assert_eq!(band.id(), BandId::zero());
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b0"));
         ib.push_entry(symlink("/1", "b0"));
@@ -247,19 +246,19 @@ mod test {
         std::fs::remove_dir_all(af.path().join("b0003"))?;
 
         let archive = Archive::open_path(af.path())?;
-        assert_eq!(simple_ls(&archive, &BandId::new(&[0])), "/0:b0 /1:b0 /2:b0");
+        assert_eq!(simple_ls(&archive, BandId::new(&[0])), "/0:b0 /1:b0 /2:b0");
 
         assert_eq!(
-            simple_ls(&archive, &BandId::new(&[1])),
+            simple_ls(&archive, BandId::new(&[1])),
             "/0:b1 /1:b1 /2:b1 /3:b1"
         );
 
-        assert_eq!(simple_ls(&archive, &BandId::new(&[2])), "/0:b2 /2:b2 /3:b1");
+        assert_eq!(simple_ls(&archive, BandId::new(&[2])), "/0:b2 /2:b2 /3:b1");
 
-        assert_eq!(simple_ls(&archive, &BandId::new(&[4])), "/0:b2 /2:b2 /3:b1");
+        assert_eq!(simple_ls(&archive, BandId::new(&[4])), "/0:b2 /2:b2 /3:b1");
 
         assert_eq!(
-            simple_ls(&archive, &BandId::new(&[5])),
+            simple_ls(&archive, BandId::new(&[5])),
             "/0:b5 /00:b5 /2:b2 /3:b1"
         );
 

@@ -56,7 +56,7 @@ impl GarbageCollectionLock {
         let archive = archive.clone();
         let band_id = archive.last_band_id()?;
         if let Some(band_id) = band_id {
-            if !archive.band_is_closed(&band_id)? {
+            if !archive.band_is_closed(band_id)? {
                 return Err(Error::DeleteWithIncompleteBackup { band_id });
             }
         }

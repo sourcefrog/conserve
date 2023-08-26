@@ -44,9 +44,9 @@ pub fn simple_backup() {
     let restore_dir = TempDir::new().unwrap();
 
     let archive = Archive::open_path(af.path()).unwrap();
-    assert!(archive.band_exists(&BandId::zero()).unwrap());
-    assert!(archive.band_is_closed(&BandId::zero()).unwrap());
-    assert!(!archive.band_exists(&BandId::new(&[1])).unwrap());
+    assert!(archive.band_exists(BandId::zero()).unwrap());
+    assert!(archive.band_is_closed(BandId::zero()).unwrap());
+    assert!(!archive.band_exists(BandId::new(&[1])).unwrap());
     let copy_stats =
         restore(&archive, restore_dir.path(), &RestoreOptions::default()).expect("restore");
 
@@ -82,7 +82,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
 
     let archive = Archive::open_path(af.path()).unwrap();
 
-    let band = Band::open(&archive, &BandId::zero()).unwrap();
+    let band = Band::open(&archive, BandId::zero()).unwrap();
     let band_info = band.get_info()?;
     assert_eq!(band_info.index_hunk_count, Some(1));
     assert_eq!(band_info.id, BandId::zero());
@@ -138,11 +138,11 @@ fn check_backup(af: &ScratchArchive) {
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
     assert_eq!(
-        *af.last_complete_band().unwrap().unwrap().id(),
+        af.last_complete_band().unwrap().unwrap().id(),
         BandId::new(&[0])
     );
 
-    let band = Band::open(af, &band_ids[0]).unwrap();
+    let band = Band::open(af, band_ids[0]).unwrap();
     assert!(band.is_closed().unwrap());
 
     let index_entries = band.index().iter_entries().collect::<Vec<IndexEntry>>();
@@ -269,7 +269,7 @@ pub fn symlink() {
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
 
-    let band = Band::open(&af, &band_ids[0]).unwrap();
+    let band = Band::open(&af, band_ids[0]).unwrap();
     assert!(band.is_closed().unwrap());
 
     let index_entries = band.index().iter_entries().collect::<Vec<IndexEntry>>();

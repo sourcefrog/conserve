@@ -42,7 +42,7 @@ pub(crate) fn validate_bands(
     let total_bands = band_ids.len();
     let bar = Bar::new();
     'band: for (bands_done, band_id) in band_ids.iter().enumerate() {
-        let band = match Band::open(archive, band_id) {
+        let band = match Band::open(archive, *band_id) {
             Ok(band) => band,
             Err(err) => {
                 error!(%err, %band_id, "Error opening band");
