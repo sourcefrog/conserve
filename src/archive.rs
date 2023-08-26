@@ -92,11 +92,8 @@ impl Archive {
     }
 
     pub fn open(transport: Box<dyn Transport>) -> Result<Archive> {
-        let header: ArchiveHeader = match read_json(&transport, HEADER_FILENAME) {
-            Ok(None) => return Err(Error::NotAnArchive {}),
-            Err(err) => return Err(err),
-            Ok(Some(header)) => header,
-        };
+        let header: ArchiveHeader =
+            read_json(&transport, HEADER_FILENAME)?.ok_or(Error::NotAnArchive {})?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(Error::UnsupportedArchiveVersion {
                 version: header.conserve_archive_version,

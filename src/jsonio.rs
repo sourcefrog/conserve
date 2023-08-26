@@ -49,22 +49,16 @@ where
 {
     let bytes = match transport.as_ref().read_file(path) {
         Ok(b) => b,
-        Err(err) => {
-            if err.is_not_found() {
-                return Ok(None);
-            } else {
-                return Err(err.into());
-            }
-        }
+        Err(err) if err.is_not_found() => return Ok(None),
+        Err(err) => return Err(err.into()),
     };
-    match serde_json::from_slice(&bytes) {
-        Ok(t) => Ok(Some(t)),
-        Err(source) => Err(Error::DeserializeJson {
+    serde_json::from_slice(&bytes)
+        .map(|t| Some(t))
+        .map_err(|source| Error::DeserializeJson {
             source,
             // TODO: Full path from the transport?
             path: path.into(),
-        }),
-    }
+        })
 }
 
 #[cfg(test)]
