@@ -1,0 +1,2 @@
+# Include only files that are currently well-tested.
+examine_globs = ["src/bandid.rs", "src/bin/conserve.rs"]

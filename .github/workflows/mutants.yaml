@@ -1,0 +1,19 @@
+name: cargo-mutants
+
+on: [pull_request, push]
+
+jobs:
+  cargo-mutants:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install cargo-mutants
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-mutants
+      - name: Run mutant tests
+        run: cargo mutants -j2 -- --all-features
+      - name: Archive results
+        uses: actions/upload-artifact@v3
+        with:
+          name: mutation-report
+          path: mutants.out
