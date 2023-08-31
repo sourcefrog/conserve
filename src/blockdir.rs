@@ -23,7 +23,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
-use std::path::Path;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -41,7 +40,6 @@ use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::progress::{Bar, Progress};
 use crate::stats::Sizes;
-use crate::transport::local::LocalTransport;
 use crate::transport::{ListDir, Transport};
 use crate::*;
 
@@ -86,10 +84,6 @@ fn block_relpath(hash: &BlockHash) -> String {
 }
 
 impl BlockDir {
-    pub fn open_path(path: &Path) -> BlockDir {
-        BlockDir::open(Box::new(LocalTransport::new(path)))
-    }
-
     pub fn open(transport: Box<dyn Transport>) -> BlockDir {
         BlockDir {
             transport: Arc::from(transport),
