@@ -96,11 +96,6 @@ impl BlockDir {
         }
     }
 
-    /// Create a BlockDir directory and return an object accessing it.
-    pub fn create_path(path: &Path) -> Result<BlockDir> {
-        BlockDir::create(Box::new(LocalTransport::new(path)))
-    }
-
     pub fn create(transport: Box<dyn Transport>) -> Result<BlockDir> {
         transport.create_dir("")?;
         Ok(BlockDir {
