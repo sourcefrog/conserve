@@ -15,6 +15,7 @@
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::{error, fmt, io, result};
 
 use bytes::Bytes;
@@ -29,22 +30,22 @@ use local::LocalTransport;
 /// Open a `Transport` to access a local directory.
 ///
 /// `s` may be a local path or a URL.
-pub fn open_transport(s: &str) -> crate::Result<Box<dyn Transport>> {
+pub fn open_transport(s: &str) -> crate::Result<Arc<dyn Transport>> {
     if let Ok(url) = Url::parse(s) {
         match url.scheme() {
-            "file" => Ok(Box::new(LocalTransport::new(
+            "file" => Ok(Arc::new(LocalTransport::new(
                 &url.to_file_path().expect("extract URL file path"),
             ))),
             d if d.len() == 1 => {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
-                Ok(Box::new(LocalTransport::new(Path::new(s))))
+                Ok(Arc::new(LocalTransport::new(Path::new(s))))
             }
             other => Err(crate::Error::UrlScheme {
                 scheme: other.to_owned(),
             }),
         }
     } else {
-        Ok(Box::new(LocalTransport::new(Path::new(s))))
+        Ok(Arc::new(LocalTransport::new(Path::new(s))))
     }
 }
 
@@ -109,7 +110,7 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     fn remove_dir_all(&self, relpath: &str) -> Result<()>;
 
     /// Make a new transport addressing a subdirectory.
-    fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;
+    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport>;
 
     /// Return a URL scheme describing this transport, such as "file".
     fn url_scheme(&self) -> &'static str;

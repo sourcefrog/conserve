@@ -41,6 +41,7 @@ pub struct Archive {
     /// Holds body content for all file versions.
     block_dir: BlockDir,
 
+    /// Transport to the root directory of the archive.
     transport: Arc<dyn Transport>,
 }
 
@@ -58,11 +59,11 @@ pub struct DeleteOptions {
 impl Archive {
     /// Make a new archive in a local directory.
     pub fn create_path(path: &Path) -> Result<Archive> {
-        Archive::create(Box::new(LocalTransport::new(path)))
+        Archive::create(Arc::new(LocalTransport::new(path)))
     }
 
     /// Make a new archive in a new directory accessed by a Transport.
-    pub fn create(transport: Box<dyn Transport>) -> Result<Archive> {
+    pub fn create(transport: Arc<dyn Transport>) -> Result<Archive> {
         transport.create_dir("")?;
         let names = transport.list_dir("")?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
@@ -78,7 +79,7 @@ impl Archive {
         )?;
         Ok(Archive {
             block_dir,
-            transport: Arc::from(transport),
+            transport,
         })
     }
 
@@ -86,10 +87,10 @@ impl Archive {
     ///
     /// Checks that the header is correct.
     pub fn open_path(path: &Path) -> Result<Archive> {
-        Archive::open(Box::new(LocalTransport::new(path)))
+        Archive::open(Arc::new(LocalTransport::new(path)))
     }
 
-    pub fn open(transport: Box<dyn Transport>) -> Result<Archive> {
+    pub fn open(transport: Arc<dyn Transport>) -> Result<Archive> {
         let header: ArchiveHeader =
             read_json(&transport, HEADER_FILENAME)?.ok_or(Error::NotAnArchive)?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
@@ -100,7 +101,7 @@ impl Archive {
         let block_dir = BlockDir::open(transport.sub_transport(BLOCK_DIR));
         Ok(Archive {
             block_dir,
-            transport: Arc::from(transport),
+            transport,
         })
     }
 

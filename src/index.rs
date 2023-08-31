@@ -201,9 +201,9 @@ pub struct IndexWriter {
 /// Accumulate and write out index entries into files in an index directory.
 impl IndexWriter {
     /// Make a new builder that will write files into the given directory.
-    pub fn new(transport: Box<dyn Transport>) -> IndexWriter {
+    pub fn new(transport: Arc<dyn Transport>) -> IndexWriter {
         IndexWriter {
-            transport: Arc::from(transport),
+            transport,
             entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
             sequence: 0,
             check_order: apath::DebugCheckOrder::new(),
@@ -285,13 +285,11 @@ pub struct IndexRead {
 impl IndexRead {
     #[allow(unused)]
     pub(crate) fn open_path(path: &Path) -> IndexRead {
-        IndexRead::open(Box::new(LocalTransport::new(path)))
+        IndexRead::open(Arc::new(LocalTransport::new(path)))
     }
 
-    pub(crate) fn open(transport: Box<dyn Transport>) -> IndexRead {
-        IndexRead {
-            transport: Arc::from(transport),
-        }
+    pub(crate) fn open(transport: Arc<dyn Transport>) -> IndexRead {
+        IndexRead { transport }
     }
 
     /// Return the (1-based) number of index hunks in an index directory.
@@ -536,7 +534,7 @@ mod tests {
 
     fn setup() -> (TempDir, IndexWriter) {
         let testdir = TempDir::new().unwrap();
-        let ib = IndexWriter::new(Box::new(LocalTransport::new(testdir.path())));
+        let ib = IndexWriter::new(Arc::new(LocalTransport::new(testdir.path())));
         (testdir, ib)
     }
 

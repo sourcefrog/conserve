@@ -17,6 +17,7 @@ use std::fs::{create_dir, File};
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use bytes::Bytes;
 use metrics::{counter, increment_counter};
@@ -143,8 +144,8 @@ impl Transport for LocalTransport {
         std::fs::remove_dir_all(&path).map_err(|err| super::Error::io_error(&path, err))
     }
 
-    fn sub_transport(&self, relpath: &str) -> Box<dyn Transport> {
-        Box::new(LocalTransport {
+    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
+        Arc::new(LocalTransport {
             root: self.root.join(relpath),
         })
     }

@@ -84,17 +84,13 @@ fn block_relpath(hash: &BlockHash) -> String {
 }
 
 impl BlockDir {
-    pub fn open(transport: Box<dyn Transport>) -> BlockDir {
-        BlockDir {
-            transport: Arc::from(transport),
-        }
+    pub fn open(transport: Arc<dyn Transport>) -> BlockDir {
+        BlockDir { transport }
     }
 
-    pub fn create(transport: Box<dyn Transport>) -> Result<BlockDir> {
+    pub fn create(transport: Arc<dyn Transport>) -> Result<BlockDir> {
         transport.create_dir("")?;
-        Ok(BlockDir {
-            transport: Arc::from(transport),
-        })
+        Ok(BlockDir { transport })
     }
 
     /// Returns the number of compressed bytes.
