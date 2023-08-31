@@ -22,6 +22,7 @@
 //! StoredTree rather than the Band itself.
 
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -73,7 +74,7 @@ pub struct Band {
     band_id: BandId,
 
     /// Transport pointing to the archive directory.
-    transport: Box<dyn Transport>,
+    transport: Arc<dyn Transport>,
 
     /// Deserialized band head info.
     head: Head,
@@ -141,7 +142,7 @@ impl Band {
         let band_id = archive
             .last_band_id()?
             .map_or_else(BandId::zero, |b| b.next_sibling());
-        let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
+        let transport = archive.transport().sub_transport(&band_id.to_string());
         transport.create_dir("")?;
         transport.create_dir(INDEX_DIR)?;
         let band_format_version = if format_flags.is_empty() {
@@ -177,7 +178,7 @@ impl Band {
 
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
-        let transport: Box<dyn Transport> = archive.transport().sub_transport(&band_id.to_string());
+        let transport = archive.transport().sub_transport(&band_id.to_string());
         let head: Head =
             read_json(&transport, BAND_HEAD_FILENAME)?.ok_or(Error::BandHeadMissing { band_id })?;
         if let Some(version) = &head.band_format_version {
