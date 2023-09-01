@@ -146,7 +146,7 @@ pub struct ListDir {
 #[derive(Debug)]
 pub struct Error {
     /// What type of generally known error?
-    pub kind: ErrorKind,
+    kind: ErrorKind,
     /// The underlying error: for example an IO or S3 error.
     source: Option<Box<dyn error::Error + Send + Sync>>,
     /// The affected path.
@@ -158,10 +158,13 @@ pub struct Error {
 pub enum ErrorKind {
     #[display(fmt = "Not found")]
     NotFound,
+
     #[display(fmt = "Already exists")]
     AlreadyExists,
+
     #[display(fmt = "Permission denied")]
     PermissionDenied,
+
     #[display(fmt = "Other transport error")]
     Other,
 }
@@ -187,6 +190,11 @@ impl Error {
 
     pub fn is_not_found(&self) -> bool {
         self.kind == ErrorKind::NotFound
+    }
+
+    /// The transport-relative path where this error occurred, if known.
+    pub fn path(&self) -> Option<&str> {
+        self.path.as_deref()
     }
 }
 
