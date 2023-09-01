@@ -138,9 +138,9 @@ impl Transport for S3Transport {
         let mut stream = self
             .client
             .list_objects_v2()
-            .set_bucket(Some(self.bucket.clone()))
-            .set_prefix(Some(prefix.clone()))
-            .set_delimiter(Some("/".to_owned()))
+            .bucket(&self.bucket)
+            .prefix(&prefix)
+            .delimiter("/")
             .into_paginator()
             .send();
         let mut result = ListDir::default();
@@ -168,7 +168,7 @@ impl Transport for S3Transport {
                         result.files.push(name.to_owned());
                     }
                 }
-                Some(Err(err)) => panic!("S3 request failed: {}", err), // TODO: Return Err
+                Some(Err(err)) => return Err(Error::s3_error(prefix, ErrorKind::Other, err)),
                 None => break,
             }
         }
@@ -178,15 +178,11 @@ impl Transport for S3Transport {
     fn read_file(&self, relpath: &str) -> Result<Bytes> {
         let _span = trace_span!("S3Transport::read_file", %relpath).entered();
         let key = self.join_path(relpath);
-        let request = self
-            .client
-            .get_object()
-            .set_bucket(Some(self.bucket.clone()))
-            .set_key(Some(key));
+        let request = self.client.get_object().bucket(&self.bucket).key(&key);
         let response = self
             .runtime
             .block_on(request.send())
-            .expect("S3 request succeeded"); // TODO: No panic, map to error
+            .map_err(|source| Error::s3_error(key, ErrorKind::Other, source))?;
         let body_bytes = self
             .runtime
             .block_on(response.body.collect())
@@ -221,17 +217,15 @@ impl Transport for S3Transport {
         // } else {
         //     Ok(())
         // }
-        todo!()
+        todo!("S3Transport::write_file")
     }
 
     fn remove_file(&self, relpath: &str) -> Result<()> {
-        todo!()
-        // std::fs::remove_file(self.full_path(relpath))
+        todo!("S3Transport::remove_file")
     }
 
     fn remove_dir_all(&self, relpath: &str) -> Result<()> {
-        todo!()
-        // std::fs::remove_dir_all(self.full_path(relpath))
+        todo!("S3Transport::remove_dir_all")
     }
 
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
@@ -288,159 +282,4 @@ impl AsRef<dyn Transport> for S3Transport {
 }
 
 #[cfg(test)]
-mod test {
-    use assert_fs::prelude::*;
-    use predicates::prelude::*;
-
-    use super::*;
-    use crate::kind::Kind;
-
-    // #[test]
-    // fn read_file() {
-    //     let temp = assert_fs::TempDir::new().unwrap();
-    //     let content: &str = "the ribs of the disaster";
-    //     let filename = "poem.txt";
-
-    //     temp.child(filename).write_str(content).unwrap();
-
-    //     let transport = S3Transport::new(temp.path());
-    //     let buf = transport.read_file(filename).unwrap();
-    //     assert_eq!(buf, content.as_bytes());
-
-    //     temp.close().unwrap();
-    // }
-
-    // #[test]
-    // fn read_metadata() {
-    //     let temp = assert_fs::TempDir::new().unwrap();
-    //     let content: &str = "the ribs of the disaster";
-    //     let filename = "poem.txt";
-    //     temp.child(filename).write_str(content).unwrap();
-
-    //     let transport = S3Transport::new(temp.path());
-
-    //     assert_eq!(
-    //         transport.metadata(filename).unwrap(),
-    //         Metadata {
-    //             len: 24,
-    //             kind: Kind::File
-    //         }
-    //     );
-    //     assert!(transport.metadata("nopoem").is_err());
-    // }
-
-    // #[test]
-    // fn list_directory() {
-    //     let temp = assert_fs::TempDir::new().unwrap();
-    //     temp.child("root file").touch().unwrap();
-    //     temp.child("subdir").create_dir_all().unwrap();
-    //     temp.child("subdir")
-    //         .child("subfile")
-    //         .write_str("Morning coffee")
-    //         .unwrap();
-
-    //     let transport = S3Transport::new(temp.path());
-    //     let mut root_list: Vec<_> = transport
-    //         .iter_dir_entries(".")
-    //         .unwrap()
-    //         .map(std::Result::unwrap)
-    //         .collect();
-    //     assert_eq!(root_list.len(), 2);
-    //     root_list.sort();
-
-    //     assert_eq!(
-    //         root_list[0],
-    //         DirEntry {
-    //             name: "root file".to_owned(),
-    //             kind: Kind::File,
-    //         }
-    //     );
-
-    //     // Len is unpredictable for directories, so check the other fields.
-    //     assert_eq!(root_list[1].name, "subdir");
-    //     assert_eq!(root_list[1].kind, Kind::Dir);
-
-    //     assert!(transport.is_file("root file").unwrap());
-    //     assert!(!transport.is_file("nuh-uh").unwrap());
-
-    //     let subdir_list: Vec<_> = transport
-    //         .iter_dir_entries("subdir")
-    //         .unwrap()
-    //         .map(std::Result::unwrap)
-    //         .collect();
-    //     assert_eq!(
-    //         subdir_list,
-    //         vec![DirEntry {
-    //             name: "subfile".to_owned(),
-    //             kind: Kind::File,
-    //         }]
-    //     );
-
-    //     temp.close().unwrap();
-    // }
-
-    // #[test]
-    // fn write_file() {
-    //     // TODO: Maybe test some error cases of failing to write.
-    //     let temp = assert_fs::TempDir::new().unwrap();
-    //     let transport = S3Transport::new(temp.path());
-
-    //     transport.create_dir("subdir").unwrap();
-    //     transport
-    //         .write_file("subdir/subfile", b"Must I paint you a picture?")
-    //         .unwrap();
-
-    //     temp.child("subdir").assert(predicate::path::is_dir());
-    //     temp.child("subdir")
-    //         .child("subfile")
-    //         .assert("Must I paint you a picture?");
-
-    //     temp.close().unwrap();
-    // }
-
-    // #[test]
-    // fn create_existing_dir() {
-    //     let temp = assert_fs::TempDir::new().unwrap();
-    //     let transport = S3Transport::new(temp.path());
-
-    //     transport.create_dir("aaa").unwrap();
-    //     transport.create_dir("aaa").unwrap();
-    //     transport.create_dir("aaa").unwrap();
-
-    //     temp.close().unwrap();
-    // }
-
-    // #[test]
-    // fn sub_transport() {
-    //     let temp = assert_fs::TempDir::new().unwrap();
-    //     let transport = S3Transport::new(temp.path());
-
-    //     transport.create_dir("aaa").unwrap();
-    //     transport.create_dir("aaa/bbb").unwrap();
-
-    //     let sub_transport = transport.sub_transport("aaa");
-    //     let sub_list: Vec<DirEntry> = sub_transport
-    //         .iter_dir_entries("")
-    //         .unwrap()
-    //         .map(|r| r.unwrap())
-    //         .collect();
-
-    //     assert_eq!(sub_list.len(), 1);
-    //     assert_eq!(sub_list[0].name, "bbb");
-
-    //     temp.close().unwrap();
-    // }
-
-    // #[test]
-    // fn remove_dir_all() -> std::Result<()> {
-    //     let temp = assert_fs::TempDir::new().unwrap();
-    //     let transport = S3Transport::new(temp.path());
-
-    //     transport.create_dir("aaa")?;
-    //     transport.create_dir("aaa/bbb")?;
-    //     transport.create_dir("aaa/bbb/ccc")?;
-
-    //     transport.remove_dir_all("aaa")?;
-    //     Ok(())
-    // }
-}
+mod test {}

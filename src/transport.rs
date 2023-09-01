@@ -191,6 +191,19 @@ impl Error {
         self.kind
     }
 
+    #[cfg(feature = "s3")]
+    pub(self) fn s3_error<K, E>(key: K, kind: ErrorKind, source: E) -> Error
+    where
+        K: ToOwned<Owned = String>,
+        E: Into<aws_sdk_s3::error::BoxError>,
+    {
+        Error {
+            kind,
+            path: Some(key.to_owned()),
+            source: Some(source.into()),
+        }
+    }
+
     pub(self) fn io_error(path: &Path, source: io::Error) -> Error {
         let kind = match source.kind() {
             io::ErrorKind::NotFound => ErrorKind::NotFound,
