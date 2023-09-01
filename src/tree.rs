@@ -31,10 +31,6 @@ pub trait ReadTree {
     /// iterator.
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT>;
 
-    /// Estimate the number of entries in the tree.
-    /// This might do somewhat expensive IO, so isn't the Iter's `size_hint`.
-    fn estimate_count(&self) -> Result<u64>;
-
     /// Measure the tree size.
     ///
     /// This typically requires walking all entries, which may take a while.
