@@ -66,15 +66,6 @@ impl tree::ReadTree for LiveTree {
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
         Iter::new(&self.path, subtree, exclude)
     }
-
-    fn estimate_count(&self) -> Result<u64> {
-        // TODO: This stats the file and builds an entry about them, just to
-        // throw it away. We could perhaps change the iter to optionally do
-        // less work.
-        Ok(self
-            .iter_entries(Apath::root(), Exclude::nothing())?
-            .count() as u64)
-    }
 }
 
 fn entry_from_fs_metadata(

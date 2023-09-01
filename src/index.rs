@@ -29,7 +29,7 @@ use crate::kind::Kind;
 use crate::owner::Owner;
 use crate::stats::{IndexReadStats, IndexWriterStats};
 use crate::transport::local::LocalTransport;
-use crate::transport::Transport;
+use crate::transport::{ListDir, Transport};
 use crate::unix_mode::UnixMode;
 use crate::unix_time::FromUnixAndNanos;
 use crate::*;
@@ -290,25 +290,6 @@ impl IndexRead {
 
     pub(crate) fn open(transport: Arc<dyn Transport>) -> IndexRead {
         IndexRead { transport }
-    }
-
-    /// Return the (1-based) number of index hunks in an index directory.
-    pub fn count_hunks(&self) -> Result<u32> {
-        // TODO: Might be faster to list the directory than to probe for all of them.
-        // TODO: Perhaps, list the directories and cope cleanly with
-        // one hunk being missing.
-        for i in 0.. {
-            let path = hunk_relpath(i);
-            if !self.transport.is_file(&path)? {
-                // If hunk 1 is missing, 1 hunks exists.
-                return Ok(i);
-            }
-        }
-        unreachable!();
-    }
-
-    pub fn estimate_entry_count(&self) -> Result<u64> {
-        Ok(u64::from(self.count_hunks()?) * (MAX_ENTRIES_PER_HUNK as u64))
     }
 
     /// Make an iterator that will return all entries in this band.
@@ -817,7 +798,7 @@ mod tests {
         // Think about, but don't actually add some files
         ib.finish_hunk()?;
         let read_index = IndexRead::open_path(testdir.path());
-        assert_eq!(read_index.count_hunks()?, 1);
+        assert_eq!(read_index.iter_hunks().count(), 1);
         Ok(())
     }
 }

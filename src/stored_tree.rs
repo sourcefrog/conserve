@@ -67,10 +67,6 @@ impl ReadTree for StoredTree {
                 .iter_entries(subtree, exclude),
         )
     }
-
-    fn estimate_count(&self) -> Result<u64> {
-        self.band.index().estimate_entry_count()
-    }
 }
 
 #[cfg(test)]
