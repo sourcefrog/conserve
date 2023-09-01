@@ -14,7 +14,7 @@
 //!
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::{error, fmt, io, result};
 
@@ -145,9 +145,12 @@ pub struct ListDir {
 /// A transport error, as a generalization of IO errors.
 #[derive(Debug)]
 pub struct Error {
+    /// What type of generally known error?
     pub kind: ErrorKind,
-    /// Might be for example an IO error or S3 error.
-    pub details: ErrorDetails,
+    /// The underlying error: for example an IO or S3 error.
+    source: Option<Box<dyn error::Error + Send + Sync>>,
+    /// The affected path.
+    path: Option<String>,
 }
 
 /// General categories of transport errors.
@@ -163,12 +166,6 @@ pub enum ErrorKind {
     Other,
 }
 
-#[derive(Debug)]
-pub enum ErrorDetails {
-    Io { source: io::Error, path: PathBuf }, // S3(s3::Error),
-    None,
-}
-
 impl Error {
     pub fn kind(&self) -> ErrorKind {
         self.kind
@@ -182,10 +179,8 @@ impl Error {
             _ => ErrorKind::Other,
         };
         Error {
-            details: ErrorDetails::Io {
-                source,
-                path: path.to_owned(),
-            },
+            source: Some(Box::new(source)),
+            path: Some(path.to_string_lossy().to_string()),
             kind,
         }
     }
@@ -197,15 +192,9 @@ impl Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // source is not in the short format; maybe should be in the alternate format?
-        match &self.details {
-            ErrorDetails::Io { path, .. } => {
-                write!(f, "{}", self.kind)?;
-                if !path.as_os_str().is_empty() {
-                    write!(f, ": {}", path.display())?;
-                }
-            }
-            ErrorDetails::None => write!(f, "{}", self.kind)?,
+        write!(f, "{}", self.kind)?;
+        if let Some(ref path) = self.path {
+            write!(f, ": {}", path)?;
         }
         Ok(())
     }
@@ -213,10 +202,7 @@ impl fmt::Display for Error {
 
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match &self.details {
-            ErrorDetails::Io { source, .. } => Some(source),
-            ErrorDetails::None => None,
-        }
+        self.source.as_ref().map(|s| &**s as _)
     }
 }
 
