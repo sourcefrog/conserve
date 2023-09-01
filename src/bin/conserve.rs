@@ -17,6 +17,7 @@ use std::cell::RefCell;
 use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
@@ -24,6 +25,7 @@ use conserve::change::Change;
 use conserve::progress::ProgressImpl;
 use conserve::trace_counter::{global_error_count, global_warn_count};
 use metrics::increment_counter;
+use time::UtcOffset;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
 
@@ -32,6 +34,10 @@ use conserve::ui::termui::TraceTimeStyle;
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
+
+/// Local timezone offset, calculated once at startup, to avoid issues about
+/// looking at the environment once multiple threads are running.
+static LOCAL_OFFSET: RwLock<UtcOffset> = RwLock::new(UtcOffset::UTC);
 
 #[derive(Debug, Parser)]
 #[command(author, about, version)]
@@ -516,11 +522,16 @@ impl Command {
                 sizes,
                 utc,
             } => {
+                let timezone = if *utc {
+                    None
+                } else {
+                    Some(*LOCAL_OFFSET.read().unwrap())
+                };
                 let archive = Archive::open(open_transport(archive)?)?;
                 let options = ShowVersionsOptions {
                     newest_first: *newest,
                     tree_size: *sizes,
-                    utc: *utc,
+                    timezone,
                     start_time: !*short,
                     backup_duration: !*short,
                 };
@@ -594,6 +605,10 @@ fn make_change_callback<'a>(
 }
 
 fn main() -> Result<ExitCode> {
+    // Before anything else, get the local time offset, to avoid `time-rs`
+    // problems with loading it when threads are running.
+    *LOCAL_OFFSET.write().unwrap() =
+        UtcOffset::current_local_offset().expect("get local time offset");
     let args = Args::parse();
     let start_time = Instant::now();
     if !args.no_progress {

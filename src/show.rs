@@ -39,8 +39,8 @@ pub struct ShowVersionsOptions {
     pub start_time: bool,
     /// Show how much time the backup took, or "incomplete" if it never finished.
     pub backup_duration: bool,
-    /// Show times in UTC rather than the local timezone.
-    pub utc: bool,
+    /// Show times in this zone.
+    pub timezone: Option<UtcOffset>,
 }
 
 /// Print a list of versions, one per line.
@@ -53,7 +53,6 @@ pub fn show_versions(
     if options.newest_first {
         band_ids.reverse();
     }
-    let local_offset = UtcOffset::current_local_offset().expect("get local time offset");
     for band_id in band_ids {
         if !(options.tree_size || options.start_time || options.backup_duration) {
             writeln!(w, "{band_id}")?;
@@ -78,8 +77,8 @@ pub fn show_versions(
 
         if options.start_time {
             let mut start_time = info.start_time;
-            if !options.utc {
-                start_time = start_time.to_offset(local_offset);
+            if let Some(timezone) = options.timezone {
+                start_time = start_time.to_offset(timezone);
             }
             l.push(format!(
                 "{date:<25}", // "yyyy-mm-ddThh:mm:ss+oooo" => 25
