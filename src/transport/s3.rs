@@ -197,27 +197,19 @@ impl Transport for S3Transport {
     }
 
     fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
-        // increment_counter!("conserve.local_transport.write_files");
-        // counter!(
-        //     "conserve.local_transport.write_file_bytes",
-        //     content.len() as u64
-        // );
-        // let full_path = self.full_path(relpath);
-        // let dir = full_path.parent().unwrap();
-        // let mut temp = tempfile::Builder::new()
-        //     .prefix(crate::TMP_PREFIX)
-        //     .tempfile_in(dir)?;
-        // if let Err(err) = temp.write_all(content) {
-        //     let _ = temp.close();
-        //     return Err(err);
-        // }
-        // if let Err(persist_error) = temp.persist(&full_path) {
-        //     persist_error.file.close()?;
-        //     Err(persist_error.error)
-        // } else {
-        //     Ok(())
-        // }
-        todo!("S3Transport::write_file")
+        let _span = trace_span!("S3Transport::write_file", %relpath).entered();
+        let key = self.join_path(relpath);
+        // TODO: Assert that it should not already exist?
+        let request = self
+            .client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .body(content.to_owned().into());
+        let response = self.runtime.block_on(request.send());
+        trace!(?response);
+        response.map_err(|err| Error::s3_error(key, ErrorKind::Other, err))?;
+        Ok(())
     }
 
     fn remove_file(&self, relpath: &str) -> Result<()> {
