@@ -16,15 +16,16 @@ use std::path::Path;
 use std::sync::Arc;
 
 use aws_config::AppName;
+use aws_sdk_s3::error::SdkError;
 use aws_types::region::Region;
 use aws_types::SdkConfig;
 use bytes::Bytes;
 use futures::stream::StreamExt;
 use tokio::runtime::Runtime;
-use tracing::{debug, trace_span};
+use tracing::{debug, trace, trace_span};
 use url::Url;
 
-use super::{Error, ListDir, Metadata, Result, Transport};
+use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, Transport};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -234,19 +235,30 @@ impl Transport for S3Transport {
     }
 
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
-        // increment_counter!("conserve.local_transport.metadata_reads");
-        // let fsmeta = self.root.join(relpath).metadata()?;
-        // Ok(Metadata {
-        //     len: fsmeta.len(),
-        //     kind: fsmeta.file_type().into(),
-        // })
-        todo!()
-    }
-
-    fn is_file(&self, relpath: &str) -> Result<bool> {
-        // increment_counter!("conserve.local_transport.metadata_reads");
-        // Ok(self.full_path(relpath).is_file())
-        todo!("S3Transport::is_file")
+        let _span = trace_span!("S3Transport::metadata", %relpath).entered();
+        let key = self.join_path(relpath);
+        let request = self.client.head_object().bucket(&self.bucket).key(&key);
+        let response = self.runtime.block_on(request.send());
+        trace!(?response);
+        match response {
+            Ok(response) => Ok(Metadata {
+                kind: Kind::File,
+                len: response
+                    .content_length
+                    .try_into()
+                    .expect("content length non-negative"),
+            }),
+            Err(err) => match &err {
+                SdkError::ServiceError(service_err) if service_err.err().is_not_found() => {
+                    Err(Error {
+                        path: Some(key),
+                        kind: ErrorKind::NotFound,
+                        source: Some(Box::new(err)),
+                    })
+                }
+                other => todo!("Unhandled S3 error: {other:#?}"), // TODO: Return Err
+            },
+        }
     }
 
     fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
