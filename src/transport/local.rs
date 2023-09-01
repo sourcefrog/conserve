@@ -126,7 +126,7 @@ impl Transport for LocalTransport {
             let _ = temp.close();
             return Err(context(err));
         }
-        if let Err(persist_error) = temp.persist(&full_path) {
+        if let Err(persist_error) = temp.persist_noclobber(&full_path) {
             persist_error.file.close().map_err(context)?;
             Err(context(persist_error.error))
         } else {
@@ -173,11 +173,14 @@ impl AsRef<dyn Transport> for LocalTransport {
 
 #[cfg(test)]
 mod test {
+    use std::error::Error;
+
     use assert_fs::prelude::*;
     use predicates::prelude::*;
 
     use super::*;
     use crate::kind::Kind;
+    use crate::transport;
 
     #[test]
     fn read_file() {
@@ -192,6 +195,28 @@ mod test {
         assert_eq!(buf, content.as_bytes());
 
         temp.close().unwrap();
+    }
+
+    #[test]
+    fn read_file_not_found() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let transport = LocalTransport::new(temp.path());
+
+        let err = transport
+            .read_file("nonexistent.json")
+            .expect_err("read_file should fail on nonexistent file");
+
+        let message = err.to_string();
+        assert!(message.contains("Not found"));
+        assert!(message.contains("nonexistent.json"));
+
+        assert!(err.path().expect("path").ends_with("nonexistent.json"));
+        assert_eq!(err.kind(), transport::ErrorKind::NotFound);
+        assert!(err.is_not_found());
+
+        let source = err.source().expect("source");
+        let io_source: &io::Error = source.downcast_ref().expect("io::Error");
+        assert_eq!(io_source.kind(), io::ErrorKind::NotFound);
     }
 
     #[test]
@@ -255,6 +280,22 @@ mod test {
             .assert("Must I paint you a picture?");
 
         temp.close().unwrap();
+    }
+
+    #[test]
+    fn write_file_does_not_overwrite() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let transport = LocalTransport::new(temp.path());
+        let filename = "filename";
+        transport
+            .write_file(filename, b"original content")
+            .expect("first write succeeds");
+        let err = transport
+            .write_file(filename, b"new content")
+            .expect_err("write over existing file fails");
+        assert_eq!(err.kind(), transport::ErrorKind::AlreadyExists);
+        assert!(!err.is_not_found());
+        assert!(err.path().expect("error has a path").ends_with(filename));
     }
 
     #[test]

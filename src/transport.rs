@@ -97,6 +97,9 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// the complete content. On a local filesystem the content is written to a temporary file and
     /// then renamed.
     ///
+    /// If the file already exists, this should return an [Error] with kind
+    /// [ErrorKind::AlreadyExists].
+    ///
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
     fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
 
@@ -149,7 +152,7 @@ pub struct Error {
     kind: ErrorKind,
     /// The underlying error: for example an IO or S3 error.
     source: Option<Box<dyn error::Error + Send + Sync>>,
-    /// The affected path.
+    /// The affected path, possibly relative to the transport.
     path: Option<String>,
 }
 
