@@ -15,8 +15,13 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use aws_config::AppName;
+use aws_types::region::Region;
+use aws_types::SdkConfig;
 use bytes::Bytes;
+use futures::stream::StreamExt;
 use tokio::runtime::Runtime;
+use tracing::{debug, trace_span};
 use url::Url;
 
 use super::{Error, ListDir, Metadata, Result, Transport};
@@ -25,11 +30,12 @@ use super::{Error, ListDir, Metadata, Result, Transport};
 #[allow(dead_code)]
 pub struct S3Transport {
     /// Tokio runtime specifically for S3 IO.
-    runtime: Runtime,
+    runtime: Arc<Runtime>,
 
-    client: aws_sdk_s3::Client,
+    client: Arc<aws_sdk_s3::Client>,
 
-    base_url: Url,
+    bucket: String,
+    base_path: String,
 }
 
 impl S3Transport {
@@ -39,52 +45,158 @@ impl S3Transport {
             .enable_all()
             .build()
             .map_err(|err| Error::io_error(Path::new(""), err))?;
-        let config = runtime.block_on(aws_config::load_from_env());
+
+        let bucket = base_url.authority().to_owned();
+        assert!(
+            !bucket.is_empty(),
+            "S3 bucket name is empty in {base_url:?}"
+        );
+
+        // Find the bucket region.
+        let config = load_aws_config(&runtime, None);
         let client = aws_sdk_s3::Client::new(&config);
+        let location_request = client
+            .get_bucket_location()
+            .set_bucket(Some(bucket.clone()));
+        let location_response = runtime
+            .block_on(location_request.send())
+            .expect("Send GetBucketLocation");
+        debug!(?location_response);
+
+        let region = location_response
+            .location_constraint
+            .map(|c| c.as_str().to_owned());
+        debug!(?region, "S3 bucket region");
+
+        // Make a new client in the right region.
+        let config = load_aws_config(&runtime, region);
+        let client = aws_sdk_s3::Client::new(&config);
+
+        let base_path = base_url.path().trim_end_matches('/').to_owned();
+        debug!(%bucket, %base_path);
+
         Ok(Arc::new(S3Transport {
-            base_url: base_url.clone(),
-            client,
-            runtime,
+            bucket,
+            base_path,
+            client: Arc::new(client),
+            runtime: Arc::new(runtime),
         }))
     }
+}
+
+fn load_aws_config(runtime: &Runtime, region: Option<String>) -> SdkConfig {
+    let mut loader = aws_config::from_env()
+        .app_name(AppName::new(format!("conserve-{}", crate::version())).unwrap());
+    if let Some(region) = region {
+        loader = loader.region(Region::new(region));
+    }
+    runtime.block_on(loader.load())
+}
+
+/// Join paths in a way that works for S3 keys.
+///
+/// S3 doesn't have directories, only keys that can contain slashes. So we
+/// have to be more careful not to produce double slashes or to insert an
+/// extra slash at the start.
+fn join_paths(a: &str, b: &str) -> String {
+    if b.is_empty() {
+        return a.to_owned();
+    }
+    if a.is_empty() {
+        return b.to_owned();
+    }
+    let mut result = a.to_owned();
+    if !result.ends_with('/') {
+        result.push('/');
+    }
+    result.push_str(b);
+    debug_assert!(
+        !result.contains("//"),
+        "result must not contain //: {result:?}"
+    );
+    debug_assert!(
+        !result.starts_with('/'),
+        "result must not start with /: {result:?}"
+    );
+    debug_assert!(
+        !result.contains("/../"),
+        "result must not contain /../: {result:?}"
+    );
+    debug_assert!(
+        !result.ends_with('/'),
+        "result must not end with /: {result:?}"
+    );
+    result
 }
 
 #[allow(unused_variables)]
 impl Transport for S3Transport {
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
-        todo!()
+        let _span = trace_span!("S3Transport::list_file", %relpath).entered();
+        let prefix = self.join_path(relpath);
+        let mut stream = self
+            .client
+            .list_objects_v2()
+            .set_bucket(Some(self.bucket.clone()))
+            .set_prefix(Some(prefix.clone()))
+            .set_delimiter(Some("/".to_owned()))
+            .into_paginator()
+            .send();
+        let mut result = ListDir::default();
+        loop {
+            match self.runtime.block_on(stream.next()) {
+                Some(Ok(response)) => {
+                    for common_prefix in response.common_prefixes.unwrap_or_default() {
+                        let name = common_prefix.prefix.expect("Common prefix has a name");
+                        debug!(%name, "S3 common prefix");
+                        let name = name
+                            .strip_prefix(&prefix)
+                            .expect("Common prefix starts with prefix")
+                            .strip_suffix('/')
+                            .expect("Common prefix ends with /");
+                        debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
+                        result.dirs.push(name.to_owned());
+                    }
+                    for object in response.contents.unwrap_or_default() {
+                        let name = object.key.expect("Object has a key");
+                        debug!(%name, "S3 object");
+                        let name = name
+                            .strip_prefix(&prefix)
+                            .expect("Object name should start with prefix");
+                        debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
+                        result.files.push(name.to_owned());
+                    }
+                }
+                Some(Err(err)) => panic!("S3 request failed: {}", err), // TODO: Return Err
+                None => break,
+            }
+        }
+        Ok(result)
     }
 
     fn read_file(&self, relpath: &str) -> Result<Bytes> {
-        // increment_counter!("conserve.local_transport.read));
-        // let mut file = File::open(self.full_path(relpath))?;
-        // let estimated_len: usize = file.metadata()?.len().try_into().unwrap();
-        // let mut out_buf = Vec::with_capacity(estimated_len);
-        // let actual_len = file.read_to_end(&mut out_buf)?;
-        // counter!(
-        //     "conserve.local_transport.read_file_bytes",
-        //     actual_len as u64
-        // );
-        // out_buf.truncate(actual_len);
-        // Ok(out_buf.into())
-        todo!()
-    }
-
-    fn is_file(&self, relpath: &str) -> Result<bool> {
-        // increment_counter!("conserve.local_transport.metadata_reads");
-        // Ok(self.full_path(relpath).is_file())
-        todo!()
+        let _span = trace_span!("S3Transport::read_file", %relpath).entered();
+        let key = self.join_path(relpath);
+        let request = self
+            .client
+            .get_object()
+            .set_bucket(Some(self.bucket.clone()))
+            .set_key(Some(key));
+        let response = self
+            .runtime
+            .block_on(request.send())
+            .expect("S3 request succeeded"); // TODO: No panic, map to error
+        let body_bytes = self
+            .runtime
+            .block_on(response.body.collect())
+            .expect("Read S3 response body");
+        Ok(body_bytes.into_bytes())
     }
 
     fn create_dir(&self, relpath: &str) -> Result<()> {
-        // create_dir(self.full_path(relpath)).or_else(|err| {
-        //     if err.kind() == io::ErrorKind::AlreadyExists {
-        //         Ok(())
-        //     } else {
-        //         Err(err)
-        //     }
-        // })
-        todo!()
+        // There are no directory objects, so there's nothing to create.
+        let _ = relpath;
+        Ok(())
     }
 
     fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
@@ -121,13 +233,6 @@ impl Transport for S3Transport {
         // std::fs::remove_dir_all(self.full_path(relpath))
     }
 
-    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
-        todo!()
-        // Box::new(S3Transport {
-        //     root: self.root.join(relpath),
-        // })
-    }
-
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
         // increment_counter!("conserve.local_transport.metadata_reads");
         // let fsmeta = self.root.join(relpath).metadata()?;
@@ -138,8 +243,29 @@ impl Transport for S3Transport {
         todo!()
     }
 
+    fn is_file(&self, relpath: &str) -> Result<bool> {
+        // increment_counter!("conserve.local_transport.metadata_reads");
+        // Ok(self.full_path(relpath).is_file())
+        todo!("S3Transport::is_file")
+    }
+
+    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
+        Arc::new(S3Transport {
+            base_path: join_paths(&self.base_path, relpath),
+            bucket: self.bucket.clone(),
+            runtime: self.runtime.clone(),
+            client: self.client.clone(),
+        })
+    }
+
     fn url_scheme(&self) -> &'static str {
-        "file"
+        "s3"
+    }
+}
+
+impl S3Transport {
+    fn join_path(&self, relpath: &str) -> String {
+        join_paths(&self.base_path, relpath)
     }
 }
 

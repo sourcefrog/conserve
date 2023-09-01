@@ -26,6 +26,7 @@ cachedir = "0.3"
 clicolors-control = "1.0"
 derive_more = "0.99"
 filetime = "0.2"
+futures = { version = "0.3", optional = true }
 globset = "0.4.5"
 hex = "0.4.2"
 itertools = "0.10"
@@ -85,7 +86,13 @@ tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 [features]
 blake2_simd_asm = ["blake2-rfc/simd_asm"]
-s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-types", "dep:tokio"]
+s3 = [
+    "dep:aws-config",
+    "dep:aws-sdk-s3",
+    "dep:aws-types",
+    "dep:futures",
+    "dep:tokio",
+]
 default = ["s3"]
 
 [lib]
