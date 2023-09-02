@@ -1,6 +1,5 @@
-exclude_re = [
-    # Causes a loop because every file seems to exist...
-    "Error::is_not_found -> bool with false",
-]
+# Controls tests with `cargo mutants`
+
+exclude_re = []
 # Include only files that are currently well-tested.
 examine_globs = ["src/bandid.rs", "src/bin/conserve.rs", "src/transport.rs"]
