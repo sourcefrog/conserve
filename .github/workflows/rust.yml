@@ -32,9 +32,13 @@ jobs:
           cargo --version
           rustc --version
       - name: Build
-        run: cargo build --all-targets --features=${{ matrix.features }}
+        run:
+          cargo build --all-targets --no-default-features --features=${{
+          matrix.features }}
       - name: Test
-        run: cargo test --features=${{ matrix.features }} -- --include-ignored
+        run:
+          cargo test --no-default-features --features=${{ matrix.features }} --
+          --include-ignored
       # Clippy and rustfmt are excellent tools but are turned off here because it's too
       # easy for PRs to fail due to irrelevant changes including Clippy flagging problems
       # that it did not notice before.
