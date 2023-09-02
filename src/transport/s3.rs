@@ -76,7 +76,12 @@ impl S3Transport {
         let config = load_aws_config(&runtime, region);
         let client = aws_sdk_s3::Client::new(&config);
 
-        let base_path = base_url.path().trim_end_matches('/').to_owned();
+        let base_path = base_url
+            .path()
+            .strip_prefix('/')
+            .expect("URL path starts with /")
+            .trim_end_matches('/')
+            .to_owned();
         debug!(%bucket, %base_path);
 
         Ok(Arc::new(S3Transport {
