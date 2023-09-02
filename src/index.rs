@@ -19,6 +19,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::vec;
 
+use itertools::Itertools;
 use metrics::{counter, increment_counter};
 use time::OffsetDateTime;
 use tracing::error;
@@ -29,7 +30,7 @@ use crate::kind::Kind;
 use crate::owner::Owner;
 use crate::stats::{IndexReadStats, IndexWriterStats};
 use crate::transport::local::LocalTransport;
-use crate::transport::{ListDir, Transport};
+use crate::transport::Transport;
 use crate::unix_mode::UnixMode;
 use crate::unix_time::FromUnixAndNanos;
 use crate::*;
@@ -300,8 +301,20 @@ impl IndexRead {
 
     /// Make an iterator that returns hunks of entries from this index.
     pub fn iter_hunks(&self) -> IndexHunkIter {
+        // All hunk numbers present in all directories.
+        let hunks: std::vec::IntoIter<u32> = self
+            .transport
+            .list_dir("")
+            .expect("list index dir") // TODO: Don't panic
+            .dirs
+            .into_iter()
+            .sorted()
+            .filter_map(|dir| self.transport.list_dir(&dir).ok())
+            .flat_map(|list| list.files)
+            .filter_map(|f| f.parse::<u32>().ok())
+            .sorted();
         IndexHunkIter {
-            next_hunk_number: 0,
+            hunks,
             transport: Arc::clone(&self.transport),
             decompressor: Decompressor::new(),
             stats: IndexReadStats::default(),
@@ -314,7 +327,7 @@ impl IndexRead {
 ///
 /// Each returned item is a vec of (typically up to a thousand) index entries.
 pub struct IndexHunkIter {
-    next_hunk_number: u32,
+    hunks: std::vec::IntoIter<u32>,
     /// The `i` directory within the band where all files for this index are written.
     transport: Arc<dyn Transport>,
     decompressor: Decompressor,
@@ -328,8 +341,8 @@ impl Iterator for IndexHunkIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let hunk_number = self.next_hunk_number;
-            let entries = match self.read_next_hunk() {
+            let hunk_number = self.hunks.next()?;
+            let entries = match self.read_next_hunk(hunk_number) {
                 Ok(None) => return None,
                 Ok(Some(entries)) => entries,
                 Err(err) => {
@@ -373,10 +386,8 @@ impl IndexHunkIter {
         }
     }
 
-    fn read_next_hunk(&mut self) -> Result<Option<Vec<IndexEntry>>> {
-        let path = hunk_relpath(self.next_hunk_number);
-        // Whether we succeed or fail, don't try to read this hunk again.
-        self.next_hunk_number += 1;
+    fn read_next_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
+        let path = hunk_relpath(hunk_number);
         let compressed_bytes = match self.transport.read_file(&path) {
             Ok(b) => b,
             Err(err) if err.is_not_found() => {
