@@ -2,4 +2,9 @@
 
 exclude_re = []
 # Include only files that are currently well-tested.
-examine_globs = ["src/bandid.rs", "src/bin/conserve.rs", "src/transport.rs"]
+examine_globs = [
+    "src/bandid.rs",
+    "src/bin/conserve.rs",
+    "src/transport.rs",
+    "src/transport/local.rs",
+]
