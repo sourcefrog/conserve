@@ -18,6 +18,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{error, fmt, io, result};
 
+use aws_sdk_s3::error::SdkError;
 use bytes::Bytes;
 use derive_more::Display;
 use url::Url;
@@ -111,8 +112,9 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// the complete content. On a local filesystem the content is written to a temporary file and
     /// then renamed.
     ///
-    /// If the file already exists, this should return an [Error] with kind
-    /// [ErrorKind::AlreadyExists].
+    /// If the transport supports it, this should error if the file already exists, returning
+    /// [ErrorKind::AlreadyExists]. However, if that can't be done by a single call, it
+    /// is OK to simply overwrite the existing object.
     ///
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
     fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
@@ -192,11 +194,17 @@ impl Error {
     }
 
     #[cfg(feature = "s3")]
-    pub(self) fn s3_error<K, E>(key: K, kind: ErrorKind, source: E) -> Error
+    pub(self) fn s3_error<K, E, R>(key: K, source: SdkError<E, R>) -> Error
     where
         K: ToOwned<Owned = String>,
-        E: Into<aws_sdk_s3::error::BoxError>,
+        E: std::error::Error + Send + Sync + 'static,
+        R: std::fmt::Debug + Send + Sync + 'static,
+        ErrorKind: for<'a> From<&'a E>,
     {
+        let kind = match &source {
+            SdkError::ServiceError(service_err) => ErrorKind::from(service_err.err()),
+            _ => ErrorKind::Other,
+        };
         Error {
             kind,
             path: Some(key.to_owned()),

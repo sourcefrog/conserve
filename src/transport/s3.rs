@@ -16,7 +16,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 use aws_config::AppName;
-use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::operation::get_object::GetObjectError;
+use aws_sdk_s3::operation::head_object::HeadObjectError;
+use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
+use aws_sdk_s3::operation::put_object::PutObjectError;
 use aws_types::region::Region;
 use aws_types::SdkConfig;
 use bytes::Bytes;
@@ -168,7 +171,7 @@ impl Transport for S3Transport {
                         result.files.push(name.to_owned());
                     }
                 }
-                Some(Err(err)) => return Err(Error::s3_error(prefix, ErrorKind::Other, err)),
+                Some(Err(err)) => return Err(Error::s3_error(prefix, err)),
                 None => break,
             }
         }
@@ -182,7 +185,7 @@ impl Transport for S3Transport {
         let response = self
             .runtime
             .block_on(request.send())
-            .map_err(|source| Error::s3_error(key, ErrorKind::Other, source))?;
+            .map_err(|source| Error::s3_error(key, source))?;
         let body_bytes = self
             .runtime
             .block_on(response.body.collect())
@@ -199,7 +202,6 @@ impl Transport for S3Transport {
     fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
         let _span = trace_span!("S3Transport::write_file", %relpath).entered();
         let key = self.join_path(relpath);
-        // TODO: Assert that it should not already exist?
         let request = self
             .client
             .put_object()
@@ -208,7 +210,7 @@ impl Transport for S3Transport {
             .body(content.to_owned().into());
         let response = self.runtime.block_on(request.send());
         trace!(?response);
-        response.map_err(|err| Error::s3_error(key, ErrorKind::Other, err))?;
+        response.map_err(|err| Error::s3_error(key, err))?;
         Ok(())
     }
 
@@ -234,16 +236,7 @@ impl Transport for S3Transport {
                     .try_into()
                     .expect("content length non-negative"),
             }),
-            Err(err) => match &err {
-                SdkError::ServiceError(service_err) if service_err.err().is_not_found() => {
-                    Err(Error {
-                        path: Some(key),
-                        kind: ErrorKind::NotFound,
-                        source: Some(Box::new(err)),
-                    })
-                }
-                other => todo!("Unhandled S3 error: {other:#?}"), // TODO: Return Err
-            },
+            Err(err) => Err(Error::s3_error(key, err)),
         }
     }
 
@@ -270,6 +263,40 @@ impl S3Transport {
 impl AsRef<dyn Transport> for S3Transport {
     fn as_ref(&self) -> &(dyn Transport + 'static) {
         self
+    }
+}
+
+impl From<&GetObjectError> for ErrorKind {
+    fn from(source: &GetObjectError) -> Self {
+        match source {
+            GetObjectError::NoSuchKey(_) => ErrorKind::NotFound,
+            _ => ErrorKind::Other,
+        }
+    }
+}
+
+impl From<&ListObjectsV2Error> for ErrorKind {
+    fn from(source: &ListObjectsV2Error) -> Self {
+        match &source {
+            ListObjectsV2Error::NoSuchBucket(_) => ErrorKind::NotFound,
+            _ => ErrorKind::Other,
+        }
+    }
+}
+
+impl From<&PutObjectError> for ErrorKind {
+    fn from(source: &PutObjectError) -> Self {
+        let _ = source;
+        ErrorKind::Other
+    }
+}
+
+impl From<&HeadObjectError> for ErrorKind {
+    fn from(source: &HeadObjectError) -> Self {
+        match &source {
+            HeadObjectError::NotFound(..) => ErrorKind::NotFound,
+            _ => ErrorKind::Other,
+        }
     }
 }
 
