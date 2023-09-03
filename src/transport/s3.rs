@@ -170,8 +170,8 @@ impl Transport for S3Transport {
             match self.runtime.block_on(stream.next()) {
                 Some(Ok(response)) => {
                     for common_prefix in response.common_prefixes.unwrap_or_default() {
-                        let name = common_prefix.prefix.expect("Common prefix has a name");
-                        // trace!(%name, "S3 common prefix");
+                        let name = common_prefix.prefix.expect("Common prefix has a name"); // needed for lifetime
+                        trace!(%name, "S3 common prefix");
                         let name = name
                             .strip_prefix(&prefix)
                             .expect("Common prefix starts with prefix")
@@ -181,8 +181,8 @@ impl Transport for S3Transport {
                         result.dirs.push(name.to_owned());
                     }
                     for object in response.contents.unwrap_or_default() {
-                        let name = object.key.expect("Object has a key");
-                        // trace!(%name, "S3 object");
+                        let name = object.key.expect("Object has a key"); // needed
+                        trace!(%name, "S3 object");
                         let name = name
                             .strip_prefix(&prefix)
                             .expect("Object name should start with prefix");
@@ -257,7 +257,40 @@ impl Transport for S3Transport {
     }
 
     fn remove_dir_all(&self, relpath: &str) -> Result<()> {
-        todo!("S3Transport::remove_dir_all: {relpath:?}")
+        // Walk the prefix and delete every object within it.
+        // This could be locally parallelized, but it's only used during `conserve delete`
+        // which isn't the most important thing to optimize.
+        let _span = trace_span!("S3Transport::remove_dir_all", %relpath).entered();
+        let prefix = self.join_path(relpath);
+        let mut stream = self
+            .client
+            .list_objects_v2()
+            .bucket(&self.bucket)
+            .prefix(&prefix)
+            .into_paginator()
+            .send();
+        let mut n_files = 0;
+        while let Some(response) = self.runtime.block_on(stream.next()) {
+            for object in response
+                .map_err(|err| s3_error(prefix.clone(), err))?
+                .contents
+                .expect("ListObjectsV2Response has contents")
+            {
+                let key = object.key.expect("Object has a key");
+                self.runtime
+                    .block_on(
+                        self.client
+                            .delete_object()
+                            .bucket(&self.bucket)
+                            .key(&key)
+                            .send(),
+                    )
+                    .map_err(|err| s3_error(key, err))?;
+                n_files += 1;
+            }
+        }
+        trace!(n_files, "Deleted all files");
+        Ok(())
     }
 
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
@@ -271,8 +304,8 @@ impl Transport for S3Transport {
                 let len = response
                     .content_length
                     .try_into()
-                    .expect("content length non-negative");
-                trace!(?len, "file exists");
+                    .expect("Content length non-negative");
+                trace!(?len, "File exists");
                 Ok(Metadata {
                     kind: Kind::File,
                     len,
