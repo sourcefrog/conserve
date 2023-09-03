@@ -1,5 +1,11 @@
 # Conserve release history
 
+## Unreleased
+
+- `--debug` now shows on stderr only debug messages from Conserve itself and not
+  from dependencies. All the messages are still recorded to the `--log-json` file
+  if that is given.
+
 ## 23.5.0
 
 - Better progress bars for various operations including `validate`.
