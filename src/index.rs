@@ -22,7 +22,7 @@ use std::vec;
 use itertools::Itertools;
 use metrics::{counter, increment_counter};
 use time::OffsetDateTime;
-use tracing::error;
+use tracing::{debug, debug_span, error};
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::entry::{EntryValue, KindMeta};
@@ -301,20 +301,27 @@ impl IndexRead {
 
     /// Make an iterator that returns hunks of entries from this index.
     pub fn iter_hunks(&self) -> IndexHunkIter {
+        let _span = debug_span!("iter_hunks", ?self.transport).entered();
         // All hunk numbers present in all directories.
-        let hunks: std::vec::IntoIter<u32> = self
+        let subdirs = self
             .transport
             .list_dir("")
             .expect("list index dir") // TODO: Don't panic
             .dirs
             .into_iter()
             .sorted()
+            .collect_vec();
+        debug!(?subdirs);
+        let hunks = subdirs
+            .into_iter()
             .filter_map(|dir| self.transport.list_dir(&dir).ok())
             .flat_map(|list| list.files)
             .filter_map(|f| f.parse::<u32>().ok())
-            .sorted();
+            .sorted()
+            .collect_vec();
+        debug!(?hunks);
         IndexHunkIter {
-            hunks,
+            hunks: hunks.into_iter(),
             transport: Arc::clone(&self.transport),
             decompressor: Decompressor::new(),
             stats: IndexReadStats::default(),

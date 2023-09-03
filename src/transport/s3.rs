@@ -12,6 +12,7 @@
 
 //! Access to an archive on AWS S3, or compatible object storage.
 
+use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -31,7 +32,6 @@ use url::Url;
 
 use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, Transport};
 
-#[derive(Debug)]
 pub struct S3Transport {
     /// Tokio runtime specifically for S3 IO.
     runtime: Arc<Runtime>,
@@ -40,6 +40,15 @@ pub struct S3Transport {
 
     bucket: String,
     base_path: String,
+}
+
+impl fmt::Debug for S3Transport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("S3Transport")
+            .field("bucket", &self.bucket)
+            .field("base_path", &self.base_path)
+            .finish()
+    }
 }
 
 impl S3Transport {
@@ -141,7 +150,11 @@ fn join_paths(a: &str, b: &str) -> String {
 impl Transport for S3Transport {
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         let _span = trace_span!("S3Transport::list_file", %relpath).entered();
-        let prefix = self.join_path(relpath);
+        let mut prefix = self.join_path(relpath);
+        debug_assert!(!prefix.ends_with('/'), "{prefix:?} ends with /");
+        if !prefix.is_empty() {
+            prefix.push('/'); // add a slash to get the files inside this directory.
+        }
         let mut stream = self
             .client
             .list_objects_v2()
