@@ -31,7 +31,6 @@ use url::Url;
 use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, Transport};
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct S3Transport {
     /// Tokio runtime specifically for S3 IO.
     runtime: Arc<Runtime>,
@@ -138,7 +137,6 @@ fn join_paths(a: &str, b: &str) -> String {
     result
 }
 
-#[allow(unused_variables)]
 impl Transport for S3Transport {
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         let _span = trace_span!("S3Transport::list_file", %relpath).entered();
