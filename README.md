@@ -109,6 +109,20 @@ crate.
 Directories marked with [`CACHEDIR.TAG`](https://bford.info/cachedir/) are
 automatically excluded from backups.
 
+## S3 support
+
+From 23.9 Conserve supports storing backups in Amazon S3. AWS IAM credentials are
+read from the environment or, on EC2, the instance metadata service.
+
+This feature is built in by default but can be turned off by passing `cargo install --no-default-features`.
+
+To use this, just specify an S3 URL for the archive location. The bucket must already exist.
+
+    conserve init s3://my-bucket/
+    conserve backup s3://my-bucket/ ~
+
+(This should work on API-compatible services but has not been tested; experience reports are welcome.)
+
 ## Install
 
 To build Conserve you need [Rust][rust] and a C compiler that can be used by
