@@ -183,27 +183,6 @@ impl Error {
         self.kind
     }
 
-    #[cfg(feature = "s3")]
-    pub(self) fn s3_error<K, E, R>(key: K, source: aws_sdk_s3::error::SdkError<E, R>) -> Error
-    where
-        K: ToOwned<Owned = String>,
-        E: std::error::Error + Send + Sync + 'static,
-        R: std::fmt::Debug + Send + Sync + 'static,
-        ErrorKind: for<'a> From<&'a E>,
-    {
-        let kind = match &source {
-            aws_sdk_s3::error::SdkError::ServiceError(service_err) => {
-                ErrorKind::from(service_err.err())
-            }
-            _ => ErrorKind::Other,
-        };
-        Error {
-            kind,
-            path: Some(key.to_owned()),
-            source: Some(source.into()),
-        }
-    }
-
     pub(self) fn io_error(path: &Path, source: io::Error) -> Error {
         let kind = match source.kind() {
             io::ErrorKind::NotFound => ErrorKind::NotFound,

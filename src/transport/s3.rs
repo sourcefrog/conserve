@@ -17,6 +17,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use aws_config::AppName;
+use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
@@ -189,7 +190,7 @@ impl Transport for S3Transport {
                         result.files.push(name.to_owned());
                     }
                 }
-                Some(Err(err)) => return Err(Error::s3_error(prefix, err)),
+                Some(Err(err)) => return Err(s3_error(prefix, err)),
                 None => break,
             }
         }
@@ -208,7 +209,7 @@ impl Transport for S3Transport {
         let response = self
             .runtime
             .block_on(request.send())
-            .map_err(|source| Error::s3_error(key.clone(), source))?;
+            .map_err(|source| s3_error(key.clone(), source))?;
         let body_bytes = self
             .runtime
             .block_on(response.body.collect())
@@ -239,7 +240,7 @@ impl Transport for S3Transport {
             .body(content.to_owned().into());
         let response = self.runtime.block_on(request.send());
         // trace!(?response);
-        response.map_err(|err| Error::s3_error(key, err))?;
+        response.map_err(|err| s3_error(key, err))?;
         trace!(body_len = content.len(), "wrote file");
         Ok(())
     }
@@ -250,7 +251,7 @@ impl Transport for S3Transport {
         let request = self.client.delete_object().bucket(&self.bucket).key(&key);
         let response = self.runtime.block_on(request.send());
         trace!(?response);
-        response.map_err(|err| Error::s3_error(key, err))?;
+        response.map_err(|err| s3_error(key, err))?;
         trace!("deleted file");
         Ok(())
     }
@@ -278,7 +279,7 @@ impl Transport for S3Transport {
                 })
             }
             Err(err) => {
-                let translated = Error::s3_error(key, err);
+                let translated = s3_error(key, err);
                 if translated.is_not_found() {
                     trace!("file does not exist");
                 } else {
@@ -312,6 +313,24 @@ impl S3Transport {
 impl AsRef<dyn Transport> for S3Transport {
     fn as_ref(&self) -> &(dyn Transport + 'static) {
         self
+    }
+}
+
+fn s3_error<K, E, R>(key: K, source: SdkError<E, R>) -> Error
+where
+    K: ToOwned<Owned = String>,
+    E: std::error::Error + Send + Sync + 'static,
+    R: std::fmt::Debug + Send + Sync + 'static,
+    ErrorKind: for<'a> From<&'a E>,
+{
+    let kind = match &source {
+        SdkError::ServiceError(service_err) => ErrorKind::from(service_err.err()),
+        _ => ErrorKind::Other,
+    };
+    Error {
+        kind,
+        path: Some(key.to_owned()),
+        source: Some(source.into()),
     }
 }
 
