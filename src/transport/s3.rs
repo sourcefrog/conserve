@@ -157,7 +157,7 @@ impl Transport for S3Transport {
                 Some(Ok(response)) => {
                     for common_prefix in response.common_prefixes.unwrap_or_default() {
                         let name = common_prefix.prefix.expect("Common prefix has a name");
-                        debug!(%name, "S3 common prefix");
+                        trace!(%name, "S3 common prefix");
                         let name = name
                             .strip_prefix(&prefix)
                             .expect("Common prefix starts with prefix")
@@ -168,7 +168,7 @@ impl Transport for S3Transport {
                     }
                     for object in response.contents.unwrap_or_default() {
                         let name = object.key.expect("Object has a key");
-                        debug!(%name, "S3 object");
+                        trace!(%name, "S3 object");
                         let name = name
                             .strip_prefix(&prefix)
                             .expect("Object name should start with prefix");
