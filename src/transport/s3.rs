@@ -16,6 +16,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use aws_config::AppName;
+use aws_sdk_s3::operation::delete_object::DeleteObjectError;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
@@ -218,11 +219,17 @@ impl Transport for S3Transport {
     }
 
     fn remove_file(&self, relpath: &str) -> Result<()> {
-        todo!("S3Transport::remove_file")
+        let _span = trace_span!("S3Transport::remove_file", %relpath).entered();
+        let key = self.join_path(relpath);
+        let request = self.client.delete_object().bucket(&self.bucket).key(&key);
+        let response = self.runtime.block_on(request.send());
+        trace!(?response);
+        response.map_err(|err| Error::s3_error(key, err))?;
+        Ok(())
     }
 
     fn remove_dir_all(&self, relpath: &str) -> Result<()> {
-        todo!("S3Transport::remove_dir_all")
+        todo!("S3Transport::remove_dir_all: {relpath:?}")
     }
 
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
@@ -300,6 +307,13 @@ impl From<&HeadObjectError> for ErrorKind {
             HeadObjectError::NotFound(..) => ErrorKind::NotFound,
             _ => ErrorKind::Other,
         }
+    }
+}
+
+impl From<&DeleteObjectError> for ErrorKind {
+    fn from(_source: &DeleteObjectError) -> Self {
+        // The AWS crate doesn't return a clear "not found" in this version.
+        ErrorKind::Other
     }
 }
 
