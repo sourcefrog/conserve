@@ -21,7 +21,10 @@ jobs:
           crate: cargo-mutants
       - name: Run mutant tests
         # Can't use --all-features here because BLAKE2 SIMD needs unstable...
-        run: cargo mutants -j2 --no-shuffle -vV
+        # Don't use the S3 features because they require AWS credentials for realistic
+        # testing.
+        run:
+          cargo mutants -j2 --no-shuffle -vV --cargo-arg --no-default-features
       - name: Archive results
         uses: actions/upload-artifact@v3
         with:
