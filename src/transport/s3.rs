@@ -22,6 +22,7 @@ use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
 use aws_sdk_s3::operation::put_object::PutObjectError;
+use aws_sdk_s3::primitives::ByteStreamError;
 use aws_types::region::Region;
 use aws_types::SdkConfig;
 use bytes::Bytes;
@@ -192,6 +193,11 @@ impl Transport for S3Transport {
                 None => break,
             }
         }
+        trace!(
+            n_dirs = result.dirs.len(),
+            n_files = result.files.len(),
+            "list_dir complete"
+        );
         Ok(result)
     }
 
@@ -202,12 +208,18 @@ impl Transport for S3Transport {
         let response = self
             .runtime
             .block_on(request.send())
-            .map_err(|source| Error::s3_error(key, source))?;
+            .map_err(|source| Error::s3_error(key.clone(), source))?;
         let body_bytes = self
             .runtime
             .block_on(response.body.collect())
-            .expect("Read S3 response body");
-        Ok(body_bytes.into_bytes())
+            .map_err(|source| Error {
+                kind: ErrorKind::Other,
+                path: Some(key.clone()),
+                source: Some(Box::new(source)),
+            })?
+            .into_bytes();
+        trace!(body_len = body_bytes.len(), "read file");
+        Ok(body_bytes)
     }
 
     fn create_dir(&self, relpath: &str) -> Result<()> {
@@ -226,8 +238,9 @@ impl Transport for S3Transport {
             .key(&key)
             .body(content.to_owned().into());
         let response = self.runtime.block_on(request.send());
-        trace!(?response);
+        // trace!(?response);
         response.map_err(|err| Error::s3_error(key, err))?;
+        trace!(body_len = content.len(), "wrote file");
         Ok(())
     }
 
@@ -238,6 +251,7 @@ impl Transport for S3Transport {
         let response = self.runtime.block_on(request.send());
         trace!(?response);
         response.map_err(|err| Error::s3_error(key, err))?;
+        trace!("deleted file");
         Ok(())
     }
 
@@ -250,16 +264,28 @@ impl Transport for S3Transport {
         let key = self.join_path(relpath);
         let request = self.client.head_object().bucket(&self.bucket).key(&key);
         let response = self.runtime.block_on(request.send());
-        trace!(?response);
+        // trace!(?response);
         match response {
-            Ok(response) => Ok(Metadata {
-                kind: Kind::File,
-                len: response
+            Ok(response) => {
+                let len = response
                     .content_length
                     .try_into()
-                    .expect("content length non-negative"),
-            }),
-            Err(err) => Err(Error::s3_error(key, err)),
+                    .expect("content length non-negative");
+                trace!(?len, "file exists");
+                Ok(Metadata {
+                    kind: Kind::File,
+                    len,
+                })
+            }
+            Err(err) => {
+                let translated = Error::s3_error(key, err);
+                if translated.is_not_found() {
+                    trace!("file does not exist");
+                } else {
+                    trace!(?translated, "error getting metadata");
+                }
+                Err(translated)
+            }
         }
     }
 
@@ -326,6 +352,12 @@ impl From<&HeadObjectError> for ErrorKind {
 impl From<&DeleteObjectError> for ErrorKind {
     fn from(_source: &DeleteObjectError) -> Self {
         // The AWS crate doesn't return a clear "not found" in this version.
+        ErrorKind::Other
+    }
+}
+
+impl From<&ByteStreamError> for ErrorKind {
+    fn from(_source: &ByteStreamError) -> Self {
         ErrorKind::Other
     }
 }
