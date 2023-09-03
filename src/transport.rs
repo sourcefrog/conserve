@@ -18,7 +18,6 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{error, fmt, io, result};
 
-use aws_sdk_s3::error::SdkError;
 use bytes::Bytes;
 use derive_more::Display;
 use url::Url;
@@ -40,7 +39,8 @@ pub fn open_transport(s: &str) -> crate::Result<Arc<dyn Transport>> {
             "file" => Ok(Arc::new(LocalTransport::new(
                 &url.to_file_path().expect("extract URL file path"),
             ))),
-            "s3" => open_s3(&url).map_err(crate::Error::from),
+            #[cfg(feature = "s3")]
+            "s3" => Ok(s3::S3Transport::new(&url)?),
             d if d.len() == 1 => {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Arc::new(LocalTransport::new(Path::new(s))))
@@ -52,16 +52,6 @@ pub fn open_transport(s: &str) -> crate::Result<Arc<dyn Transport>> {
     } else {
         Ok(Arc::new(LocalTransport::new(Path::new(s))))
     }
-}
-
-#[cfg(not(feature = "s3"))]
-fn open_s3(_url: &Url) -> Result<Arc<dyn Transport>> {
-    panic!("s3 not supported")
-}
-
-#[cfg(feature = "s3")]
-fn open_s3(url: &Url) -> Result<Arc<dyn Transport>> {
-    Ok(s3::S3Transport::new(url)?)
 }
 
 /// Abstracted filesystem IO to access an archive.
@@ -194,7 +184,7 @@ impl Error {
     }
 
     #[cfg(feature = "s3")]
-    pub(self) fn s3_error<K, E, R>(key: K, source: SdkError<E, R>) -> Error
+    pub(self) fn s3_error<K, E, R>(key: K, source: aws_sdk_s3::error::SdkError<E, R>) -> Error
     where
         K: ToOwned<Owned = String>,
         E: std::error::Error + Send + Sync + 'static,
@@ -202,7 +192,9 @@ impl Error {
         ErrorKind: for<'a> From<&'a E>,
     {
         let kind = match &source {
-            SdkError::ServiceError(service_err) => ErrorKind::from(service_err.err()),
+            aws_sdk_s3::error::SdkError::ServiceError(service_err) => {
+                ErrorKind::from(service_err.err())
+            }
             _ => ErrorKind::Other,
         };
         Error {
