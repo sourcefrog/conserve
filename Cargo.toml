@@ -85,6 +85,7 @@ rstest = { version = "0.17", default-features = false }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 [features]
+default = ["s3"]
 blake2_simd_asm = ["blake2-rfc/simd_asm"]
 s3 = [
     "dep:aws-config",
@@ -93,7 +94,7 @@ s3 = [
     "dep:futures",
     "dep:tokio",
 ]
-default = ["s3"]
+s3-integration-test = ["s3"]
 
 [lib]
 doctest = false
