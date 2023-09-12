@@ -19,8 +19,13 @@
 // rather than "real" async, or making use or rstest's async features,
 // to be more similar to the code under test.
 
+use std::str::FromStr;
+
 use ::aws_config::AppName;
-use ::aws_types::SdkConfig;
+use aws_sdk_s3::types::{
+    BucketLifecycleConfiguration, BucketLocationConstraint, CreateBucketConfiguration,
+    ExpirationStatus, LifecycleExpiration, LifecycleRule, LifecycleRuleFilter,
+};
 use aws_sdk_s3::Config;
 use rand::Rng;
 use rstest::{fixture, rstest};
@@ -50,10 +55,48 @@ fn temp_bucket() -> TempBucket {
         "conserve-s3-integration-{:x}",
         rand::thread_rng().gen::<u64>()
     );
+
     let client = aws_sdk_s3::Client::new(&config);
-    let request = client.create_bucket().bucket(&bucket_name).send();
-    runtime.block_on(request).expect("Create bucket");
+    let region = config.region().unwrap().as_ref();
+    dbg!(&region);
+
+    runtime
+        .block_on(
+            client
+                .create_bucket()
+                .bucket(&bucket_name)
+                .create_bucket_configuration(
+                    CreateBucketConfiguration::builder()
+                        .location_constraint(BucketLocationConstraint::from_str(region).unwrap())
+                        .build(),
+                )
+                .send(),
+        )
+        .expect("Create bucket");
     println!("Created bucket {bucket_name}");
+
+    runtime
+        .block_on(
+            client
+                .put_bucket_lifecycle_configuration()
+                .bucket(&bucket_name)
+                .lifecycle_configuration(
+                    BucketLifecycleConfiguration::builder()
+                        .rules(
+                            LifecycleRule::builder()
+                                .id("delete-after-7d")
+                                .filter(LifecycleRuleFilter::ObjectSizeGreaterThan(0))
+                                .status(ExpirationStatus::Enabled)
+                                .expiration(LifecycleExpiration::builder().days(7).build())
+                                .build(),
+                        )
+                        .build(),
+                )
+                .send(),
+        )
+        .expect("Set bucket lifecycle");
+    println!("Set lifecycle on bucket {bucket_name}");
+
     TempBucket {
         runtime,
         bucket_name,
