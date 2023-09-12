@@ -114,7 +114,8 @@ automatically excluded from backups.
 From 23.9 Conserve supports storing backups in Amazon S3. AWS IAM credentials are
 read from the standard sources: the environment, config file, or, on EC2, the instance metadata service.
 
-This feature is built in by default but can be turned off by passing `cargo install --no-default-features`.
+S3 support can be turned off by passing `cargo install --no-default-features`. (There's no
+runtime impact if it is not used, but it does add a lot of build-time dependencies.)
 
 To use this, just specify an S3 URL for the archive location. The bucket must already exist.
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- S3 support! Enable it with `cargo install --features s3`, then e.g. `cargo backup s3://mybucket.example/`.
+
 - `--debug` now shows on stderr only debug messages from Conserve itself and not
   from dependencies. All the messages are still recorded to the `--log-json` file
   if that is given.
