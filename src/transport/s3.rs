@@ -12,6 +12,18 @@
 
 //! Access to an archive on AWS S3, or compatible object storage.
 
+// This file is mostly tested by the s3-integration test, which needs
+// AWS credentials and so is not built or run by default.
+//
+// To run it, use
+//
+//     cargo test --features s3-integration-test,s3 --test s3-integration
+//
+// Similarly, this file is not included in mutation testing by default,
+// but it can be tested with
+//
+//    cargo mutants -f s3.rs --no-config -C --features=s3,s3-integration-test
+
 use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
