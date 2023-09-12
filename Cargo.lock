@@ -741,6 +741,7 @@ dependencies = [
  "pretty_assertions",
  "proptest",
  "proptest-derive",
+ "rand",
  "rayon",
  "readahead-iterator",
  "regex",
