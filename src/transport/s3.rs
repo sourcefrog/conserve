@@ -350,10 +350,6 @@ impl Transport for S3Transport {
             storage_class: self.storage_class.clone(),
         })
     }
-
-    fn url_scheme(&self) -> &'static str {
-        "s3"
-    }
 }
 
 impl S3Transport {

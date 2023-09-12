@@ -120,9 +120,6 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
 
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport>;
-
-    /// Return a URL scheme describing this transport, such as "file".
-    fn url_scheme(&self) -> &'static str;
 }
 
 /// A directory entry read from a transport.

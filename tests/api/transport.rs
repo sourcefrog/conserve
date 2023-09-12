@@ -17,8 +17,7 @@ use conserve::transport::{open_transport, ListDir};
 
 #[test]
 fn open_local() {
-    let transport = open_transport("/backup").unwrap();
-    assert_eq!(transport.url_scheme(), "file");
+    open_transport("/backup").unwrap();
 }
 
 #[test]
@@ -43,15 +42,15 @@ fn list_dir_names() {
 
 #[test]
 fn parse_location_urls() {
-    fn parsed_scheme(s: &str) -> &'static str {
-        open_transport(s).unwrap().url_scheme()
+    for n in [
+        "./relative",
+        "/backup/repo.c6",
+        "../backup/repo.c6",
+        "c:/backup/repo",
+        r"c:\backup\repo\",
+    ] {
+        assert!(open_transport(n).is_ok(), "Failed to parse {n:?}");
     }
-
-    assert_eq!(parsed_scheme("./relative"), "file");
-    assert_eq!(parsed_scheme("/backup/repo.c6"), "file");
-    assert_eq!(parsed_scheme("../backup/repo.c6"), "file");
-    assert_eq!(parsed_scheme("c:/backup/repo"), "file");
-    assert_eq!(parsed_scheme(r"c:\backup\repo\"), "file");
 }
 
 #[test]
