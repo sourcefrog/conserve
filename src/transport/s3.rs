@@ -36,6 +36,10 @@ use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, Transport};
 
 pub struct S3Transport {
     /// Tokio runtime specifically for S3 IO.
+    ///
+    /// S3 SDK is built on Tokio but the rest of Conserve uses threads.
+    /// Each call into the S3 transport blocks the calling thread
+    /// until the request is complete.
     runtime: Arc<Runtime>,
 
     client: Arc<aws_sdk_s3::Client>,
@@ -413,6 +417,3 @@ impl From<&ByteStreamError> for ErrorKind {
         ErrorKind::Other
     }
 }
-
-#[cfg(test)]
-mod test {}
