@@ -112,7 +112,7 @@ automatically excluded from backups.
 ## S3 support
 
 From 23.9 Conserve supports storing backups in Amazon S3. AWS IAM credentials are
-read from the environment or, on EC2, the instance metadata service.
+read from the standard sources: the environment, config file, or, on EC2, the instance metadata service.
 
 This feature is built in by default but can be turned off by passing `cargo install --no-default-features`.
 
@@ -120,6 +120,8 @@ To use this, just specify an S3 URL for the archive location. The bucket must al
 
     conserve init s3://my-bucket/
     conserve backup s3://my-bucket/ ~
+
+Files are written in the `INTELLIGENT_TIERING` storage class.
 
 (This should work on API-compatible services but has not been tested; experience reports are welcome.)
 

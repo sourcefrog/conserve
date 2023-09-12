@@ -24,6 +24,7 @@ use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
 use aws_sdk_s3::operation::put_object::PutObjectError;
 use aws_sdk_s3::primitives::ByteStreamError;
+use aws_sdk_s3::types::StorageClass;
 use aws_types::region::Region;
 use aws_types::SdkConfig;
 use bytes::Bytes;
@@ -46,6 +47,9 @@ pub struct S3Transport {
 
     bucket: String,
     base_path: String,
+
+    /// Storage class for new objects.
+    storage_class: StorageClass,
 }
 
 impl fmt::Debug for S3Transport {
@@ -104,6 +108,7 @@ impl S3Transport {
             base_path,
             client: Arc::new(client),
             runtime: Arc::new(runtime),
+            storage_class: StorageClass::IntelligentTiering,
         }))
     }
 }
@@ -241,6 +246,7 @@ impl Transport for S3Transport {
             .put_object()
             .bucket(&self.bucket)
             .key(&key)
+            .storage_class(self.storage_class.clone())
             .body(content.to_owned().into());
         let response = self.runtime.block_on(request.send());
         // trace!(?response);
@@ -333,6 +339,7 @@ impl Transport for S3Transport {
             bucket: self.bucket.clone(),
             runtime: self.runtime.clone(),
             client: self.client.clone(),
+            storage_class: self.storage_class.clone(),
         })
     }
 
