@@ -213,6 +213,10 @@ impl fmt::Display for Error {
         if let Some(ref path) = self.path {
             write!(f, ": {}", path)?;
         }
+        if let Some(source) = &self.source {
+            // I'm not sure we should write this here; it might be repetitive.
+            write!(f, ": {source}")?;
+        }
         Ok(())
     }
 }

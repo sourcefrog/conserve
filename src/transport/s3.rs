@@ -27,6 +27,7 @@ use aws_sdk_s3::primitives::ByteStreamError;
 use aws_sdk_s3::types::StorageClass;
 use aws_types::region::Region;
 use aws_types::SdkConfig;
+use base64::Engine;
 use bytes::Bytes;
 use futures::stream::StreamExt;
 use tokio::runtime::Runtime;
@@ -243,12 +244,15 @@ impl Transport for S3Transport {
     fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
         let _span = trace_span!("S3Transport::write_file", %relpath).entered();
         let key = self.join_path(relpath);
+        let crc32c =
+            base64::engine::general_purpose::STANDARD.encode(crc32c::crc32c(content).to_be_bytes());
         let request = self
             .client
             .put_object()
             .bucket(&self.bucket)
             .key(&key)
             .storage_class(self.storage_class.clone())
+            .checksum_crc32_c(crc32c)
             .body(content.to_owned().into());
         let response = self.runtime.block_on(request.send());
         // trace!(?response);
@@ -369,6 +373,7 @@ where
     R: std::fmt::Debug + Send + Sync + 'static,
     ErrorKind: for<'a> From<&'a E>,
 {
+    debug!(s3_error = ?source);
     let kind = match &source {
         SdkError::ServiceError(service_err) => ErrorKind::from(service_err.err()),
         _ => ErrorKind::Other,
