@@ -232,6 +232,12 @@ fn integration_test() {
     println!("validate {url}");
     conserve().arg("validate").arg(url).assert().success();
 
+    println!("gc {url}");
+    conserve().arg("gc").arg(url).assert().success();
+
+    println!("gc {url}");
+    conserve().arg("gc").arg(url).assert().success();
+
     println!("versions {url}");
     conserve()
         .arg("versions")
