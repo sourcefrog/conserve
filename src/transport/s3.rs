@@ -54,6 +54,7 @@ pub struct S3Transport {
 }
 
 impl fmt::Debug for S3Transport {
+    #[mutants::skip] // unimportant to test
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("S3Transport")
             .field("bucket", &self.bucket)
@@ -237,6 +238,7 @@ impl Transport for S3Transport {
         Ok(body_bytes)
     }
 
+    #[mutants::skip] // does nothing so hard to observe!
     fn create_dir(&self, relpath: &str) -> Result<()> {
         // There are no directory objects, so there's nothing to create.
         let _ = relpath;
