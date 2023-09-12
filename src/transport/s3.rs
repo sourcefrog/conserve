@@ -114,11 +114,13 @@ impl S3Transport {
 }
 
 fn load_aws_config(runtime: &Runtime, region: Option<String>) -> SdkConfig {
-    let mut loader = aws_config::from_env()
-        .app_name(AppName::new(format!("conserve-{}", crate::version())).unwrap());
-    if let Some(region) = region {
-        loader = loader.region(Region::new(region));
-    }
+    // Use us-east-1 at least for looking up the bucket's region, if
+    // none is known yet.
+    let loader = aws_config::from_env()
+        .app_name(AppName::new(format!("conserve-{}", crate::version())).unwrap())
+        .region(Region::new(
+            region.unwrap_or_else(|| "us-east-1".to_owned()),
+        ));
     runtime.block_on(loader.load())
 }
 
