@@ -256,7 +256,7 @@ impl IndexWriter {
             self.transport.create_dir(&subdir_relpath(self.sequence))?;
         }
         let compressed_bytes = self.compressor.compress(&json)?;
-        self.transport.write_file(&relpath, compressed_bytes)?;
+        self.transport.write_file(&relpath, &compressed_bytes)?;
         self.stats.index_hunks += 1;
         self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
         self.stats.uncompressed_index_bytes += json.len() as u64;
@@ -419,7 +419,7 @@ impl IndexHunkIter {
         );
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
         let entries: Vec<IndexEntry> =
-            serde_json::from_slice(index_bytes).map_err(|source| Error::DeserializeJson {
+            serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeJson {
                 path: path.clone(),
                 source,
             })?;

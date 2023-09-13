@@ -109,7 +109,7 @@ impl BlockDir {
         counter!("conserve.block.write_compressed_bytes", comp_len);
         histogram!("conserve.block.write_compressed_bytes", comp_len as f64);
         self.transport
-            .write_file(&relpath, compressed)
+            .write_file(&relpath, &compressed)
             .or_else(|err| {
                 if err.kind() == transport::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
@@ -274,7 +274,6 @@ impl BlockDir {
     /// Checks that the hash is correct with the contents.
     pub fn get_block_content(&self, hash: &BlockHash) -> Result<Bytes> {
         // TODO: Reuse decompressor buffer.
-        // TODO: Reuse read buffer.
         // TODO: Most importantly, cache decompressed blocks!
         increment_counter!("conserve.block.read");
         let mut decompressor = Decompressor::new();
@@ -284,13 +283,13 @@ impl BlockDir {
         let actual_hash = BlockHash::from(blake2b::blake2b(
             BLAKE_HASH_SIZE_BYTES,
             &[],
-            decompressed_bytes,
+            &decompressed_bytes,
         ));
         if actual_hash != *hash {
             error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
             return Err(Error::BlockCorrupt { hash: hash.clone() });
         }
-        Ok(decompressor.take_buffer().into())
+        Ok(decompressed_bytes)
     }
 
     fn hash_bytes(&self, in_buf: &[u8]) -> BlockHash {
