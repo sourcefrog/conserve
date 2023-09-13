@@ -1,4 +1,4 @@
-// Copyright 2017, 2018, 2019 Martin Pool.
+// Copyright 2017, 2018, 2019, 2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -11,7 +11,7 @@
 // GNU General Public License for more details.
 
 //! Access a file stored in the archive.
-use crate::stats::Sizes;
+use crate::blockdir::Address;
 use crate::*;
 
 /// Returns the contents of a file stored in the archive, as an iter of byte blocks.
@@ -29,16 +29,16 @@ impl StoredFile {
     pub fn open(block_dir: BlockDir, addrs: Vec<blockdir::Address>) -> StoredFile {
         StoredFile { block_dir, addrs }
     }
-}
 
-impl ReadBlocks for StoredFile {
-    fn num_blocks(&self) -> Result<usize> {
-        Ok(self.addrs.len())
+    pub fn addresses(&self) -> &[Address] {
+        self.addrs.as_ref()
     }
 
-    /// Return the content of the ith address in this file.
-    // TODO: Not the best name, because it doesn't return the whole block...
-    fn read_block(&self, i: usize) -> Result<(Vec<u8>, Sizes)> {
-        self.block_dir.get(&self.addrs[i])
+    /// Return an iterator of content parts, which when concatenated
+    /// reconstruct the content of the file.
+    pub fn content(&self) -> impl Iterator<Item = Result<Vec<u8>>> + '_ {
+        self.addrs
+            .iter()
+            .map(|addr| self.block_dir.get(addr).map(|(bytes, _sizes)| bytes))
     }
 }

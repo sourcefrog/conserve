@@ -299,7 +299,7 @@ pub fn empty_file_uses_zero_blocks() {
         .find(|i| &i.apath == "/empty")
         .expect("found one entry");
     let stored_file = st.open_stored_file(&empty_entry);
-    assert_eq!(stored_file.num_blocks().unwrap(), 0);
+    assert_eq!(stored_file.addresses(), []);
 
     // Restore it
     let dest = TempDir::new().unwrap();

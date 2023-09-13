@@ -13,10 +13,7 @@
 
 //! Abstract Tree trait.
 
-use std::ops::Range;
-
 use crate::progress::{Bar, Progress};
-use crate::stats::Sizes;
 use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
@@ -50,24 +47,6 @@ pub trait ReadTree {
             file_bytes: total_bytes,
         })
     }
-}
-
-/// Read a file as a series of blocks of bytes.
-///
-/// When reading from the archive, the blocks are whatever size is stored.
-/// When reading from the filesystem they're MAX_BLOCK_SIZE. But the caller
-/// shouldn't assume the size.
-pub trait ReadBlocks {
-    /// Return a range of integers indexing the blocks (starting from 0.)
-    fn num_blocks(&self) -> Result<usize>;
-
-    fn block_range(&self) -> Result<Range<usize>> {
-        Ok(0..self.num_blocks()?)
-    }
-
-    /// Read one block and return it as a byte vec. Also returns the compressed and uncompressed
-    /// sizes.
-    fn read_block(&self, i: usize) -> Result<(Vec<u8>, Sizes)>;
 }
 
 /// The measured size of a tree.

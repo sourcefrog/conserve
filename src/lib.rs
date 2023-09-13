@@ -76,7 +76,7 @@ pub use crate::show::{show_versions, ShowVersionsOptions};
 pub use crate::stats::{DeleteStats, RestoreStats};
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
-pub use crate::tree::{ReadBlocks, ReadTree, TreeSize};
+pub use crate::tree::{ReadTree, TreeSize};
 pub use crate::unix_mode::UnixMode;
 pub use crate::validate::ValidateOptions;
 

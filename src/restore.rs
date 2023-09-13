@@ -203,8 +203,8 @@ fn restore_file(
     let mut restore_file = File::create(&path).map_err(restore_err)?;
     let stored_file = from_tree.open_stored_file(source_entry);
     let mut len = 0u64;
-    for i in 0..stored_file.num_blocks()? {
-        let bytes = stored_file.read_block(i)?.0;
+    for bytes in stored_file.content() {
+        let bytes = bytes?;
         restore_file.write_all(&bytes)?;
         len += bytes.len() as u64;
     }
