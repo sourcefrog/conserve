@@ -210,14 +210,10 @@ fn restore_file(
         // for the probably common cases of files with one part, or
         // many larger parts, sending everything through a BufWriter is
         // probably a waste.
-        let bytes = from_tree
-            .block_dir()
-            .get(addr)
-            .map_err(|err| {
-                error!(?path, ?err, "Failed to read block content for file");
-                err
-            })?
-            .0;
+        let bytes = from_tree.block_dir().read_address(addr).map_err(|err| {
+            error!(?path, ?err, "Failed to read block content for file");
+            err
+        })?;
         restore_file.write_all(&bytes).map_err(|err| {
             error!(?path, ?err, "Failed to write content to restore file");
             Error::Restore {
