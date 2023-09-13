@@ -94,8 +94,6 @@ pub fn simple_backup_with_excludes() -> Result<()> {
 
     assert_eq!(copy_stats.uncompressed_file_bytes, 8);
     // TODO: Read back contents of that file.
-    // TODO: Compressed size isn't set properly when restoring, because it's
-    // lost by passing through a std::io::Read in ReadStoredFile.
     // TODO: Check index stats.
     // TODO: Check what was restored.
 
@@ -298,8 +296,7 @@ pub fn empty_file_uses_zero_blocks() {
         .unwrap()
         .find(|i| &i.apath == "/empty")
         .expect("found one entry");
-    let stored_file = st.open_stored_file(&empty_entry);
-    assert_eq!(stored_file.addresses(), []);
+    assert_eq!(empty_entry.addrs, []);
 
     // Restore it
     let dest = TempDir::new().unwrap();

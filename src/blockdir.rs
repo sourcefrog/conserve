@@ -157,10 +157,10 @@ impl BlockDir {
         Ok(self.transport.metadata(&block_relpath(hash))?.len)
     }
 
-    /// Read back the contents of a block, as a byte array.
-    ///
-    /// To read a whole file, use StoredFile instead.
+    /// Read back some content addressed by an [Address] (a block hash, start and end).
     pub fn get(&self, address: &Address) -> Result<(Vec<u8>, Sizes)> {
+        // TODO: Return Bytes rather than copying.
+        // TODO: Maybe drop the sizes?
         let (mut decompressed, sizes) = self.get_block_content(&address.hash)?;
         let len = address.len as usize;
         let start = address.start as usize;
@@ -171,8 +171,6 @@ impl BlockDir {
                 actual_len,
             });
         }
-        // TODO: Could we return a slice into some shared object with the
-        // right lifetime instead of copying here?
         if start != 0 {
             let trimmed = decompressed[start..(start + len)].to_owned();
             Ok((trimmed, sizes))

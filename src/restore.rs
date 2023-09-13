@@ -203,15 +203,21 @@ fn restore_file(
             source: err,
         }
     })?;
-    let stored_file = from_tree.open_stored_file(source_entry);
     let mut len = 0u64;
-    for bytes in stored_file.content() {
-        // TODO: Conceivably at this point we could combine small parts
+    for addr in &source_entry.addrs {
+        // TODO: We could combine small parts
         // in memory, and then write them in a single system call. However
         // for the probably common cases of files with one part, or
         // many larger parts, sending everything through a BufWriter is
         // probably a waste.
-        let bytes = bytes?;
+        let bytes = from_tree
+            .block_dir()
+            .get(addr)
+            .map_err(|err| {
+                error!(?path, ?err, "Failed to read block content for file");
+                err
+            })?
+            .0;
         restore_file.write_all(&bytes).map_err(|err| {
             error!(?path, ?err, "Failed to write content to restore file");
             Error::Restore {
