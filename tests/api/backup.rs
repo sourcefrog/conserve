@@ -283,8 +283,6 @@ pub fn symlink() {
 
 #[test]
 pub fn empty_file_uses_zero_blocks() {
-    use std::io::Read;
-
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file_with_contents("empty", &[]);
@@ -301,9 +299,7 @@ pub fn empty_file_uses_zero_blocks() {
         .find(|i| &i.apath == "/empty")
         .expect("found one entry");
     let stored_file = st.open_stored_file(&empty_entry);
-    let mut s = String::new();
-    assert_eq!(stored_file.into_read().read_to_string(&mut s).unwrap(), 0);
-    assert_eq!(s.len(), 0);
+    assert_eq!(stored_file.num_blocks().unwrap(), 0);
 
     // Restore it
     let dest = TempDir::new().unwrap();

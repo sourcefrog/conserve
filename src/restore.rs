@@ -23,6 +23,7 @@ use filetime::set_file_handle_times;
 use filetime::set_symlink_file_times;
 use metrics::{counter, increment_counter};
 use time::OffsetDateTime;
+use tracing::trace_span;
 #[allow(unused_imports)]
 use tracing::{error, warn};
 
@@ -193,16 +194,20 @@ fn restore_file(
     source_entry: &IndexEntry,
     from_tree: &StoredTree,
 ) -> Result<RestoreStats> {
+    let _span = trace_span!("restore_file", ?path).entered();
     let restore_err = |source| Error::Restore {
         path: path.clone(),
         source,
     };
     let mut stats = RestoreStats::default();
     let mut restore_file = File::create(&path).map_err(restore_err)?;
-    // TODO: Read one block at a time, maybe don't go through io::copy.
     let stored_file = from_tree.open_stored_file(source_entry);
-    let len =
-        std::io::copy(&mut stored_file.into_read(), &mut restore_file).map_err(restore_err)?;
+    let mut len = 0u64;
+    for i in 0..stored_file.num_blocks()? {
+        let bytes = stored_file.read_block(i)?.0;
+        restore_file.write_all(&bytes)?;
+        len += bytes.len() as u64;
+    }
     stats.uncompressed_file_bytes = len;
     counter!("conserve.restore.file_bytes", len);
     restore_file.flush().map_err(restore_err)?;

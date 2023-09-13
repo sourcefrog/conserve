@@ -171,6 +171,8 @@ impl BlockDir {
                 actual_len,
             });
         }
+        // TODO: Could we return a slice into some shared object with the
+        // right lifetime instead of copying here?
         if start != 0 {
             let trimmed = decompressed[start..(start + len)].to_owned();
             Ok((trimmed, sizes))
