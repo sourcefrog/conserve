@@ -10,7 +10,7 @@ use std::path::PathBuf;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::filter;
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::layer::Layer;
 use tracing_subscriber::prelude::*;
@@ -50,7 +50,7 @@ pub fn enable_tracing(
             .with_ansi(clicolors_control::colors_enabled())
             .with_writer(WriteToNutmeg)
             .with_timer(timer)
-            .with_filter(LevelFilter::from_level(console_level));
+            .with_filter(filter::Targets::new().with_target("conserve", console_level));
         let json_layer;
         let flush_guard;
         if let Some(json_path) = json_path {

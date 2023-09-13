@@ -159,10 +159,6 @@ impl Transport for LocalTransport {
             kind: fsmeta.file_type().into(),
         })
     }
-
-    fn url_scheme(&self) -> &'static str {
-        "file"
-    }
 }
 
 impl AsRef<dyn Transport> for LocalTransport {

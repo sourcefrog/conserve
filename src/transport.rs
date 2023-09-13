@@ -27,6 +27,9 @@ use crate::*;
 pub mod local;
 use local::LocalTransport;
 
+#[cfg(feature = "s3")]
+pub mod s3;
+
 /// Open a `Transport` to access a local directory.
 ///
 /// `s` may be a local path or a URL.
@@ -36,6 +39,8 @@ pub fn open_transport(s: &str) -> crate::Result<Arc<dyn Transport>> {
             "file" => Ok(Arc::new(LocalTransport::new(
                 &url.to_file_path().expect("extract URL file path"),
             ))),
+            #[cfg(feature = "s3")]
+            "s3" => Ok(s3::S3Transport::new(&url)?),
             d if d.len() == 1 => {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Arc::new(LocalTransport::new(Path::new(s))))
@@ -97,8 +102,9 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// the complete content. On a local filesystem the content is written to a temporary file and
     /// then renamed.
     ///
-    /// If the file already exists, this should return an [Error] with kind
-    /// [ErrorKind::AlreadyExists].
+    /// If the transport supports it, this should error if the file already exists, returning
+    /// [ErrorKind::AlreadyExists]. However, if that can't be done by a single call, it
+    /// is OK to simply overwrite the existing object.
     ///
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
     fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
@@ -114,9 +120,6 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
 
     /// Make a new transport addressing a subdirectory.
     fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport>;
-
-    /// Return a URL scheme describing this transport, such as "file".
-    fn url_scheme(&self) -> &'static str;
 }
 
 /// A directory entry read from a transport.
@@ -206,6 +209,10 @@ impl fmt::Display for Error {
         write!(f, "{}", self.kind)?;
         if let Some(ref path) = self.path {
             write!(f, ": {}", path)?;
+        }
+        if let Some(source) = &self.source {
+            // I'm not sure we should write this here; it might be repetitive.
+            write!(f, ": {source}")?;
         }
         Ok(())
     }

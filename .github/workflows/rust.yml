@@ -1,6 +1,6 @@
 name: Rust
 
-on: [push, pull_request]
+on: [push]
 
 # see https://matklad.github.io/2021/09/04/fast-rust-builds.html
 env:
@@ -15,25 +15,32 @@ env:
 # TODO: Add -D warnings when that's clean on Windows.
 
 jobs:
-  build:
+  tests:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
+        features: ["", "s3"]
 
     steps:
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.features }}
       - name: Show version
         run: |
           rustup show
           cargo --version
           rustc --version
       - name: Build
-        run: cargo build --all-targets
+        run:
+          cargo build --all-targets --no-default-features --features=${{
+          matrix.features }}
       - name: Test
-        run: cargo test -- --include-ignored
+        run:
+          cargo test --no-default-features --features=${{ matrix.features }} --
+          --include-ignored
       # Clippy and rustfmt are excellent tools but are turned off here because it's too
       # easy for PRs to fail due to irrelevant changes including Clippy flagging problems
       # that it did not notice before.
@@ -41,3 +48,26 @@ jobs:
       #   run: cargo clippy --all-targets -- -d clippy::all
       # - name: rustfmt
       #   run: cargo fmt --all -- --check
+
+  cargo-mutants:
+    runs-on: ubuntu-latest
+    # Don't run expensive mutant tests until we know the build is clean.
+    needs: tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install cargo-mutants
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-mutants
+      - name: Run mutant tests
+        # Can't use --all-features here because BLAKE2 SIMD needs unstable...
+        # Don't use the S3 features because they require AWS credentials for realistic
+        # testing.
+        run:
+          cargo mutants -j2 --no-shuffle -vV --cargo-arg --no-default-features
+      - name: Archive results
+        uses: actions/upload-artifact@v3
+        with:
+          name: mutation-report
+          path: mutants.out
