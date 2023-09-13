@@ -90,9 +90,6 @@ pub enum Error {
         source: globset::Error,
     },
 
-    #[error("Failed to write metadata file {:?}", path)]
-    WriteMetadata { path: String, source: io::Error },
-
     #[error("Failed to deserialize json from {:?}", path)]
     DeserializeJson {
         path: String,
@@ -105,9 +102,6 @@ pub enum Error {
         #[from]
         source: serde_json::Error,
     },
-
-    #[error("Metadata file not found: {:?}", path)]
-    MetadataNotFound { path: String, source: io::Error },
 
     #[error("Invalid metadata: {details}")]
     InvalidMetadata { details: String },
