@@ -1,8 +1,11 @@
 # Controls tests with `cargo mutants`
 
-exclude_re = []
+# Skip some relatively unimportant functions and traits for now.
+exclude_re = ["<impl Display"]
+
 # Include only files that are currently well-tested.
 examine_globs = [
+    "src/backup.rs",
     "src/bandid.rs",
     "src/blockdir.rs",
     "src/blockhash.rs",
