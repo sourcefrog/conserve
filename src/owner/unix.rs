@@ -22,7 +22,7 @@ use std::{fs, path::Path};
 use lazy_static::lazy_static;
 use nix::errno::Errno;
 use nix::unistd;
-use users::{Groups, Users, UsersCache};
+use uzers::{Groups, Users, UsersCache};
 
 use super::Owner;
 use crate::{Error, Result};

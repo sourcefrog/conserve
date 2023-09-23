@@ -57,13 +57,13 @@ fn backup_unix_permissions() {
     // Find out which user and group is on the temporary directory.
     let mdata = std::fs::metadata(&data_dir).expect("Unable to read file metadata");
     dbg!(&mdata);
-    let user = users::get_user_by_uid(mdata.uid())
+    let user = uzers::get_user_by_uid(mdata.uid())
         .expect("Unable to find user by uid")
         .name()
         .to_str()
         .unwrap()
         .to_string();
-    let group = users::get_group_by_gid(mdata.gid())
+    let group = uzers::get_group_by_gid(mdata.gid())
         .expect("Unable to find user by uid")
         .name()
         .to_str()
