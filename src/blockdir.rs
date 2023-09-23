@@ -91,14 +91,28 @@ impl BlockDir {
         Ok(BlockDir { transport })
     }
 
-    /// Returns the number of compressed bytes.
-    pub(crate) fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
-        let mut compressor = Compressor::new();
-        let uncomp_len = in_buf.len() as u64;
-        let compressed = compressor.compress(in_buf)?;
+    /// Store block data, if it's not already present, and return the hash.
+    ///
+    /// The block data must be less than the maximum block size.
+    pub(crate) fn store_or_deduplicate(
+        &mut self,
+        block_data: &[u8],
+        stats: &mut BackupStats,
+    ) -> Result<BlockHash> {
+        let hash = BlockHash::hash_bytes(block_data);
+        let uncomp_len = block_data.len() as u64;
+        if self.contains(&hash)? {
+            increment_counter!("conserve.block.matches");
+            stats.deduplicated_blocks += 1;
+            counter!("conserve.block.matched_bytes", uncomp_len);
+            stats.deduplicated_bytes += uncomp_len;
+            return Ok(hash);
+        }
+        let start = Instant::now();
+        let compressed = Compressor::new().compress(block_data)?;
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
-        let relpath = block_relpath(hash);
+        let relpath = block_relpath(&hash);
         self.transport.create_dir(subdir_relpath(&hex_hash))?;
         increment_counter!("conserve.block.writes");
         counter!("conserve.block.write_uncompressed_bytes", uncomp_len);
@@ -106,29 +120,10 @@ impl BlockDir {
         counter!("conserve.block.write_compressed_bytes", comp_len);
         histogram!("conserve.block.write_compressed_bytes", comp_len as f64);
         self.transport.write_file(&relpath, &compressed)?;
-        Ok(comp_len)
-    }
-
-    pub(crate) fn store_or_deduplicate(
-        &mut self,
-        block_data: &[u8],
-        stats: &mut BackupStats,
-    ) -> Result<BlockHash> {
-        let hash = BlockHash::hash_bytes(block_data);
-        let len = block_data.len() as u64;
-        if self.contains(&hash)? {
-            increment_counter!("conserve.block.matches");
-            stats.deduplicated_blocks += 1;
-            counter!("conserve.block.matched_bytes", len);
-            stats.deduplicated_bytes += len;
-        } else {
-            let start = Instant::now();
-            let comp_len = self.compress_and_store(block_data, &hash)?;
-            histogram!("conserve.block.compress_and_store_seconds", start.elapsed());
-            stats.written_blocks += 1;
-            stats.uncompressed_bytes += block_data.len() as u64;
-            stats.compressed_bytes += comp_len;
-        }
+        histogram!("conserve.block.compress_and_store_seconds", start.elapsed());
+        stats.written_blocks += 1;
+        stats.uncompressed_bytes += uncomp_len as u64;
+        stats.compressed_bytes += comp_len;
         Ok(hash)
     }
 

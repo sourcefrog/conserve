@@ -296,7 +296,7 @@ fn store_file_content(
     block_dir: &mut BlockDir,
     stats: &mut BackupStats,
 ) -> Result<Vec<Address>> {
-    let mut buffer = Vec::new();
+    let mut buffer = Vec::new(); // TODO: Maybe Bytes here.
     let mut addresses = Vec::<Address>::with_capacity(1);
     loop {
         read_with_retries(&mut buffer, MAX_BLOCK_SIZE, from_file).map_err(|source| {
