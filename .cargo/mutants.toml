@@ -4,6 +4,7 @@ exclude_re = []
 # Include only files that are currently well-tested.
 examine_globs = [
     "src/bandid.rs",
+    "src/blockdir.rs",
     "src/blockhash.rs",
     "src/bin/conserve.rs",
     "src/transport.rs",
