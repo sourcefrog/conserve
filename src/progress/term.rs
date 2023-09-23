@@ -14,27 +14,23 @@
 use std::io;
 
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use nutmeg::estimate_remaining;
 use thousands::Separable;
 
 use super::*;
 
-lazy_static! {
-    /// A global Nutmeg view.
-    ///
-    /// This is global to reflect that there is globally one stdout/stderr:
-    /// this object manages it.
-    static ref NUTMEG_VIEW: nutmeg::View<MultiModel> =
-        nutmeg::View::new(
-            MultiModel::new(),
-            nutmeg::Options::new()
-                .destination(nutmeg::Destination::Stderr)
-        );
-}
+/// A global Nutmeg view.
+///
+/// This is global to reflect that there is globally one stdout/stderr:
+/// this object manages it.
+static NUTMEG_VIEW: nutmeg::View<MultiModel> = nutmeg::View::new(
+    MultiModel::new(),
+    nutmeg::Options::new().destination(nutmeg::Destination::Stderr),
+);
 
-pub(crate) fn make_writer() -> impl io::Write {
-    &*NUTMEG_VIEW
+/// Return a way to write to the global Nutmeg view, for tracing.
+pub(crate) fn make_nutmeg_writer() -> impl io::Write {
+    &NUTMEG_VIEW
 }
 
 pub(super) fn add_bar(bar_id: usize) {

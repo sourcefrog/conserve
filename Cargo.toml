@@ -70,7 +70,8 @@ features = ["derive", "deprecated", "wrap_help"]
 [dependencies.nutmeg]
 version = "0.1.4"
 # git = "https://github.com/sourcefrog/nutmeg"
-path = "../nutmeg"
+# branch = "const-new"
+# path = "../nutmeg"
 
 [dependencies.tracing-subscriber]
 version = "0.3.16"
