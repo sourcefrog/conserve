@@ -8,6 +8,10 @@
   from dependencies. All the messages are still recorded to the `--log-json` file
   if that is given.
 
+- Robustness: during backup, if the blocks referenced by the previous version are missing
+  or zero length, write new blocks rather than referencing them. This allows the archive
+  to better recover from filesystem corruption so that at least new backups are fully readable.
+
 ## 23.5.0
 
 - Better progress bars for various operations including `validate`.
