@@ -105,12 +105,10 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// As much as possible, the file should be written atomically so that it is only visible with
     /// the complete content. On a local filesystem the content is written to a temporary file and
     /// then renamed.
-    ///
-    /// If the transport supports it, this should error if the file already exists, returning
-    /// [ErrorKind::AlreadyExists]. However, if that can't be done by a single call, it
-    /// is OK to simply overwrite the existing object.
-    ///
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
+    ///
+    /// If the file exists it is replaced. (Across transports, and particularly on S3,
+    /// we can't rely on detecting existing files.)
     fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
 
     /// Get metadata about a file.

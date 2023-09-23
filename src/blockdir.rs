@@ -105,17 +105,7 @@ impl BlockDir {
         histogram!("conserve.block.write_uncompressed_bytes", uncomp_len as f64);
         counter!("conserve.block.write_compressed_bytes", comp_len);
         histogram!("conserve.block.write_compressed_bytes", comp_len as f64);
-        self.transport
-            .write_file(&relpath, &compressed)
-            .or_else(|err| {
-                if err.kind() == transport::ErrorKind::AlreadyExists {
-                    // Perhaps it was simultaneously created by another thread or process.
-                    debug!("Unexpected late detection of existing block {hex_hash:?}");
-                    Ok(())
-                } else {
-                    Err(err)
-                }
-            })?;
+        self.transport.write_file(&relpath, &compressed)?;
         Ok(comp_len)
     }
 

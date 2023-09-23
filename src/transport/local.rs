@@ -124,9 +124,11 @@ impl Transport for LocalTransport {
             .map_err(context)?;
         if let Err(err) = temp.write_all(content) {
             let _ = temp.close();
+            warn!("Failed to write {:?}: {:?}", relpath, err);
             return Err(context(err));
         }
-        if let Err(persist_error) = temp.persist_noclobber(&full_path) {
+        if let Err(persist_error) = temp.persist(&full_path) {
+            warn!("Failed to persist {:?}: {:?}", full_path, persist_error);
             persist_error.file.close().map_err(context)?;
             Err(context(persist_error.error))
         } else {
@@ -279,19 +281,20 @@ mod test {
     }
 
     #[test]
-    fn write_file_does_not_overwrite() {
+    fn write_file_can_overwrite() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = LocalTransport::new(temp.path());
         let filename = "filename";
         transport
             .write_file(filename, b"original content")
             .expect("first write succeeds");
-        let err = transport
+        transport
             .write_file(filename, b"new content")
-            .expect_err("write over existing file fails");
-        assert_eq!(err.kind(), transport::ErrorKind::AlreadyExists);
-        assert!(!err.is_not_found());
-        assert!(err.path().expect("error has a path").ends_with(filename));
+            .expect("write over existing file succeeds");
+        assert_eq!(
+            transport.read_file(filename).unwrap().as_ref(),
+            b"new content"
+        );
     }
 
     #[test]
