@@ -30,6 +30,7 @@ use std::time::Instant;
 use ::metrics::{counter, histogram, increment_counter};
 use blake2_rfc::blake2b;
 use blake2_rfc::blake2b::Blake2b;
+use bytes::Bytes;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
@@ -39,7 +40,6 @@ use crate::backup::BackupStats;
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::progress::{Bar, Progress};
-use crate::stats::Sizes;
 use crate::transport::{ListDir, Transport};
 use crate::*;
 
@@ -95,7 +95,6 @@ impl BlockDir {
 
     /// Returns the number of compressed bytes.
     pub(crate) fn compress_and_store(&mut self, in_buf: &[u8], hash: &BlockHash) -> Result<u64> {
-        // TODO: Move this to a BlockWriter, which can hold a reusable buffer.
         let mut compressor = Compressor::new();
         let uncomp_len = in_buf.len() as u64;
         let compressed = compressor.compress(in_buf)?;
@@ -109,7 +108,7 @@ impl BlockDir {
         counter!("conserve.block.write_compressed_bytes", comp_len);
         histogram!("conserve.block.write_compressed_bytes", comp_len as f64);
         self.transport
-            .write_file(&relpath, compressed)
+            .write_file(&relpath, &compressed)
             .or_else(|err| {
                 if err.kind() == transport::ErrorKind::AlreadyExists {
                     // Perhaps it was simultaneously created by another thread or process.
@@ -157,27 +156,20 @@ impl BlockDir {
         Ok(self.transport.metadata(&block_relpath(hash))?.len)
     }
 
-    /// Read back the contents of a block, as a byte array.
-    ///
-    /// To read a whole file, use StoredFile instead.
-    pub fn get(&self, address: &Address) -> Result<(Vec<u8>, Sizes)> {
-        let (mut decompressed, sizes) = self.get_block_content(&address.hash)?;
+    /// Read back some content addressed by an [Address] (a block hash, start and end).
+    pub fn read_address(&self, address: &Address) -> Result<Bytes> {
+        let bytes = self.get_block_content(&address.hash)?;
         let len = address.len as usize;
         let start = address.start as usize;
-        let actual_len = decompressed.len();
-        if (start + len) > actual_len {
+        let end = start + len;
+        let actual_len = bytes.len();
+        if end > actual_len {
             return Err(Error::AddressTooLong {
-                address: address.clone(),
+                address: address.to_owned(),
                 actual_len,
             });
         }
-        if start != 0 {
-            let trimmed = decompressed[start..(start + len)].to_owned();
-            Ok((trimmed, sizes))
-        } else {
-            decompressed.truncate(len);
-            Ok((decompressed, sizes))
-        }
+        Ok(bytes.slice(start..end))
     }
 
     pub fn delete_block(&self, hash: &BlockHash) -> Result<()> {
@@ -256,7 +248,7 @@ impl BlockDir {
         let block_lens = blocks
             .into_par_iter()
             .flat_map(|hash| match self.get_block_content(&hash) {
-                Ok((bytes, _sizes)) => {
+                Ok(bytes) => {
                     let len = bytes.len();
                     let len64 = len as u64;
                     task.post(Progress::ValidateBlocks {
@@ -279,9 +271,8 @@ impl BlockDir {
     /// Return the entire contents of the block.
     ///
     /// Checks that the hash is correct with the contents.
-    pub fn get_block_content(&self, hash: &BlockHash) -> Result<(Vec<u8>, Sizes)> {
+    pub fn get_block_content(&self, hash: &BlockHash) -> Result<Bytes> {
         // TODO: Reuse decompressor buffer.
-        // TODO: Reuse read buffer.
         // TODO: Most importantly, cache decompressed blocks!
         increment_counter!("conserve.block.read");
         let mut decompressor = Decompressor::new();
@@ -291,17 +282,13 @@ impl BlockDir {
         let actual_hash = BlockHash::from(blake2b::blake2b(
             BLAKE_HASH_SIZE_BYTES,
             &[],
-            decompressed_bytes,
+            &decompressed_bytes,
         ));
         if actual_hash != *hash {
             error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
             return Err(Error::BlockCorrupt { hash: hash.clone() });
         }
-        let sizes = Sizes {
-            uncompressed: decompressed_bytes.len() as u64,
-            compressed: compressed_bytes.len() as u64,
-        };
-        Ok((decompressor.take_buffer(), sizes))
+        Ok(decompressed_bytes)
     }
 
     fn hash_bytes(&self, in_buf: &[u8]) -> BlockHash {

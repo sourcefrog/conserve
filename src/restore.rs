@@ -23,6 +23,7 @@ use filetime::set_file_handle_times;
 use filetime::set_symlink_file_times;
 use metrics::{counter, increment_counter};
 use time::OffsetDateTime;
+use tracing::trace_span;
 #[allow(unused_imports)]
 use tracing::{error, warn};
 
@@ -193,19 +194,41 @@ fn restore_file(
     source_entry: &IndexEntry,
     from_tree: &StoredTree,
 ) -> Result<RestoreStats> {
-    let restore_err = |source| Error::Restore {
-        path: path.clone(),
-        source,
-    };
+    let _span = trace_span!("restore_file", ?path).entered();
     let mut stats = RestoreStats::default();
-    let mut restore_file = File::create(&path).map_err(restore_err)?;
-    // TODO: Read one block at a time, maybe don't go through io::copy.
-    let stored_file = from_tree.open_stored_file(source_entry);
-    let len =
-        std::io::copy(&mut stored_file.into_read(), &mut restore_file).map_err(restore_err)?;
+    let mut restore_file = File::create(&path).map_err(|err| {
+        error!(?path, ?err, "Error creating destination file");
+        Error::Restore {
+            path: path.clone(),
+            source: err,
+        }
+    })?;
+    let mut len = 0u64;
+    for addr in &source_entry.addrs {
+        // TODO: We could combine small parts
+        // in memory, and then write them in a single system call. However
+        // for the probably common cases of files with one part, or
+        // many larger parts, sending everything through a BufWriter is
+        // probably a waste.
+        let bytes = from_tree.block_dir().read_address(addr).map_err(|err| {
+            error!(?path, ?err, "Failed to read block content for file");
+            err
+        })?;
+        restore_file.write_all(&bytes).map_err(|err| {
+            error!(?path, ?err, "Failed to write content to restore file");
+            Error::Restore {
+                path: path.clone(),
+                source: err,
+            }
+        })?;
+        len += bytes.len() as u64;
+    }
     stats.uncompressed_file_bytes = len;
     counter!("conserve.restore.file_bytes", len);
-    restore_file.flush().map_err(restore_err)?;
+    restore_file.flush().map_err(|source| Error::Restore {
+        path: path.clone(),
+        source,
+    })?;
 
     let mtime = Some(source_entry.mtime().to_file_time());
     set_file_handle_times(&restore_file, mtime, mtime).map_err(|source| {
