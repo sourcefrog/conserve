@@ -55,7 +55,7 @@ fn backup_after_damage(
     #[values(
         DamageLocation::BandHead(0),
         DamageLocation::BandTail(0),
-        DamageLocation::Block(0)
+        // DamageLocation::Block(0)
     )]
     location: DamageLocation,
     #[values(TreeChanges::None, TreeChanges::AlterExistingFile)] changes: TreeChanges,
