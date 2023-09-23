@@ -246,24 +246,24 @@ impl BackupWriter {
             self.index_builder
                 .push_entry(IndexEntry::metadata_from(source_entry));
             self.stats.empty_files += 1;
-            return Ok(result);
+        } else {
+            let mut source_file = from_tree.open_file(source_entry)?;
+            if size <= SMALL_FILE_CAP {
+                self.file_combiner
+                    .push_file(source_entry, &mut source_file)?;
+            } else {
+                let addrs = store_file_content(
+                    apath,
+                    &mut source_file,
+                    &mut self.block_dir,
+                    &mut self.stats,
+                )?;
+                self.index_builder.push_entry(IndexEntry {
+                    addrs,
+                    ..IndexEntry::metadata_from(source_entry)
+                });
+            }
         }
-        let mut source_file = from_tree.open_file(source_entry)?;
-        if size <= SMALL_FILE_CAP {
-            self.file_combiner
-                .push_file(source_entry, &mut source_file)?;
-            return Ok(result);
-        }
-        let addrs = store_file_content(
-            apath,
-            &mut source_file,
-            &mut self.block_dir,
-            &mut self.stats,
-        )?;
-        self.index_builder.push_entry(IndexEntry {
-            addrs,
-            ..IndexEntry::metadata_from(source_entry)
-        });
         Ok(result)
     }
 
