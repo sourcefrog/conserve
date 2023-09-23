@@ -76,7 +76,7 @@ fn subdir_relpath(block_hash: &str) -> &str {
 }
 
 /// Return the transport-relative file for a given hash.
-fn block_relpath(hash: &BlockHash) -> String {
+pub fn block_relpath(hash: &BlockHash) -> String {
     let hash_hex = hash.to_string();
     format!("{}/{}", subdir_relpath(&hash_hex), hash_hex)
 }

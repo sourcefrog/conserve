@@ -24,16 +24,42 @@ use conserve::{
     Exclude, RestoreOptions, ValidateOptions,
 };
 
-mod strategy;
-use strategy::Damage;
+mod damage;
+use damage::{DamageAction, DamageLocation};
 
-// TODO: Also test damage to other files: band tail, index hunks, data blocks, etc.
 // TODO: Test that you can delete a damaged backup; then there are no problems.
+
+/// Changes that can be made to a tree and then backed up.
+#[derive(Debug, Clone)]
+enum TreeChanges {
+    None,
+    AlterExistingFile,
+}
+
+impl TreeChanges {
+    fn apply(&self, dir: &TempDir) {
+        match self {
+            TreeChanges::None => {}
+            TreeChanges::AlterExistingFile => {
+                dir.child("file").write_str("changed").unwrap();
+            }
+        }
+    }
+}
 
 #[rstest]
 #[traced_test]
 #[test]
-fn backup_after_damage(#[values(Damage::Delete, Damage::Truncate)] damage: Damage) {
+fn backup_after_damage(
+    #[values(DamageAction::Delete, DamageAction::Truncate)] action: DamageAction,
+    #[values(
+        DamageLocation::BandHead(0),
+        DamageLocation::BandTail(0),
+        DamageLocation::Block(0)
+    )]
+    location: DamageLocation,
+    #[values(TreeChanges::None, TreeChanges::AlterExistingFile)] changes: TreeChanges,
+) {
     let archive_dir = TempDir::new().unwrap();
     let source_dir = TempDir::new().unwrap();
 
@@ -46,20 +72,21 @@ fn backup_after_damage(#[values(Damage::Delete, Damage::Truncate)] damage: Damag
     let backup_options = BackupOptions::default();
     backup(&archive, source_dir.path(), &backup_options).expect("initial backup");
 
-    damage.damage(&archive_dir.child("b0000").child("BANDHEAD"));
+    action.damage(&location.to_path(&archive_dir));
 
     // A second backup should succeed.
-    source_dir
-        .child("file")
-        .write_str("content in second backup")
-        .unwrap();
-    backup(&archive, source_dir.path(), &backup_options)
-        .expect("write second backup even though first bandhead is damaged");
+    changes.apply(&source_dir);
+    let backup_stats = backup(&archive, source_dir.path(), &backup_options)
+        .expect("write second backup after damage");
+    dbg!(&backup_stats);
 
     // Can restore the second backup
     let restore_dir = TempDir::new().unwrap();
-    restore(&archive, restore_dir.path(), &RestoreOptions::default())
+    let restore_stats = restore(&archive, restore_dir.path(), &RestoreOptions::default())
         .expect("restore second backup");
+    dbg!(&restore_stats);
+    assert_eq!(restore_stats.files, 1);
+    assert_eq!(restore_stats.errors, 0);
 
     // Since the second backup rewrote the single file in the backup (and the root dir),
     // we should get all the content back out.

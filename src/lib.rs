@@ -17,7 +17,7 @@ pub mod archive;
 pub mod backup;
 mod band;
 pub mod bandid;
-mod blockdir;
+pub mod blockdir;
 pub mod blockhash;
 pub mod change;
 pub mod compress;

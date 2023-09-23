@@ -54,6 +54,10 @@ pub fn open_transport(s: &str) -> crate::Result<Arc<dyn Transport>> {
     }
 }
 
+pub fn open_local_transport(path: &Path) -> crate::Result<Arc<dyn Transport>> {
+    Ok(Arc::new(LocalTransport::new(path)))
+}
+
 /// Abstracted filesystem IO to access an archive.
 ///
 /// This supports operations that are common across local filesystems, SFTP, and cloud storage, and
