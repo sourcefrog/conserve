@@ -143,7 +143,10 @@ impl BlockDir {
     pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
         match self.transport.metadata(&block_relpath(hash)) {
             Err(err) if err.is_not_found() => Ok(false),
-            Err(err) => Err(err.into()),
+            Err(err) => {
+                warn!(?err, ?hash, "Error checking presence of block");
+                Err(err.into())
+            }
             Ok(metadata) => Ok(metadata.kind == Kind::File && metadata.len > 0),
         }
     }

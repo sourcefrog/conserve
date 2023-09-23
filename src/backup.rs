@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 
 use derive_more::{Add, AddAssign};
 use itertools::Itertools;
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::blockdir::Address;
 use crate::change::Change;
@@ -226,21 +226,33 @@ impl BackupWriter {
     ) -> Result<Option<EntryChange>> {
         self.stats.files += 1;
         let apath = source_entry.apath();
-        let result;
-        if let Some(basis_entry) = self.basis_index.advance_to(apath) {
+        let result = if let Some(basis_entry) = self.basis_index.advance_to(apath) {
             if entry_metadata_unchanged(source_entry, &basis_entry) {
-                self.stats.unmodified_files += 1;
-                let change = Some(EntryChange::unchanged(&basis_entry));
-                self.index_builder.push_entry(basis_entry);
-                return Ok(change);
+                if basis_entry
+                    .addrs
+                    .iter()
+                    .map(|addr| &addr.hash)
+                    .unique()
+                    .all(|hash| self.block_dir.contains(hash).unwrap_or(false))
+                {
+                    self.stats.unmodified_files += 1;
+                    let change = Some(EntryChange::unchanged(&basis_entry));
+                    self.index_builder.push_entry(basis_entry);
+                    return Ok(change);
+                } else {
+                    warn!("Some blocks referenced by {apath:?} are missing from the blockdir; file will be stored again");
+                    self.stats.modified_files += 1;
+                    self.stats.replaced_damaged_files += 1;
+                    Some(EntryChange::changed(&basis_entry, source_entry))
+                }
             } else {
                 self.stats.modified_files += 1;
-                result = Some(EntryChange::changed(&basis_entry, source_entry));
+                Some(EntryChange::changed(&basis_entry, source_entry))
             }
         } else {
             self.stats.new_files += 1;
-            result = Some(EntryChange::added(source_entry));
-        }
+            Some(EntryChange::added(source_entry))
+        };
         let size = source_entry.size().expect("source entry has a size");
         if size == 0 {
             self.index_builder
@@ -462,6 +474,10 @@ pub struct BackupStats {
     pub unmodified_files: usize,
     pub modified_files: usize,
     pub new_files: usize,
+
+    /// Files that were previously stored and that have been stored again because
+    /// some of their blocks were damaged.
+    pub replaced_damaged_files: usize,
 
     /// Bytes that matched an existing block.
     pub deduplicated_bytes: u64,

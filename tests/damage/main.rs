@@ -55,7 +55,7 @@ fn backup_after_damage(
     #[values(
         DamageLocation::BandHead(0),
         DamageLocation::BandTail(0),
-        // DamageLocation::Block(0)
+        DamageLocation::Block(0)
     )]
     location: DamageLocation,
     #[values(TreeChanges::None, TreeChanges::AlterExistingFile)] changes: TreeChanges,
@@ -79,6 +79,11 @@ fn backup_after_damage(
     let backup_stats = backup(&archive, source_dir.path(), &backup_options)
         .expect("write second backup after damage");
     dbg!(&backup_stats);
+    if matches!(location, DamageLocation::Block(_)) && matches!(changes, TreeChanges::None) {
+        assert_eq!(backup_stats.replaced_damaged_files, 1);
+    } else {
+        assert_eq!(backup_stats.replaced_damaged_files, 0);
+    }
 
     // Can restore the second backup
     let restore_dir = TempDir::new().unwrap();
