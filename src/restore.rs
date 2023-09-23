@@ -23,9 +23,7 @@ use filetime::set_file_handle_times;
 use filetime::set_symlink_file_times;
 use metrics::{counter, increment_counter};
 use time::OffsetDateTime;
-use tracing::trace_span;
-#[allow(unused_imports)]
-use tracing::{error, warn};
+use tracing::{error, instrument, warn};
 
 use crate::band::BandSelectionPolicy;
 use crate::io::{directory_is_empty, ensure_dir_exists};
@@ -76,6 +74,7 @@ pub fn restore(
     let mut bytes_done = 0;
     let bar = Bar::new();
     let start = Instant::now();
+    let block_dir = archive.block_dir();
     // // This causes us to walk the source tree twice, which is probably an acceptable option
     // // since it's nice to see realistic overall progress. We could keep all the entries
     // // in memory, and maybe we should, but it might get unreasonably big.
@@ -118,7 +117,7 @@ pub fn restore(
             Kind::File => {
                 stats.files += 1;
                 increment_counter!("conserve.restore.files");
-                match restore_file(path.clone(), &entry, &st) {
+                match restore_file(path.clone(), &entry, block_dir) {
                     Err(err) => {
                         error!(?err, ?path, "Failed to restore file");
                         stats.errors += 1;
@@ -189,14 +188,14 @@ fn apply_deferrals(deferrals: &[DirDeferral]) -> Result<RestoreStats> {
 }
 
 /// Copy in the contents of a file from another tree.
+#[instrument(skip(source_entry, block_dir))]
 fn restore_file(
     path: PathBuf,
     source_entry: &IndexEntry,
-    from_tree: &StoredTree,
+    block_dir: &BlockDir,
 ) -> Result<RestoreStats> {
-    let _span = trace_span!("restore_file", ?path).entered();
     let mut stats = RestoreStats::default();
-    let mut restore_file = File::create(&path).map_err(|err| {
+    let mut out = File::create(&path).map_err(|err| {
         error!(?path, ?err, "Error creating destination file");
         Error::Restore {
             path: path.clone(),
@@ -210,11 +209,11 @@ fn restore_file(
         // for the probably common cases of files with one part, or
         // many larger parts, sending everything through a BufWriter is
         // probably a waste.
-        let bytes = from_tree.block_dir().read_address(addr).map_err(|err| {
+        let bytes = block_dir.read_address(addr).map_err(|err| {
             error!(?path, ?err, "Failed to read block content for file");
             err
         })?;
-        restore_file.write_all(&bytes).map_err(|err| {
+        out.write_all(&bytes).map_err(|err| {
             error!(?path, ?err, "Failed to write content to restore file");
             Error::Restore {
                 path: path.clone(),
@@ -225,17 +224,15 @@ fn restore_file(
     }
     stats.uncompressed_file_bytes = len;
     counter!("conserve.restore.file_bytes", len);
-    restore_file.flush().map_err(|source| Error::Restore {
+    out.flush().map_err(|source| Error::Restore {
         path: path.clone(),
         source,
     })?;
 
     let mtime = Some(source_entry.mtime().to_file_time());
-    set_file_handle_times(&restore_file, mtime, mtime).map_err(|source| {
-        Error::RestoreModificationTime {
-            path: path.clone(),
-            source,
-        }
+    set_file_handle_times(&out, mtime, mtime).map_err(|source| Error::RestoreModificationTime {
+        path: path.clone(),
+        source,
     })?;
 
     // Restore permissions only if there are mode bits stored in the archive
