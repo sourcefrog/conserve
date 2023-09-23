@@ -4,7 +4,27 @@ exclude_re = []
 # Include only files that are currently well-tested.
 examine_globs = [
     "src/bandid.rs",
+    "src/blockhash.rs",
     "src/bin/conserve.rs",
     "src/transport.rs",
     "src/transport/local.rs",
 ]
+
+# Skip S3 which is hard to test hermetically without AWS creds.
+#
+# Skip console and progress code which seems like a low priority
+# to test.
+#
+# stats.rs should be tested but is closely tied to formatting, and the
+# text format might change.
+#
+# I test for mutants on Unix so skip Windows code.
+# exclude_globs = [
+#     "metric_recorder.rs",
+#     "progress.rs",
+#     "src/progress/term.rs",
+#     "src/transport/s3.rs",
+#     "src/ui/termui.rs",
+#     "src/owner/windows.rs",
+#     "stats.rs",
+# ]

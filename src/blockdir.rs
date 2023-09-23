@@ -28,8 +28,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use ::metrics::{counter, histogram, increment_counter};
-use blake2_rfc::blake2b;
-use blake2_rfc::blake2b::Blake2b;
 use bytes::Bytes;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -126,7 +124,7 @@ impl BlockDir {
         block_data: &[u8],
         stats: &mut BackupStats,
     ) -> Result<BlockHash> {
-        let hash = self.hash_bytes(block_data);
+        let hash = BlockHash::hash_bytes(block_data);
         let len = block_data.len() as u64;
         if self.contains(&hash)? {
             increment_counter!("conserve.block.matches");
@@ -279,21 +277,11 @@ impl BlockDir {
         let block_relpath = block_relpath(hash);
         let compressed_bytes = self.transport.read_file(&block_relpath)?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
-        let actual_hash = BlockHash::from(blake2b::blake2b(
-            BLAKE_HASH_SIZE_BYTES,
-            &[],
-            &decompressed_bytes,
-        ));
+        let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
         if actual_hash != *hash {
             error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
             return Err(Error::BlockCorrupt { hash: hash.clone() });
         }
         Ok(decompressed_bytes)
-    }
-
-    fn hash_bytes(&self, in_buf: &[u8]) -> BlockHash {
-        let mut hasher = Blake2b::new(BLAKE_HASH_SIZE_BYTES);
-        hasher.update(in_buf);
-        BlockHash::from(hasher.finalize())
     }
 }
