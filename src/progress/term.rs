@@ -33,6 +33,10 @@ lazy_static! {
         );
 }
 
+pub(crate) fn make_writer() -> impl io::Write {
+    &*NUTMEG_VIEW
+}
+
 pub(super) fn add_bar(bar_id: usize) {
     NUTMEG_VIEW.update(|model| model.add_bar(bar_id));
 }
@@ -192,18 +196,5 @@ impl nutmeg::Model for Progress {
                 nutmeg::estimate_remaining(start, *bands_done, *total_bands)
             ),
         }
-    }
-}
-
-pub(crate) struct WriteToNutmeg();
-
-impl io::Write for WriteToNutmeg {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        NUTMEG_VIEW.message_bytes(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
     }
 }

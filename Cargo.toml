@@ -68,8 +68,9 @@ version = "4.3"
 features = ["derive", "deprecated", "wrap_help"]
 
 [dependencies.nutmeg]
-version = "0.1.3-pre"
-git = "https://github.com/sourcefrog/nutmeg"
+version = "0.1.4"
+# git = "https://github.com/sourcefrog/nutmeg"
+path = "../nutmeg"
 
 [dependencies.tracing-subscriber]
 version = "0.3.16"

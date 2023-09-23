@@ -16,7 +16,7 @@ use tracing_subscriber::layer::Layer;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
-use crate::progress::term::WriteToNutmeg;
+use crate::progress::term::make_writer;
 
 /// Chosen style of timestamp prefix on trace lines.
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -48,7 +48,7 @@ pub fn enable_tracing(
     {
         let console_layer = tracing_subscriber::fmt::Layer::default()
             .with_ansi(clicolors_control::colors_enabled())
-            .with_writer(WriteToNutmeg)
+            .with_writer(make_writer)
             .with_timer(timer)
             .with_filter(filter::Targets::new().with_target("conserve", console_level));
         let json_layer;
