@@ -142,11 +142,20 @@ impl BlockDir {
         Ok(hash)
     }
 
-    /// True if the named block is present in this directory.
+    /// True if the named block is present and apparently in this blockdir.
+    ///
+    /// Empty block files should never normally occur, because the index doesn't
+    /// point to empty blocks and anyhow the compression method would expand an
+    /// empty block to a non-empty compressed form. However, it's possible for
+    /// an interrupted operation on a local filesystem to leave an empty file.
+    /// So, these are specifically treated as missing, so there's a chance to heal
+    /// them later.
     pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
-        self.transport
-            .is_file(&block_relpath(hash))
-            .map_err(Error::from)
+        match self.transport.metadata(&block_relpath(hash)) {
+            Err(err) if err.is_not_found() => Ok(false),
+            Err(err) => Err(err.into()),
+            Ok(metadata) => Ok(metadata.kind == Kind::File && metadata.len > 0),
+        }
     }
 
     /// Returns the compressed on-disk size of a block.
@@ -283,5 +292,30 @@ impl BlockDir {
             return Err(Error::BlockCorrupt { hash: hash.clone() });
         }
         Ok(decompressed_bytes)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::fs::OpenOptions;
+
+    use crate::transport::open_local_transport;
+
+    use super::*;
+    use tempfile::TempDir;
+    #[test]
+    fn empty_block_file_counts_as_not_present() {
+        let tempdir = TempDir::new().unwrap();
+        let mut blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let mut stats = BackupStats::default();
+        let hash = blockdir.store_or_deduplicate(b"stuff", &mut stats).unwrap();
+        assert!(blockdir.contains(&hash).unwrap());
+        OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(false)
+            .open(tempdir.path().join(block_relpath(&hash)))
+            .expect("Truncate block");
+        assert!(!blockdir.contains(&hash).unwrap());
     }
 }
