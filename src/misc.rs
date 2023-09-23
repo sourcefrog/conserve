@@ -49,15 +49,6 @@ pub(crate) fn zero_u64(a: &u64) -> bool {
     *a == 0
 }
 
-#[allow(unused)]
-pub(crate) fn compression_percent(s: &Sizes) -> i64 {
-    if s.uncompressed > 0 {
-        100i64 - (100 * s.compressed / s.uncompressed) as i64
-    } else {
-        0
-    }
-}
-
 pub fn duration_to_hms(d: Duration) -> String {
     let elapsed_secs = d.as_secs();
     if elapsed_secs >= 3600 {
