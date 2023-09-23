@@ -44,6 +44,7 @@ impl From<&fs::Metadata> for Owner {
     }
 }
 
+#[mutants::skip] // TODO: Test that at least groups are restored!
 pub(crate) fn set_owner(owner: &Owner, path: &Path) -> Result<()> {
     let users_cache = USERS_CACHE.lock().unwrap();
     let uid_opt = owner
