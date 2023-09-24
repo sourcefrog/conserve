@@ -34,7 +34,7 @@ use crate::unix_mode::UnixMode;
 use crate::unix_time::FromUnixAndNanos;
 use crate::*;
 
-pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
+pub const MAX_ENTRIES_PER_HUNK: usize = 100_000;
 
 pub const HUNKS_PER_SUBDIR: u32 = 10_000;
 

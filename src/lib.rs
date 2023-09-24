@@ -94,10 +94,10 @@ pub const ARCHIVE_VERSION: &str = "0.6";
 pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");
 
 /// Break blocks at this many uncompressed bytes.
-pub(crate) const MAX_BLOCK_SIZE: usize = 1 << 20;
+pub(crate) const MAX_BLOCK_SIZE: usize = 20 << 20;
 
 /// Maximum file size that will be combined with others rather than being stored alone.
-const SMALL_FILE_CAP: u64 = 100_000;
+const SMALL_FILE_CAP: u64 = 1_000_000;
 
 /// Target maximum uncompressed size for combined blocks.
 const TARGET_COMBINED_BLOCK_SIZE: usize = MAX_BLOCK_SIZE;
