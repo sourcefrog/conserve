@@ -1,5 +1,9 @@
 # Conserve release history
 
+## Unreleased
+
+- Performance: Also keep a cache of the existence of blocks that have not yet been read.
+
 ## 23.9.0
 
 - S3 support! Enable it with `cargo install --features s3`, then e.g. `cargo backup s3://mybucket.example/`.

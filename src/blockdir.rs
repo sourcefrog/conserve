@@ -76,6 +76,10 @@ pub struct BlockDir {
     pub stats: BlockDirStats,
     // TODO: There are fancier caches and they might help, but this one works, and Stretto did not work for me.
     cache: RwLock<LruCache<BlockHash, Bytes>>,
+    /// True if we know that this block exists, even if we don't have its content.
+    ///
+    /// This does _not_ contain keys that are in `cache`.
+    exists: RwLock<LruCache<BlockHash, ()>>,
 }
 
 /// Returns the transport-relative subdirectory name.
@@ -95,6 +99,7 @@ impl BlockDir {
             transport,
             stats: BlockDirStats::default(),
             cache: RwLock::new(LruCache::new(CACHE_SIZE.try_into().unwrap())),
+            exists: RwLock::new(LruCache::new(100_000_000.try_into().unwrap())),
         }
     }
 
@@ -143,7 +148,9 @@ impl BlockDir {
     /// So, these are specifically treated as missing, so there's a chance to heal
     /// them later.
     pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
-        if self.cache.read().expect("Lock cache").contains(hash) {
+        if self.cache.read().expect("Lock cache").contains(hash)
+            || self.exists.read().unwrap().contains(hash)
+        {
             self.stats.cache_hit.fetch_add(1, Relaxed);
             return Ok(true);
         }
@@ -153,7 +160,11 @@ impl BlockDir {
                 warn!(?err, ?hash, "Error checking presence of block");
                 Err(err.into())
             }
-            Ok(metadata) => Ok(metadata.kind == Kind::File && metadata.len > 0),
+            Ok(metadata) if metadata.kind == Kind::File && metadata.len > 0 => {
+                self.exists.write().unwrap().put(hash.clone(), ());
+                Ok(true)
+            }
+            Ok(_) => Ok(false),
         }
     }
 
@@ -201,6 +212,7 @@ impl BlockDir {
             .write()
             .expect("Lock cache")
             .put(hash.clone(), decompressed_bytes.clone());
+        self.exists.write().unwrap().pop(hash);
         self.stats.read_blocks.fetch_add(1, Relaxed);
         self.stats
             .read_block_compressed_bytes
@@ -213,6 +225,7 @@ impl BlockDir {
 
     pub fn delete_block(&self, hash: &BlockHash) -> Result<()> {
         self.cache.write().expect("Lock cache").pop(hash);
+        self.exists.write().unwrap().pop(hash);
         self.transport
             .remove_file(&block_relpath(hash))
             .map_err(Error::from)
@@ -367,5 +380,30 @@ mod test {
         let retrieved = blockdir.get_block_content(&hash).unwrap();
         assert_eq!(content, retrieved);
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 3); // hit again
+    }
+
+    #[test]
+    fn existence_cache_hit() {
+        let tempdir = TempDir::new().unwrap();
+        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let mut stats = BackupStats::default();
+        let content = Bytes::from("stuff");
+        let hash = blockdir
+            .store_or_deduplicate(content.clone(), &mut stats)
+            .unwrap();
+
+        // reopen
+        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        assert!(blockdir.contains(&hash).unwrap());
+        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
+        assert!(blockdir.contains(&hash).unwrap());
+        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
+        assert!(blockdir.contains(&hash).unwrap());
+        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2);
+
+        // actually reading the content is a miss
+        let retrieved = blockdir.get_block_content(&hash).unwrap();
+        assert_eq!(content, retrieved);
+        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit again
     }
 }
