@@ -274,6 +274,7 @@ fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<()> {
 }
 
 #[cfg(not(unix))]
+#[mutants::skip]
 fn restore_symlink(_restore_path: &Path, entry: &IndexEntry) -> Result<()> {
     // TODO: Add a test with a canned index containing a symlink, and expect
     // it cannot be restored on Windows and can be on Unix.

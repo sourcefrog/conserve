@@ -11,6 +11,7 @@ examine_globs = [
     "src/blockhash.rs",
     "src/bin/conserve.rs",
     "src/jsonio.rs",
+    "src/restore.rs",
     "src/transport.rs",
     "src/transport/local.rs",
 ]
