@@ -20,7 +20,6 @@ use std::sync::Arc;
 use std::vec;
 
 use itertools::Itertools;
-use metrics::{counter, increment_counter};
 use time::OffsetDateTime;
 use tracing::{debug, debug_span, error};
 
@@ -405,25 +404,15 @@ impl IndexHunkIter {
             }
             Err(source) => return Err(Error::Transport { source }),
         };
-        increment_counter!("conserve.index.read.hunks");
         self.stats.index_hunks += 1;
-        counter!(
-            "conserve.index.read.compressed_bytes",
-            compressed_bytes.len() as u64
-        );
         self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
         let index_bytes = self.decompressor.decompress(&compressed_bytes)?;
-        counter!(
-            "conserve.index.read.decompressed_bytes",
-            index_bytes.len() as u64
-        );
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
         let entries: Vec<IndexEntry> =
             serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeJson {
                 path: path.clone(),
                 source,
             })?;
-        counter!("conserve.index.read.entries", entries.len() as u64);
         if entries.is_empty() {
             // It's legal, it's just weird - and it can be produced by some old Conserve versions.
         }

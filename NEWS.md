@@ -12,6 +12,8 @@
   or zero length, write new blocks rather than referencing them. This allows the archive
   to better recover from filesystem corruption so that at least new backups are fully readable.
 
+- Deprecate low-value `--metrics-json`.
+
 ## 23.5.0
 
 - Better progress bars for various operations including `validate`.

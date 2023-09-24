@@ -27,7 +27,6 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use ::metrics::{counter, histogram, increment_counter};
 use bytes::Bytes;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -102,25 +101,16 @@ impl BlockDir {
         let hash = BlockHash::hash_bytes(block_data);
         let uncomp_len = block_data.len() as u64;
         if self.contains(&hash)? {
-            increment_counter!("conserve.block.matches");
             stats.deduplicated_blocks += 1;
-            counter!("conserve.block.matched_bytes", uncomp_len);
             stats.deduplicated_bytes += uncomp_len;
             return Ok(hash);
         }
-        let start = Instant::now();
         let compressed = Compressor::new().compress(block_data)?;
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
         let relpath = block_relpath(&hash);
         self.transport.create_dir(subdir_relpath(&hex_hash))?;
-        increment_counter!("conserve.block.writes");
-        counter!("conserve.block.write_uncompressed_bytes", uncomp_len);
-        histogram!("conserve.block.write_uncompressed_bytes", uncomp_len as f64);
-        counter!("conserve.block.write_compressed_bytes", comp_len);
-        histogram!("conserve.block.write_compressed_bytes", comp_len as f64);
         self.transport.write_file(&relpath, &compressed)?;
-        histogram!("conserve.block.compress_and_store_seconds", start.elapsed());
         stats.written_blocks += 1;
         stats.uncompressed_bytes += uncomp_len;
         stats.compressed_bytes += comp_len;
@@ -269,7 +259,7 @@ impl BlockDir {
     pub fn get_block_content(&self, hash: &BlockHash) -> Result<Bytes> {
         // TODO: Reuse decompressor buffer.
         // TODO: Most importantly, cache decompressed blocks!
-        increment_counter!("conserve.block.read");
+        // TODO: Stats for block reads, maybe in the blockdir?
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
         let compressed_bytes = self.transport.read_file(&block_relpath)?;

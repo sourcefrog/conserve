@@ -24,7 +24,6 @@ use clap::{Parser, Subcommand};
 use conserve::change::Change;
 use conserve::progress::ProgressImpl;
 use conserve::trace_counter::{global_error_count, global_warn_count};
-use metrics::increment_counter;
 use time::UtcOffset;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
@@ -61,8 +60,8 @@ struct Args {
     #[arg(long, global = true)]
     log_json: Option<PathBuf>,
 
-    /// Write metrics to this file.
-    #[arg(long, global = true)]
+    /// Write metrics to this file: deprecated and ignored.
+    #[arg(long, global = true, hide = true)]
     metrics_json: Option<PathBuf>,
 }
 
@@ -619,18 +618,14 @@ fn main() -> Result<ExitCode> {
     } else {
         Level::INFO
     };
+    if args.metrics_json.is_some() {
+        warn!("--metrics-json is no longer supported");
+    }
     let _flush_guard = ui::termui::enable_tracing(&args.trace_time, console_level, &args.log_json);
-    ::metrics::set_recorder(&conserve::metric_recorder::IN_MEMORY)
-        .expect("Failed to install recorder");
-    increment_counter!("conserve.start");
     let result = args.command.run();
-    metric_recorder::emit_to_trace();
     debug!(elapsed = ?start_time.elapsed());
     let error_count = global_error_count();
     let warn_count = global_warn_count();
-    if let Some(metrics_json_path) = args.metrics_json {
-        metric_recorder::write_json_metrics(&metrics_json_path)?;
-    }
     match result {
         Err(err) => {
             error!("{err:#}");

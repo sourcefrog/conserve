@@ -32,7 +32,6 @@ mod jsonio;
 pub mod kind;
 pub mod live_tree;
 mod merge;
-pub mod metric_recorder;
 pub mod misc;
 pub mod owner;
 pub mod progress;
