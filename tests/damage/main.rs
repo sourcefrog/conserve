@@ -11,9 +11,12 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+use std::fs::rename;
+
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use dir_assert::assert_paths;
+use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use rstest::rstest;
 use tracing_test::traced_test;
@@ -27,21 +30,26 @@ use conserve::{
 mod damage;
 use damage::{DamageAction, DamageLocation};
 
+// TODO: Test restore from a partially damaged backup.
 // TODO: Test that you can delete a damaged backup; then there are no problems.
 
 /// Changes that can be made to a tree and then backed up.
 #[derive(Debug, Clone)]
 enum TreeChanges {
     None,
-    AlterExistingFile,
+    AlterFile,
+    RenameFile,
 }
 
 impl TreeChanges {
     fn apply(&self, dir: &TempDir) {
         match self {
             TreeChanges::None => {}
-            TreeChanges::AlterExistingFile => {
+            TreeChanges::AlterFile => {
                 dir.child("file").write_str("changed").unwrap();
+            }
+            TreeChanges::RenameFile => {
+                rename(dir.child("file"), dir.child("file2")).unwrap();
             }
         }
     }
@@ -58,7 +66,8 @@ fn backup_after_damage(
         DamageLocation::Block(0)
     )]
     location: DamageLocation,
-    #[values(TreeChanges::None, TreeChanges::AlterExistingFile)] changes: TreeChanges,
+    #[values(TreeChanges::None, TreeChanges::AlterFile, TreeChanges::RenameFile)]
+    changes: TreeChanges,
 ) {
     let archive_dir = TempDir::new().unwrap();
     let source_dir = TempDir::new().unwrap();
@@ -79,10 +88,35 @@ fn backup_after_damage(
     let backup_stats = backup(&archive, source_dir.path(), &backup_options)
         .expect("write second backup after damage");
     dbg!(&backup_stats);
-    if matches!(location, DamageLocation::Block(_)) && matches!(changes, TreeChanges::None) {
-        assert_eq!(backup_stats.replaced_damaged_files, 1);
-    } else {
-        assert_eq!(backup_stats.replaced_damaged_files, 0);
+
+    match changes {
+        TreeChanges::None => match location {
+            DamageLocation::Block(_) => {
+                assert_eq!(backup_stats.replaced_damaged_blocks, 1);
+                assert_eq!(backup_stats.written_blocks, 1);
+            }
+            _ => {
+                assert_eq!(backup_stats.replaced_damaged_blocks, 0);
+                assert_eq!(backup_stats.written_blocks, 0);
+            }
+        },
+        TreeChanges::RenameFile => match location {
+            DamageLocation::Block(_) => {
+                // We can't deduplicate against the previous block because it's damaged.
+                assert_eq!(backup_stats.written_blocks, 1);
+                assert_eq!(backup_stats.replaced_damaged_blocks, 0);
+            }
+            _ => {
+                // The file is renamed, but with the same content, so it should match the block from the previous backup.
+                assert_eq!(backup_stats.deduplicated_blocks, 1);
+            }
+        },
+        TreeChanges::AlterFile => {
+            // a new block is written regardless
+            assert_eq!(backup_stats.written_blocks, 1);
+            assert_eq!(backup_stats.deduplicated_blocks, 0);
+            assert_eq!(backup_stats.replaced_damaged_blocks, 0);
+        }
     }
 
     // Can restore the second backup
@@ -102,7 +136,7 @@ fn backup_after_damage(
     assert_eq!(versions, [BandId::zero(), BandId::new(&[1])]);
 
     // Can list the contents of the second backup.
-    let apaths: Vec<String> = archive
+    let apaths = archive
         .iter_entries(
             BandSelectionPolicy::Latest,
             Apath::root(),
@@ -110,9 +144,13 @@ fn backup_after_damage(
         )
         .expect("iter entries")
         .map(|e| e.apath().to_string())
-        .collect();
+        .collect_vec();
 
-    assert_eq!(apaths, ["/", "/file"]);
+    if matches!(changes, TreeChanges::RenameFile) {
+        assert_eq!(apaths, ["/", "/file2"]);
+    } else {
+        assert_eq!(apaths, ["/", "/file"]);
+    }
 
     // Validation completes although with warnings.
     // TODO: This should return problems that we can inspect.

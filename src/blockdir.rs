@@ -122,7 +122,7 @@ impl BlockDir {
         self.transport.write_file(&relpath, &compressed)?;
         histogram!("conserve.block.compress_and_store_seconds", start.elapsed());
         stats.written_blocks += 1;
-        stats.uncompressed_bytes += uncomp_len as u64;
+        stats.uncompressed_bytes += uncomp_len;
         stats.compressed_bytes += comp_len;
         Ok(hash)
     }

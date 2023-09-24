@@ -242,7 +242,7 @@ impl BackupWriter {
                 } else {
                     warn!("Some blocks referenced by {apath:?} are missing from the blockdir; file will be stored again");
                     self.stats.modified_files += 1;
-                    self.stats.replaced_damaged_files += 1;
+                    self.stats.replaced_damaged_blocks += 1;
                     Some(EntryChange::changed(&basis_entry, source_entry))
                 }
             } else {
@@ -477,7 +477,7 @@ pub struct BackupStats {
 
     /// Files that were previously stored and that have been stored again because
     /// some of their blocks were damaged.
-    pub replaced_damaged_files: usize,
+    pub replaced_damaged_blocks: usize,
 
     /// Bytes that matched an existing block.
     pub deduplicated_bytes: u64,
