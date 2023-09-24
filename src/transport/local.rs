@@ -20,8 +20,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use bytes::Bytes;
-use metrics::{counter, increment_counter};
-use tracing::warn;
+use tracing::{instrument, trace, warn};
 
 use super::{Error, ListDir, Metadata, Result, Transport};
 
@@ -50,7 +49,6 @@ impl Transport for LocalTransport {
         // let's pass them back as lossy UTF-8 so they can be reported at a higher level, for
         // example during validation.
         let path = self.full_path(relpath);
-        increment_counter!("conserve.local_transport.read_dirs");
         let fail = |err| Error::io_error(&path, err);
         let mut names = ListDir::default();
         for dir_entry in path.read_dir().map_err(fail)? {
@@ -70,8 +68,8 @@ impl Transport for LocalTransport {
         Ok(names)
     }
 
+    #[instrument(skip(self))]
     fn read_file(&self, relpath: &str) -> Result<Bytes> {
-        increment_counter!("conserve.local_transport.read_files");
         fn try_block(path: &Path) -> io::Result<Bytes> {
             let mut file = File::open(path)?;
             let estimated_len: usize = file
@@ -81,10 +79,7 @@ impl Transport for LocalTransport {
                 .expect("File size fits in usize");
             let mut out_buf = Vec::with_capacity(estimated_len);
             let actual_len = file.read_to_end(&mut out_buf)?;
-            counter!(
-                "conserve.local_transport.read_file_bytes",
-                actual_len as u64
-            );
+            trace!("Read {actual_len} bytes");
             out_buf.truncate(actual_len);
             Ok(out_buf.into())
         }
@@ -93,7 +88,6 @@ impl Transport for LocalTransport {
     }
 
     fn is_file(&self, relpath: &str) -> Result<bool> {
-        increment_counter!("conserve.local_transport.metadata_reads");
         let path = self.full_path(relpath);
         Ok(path.is_file())
     }
@@ -109,12 +103,8 @@ impl Transport for LocalTransport {
         })
     }
 
+    #[instrument(skip(self, content))]
     fn write_file(&self, relpath: &str, content: &[u8]) -> super::Result<()> {
-        increment_counter!("conserve.local_transport.write_files");
-        counter!(
-            "conserve.local_transport.write_file_bytes",
-            content.len() as u64
-        );
         let full_path = self.full_path(relpath);
         let dir = full_path.parent().unwrap();
         let context = |err| super::Error::io_error(&full_path, err);
@@ -132,6 +122,7 @@ impl Transport for LocalTransport {
             persist_error.file.close().map_err(context)?;
             Err(context(persist_error.error))
         } else {
+            trace!("Wrote {} bytes", content.len());
             Ok(())
         }
     }
@@ -153,7 +144,6 @@ impl Transport for LocalTransport {
     }
 
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
-        increment_counter!("conserve.local_transport.metadata_reads");
         let path = self.root.join(relpath);
         let fsmeta = path.metadata().map_err(|err| Error::io_error(&path, err))?;
         Ok(Metadata {

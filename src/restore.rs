@@ -21,7 +21,6 @@ use std::{fs, time::Instant};
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
-use metrics::{counter, increment_counter};
 use time::OffsetDateTime;
 use tracing::{error, instrument, warn};
 
@@ -100,7 +99,6 @@ pub fn restore(
         match entry.kind() {
             Kind::Dir => {
                 stats.directories += 1;
-                increment_counter!("conserve.restore.dirs");
                 if let Err(err) = fs::create_dir_all(&path) {
                     if err.kind() != io::ErrorKind::AlreadyExists {
                         error!(?path, ?err, "Failed to create directory");
@@ -116,7 +114,6 @@ pub fn restore(
             }
             Kind::File => {
                 stats.files += 1;
-                increment_counter!("conserve.restore.files");
                 match restore_file(path.clone(), &entry, block_dir) {
                     Err(err) => {
                         error!(?err, ?path, "Failed to restore file");
@@ -133,7 +130,6 @@ pub fn restore(
             }
             Kind::Symlink => {
                 stats.symlinks += 1;
-                increment_counter!("conserve.restore.symlinks");
                 if let Err(err) = restore_symlink(&path, &entry) {
                     error!(?path, ?err, "Failed to restore symlink");
                     stats.errors += 1;
@@ -223,7 +219,6 @@ fn restore_file(
         len += bytes.len() as u64;
     }
     stats.uncompressed_file_bytes = len;
-    counter!("conserve.restore.file_bytes", len);
     out.flush().map_err(|source| Error::Restore {
         path: path.clone(),
         source,
