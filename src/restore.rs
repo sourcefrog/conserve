@@ -16,13 +16,14 @@ use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering::Relaxed;
 use std::{fs, time::Instant};
 
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
 use time::OffsetDateTime;
-use tracing::{error, instrument, warn};
+use tracing::{error, instrument, trace, warn};
 
 use crate::band::BandSelectionPolicy;
 use crate::io::{directory_is_empty, ensure_dir_exists};
@@ -148,6 +149,7 @@ pub fn restore(
     }
     stats += apply_deferrals(&deferrals)?;
     stats.elapsed = start.elapsed();
+    stats.block_cache_hits = block_dir.stats.cache_hit.load(Relaxed);
     // TODO: Merge in stats from the tree iter and maybe the source tree?
     Ok(stats)
 }
@@ -244,6 +246,7 @@ fn restore_file(
         stats.errors += 1;
     }
     // TODO: Accumulate more stats.
+    trace!("Restored file");
     Ok(stats)
 }
 

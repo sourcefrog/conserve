@@ -25,14 +25,16 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use bytes::Bytes;
+use lru::LruCache;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use tracing::{debug, error, info, warn};
+use tracing::{instrument, trace};
 
 use crate::backup::BackupStats;
 use crate::blockhash::BlockHash;
@@ -45,6 +47,9 @@ const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
 
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
+
+/// Cache this many blocks in memory, of up to 1MB each.
+const CACHE_SIZE: usize = 1000;
 
 /// Points to some compressed data inside the block dir.
 ///
@@ -69,6 +74,8 @@ pub struct Address {
 pub struct BlockDir {
     transport: Arc<dyn Transport>,
     pub stats: BlockDirStats,
+    // TODO: There are fancier caches and they might help, but this one works, and Stretto did not work for me.
+    cache: RwLock<LruCache<BlockHash, Bytes>>,
 }
 
 /// Returns the transport-relative subdirectory name.
@@ -87,6 +94,7 @@ impl BlockDir {
         BlockDir {
             transport,
             stats: BlockDirStats::default(),
+            cache: RwLock::new(LruCache::new(CACHE_SIZE.try_into().unwrap())),
         }
     }
 
@@ -111,6 +119,10 @@ impl BlockDir {
             return Ok(hash);
         }
         let compressed = Compressor::new().compress(&block_data)?;
+        self.cache
+            .write()
+            .expect("Lock cache")
+            .put(hash.clone(), block_data);
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
         let relpath = block_relpath(&hash);
@@ -131,6 +143,10 @@ impl BlockDir {
     /// So, these are specifically treated as missing, so there's a chance to heal
     /// them later.
     pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
+        if self.cache.read().expect("Lock cache").contains(hash) {
+            self.stats.cache_hit.fetch_add(1, Relaxed);
+            return Ok(true);
+        }
         match self.transport.metadata(&block_relpath(hash)) {
             Err(err) if err.is_not_found() => Ok(false),
             Err(err) => {
@@ -165,10 +181,13 @@ impl BlockDir {
     /// Return the entire contents of the block.
     ///
     /// Checks that the hash is correct with the contents.
+    #[instrument(skip(self))]
     pub fn get_block_content(&self, hash: &BlockHash) -> Result<Bytes> {
-        // TODO: Reuse decompressor buffer.
-        // TODO: Most importantly, cache decompressed blocks!
-        // TODO: Stats for block reads, maybe in the blockdir?
+        if let Some(hit) = self.cache.write().expect("Lock cache").get(hash) {
+            self.stats.cache_hit.fetch_add(1, Relaxed);
+            trace!("Block cache hit");
+            return Ok(hit.clone());
+        }
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
         let compressed_bytes = self.transport.read_file(&block_relpath)?;
@@ -178,6 +197,10 @@ impl BlockDir {
             error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
             return Err(Error::BlockCorrupt { hash: hash.clone() });
         }
+        self.cache
+            .write()
+            .expect("Lock cache")
+            .put(hash.clone(), decompressed_bytes.clone());
         self.stats.read_blocks.fetch_add(1, Relaxed);
         self.stats
             .read_block_compressed_bytes
@@ -189,6 +212,7 @@ impl BlockDir {
     }
 
     pub fn delete_block(&self, hash: &BlockHash) -> Result<()> {
+        self.cache.write().expect("Lock cache").pop(hash);
         self.transport
             .remove_file(&block_relpath(hash))
             .map_err(Error::from)
@@ -290,6 +314,7 @@ pub struct BlockDirStats {
     pub read_blocks: AtomicUsize,
     pub read_block_compressed_bytes: AtomicUsize,
     pub read_block_uncompressed_bytes: AtomicUsize,
+    pub cache_hit: AtomicUsize,
 }
 
 #[cfg(test)]
@@ -309,6 +334,9 @@ mod test {
             .store_or_deduplicate(Bytes::from("stuff"), &mut stats)
             .unwrap();
         assert!(blockdir.contains(&hash).unwrap());
+
+        // Open again to get a fresh cache
+        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -316,5 +344,28 @@ mod test {
             .open(tempdir.path().join(block_relpath(&hash)))
             .expect("Truncate block");
         assert!(!blockdir.contains(&hash).unwrap());
+    }
+
+    #[test]
+    fn cache_hit() {
+        let tempdir = TempDir::new().unwrap();
+        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let mut stats = BackupStats::default();
+        let content = Bytes::from("stuff");
+        let hash = blockdir
+            .store_or_deduplicate(content.clone(), &mut stats)
+            .unwrap();
+        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
+
+        assert!(blockdir.contains(&hash).unwrap());
+        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
+
+        let retrieved = blockdir.get_block_content(&hash).unwrap();
+        assert_eq!(content, retrieved);
+        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit against the value written
+
+        let retrieved = blockdir.get_block_content(&hash).unwrap();
+        assert_eq!(content, retrieved);
+        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 3); // hit again
     }
 }

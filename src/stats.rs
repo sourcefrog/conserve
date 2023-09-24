@@ -110,6 +110,8 @@ pub struct RestoreStats {
     pub uncompressed_file_bytes: u64,
 
     pub elapsed: Duration,
+
+    pub block_cache_hits: usize,
 }
 
 impl fmt::Display for RestoreStats {
@@ -120,6 +122,9 @@ impl fmt::Display for RestoreStats {
         write_count(w, "symlinks", self.symlinks);
         write_count(w, "directories", self.directories);
         write_count(w, "unsupported file kind", self.unknown_kind);
+        writeln!(w).unwrap();
+
+        write_count(w, "block cache hits", self.block_cache_hits);
         writeln!(w).unwrap();
 
         write_count(w, "errors", self.errors);

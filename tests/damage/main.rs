@@ -81,7 +81,13 @@ fn backup_after_damage(
     let backup_options = BackupOptions::default();
     backup(&archive, source_dir.path(), &backup_options).expect("initial backup");
 
+    drop(archive);
     action.damage(&location.to_path(&archive_dir));
+
+    // Open the archive again to avoid cache effects.
+    let archive =
+        Archive::open(conserve::transport::open_local_transport(archive_dir.path()).unwrap())
+            .expect("open archive");
 
     // A second backup should succeed.
     changes.apply(&source_dir);
