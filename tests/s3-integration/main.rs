@@ -40,109 +40,113 @@ struct TempBucket {
     client: aws_sdk_s3::Client,
 }
 
-fn temp_bucket() -> TempBucket {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("Create runtime");
-    println!("make a bucket");
-    let app_name = AppName::new(format!(
-        "conserve-s3-integration-test-{}",
-        conserve::version()
-    ))
-    .unwrap();
-    let config = runtime.block_on(::aws_config::from_env().app_name(app_name).load());
-    let bucket_name = format!(
-        "conserve-s3-integration-{time}-{rand:x}",
-        time = OffsetDateTime::now_utc()
-            .format(format_description!("[year][month][day]-[hour][minute]"))
-            .expect("Format time"),
-        rand = rand::thread_rng().gen::<u64>()
-    );
-
-    let client = aws_sdk_s3::Client::new(&config);
-    let region = config.region().unwrap().as_ref();
-    dbg!(&region);
-
-    runtime
-        .block_on(
-            client
-                .create_bucket()
-                .bucket(&bucket_name)
-                .create_bucket_configuration(
-                    CreateBucketConfiguration::builder()
-                        .location_constraint(BucketLocationConstraint::from_str(region).unwrap())
-                        .build(),
-                )
-                .send(),
-        )
-        .expect("Create bucket");
-    println!("Created bucket {bucket_name}");
-
-    runtime
-        .block_on(
-            client
-                .put_bucket_lifecycle_configuration()
-                .bucket(&bucket_name)
-                .lifecycle_configuration(
-                    BucketLifecycleConfiguration::builder()
-                        .rules(
-                            LifecycleRule::builder()
-                                .id("delete-after-7d")
-                                .filter(LifecycleRuleFilter::ObjectSizeGreaterThan(0))
-                                .status(ExpirationStatus::Enabled)
-                                .expiration(LifecycleExpiration::builder().days(7).build())
-                                .build(),
-                        )
-                        .build(),
-                )
-                .send(),
-        )
-        .expect("Set bucket lifecycle");
-    println!("Set lifecycle on bucket {bucket_name}");
-
-    TempBucket {
-        runtime,
-        bucket_name,
-        client,
-    }
-}
-
 impl TempBucket {
     pub fn url(&self) -> String {
         format!("s3://{}", self.bucket_name)
     }
-}
 
-impl Drop for TempBucket {
-    fn drop(&mut self) {
-        println!("Delete bucket {}", self.bucket_name);
+    fn new() -> TempBucket {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Create runtime");
+        let bucket_name = format!(
+            "conserve-s3-integration-{time}-{rand:x}",
+            time = OffsetDateTime::now_utc()
+                .format(format_description!("[year][month][day]-[hour][minute]"))
+                .expect("Format time"),
+            rand = rand::thread_rng().gen::<u64>()
+        );
+        let app_name = AppName::new(format!(
+            "conserve-s3-integration-test-{}",
+            conserve::version()
+        ))
+        .unwrap();
+        let config = runtime.block_on(::aws_config::from_env().app_name(app_name).load());
+        let client = aws_sdk_s3::Client::new(&config);
+        runtime.block_on(TempBucket::setup_bucket(&bucket_name, &client));
+        TempBucket {
+            runtime,
+            bucket_name,
+            client,
+        }
+    }
+
+    async fn setup_bucket(bucket_name: &str, client: &aws_sdk_s3::Client) {
+        println!("make a bucket");
+        let region = client.config().region().unwrap().as_ref();
+        dbg!(&region);
+
+        client
+            .create_bucket()
+            .bucket(bucket_name)
+            .create_bucket_configuration(
+                CreateBucketConfiguration::builder()
+                    .location_constraint(BucketLocationConstraint::from_str(region).unwrap())
+                    .build(),
+            )
+            .send()
+            .await
+            .expect("Create bucket");
+        println!("Created bucket {bucket_name}");
+
+        client
+            .put_bucket_lifecycle_configuration()
+            .bucket(bucket_name)
+            .lifecycle_configuration(
+                BucketLifecycleConfiguration::builder()
+                    .rules(
+                        LifecycleRule::builder()
+                            .id("delete-after-7d")
+                            .filter(LifecycleRuleFilter::ObjectSizeGreaterThan(0))
+                            .status(ExpirationStatus::Enabled)
+                            .expiration(LifecycleExpiration::builder().days(7).build())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .send()
+            .await
+            .expect("Set bucket lifecycle");
+        println!("Set lifecycle on bucket {bucket_name}");
+    }
+
+    /// Delete all objects and then the bucket.
+    async fn delete(&self) {
         let mut paginator = self
             .client
             .list_objects_v2()
             .bucket(&self.bucket_name)
             .into_paginator()
             .send();
-        while let Some(page) = self.runtime.block_on(paginator.next()) {
+        while let Some(page) = paginator.next().await {
             for object in page
                 .expect("List objects page")
                 .contents
                 .unwrap_or_default()
             {
-                self.runtime
-                    .block_on(
-                        self.client
-                            .delete_object()
-                            .bucket(&self.bucket_name)
-                            .key(object.key.unwrap())
-                            .send(),
-                    )
+                self.client
+                    .delete_object()
+                    .bucket(&self.bucket_name)
+                    .key(object.key.unwrap())
+                    .send()
+                    .await
                     .expect("Delete object");
             }
         }
-        self.runtime
-            .block_on(self.client.delete_bucket().bucket(&self.bucket_name).send())
+        self.client
+            .delete_bucket()
+            .bucket(&self.bucket_name)
+            .send()
+            .await
             .expect("Delete bucket");
+    }
+}
+
+impl Drop for TempBucket {
+    fn drop(&mut self) {
+        println!("Delete bucket {}", self.bucket_name);
+        self.runtime.block_on(self.delete());
     }
 }
 
@@ -152,7 +156,7 @@ fn conserve() -> Command {
 
 #[test]
 fn integration_test() {
-    let temp_bucket = temp_bucket(); // Delete on drop
+    let temp_bucket = TempBucket::new();
     let url = &temp_bucket.url().to_string();
     println!("init {url}");
     conserve().arg("init").arg(url).assert().success();
