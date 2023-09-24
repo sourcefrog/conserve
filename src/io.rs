@@ -40,6 +40,7 @@ pub(crate) fn read_with_retries(
     from_file: &mut dyn Read,
 ) -> std::io::Result<()> {
     // TODO: This could safely resize the buf without initializing, since it will be overwritten.
+    // TODO: Maybe use Bytes.
     buf.resize(len, 0);
     let mut bytes_read = 0;
     while bytes_read < len {

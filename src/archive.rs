@@ -39,7 +39,7 @@ static BLOCK_DIR: &str = "d";
 #[derive(Clone, Debug)]
 pub struct Archive {
     /// Holds body content for all file versions.
-    block_dir: BlockDir,
+    pub(crate) block_dir: Arc<BlockDir>,
 
     /// Transport to the root directory of the archive.
     transport: Arc<dyn Transport>,
@@ -69,7 +69,7 @@ impl Archive {
         if !names.files.is_empty() || !names.dirs.is_empty() {
             return Err(Error::NewArchiveDirectoryNotEmpty);
         }
-        let block_dir = BlockDir::create(transport.sub_transport(BLOCK_DIR))?;
+        let block_dir = Arc::new(BlockDir::create(transport.sub_transport(BLOCK_DIR))?);
         write_json(
             &transport,
             HEADER_FILENAME,
@@ -98,7 +98,7 @@ impl Archive {
                 version: header.conserve_archive_version,
             });
         }
-        let block_dir = BlockDir::open(transport.sub_transport(BLOCK_DIR));
+        let block_dir = Arc::new(BlockDir::open(transport.sub_transport(BLOCK_DIR)));
         debug!(?header, "Opened archive");
         Ok(Archive {
             block_dir,

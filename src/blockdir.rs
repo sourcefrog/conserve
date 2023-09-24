@@ -23,6 +23,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
+use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -64,9 +65,10 @@ pub struct Address {
 }
 
 /// A readable, writable directory within a band holding data blocks.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct BlockDir {
     transport: Arc<dyn Transport>,
+    pub stats: BlockDirStats,
 }
 
 /// Returns the transport-relative subdirectory name.
@@ -82,19 +84,22 @@ pub fn block_relpath(hash: &BlockHash) -> String {
 
 impl BlockDir {
     pub fn open(transport: Arc<dyn Transport>) -> BlockDir {
-        BlockDir { transport }
+        BlockDir {
+            transport,
+            stats: BlockDirStats::default(),
+        }
     }
 
     pub fn create(transport: Arc<dyn Transport>) -> Result<BlockDir> {
         transport.create_dir("")?;
-        Ok(BlockDir { transport })
+        Ok(BlockDir::open(transport))
     }
 
     /// Store block data, if it's not already present, and return the hash.
     ///
     /// The block data must be less than the maximum block size.
     pub(crate) fn store_or_deduplicate(
-        &mut self,
+        &self,
         block_data: &[u8],
         stats: &mut BackupStats,
     ) -> Result<BlockHash> {
@@ -155,6 +160,32 @@ impl BlockDir {
             });
         }
         Ok(bytes.slice(start..end))
+    }
+
+    /// Return the entire contents of the block.
+    ///
+    /// Checks that the hash is correct with the contents.
+    pub fn get_block_content(&self, hash: &BlockHash) -> Result<Bytes> {
+        // TODO: Reuse decompressor buffer.
+        // TODO: Most importantly, cache decompressed blocks!
+        // TODO: Stats for block reads, maybe in the blockdir?
+        let mut decompressor = Decompressor::new();
+        let block_relpath = block_relpath(hash);
+        let compressed_bytes = self.transport.read_file(&block_relpath)?;
+        let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
+        let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
+        if actual_hash != *hash {
+            error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
+            return Err(Error::BlockCorrupt { hash: hash.clone() });
+        }
+        self.stats.read_blocks.fetch_add(1, Relaxed);
+        self.stats
+            .read_block_compressed_bytes
+            .fetch_add(compressed_bytes.len(), Relaxed);
+        self.stats
+            .read_block_uncompressed_bytes
+            .fetch_add(decompressed_bytes.len(), Relaxed);
+        Ok(decompressed_bytes)
     }
 
     pub fn delete_block(&self, hash: &BlockHash) -> Result<()> {
@@ -252,25 +283,13 @@ impl BlockDir {
             .collect();
         Ok(block_lens)
     }
+}
 
-    /// Return the entire contents of the block.
-    ///
-    /// Checks that the hash is correct with the contents.
-    pub fn get_block_content(&self, hash: &BlockHash) -> Result<Bytes> {
-        // TODO: Reuse decompressor buffer.
-        // TODO: Most importantly, cache decompressed blocks!
-        // TODO: Stats for block reads, maybe in the blockdir?
-        let mut decompressor = Decompressor::new();
-        let block_relpath = block_relpath(hash);
-        let compressed_bytes = self.transport.read_file(&block_relpath)?;
-        let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
-        let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
-        if actual_hash != *hash {
-            error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
-            return Err(Error::BlockCorrupt { hash: hash.clone() });
-        }
-        Ok(decompressed_bytes)
-    }
+#[derive(Debug, Default)]
+pub struct BlockDirStats {
+    pub read_blocks: AtomicUsize,
+    pub read_block_compressed_bytes: AtomicUsize,
+    pub read_block_uncompressed_bytes: AtomicUsize,
 }
 
 #[cfg(test)]
@@ -284,7 +303,7 @@ mod test {
     #[test]
     fn empty_block_file_counts_as_not_present() {
         let tempdir = TempDir::new().unwrap();
-        let mut blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
         let hash = blockdir.store_or_deduplicate(b"stuff", &mut stats).unwrap();
         assert!(blockdir.contains(&hash).unwrap());

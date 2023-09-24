@@ -18,6 +18,8 @@
 //! across incremental backups, hiding from the caller that data may be distributed across
 //! multiple index files, bands, and blocks.
 
+use std::sync::Arc;
+
 use crate::blockdir::BlockDir;
 use crate::stitch::IterStitchedIndexHunks;
 use crate::*;
@@ -27,14 +29,14 @@ use crate::*;
 pub struct StoredTree {
     band: Band,
     archive: Archive,
-    block_dir: BlockDir,
+    block_dir: Arc<BlockDir>,
 }
 
 impl StoredTree {
     pub(crate) fn open(archive: &Archive, band_id: BandId) -> Result<StoredTree> {
         Ok(StoredTree {
             band: Band::open(archive, band_id)?,
-            block_dir: archive.block_dir().clone(),
+            block_dir: archive.block_dir.clone(),
             archive: archive.clone(),
         })
     }

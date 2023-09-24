@@ -18,6 +18,8 @@ use std::convert::TryInto;
 use std::fmt;
 use std::io::prelude::*;
 use std::path::Path;
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use derive_more::{Add, AddAssign};
@@ -131,6 +133,10 @@ pub fn backup(
     }
     stats += writer.finish()?;
     stats.elapsed = start.elapsed();
+    let block_stats = &archive.block_dir.stats;
+    stats.read_blocks = block_stats.read_blocks.load(Relaxed);
+    stats.read_blocks_compressed_bytes = block_stats.read_block_compressed_bytes.load(Relaxed);
+    stats.read_blocks_uncompressed_bytes = block_stats.read_block_uncompressed_bytes.load(Relaxed);
     // TODO: Merge in stats from the source tree?
     Ok(stats)
 }
@@ -140,7 +146,7 @@ struct BackupWriter {
     band: Band,
     index_builder: IndexWriter,
     stats: BackupStats,
-    block_dir: BlockDir,
+    block_dir: Arc<BlockDir>,
 
     /// The index for the last stored band, used as hints for whether newly
     /// stored files have changed.
@@ -166,10 +172,10 @@ impl BackupWriter {
         Ok(BackupWriter {
             band,
             index_builder,
-            block_dir: archive.block_dir().clone(),
+            block_dir: archive.block_dir.clone(),
             stats: BackupStats::default(),
             basis_index,
-            file_combiner: FileCombiner::new(archive.block_dir().clone()),
+            file_combiner: FileCombiner::new(archive.block_dir.clone()),
         })
     }
 
@@ -264,12 +270,8 @@ impl BackupWriter {
                 self.file_combiner
                     .push_file(source_entry, &mut source_file)?;
             } else {
-                let addrs = store_file_content(
-                    apath,
-                    &mut source_file,
-                    &mut self.block_dir,
-                    &mut self.stats,
-                )?;
+                let addrs =
+                    store_file_content(apath, &mut source_file, &self.block_dir, &mut self.stats)?;
                 self.index_builder.push_entry(IndexEntry {
                     addrs,
                     ..IndexEntry::metadata_from(source_entry)
@@ -293,7 +295,7 @@ impl BackupWriter {
 fn store_file_content(
     apath: &Apath,
     from_file: &mut dyn Read,
-    block_dir: &mut BlockDir,
+    block_dir: &BlockDir,
     stats: &mut BackupStats,
 ) -> Result<Vec<Address>> {
     let mut buffer = Vec::new(); // TODO: Maybe Bytes here.
@@ -334,7 +336,7 @@ struct FileCombiner {
     /// Entries for files that have been written to the blockdir, and that have complete addresses.
     finished: Vec<IndexEntry>,
     stats: BackupStats,
-    block_dir: BlockDir,
+    block_dir: Arc<BlockDir>,
 }
 
 /// A file in the process of being written into a combined block.
@@ -352,7 +354,7 @@ struct QueuedFile {
 }
 
 impl FileCombiner {
-    fn new(block_dir: BlockDir) -> FileCombiner {
+    fn new(block_dir: Arc<BlockDir>) -> FileCombiner {
         FileCombiner {
             block_dir,
             buf: Vec::new(),
@@ -499,6 +501,10 @@ pub struct BackupStats {
 
     pub index_builder_stats: IndexWriterStats,
     pub elapsed: Duration,
+
+    pub read_blocks: usize,
+    pub read_blocks_uncompressed_bytes: usize,
+    pub read_blocks_compressed_bytes: usize,
 }
 
 impl fmt::Display for BackupStats {
@@ -531,6 +537,15 @@ impl fmt::Display for BackupStats {
         let idx = &self.index_builder_stats;
         write_count(w, "new index hunks", idx.index_hunks);
         write_compressed_size(w, idx.compressed_index_bytes, idx.uncompressed_index_bytes);
+        writeln!(w).unwrap();
+
+        write_count(w, "blocks read", self.read_blocks);
+        write_size(
+            w,
+            "  uncompressed",
+            self.read_blocks_uncompressed_bytes as u64,
+        );
+        write_size(w, "  compressed", self.read_blocks_compressed_bytes as u64);
         writeln!(w).unwrap();
 
         write_count(w, "errors", self.errors);
