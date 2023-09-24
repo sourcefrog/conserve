@@ -13,6 +13,7 @@
 
 //! Archives holding backup material.
 
+use core::fmt;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
@@ -36,13 +37,21 @@ const HEADER_FILENAME: &str = "CONSERVE";
 static BLOCK_DIR: &str = "d";
 
 /// An archive holding backup material.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Archive {
     /// Holds body content for all file versions.
     pub(crate) block_dir: Arc<BlockDir>,
 
     /// Transport to the root directory of the archive.
     transport: Arc<dyn Transport>,
+}
+
+impl fmt::Debug for Archive {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Archive")
+            .field("transport", &self.transport)
+            .finish()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

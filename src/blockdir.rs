@@ -23,6 +23,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
+use std::fmt;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -46,6 +47,9 @@ const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
 
+/// Maximum in-memory cached block bytes.
+const MAX_CACHE_BYTES: usize = 1 << 30;
+
 /// Points to some compressed data inside the block dir.
 ///
 /// Identifiers are: which file contains it, at what (pre-compression) offset,
@@ -65,10 +69,21 @@ pub struct Address {
 }
 
 /// A readable, writable directory within a band holding data blocks.
-#[derive(Debug)]
+///
+/// A blockdir is relatively expensive as it holds stats and a cache,
+/// so it should be opened only once, by the archive.
 pub struct BlockDir {
     transport: Arc<dyn Transport>,
     pub stats: BlockDirStats,
+    cache: stretto::Cache<BlockHash, Bytes, stretto::DefaultKeyBuilder<BlockHash>>,
+}
+
+impl fmt::Debug for BlockDir {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BlockDir")
+            .field("transport", &self.transport)
+            .finish()
+    }
 }
 
 /// Returns the transport-relative subdirectory name.
@@ -84,9 +99,20 @@ pub fn block_relpath(hash: &BlockHash) -> String {
 
 impl BlockDir {
     pub fn open(transport: Arc<dyn Transport>) -> BlockDir {
+        // pessimistically, assume 1k blocks, so 1000k blocks in cache at most, 10 counters per block, so 10M counters,
+        // 4 bits/counter so 5MB for counters.
+        // TODO: Seems like we should be able to use TransparentKeyBuilder, but I can't work out how.
+        let max_counters = MAX_CACHE_BYTES * 10 / 1000;
+        let cache = stretto::Cache::new_with_key_builder(
+            max_counters,
+            MAX_CACHE_BYTES as i64,
+            stretto::DefaultKeyBuilder::default(),
+        )
+        .expect("Create blockdir cache");
         BlockDir {
             transport,
             stats: BlockDirStats::default(),
+            cache,
         }
     }
 
@@ -111,6 +137,8 @@ impl BlockDir {
             return Ok(hash);
         }
         let compressed = Compressor::new().compress(&block_data)?;
+        self.cache
+            .insert(hash.clone(), block_data, uncomp_len as i64);
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
         let relpath = block_relpath(&hash);
