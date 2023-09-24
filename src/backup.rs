@@ -17,11 +17,13 @@
 use std::convert::TryInto;
 use std::fmt;
 use std::io::prelude::*;
+use std::mem::take;
 use std::path::Path;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use bytes::BytesMut;
 use derive_more::{Add, AddAssign};
 use itertools::Itertools;
 use tracing::{error, warn};
@@ -298,10 +300,9 @@ fn store_file_content(
     block_dir: &BlockDir,
     stats: &mut BackupStats,
 ) -> Result<Vec<Address>> {
-    let mut buffer = Vec::new(); // TODO: Maybe Bytes here.
     let mut addresses = Vec::<Address>::with_capacity(1);
     loop {
-        read_with_retries(&mut buffer, MAX_BLOCK_SIZE, from_file).map_err(|source| {
+        let buffer = read_with_retries(MAX_BLOCK_SIZE, from_file).map_err(|source| {
             Error::ReadSourceFile {
                 path: apath.to_string().into(),
                 source,
@@ -310,11 +311,13 @@ fn store_file_content(
         if buffer.is_empty() {
             break;
         }
-        let hash = block_dir.store_or_deduplicate(buffer.as_slice(), stats)?;
+        let buffer = buffer.freeze();
+        let len = buffer.len() as u64;
+        let hash = block_dir.store_or_deduplicate(buffer, stats)?;
         addresses.push(Address {
             hash,
             start: 0,
-            len: buffer.len() as u64,
+            len,
         });
     }
     match addresses.len() {
@@ -331,7 +334,7 @@ fn store_file_content(
 /// completed.
 struct FileCombiner {
     /// Buffer of concatenated data from small files.
-    buf: Vec<u8>,
+    buf: BytesMut,
     queue: Vec<QueuedFile>,
     /// Entries for files that have been written to the blockdir, and that have complete addresses.
     finished: Vec<IndexEntry>,
@@ -357,7 +360,7 @@ impl FileCombiner {
     fn new(block_dir: Arc<BlockDir>) -> FileCombiner {
         FileCombiner {
             block_dir,
-            buf: Vec::new(),
+            buf: BytesMut::new(),
             queue: Vec::new(),
             finished: Vec::new(),
             stats: BackupStats::default(),
@@ -389,9 +392,8 @@ impl FileCombiner {
         }
         let hash = self
             .block_dir
-            .store_or_deduplicate(&self.buf, &mut self.stats)?;
+            .store_or_deduplicate(take(&mut self.buf).freeze(), &mut self.stats)?;
         self.stats.combined_blocks += 1;
-        self.buf.clear();
         self.finished
             .extend(self.queue.drain(..).map(|qf| IndexEntry {
                 addrs: vec![Address {

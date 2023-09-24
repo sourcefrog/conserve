@@ -100,17 +100,17 @@ impl BlockDir {
     /// The block data must be less than the maximum block size.
     pub(crate) fn store_or_deduplicate(
         &self,
-        block_data: &[u8],
+        block_data: Bytes,
         stats: &mut BackupStats,
     ) -> Result<BlockHash> {
-        let hash = BlockHash::hash_bytes(block_data);
+        let hash = BlockHash::hash_bytes(&block_data);
         let uncomp_len = block_data.len() as u64;
         if self.contains(&hash)? {
             stats.deduplicated_blocks += 1;
             stats.deduplicated_bytes += uncomp_len;
             return Ok(hash);
         }
-        let compressed = Compressor::new().compress(block_data)?;
+        let compressed = Compressor::new().compress(&block_data)?;
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
         let relpath = block_relpath(&hash);
@@ -305,7 +305,9 @@ mod test {
         let tempdir = TempDir::new().unwrap();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
-        let hash = blockdir.store_or_deduplicate(b"stuff", &mut stats).unwrap();
+        let hash = blockdir
+            .store_or_deduplicate(Bytes::from("stuff"), &mut stats)
+            .unwrap();
         assert!(blockdir.contains(&hash).unwrap());
         OpenOptions::new()
             .write(true)
