@@ -233,7 +233,7 @@ mod test {
                 kind: Kind::File
             }
         );
-        assert!(transport.metadata("nopoem").is_err());
+        assert!(transport.metadata("nopoem").unwrap_err().is_not_found());
     }
 
     #[test]
@@ -263,7 +263,6 @@ mod test {
 
     #[test]
     fn write_file() {
-        // TODO: Maybe test some error cases of failing to write.
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = LocalTransport::new(temp.path());
 
@@ -278,6 +277,23 @@ mod test {
             .assert("Must I paint you a picture?");
 
         temp.close().unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_file_permission_denied() {
+        use std::fs;
+        use std::os::unix::prelude::PermissionsExt;
+
+        let temp = assert_fs::TempDir::new().unwrap();
+        let transport = LocalTransport::new(temp.path());
+        temp.child("file").touch().unwrap();
+        fs::set_permissions(temp.child("file").path(), fs::Permissions::from_mode(0o000))
+            .expect("set_permissions");
+
+        let err = transport.read_file("file").unwrap_err();
+        assert!(!err.is_not_found());
+        assert_eq!(err.kind(), transport::ErrorKind::PermissionDenied);
     }
 
     #[test]
