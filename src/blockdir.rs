@@ -48,8 +48,11 @@ const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
 
-/// Cache this many blocks in memory, of up to 1MB each.
-const CACHE_SIZE: usize = 1000;
+/// Cache this many blocks in memory.
+const CACHE_SIZE: usize = (1 << 30) / MAX_BLOCK_SIZE;
+
+/// Remember the existence of this many blocks, even if we don't have their content.
+const EXISTENCE_CACHE_SIZE: usize = (64 << 20) / BLAKE_HASH_SIZE_BYTES;
 
 /// Points to some compressed data inside the block dir.
 ///
@@ -76,9 +79,7 @@ pub struct BlockDir {
     pub stats: BlockDirStats,
     // TODO: There are fancier caches and they might help, but this one works, and Stretto did not work for me.
     cache: RwLock<LruCache<BlockHash, Bytes>>,
-    /// True if we know that this block exists, even if we don't have its content.
-    ///
-    /// This does _not_ contain keys that are in `cache`.
+    /// Presence means that we know that this block exists, even if we don't have its content.
     exists: RwLock<LruCache<BlockHash, ()>>,
 }
 
@@ -99,7 +100,7 @@ impl BlockDir {
             transport,
             stats: BlockDirStats::default(),
             cache: RwLock::new(LruCache::new(CACHE_SIZE.try_into().unwrap())),
-            exists: RwLock::new(LruCache::new(100_000_000.try_into().unwrap())),
+            exists: RwLock::new(LruCache::new(EXISTENCE_CACHE_SIZE.try_into().unwrap())),
         }
     }
 
@@ -212,7 +213,7 @@ impl BlockDir {
             .write()
             .expect("Lock cache")
             .put(hash.clone(), decompressed_bytes.clone());
-        self.exists.write().unwrap().pop(hash);
+        self.exists.write().unwrap().put(hash.clone(), ());
         self.stats.read_blocks.fetch_add(1, Relaxed);
         self.stats
             .read_block_compressed_bytes
