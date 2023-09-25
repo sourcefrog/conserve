@@ -48,7 +48,3 @@ pub enum Counter {
     BlockCacheHit,
     // ...
 }
-
-impl Counter {
-    pub(self) const COUNT: usize = 9;
-}
