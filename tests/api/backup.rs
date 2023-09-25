@@ -183,7 +183,15 @@ fn large_file() {
     let large_content = vec![b'a'; 4 << 20];
     tf.create_file_with_contents("large", &large_content);
 
-    let backup_stats = backup(&af, tf.path(), &BackupOptions::default()).expect("backup");
+    let backup_stats = backup(
+        &af,
+        tf.path(),
+        &BackupOptions {
+            max_block_size: 1 << 20,
+            ..Default::default()
+        },
+    )
+    .expect("backup");
     assert_eq!(backup_stats.new_files, 1);
     // First 1MB should be new; remainder should be deduplicated.
     assert_eq!(backup_stats.uncompressed_bytes, 1 << 20);
@@ -415,10 +423,14 @@ fn many_small_files_combined_to_one_block() {
             format!("something about {i}").as_bytes(),
         );
     }
-    let stats = backup(&af, srcdir.path(), &BackupOptions::default()).expect("backup");
+    let backup_options = BackupOptions {
+        max_entries_per_hunk: 1000,
+        ..Default::default()
+    };
+    let stats = backup(&af, srcdir.path(), &backup_options).expect("backup");
     assert_eq!(
         stats.index_builder_stats.index_hunks, 2,
-        "expect exactly 2 hunks"
+        "expect exactly index 2 hunks"
     );
     assert_eq!(stats.files, 1999);
     assert_eq!(stats.directories, 1);
@@ -461,7 +473,12 @@ pub fn mixed_medium_small_files_two_hunks() {
             srcdir.create_file(&name);
         }
     }
-    let stats = backup(&af, srcdir.path(), &BackupOptions::default()).expect("backup");
+    let backup_options = BackupOptions {
+        max_entries_per_hunk: 1000,
+        small_file_cap: 100_000,
+        ..Default::default()
+    };
+    let stats = backup(&af, srcdir.path(), &backup_options).expect("backup");
     assert_eq!(
         stats.index_builder_stats.index_hunks, 2,
         "expect exactly 2 hunks"

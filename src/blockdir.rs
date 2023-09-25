@@ -48,12 +48,6 @@ const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
 
-/// Cache this many blocks in memory.
-const CACHE_SIZE: usize = (1 << 30) / MAX_BLOCK_SIZE;
-
-/// Remember the existence of this many blocks, even if we don't have their content.
-const EXISTENCE_CACHE_SIZE: usize = (64 << 20) / BLAKE_HASH_SIZE_BYTES;
-
 /// Points to some compressed data inside the block dir.
 ///
 /// Identifiers are: which file contains it, at what (pre-compression) offset,
@@ -96,6 +90,14 @@ pub fn block_relpath(hash: &BlockHash) -> String {
 
 impl BlockDir {
     pub fn open(transport: Arc<dyn Transport>) -> BlockDir {
+        /// Cache this many blocks in memory.
+        // TODO: Change to a cache that tracks the size of strored blocks?
+        // As a safe conservative value, 100 blocks of 20MB each would be 2GB.
+        const CACHE_SIZE: usize = 100;
+
+        /// Remember the existence of this many blocks, even if we don't have their content.
+        const EXISTENCE_CACHE_SIZE: usize = (64 << 20) / BLAKE_HASH_SIZE_BYTES;
+
         BlockDir {
             transport,
             stats: BlockDirStats::default(),
