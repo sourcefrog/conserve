@@ -3,14 +3,12 @@
 //! Collect monitored information so that it can be inspected by tests.
 
 use std::mem::take;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Mutex;
 
 use crate::Apath;
 
-use super::counters::{Counter, Counters};
-use super::{Monitor, Problem};
+use super::counters::Counters;
+use super::{Counter, Monitor, Problem};
 
 /// A monitor that collects information for later inspection.
 ///

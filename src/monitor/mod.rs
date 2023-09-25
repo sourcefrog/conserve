@@ -4,11 +4,13 @@
 
 pub mod collect;
 pub mod counters;
+pub mod termui;
 
 use std::fmt::Debug;
 
+use strum_macros::{EnumCount, EnumIter};
+
 use crate::Apath;
-use counters::Counter;
 
 pub trait Monitor {
     /// Notify that a counter increased by a given amount.
@@ -31,4 +33,22 @@ pub trait Monitor {
 pub enum Problem {
     /// Some generic error.
     Error(crate::Error),
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount, EnumIter)]
+pub enum Counter {
+    BandsDone,
+    BandsTotal,
+    FilesDone,
+    IndexBytesDone,
+    BlockBytesDone,
+    BlockRead,
+    BlockWrite,
+    BlockMatchExisting,
+    BlockCacheHit,
+    // ...
+}
+
+impl Counter {
+    pub(self) const COUNT: usize = 9;
 }
