@@ -7,7 +7,10 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Mutex;
 
-use super::{Counter, Counters, Monitor, Problem};
+use crate::Apath;
+
+use super::counters::{Counter, Counters};
+use super::{Monitor, Problem};
 
 /// A monitor that collects information for later inspection.
 ///
@@ -20,7 +23,7 @@ use super::{Counter, Counters, Monitor, Problem};
 pub struct CollectMonitor {
     pub problems: Mutex<Vec<Problem>>,
     counters: Counters,
-    next_task_id: AtomicUsize,
+    started_files: Mutex<Vec<Apath>>,
 }
 
 impl CollectMonitor {
@@ -35,29 +38,30 @@ impl CollectMonitor {
     pub fn take_problems(&self) -> Vec<Problem> {
         take(self.problems.lock().unwrap().as_mut())
     }
+
+    pub fn take_started_files(&self) -> Vec<Apath> {
+        take(self.started_files.lock().unwrap().as_mut())
+    }
 }
 
 impl Monitor for CollectMonitor {
-    type TaskId = usize;
-
-    fn counter(&self, counter: Counter, increment: usize) {
+    fn count(&self, counter: Counter, increment: usize) {
         self.counters.count(counter, increment)
+    }
+
+    fn set_counter(&self, counter: Counter, value: usize) {
+        self.counters.set(counter, value)
     }
 
     fn problem(&self, problem: Problem) {
         self.problems.lock().unwrap().push(problem);
     }
 
-    fn start_task(&self, _task: super::Task) -> Self::TaskId {
-        // TODO: Record tasks?
-        self.next_task_id.fetch_add(1, Relaxed)
+    fn start_file(&self, apath: &crate::Apath) {
+        self.started_files.lock().unwrap().push(apath.clone());
     }
 
-    fn update_task(&self, _task_id: Self::TaskId, _task: super::Task) {
-        // TODO: Record tasks?
-    }
-
-    fn stop_task(&self, _task_id: Self::TaskId, _task: super::Task) {
-        // TODO: Record tasks?
+    fn stop_file(&self, _apath: &crate::Apath) {
+        // Not used yet
     }
 }
