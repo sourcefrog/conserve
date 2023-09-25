@@ -48,8 +48,10 @@ const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
 
-/// Cache this many blocks in memory, of up to 1MB each.
-const CACHE_SIZE: usize = 1000;
+/// Cache this many blocks in memory.
+const BLOCK_CACHE_SIZE: usize = (1 << 30) / MAX_BLOCK_SIZE;
+
+const EXISTENCE_CACHE_SIZE: usize = (64 << 20) / BLOCKDIR_FILE_NAME_LEN;
 
 /// Points to some compressed data inside the block dir.
 ///
@@ -98,8 +100,8 @@ impl BlockDir {
         BlockDir {
             transport,
             stats: BlockDirStats::default(),
-            cache: RwLock::new(LruCache::new(CACHE_SIZE.try_into().unwrap())),
-            exists: RwLock::new(LruCache::new(100_000_000.try_into().unwrap())),
+            cache: RwLock::new(LruCache::new(BLOCK_CACHE_SIZE.try_into().unwrap())),
+            exists: RwLock::new(LruCache::new(EXISTENCE_CACHE_SIZE.try_into().unwrap())),
         }
     }
 
