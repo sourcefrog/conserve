@@ -9,7 +9,7 @@ use strum::{EnumCount, IntoEnumIterator};
 use super::Counter;
 
 #[derive(Default)]
-pub(super) struct Counters {
+pub struct Counters {
     counters: [AtomicUsize; Counter::COUNT],
 }
 

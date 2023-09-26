@@ -23,7 +23,7 @@ static IMPL: RwLock<ProgressImpl> = RwLock::new(ProgressImpl::Null);
 
 static NEXT_TASK_ID: AtomicUsize = AtomicUsize::new(0);
 
-pub(crate) mod term;
+use crate::termui::progress as term;
 
 /// How to show progress bars?
 #[derive(Debug, Clone, Copy)]

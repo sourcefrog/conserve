@@ -29,7 +29,7 @@ use time::UtcOffset;
 use tracing::{debug, error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
-use conserve::ui::termui::TraceTimeStyle;
+use conserve::termui::{enable_tracing, TraceTimeStyle};
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
@@ -621,7 +621,7 @@ fn main() -> Result<ExitCode> {
     if args.metrics_json.is_some() {
         warn!("--metrics-json is no longer supported");
     }
-    let _flush_guard = ui::termui::enable_tracing(&args.trace_time, console_level, &args.log_json);
+    let _flush_guard = enable_tracing(&args.trace_time, console_level, &args.log_json);
     let result = args.command.run();
     debug!(elapsed = ?start_time.elapsed());
     let error_count = global_error_count();

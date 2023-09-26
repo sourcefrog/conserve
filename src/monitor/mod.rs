@@ -3,14 +3,15 @@
 //! Communication from the library to a monitor: a test, a UI, etc.
 
 pub mod collect;
-pub mod counters;
-pub mod termui;
+mod counters;
 
 use std::fmt::Debug;
 
 use strum_macros::{EnumCount, EnumIter};
 
 use crate::Apath;
+
+pub use counters::Counters;
 
 pub trait Monitor {
     /// Notify that a counter increased by a given amount.

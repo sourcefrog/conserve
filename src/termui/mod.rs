@@ -1,5 +1,4 @@
-// Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2023 Martin Pool
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -11,6 +10,11 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Generic UI layer.
+//! Terminal UI: tracing, progress bars, etc.
 
-pub mod termui;
+mod monitor;
+pub(crate) mod progress;
+mod trace;
+
+pub use monitor::TermUiMonitor;
+pub use trace::{enable_tracing, TraceTimeStyle};

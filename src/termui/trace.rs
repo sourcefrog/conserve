@@ -16,7 +16,7 @@ use tracing_subscriber::layer::Layer;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
-use crate::progress::term::make_nutmeg_writer;
+use super::progress::make_nutmeg_writer;
 
 /// Chosen style of timestamp prefix on trace lines.
 #[derive(clap::ValueEnum, Clone, Debug)]

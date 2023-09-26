@@ -17,7 +17,7 @@ use itertools::Itertools;
 use nutmeg::estimate_remaining;
 use thousands::Separable;
 
-use super::*;
+use crate::progress::Progress;
 
 /// A global Nutmeg view.
 ///
@@ -33,17 +33,17 @@ pub(crate) fn make_nutmeg_writer() -> impl io::Write {
     &NUTMEG_VIEW
 }
 
-pub(super) fn add_bar(bar_id: usize) {
+pub(crate) fn add_bar(bar_id: usize) {
     NUTMEG_VIEW.update(|model| model.add_bar(bar_id));
 }
 
 /// Show progress on the global terminal progress bar,
 /// or clear the bar if it's [Progress::None].
-pub(super) fn update_bar(bar_id: usize, progress: Progress) {
+pub(crate) fn update_bar(bar_id: usize, progress: Progress) {
     NUTMEG_VIEW.update(|model| model.update_bar(bar_id, progress));
 }
 
-pub(super) fn remove_bar(bar_id: usize) {
+pub(crate) fn remove_bar(bar_id: usize) {
     let removed_last = NUTMEG_VIEW.update(|model| model.remove_bar(bar_id));
     if removed_last {
         NUTMEG_VIEW.clear();
