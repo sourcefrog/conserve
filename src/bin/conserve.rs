@@ -322,7 +322,12 @@ impl Command {
                     // TODO(CON-23): Really Nutmeg should coordinate stdout and stderr...
                     ProgressImpl::Null.activate()
                 }
-                let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
+                let stats = backup(
+                    &Archive::open(open_transport(archive)?)?,
+                    source,
+                    &options,
+                    monitor,
+                )?;
                 if !no_stats {
                     info!("Backup complete.\n{stats}");
                 }

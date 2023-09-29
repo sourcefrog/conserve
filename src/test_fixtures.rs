@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 use crate::backup::BackupOptions;
+use crate::monitor::collect::CollectMonitor;
 use crate::*;
 
 /// A temporary archive, deleted when it goes out of scope.
@@ -65,10 +66,10 @@ impl ScratchArchive {
         }
 
         let options = &BackupOptions::default();
-        backup(&self.archive, srcdir.path(), options).unwrap();
+        backup(&self.archive, srcdir.path(), options, CollectMonitor::arc()).unwrap();
 
         srcdir.create_file("hello2");
-        backup(&self.archive, srcdir.path(), options).unwrap();
+        backup(&self.archive, srcdir.path(), options, CollectMonitor::arc()).unwrap();
     }
 
     pub fn transport(&self) -> &dyn Transport {

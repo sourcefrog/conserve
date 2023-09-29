@@ -149,6 +149,7 @@ fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<Band
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::monitor::collect::CollectMonitor;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
@@ -274,7 +275,13 @@ mod test {
         tf.create_file("file_a");
 
         let af = ScratchArchive::new();
-        backup(&af, tf.path(), &BackupOptions::default()).expect("backup should work");
+        backup(
+            &af,
+            tf.path(),
+            &BackupOptions::default(),
+            CollectMonitor::arc(),
+        )
+        .expect("backup should work");
 
         af.transport().remove_file("b0000/BANDTAIL").unwrap();
         let band_ids = af.list_band_ids().expect("should list bands");

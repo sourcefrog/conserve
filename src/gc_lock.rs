@@ -108,6 +108,7 @@ impl Drop for GarbageCollectionLock {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::monitor::collect::CollectMonitor;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     #[test]
@@ -126,7 +127,13 @@ mod test {
     fn completed_backup_ok() {
         let archive = ScratchArchive::new();
         let source = TreeFixture::new();
-        backup(&archive, source.path(), &BackupOptions::default()).unwrap();
+        backup(
+            &archive,
+            source.path(),
+            &BackupOptions::default(),
+            CollectMonitor::arc(),
+        )
+        .unwrap();
         let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
         delete_guard.check().unwrap();
     }
@@ -136,7 +143,12 @@ mod test {
         let archive = ScratchArchive::new();
         let source = TreeFixture::new();
         let _delete_guard = GarbageCollectionLock::new(&archive).unwrap();
-        let backup_result = backup(&archive, source.path(), &BackupOptions::default());
+        let backup_result = backup(
+            &archive,
+            source.path(),
+            &BackupOptions::default(),
+            CollectMonitor::arc(),
+        );
         assert_eq!(
             backup_result.expect_err("backup fails").to_string(),
             "Archive is locked for garbage collection"

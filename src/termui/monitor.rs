@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{sleep, spawn, JoinHandle};
 use std::time::Duration;
 
-use nutmeg::View;
+use nutmeg::{Destination, View};
 
 use crate::monitor::task::{Task, TaskList};
 use crate::monitor::{counters::Counter, Counters, Monitor, Problem};
@@ -32,7 +32,9 @@ impl TermUiMonitor {
         let counters = Arc::new(Counters::default());
         let tasks = Arc::new(Mutex::new(TaskList::default()));
         // We'll update from a polling thread at regular intervals, so we don't need Nutmeg to rate limit updates.
-        let options = nutmeg::Options::default().update_interval(Duration::ZERO);
+        let options = nutmeg::Options::default()
+            .update_interval(Duration::ZERO)
+            .destination(Destination::Stderr);
         let view = Arc::new(View::new(
             Model {
                 counters: counters.clone(),
@@ -49,7 +51,6 @@ impl TermUiMonitor {
                 sleep(Duration::from_millis(100));
             }
         }));
-        // TODO: Stop the thread when dropped
         TermUiMonitor {
             counters,
             tasks,

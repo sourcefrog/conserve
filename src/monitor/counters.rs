@@ -21,6 +21,11 @@ pub enum Counter {
     BlockWrite,
     BlockMatchExisting,
     BlockCacheHit,
+    ScannedFileBytes,
+    EntriesUnchanged,
+    EntriesChanged,
+    EntriesAdded,
+    EntriesDeleted,
     // ...
 }
 #[derive(Default)]

@@ -224,6 +224,7 @@ fn restore_modify_backup() {
                 })),
                 ..Default::default()
             },
+            CollectMonitor::arc(),
         )
         .expect("Backup modified tree");
 

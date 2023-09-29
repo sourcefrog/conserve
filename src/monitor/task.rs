@@ -6,7 +6,7 @@
 use std::fmt::Display;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, RwLock, Weak};
 
 #[derive(Default)]
 pub struct TaskList {
@@ -16,7 +16,7 @@ pub struct TaskList {
 impl TaskList {
     pub fn start_task(&mut self, name: String) -> Task {
         let inner = Arc::new(TaskState {
-            name,
+            name: name.into(),
             total: 0.into(),
             done: 0.into(),
         });
@@ -56,6 +56,10 @@ impl Task {
     pub fn increment(&self, increment: usize) {
         self.0.done.fetch_add(increment, Relaxed);
     }
+
+    pub fn set_name(&self, name: String) {
+        *self.0.name.write().unwrap() = name;
+    }
 }
 
 impl AsRef<TaskState> for Task {
@@ -66,14 +70,14 @@ impl AsRef<TaskState> for Task {
 
 #[derive(Debug)]
 pub struct TaskState {
-    name: String,
+    name: RwLock<String>,
     total: AtomicUsize,
     done: AtomicUsize,
 }
 
 impl TaskState {
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> String {
+        self.name.read().unwrap().clone()
     }
 
     pub fn total(&self) -> usize {
@@ -98,15 +102,16 @@ impl Display for TaskState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let total = self.total.load(Relaxed);
         let done = self.done.load(Relaxed);
+        let name = self.name.read().unwrap();
         if total == 0 && done == 0 {
-            write!(f, "{}", self.name)
+            write!(f, "{}", name)
         } else if total == 0 {
-            write!(f, "{}: {}", self.name, done)
+            write!(f, "{}: {}", name, done)
         } else {
             write!(
                 f,
                 "{}: {}/{}, {:.1}%",
-                self.name,
+                name,
                 done,
                 total,
                 done as f64 * 100.0 / total as f64

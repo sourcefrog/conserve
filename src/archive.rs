@@ -27,7 +27,7 @@ use tracing::{debug, error, warn};
 
 use crate::blockhash::BlockHash;
 use crate::jsonio::{read_json, write_json};
-use crate::monitor::{counters::Counter, Monitor};
+use crate::monitor::Monitor;
 use crate::progress::{Bar, Progress};
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
@@ -331,7 +331,6 @@ impl Archive {
 
         debug!("List bands...");
         let band_ids = self.list_band_ids()?;
-        monitor.set_counter(Counter::BandsTotal, band_ids.len());
         debug!("Check {} bands...", band_ids.len());
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)

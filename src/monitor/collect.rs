@@ -10,7 +10,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, Mutex, Weak};
 
-use crate::Apath;
+use crate::{Apath, GarbageCollectionLock};
 
 use super::counters::{Counter, Counters};
 use super::task::{Task, TaskList, TaskState};
@@ -46,6 +46,10 @@ impl CollectMonitor {
 
     pub fn take_started_files(&self) -> Vec<Apath> {
         take(self.started_files.lock().unwrap().as_mut())
+    }
+
+    pub fn arc() -> Arc<CollectMonitor> {
+        Arc::new(CollectMonitor::new())
     }
 }
 

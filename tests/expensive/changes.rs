@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
+use conserve::monitor::collect::CollectMonitor;
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
 use tempfile::TempDir;
@@ -93,7 +94,7 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
                     max_entries_per_hunk: 3,
                     ..BackupOptions::default()
                 };
-                backup(&archive, tf.path(), &options).unwrap();
+                backup(&archive, tf.path(), &options, CollectMonitor::arc()).unwrap();
                 let snapshot = TempDir::new().unwrap();
                 cp_r::CopyOptions::default()
                     .copy_tree(tf.path(), snapshot.path())

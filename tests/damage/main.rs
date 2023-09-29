@@ -81,7 +81,13 @@ fn backup_after_damage(
         .unwrap();
 
     let backup_options = BackupOptions::default();
-    backup(&archive, source_dir.path(), &backup_options).expect("initial backup");
+    backup(
+        &archive,
+        source_dir.path(),
+        &backup_options,
+        CollectMonitor::arc(),
+    )
+    .expect("initial backup");
 
     drop(archive);
     action.damage(&location.to_path(&archive_dir));
@@ -93,8 +99,13 @@ fn backup_after_damage(
 
     // A second backup should succeed.
     changes.apply(&source_dir);
-    let backup_stats = backup(&archive, source_dir.path(), &backup_options)
-        .expect("write second backup after damage");
+    let backup_stats = backup(
+        &archive,
+        source_dir.path(),
+        &backup_options,
+        CollectMonitor::arc(),
+    )
+    .expect("write second backup after damage");
     dbg!(&backup_stats);
 
     match changes {

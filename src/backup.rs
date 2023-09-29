@@ -32,7 +32,8 @@ use crate::blockdir::Address;
 use crate::change::Change;
 use crate::entry::EntryValue;
 use crate::io::read_with_retries;
-use crate::progress::{Bar, Progress};
+use crate::monitor::counters::Counter;
+use crate::monitor::Monitor;
 use crate::stats::{
     write_compressed_size, write_count, write_duration, write_size, IndexWriterStats,
 };
@@ -80,17 +81,14 @@ pub fn backup(
     archive: &Archive,
     source_path: &Path,
     options: &BackupOptions,
+    monitor: Arc<dyn Monitor>,
 ) -> Result<BackupStats> {
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive)?;
     let mut stats = BackupStats::default();
-    let bar = Bar::new();
     let source_tree = LiveTree::open(source_path)?;
 
-    let mut scanned_file_bytes = 0;
-    let mut entries_new = 0;
-    let mut entries_changed = 0;
-    let mut entries_unchanged = 0;
+    let task = monitor.start_task("Backup".to_string());
 
     let entry_iter = source_tree.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
@@ -103,11 +101,11 @@ pub fn backup(
                 }
                 Ok(Some(entry_change)) => {
                     match entry_change.change {
-                        Change::Changed { .. } => entries_changed += 1,
-                        Change::Added { .. } => entries_new += 1,
-                        Change::Unchanged { .. } => entries_unchanged += 1,
+                        Change::Changed { .. } => monitor.count(Counter::EntriesChanged, 1),
+                        Change::Added { .. } => monitor.count(Counter::EntriesAdded, 1),
+                        Change::Unchanged { .. } => monitor.count(Counter::EntriesUnchanged, 1),
                         // Deletions are not produced at the moment.
-                        Change::Deleted { .. } => (), // model.entries_deleted += 1,
+                        Change::Deleted { .. } => monitor.count(Counter::EntriesDeleted, 1),
                     }
                     if let Some(cb) = &options.change_callback {
                         cb(&entry_change)?;
@@ -115,18 +113,10 @@ pub fn backup(
                 }
                 Ok(_) => {}
             }
+            task.set_name(format!("Backup {}", entry.apath()));
             match entry.size() {
                 Some(bytes) if bytes > 0 => {
-                    scanned_file_bytes += bytes;
-                    bar.post(Progress::Backup {
-                        filename: entry.apath().to_string(),
-                        scanned_file_bytes,
-                        scanned_dirs: stats.directories,
-                        scanned_files: stats.files,
-                        entries_new,
-                        entries_changed,
-                        entries_unchanged,
-                    });
+                    monitor.count(Counter::ScannedFileBytes, bytes as usize);
                 }
                 _ => (),
             }
