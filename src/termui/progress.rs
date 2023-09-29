@@ -11,8 +11,6 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-use std::io;
-
 use itertools::Itertools;
 use nutmeg::estimate_remaining;
 use thousands::Separable;
@@ -27,11 +25,6 @@ static NUTMEG_VIEW: nutmeg::View<MultiModel> = nutmeg::View::new(
     MultiModel::new(),
     nutmeg::Options::new().destination(nutmeg::Destination::Stderr),
 );
-
-/// Return a way to write to the global Nutmeg view, for tracing.
-pub(crate) fn make_nutmeg_writer() -> impl io::Write {
-    &NUTMEG_VIEW
-}
 
 pub(crate) fn add_bar(bar_id: usize) {
     NUTMEG_VIEW.update(|model| model.add_bar(bar_id));

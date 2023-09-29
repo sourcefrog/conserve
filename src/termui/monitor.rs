@@ -22,7 +22,7 @@ pub struct TermUiMonitor {
 }
 
 /// The nutmeg model.
-struct Model {
+pub(super) struct Model {
     counters: Arc<Counters>,
     tasks: Arc<Mutex<TaskList>>,
 }
@@ -55,6 +55,10 @@ impl TermUiMonitor {
             poller,
             stop_poller,
         }
+    }
+
+    pub(super) fn view(&self) -> Arc<View<Model>> {
+        Arc::clone(&self.view)
     }
 }
 

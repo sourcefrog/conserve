@@ -26,8 +26,7 @@ use std::convert::TryInto;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
-use std::thread::sleep;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use bytes::Bytes;
 use lru::LruCache;

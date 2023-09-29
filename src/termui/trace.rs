@@ -16,8 +16,6 @@ use tracing_subscriber::layer::Layer;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
-use super::progress::make_nutmeg_writer;
-
 /// Chosen style of timestamp prefix on trace lines.
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum TraceTimeStyle {
@@ -33,12 +31,14 @@ pub enum TraceTimeStyle {
 
 #[must_use]
 pub fn enable_tracing(
+    monitor: &super::TermUiMonitor,
     time_style: &TraceTimeStyle,
     console_level: Level,
     json_path: &Option<PathBuf>,
 ) -> Option<WorkerGuard> {
     use tracing_subscriber::fmt::time;
     fn hookup<FT>(
+        monitor: &super::TermUiMonitor,
         timer: FT,
         console_level: Level,
         json_path: &Option<PathBuf>,
@@ -48,7 +48,7 @@ pub fn enable_tracing(
     {
         let console_layer = tracing_subscriber::fmt::Layer::default()
             .with_ansi(clicolors_control::colors_enabled())
-            .with_writer(make_nutmeg_writer)
+            .with_writer(monitor.view())
             .with_timer(timer)
             .with_filter(filter::Targets::new().with_target("conserve", console_level));
         let json_layer;
@@ -81,10 +81,11 @@ pub fn enable_tracing(
     }
 
     let flush_guard = match time_style {
-        TraceTimeStyle::None => hookup((), console_level, json_path),
-        TraceTimeStyle::Utc => hookup(time::UtcTime::rfc_3339(), console_level, json_path),
-        TraceTimeStyle::Relative => hookup(time::uptime(), console_level, json_path),
+        TraceTimeStyle::None => hookup(monitor, (), console_level, json_path),
+        TraceTimeStyle::Utc => hookup(monitor, time::UtcTime::rfc_3339(), console_level, json_path),
+        TraceTimeStyle::Relative => hookup(monitor, time::uptime(), console_level, json_path),
         TraceTimeStyle::Local => hookup(
+            monitor,
             time::OffsetTime::local_rfc_3339().unwrap(),
             console_level,
             json_path,

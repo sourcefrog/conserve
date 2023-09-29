@@ -296,8 +296,7 @@ impl std::process::Termination for ExitCode {
 }
 
 impl Command {
-    fn run(&self) -> Result<ExitCode> {
-        let term_monitor = Arc::new(TermUiMonitor::new());
+    fn run(&self, monitor: Arc<TermUiMonitor>) -> Result<ExitCode> {
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -332,7 +331,7 @@ impl Command {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open(open_transport(archive)?)?
                     .block_dir()
-                    .iter_block_names_monitor(term_monitor.clone())?
+                    .iter_block_names_monitor(monitor)?
                     .collect_vec()
                     .into_iter()
                 {
@@ -511,8 +510,7 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                Archive::open(open_transport(archive)?)?
-                    .validate(&options, term_monitor.clone())?;
+                Archive::open(open_transport(archive)?)?.validate(&options, monitor)?;
                 if global_error_count() > 0 || global_warn_count() > 0 {
                     warn!("Archive has some problems.");
                 } else {
@@ -626,8 +624,9 @@ fn main() -> Result<ExitCode> {
     if args.metrics_json.is_some() {
         warn!("--metrics-json is no longer supported");
     }
-    let _flush_guard = enable_tracing(&args.trace_time, console_level, &args.log_json);
-    let result = args.command.run();
+    let monitor = Arc::new(TermUiMonitor::new());
+    let _flush_tracing = enable_tracing(&monitor, &args.trace_time, console_level, &args.log_json);
+    let result = args.command.run(monitor);
     debug!(elapsed = ?start_time.elapsed());
     let error_count = global_error_count();
     let warn_count = global_warn_count();

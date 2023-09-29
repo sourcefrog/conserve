@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::misc::ResultExt;
 use crate::monitor::Monitor;
@@ -99,5 +99,6 @@ fn validate_stored_tree(st: &StoredTree, monitor: &dyn Monitor) -> Result<HashMa
                 .or_insert(end);
         }
     }
+    debug!(blocks = %block_lens.len(), band_id = ?st.band().id(), "Validated stored tree");
     Ok(block_lens)
 }
