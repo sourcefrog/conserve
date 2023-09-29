@@ -31,12 +31,14 @@ impl TermUiMonitor {
     pub fn new() -> Self {
         let counters = Arc::new(Counters::default());
         let tasks = Arc::new(Mutex::new(TaskList::default()));
+        // We'll update from a polling thread at regular intervals, so we don't need Nutmeg to rate limit updates.
+        let options = nutmeg::Options::default().update_interval(Duration::ZERO);
         let view = Arc::new(View::new(
             Model {
                 counters: counters.clone(),
                 tasks: tasks.clone(),
             },
-            nutmeg::Options::default(),
+            options,
         ));
         let stop_poller = Arc::new(AtomicBool::new(false));
         let view2 = view.clone();
