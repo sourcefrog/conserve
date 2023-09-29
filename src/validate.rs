@@ -15,11 +15,9 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-#[allow(unused_imports)]
-use tracing::{error, info, warn};
+use tracing::error;
 
 use crate::misc::ResultExt;
-use crate::monitor::counters::Counter;
 use crate::monitor::Monitor;
 use crate::*;
 
@@ -62,7 +60,7 @@ pub(crate) fn validate_bands(
             }
             Ok(st) => st,
         };
-        let band_block_lens = match validate_stored_tree(&st) {
+        let band_block_lens = match validate_stored_tree(&st, monitor.as_ref()) {
             Err(err) => {
                 error!(%err, %band_id, "Error validating stored tree");
                 continue 'band;
@@ -70,7 +68,6 @@ pub(crate) fn validate_bands(
             Ok(block_lens) => block_lens,
         };
         merge_block_lens(&mut block_lens, &band_block_lens);
-        monitor.count(Counter::BandsDone, 1);
     }
     Ok(block_lens)
 }
@@ -83,11 +80,12 @@ fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash
     }
 }
 
-fn validate_stored_tree(st: &StoredTree) -> Result<HashMap<BlockHash, u64>> {
-    let mut block_lens = HashMap::new();
+fn validate_stored_tree(st: &StoredTree, monitor: &dyn Monitor) -> Result<HashMap<BlockHash, u64>> {
     // TODO: Check other entry properties are correct.
     // TODO: Check they're in apath order.
     // TODO: Count progress for index blocks within one tree?
+    let _task = monitor.start_task(format!("Validate stored tree {}", st.band().id()));
+    let mut block_lens = HashMap::new();
     for entry in st
         .iter_entries(Apath::root(), Exclude::nothing())
         .our_inspect_err(|err| error!(%err, "Error iterating index entries"))?

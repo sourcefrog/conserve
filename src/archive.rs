@@ -336,14 +336,17 @@ impl Archive {
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
-        let referenced_lens = validate::validate_bands(self, &band_ids, monitor)?;
+        let referenced_lens = validate::validate_bands(self, &band_ids, monitor.clone())?;
 
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
             // content.
             debug!("List blocks...");
             // TODO: Check for unexpected files or directories in the blockdir.
-            let present_blocks: HashSet<BlockHash> = self.block_dir.block_names_set()?;
+            let present_blocks: HashSet<BlockHash> = self
+                .block_dir
+                .iter_block_names_monitor(monitor.clone())?
+                .collect();
             for block_hash in referenced_lens.keys() {
                 if !present_blocks.contains(block_hash) {
                     error!(%block_hash, "Referenced block missing");

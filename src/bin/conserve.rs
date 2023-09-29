@@ -24,6 +24,7 @@ use clap::{Parser, Subcommand};
 use conserve::change::Change;
 use conserve::progress::ProgressImpl;
 use conserve::trace_counter::{global_error_count, global_warn_count};
+use itertools::Itertools;
 use time::UtcOffset;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
@@ -331,7 +332,9 @@ impl Command {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open(open_transport(archive)?)?
                     .block_dir()
-                    .iter_block_names()?
+                    .iter_block_names_monitor(term_monitor.clone())?
+                    .collect_vec()
+                    .into_iter()
                 {
                     writeln!(bw, "{hash}")?;
                 }

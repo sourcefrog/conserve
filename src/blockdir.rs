@@ -26,7 +26,8 @@ use std::convert::TryInto;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use lru::LruCache;
@@ -39,6 +40,7 @@ use tracing::{instrument, trace};
 use crate::backup::BackupStats;
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
+use crate::monitor::Monitor;
 use crate::progress::{Bar, Progress};
 use crate::transport::{ListDir, Transport};
 use crate::*;
@@ -247,6 +249,34 @@ impl BlockDir {
             }
         });
         Ok(dirs)
+    }
+
+    /// Return all the blocknames in the blockdir, in arbitrary order.
+    pub fn iter_block_names_monitor(
+        &self,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<impl Iterator<Item = BlockHash>> {
+        // TODO: Read subdirs in parallel.
+        let transport = self.transport.clone();
+        let task = monitor.start_task("List block subdir".to_string());
+        let subdirs = self.subdirs()?;
+        task.set_total(subdirs.len());
+        Ok(subdirs
+            .into_iter()
+            .map(move |subdir_name| {
+                task.increment(1);
+                // sleep(Duration::from_millis(5)); //TODO: Remove
+                transport.list_dir(&subdir_name)
+            })
+            .filter_map(|iter_or| {
+                if let Err(ref err) = iter_or {
+                    error!(%err, "Error listing block subdirectory");
+                }
+                iter_or.ok()
+            })
+            .flat_map(|ListDir { files, .. }| files)
+            .filter(|name| name.len() == BLOCKDIR_FILE_NAME_LEN && !name.starts_with(TMP_PREFIX))
+            .filter_map(|name| name.parse().ok()))
     }
 
     /// Return all the blocknames in the blockdir, in arbitrary order.
