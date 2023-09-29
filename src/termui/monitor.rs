@@ -95,9 +95,14 @@ impl Monitor for TermUiMonitor {
 
 impl nutmeg::Model for Model {
     fn render(&mut self, _width: usize) -> String {
-        let mut s = format!("{:?}\n", self.counters);
+        let mut s = String::new();
+        for (counter, value) in self.counters.as_ref().iter() {
+            if value > 0 {
+                s += &format!("{:?}: {}\n", counter, value);
+            }
+        }
         for task in self.tasks.lock().unwrap().active_tasks() {
-            s += &format!("{:?}\n", task);
+            s += &format!("{}\n", task);
         }
         s
     }

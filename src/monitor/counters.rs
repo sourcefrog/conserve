@@ -1,9 +1,12 @@
 //! Track counters.
 
 use std::fmt::{self, Debug};
+use std::iter::Map;
+use std::slice;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 
+use itertools::Itertools;
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount, EnumIter};
 
@@ -36,6 +39,14 @@ impl Counters {
 
     pub fn get(&self, counter: Counter) -> usize {
         self.counters[counter as usize].load(Relaxed)
+    }
+
+    /// Return an iterator over counter, value pairs.
+    pub fn iter(&self) -> impl Iterator<Item = (Counter, usize)> {
+        Counter::iter()
+            .map(move |c| (c, self.counters[c as usize].load(Relaxed)))
+            .collect_vec()
+            .into_iter()
     }
 }
 

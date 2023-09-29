@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex, Weak};
 use crate::Apath;
 
 use super::counters::{Counter, Counters};
-use super::task::{Task, TaskInner, TaskList};
+use super::task::{Task, TaskList, TaskState};
 use super::{Monitor, Problem};
 
 /// A monitor that collects information for later inspection.

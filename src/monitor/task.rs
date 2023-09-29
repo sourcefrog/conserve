@@ -3,18 +3,19 @@
 //! Tasks are an abstraction to report progress on a long-running operation
 //! from the core library to a UI, such as a progress bar.
 
+use std::fmt::Display;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, Weak};
 
 #[derive(Default)]
 pub struct TaskList {
-    tasks: Vec<Weak<TaskInner>>,
+    tasks: Vec<Weak<TaskState>>,
 }
 
 impl TaskList {
     pub fn start_task(&mut self, name: String) -> Task {
-        let inner = Arc::new(TaskInner {
+        let inner = Arc::new(TaskState {
             name,
             total: 0.into(),
             done: 0.into(),
@@ -23,7 +24,7 @@ impl TaskList {
         Task(inner)
     }
 
-    pub fn active_tasks(&mut self) -> impl Iterator<Item = Arc<TaskInner>> {
+    pub fn active_tasks(&mut self) -> impl Iterator<Item = Arc<TaskState>> {
         let mut v = Vec::new();
         self.tasks.retain(|task| {
             if let Some(inner) = task.upgrade() {
@@ -41,7 +42,7 @@ impl TaskList {
 /// A Task is constructed from a monitor. It can
 /// be updated while it's alive. When it's dropped, the progress
 /// bar is removed.
-pub struct Task(Arc<TaskInner>);
+pub struct Task(Arc<TaskState>);
 
 impl Task {
     pub fn set_total(&self, total: usize) {
@@ -53,13 +54,63 @@ impl Task {
     }
 
     pub fn increment(&self, increment: usize) {
-        self.0.done.fetch_add(1, Relaxed);
+        self.0.done.fetch_add(increment, Relaxed);
+    }
+}
+
+impl AsRef<TaskState> for Task {
+    fn as_ref(&self) -> &TaskState {
+        self.0.as_ref()
     }
 }
 
 #[derive(Debug)]
-pub struct TaskInner {
-    name: String, // TODO: Enum rather than string?
+pub struct TaskState {
+    name: String,
     total: AtomicUsize,
     done: AtomicUsize,
+}
+
+impl TaskState {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn total(&self) -> usize {
+        self.total.load(Relaxed)
+    }
+
+    pub fn done(&self) -> usize {
+        self.done.load(Relaxed)
+    }
+
+    pub fn percent(&self) -> usize {
+        let total = self.total.load(Relaxed);
+        if total == 0 {
+            0
+        } else {
+            self.done.load(Relaxed) * 100 / total
+        }
+    }
+}
+
+impl Display for TaskState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let total = self.total.load(Relaxed);
+        let done = self.done.load(Relaxed);
+        if total == 0 && done == 0 {
+            write!(f, "{}", self.name)
+        } else if total == 0 {
+            write!(f, "{}: {}", self.name, done)
+        } else {
+            write!(
+                f,
+                "{}: {}/{}, {:.1}%",
+                self.name,
+                done,
+                total,
+                done as f64 * 100.0 / total as f64
+            )
+        }
+    }
 }
