@@ -19,12 +19,14 @@
 use std::borrow::Cow;
 use std::convert::TryInto;
 use std::io::{BufWriter, Write};
+use std::sync::Arc;
 
 use time::format_description::well_known::Rfc3339;
 use time::UtcOffset;
 use tracing::error;
 
 use crate::misc::duration_to_hms;
+use crate::termui::TermUiMonitor;
 use crate::*;
 
 /// Options controlling the behavior of `show_versions`.
@@ -43,11 +45,11 @@ pub struct ShowVersionsOptions {
     pub timezone: Option<UtcOffset>,
 }
 
-/// Print a list of versions, one per line.
+/// Print a list of versions, one per line, on stdout.
 pub fn show_versions(
     archive: &Archive,
     options: &ShowVersionsOptions,
-    w: &mut dyn Write,
+    monitor: Arc<TermUiMonitor>,
 ) -> Result<()> {
     let mut band_ids = archive.list_band_ids()?;
     if options.newest_first {
@@ -55,7 +57,7 @@ pub fn show_versions(
     }
     for band_id in band_ids {
         if !(options.tree_size || options.start_time || options.backup_duration) {
-            writeln!(w, "{band_id}")?;
+            println!("{}", band_id);
             continue;
         }
         let mut l: Vec<String> = Vec::new();
@@ -108,13 +110,13 @@ pub fn show_versions(
             let tree_mb_str = crate::misc::bytes_to_human_mb(
                 archive
                     .open_stored_tree(BandSelectionPolicy::Specified(band_id))?
-                    .size(Exclude::nothing())?
+                    .size(Exclude::nothing(), monitor.clone())?
                     .file_bytes,
             );
             l.push(format!("{tree_mb_str:>14}",));
         }
-
-        writeln!(w, "{}", l.join(" "))?;
+        monitor.clear_progress_bars(); // to avoid fighting with stdout
+        println!("{}", l.join(" "));
     }
     Ok(())
 }

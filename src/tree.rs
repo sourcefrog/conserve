@@ -13,7 +13,10 @@
 
 //! Abstract Tree trait.
 
-use crate::progress::{Bar, Progress};
+use std::sync::Arc;
+
+use crate::monitor::counters::Counter;
+use crate::monitor::Monitor;
 use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
@@ -31,21 +34,19 @@ pub trait ReadTree {
     /// Measure the tree size.
     ///
     /// This typically requires walking all entries, which may take a while.
-    fn size(&self, exclude: Exclude) -> Result<TreeSize> {
-        let mut files = 0;
-        let mut total_bytes = 0u64;
-        let bar = Bar::new();
+    fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
+        let mut file_bytes = 0u64;
+        let task = monitor.start_task("Measure tree".to_string());
         for e in self.iter_entries(Apath::root(), exclude)? {
             // While just measuring size, ignore directories/files we can't stat.
             if let Some(bytes) = e.size() {
-                total_bytes += bytes;
-                files += 1;
-                bar.post(Progress::MeasureTree { files, total_bytes });
+                monitor.count(Counter::Files, 1);
+                monitor.count(Counter::FileBytes, bytes as usize);
+                file_bytes += bytes;
+                task.increment(bytes as usize);
             }
         }
-        Ok(TreeSize {
-            file_bytes: total_bytes,
-        })
+        Ok(TreeSize { file_bytes })
     }
 }
 

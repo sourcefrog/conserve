@@ -14,7 +14,8 @@ use strum_macros::{EnumCount, EnumIter};
 pub enum Counter {
     BandsDone,
     BandsTotal,
-    FilesDone,
+    Files,
+    FileBytes,
     IndexBytesDone,
     BlockBytesDone,
     BlockRead,

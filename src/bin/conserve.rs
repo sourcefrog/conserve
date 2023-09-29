@@ -375,6 +375,7 @@ impl Command {
                     },
                 )?;
                 if !no_stats {
+                    monitor.clear_progress_bars();
                     println!("{stats}");
                 }
             }
@@ -446,6 +447,7 @@ impl Command {
                                 .iter_entries(Apath::root(), exclude)?,
                         )
                     };
+                monitor.clear_progress_bars();
                 if *json {
                     for entry in entry_iter {
                         println!("{}", serde_json::ser::to_string(&entry)?);
@@ -498,13 +500,14 @@ impl Command {
                 let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
-                        .size(exclude)?
+                        .size(exclude, monitor.clone())?
                         .file_bytes
                 } else {
                     LiveTree::open(stos.source.as_ref().unwrap())?
-                        .size(exclude)?
+                        .size(exclude, monitor.clone())?
                         .file_bytes
                 };
+                monitor.clear_progress_bars();
                 if *bytes {
                     println!("{size}");
                 } else {
@@ -542,7 +545,7 @@ impl Command {
                     start_time: !*short,
                     backup_duration: !*short,
                 };
-                conserve::show_versions(&archive, &options, &mut stdout)?;
+                conserve::show_versions(&archive, &options, monitor)?;
             }
         }
         Ok(ExitCode::Success)

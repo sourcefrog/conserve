@@ -63,6 +63,11 @@ impl TermUiMonitor {
     pub(super) fn view(&self) -> Arc<View<Model>> {
         Arc::clone(&self.view)
     }
+
+    pub fn clear_progress_bars(&self) {
+        // TODO: Make Nutmeg understand when to clear stderr to write to stdout.
+        self.view.clear();
+    }
 }
 
 impl Default for TermUiMonitor {
