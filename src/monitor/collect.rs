@@ -2,13 +2,19 @@
 
 //! Collect monitored information so that it can be inspected by tests.
 
+#![allow(unused_imports)]
+
+use std::collections::HashSet;
 use std::mem::take;
-use std::sync::Mutex;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::{Arc, Mutex, Weak};
 
 use crate::Apath;
 
-use super::counters::Counters;
-use super::{Counter, Monitor, Problem};
+use super::counters::{Counter, Counters};
+use super::task::{Task, TaskInner, TaskList};
+use super::{Monitor, Problem};
 
 /// A monitor that collects information for later inspection.
 ///
@@ -22,6 +28,7 @@ pub struct CollectMonitor {
     pub problems: Mutex<Vec<Problem>>,
     counters: Counters,
     started_files: Mutex<Vec<Apath>>,
+    task_list: Mutex<TaskList>,
 }
 
 impl CollectMonitor {
@@ -55,11 +62,7 @@ impl Monitor for CollectMonitor {
         self.problems.lock().unwrap().push(problem);
     }
 
-    fn start_file(&self, apath: &crate::Apath) {
-        self.started_files.lock().unwrap().push(apath.clone());
-    }
-
-    fn stop_file(&self, _apath: &crate::Apath) {
-        // Not used yet
+    fn start_task(&self, name: String) -> Task {
+        self.task_list.lock().unwrap().start_task(name)
     }
 }

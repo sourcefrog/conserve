@@ -272,15 +272,8 @@ impl BlockDir {
     pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
         // TODO: We could estimate time remaining by accounting for how
         // many prefixes are present and how many have been read.
-        let bar = Bar::new();
-        Ok(self
-            .iter_block_names()?
-            .enumerate()
-            .map(|(count, hash)| {
-                bar.post(Progress::ListBlocks { count });
-                hash
-            })
-            .collect())
+        // TODO: Take a Monitor; estimate progress from the number of prefixes scanned.
+        Ok(self.iter_block_names()?.collect())
     }
 
     /// Check format invariants of the BlockDir.

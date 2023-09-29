@@ -27,6 +27,7 @@ use tracing::{debug, error, warn};
 
 use crate::blockhash::BlockHash;
 use crate::jsonio::{read_json, write_json};
+use crate::monitor::{counters::Counter, Monitor};
 use crate::progress::{Bar, Progress};
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
@@ -325,16 +326,17 @@ impl Archive {
     /// If problems are found, they are emitted as `warn` or `error` level
     /// tracing messages. This function only returns an error if validation
     /// stops due to a fatal error.
-    pub fn validate(&self, options: &ValidateOptions) -> Result<()> {
+    pub fn validate(&self, options: &ValidateOptions, monitor: Arc<dyn Monitor>) -> Result<()> {
         self.validate_archive_dir()?;
 
         debug!("List bands...");
         let band_ids = self.list_band_ids()?;
+        monitor.set_counter(Counter::BandsTotal, band_ids.len());
         debug!("Check {} bands...", band_ids.len());
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
-        let referenced_lens = validate::validate_bands(self, &band_ids)?;
+        let referenced_lens = validate::validate_bands(self, &band_ids, monitor)?;
 
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their

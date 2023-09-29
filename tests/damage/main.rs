@@ -12,6 +12,7 @@
 // GNU General Public License for more details.
 
 use std::fs::rename;
+use std::sync::Arc;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
@@ -22,6 +23,7 @@ use rstest::rstest;
 use tracing_test::traced_test;
 // use predicates::prelude::*;
 
+use conserve::monitor::collect::CollectMonitor;
 use conserve::{
     backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait,
     Exclude, RestoreOptions, ValidateOptions,
@@ -161,6 +163,6 @@ fn backup_after_damage(
     // Validation completes although with warnings.
     // TODO: This should return problems that we can inspect.
     archive
-        .validate(&ValidateOptions::default())
+        .validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))
         .expect("validate");
 }

@@ -17,9 +17,11 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fs::{self, metadata, read_dir};
 use std::path::Path;
+use std::sync::Arc;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use conserve::monitor::collect::CollectMonitor;
 use predicates::prelude::*;
 use pretty_assertions::assert_eq;
 
@@ -81,7 +83,7 @@ fn validate_archive() {
         let archive = open_old_archive(ver, "minimal");
 
         archive
-            .validate(&ValidateOptions::default())
+            .validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))
             .expect("validate archive");
         assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     }

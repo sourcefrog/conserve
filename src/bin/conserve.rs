@@ -17,7 +17,7 @@ use std::cell::RefCell;
 use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
@@ -29,7 +29,7 @@ use time::UtcOffset;
 use tracing::{debug, error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
-use conserve::termui::{enable_tracing, TraceTimeStyle};
+use conserve::termui::{enable_tracing, TermUiMonitor, TraceTimeStyle};
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
@@ -296,6 +296,7 @@ impl std::process::Termination for ExitCode {
 
 impl Command {
     fn run(&self) -> Result<ExitCode> {
+        let term_monitor = Arc::new(TermUiMonitor::new());
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -507,7 +508,8 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                Archive::open(open_transport(archive)?)?.validate(&options)?;
+                Archive::open(open_transport(archive)?)?
+                    .validate(&options, term_monitor.clone())?;
                 if global_error_count() > 0 || global_warn_count() > 0 {
                     warn!("Archive has some problems.");
                 } else {

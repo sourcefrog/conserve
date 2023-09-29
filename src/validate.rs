@@ -13,13 +13,15 @@
 use std::cmp::max;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::time::Instant;
+use std::sync::Arc;
 
 #[allow(unused_imports)]
 use tracing::{error, info, warn};
 
 use crate::misc::ResultExt;
-use crate::progress::{Bar, Progress};
+use crate::monitor::counters::Counter;
+use crate::monitor::task::Task;
+use crate::monitor::Monitor;
 use crate::*;
 
 /// Options to [Archive::validate].
@@ -36,12 +38,13 @@ pub struct ValidateOptions {
 pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
+    monitor: Arc<dyn Monitor>,
 ) -> Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
-    let start = Instant::now();
-    let total_bands = band_ids.len();
-    let bar = Bar::new();
-    'band: for (bands_done, band_id) in band_ids.iter().enumerate() {
+    let task = monitor.start_task("Validate indexes".to_string());
+    task.set_total(band_ids.len());
+    'band: for band_id in band_ids.iter() {
+        task.increment(1);
         let band = match Band::open(archive, *band_id) {
             Ok(band) => band,
             Err(err) => {
@@ -53,19 +56,22 @@ pub(crate) fn validate_bands(
             error!(%err, %band_id, "Error validating band");
             continue 'band;
         };
-        if let Err(err) = archive
-            .open_stored_tree(BandSelectionPolicy::Specified(*band_id))
-            .and_then(|st| validate_stored_tree(&st))
-            .map(|st_block_lens| merge_block_lens(&mut block_lens, &st_block_lens))
-        {
-            error!(%err, %band_id, "Error validating stored tree");
-            continue 'band;
-        }
-        bar.post(Progress::ValidateBands {
-            total_bands,
-            bands_done,
-            start,
-        });
+        let st = match archive.open_stored_tree(BandSelectionPolicy::Specified(*band_id)) {
+            Err(err) => {
+                error!(%err, %band_id, "Error validating stored tree");
+                continue 'band;
+            }
+            Ok(st) => st,
+        };
+        let band_block_lens = match validate_stored_tree(&st) {
+            Err(err) => {
+                error!(%err, %band_id, "Error validating stored tree");
+                continue 'band;
+            }
+            Ok(block_lens) => block_lens,
+        };
+        merge_block_lens(&mut block_lens, &band_block_lens);
+        monitor.count(Counter::BandsDone, 1);
     }
     Ok(block_lens)
 }

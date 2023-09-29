@@ -12,8 +12,11 @@
 
 //! Tests focused on backup behavior.
 
+use std::sync::Arc;
+
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use conserve::monitor::collect::CollectMonitor;
 use filetime::{set_file_mtime, FileTime};
 
 use conserve::kind::Kind;
@@ -97,7 +100,8 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     // TODO: Check index stats.
     // TODO: Check what was restored.
 
-    af.validate(&ValidateOptions::default()).unwrap();
+    af.validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))
+        .unwrap();
     assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     Ok(())
 }

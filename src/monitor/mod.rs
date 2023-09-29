@@ -2,13 +2,18 @@
 
 //! Communication from the library to a monitor: a test, a UI, etc.
 
+#![allow(unused_imports)]
+
 pub mod collect;
-mod counters;
+pub mod counters;
+pub mod task;
 
 use std::fmt::Debug;
 
 use strum_macros::{EnumCount, EnumIter};
 
+use self::counters::Counter;
+use self::task::Task;
 use crate::Apath;
 
 pub use counters::Counters;
@@ -23,29 +28,11 @@ pub trait Monitor {
     /// Notify that a problem occurred.
     fn problem(&self, problem: Problem);
 
-    /// Started processing a file. Multiple files may be processed concurrently.
-    fn start_file(&self, apath: &Apath);
-
-    /// Finished processing a file.
-    fn stop_file(&self, apath: &Apath);
+    fn start_task(&self, name: String) -> Task;
 }
 
 #[derive(Debug)]
 pub enum Problem {
     /// Some generic error.
     Error(crate::Error),
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount, EnumIter)]
-pub enum Counter {
-    BandsDone,
-    BandsTotal,
-    FilesDone,
-    IndexBytesDone,
-    BlockBytesDone,
-    BlockRead,
-    BlockWrite,
-    BlockMatchExisting,
-    BlockCacheHit,
-    // ...
 }

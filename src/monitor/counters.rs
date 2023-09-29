@@ -5,9 +5,21 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 
 use strum::{EnumCount, IntoEnumIterator};
+use strum_macros::{EnumCount, EnumIter};
 
-use super::Counter;
-
+#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount, EnumIter)]
+pub enum Counter {
+    BandsDone,
+    BandsTotal,
+    FilesDone,
+    IndexBytesDone,
+    BlockBytesDone,
+    BlockRead,
+    BlockWrite,
+    BlockMatchExisting,
+    BlockCacheHit,
+    // ...
+}
 #[derive(Default)]
 pub struct Counters {
     counters: [AtomicUsize; Counter::COUNT],

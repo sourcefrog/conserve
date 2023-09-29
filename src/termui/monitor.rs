@@ -1,50 +1,59 @@
 //! Monitor on a terminal UI.
 
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, Mutex};
+use std::thread::{sleep, spawn, JoinHandle};
+use std::time::Duration;
 
 use nutmeg::View;
-use strum::IntoEnumIterator;
 
-use crate::monitor::{Counter, Counters, Monitor, Problem};
-
-// /// What high-level operation is being performed? This determines
-// /// how the progress is presented.
-// pub enum Operation {
-//     Backup,
-//     Restore,
-//     Validate,
-// }
+use crate::monitor::task::{Task, TaskList};
+use crate::monitor::{counters::Counter, Counters, Monitor, Problem};
 
 pub struct TermUiMonitor {
     // operation: Operation,
     counters: Arc<Counters>,
-    active_files: Arc<Mutex<Vec<String>>>,
-    view: View<Model>,
+    // active_files: Mutex<Vec<String>>,
+    tasks: Arc<Mutex<TaskList>>,
+    view: Arc<View<Model>>,
+    poller: Option<JoinHandle<()>>,
+    stop_poller: Arc<AtomicBool>,
 }
 
-/// Internal state for Nutmeg.
+/// The nutmeg model.
 struct Model {
     counters: Arc<Counters>,
-    active_files: Arc<Mutex<Vec<String>>>,
+    tasks: Arc<Mutex<TaskList>>,
 }
 
 impl TermUiMonitor {
     pub fn new() -> Self {
-        // TODO: Hook up trace into this model.
-        // TODO: View must be global (or leaked or just Arc?) to use as a trace target?
         let counters = Arc::new(Counters::default());
-        let active_files = Arc::new(Mutex::new(Vec::new()));
-        let view = View::new(
+        let tasks = Arc::new(Mutex::new(TaskList::default()));
+        let view = Arc::new(View::new(
             Model {
                 counters: counters.clone(),
-                active_files: active_files.clone(),
+                tasks: tasks.clone(),
             },
-            nutmeg::Options::new().destination(nutmeg::Destination::Stderr),
-        );
+            nutmeg::Options::default(),
+        ));
+        let stop_poller = Arc::new(AtomicBool::new(false));
+        let view2 = view.clone();
+        let stop_poller2 = stop_poller.clone();
+        let poller = Some(spawn(move || {
+            while !stop_poller2.load(Relaxed) {
+                view2.update(|_| {});
+                sleep(Duration::from_millis(100));
+            }
+        }));
+        // TODO: Stop the thread when dropped
         TermUiMonitor {
             counters,
-            active_files,
+            tasks,
             view,
+            poller,
+            stop_poller,
         }
     }
 }
@@ -55,21 +64,14 @@ impl Default for TermUiMonitor {
     }
 }
 
-impl nutmeg::Model for Model {
-    fn render(&mut self, _width: usize) -> String {
-        let mut s = String::new();
-        for i in Counter::iter() {
-            let value = self.counters.get(i);
-            if value > 0 {
-                s.push_str(&format!("{:?}: {}\n", i, value));
-            }
-        }
-        let active_files = self.active_files.lock().unwrap();
-        for f in active_files.iter() {
-            s.push_str(f);
-            s.push('\n');
-        }
-        s
+impl Drop for TermUiMonitor {
+    fn drop(&mut self) {
+        self.stop_poller.store(true, Relaxed);
+        self.poller
+            .take()
+            .expect("Poller thread should exist")
+            .join()
+            .expect("Wait for nutmeg poller thread to stop");
     }
 }
 
@@ -79,31 +81,24 @@ impl Monitor for TermUiMonitor {
     }
 
     fn set_counter(&self, counter: Counter, value: usize) {
-        self.counters.set(counter, value);
-        self.view.update(|_| {})
+        self.counters.set(counter, value)
     }
 
     fn problem(&self, problem: Problem) {
-        // TODO: Through Nutmeg
         self.view.message(format!("Problem: {:?}", problem));
     }
 
-    fn start_file(&self, apath: &crate::Apath) {
-        // TODO: Nutmeg
-        let path = apath.to_string();
-        {
-            let mut active_files = self.active_files.lock().unwrap();
-            debug_assert!(!active_files.iter().any(|x| *x == path));
-            active_files.push(path);
-        }
-        self.view.update(|_| {})
+    fn start_task(&self, name: String) -> Task {
+        self.tasks.lock().unwrap().start_task(name)
     }
+}
 
-    fn stop_file(&self, apath: &crate::Apath) {
-        // TODO: Nutmeg
-        let path = apath.to_string();
-        println!("Finished {:?}", path);
-        self.active_files.lock().unwrap().retain(|x| *x != path);
-        self.view.update(|_| {})
+impl nutmeg::Model for Model {
+    fn render(&mut self, _width: usize) -> String {
+        let mut s = format!("{:?}\n", self.counters);
+        for task in self.tasks.lock().unwrap().active_tasks() {
+            s += &format!("{:?}\n", task);
+        }
+        s
     }
 }
