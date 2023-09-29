@@ -114,11 +114,10 @@ pub fn backup(
                 Ok(_) => {}
             }
             task.set_name(format!("Backup {}", entry.apath()));
-            match entry.size() {
-                Some(bytes) if bytes > 0 => {
+            if let Some(bytes) = entry.size() {
+                if bytes > 0 {
                     monitor.count(Counter::ScannedFileBytes, bytes as usize);
                 }
-                _ => (),
             }
         }
         writer.flush_group()?;

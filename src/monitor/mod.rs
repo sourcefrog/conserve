@@ -18,7 +18,7 @@ use crate::Apath;
 
 pub use counters::Counters;
 
-pub trait Monitor {
+pub trait Monitor: Send + Sync + 'static {
     /// Notify that a counter increased by a given amount.
     fn count(&self, counter: Counter, increment: usize);
 

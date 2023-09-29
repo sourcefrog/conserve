@@ -23,10 +23,9 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
 
 use bytes::Bytes;
 use lru::LruCache;
@@ -39,8 +38,8 @@ use tracing::{instrument, trace};
 use crate::backup::BackupStats;
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
+use crate::monitor::counters::Counter;
 use crate::monitor::Monitor;
-use crate::progress::{Bar, Progress};
 use crate::transport::{ListDir, Transport};
 use crate::*;
 
@@ -309,7 +308,7 @@ impl BlockDir {
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub fn validate(&self) -> Result<HashMap<BlockHash, usize>> {
+    pub fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
@@ -318,23 +317,15 @@ impl BlockDir {
         let blocks = self.block_names_set()?;
         let total_blocks = blocks.len();
         debug!("Check {total_blocks} blocks");
-        let blocks_done = AtomicUsize::new(0);
-        let bytes_done = AtomicU64::new(0);
-        let start = Instant::now();
-        let task = Bar::new();
+        let task = monitor.start_task("Validate blocks".to_string());
+        task.set_total(total_blocks);
         let block_lens = blocks
             .into_par_iter()
             .flat_map(|hash| match self.get_block_content(&hash) {
                 Ok(bytes) => {
-                    let len = bytes.len();
-                    let len64 = len as u64;
-                    task.post(Progress::ValidateBlocks {
-                        blocks_done: blocks_done.fetch_add(1, Ordering::Relaxed) + 1,
-                        total_blocks,
-                        bytes_done: bytes_done.fetch_add(len64, Ordering::Relaxed) + len64,
-                        start,
-                    });
-                    Some((hash, len))
+                    task.increment(1);
+                    monitor.count(Counter::BlockBytesDone, bytes.len());
+                    Some((hash, bytes.len()))
                 }
                 Err(err) => {
                     error!(%err, %hash, "Error reading block content");
