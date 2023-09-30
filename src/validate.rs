@@ -91,6 +91,8 @@ fn validate_stored_tree(st: &StoredTree, monitor: &dyn Monitor) -> Result<HashMa
         .our_inspect_err(|err| error!(%err, "Error iterating index entries"))?
         .filter(|entry| entry.kind() == Kind::File)
     {
+        // TODO: Read index hunks, count into the task per hunk. Then, we can
+        // read hunks in parallel.
         for addr in entry.addrs {
             let end = addr.start + addr.len;
             block_lens
