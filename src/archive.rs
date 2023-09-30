@@ -216,11 +216,11 @@ impl Archive {
     pub fn unreferenced_blocks(
         &self,
         monitor: Arc<dyn Monitor>,
-    ) -> Result<impl Iterator<Item = BlockHash>> {
-        let referenced = self.referenced_blocks(&self.list_band_ids()?, monitor)?;
+    ) -> Result<impl ParallelIterator<Item = BlockHash>> {
+        let referenced = self.referenced_blocks(&self.list_band_ids()?, monitor.clone())?;
         Ok(self
             .block_dir()
-            .iter_block_names()?
+            .blocks(monitor)?
             .filter(move |h| !referenced.contains(h)))
     }
 
@@ -255,10 +255,7 @@ impl Archive {
         debug!(referenced.len = referenced.len());
 
         debug!("Find present blocks...");
-        let present: HashSet<BlockHash> = self
-            .block_dir
-            .iter_block_names_monitor(monitor.clone())?
-            .collect();
+        let present: HashSet<BlockHash> = self.block_dir.blocks(monitor.clone())?.collect();
         debug!(present.len = present.len());
 
         debug!("Find unreferenced blocks...");
@@ -329,10 +326,8 @@ impl Archive {
             // content.
             debug!("List blocks...");
             // TODO: Check for unexpected files or directories in the blockdir.
-            let present_blocks: HashSet<BlockHash> = self
-                .block_dir
-                .iter_block_names_monitor(monitor.clone())?
-                .collect();
+            let present_blocks: HashSet<BlockHash> =
+                self.block_dir.blocks(monitor.clone())?.collect();
             for block_hash in referenced_lens.keys() {
                 if !present_blocks.contains(block_hash) {
                     error!(%block_hash, "Referenced block missing");

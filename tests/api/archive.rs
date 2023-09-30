@@ -24,6 +24,7 @@ use conserve::monitor::collect::CollectMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::Band;
 use conserve::BandId;
+use rayon::prelude::ParallelIterator;
 
 #[test]
 fn create_then_open_archive() {
@@ -84,7 +85,13 @@ fn empty_archive() {
             .len(),
         0
     );
-    assert_eq!(af.block_dir().iter_block_names().unwrap().count(), 0);
+    assert_eq!(
+        af.block_dir()
+            .blocks(CollectMonitor::arc())
+            .unwrap()
+            .count(),
+        0
+    );
 }
 
 #[test]
@@ -116,5 +123,11 @@ fn create_bands() {
             .len(),
         0
     );
-    assert_eq!(af.block_dir().iter_block_names().unwrap().count(), 0);
+    assert_eq!(
+        af.block_dir()
+            .blocks(CollectMonitor::arc())
+            .unwrap()
+            .count(),
+        0
+    );
 }

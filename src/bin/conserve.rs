@@ -335,7 +335,7 @@ impl Command {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open(open_transport(archive)?)?
                     .block_dir()
-                    .iter_block_names_monitor(monitor)?
+                    .blocks(monitor)?
                     .collect::<Vec<BlockHash>>()
                     .into_iter()
                 {
@@ -354,10 +354,14 @@ impl Command {
                 }
             }
             Command::Debug(Debug::Unreferenced { archive }) => {
-                let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks(monitor)? {
-                    writeln!(bw, "{hash}")?;
-                }
+                print!(
+                    "{}",
+                    Archive::open(open_transport(archive)?)?
+                        .unreferenced_blocks(monitor)?
+                        .map(|hash| format!("{}\n", hash))
+                        .collect::<Vec<String>>()
+                        .join("")
+                );
             }
             Command::Delete {
                 archive,

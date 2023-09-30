@@ -15,6 +15,7 @@
 use conserve::monitor::collect::CollectMonitor;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 use conserve::*;
+use rayon::prelude::ParallelIterator;
 
 #[test]
 fn unreferenced_blocks() {

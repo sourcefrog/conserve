@@ -18,6 +18,7 @@ use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use conserve::monitor::collect::CollectMonitor;
 use filetime::{set_file_mtime, FileTime};
+use rayon::prelude::ParallelIterator;
 
 use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
@@ -187,7 +188,7 @@ fn check_backup(af: &ScratchArchive) {
     );
     assert_eq!(
         af.block_dir()
-            .iter_block_names()
+            .blocks(CollectMonitor::arc())
             .unwrap()
             .map(|h| h.to_string())
             .collect::<Vec<String>>(),
@@ -478,7 +479,13 @@ fn small_files_combined_two_backups() {
     assert_eq!(stats2.written_blocks, 1);
     assert_eq!(stats2.combined_blocks, 1);
 
-    assert_eq!(af.block_dir().iter_block_names().unwrap().count(), 2);
+    assert_eq!(
+        af.block_dir()
+            .blocks(CollectMonitor::arc())
+            .unwrap()
+            .count(),
+        2
+    );
 }
 
 #[test]

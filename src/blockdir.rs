@@ -31,8 +31,7 @@ use bytes::Bytes;
 use lru::LruCache;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-#[allow(unused_imports)]
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 use tracing::{instrument, trace};
 
 use crate::backup::BackupStats;
@@ -249,11 +248,10 @@ impl BlockDir {
     }
 
     /// Return all the blocknames in the blockdir, in arbitrary order.
-    pub fn iter_block_names_monitor(
+    pub fn blocks(
         &self,
         monitor: Arc<dyn Monitor>,
     ) -> Result<impl ParallelIterator<Item = BlockHash>> {
-        // TODO: Read subdirs in parallel.
         let transport = self.transport.clone();
         let task = monitor.start_task("List block subdir".to_string());
         let subdirs = self.subdirs()?;
@@ -261,7 +259,6 @@ impl BlockDir {
         Ok(subdirs
             .into_par_iter()
             .map(move |subdir_name| {
-                // sleep(Duration::from_millis(5)); //TODO: Remove
                 let r = transport.list_dir(&subdir_name);
                 task.increment(1);
                 r
@@ -277,33 +274,6 @@ impl BlockDir {
             .filter_map(|name| name.parse().ok()))
     }
 
-    /// Return all the blocknames in the blockdir, in arbitrary order.
-    pub fn iter_block_names(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        // TODO: Read subdirs in parallel.
-        let transport = self.transport.clone();
-        Ok(self
-            .subdirs()?
-            .into_iter()
-            .map(move |subdir_name| transport.list_dir(&subdir_name))
-            .filter_map(|iter_or| {
-                if let Err(ref err) = iter_or {
-                    error!(%err, "Error listing block subdirectory");
-                }
-                iter_or.ok()
-            })
-            .flat_map(|ListDir { files, .. }| files)
-            .filter(|name| name.len() == BLOCKDIR_FILE_NAME_LEN && !name.starts_with(TMP_PREFIX))
-            .filter_map(|name| name.parse().ok()))
-    }
-
-    /// Return all the blocknames in the blockdir, while showing progress.
-    pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
-        // TODO: We could estimate time remaining by accounting for how
-        // many prefixes are present and how many have been read.
-        // TODO: Take a Monitor; estimate progress from the number of prefixes scanned.
-        Ok(self.iter_block_names()?.collect())
-    }
-
     /// Check format invariants of the BlockDir.
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
@@ -314,11 +284,12 @@ impl BlockDir {
         // TODO: Test having a block with the right compression but the wrong contents.
         // TODO: Warn on blocks in the wrong subdir.
         debug!("Start list blocks");
-        let blocks = self.block_names_set()?;
-        let total_blocks = blocks.len();
-        debug!("Check {total_blocks} blocks");
+        let blocks = self
+            .blocks(monitor.clone())?
+            .collect::<HashSet<BlockHash>>();
+        debug!("Check {} blocks", blocks.len());
         let task = monitor.start_task("Validate blocks".to_string());
-        task.set_total(total_blocks);
+        task.set_total(blocks.len());
         let block_lens = blocks
             .into_par_iter()
             .flat_map(|hash| match self.get_block_content(&hash) {
