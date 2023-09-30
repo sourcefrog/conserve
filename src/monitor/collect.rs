@@ -10,11 +10,10 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, Mutex, Weak};
 
-use crate::{Apath, GarbageCollectionLock};
-
-use super::counters::{Counter, Counters};
 use super::task::{Task, TaskList, TaskState};
 use super::{Monitor, Problem};
+use crate::counters::{Counter, Counters};
+use crate::{Apath, GarbageCollectionLock};
 
 /// A monitor that collects information for later inspection.
 ///

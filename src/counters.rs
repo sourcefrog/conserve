@@ -1,8 +1,10 @@
-//! Track counters.
+// Copyright 2023 Martin Pool
+
+//! Track counters of the number of files, bytes, blocks, etc, processed.
+//!
+//! Library code sets counters through the [Monitor] interface.
 
 use std::fmt::{self, Debug};
-use std::iter::Map;
-use std::slice;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 
@@ -12,6 +14,7 @@ use strum_macros::{EnumCount, EnumIter};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount, EnumIter)]
 pub enum Counter {
+    /// Number of files processed.
     Files,
     FileBytes,
     Dirs,

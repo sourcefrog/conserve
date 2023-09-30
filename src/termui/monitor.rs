@@ -8,8 +8,9 @@ use std::time::Duration;
 
 use nutmeg::{Destination, View};
 
+use crate::counters::{Counter, Counters};
 use crate::monitor::task::{Task, TaskList};
-use crate::monitor::{counters::Counter, Counters, Monitor, Problem};
+use crate::monitor::{Monitor, Problem};
 
 pub struct TermUiMonitor {
     // operation: Operation,

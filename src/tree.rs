@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use crate::monitor::counters::Counter;
+use crate::counters::Counter;
 use crate::monitor::Monitor;
 use crate::*;
 

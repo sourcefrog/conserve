@@ -30,9 +30,9 @@ use tracing::{error, warn};
 
 use crate::blockdir::Address;
 use crate::change::Change;
+use crate::counters::Counter;
 use crate::entry::EntryValue;
 use crate::io::read_with_retries;
-use crate::monitor::counters::Counter;
 use crate::monitor::Monitor;
 use crate::stats::{
     write_compressed_size, write_count, write_duration, write_size, IndexWriterStats,

@@ -2,21 +2,13 @@
 
 //! Communication from the library to a monitor: a test, a UI, etc.
 
-#![allow(unused_imports)]
-
 pub mod collect;
-pub mod counters;
 pub mod task;
 
 use std::fmt::Debug;
 
-use strum_macros::{EnumCount, EnumIter};
-
-use self::counters::Counter;
 use self::task::Task;
-use crate::Apath;
-
-pub use counters::Counters;
+use crate::counters::Counter;
 
 pub trait Monitor: Send + Sync + 'static {
     /// Notify that a counter increased by a given amount.

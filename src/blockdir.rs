@@ -38,7 +38,7 @@ use tracing::{instrument, trace};
 use crate::backup::BackupStats;
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
-use crate::monitor::counters::Counter;
+use crate::counters::Counter;
 use crate::monitor::Monitor;
 use crate::transport::{ListDir, Transport};
 use crate::*;

@@ -21,6 +21,7 @@ pub mod blockdir;
 pub mod blockhash;
 pub mod change;
 pub mod compress;
+pub mod counters;
 mod diff;
 pub mod entry;
 pub mod errors;

@@ -27,8 +27,8 @@ use time::OffsetDateTime;
 use tracing::{error, instrument, trace, warn};
 
 use crate::band::BandSelectionPolicy;
+use crate::counters::Counter;
 use crate::io::{directory_is_empty, ensure_dir_exists};
-use crate::monitor::counters::Counter;
 use crate::monitor::Monitor;
 use crate::stats::RestoreStats;
 use crate::unix_mode::UnixMode;
