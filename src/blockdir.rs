@@ -37,6 +37,7 @@ use tracing::{instrument, trace};
 use crate::backup::BackupStats;
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
+use crate::counters::Counter;
 use crate::monitor::Monitor;
 use crate::transport::{ListDir, Transport};
 use crate::*;
@@ -115,15 +116,19 @@ impl BlockDir {
         &self,
         block_data: Bytes,
         stats: &mut BackupStats,
+        monitor: Arc<dyn Monitor>,
     ) -> Result<BlockHash> {
         let hash = BlockHash::hash_bytes(&block_data);
         let uncomp_len = block_data.len() as u64;
         if self.contains(&hash)? {
             stats.deduplicated_blocks += 1;
             stats.deduplicated_bytes += uncomp_len;
+            monitor.count(Counter::DeduplicatedBlocks, 1);
+            monitor.count(Counter::DeduplicatedBlockBytes, block_data.len());
             return Ok(hash);
         }
         let compressed = Compressor::new().compress(&block_data)?;
+        monitor.count(Counter::BlockWriteUncompressedBytes, block_data.len());
         self.cache
             .write()
             .expect("Lock cache")
@@ -136,6 +141,8 @@ impl BlockDir {
         stats.written_blocks += 1;
         stats.uncompressed_bytes += uncomp_len;
         stats.compressed_bytes += comp_len;
+        monitor.count(Counter::BlockWrites, 1);
+        monitor.count(Counter::BlockWriteCompressedBytes, compressed.len());
         Ok(hash)
     }
 
@@ -319,6 +326,7 @@ pub struct BlockDirStats {
 mod test {
     use std::fs::OpenOptions;
 
+    use crate::monitor::collect::CollectMonitor;
     use crate::transport::open_local_transport;
 
     use super::*;
@@ -329,7 +337,7 @@ mod test {
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
         let hash = blockdir
-            .store_or_deduplicate(Bytes::from("stuff"), &mut stats)
+            .store_or_deduplicate(Bytes::from("stuff"), &mut stats, CollectMonitor::arc())
             .unwrap();
         assert!(blockdir.contains(&hash).unwrap());
 
@@ -351,7 +359,7 @@ mod test {
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let hash = blockdir
-            .store_or_deduplicate(content.clone(), &mut stats)
+            .store_or_deduplicate(content.clone(), &mut stats, CollectMonitor::arc())
             .unwrap();
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
 
@@ -374,7 +382,7 @@ mod test {
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let hash = blockdir
-            .store_or_deduplicate(content.clone(), &mut stats)
+            .store_or_deduplicate(content.clone(), &mut stats, CollectMonitor::arc())
             .unwrap();
 
         // reopen

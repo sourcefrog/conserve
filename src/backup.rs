@@ -114,13 +114,8 @@ pub fn backup(
                 Ok(_) => {}
             }
             task.set_name(format!("Backup {}", entry.apath()));
-            if let Some(bytes) = entry.size() {
-                if bytes > 0 {
-                    monitor.count(Counter::FileBytes, bytes as usize);
-                }
-            }
         }
-        writer.flush_group()?;
+        writer.flush_group(monitor.clone())?;
     }
     stats += writer.finish()?;
     stats.elapsed = start.elapsed();
@@ -180,8 +175,8 @@ impl BackupWriter {
     }
 
     /// Write out any pending data blocks, and then the pending index entries.
-    fn flush_group(&mut self) -> Result<()> {
-        let (stats, mut entries) = self.file_combiner.drain()?;
+    fn flush_group(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
+        let (stats, mut entries) = self.file_combiner.drain(monitor)?;
         self.stats += stats;
         self.index_builder.append_entries(&mut entries);
         self.index_builder.finish_hunk()
@@ -266,15 +261,21 @@ impl BackupWriter {
         if size == 0 {
             self.index_builder
                 .push_entry(IndexEntry::metadata_from(source_entry));
-            self.stats.empty_files += 1;
+            monitor.count(Counter::EmptyFiles, 1);
         } else {
             let mut source_file = from_tree.open_file(source_entry)?;
             if size <= SMALL_FILE_CAP {
                 self.file_combiner
-                    .push_file(source_entry, &mut source_file)?;
+                    .push_file(source_entry, &mut source_file, monitor.clone())?;
+                monitor.count(Counter::SmallFiles, 1);
             } else {
-                let addrs =
-                    store_file_content(apath, &mut source_file, &self.block_dir, &mut self.stats)?;
+                let addrs = store_file_content(
+                    apath,
+                    &mut source_file,
+                    &self.block_dir,
+                    &mut self.stats,
+                    monitor.clone(),
+                )?;
                 self.index_builder.push_entry(IndexEntry {
                     addrs,
                     ..IndexEntry::metadata_from(source_entry)
@@ -305,6 +306,7 @@ fn store_file_content(
     from_file: &mut dyn Read,
     block_dir: &BlockDir,
     stats: &mut BackupStats,
+    monitor: Arc<dyn Monitor>,
 ) -> Result<Vec<Address>> {
     let mut addresses = Vec::<Address>::with_capacity(1);
     loop {
@@ -318,8 +320,9 @@ fn store_file_content(
             break;
         }
         let buffer = buffer.freeze();
+        monitor.count(Counter::FileBytes, buffer.len());
         let len = buffer.len() as u64;
-        let hash = block_dir.store_or_deduplicate(buffer, stats)?;
+        let hash = block_dir.store_or_deduplicate(buffer, stats, monitor.clone())?;
         addresses.push(Address {
             hash,
             start: 0,
@@ -327,9 +330,21 @@ fn store_file_content(
         });
     }
     match addresses.len() {
-        0 => stats.empty_files += 1,
-        1 => stats.single_block_files += 1,
-        _ => stats.multi_block_files += 1,
+        0 => {
+            // This doesn't duplicate the call to monitor.count above, because
+            // in this case we only discovered that it was empty after reading the
+            // file.
+            monitor.count(Counter::EmptyFiles, 1);
+            stats.empty_files += 1;
+        }
+        1 => {
+            monitor.count(Counter::SingleBlockFiles, 1);
+            stats.single_block_files += 1
+        }
+        _ => {
+            monitor.count(Counter::MultiBlockFiles, 1);
+            stats.multi_block_files += 1
+        }
     }
     Ok(addresses)
 }
@@ -375,8 +390,8 @@ impl FileCombiner {
 
     /// Flush any pending files, and return accumulated file entries and stats.
     /// The FileCombiner is then empty and ready for reuse.
-    fn drain(&mut self) -> Result<(BackupStats, Vec<IndexEntry>)> {
-        self.flush()?;
+    fn drain(&mut self, monitor: Arc<dyn Monitor>) -> Result<(BackupStats, Vec<IndexEntry>)> {
+        self.flush(monitor)?;
         debug_assert!(self.queue.is_empty());
         debug_assert!(self.buf.is_empty());
         Ok((
@@ -391,14 +406,16 @@ impl FileCombiner {
     ///
     /// After this call the FileCombiner is empty and can be reused for more files into a new
     /// block.
-    fn flush(&mut self) -> Result<()> {
+    fn flush(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
         if self.queue.is_empty() {
             debug_assert!(self.buf.is_empty());
             return Ok(());
         }
-        let hash = self
-            .block_dir
-            .store_or_deduplicate(take(&mut self.buf).freeze(), &mut self.stats)?;
+        let hash = self.block_dir.store_or_deduplicate(
+            take(&mut self.buf).freeze(),
+            &mut self.stats,
+            monitor,
+        )?;
         self.stats.combined_blocks += 1;
         self.finished
             .extend(self.queue.drain(..).map(|qf| IndexEntry {
@@ -415,7 +432,12 @@ impl FileCombiner {
     /// Add the contents of a small file into this combiner.
     ///
     /// `entry` should be an IndexEntry that's complete apart from the block addresses.
-    fn push_file(&mut self, entry: &EntryValue, from_file: &mut dyn Read) -> Result<()> {
+    fn push_file(
+        &mut self,
+        entry: &EntryValue,
+        from_file: &mut dyn Read,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<()> {
         let start = self.buf.len();
         let expected_len: usize = entry
             .size()
@@ -452,7 +474,7 @@ impl FileCombiner {
             entry: index_entry,
         });
         if self.buf.len() >= TARGET_COMBINED_BLOCK_SIZE {
-            self.flush()
+            self.flush(monitor)
         } else {
             Ok(())
         }

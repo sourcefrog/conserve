@@ -35,6 +35,24 @@ pub enum Counter {
     EntriesAdded,
     /// Number of entries deleted relative to the basis backup.
     EntriesDeleted,
+    /// Number of files with length zero.
+    EmptyFiles,
+    /// Number of small files packed into combined blocks.
+    SmallFiles,
+    /// Number of files that used a single block: not combined but not broken into multiple blocks.
+    SingleBlockFiles,
+    /// Number of files broken into multiple blocks.
+    MultiBlockFiles,
+    /// Number of blocks that matched a hash-addressed block that's already present.
+    DeduplicatedBlocks,
+    /// Total bytes in deduplicated blocks.
+    DeduplicatedBlockBytes,
+    /// Blocks written.
+    BlockWrites,
+    /// Total uncompressed bytes in blocks written out.
+    BlockWriteUncompressedBytes,
+    /// Total compressed bytes in blocks written out.
+    BlockWriteCompressedBytes,
 }
 
 /// Counter values, identified by a [Counter].
