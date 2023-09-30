@@ -116,7 +116,7 @@ pub fn restore(
             Kind::File => {
                 stats.files += 1;
                 monitor.count(Counter::Files, 1);
-                match restore_file(path.clone(), &entry, block_dir) {
+                match restore_file(path.clone(), &entry, block_dir, monitor.clone()) {
                     Err(err) => {
                         error!(?err, ?path, "Failed to restore file");
                         stats.errors += 1;
@@ -186,11 +186,12 @@ fn apply_deferrals(deferrals: &[DirDeferral]) -> Result<RestoreStats> {
 }
 
 /// Copy in the contents of a file from another tree.
-#[instrument(skip(source_entry, block_dir))]
+#[instrument(skip(source_entry, block_dir, monitor))]
 fn restore_file(
     path: PathBuf,
     source_entry: &IndexEntry,
     block_dir: &BlockDir,
+    monitor: Arc<dyn Monitor>,
 ) -> Result<RestoreStats> {
     let mut stats = RestoreStats::default();
     let mut out = File::create(&path).map_err(|err| {
@@ -207,10 +208,12 @@ fn restore_file(
         // for the probably common cases of files with one part, or
         // many larger parts, sending everything through a BufWriter is
         // probably a waste.
-        let bytes = block_dir.read_address(addr).map_err(|err| {
-            error!(?path, ?err, "Failed to read block content for file");
-            err
-        })?;
+        let bytes = block_dir
+            .read_address(addr, monitor.clone())
+            .map_err(|err| {
+                error!(?path, ?err, "Failed to read block content for file");
+                err
+            })?;
         out.write_all(&bytes).map_err(|err| {
             error!(?path, ?err, "Failed to write content to restore file");
             Error::Restore {

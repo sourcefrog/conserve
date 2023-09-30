@@ -181,8 +181,8 @@ impl BlockDir {
     }
 
     /// Read back some content addressed by an [Address] (a block hash, start and end).
-    pub fn read_address(&self, address: &Address) -> Result<Bytes> {
-        let bytes = self.get_block_content(&address.hash)?;
+    pub fn read_address(&self, address: &Address, monitor: Arc<dyn Monitor>) -> Result<Bytes> {
+        let bytes = self.get_block_content(&address.hash, monitor)?;
         let len = address.len as usize;
         let start = address.start as usize;
         let end = start + len;
@@ -199,13 +199,15 @@ impl BlockDir {
     /// Return the entire contents of the block.
     ///
     /// Checks that the hash is correct with the contents.
-    #[instrument(skip(self))]
-    pub fn get_block_content(&self, hash: &BlockHash) -> Result<Bytes> {
+    #[instrument(skip(self, monitor))]
+    pub fn get_block_content(&self, hash: &BlockHash, monitor: Arc<dyn Monitor>) -> Result<Bytes> {
         if let Some(hit) = self.cache.write().expect("Lock cache").get(hash) {
+            monitor.count(Counter::BlockContentCacheHit, 1);
             self.stats.cache_hit.fetch_add(1, Relaxed);
             trace!("Block cache hit");
             return Ok(hit.clone());
         }
+        monitor.count(Counter::BlockContentCacheMiss, 1);
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
         let compressed_bytes = self.transport.read_file(&block_relpath)?;
@@ -299,16 +301,18 @@ impl BlockDir {
         task.set_total(blocks.len());
         let block_lens = blocks
             .into_par_iter()
-            .flat_map(|hash| match self.get_block_content(&hash) {
-                Ok(bytes) => {
-                    task.increment(1);
-                    Some((hash, bytes.len()))
-                }
-                Err(err) => {
-                    error!(%err, %hash, "Error reading block content");
-                    None
-                }
-            })
+            .flat_map(
+                |hash| match self.get_block_content(&hash, monitor.clone()) {
+                    Ok(bytes) => {
+                        task.increment(1);
+                        Some((hash, bytes.len()))
+                    }
+                    Err(err) => {
+                        error!(%err, %hash, "Error reading block content");
+                        None
+                    }
+                },
+            )
             .collect();
         Ok(block_lens)
     }
@@ -366,11 +370,16 @@ mod test {
         assert!(blockdir.contains(&hash).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
 
-        let retrieved = blockdir.get_block_content(&hash).unwrap();
+        let monitor = CollectMonitor::arc();
+        let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
         assert_eq!(content, retrieved);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 1);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 0);
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit against the value written
 
-        let retrieved = blockdir.get_block_content(&hash).unwrap();
+        let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 2);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 0);
         assert_eq!(content, retrieved);
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 3); // hit again
     }
@@ -381,8 +390,9 @@ mod test {
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
+        let monitor = CollectMonitor::arc();
         let hash = blockdir
-            .store_or_deduplicate(content.clone(), &mut stats, CollectMonitor::arc())
+            .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
             .unwrap();
 
         // reopen
@@ -395,8 +405,10 @@ mod test {
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2);
 
         // actually reading the content is a miss
-        let retrieved = blockdir.get_block_content(&hash).unwrap();
+        let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
         assert_eq!(content, retrieved);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 1);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 0);
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit again
     }
 }

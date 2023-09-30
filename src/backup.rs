@@ -261,6 +261,7 @@ impl BackupWriter {
         if size == 0 {
             self.index_builder
                 .push_entry(IndexEntry::metadata_from(source_entry));
+            self.stats.empty_files += 1;
             monitor.count(Counter::EmptyFiles, 1);
         } else {
             let mut source_file = from_tree.open_file(source_entry)?;
