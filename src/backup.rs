@@ -237,7 +237,11 @@ impl BackupWriter {
                     .iter()
                     .map(|addr| &addr.hash)
                     .unique()
-                    .all(|hash| self.block_dir.contains(hash).unwrap_or(false))
+                    .all(|hash| {
+                        self.block_dir
+                            .contains(hash, monitor.clone())
+                            .unwrap_or(false)
+                    })
                 {
                     self.stats.unmodified_files += 1;
                     let change = Some(EntryChange::unchanged(&basis_entry));

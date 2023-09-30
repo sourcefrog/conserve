@@ -120,7 +120,7 @@ impl BlockDir {
     ) -> Result<BlockHash> {
         let hash = BlockHash::hash_bytes(&block_data);
         let uncomp_len = block_data.len() as u64;
-        if self.contains(&hash)? {
+        if self.contains(&hash, monitor.clone())? {
             stats.deduplicated_blocks += 1;
             stats.deduplicated_bytes += uncomp_len;
             monitor.count(Counter::DeduplicatedBlocks, 1);
@@ -129,10 +129,6 @@ impl BlockDir {
         }
         let compressed = Compressor::new().compress(&block_data)?;
         monitor.count(Counter::BlockWriteUncompressedBytes, block_data.len());
-        self.cache
-            .write()
-            .expect("Lock cache")
-            .put(hash.clone(), block_data);
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
         let relpath = block_relpath(&hash);
@@ -143,6 +139,12 @@ impl BlockDir {
         stats.compressed_bytes += comp_len;
         monitor.count(Counter::BlockWrites, 1);
         monitor.count(Counter::BlockWriteCompressedBytes, compressed.len());
+        // Only update caches after everything succeeded
+        self.cache
+            .write()
+            .expect("Lock cache")
+            .put(hash.clone(), block_data);
+        self.exists.write().unwrap().push(hash.clone(), ());
         Ok(hash)
     }
 
@@ -154,13 +156,15 @@ impl BlockDir {
     /// an interrupted operation on a local filesystem to leave an empty file.
     /// So, these are specifically treated as missing, so there's a chance to heal
     /// them later.
-    pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
+    pub fn contains(&self, hash: &BlockHash, monitor: Arc<dyn Monitor>) -> Result<bool> {
         if self.cache.read().expect("Lock cache").contains(hash)
             || self.exists.read().unwrap().contains(hash)
         {
+            monitor.count(Counter::BlockExistenceCacheHit, 1);
             self.stats.cache_hit.fetch_add(1, Relaxed);
             return Ok(true);
         }
+        monitor.count(Counter::BlockExistenceCacheMiss, 1);
         match self.transport.metadata(&block_relpath(hash)) {
             Err(err) if err.is_not_found() => Ok(false),
             Err(err) => {
@@ -337,23 +341,35 @@ mod test {
     use tempfile::TempDir;
     #[test]
     fn empty_block_file_counts_as_not_present() {
+        // Due to an interruption or system crash we might end up with a block
+        // file with 0 bytes. It's not valid compressed data. We just treat
+        // the block as not present at all.
         let tempdir = TempDir::new().unwrap();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
+        let monitor = CollectMonitor::arc();
         let hash = blockdir
-            .store_or_deduplicate(Bytes::from("stuff"), &mut stats, CollectMonitor::arc())
+            .store_or_deduplicate(Bytes::from("stuff"), &mut stats, monitor.clone())
             .unwrap();
-        assert!(blockdir.contains(&hash).unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockWrites), 1);
+        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 0);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
+        assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1); // Since we just wrote it, we know it's there.
 
         // Open again to get a fresh cache
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let monitor = CollectMonitor::arc();
         OpenOptions::new()
             .write(true)
             .truncate(true)
             .create(false)
             .open(tempdir.path().join(block_relpath(&hash)))
             .expect("Truncate block");
-        assert!(!blockdir.contains(&hash).unwrap());
+        assert!(!blockdir.contains(&hash, monitor.clone()).unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
     }
 
     #[test]
@@ -367,8 +383,10 @@ mod test {
             .unwrap();
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
 
-        assert!(blockdir.contains(&hash).unwrap());
+        let monitor = CollectMonitor::arc();
+        assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1);
 
         let monitor = CollectMonitor::arc();
         let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
@@ -396,13 +414,19 @@ mod test {
             .unwrap();
 
         // reopen
+        let monitor = CollectMonitor::arc();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
-        assert!(blockdir.contains(&hash).unwrap());
+        assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
-        assert!(blockdir.contains(&hash).unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);
+
+        assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
-        assert!(blockdir.contains(&hash).unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1);
+
+        assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 2);
 
         // actually reading the content is a miss
         let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
