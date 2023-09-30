@@ -22,9 +22,7 @@ use std::time::Instant;
 
 use clap::{Parser, Subcommand};
 use conserve::change::Change;
-use conserve::progress::ProgressImpl;
 use conserve::trace_counter::{global_error_count, global_warn_count};
-use itertools::Itertools;
 use rayon::prelude::ParallelIterator;
 use time::UtcOffset;
 #[allow(unused_imports)]
@@ -321,7 +319,7 @@ impl Command {
                 };
                 if *long_listing || *verbose {
                     // TODO(CON-23): Really Nutmeg should coordinate stdout and stderr...
-                    ProgressImpl::Null.activate()
+                    // todo!("Disable progress bars!");
                 }
                 let stats = backup(
                     &Archive::open(open_transport(archive)?)?,
@@ -486,7 +484,7 @@ impl Command {
                     )?,
                 };
                 if *verbose || *long_listing {
-                    ProgressImpl::Null.activate();
+                    // todo!("Disable progress bar");
                 }
                 let stats = restore(&archive, destination, &options, monitor)?;
                 debug!("Restore complete");
@@ -624,9 +622,6 @@ fn main() -> Result<ExitCode> {
         UtcOffset::current_local_offset().expect("get local time offset");
     let args = Args::parse();
     let start_time = Instant::now();
-    if !args.no_progress {
-        progress::ProgressImpl::Terminal.activate();
-    }
     let console_level = if args.debug {
         Level::TRACE
     } else {
@@ -635,6 +630,7 @@ fn main() -> Result<ExitCode> {
     if args.metrics_json.is_some() {
         warn!("--metrics-json is no longer supported");
     }
+    // TODO: Pass through --no-progress.
     let monitor = Arc::new(TermUiMonitor::new());
     let _flush_tracing = enable_tracing(&monitor, &args.trace_time, console_level, &args.log_json);
     let result = args.command.run(monitor);

@@ -13,7 +13,6 @@
 //! Terminal UI: tracing, progress bars, etc.
 
 mod monitor;
-pub(crate) mod progress;
 mod trace;
 
 pub use monitor::TermUiMonitor;

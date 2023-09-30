@@ -17,7 +17,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use itertools::Itertools;
@@ -28,7 +27,6 @@ use tracing::{debug, error, warn};
 use crate::blockhash::BlockHash;
 use crate::jsonio::{read_json, write_json};
 use crate::monitor::Monitor;
-use crate::progress::{Bar, Progress};
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
 use crate::*;
@@ -285,27 +283,20 @@ impl Archive {
 
         if !options.dry_run {
             delete_guard.check()?;
-            let bar = Bar::new();
+            let task = monitor.start_task("Delete bands".to_string());
 
-            for (bands_done, band_id) in delete_band_ids.iter().enumerate() {
+            for band_id in delete_band_ids.iter() {
                 Band::delete(self, *band_id)?;
                 stats.deleted_band_count += 1;
-                bar.post(Progress::DeleteBands {
-                    bands_done,
-                    total_bands: delete_band_ids.len(),
-                });
+                task.increment(1);
             }
 
-            let blocks_done: AtomicUsize = AtomicUsize::new(0);
-            let start = Instant::now();
+            let task = monitor.start_task("Delete blocks".to_string());
+            task.set_total(unref_count);
             let error_count = unref
                 .par_iter()
                 .filter(|block_hash| {
-                    bar.post(Progress::DeleteBlocks {
-                        blocks_done: blocks_done.fetch_add(1, Ordering::Relaxed),
-                        start,
-                        total_blocks: unref_count,
-                    });
+                    task.increment(1);
                     block_dir.delete_block(block_hash).is_err()
                 })
                 .count();

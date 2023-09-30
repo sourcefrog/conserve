@@ -35,7 +35,6 @@ mod merge;
 pub mod misc;
 pub mod monitor;
 pub mod owner;
-pub mod progress;
 pub mod restore;
 pub mod show;
 pub mod stats;
