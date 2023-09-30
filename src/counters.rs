@@ -80,3 +80,44 @@ impl Debug for Counters {
         s.finish()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn simple_counts() {
+        let counters = Counters::default();
+        counters.count(Counter::Files, 1);
+        counters.count(Counter::Files, 2);
+        counters.set(Counter::FileBytes, 100);
+        assert_eq!(counters.get(Counter::Files), 3);
+        assert_eq!(counters.get(Counter::Dirs), 0);
+        assert_eq!(counters.get(Counter::FileBytes), 100);
+    }
+
+    #[test]
+    fn iter_counters() {
+        let counters = Counters::default();
+        counters.count(Counter::Files, 2);
+        dbg!(&counters);
+
+        counters.iter().for_each(|(c, v)| {
+            assert_eq!(counters.get(c), v);
+        });
+        assert_eq!(counters.iter().count(), Counter::COUNT);
+        assert!(counters
+            .iter()
+            .all(|(c, v)| (c == Counter::Files) == (v == 2)));
+    }
+
+    #[test]
+    fn debug_form() {
+        let counters = Counters::default();
+        counters.count(Counter::Files, 2);
+        let d = format!("{counters:#?}");
+        println!("{}", d);
+        assert!(d.contains("Files: 2"));
+        assert!(d.contains("Dirs: 0"));
+    }
+}
