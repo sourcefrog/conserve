@@ -93,7 +93,7 @@ pub fn backup(
     let entry_iter = source_tree.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
-            match writer.copy_entry(&entry, &source_tree) {
+            match writer.copy_entry(&entry, &source_tree, monitor.clone()) {
                 Err(err) => {
                     error!(?entry, ?err, "Error copying entry to backup");
                     stats.errors += 1;
@@ -192,12 +192,17 @@ impl BackupWriter {
     /// Return an indication of whether it changed (if it's a file), or
     /// None for non-plain-file types where that information is not currently
     /// calculated.
-    fn copy_entry(&mut self, entry: &EntryValue, source: &LiveTree) -> Result<Option<EntryChange>> {
+    fn copy_entry(
+        &mut self,
+        entry: &EntryValue,
+        source: &LiveTree,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<Option<EntryChange>> {
         // TODO: Emit deletions for entries in the basis not present in the source.
         match entry.kind() {
-            Kind::Dir => self.copy_dir(entry),
-            Kind::File => self.copy_file(entry, source),
-            Kind::Symlink => self.copy_symlink(entry),
+            Kind::Dir => self.copy_dir(entry, monitor.as_ref()),
+            Kind::File => self.copy_file(entry, source, monitor.clone()),
+            Kind::Symlink => self.copy_symlink(entry, monitor.as_ref()),
             Kind::Unknown => {
                 self.stats.unknown_kind += 1;
                 // TODO: Perhaps eventually we could backup and restore pipes,
@@ -208,7 +213,12 @@ impl BackupWriter {
         }
     }
 
-    fn copy_dir(&mut self, source_entry: &EntryValue) -> Result<Option<EntryChange>> {
+    fn copy_dir(
+        &mut self,
+        source_entry: &EntryValue,
+        monitor: &dyn Monitor,
+    ) -> Result<Option<EntryChange>> {
+        monitor.count(Counter::Dirs, 1);
         self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
@@ -220,8 +230,10 @@ impl BackupWriter {
         &mut self,
         source_entry: &EntryValue,
         from_tree: &LiveTree,
+        monitor: Arc<dyn Monitor>,
     ) -> Result<Option<EntryChange>> {
         self.stats.files += 1;
+        monitor.count(Counter::Files, 1);
         let apath = source_entry.apath();
         let result = if let Some(basis_entry) = self.basis_index.advance_to(apath) {
             if entry_metadata_unchanged(source_entry, &basis_entry) {
@@ -272,7 +284,12 @@ impl BackupWriter {
         Ok(result)
     }
 
-    fn copy_symlink(&mut self, source_entry: &EntryValue) -> Result<Option<EntryChange>> {
+    fn copy_symlink(
+        &mut self,
+        source_entry: &EntryValue,
+        monitor: &dyn Monitor,
+    ) -> Result<Option<EntryChange>> {
+        monitor.count(Counter::Symlinks, 1);
         let target = source_entry.symlink_target();
         self.stats.symlinks += 1;
         assert!(target.is_some());
