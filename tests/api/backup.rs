@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use conserve::counters::Counter;
 use conserve::monitor::collect::CollectMonitor;
 use filetime::{set_file_mtime, FileTime};
 use rayon::prelude::ParallelIterator;
@@ -37,19 +38,19 @@ pub fn simple_backup() {
     srcdir.create_file("hello");
 
     let monitor = CollectMonitor::arc();
-    let copy_stats = backup(
+    let backup_stats = backup(
         &af,
         srcdir.path(),
         &BackupOptions::default(),
         monitor.clone(),
     )
     .expect("backup");
-    assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
-    assert_eq!(copy_stats.files, 1);
-    assert_eq!(copy_stats.deduplicated_blocks, 0);
-    assert_eq!(copy_stats.written_blocks, 1);
-    assert_eq!(copy_stats.uncompressed_bytes, 8);
-    assert_eq!(copy_stats.compressed_bytes, 10);
+    assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
+    assert_eq!(backup_stats.files, 1);
+    assert_eq!(backup_stats.deduplicated_blocks, 0);
+    assert_eq!(backup_stats.written_blocks, 1);
+    assert_eq!(backup_stats.uncompressed_bytes, 8);
+    assert_eq!(backup_stats.compressed_bytes, 10);
     check_backup(&af);
 
     let restore_dir = TempDir::new().unwrap();
@@ -84,15 +85,18 @@ pub fn simple_backup_with_excludes() -> Result<()> {
         exclude,
         ..BackupOptions::default()
     };
-    let copy_stats = backup(&af, srcdir.path(), &options, CollectMonitor::arc()).expect("backup");
+    let monitor = CollectMonitor::arc();
+    let stats = backup(&af, srcdir.path(), &options, monitor.clone()).expect("backup");
 
     check_backup(&af);
 
-    assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
-    assert_eq!(copy_stats.files, 1);
+    let counters = monitor.counters();
+    dbg!(counters);
+    assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
+    assert_eq!(stats.files, 1);
     // TODO: Check stats for the number of excluded entries.
-    assert!(copy_stats.index_builder_stats.compressed_index_bytes > 100);
-    assert!(copy_stats.index_builder_stats.uncompressed_index_bytes > 200);
+    assert!(counters.get(Counter::IndexWriteCompressedBytes) > 100);
+    assert!(counters.get(Counter::IndexWriteUncompressedBytes) > 200);
 
     let restore_dir = TempDir::new().unwrap();
 
@@ -210,13 +214,9 @@ fn large_file() {
     let large_content = vec![b'a'; 4 << 20];
     tf.create_file_with_contents("large", &large_content);
 
-    let backup_stats = backup(
-        &af,
-        tf.path(),
-        &BackupOptions::default(),
-        CollectMonitor::arc(),
-    )
-    .expect("backup");
+    let monitor = CollectMonitor::arc();
+    let backup_stats =
+        backup(&af, tf.path(), &BackupOptions::default(), monitor.clone()).expect("backup");
     assert_eq!(backup_stats.new_files, 1);
     // First 1MB should be new; remainder should be deduplicated.
     assert_eq!(backup_stats.uncompressed_bytes, 1 << 20);
@@ -224,7 +224,7 @@ fn large_file() {
     assert_eq!(backup_stats.deduplicated_blocks, 3);
     assert_eq!(backup_stats.deduplicated_bytes, 3 << 20);
     assert_eq!(backup_stats.errors, 0);
-    assert_eq!(backup_stats.index_builder_stats.index_hunks, 1);
+    assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
 
     // Try to restore it
     let rd = TempDir::new().unwrap();
@@ -501,15 +501,17 @@ fn many_small_files_combined_to_one_block() {
             format!("something about {i}").as_bytes(),
         );
     }
+    let monitor = CollectMonitor::arc();
     let stats = backup(
         &af,
         srcdir.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .expect("backup");
     assert_eq!(
-        stats.index_builder_stats.index_hunks, 2,
+        monitor.get_counter(Counter::IndexWrites),
+        2,
         "expect exactly 2 hunks"
     );
     assert_eq!(stats.files, 1999);
@@ -553,15 +555,17 @@ pub fn mixed_medium_small_files_two_hunks() {
             srcdir.create_file(&name);
         }
     }
+    let monitor = CollectMonitor::arc();
     let stats = backup(
         &af,
         srcdir.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .expect("backup");
     assert_eq!(
-        stats.index_builder_stats.index_hunks, 2,
+        monitor.get_counter(Counter::IndexWrites),
+        2,
         "expect exactly 2 hunks"
     );
     assert_eq!(stats.files, 1999);
@@ -598,6 +602,7 @@ fn detect_unchanged_from_stitched_index() {
     srcdir.create_file("a");
     srcdir.create_file("b");
     // Use small hunks for easier manipulation.
+    let monitor = CollectMonitor::arc();
     let stats = backup(
         &af,
         srcdir.path(),
@@ -605,14 +610,15 @@ fn detect_unchanged_from_stitched_index() {
             max_entries_per_hunk: 1,
             ..Default::default()
         },
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .unwrap();
     assert_eq!(stats.new_files, 2);
     assert_eq!(stats.small_combined_files, 2);
-    assert_eq!(stats.index_builder_stats.index_hunks, 3);
+    assert_eq!(monitor.get_counter(Counter::IndexWrites), 3,);
 
     // Make a second backup, with the first file changed.
+    let monitor = CollectMonitor::arc();
     srcdir.create_file_with_contents("a", b"new a contents");
     let stats = backup(
         &af,
@@ -621,12 +627,12 @@ fn detect_unchanged_from_stitched_index() {
             max_entries_per_hunk: 1,
             ..Default::default()
         },
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .unwrap();
     assert_eq!(stats.unmodified_files, 1);
     assert_eq!(stats.modified_files, 1);
-    assert_eq!(stats.index_builder_stats.index_hunks, 3);
+    assert_eq!(monitor.get_counter(Counter::IndexWrites), 3,);
 
     // Delete the last hunk and reopen the last band.
     af.transport().remove_file("b0001/BANDTAIL").unwrap();
@@ -636,6 +642,7 @@ fn detect_unchanged_from_stitched_index() {
 
     // The third backup should see nothing changed, by looking at the stitched
     // index from both b0 and b1.
+    let monitor = CollectMonitor::arc();
     let stats = backup(
         &af,
         srcdir.path(),
@@ -643,9 +650,9 @@ fn detect_unchanged_from_stitched_index() {
             max_entries_per_hunk: 1,
             ..Default::default()
         },
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .unwrap();
     assert_eq!(stats.unmodified_files, 2, "both files are unmodified");
-    assert_eq!(stats.index_builder_stats.index_hunks, 3);
+    assert_eq!(monitor.get_counter(Counter::IndexWrites), 3);
 }

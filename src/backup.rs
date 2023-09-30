@@ -34,9 +34,7 @@ use crate::counters::Counter;
 use crate::entry::EntryValue;
 use crate::io::read_with_retries;
 use crate::monitor::Monitor;
-use crate::stats::{
-    write_compressed_size, write_count, write_duration, write_size, IndexWriterStats,
-};
+use crate::stats::{write_compressed_size, write_count, write_duration, write_size};
 use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::ReadTree;
 use crate::*;
@@ -166,12 +164,9 @@ impl BackupWriter {
     }
 
     fn finish(self, monitor: Arc<dyn Monitor>) -> Result<BackupStats> {
-        let index_builder_stats = self.index_builder.finish(monitor)?;
-        self.band.close(index_builder_stats.index_hunks as u64)?;
-        Ok(BackupStats {
-            index_builder_stats,
-            ..self.stats
-        })
+        let hunks = self.index_builder.finish(monitor)?;
+        self.band.close(hunks as u64)?;
+        Ok(BackupStats { ..self.stats })
     }
 
     /// Write out any pending data blocks, and then the pending index entries.
@@ -534,7 +529,6 @@ pub struct BackupStats {
 
     pub errors: usize,
 
-    pub index_builder_stats: IndexWriterStats,
     pub elapsed: Duration,
 
     pub read_blocks: usize,
@@ -567,11 +561,6 @@ impl fmt::Display for BackupStats {
         write_count(w, "new data blocks written:", self.written_blocks);
         write_count(w, "  blocks of combined files", self.combined_blocks);
         write_compressed_size(w, self.compressed_bytes, self.uncompressed_bytes);
-        writeln!(w).unwrap();
-
-        let idx = &self.index_builder_stats;
-        write_count(w, "new index hunks", idx.index_hunks);
-        write_compressed_size(w, idx.compressed_index_bytes, idx.uncompressed_index_bytes);
         writeln!(w).unwrap();
 
         write_count(w, "blocks read", self.read_blocks);

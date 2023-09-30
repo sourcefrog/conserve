@@ -29,7 +29,7 @@ use crate::entry::{EntryValue, KindMeta};
 use crate::kind::Kind;
 use crate::monitor::Monitor;
 use crate::owner::Owner;
-use crate::stats::{IndexReadStats, IndexWriterStats};
+use crate::stats::IndexReadStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
 use crate::unix_mode::UnixMode;
@@ -189,13 +189,13 @@ pub struct IndexWriter {
     /// Index hunk number, starting at 0.
     sequence: u32,
 
+    /// Number of hunks actually written.
+    hunks_written: usize,
+
     /// The last filename from the previous hunk, to enforce ordering. At the
     /// start of the first hunk this is empty; at the start of a later hunk it's
     /// the last path from the previous hunk.
     check_order: apath::DebugCheckOrder,
-
-    /// Statistics about work done while writing this index.
-    pub stats: IndexWriterStats,
 
     compressor: Compressor,
 }
@@ -208,16 +208,16 @@ impl IndexWriter {
             transport,
             entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
             sequence: 0,
+            hunks_written: 0,
             check_order: apath::DebugCheckOrder::new(),
-            stats: IndexWriterStats::default(),
             compressor: Compressor::new(),
         }
     }
 
     /// Finish the last hunk of this index, and return the stats.
-    pub fn finish(mut self, monitor: Arc<dyn Monitor>) -> Result<IndexWriterStats> {
+    pub fn finish(mut self, monitor: Arc<dyn Monitor>) -> Result<usize> {
         self.finish_hunk(monitor)?;
-        Ok(self.stats)
+        Ok(self.hunks_written)
     }
 
     /// Write new index entries.
@@ -258,9 +258,7 @@ impl IndexWriter {
         }
         let compressed_bytes = self.compressor.compress(&json)?;
         self.transport.write_file(&relpath, &compressed_bytes)?;
-        self.stats.index_hunks += 1;
-        self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
-        self.stats.uncompressed_index_bytes += json.len() as u64;
+        self.hunks_written += 1;
         monitor.count(Counter::IndexWrites, 1);
         monitor.count(Counter::IndexWriteCompressedBytes, compressed_bytes.len());
         monitor.count(Counter::IndexWriteUncompressedBytes, json.len());
@@ -616,22 +614,16 @@ mod tests {
         let (testdir, mut ib) = setup();
         let monitor = CollectMonitor::arc();
         ib.append_entries(&mut vec![sample_entry("/apple"), sample_entry("/banana")]);
-        let stats = ib.finish(monitor.clone()).unwrap();
+        let hunks = ib.finish(monitor.clone()).unwrap();
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
 
-        assert_eq!(stats.index_hunks, 1);
-        assert!(stats.compressed_index_bytes > 30);
-        assert!(
-            stats.compressed_index_bytes <= 125,
-            "expected shorter compressed index: {}",
-            stats.compressed_index_bytes
-        );
-        assert!(stats.uncompressed_index_bytes > 100);
-        assert!(
-            stats.uncompressed_index_bytes < 250,
-            "expected shorter uncompressed index: {}",
-            stats.uncompressed_index_bytes
-        );
+        assert_eq!(hunks, 1);
+        let counters = monitor.counters();
+        dbg!(&counters);
+        assert!(counters.get(Counter::IndexWriteCompressedBytes) > 30);
+        assert!(counters.get(Counter::IndexWriteCompressedBytes) < 125,);
+        assert!(counters.get(Counter::IndexWriteUncompressedBytes) > 100);
+        assert!(counters.get(Counter::IndexWriteUncompressedBytes) < 250);
 
         assert!(
             std::fs::metadata(testdir.path().join("00000").join("000000000"))

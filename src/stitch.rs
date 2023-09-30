@@ -202,13 +202,13 @@ mod test {
         ib.finish_hunk(monitor.clone())?;
         ib.push_entry(symlink("/2", "b0"));
         // Flush this hunk but leave the band incomplete.
-        let stats = ib.finish(monitor.clone())?;
+        let hunks = ib.finish(monitor.clone())?;
+        assert_eq!(hunks, 2);
         assert_eq!(
             monitor.get_counter(Counter::IndexWrites),
             2,
             "2 hunks were finished"
         );
-        assert_eq!(stats.index_hunks, 2);
 
         let monitor = CollectMonitor::arc();
         let band = Band::create(&af)?;
@@ -219,8 +219,8 @@ mod test {
         ib.finish_hunk(monitor.clone())?;
         ib.push_entry(symlink("/2", "b1"));
         ib.push_entry(symlink("/3", "b1"));
-        let stats = ib.finish(monitor.clone())?;
-        assert_eq!(stats.index_hunks, 2);
+        let hunks = ib.finish(monitor.clone())?;
+        assert_eq!(hunks, 2);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
         band.close(2)?;
 
@@ -233,8 +233,8 @@ mod test {
         ib.finish_hunk(monitor.clone())?;
         ib.push_entry(symlink("/2", "b2"));
         // incomplete
-        let stats = ib.finish(monitor.clone())?;
-        assert_eq!(stats.index_hunks, 2);
+        let hunks = ib.finish(monitor.clone())?;
+        assert_eq!(hunks, 2);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
 
         // b3
@@ -252,8 +252,8 @@ mod test {
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b5"));
         ib.push_entry(symlink("/00", "b5"));
-        let stats = ib.finish(monitor.clone())?;
-        assert_eq!(stats.index_hunks, 1);
+        let hunks = ib.finish(monitor.clone())?;
+        assert_eq!(hunks, 1);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
         // incomplete
 

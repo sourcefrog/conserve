@@ -50,6 +50,10 @@ impl CollectMonitor {
     pub fn arc() -> Arc<CollectMonitor> {
         Arc::new(CollectMonitor::new())
     }
+
+    pub fn counters(&self) -> &Counters {
+        &self.counters
+    }
 }
 
 impl Monitor for CollectMonitor {
