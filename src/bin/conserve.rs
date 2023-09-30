@@ -350,13 +350,13 @@ impl Command {
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 let archive = Archive::open(open_transport(archive)?)?;
-                for hash in archive.referenced_blocks(&archive.list_band_ids()?)? {
+                for hash in archive.referenced_blocks(&archive.list_band_ids()?, monitor)? {
                     writeln!(bw, "{hash}")?;
                 }
             }
             Command::Debug(Debug::Unreferenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks()? {
+                for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks(monitor)? {
                     writeln!(bw, "{hash}")?;
                 }
             }
@@ -373,6 +373,7 @@ impl Command {
                         dry_run: *dry_run,
                         break_lock: *break_lock,
                     },
+                    monitor.clone(),
                 )?;
                 if !no_stats {
                     monitor.clear_progress_bars();
@@ -416,6 +417,7 @@ impl Command {
                         dry_run: *dry_run,
                         break_lock: *break_lock,
                     },
+                    monitor,
                 )?;
                 if !no_stats {
                     info!(%stats);

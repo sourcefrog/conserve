@@ -195,37 +195,32 @@ impl Archive {
     /// Returns all blocks referenced by all bands.
     ///
     /// Shows a progress bar as they're collected.
-    pub fn referenced_blocks(&self, band_ids: &[BandId]) -> Result<HashSet<BlockHash>> {
+    pub fn referenced_blocks(
+        &self,
+        band_ids: &[BandId],
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<HashSet<BlockHash>> {
         let archive = self.clone();
-        // TODO: Percentage completion based on how many bands have been checked so far.
-        let bar = Bar::new();
-        let references_found = AtomicUsize::new(0);
-        let bands_started = AtomicUsize::new(0);
-        let total_bands = band_ids.len();
-        let start = Instant::now();
+        let task = monitor.start_task("Find referenced blocks".to_string());
+        task.set_total(band_ids.len());
         Ok(band_ids
             .par_iter()
             .inspect(|_| {
-                bands_started.fetch_add(1, Ordering::Relaxed);
+                task.increment(1);
             })
             .map(move |band_id| Band::open(&archive, *band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
             .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
-            .inspect(|_hash| {
-                bar.post(Progress::ReferencedBlocks {
-                    references_found: references_found.fetch_add(1, Ordering::Relaxed),
-                    bands_started: bands_started.load(Ordering::Relaxed),
-                    total_bands,
-                    start,
-                })
-            })
             .collect())
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
-    pub fn unreferenced_blocks(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        let referenced = self.referenced_blocks(&self.list_band_ids()?)?;
+    pub fn unreferenced_blocks(
+        &self,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<impl Iterator<Item = BlockHash>> {
+        let referenced = self.referenced_blocks(&self.list_band_ids()?, monitor)?;
         Ok(self
             .block_dir()
             .iter_block_names()?
@@ -240,6 +235,7 @@ impl Archive {
         &self,
         delete_band_ids: &[BandId],
         options: &DeleteOptions,
+        monitor: Arc<dyn Monitor>,
     ) -> Result<DeleteStats> {
         let mut stats = DeleteStats::default();
         let start = Instant::now();
@@ -258,7 +254,7 @@ impl Archive {
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
         debug!("List referenced blocks...");
-        let referenced = self.referenced_blocks(&keep_band_ids)?;
+        let referenced = self.referenced_blocks(&keep_band_ids, monitor.clone())?;
         debug!(referenced.len = referenced.len());
 
         debug!("Find present blocks...");
@@ -272,19 +268,17 @@ impl Archive {
         stats.unreferenced_block_count = unref_count;
 
         debug!("Measure unreferenced blocks...");
-        let measure_bar = Bar::new();
+        let task = monitor.start_task("Measure unreferenced blocks".to_string());
+        task.set_total(unref_count);
         let total_bytes = unref
             .par_iter()
             .enumerate()
-            .inspect(|(i, _)| {
-                measure_bar.post(Progress::MeasureUnreferenced {
-                    blocks_done: *i,
-                    blocks_total: unref_count,
-                })
+            .inspect(|_| {
+                task.increment(1);
             })
             .map(|(_i, block_id)| block_dir.compressed_size(block_id).unwrap_or_default())
             .sum();
-        drop(measure_bar);
+        drop(task);
         stats.unreferenced_block_bytes = total_bytes;
 
         if !options.dry_run {

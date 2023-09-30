@@ -37,8 +37,12 @@ fn unreferenced_blocks() {
 
     // Delete the band and index
     std::fs::remove_dir_all(archive.path().join("b0000")).unwrap();
+    let monitor = CollectMonitor::arc();
 
-    let unreferenced: Vec<BlockHash> = archive.unreferenced_blocks().unwrap().collect();
+    let unreferenced: Vec<BlockHash> = archive
+        .unreferenced_blocks(monitor.clone())
+        .unwrap()
+        .collect();
     assert_eq!(unreferenced, [content_hash]);
 
     // Delete dry run.
@@ -49,6 +53,7 @@ fn unreferenced_blocks() {
                 dry_run: true,
                 break_lock: false,
             },
+            monitor.clone(),
         )
         .unwrap();
     assert_eq!(
@@ -68,7 +73,9 @@ fn unreferenced_blocks() {
         dry_run: false,
         break_lock: false,
     };
-    let delete_stats = archive.delete_bands(&[], &options).unwrap();
+    let delete_stats = archive
+        .delete_bands(&[], &options, monitor.clone())
+        .unwrap();
     assert_eq!(
         delete_stats,
         DeleteStats {
@@ -82,7 +89,9 @@ fn unreferenced_blocks() {
     );
 
     // Try again to delete: should find no garbage.
-    let delete_stats = archive.delete_bands(&[], &options).unwrap();
+    let delete_stats = archive
+        .delete_bands(&[], &options, monitor.clone())
+        .unwrap();
     assert_eq!(
         delete_stats,
         DeleteStats {
@@ -105,11 +114,12 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
     let lock1 = GarbageCollectionLock::new(&archive)?;
 
     // Backup should fail while gc lock is held.
+    let monitor = CollectMonitor::arc();
     let backup_result = backup(
         &archive,
         tf.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     );
     assert_eq!(
         backup_result.unwrap_err().to_string(),
@@ -124,6 +134,7 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
             break_lock: true,
             ..Default::default()
         },
+        monitor.clone(),
     )?;
 
     // Backup should now succeed.
@@ -131,7 +142,7 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
         &archive,
         tf.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     );
     assert!(backup_result.is_ok());
 

@@ -178,7 +178,7 @@ fn check_backup(af: &ScratchArchive) {
     assert!(file_entry.mtime > 0);
 
     assert_eq!(
-        af.referenced_blocks(&af.list_band_ids().unwrap())
+        af.referenced_blocks(&af.list_band_ids().unwrap(), CollectMonitor::arc())
             .unwrap()
             .into_iter()
             .map(|h| h.to_string())
@@ -193,7 +193,12 @@ fn check_backup(af: &ScratchArchive) {
             .collect::<Vec<String>>(),
         vec![HELLO_HASH]
     );
-    assert_eq!(af.unreferenced_blocks().unwrap().count(), 0);
+    assert_eq!(
+        af.unreferenced_blocks(CollectMonitor::arc())
+            .unwrap()
+            .count(),
+        0
+    );
 }
 
 #[test]
