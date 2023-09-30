@@ -140,8 +140,13 @@ fn backup_after_damage(
 
     // Can restore the second backup
     let restore_dir = TempDir::new().unwrap();
-    let restore_stats = restore(&archive, restore_dir.path(), &RestoreOptions::default())
-        .expect("restore second backup");
+    let restore_stats = restore(
+        &archive,
+        restore_dir.path(),
+        &RestoreOptions::default(),
+        CollectMonitor::arc(),
+    )
+    .expect("restore second backup");
     dbg!(&restore_stats);
     assert_eq!(restore_stats.files, 1);
     assert_eq!(restore_stats.errors, 0);

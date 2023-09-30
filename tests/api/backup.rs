@@ -35,11 +35,12 @@ pub fn simple_backup() {
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
 
+    let monitor = CollectMonitor::arc();
     let copy_stats = backup(
         &af,
         srcdir.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .expect("backup");
     assert_eq!(copy_stats.index_builder_stats.index_hunks, 1);
@@ -56,8 +57,13 @@ pub fn simple_backup() {
     assert!(archive.band_exists(BandId::zero()).unwrap());
     assert!(archive.band_is_closed(BandId::zero()).unwrap());
     assert!(!archive.band_exists(BandId::new(&[1])).unwrap());
-    let copy_stats =
-        restore(&archive, restore_dir.path(), &RestoreOptions::default()).expect("restore");
+    let copy_stats = restore(
+        &archive,
+        restore_dir.path(),
+        &RestoreOptions::default(),
+        monitor.clone(),
+    )
+    .expect("restore");
 
     assert_eq!(copy_stats.uncompressed_file_bytes, 8);
 }
@@ -98,8 +104,13 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     assert!(band_info.is_closed);
     assert!(band_info.end_time.is_some());
 
-    let copy_stats =
-        restore(&archive, restore_dir.path(), &RestoreOptions::default()).expect("restore");
+    let copy_stats = restore(
+        &archive,
+        restore_dir.path(),
+        &RestoreOptions::default(),
+        CollectMonitor::arc(),
+    )
+    .expect("restore");
 
     assert_eq!(copy_stats.uncompressed_file_bytes, 8);
     // TODO: Read back contents of that file.
@@ -212,8 +223,13 @@ fn large_file() {
     // Try to restore it
     let rd = TempDir::new().unwrap();
     let restore_archive = Archive::open_path(af.path()).unwrap();
-    let restore_stats =
-        restore(&restore_archive, rd.path(), &RestoreOptions::default()).expect("restore");
+    let restore_stats = restore(
+        &restore_archive,
+        rd.path(),
+        &RestoreOptions::default(),
+        CollectMonitor::arc(),
+    )
+    .expect("restore");
     assert_eq!(restore_stats.files, 1);
 
     let content = std::fs::read(rd.path().join("large")).unwrap();
@@ -340,7 +356,13 @@ pub fn empty_file_uses_zero_blocks() {
 
     // Restore it
     let dest = TempDir::new().unwrap();
-    restore(&af, dest.path(), &RestoreOptions::default()).expect("restore");
+    restore(
+        &af,
+        dest.path(),
+        &RestoreOptions::default(),
+        CollectMonitor::arc(),
+    )
+    .expect("restore");
     // TODO: Check restore stats.
     dest.child("empty").assert("");
 }

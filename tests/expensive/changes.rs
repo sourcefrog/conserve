@@ -126,7 +126,7 @@ fn check_restore_against_snapshot(archive: &Archive, band_id: BandId, snapshot: 
         band_selection: BandSelectionPolicy::Specified(band_id),
         ..RestoreOptions::default()
     };
-    restore(archive, restore_dir.path(), &options).unwrap();
+    restore(archive, restore_dir.path(), &options, CollectMonitor::arc()).unwrap();
     dir_assert::assert_paths(restore_dir.path(), snapshot).unwrap();
 }
 

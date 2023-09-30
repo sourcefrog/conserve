@@ -17,6 +17,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Arc;
 use std::{fs, time::Instant};
 
 use filetime::set_file_handle_times;
@@ -27,7 +28,8 @@ use tracing::{error, instrument, trace, warn};
 
 use crate::band::BandSelectionPolicy;
 use crate::io::{directory_is_empty, ensure_dir_exists};
-use crate::progress::{Bar, Progress};
+use crate::monitor::counters::Counter;
+use crate::monitor::Monitor;
 use crate::stats::RestoreStats;
 use crate::unix_mode::UnixMode;
 use crate::unix_time::ToFileTime;
@@ -64,6 +66,7 @@ pub fn restore(
     archive: &Archive,
     destination: &Path,
     options: &RestoreOptions,
+    monitor: Arc<dyn Monitor>,
 ) -> Result<RestoreStats> {
     let st = archive.open_stored_tree(options.band_selection.clone())?;
     ensure_dir_exists(destination)?;
@@ -71,8 +74,7 @@ pub fn restore(
         return Err(Error::DestinationNotEmpty);
     }
     let mut stats = RestoreStats::default();
-    let mut bytes_done = 0;
-    let bar = Bar::new();
+    let task = monitor.start_task("Restore".to_string());
     let start = Instant::now();
     let block_dir = archive.block_dir();
     // // This causes us to walk the source tree twice, which is probably an acceptable option
@@ -92,13 +94,11 @@ pub fn restore(
     )?;
     let mut deferrals = Vec::new();
     for entry in entry_iter {
-        bar.post(Progress::Restore {
-            filename: entry.apath().to_string(),
-            bytes_done,
-        });
+        task.set_name(format!("Restore {}", entry.apath));
         let path = destination.join(&entry.apath[1..]);
         match entry.kind() {
             Kind::Dir => {
+                monitor.count(Counter::Dirs, 1);
                 stats.directories += 1;
                 if let Err(err) = fs::create_dir_all(&path) {
                     if err.kind() != io::ErrorKind::AlreadyExists {
@@ -115,6 +115,7 @@ pub fn restore(
             }
             Kind::File => {
                 stats.files += 1;
+                monitor.count(Counter::Files, 1);
                 match restore_file(path.clone(), &entry, block_dir) {
                     Err(err) => {
                         error!(?err, ?path, "Failed to restore file");
@@ -122,14 +123,13 @@ pub fn restore(
                         continue;
                     }
                     Ok(s) => {
-                        if let Some(bytes) = entry.size() {
-                            bytes_done += bytes;
-                        }
+                        monitor.count(Counter::FileBytes, s.uncompressed_file_bytes as usize);
                         stats += s;
                     }
                 }
             }
             Kind::Symlink => {
+                monitor.count(Counter::Symlinks, 1);
                 stats.symlinks += 1;
                 if let Err(err) = restore_symlink(&path, &entry) {
                     error!(?path, ?err, "Failed to restore symlink");

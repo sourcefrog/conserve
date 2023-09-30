@@ -12,10 +12,11 @@ use strum_macros::{EnumCount, EnumIter};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount, EnumIter)]
 pub enum Counter {
-    BandsDone,
-    BandsTotal,
     Files,
     FileBytes,
+    Dirs,
+    Symlinks,
+    Bands,
     IndexBytesDone,
     BlockBytesDone,
     BlockRead,

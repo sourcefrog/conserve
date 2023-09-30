@@ -485,7 +485,7 @@ impl Command {
                 if *verbose || *long_listing {
                     ProgressImpl::Null.activate();
                 }
-                let stats = restore(&archive, destination, &options)?;
+                let stats = restore(&archive, destination, &options, monitor)?;
                 debug!("Restore complete");
                 if !no_stats {
                     debug!(%stats);
