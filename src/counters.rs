@@ -11,11 +11,12 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 
 use itertools::Itertools;
+use serde::ser::{Serialize, SerializeStruct};
 use strum::{EnumCount, IntoEnumIterator};
-use strum_macros::{EnumCount, EnumIter};
+use strum_macros::{EnumCount, EnumIter, IntoStaticStr};
 
 /// Counters of events or bytes.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount, EnumIter)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount, EnumIter, IntoStaticStr)]
 pub enum Counter {
     /// Number of files processed (restored, backed up, etc).
     ///
@@ -116,6 +117,19 @@ impl Debug for Counters {
             );
         }
         s.finish()
+    }
+}
+
+impl Serialize for Counters {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut s = serializer.serialize_struct("Counters", self.counters.len())?;
+        for (c, v) in self.iter() {
+            s.serialize_field(c.into(), &v)?;
+        }
+        s.end()
     }
 }
 

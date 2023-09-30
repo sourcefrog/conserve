@@ -30,6 +30,7 @@ fn backup_verbose() {
     src.create_file("subdir/a");
     src.create_file("subdir/b");
     let changes_json = NamedTempFile::new("changes.json").unwrap();
+    let counters_tmp = NamedTempFile::new("counters.json").unwrap();
 
     run_conserve()
         .args(["backup", "--no-stats", "-v"])
@@ -37,6 +38,8 @@ fn backup_verbose() {
         .arg(src.path())
         .arg("--changes-json")
         .arg(changes_json.path())
+        .arg("--metrics-json")
+        .arg(counters_tmp.path())
         .assert()
         .success()
         .stdout(indoc! { "
@@ -57,6 +60,13 @@ fn backup_verbose() {
     assert_eq!(changes[1]["apath"], "/subdir/b");
     assert_eq!(changes[1]["change"], "Added");
     assert_eq!(changes[1]["added"]["kind"], "File");
+
+    let counters_json = read_to_string(counters_tmp).unwrap();
+    println!("{counters_json}");
+    let counters: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(&counters_json).unwrap();
+    assert_eq!(counters.get("Files").unwrap(), 2);
+    assert_eq!(counters.get("Dirs").unwrap(), 2);
 }
 
 #[test]

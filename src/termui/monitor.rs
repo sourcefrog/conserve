@@ -83,6 +83,10 @@ impl TermUiMonitor {
         // TODO: Make Nutmeg understand when to clear stderr to write to stdout.
         self.view.clear();
     }
+
+    pub fn counters(&self) -> &Counters {
+        &self.counters
+    }
 }
 
 impl Drop for TermUiMonitor {

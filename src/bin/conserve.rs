@@ -14,7 +14,7 @@
 //! Command-line entry point for Conserve backups.
 
 use std::cell::RefCell;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
@@ -631,14 +631,20 @@ fn main() -> Result<ExitCode> {
     } else {
         Level::INFO
     };
-    if args.metrics_json.is_some() {
-        warn!("--metrics-json is no longer supported");
-    }
-    // TODO: Pass through --no-progress.
     let monitor = Arc::new(TermUiMonitor::new(!args.no_progress));
     let _flush_tracing = enable_tracing(&monitor, &args.trace_time, console_level, &args.log_json);
-    let result = args.command.run(monitor);
+    let result = args.command.run(monitor.clone());
     debug!(elapsed = ?start_time.elapsed());
+    if let Some(metrics_path) = args.metrics_json {
+        serde_json::to_writer_pretty(
+            File::options()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(metrics_path)?,
+            monitor.counters(),
+        )?;
+    }
     let error_count = global_error_count();
     let warn_count = global_warn_count();
     match result {
