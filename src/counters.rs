@@ -67,6 +67,12 @@ pub enum Counter {
     BlockExistenceCacheHit,
     /// Cache did not know whether this block exists.
     BlockExistenceCacheMiss,
+    /// Number of index hunks written.
+    IndexWrites,
+    /// Total uncompressed bytes in index hunks written.
+    IndexWriteUncompressedBytes,
+    /// Total compressed bytes in index hunks written.
+    IndexWriteCompressedBytes,
 }
 
 /// Counter values, identified by a [Counter].

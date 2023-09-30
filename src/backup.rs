@@ -117,7 +117,7 @@ pub fn backup(
         }
         writer.flush_group(monitor.clone())?;
     }
-    stats += writer.finish()?;
+    stats += writer.finish(monitor.clone())?;
     stats.elapsed = start.elapsed();
     let block_stats = &archive.block_dir.stats;
     stats.read_blocks = block_stats.read_blocks.load(Relaxed);
@@ -165,8 +165,8 @@ impl BackupWriter {
         })
     }
 
-    fn finish(self) -> Result<BackupStats> {
-        let index_builder_stats = self.index_builder.finish()?;
+    fn finish(self, monitor: Arc<dyn Monitor>) -> Result<BackupStats> {
+        let index_builder_stats = self.index_builder.finish(monitor)?;
         self.band.close(index_builder_stats.index_hunks as u64)?;
         Ok(BackupStats {
             index_builder_stats,
@@ -176,10 +176,10 @@ impl BackupWriter {
 
     /// Write out any pending data blocks, and then the pending index entries.
     fn flush_group(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
-        let (stats, mut entries) = self.file_combiner.drain(monitor)?;
+        let (stats, mut entries) = self.file_combiner.drain(monitor.clone())?;
         self.stats += stats;
         self.index_builder.append_entries(&mut entries);
-        self.index_builder.finish_hunk()
+        self.index_builder.finish_hunk(monitor)
     }
 
     /// Add one entry to the backup.
