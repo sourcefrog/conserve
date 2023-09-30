@@ -7,6 +7,7 @@ use std::thread::{sleep, spawn, JoinHandle};
 use std::time::Duration;
 
 use nutmeg::{Destination, View};
+use thousands::Separable;
 
 use crate::counters::{Counter, Counters};
 use crate::monitor::task::{Task, TaskList};
@@ -111,7 +112,7 @@ impl nutmeg::Model for Model {
         let mut s = String::new();
         for (counter, value) in self.counters.as_ref().iter() {
             if value > 0 {
-                s += &format!("{:?}: {}\n", counter, value);
+                s += &format!("{:?}: {}\n", counter, value.separate_with_commas());
             }
         }
         for task in self.tasks.lock().unwrap().active_tasks() {
