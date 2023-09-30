@@ -258,7 +258,10 @@ impl Archive {
         debug!(referenced.len = referenced.len());
 
         debug!("Find present blocks...");
-        let present = self.block_dir.block_names_set()?;
+        let present: HashSet<BlockHash> = self
+            .block_dir
+            .iter_block_names_monitor(monitor.clone())?
+            .collect();
         debug!(present.len = present.len());
 
         debug!("Find unreferenced blocks...");
