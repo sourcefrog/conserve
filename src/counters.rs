@@ -53,6 +53,12 @@ pub enum Counter {
     BlockWriteUncompressedBytes,
     /// Total compressed bytes in blocks written out.
     BlockWriteCompressedBytes,
+    /// Number of blocks read
+    BlockReads,
+    /// Total uncompressed bytes read from blocks.
+    BlockReadUncompressedBytes,
+    /// Total compressed bytes read from blocks.
+    BlockReadCompressedBytes,
     /// Found the content of a block in memory.
     BlockContentCacheHit,
     /// Failed to find a block in memory.

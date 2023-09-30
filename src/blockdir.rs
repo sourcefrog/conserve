@@ -227,12 +227,18 @@ impl BlockDir {
             .put(hash.clone(), decompressed_bytes.clone());
         self.exists.write().unwrap().pop(hash);
         self.stats.read_blocks.fetch_add(1, Relaxed);
+        monitor.count(Counter::BlockReads, 1);
         self.stats
             .read_block_compressed_bytes
             .fetch_add(compressed_bytes.len(), Relaxed);
+        monitor.count(Counter::BlockReadCompressedBytes, compressed_bytes.len());
         self.stats
             .read_block_uncompressed_bytes
             .fetch_add(decompressed_bytes.len(), Relaxed);
+        monitor.count(
+            Counter::BlockReadUncompressedBytes,
+            decompressed_bytes.len(),
+        );
         Ok(decompressed_bytes)
     }
 
