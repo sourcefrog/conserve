@@ -202,16 +202,15 @@ impl Archive {
     ) -> Result<HashSet<BlockHash>> {
         let archive = self.clone();
         let task = monitor.start_task("Find referenced blocks".to_string());
-        task.set_total(band_ids.len());
         Ok(band_ids
             .par_iter()
-            .inspect(|_| {
-                task.increment(1);
-            })
             .map(move |band_id| Band::open(&archive, *band_id).expect("Failed to open band"))
             .flat_map_iter(|band| band.index().iter_entries())
             .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
+            .inspect(|_| {
+                task.increment(1);
+            })
             .collect())
     }
 
