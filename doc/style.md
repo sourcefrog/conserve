@@ -40,6 +40,15 @@ To make a new one, `::create()` which returns a `Writer`.
 Versions that take a `Path` rather than a `Transport` should be called
 `open_path` and `create_path`.
 
+### Arguments
+
+If the function takes a `Monitor` argument it should be the last.
+
+If it takes some kind of `Options` that should be last before the monitor.
+
+In general arguments that are conceptually inputs should be towards the left,
+and those that are conceptually outputs should be towards the right.
+
 ### Variables
 
 Local variables (not in a closure) that hold a "major" object should have a
