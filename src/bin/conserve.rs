@@ -25,6 +25,7 @@ use conserve::change::Change;
 use conserve::progress::ProgressImpl;
 use conserve::trace_counter::{global_error_count, global_warn_count};
 use itertools::Itertools;
+use rayon::prelude::ParallelIterator;
 use time::UtcOffset;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
@@ -337,7 +338,7 @@ impl Command {
                 for hash in Archive::open(open_transport(archive)?)?
                     .block_dir()
                     .iter_block_names_monitor(monitor)?
-                    .collect_vec()
+                    .collect::<Vec<BlockHash>>()
                     .into_iter()
                 {
                     writeln!(bw, "{hash}")?;

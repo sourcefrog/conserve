@@ -253,18 +253,19 @@ impl BlockDir {
     pub fn iter_block_names_monitor(
         &self,
         monitor: Arc<dyn Monitor>,
-    ) -> Result<impl Iterator<Item = BlockHash>> {
+    ) -> Result<impl ParallelIterator<Item = BlockHash>> {
         // TODO: Read subdirs in parallel.
         let transport = self.transport.clone();
         let task = monitor.start_task("List block subdir".to_string());
         let subdirs = self.subdirs()?;
         task.set_total(subdirs.len());
         Ok(subdirs
-            .into_iter()
+            .into_par_iter()
             .map(move |subdir_name| {
-                task.increment(1);
                 // sleep(Duration::from_millis(5)); //TODO: Remove
-                transport.list_dir(&subdir_name)
+                let r = transport.list_dir(&subdir_name);
+                task.increment(1);
+                r
             })
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
