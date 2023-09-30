@@ -1,3 +1,5 @@
+// Copyright 2023 Martin Pool
+
 //! Monitor on a terminal UI.
 
 use std::sync::atomic::AtomicBool;
@@ -19,7 +21,12 @@ pub struct TermUiMonitor {
     // active_files: Mutex<Vec<String>>,
     tasks: Arc<Mutex<TaskList>>,
     view: Arc<View<Model>>,
+    /// A thread that periodically updates the view's progress bars from the Model.
+    ///
+    /// This is None during drop when the thread has been joined, and if progress
+    /// bars are disabled.
     poller: Option<JoinHandle<()>>,
+    /// True to ask the poller thread to stop, during drop.
     stop_poller: Arc<AtomicBool>,
 }
 
@@ -30,12 +37,14 @@ pub(super) struct Model {
 }
 
 impl TermUiMonitor {
-    pub fn new() -> Self {
+    /// Make a new terminal UI monitor.
+    pub fn new(show_progress: bool) -> Self {
         let counters = Arc::new(Counters::default());
         let tasks = Arc::new(Mutex::new(TaskList::default()));
         // We'll update from a polling thread at regular intervals, so we don't need Nutmeg to rate limit updates.
         let options = nutmeg::Options::default()
             .update_interval(Duration::ZERO)
+            .progress_enabled(show_progress)
             .destination(Destination::Stderr);
         let view = Arc::new(View::new(
             Model {
@@ -45,14 +54,18 @@ impl TermUiMonitor {
             options,
         ));
         let stop_poller = Arc::new(AtomicBool::new(false));
-        let view2 = view.clone();
-        let stop_poller2 = stop_poller.clone();
-        let poller = Some(spawn(move || {
-            while !stop_poller2.load(Relaxed) {
-                view2.update(|_| {});
-                sleep(Duration::from_millis(100));
-            }
-        }));
+        let poller = if show_progress {
+            let view2 = view.clone();
+            let stop_poller2 = stop_poller.clone();
+            Some(spawn(move || {
+                while !stop_poller2.load(Relaxed) {
+                    view2.update(|_| {});
+                    sleep(Duration::from_millis(100));
+                }
+            }))
+        } else {
+            None
+        };
         TermUiMonitor {
             counters,
             tasks,
@@ -72,20 +85,14 @@ impl TermUiMonitor {
     }
 }
 
-impl Default for TermUiMonitor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Drop for TermUiMonitor {
     fn drop(&mut self) {
         self.stop_poller.store(true, Relaxed);
-        self.poller
-            .take()
-            .expect("Poller thread should exist")
-            .join()
-            .expect("Wait for nutmeg poller thread to stop");
+        if let Some(poller) = self.poller.take() {
+            poller
+                .join()
+                .expect("Wait for nutmeg poller thread to stop");
+        }
     }
 }
 

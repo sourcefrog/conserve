@@ -635,7 +635,7 @@ fn main() -> Result<ExitCode> {
         warn!("--metrics-json is no longer supported");
     }
     // TODO: Pass through --no-progress.
-    let monitor = Arc::new(TermUiMonitor::new());
+    let monitor = Arc::new(TermUiMonitor::new(!args.no_progress));
     let _flush_tracing = enable_tracing(&monitor, &args.trace_time, console_level, &args.log_json);
     let result = args.command.run(monitor);
     debug!(elapsed = ?start_time.elapsed());
