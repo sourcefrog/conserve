@@ -4,6 +4,8 @@
 //!
 //! Library code sets counters through the [Monitor] interface.
 
+#![warn(missing_docs)]
+
 use std::fmt::{self, Debug};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -12,41 +14,47 @@ use itertools::Itertools;
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount, EnumIter};
 
+/// Counters of events or bytes.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumCount, EnumIter)]
 pub enum Counter {
-    /// Number of files processed.
+    /// Number of files processed (restored, backed up, etc).
+    ///
+    /// Includes files that are unchanged, but not files that are excluded.
     Files,
+    /// Total bytes in files processed.
     FileBytes,
+    /// Number of directories processed.
     Dirs,
+    /// Number of symlinks processed.
     Symlinks,
-    Bands,
-    IndexBytesDone,
-    BlockBytesDone,
-    BlockRead,
-    BlockWrite,
-    BlockMatchExisting,
-    BlockCacheHit,
-    ScannedFileBytes,
+    /// Number of entries (files etc) that are unchanged from the basis backup.
     EntriesUnchanged,
+    /// Number of entries changed since the basis backup.
     EntriesChanged,
+    /// Number of entries added since the basis backup.
     EntriesAdded,
+    /// Number of entries deleted relative to the basis backup.
     EntriesDeleted,
-    // ...
 }
+
+/// Counter values, identified by a [Counter].
 #[derive(Default)]
 pub struct Counters {
     counters: [AtomicUsize; Counter::COUNT],
 }
 
 impl Counters {
+    /// Increase the value for a given counter by an amount.
     pub fn count(&self, counter: Counter, increment: usize) {
         self.counters[counter as usize].fetch_add(increment, Relaxed);
     }
 
+    /// Set the absolute value of a counter.
     pub fn set(&self, counter: Counter, value: usize) {
         self.counters[counter as usize].store(value, Relaxed);
     }
 
+    /// Get the current value of a counter.
     pub fn get(&self, counter: Counter) -> usize {
         self.counters[counter as usize].load(Relaxed)
     }

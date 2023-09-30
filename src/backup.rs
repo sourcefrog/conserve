@@ -116,7 +116,7 @@ pub fn backup(
             task.set_name(format!("Backup {}", entry.apath()));
             if let Some(bytes) = entry.size() {
                 if bytes > 0 {
-                    monitor.count(Counter::ScannedFileBytes, bytes as usize);
+                    monitor.count(Counter::FileBytes, bytes as usize);
                 }
             }
         }

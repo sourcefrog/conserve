@@ -38,7 +38,6 @@ use tracing::{instrument, trace};
 use crate::backup::BackupStats;
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
-use crate::counters::Counter;
 use crate::monitor::Monitor;
 use crate::transport::{ListDir, Transport};
 use crate::*;
@@ -325,7 +324,6 @@ impl BlockDir {
             .flat_map(|hash| match self.get_block_content(&hash) {
                 Ok(bytes) => {
                     task.increment(1);
-                    monitor.count(Counter::BlockBytesDone, bytes.len());
                     Some((hash, bytes.len()))
                 }
                 Err(err) => {
