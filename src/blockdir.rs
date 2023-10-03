@@ -48,11 +48,6 @@ const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
 
-/// Cache this many blocks in memory.
-const BLOCK_CACHE_SIZE: usize = (1 << 30) / MAX_BLOCK_SIZE;
-
-const EXISTENCE_CACHE_SIZE: usize = (64 << 20) / BLOCKDIR_FILE_NAME_LEN;
-
 /// Points to some compressed data inside the block dir.
 ///
 /// Identifiers are: which file contains it, at what (pre-compression) offset,
@@ -78,9 +73,7 @@ pub struct BlockDir {
     pub stats: BlockDirStats,
     // TODO: There are fancier caches and they might help, but this one works, and Stretto did not work for me.
     cache: RwLock<LruCache<BlockHash, Bytes>>,
-    /// True if we know that this block exists, even if we don't have its content.
-    ///
-    /// This does _not_ contain keys that are in `cache`.
+    /// Presence means that we know that this block exists, even if we don't have its content.
     exists: RwLock<LruCache<BlockHash, ()>>,
 }
 
@@ -97,6 +90,14 @@ pub fn block_relpath(hash: &BlockHash) -> String {
 
 impl BlockDir {
     pub fn open(transport: Arc<dyn Transport>) -> BlockDir {
+        /// Cache this many blocks in memory.
+        // TODO: Change to a cache that tracks the size of strored blocks?
+        // As a safe conservative value, 100 blocks of 20MB each would be 2GB.
+        const BLOCK_CACHE_SIZE: usize = 100;
+
+        /// Remember the existence of this many blocks, even if we don't have their content.
+        const EXISTENCE_CACHE_SIZE: usize = (64 << 20) / BLAKE_HASH_SIZE_BYTES;
+
         BlockDir {
             transport,
             stats: BlockDirStats::default(),
@@ -214,7 +215,7 @@ impl BlockDir {
             .write()
             .expect("Lock cache")
             .put(hash.clone(), decompressed_bytes.clone());
-        self.exists.write().unwrap().pop(hash);
+        self.exists.write().unwrap().put(hash.clone(), ());
         self.stats.read_blocks.fetch_add(1, Relaxed);
         self.stats
             .read_block_compressed_bytes

@@ -49,14 +49,21 @@ pub struct BackupOptions<'cb> {
 
     // Call this callback as each entry is successfully stored.
     pub change_callback: Option<ChangeCallback<'cb>>,
+
+    pub max_block_size: usize,
+
+    /// Combine files smaller than this into a single block.
+    pub small_file_cap: u64,
 }
 
 impl Default for BackupOptions<'_> {
     fn default() -> BackupOptions<'static> {
         BackupOptions {
             exclude: Exclude::nothing(),
-            max_entries_per_hunk: crate::index::MAX_ENTRIES_PER_HUNK,
+            max_entries_per_hunk: 100_000,
             change_callback: None,
+            max_block_size: 20 << 20,
+            small_file_cap: 1 << 20,
         }
     }
 }
@@ -82,7 +89,7 @@ pub fn backup(
     options: &BackupOptions,
 ) -> Result<BackupStats> {
     let start = Instant::now();
-    let mut writer = BackupWriter::begin(archive)?;
+    let mut writer = BackupWriter::begin(archive, options)?;
     let mut stats = BackupStats::default();
     let bar = Bar::new();
     let source_tree = LiveTree::open(source_path)?;
@@ -95,7 +102,7 @@ pub fn backup(
     let entry_iter = source_tree.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
-            match writer.copy_entry(&entry, &source_tree) {
+            match writer.copy_entry(&entry, &source_tree, options) {
                 Err(err) => {
                     error!(?entry, ?err, "Error copying entry to backup");
                     stats.errors += 1;
@@ -161,7 +168,7 @@ impl BackupWriter {
     /// Create a new BackupWriter.
     ///
     /// This currently makes a new top-level band.
-    pub fn begin(archive: &Archive) -> Result<BackupWriter> {
+    pub fn begin(archive: &Archive, options: &BackupOptions) -> Result<Self> {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
@@ -177,7 +184,7 @@ impl BackupWriter {
             block_dir: archive.block_dir.clone(),
             stats: BackupStats::default(),
             basis_index,
-            file_combiner: FileCombiner::new(archive.block_dir.clone()),
+            file_combiner: FileCombiner::new(archive.block_dir.clone(), options.max_block_size),
         })
     }
 
@@ -203,11 +210,16 @@ impl BackupWriter {
     /// Return an indication of whether it changed (if it's a file), or
     /// None for non-plain-file types where that information is not currently
     /// calculated.
-    fn copy_entry(&mut self, entry: &EntryValue, source: &LiveTree) -> Result<Option<EntryChange>> {
+    fn copy_entry(
+        &mut self,
+        entry: &EntryValue,
+        source: &LiveTree,
+        options: &BackupOptions,
+    ) -> Result<Option<EntryChange>> {
         // TODO: Emit deletions for entries in the basis not present in the source.
         match entry.kind() {
             Kind::Dir => self.copy_dir(entry),
-            Kind::File => self.copy_file(entry, source),
+            Kind::File => self.copy_file(entry, source, options),
             Kind::Symlink => self.copy_symlink(entry),
             Kind::Unknown => {
                 self.stats.unknown_kind += 1;
@@ -231,6 +243,7 @@ impl BackupWriter {
         &mut self,
         source_entry: &EntryValue,
         from_tree: &LiveTree,
+        options: &BackupOptions,
     ) -> Result<Option<EntryChange>> {
         self.stats.files += 1;
         let apath = source_entry.apath();
@@ -268,12 +281,17 @@ impl BackupWriter {
             self.stats.empty_files += 1;
         } else {
             let mut source_file = from_tree.open_file(source_entry)?;
-            if size <= SMALL_FILE_CAP {
+            if size <= options.small_file_cap {
                 self.file_combiner
                     .push_file(source_entry, &mut source_file)?;
             } else {
-                let addrs =
-                    store_file_content(apath, &mut source_file, &self.block_dir, &mut self.stats)?;
+                let addrs = store_file_content(
+                    apath,
+                    &mut source_file,
+                    &self.block_dir,
+                    &mut self.stats,
+                    options.max_block_size,
+                )?;
                 self.index_builder.push_entry(IndexEntry {
                     addrs,
                     ..IndexEntry::metadata_from(source_entry)
@@ -299,10 +317,11 @@ fn store_file_content(
     from_file: &mut dyn Read,
     block_dir: &BlockDir,
     stats: &mut BackupStats,
+    max_block_size: usize,
 ) -> Result<Vec<Address>> {
     let mut addresses = Vec::<Address>::with_capacity(1);
     loop {
-        let buffer = read_with_retries(MAX_BLOCK_SIZE, from_file).map_err(|source| {
+        let buffer = read_with_retries(max_block_size, from_file).map_err(|source| {
             Error::ReadSourceFile {
                 path: apath.to_string().into(),
                 source,
@@ -340,6 +359,7 @@ struct FileCombiner {
     finished: Vec<IndexEntry>,
     stats: BackupStats,
     block_dir: Arc<BlockDir>,
+    max_block_size: usize,
 }
 
 /// A file in the process of being written into a combined block.
@@ -357,13 +377,14 @@ struct QueuedFile {
 }
 
 impl FileCombiner {
-    fn new(block_dir: Arc<BlockDir>) -> FileCombiner {
+    fn new(block_dir: Arc<BlockDir>, max_block_size: usize) -> FileCombiner {
         FileCombiner {
             block_dir,
             buf: BytesMut::new(),
             queue: Vec::new(),
             finished: Vec::new(),
             stats: BackupStats::default(),
+            max_block_size,
         }
     }
 
@@ -445,7 +466,9 @@ impl FileCombiner {
             len,
             entry: index_entry,
         });
-        if self.buf.len() >= TARGET_COMBINED_BLOCK_SIZE {
+        // TODO: This can overrun by one small file; it would be better to check
+        // in advance and perhaps start a new combined block that it will fit inside.
+        if self.buf.len() >= self.max_block_size {
             self.flush()
         } else {
             Ok(())

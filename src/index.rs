@@ -34,8 +34,6 @@ use crate::unix_mode::UnixMode;
 use crate::unix_time::FromUnixAndNanos;
 use crate::*;
 
-pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
-
 pub const HUNKS_PER_SUBDIR: u32 = 10_000;
 
 /// Description of one archived file.
@@ -204,7 +202,7 @@ impl IndexWriter {
     pub fn new(transport: Arc<dyn Transport>) -> IndexWriter {
         IndexWriter {
             transport,
-            entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
+            entries: Vec::new(),
             sequence: 0,
             check_order: apath::DebugCheckOrder::new(),
             stats: IndexWriterStats::default(),
@@ -798,7 +796,7 @@ mod tests {
     #[test]
     fn no_final_empty_hunk() -> Result<()> {
         let (testdir, mut ib) = setup();
-        for i in 0..MAX_ENTRIES_PER_HUNK {
+        for i in 0..100_000 {
             ib.push_entry(sample_entry(&format!("/{i:0>10}")));
         }
         ib.finish_hunk()?;
