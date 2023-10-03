@@ -20,9 +20,11 @@ use assert_fs::prelude::*;
 use assert_fs::TempDir;
 
 use conserve::archive::Archive;
+use conserve::monitor::collect::CollectMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::Band;
 use conserve::BandId;
+use rayon::prelude::ParallelIterator;
 
 #[test]
 fn create_then_open_archive() {
@@ -78,12 +80,18 @@ fn empty_archive() {
         "Archive should have no bands yet"
     );
     assert_eq!(
-        af.referenced_blocks(&af.list_band_ids().unwrap())
+        af.referenced_blocks(&af.list_band_ids().unwrap(), CollectMonitor::arc())
             .unwrap()
             .len(),
         0
     );
-    assert_eq!(af.block_dir().iter_block_names().unwrap().count(), 0);
+    assert_eq!(
+        af.block_dir()
+            .blocks(CollectMonitor::arc())
+            .unwrap()
+            .count(),
+        0
+    );
 }
 
 #[test]
@@ -110,10 +118,16 @@ fn create_bands() {
     assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
     assert_eq!(
-        af.referenced_blocks(&af.list_band_ids().unwrap())
+        af.referenced_blocks(&af.list_band_ids().unwrap(), CollectMonitor::arc())
             .unwrap()
             .len(),
         0
     );
-    assert_eq!(af.block_dir().iter_block_names().unwrap().count(), 0);
+    assert_eq!(
+        af.block_dir()
+            .blocks(CollectMonitor::arc())
+            .unwrap()
+            .count(),
+        0
+    );
 }

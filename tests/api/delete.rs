@@ -12,6 +12,7 @@
 
 //! Test deletion.
 
+use conserve::monitor::collect::CollectMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::*;
 
@@ -21,7 +22,11 @@ fn delete_all_bands() {
     af.store_two_versions();
 
     let stats = af
-        .delete_bands(&[BandId::new(&[0]), BandId::new(&[1])], &Default::default())
+        .delete_bands(
+            &[BandId::new(&[0]), BandId::new(&[1])],
+            &Default::default(),
+            CollectMonitor::arc(),
+        )
         .expect("delete_bands");
 
     assert_eq!(stats.deleted_block_count, 2);

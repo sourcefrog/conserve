@@ -83,13 +83,6 @@ pub struct IndexReadStats {
     pub errors: usize,
 }
 
-#[derive(Add, AddAssign, Clone, Debug, Default, Eq, PartialEq)]
-pub struct IndexWriterStats {
-    pub index_hunks: usize,
-    pub uncompressed_index_bytes: u64,
-    pub compressed_index_bytes: u64,
-}
-
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct LiveTreeIterStats {
     pub directories_visited: usize,

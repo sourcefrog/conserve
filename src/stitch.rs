@@ -149,6 +149,8 @@ fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<Band
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::counters::Counter;
+    use crate::monitor::collect::CollectMonitor;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
@@ -191,39 +193,49 @@ mod test {
         //   1 was deleted in b2, 2 is carried over from b2,
         //   and 3 is carried over from b1.
 
+        let monitor = CollectMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id(), BandId::zero());
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b0"));
         ib.push_entry(symlink("/1", "b0"));
-        ib.finish_hunk()?;
+        ib.finish_hunk(monitor.clone())?;
         ib.push_entry(symlink("/2", "b0"));
         // Flush this hunk but leave the band incomplete.
-        let stats = ib.finish()?;
-        assert_eq!(stats.index_hunks, 2);
+        let hunks = ib.finish(monitor.clone())?;
+        assert_eq!(hunks, 2);
+        assert_eq!(
+            monitor.get_counter(Counter::IndexWrites),
+            2,
+            "2 hunks were finished"
+        );
 
+        let monitor = CollectMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0001");
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b1"));
         ib.push_entry(symlink("/1", "b1"));
-        ib.finish_hunk()?;
+        ib.finish_hunk(monitor.clone())?;
         ib.push_entry(symlink("/2", "b1"));
         ib.push_entry(symlink("/3", "b1"));
-        let stats = ib.finish()?;
-        assert_eq!(stats.index_hunks, 2);
+        let hunks = ib.finish(monitor.clone())?;
+        assert_eq!(hunks, 2);
+        assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
         band.close(2)?;
 
         // b2
+        let monitor = CollectMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0002");
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b2"));
-        ib.finish_hunk()?;
+        ib.finish_hunk(monitor.clone())?;
         ib.push_entry(symlink("/2", "b2"));
         // incomplete
-        let stats = ib.finish()?;
-        assert_eq!(stats.index_hunks, 2);
+        let hunks = ib.finish(monitor.clone())?;
+        assert_eq!(hunks, 2);
+        assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
 
         // b3
         let band = Band::create(&af)?;
@@ -234,13 +246,15 @@ mod test {
         assert_eq!(band.id().to_string(), "b0004");
 
         // b5
+        let monitor = CollectMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0005");
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b5"));
         ib.push_entry(symlink("/00", "b5"));
-        let stats = ib.finish()?;
-        assert_eq!(stats.index_hunks, 1);
+        let hunks = ib.finish(monitor.clone())?;
+        assert_eq!(hunks, 1);
+        assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
         // incomplete
 
         std::fs::remove_dir_all(af.path().join("b0003"))?;
@@ -274,7 +288,13 @@ mod test {
         tf.create_file("file_a");
 
         let af = ScratchArchive::new();
-        backup(&af, tf.path(), &BackupOptions::default()).expect("backup should work");
+        backup(
+            &af,
+            tf.path(),
+            &BackupOptions::default(),
+            CollectMonitor::arc(),
+        )
+        .expect("backup should work");
 
         af.transport().remove_file("b0000/BANDTAIL").unwrap();
         let band_ids = af.list_band_ids().expect("should list bands");

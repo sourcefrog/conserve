@@ -16,9 +16,11 @@
 use std::fs::{remove_file, OpenOptions};
 use std::path::{Path, PathBuf};
 
+use conserve::monitor::collect::CollectMonitor;
 use conserve::transport::open_local_transport;
-use conserve::{Archive, BandId};
+use conserve::{Archive, BandId, BlockHash};
 use itertools::Itertools;
+use rayon::prelude::ParallelIterator;
 
 /// A way of damaging a file in an archive.
 #[derive(Debug, Clone)]
@@ -83,8 +85,10 @@ impl DamageLocation {
                         .expect("open archive");
                 let block_dir = archive.block_dir();
                 let block_hash = block_dir
-                    .iter_block_names()
+                    .blocks(CollectMonitor::arc())
                     .expect("list blocks")
+                    .collect::<Vec<BlockHash>>()
+                    .into_iter()
                     .sorted()
                     .nth(*block_index)
                     .expect("Archive has an nth block");

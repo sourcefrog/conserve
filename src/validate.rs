@@ -13,13 +13,12 @@
 use std::cmp::max;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::time::Instant;
+use std::sync::Arc;
 
-#[allow(unused_imports)]
-use tracing::{error, info, warn};
+use tracing::{debug, error};
 
 use crate::misc::ResultExt;
-use crate::progress::{Bar, Progress};
+use crate::monitor::Monitor;
 use crate::*;
 
 /// Options to [Archive::validate].
@@ -36,12 +35,13 @@ pub struct ValidateOptions {
 pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
+    monitor: Arc<dyn Monitor>,
 ) -> Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
-    let start = Instant::now();
-    let total_bands = band_ids.len();
-    let bar = Bar::new();
-    'band: for (bands_done, band_id) in band_ids.iter().enumerate() {
+    let task = monitor.start_task("Validate indexes".to_string());
+    task.set_total(band_ids.len());
+    'band: for band_id in band_ids.iter() {
+        task.increment(1);
         let band = match Band::open(archive, *band_id) {
             Ok(band) => band,
             Err(err) => {
@@ -53,19 +53,21 @@ pub(crate) fn validate_bands(
             error!(%err, %band_id, "Error validating band");
             continue 'band;
         };
-        if let Err(err) = archive
-            .open_stored_tree(BandSelectionPolicy::Specified(*band_id))
-            .and_then(|st| validate_stored_tree(&st))
-            .map(|st_block_lens| merge_block_lens(&mut block_lens, &st_block_lens))
-        {
-            error!(%err, %band_id, "Error validating stored tree");
-            continue 'band;
-        }
-        bar.post(Progress::ValidateBands {
-            total_bands,
-            bands_done,
-            start,
-        });
+        let st = match archive.open_stored_tree(BandSelectionPolicy::Specified(*band_id)) {
+            Err(err) => {
+                error!(%err, %band_id, "Error validating stored tree");
+                continue 'band;
+            }
+            Ok(st) => st,
+        };
+        let band_block_lens = match validate_stored_tree(&st, monitor.as_ref()) {
+            Err(err) => {
+                error!(%err, %band_id, "Error validating stored tree");
+                continue 'band;
+            }
+            Ok(block_lens) => block_lens,
+        };
+        merge_block_lens(&mut block_lens, &band_block_lens);
     }
     Ok(block_lens)
 }
@@ -78,16 +80,19 @@ fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash
     }
 }
 
-fn validate_stored_tree(st: &StoredTree) -> Result<HashMap<BlockHash, u64>> {
-    let mut block_lens = HashMap::new();
+fn validate_stored_tree(st: &StoredTree, monitor: &dyn Monitor) -> Result<HashMap<BlockHash, u64>> {
     // TODO: Check other entry properties are correct.
     // TODO: Check they're in apath order.
     // TODO: Count progress for index blocks within one tree?
+    let _task = monitor.start_task(format!("Validate stored tree {}", st.band().id()));
+    let mut block_lens = HashMap::new();
     for entry in st
         .iter_entries(Apath::root(), Exclude::nothing())
         .our_inspect_err(|err| error!(%err, "Error iterating index entries"))?
         .filter(|entry| entry.kind() == Kind::File)
     {
+        // TODO: Read index hunks, count into the task per hunk. Then, we can
+        // read hunks in parallel.
         for addr in entry.addrs {
             let end = addr.start + addr.len;
             block_lens
@@ -96,5 +101,6 @@ fn validate_stored_tree(st: &StoredTree) -> Result<HashMap<BlockHash, u64>> {
                 .or_insert(end);
         }
     }
+    debug!(blocks = %block_lens.len(), band_id = ?st.band().id(), "Validated stored tree");
     Ok(block_lens)
 }

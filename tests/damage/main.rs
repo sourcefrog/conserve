@@ -12,6 +12,7 @@
 // GNU General Public License for more details.
 
 use std::fs::rename;
+use std::sync::Arc;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
@@ -22,6 +23,7 @@ use rstest::rstest;
 use tracing_test::traced_test;
 // use predicates::prelude::*;
 
+use conserve::monitor::collect::CollectMonitor;
 use conserve::{
     backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait,
     Exclude, RestoreOptions, ValidateOptions,
@@ -79,7 +81,13 @@ fn backup_after_damage(
         .unwrap();
 
     let backup_options = BackupOptions::default();
-    backup(&archive, source_dir.path(), &backup_options).expect("initial backup");
+    backup(
+        &archive,
+        source_dir.path(),
+        &backup_options,
+        CollectMonitor::arc(),
+    )
+    .expect("initial backup");
 
     drop(archive);
     action.damage(&location.to_path(&archive_dir));
@@ -91,8 +99,13 @@ fn backup_after_damage(
 
     // A second backup should succeed.
     changes.apply(&source_dir);
-    let backup_stats = backup(&archive, source_dir.path(), &backup_options)
-        .expect("write second backup after damage");
+    let backup_stats = backup(
+        &archive,
+        source_dir.path(),
+        &backup_options,
+        CollectMonitor::arc(),
+    )
+    .expect("write second backup after damage");
     dbg!(&backup_stats);
 
     match changes {
@@ -127,8 +140,13 @@ fn backup_after_damage(
 
     // Can restore the second backup
     let restore_dir = TempDir::new().unwrap();
-    let restore_stats = restore(&archive, restore_dir.path(), &RestoreOptions::default())
-        .expect("restore second backup");
+    let restore_stats = restore(
+        &archive,
+        restore_dir.path(),
+        &RestoreOptions::default(),
+        CollectMonitor::arc(),
+    )
+    .expect("restore second backup");
     dbg!(&restore_stats);
     assert_eq!(restore_stats.files, 1);
     assert_eq!(restore_stats.errors, 0);
@@ -161,6 +179,6 @@ fn backup_after_damage(
     // Validation completes although with warnings.
     // TODO: This should return problems that we can inspect.
     archive
-        .validate(&ValidateOptions::default())
+        .validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))
         .expect("validate");
 }

@@ -30,12 +30,11 @@ use tracing::{error, warn};
 
 use crate::blockdir::Address;
 use crate::change::Change;
+use crate::counters::Counter;
 use crate::entry::EntryValue;
 use crate::io::read_with_retries;
-use crate::progress::{Bar, Progress};
-use crate::stats::{
-    write_compressed_size, write_count, write_duration, write_size, IndexWriterStats,
-};
+use crate::monitor::Monitor;
+use crate::stats::{write_compressed_size, write_count, write_duration, write_size};
 use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::ReadTree;
 use crate::*;
@@ -87,22 +86,19 @@ pub fn backup(
     archive: &Archive,
     source_path: &Path,
     options: &BackupOptions,
+    monitor: Arc<dyn Monitor>,
 ) -> Result<BackupStats> {
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive, options)?;
     let mut stats = BackupStats::default();
-    let bar = Bar::new();
     let source_tree = LiveTree::open(source_path)?;
 
-    let mut scanned_file_bytes = 0;
-    let mut entries_new = 0;
-    let mut entries_changed = 0;
-    let mut entries_unchanged = 0;
+    let task = monitor.start_task("Backup".to_string());
 
     let entry_iter = source_tree.iter_entries(Apath::root(), options.exclude.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
         for entry in entry_group {
-            match writer.copy_entry(&entry, &source_tree, options) {
+            match writer.copy_entry(&entry, &source_tree, options, monitor.clone()) {
                 Err(err) => {
                     error!(?entry, ?err, "Error copying entry to backup");
                     stats.errors += 1;
@@ -110,11 +106,11 @@ pub fn backup(
                 }
                 Ok(Some(entry_change)) => {
                     match entry_change.change {
-                        Change::Changed { .. } => entries_changed += 1,
-                        Change::Added { .. } => entries_new += 1,
-                        Change::Unchanged { .. } => entries_unchanged += 1,
+                        Change::Changed { .. } => monitor.count(Counter::EntriesChanged, 1),
+                        Change::Added { .. } => monitor.count(Counter::EntriesAdded, 1),
+                        Change::Unchanged { .. } => monitor.count(Counter::EntriesUnchanged, 1),
                         // Deletions are not produced at the moment.
-                        Change::Deleted { .. } => (), // model.entries_deleted += 1,
+                        Change::Deleted { .. } => monitor.count(Counter::EntriesDeleted, 1),
                     }
                     if let Some(cb) = &options.change_callback {
                         cb(&entry_change)?;
@@ -122,25 +118,11 @@ pub fn backup(
                 }
                 Ok(_) => {}
             }
-            match entry.size() {
-                Some(bytes) if bytes > 0 => {
-                    scanned_file_bytes += bytes;
-                    bar.post(Progress::Backup {
-                        filename: entry.apath().to_string(),
-                        scanned_file_bytes,
-                        scanned_dirs: stats.directories,
-                        scanned_files: stats.files,
-                        entries_new,
-                        entries_changed,
-                        entries_unchanged,
-                    });
-                }
-                _ => (),
-            }
+            task.set_name(format!("Backup {}", entry.apath()));
         }
-        writer.flush_group()?;
+        writer.flush_group(monitor.clone())?;
     }
-    stats += writer.finish()?;
+    stats += writer.finish(monitor.clone())?;
     stats.elapsed = start.elapsed();
     let block_stats = &archive.block_dir.stats;
     stats.read_blocks = block_stats.read_blocks.load(Relaxed);
@@ -188,21 +170,18 @@ impl BackupWriter {
         })
     }
 
-    fn finish(self) -> Result<BackupStats> {
-        let index_builder_stats = self.index_builder.finish()?;
-        self.band.close(index_builder_stats.index_hunks as u64)?;
-        Ok(BackupStats {
-            index_builder_stats,
-            ..self.stats
-        })
+    fn finish(self, monitor: Arc<dyn Monitor>) -> Result<BackupStats> {
+        let hunks = self.index_builder.finish(monitor)?;
+        self.band.close(hunks as u64)?;
+        Ok(BackupStats { ..self.stats })
     }
 
     /// Write out any pending data blocks, and then the pending index entries.
-    fn flush_group(&mut self) -> Result<()> {
-        let (stats, mut entries) = self.file_combiner.drain()?;
+    fn flush_group(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
+        let (stats, mut entries) = self.file_combiner.drain(monitor.clone())?;
         self.stats += stats;
         self.index_builder.append_entries(&mut entries);
-        self.index_builder.finish_hunk()
+        self.index_builder.finish_hunk(monitor)
     }
 
     /// Add one entry to the backup.
@@ -215,12 +194,13 @@ impl BackupWriter {
         entry: &EntryValue,
         source: &LiveTree,
         options: &BackupOptions,
+        monitor: Arc<dyn Monitor>,
     ) -> Result<Option<EntryChange>> {
         // TODO: Emit deletions for entries in the basis not present in the source.
         match entry.kind() {
-            Kind::Dir => self.copy_dir(entry),
-            Kind::File => self.copy_file(entry, source, options),
-            Kind::Symlink => self.copy_symlink(entry),
+            Kind::Dir => self.copy_dir(entry, monitor.as_ref()),
+            Kind::File => self.copy_file(entry, source, options, monitor.clone()),
+            Kind::Symlink => self.copy_symlink(entry, monitor.as_ref()),
             Kind::Unknown => {
                 self.stats.unknown_kind += 1;
                 // TODO: Perhaps eventually we could backup and restore pipes,
@@ -231,7 +211,12 @@ impl BackupWriter {
         }
     }
 
-    fn copy_dir(&mut self, source_entry: &EntryValue) -> Result<Option<EntryChange>> {
+    fn copy_dir(
+        &mut self,
+        source_entry: &EntryValue,
+        monitor: &dyn Monitor,
+    ) -> Result<Option<EntryChange>> {
+        monitor.count(Counter::Dirs, 1);
         self.stats.directories += 1;
         self.index_builder
             .push_entry(IndexEntry::metadata_from(source_entry));
@@ -244,8 +229,10 @@ impl BackupWriter {
         source_entry: &EntryValue,
         from_tree: &LiveTree,
         options: &BackupOptions,
+        monitor: Arc<dyn Monitor>,
     ) -> Result<Option<EntryChange>> {
         self.stats.files += 1;
+        monitor.count(Counter::Files, 1);
         let apath = source_entry.apath();
         let result = if let Some(basis_entry) = self.basis_index.advance_to(apath) {
             if entry_metadata_unchanged(source_entry, &basis_entry) {
@@ -254,7 +241,11 @@ impl BackupWriter {
                     .iter()
                     .map(|addr| &addr.hash)
                     .unique()
-                    .all(|hash| self.block_dir.contains(hash).unwrap_or(false))
+                    .all(|hash| {
+                        self.block_dir
+                            .contains(hash, monitor.clone())
+                            .unwrap_or(false)
+                    })
                 {
                     self.stats.unmodified_files += 1;
                     let change = Some(EntryChange::unchanged(&basis_entry));
@@ -279,11 +270,13 @@ impl BackupWriter {
             self.index_builder
                 .push_entry(IndexEntry::metadata_from(source_entry));
             self.stats.empty_files += 1;
+            monitor.count(Counter::EmptyFiles, 1);
         } else {
             let mut source_file = from_tree.open_file(source_entry)?;
             if size <= options.small_file_cap {
                 self.file_combiner
-                    .push_file(source_entry, &mut source_file)?;
+                    .push_file(source_entry, &mut source_file, monitor.clone())?;
+                monitor.count(Counter::SmallFiles, 1);
             } else {
                 let addrs = store_file_content(
                     apath,
@@ -291,6 +284,7 @@ impl BackupWriter {
                     &self.block_dir,
                     &mut self.stats,
                     options.max_block_size,
+                    monitor.clone(),
                 )?;
                 self.index_builder.push_entry(IndexEntry {
                     addrs,
@@ -301,7 +295,12 @@ impl BackupWriter {
         Ok(result)
     }
 
-    fn copy_symlink(&mut self, source_entry: &EntryValue) -> Result<Option<EntryChange>> {
+    fn copy_symlink(
+        &mut self,
+        source_entry: &EntryValue,
+        monitor: &dyn Monitor,
+    ) -> Result<Option<EntryChange>> {
+        monitor.count(Counter::Symlinks, 1);
         let target = source_entry.symlink_target();
         self.stats.symlinks += 1;
         assert!(target.is_some());
@@ -318,6 +317,7 @@ fn store_file_content(
     block_dir: &BlockDir,
     stats: &mut BackupStats,
     max_block_size: usize,
+    monitor: Arc<dyn Monitor>,
 ) -> Result<Vec<Address>> {
     let mut addresses = Vec::<Address>::with_capacity(1);
     loop {
@@ -331,8 +331,9 @@ fn store_file_content(
             break;
         }
         let buffer = buffer.freeze();
+        monitor.count(Counter::FileBytes, buffer.len());
         let len = buffer.len() as u64;
-        let hash = block_dir.store_or_deduplicate(buffer, stats)?;
+        let hash = block_dir.store_or_deduplicate(buffer, stats, monitor.clone())?;
         addresses.push(Address {
             hash,
             start: 0,
@@ -340,9 +341,21 @@ fn store_file_content(
         });
     }
     match addresses.len() {
-        0 => stats.empty_files += 1,
-        1 => stats.single_block_files += 1,
-        _ => stats.multi_block_files += 1,
+        0 => {
+            // This doesn't duplicate the call to monitor.count above, because
+            // in this case we only discovered that it was empty after reading the
+            // file.
+            monitor.count(Counter::EmptyFiles, 1);
+            stats.empty_files += 1;
+        }
+        1 => {
+            monitor.count(Counter::SingleBlockFiles, 1);
+            stats.single_block_files += 1
+        }
+        _ => {
+            monitor.count(Counter::MultiBlockFiles, 1);
+            stats.multi_block_files += 1
+        }
     }
     Ok(addresses)
 }
@@ -390,8 +403,8 @@ impl FileCombiner {
 
     /// Flush any pending files, and return accumulated file entries and stats.
     /// The FileCombiner is then empty and ready for reuse.
-    fn drain(&mut self) -> Result<(BackupStats, Vec<IndexEntry>)> {
-        self.flush()?;
+    fn drain(&mut self, monitor: Arc<dyn Monitor>) -> Result<(BackupStats, Vec<IndexEntry>)> {
+        self.flush(monitor)?;
         debug_assert!(self.queue.is_empty());
         debug_assert!(self.buf.is_empty());
         Ok((
@@ -406,14 +419,16 @@ impl FileCombiner {
     ///
     /// After this call the FileCombiner is empty and can be reused for more files into a new
     /// block.
-    fn flush(&mut self) -> Result<()> {
+    fn flush(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
         if self.queue.is_empty() {
             debug_assert!(self.buf.is_empty());
             return Ok(());
         }
-        let hash = self
-            .block_dir
-            .store_or_deduplicate(take(&mut self.buf).freeze(), &mut self.stats)?;
+        let hash = self.block_dir.store_or_deduplicate(
+            take(&mut self.buf).freeze(),
+            &mut self.stats,
+            monitor,
+        )?;
         self.stats.combined_blocks += 1;
         self.finished
             .extend(self.queue.drain(..).map(|qf| IndexEntry {
@@ -430,7 +445,12 @@ impl FileCombiner {
     /// Add the contents of a small file into this combiner.
     ///
     /// `entry` should be an IndexEntry that's complete apart from the block addresses.
-    fn push_file(&mut self, entry: &EntryValue, from_file: &mut dyn Read) -> Result<()> {
+    fn push_file(
+        &mut self,
+        entry: &EntryValue,
+        from_file: &mut dyn Read,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<()> {
         let start = self.buf.len();
         let expected_len: usize = entry
             .size()
@@ -469,7 +489,7 @@ impl FileCombiner {
         // TODO: This can overrun by one small file; it would be better to check
         // in advance and perhaps start a new combined block that it will fit inside.
         if self.buf.len() >= self.max_block_size {
-            self.flush()
+            self.flush(monitor)
         } else {
             Ok(())
         }
@@ -524,7 +544,6 @@ pub struct BackupStats {
 
     pub errors: usize,
 
-    pub index_builder_stats: IndexWriterStats,
     pub elapsed: Duration,
 
     pub read_blocks: usize,
@@ -557,11 +576,6 @@ impl fmt::Display for BackupStats {
         write_count(w, "new data blocks written:", self.written_blocks);
         write_count(w, "  blocks of combined files", self.combined_blocks);
         write_compressed_size(w, self.compressed_bytes, self.uncompressed_bytes);
-        writeln!(w).unwrap();
-
-        let idx = &self.index_builder_stats;
-        write_count(w, "new index hunks", idx.index_hunks);
-        write_compressed_size(w, idx.compressed_index_bytes, idx.uncompressed_index_bytes);
         writeln!(w).unwrap();
 
         write_count(w, "blocks read", self.read_blocks);

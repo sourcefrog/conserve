@@ -14,22 +14,22 @@
 //! Command-line entry point for Conserve backups.
 
 use std::cell::RefCell;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
 use conserve::change::Change;
-use conserve::progress::ProgressImpl;
 use conserve::trace_counter::{global_error_count, global_warn_count};
+use rayon::prelude::ParallelIterator;
 use time::UtcOffset;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
 
 use conserve::backup::BackupOptions;
-use conserve::ui::termui::TraceTimeStyle;
+use conserve::termui::{enable_tracing, TermUiMonitor, TraceTimeStyle};
 use conserve::ReadTree;
 use conserve::RestoreOptions;
 use conserve::*;
@@ -295,7 +295,7 @@ impl std::process::Termination for ExitCode {
 }
 
 impl Command {
-    fn run(&self) -> Result<ExitCode> {
+    fn run(&self, monitor: Arc<TermUiMonitor>) -> Result<ExitCode> {
         let mut stdout = std::io::stdout();
         match self {
             Command::Backup {
@@ -319,9 +319,14 @@ impl Command {
                 };
                 if *long_listing || *verbose {
                     // TODO(CON-23): Really Nutmeg should coordinate stdout and stderr...
-                    ProgressImpl::Null.activate()
+                    // todo!("Disable progress bars!");
                 }
-                let stats = backup(&Archive::open(open_transport(archive)?)?, source, &options)?;
+                let stats = backup(
+                    &Archive::open(open_transport(archive)?)?,
+                    source,
+                    &options,
+                    monitor,
+                )?;
                 if !no_stats {
                     info!("Backup complete.\n{stats}");
                 }
@@ -330,7 +335,9 @@ impl Command {
                 let mut bw = BufWriter::new(stdout);
                 for hash in Archive::open(open_transport(archive)?)?
                     .block_dir()
-                    .iter_block_names()?
+                    .blocks(monitor)?
+                    .collect::<Vec<BlockHash>>()
+                    .into_iter()
                 {
                     writeln!(bw, "{hash}")?;
                 }
@@ -342,15 +349,19 @@ impl Command {
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 let archive = Archive::open(open_transport(archive)?)?;
-                for hash in archive.referenced_blocks(&archive.list_band_ids()?)? {
+                for hash in archive.referenced_blocks(&archive.list_band_ids()?, monitor)? {
                     writeln!(bw, "{hash}")?;
                 }
             }
             Command::Debug(Debug::Unreferenced { archive }) => {
-                let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open(open_transport(archive)?)?.unreferenced_blocks()? {
-                    writeln!(bw, "{hash}")?;
-                }
+                print!(
+                    "{}",
+                    Archive::open(open_transport(archive)?)?
+                        .unreferenced_blocks(monitor)?
+                        .map(|hash| format!("{}\n", hash))
+                        .collect::<Vec<String>>()
+                        .join("")
+                );
             }
             Command::Delete {
                 archive,
@@ -365,8 +376,10 @@ impl Command {
                         dry_run: *dry_run,
                         break_lock: *break_lock,
                     },
+                    monitor.clone(),
                 )?;
                 if !no_stats {
+                    monitor.clear_progress_bars();
                     println!("{stats}");
                 }
             }
@@ -407,6 +420,7 @@ impl Command {
                         dry_run: *dry_run,
                         break_lock: *break_lock,
                     },
+                    monitor,
                 )?;
                 if !no_stats {
                     info!(%stats);
@@ -438,6 +452,7 @@ impl Command {
                                 .iter_entries(Apath::root(), exclude)?,
                         )
                     };
+                monitor.clear_progress_bars();
                 if *json {
                     for entry in entry_iter {
                         println!("{}", serde_json::ser::to_string(&entry)?);
@@ -473,9 +488,9 @@ impl Command {
                     )?,
                 };
                 if *verbose || *long_listing {
-                    ProgressImpl::Null.activate();
+                    // todo!("Disable progress bar");
                 }
-                let stats = restore(&archive, destination, &options)?;
+                let stats = restore(&archive, destination, &options, monitor)?;
                 debug!("Restore complete");
                 if !no_stats {
                     debug!(%stats);
@@ -490,13 +505,14 @@ impl Command {
                 let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)?
-                        .size(exclude)?
+                        .size(exclude, monitor.clone())?
                         .file_bytes
                 } else {
                     LiveTree::open(stos.source.as_ref().unwrap())?
-                        .size(exclude)?
+                        .size(exclude, monitor.clone())?
                         .file_bytes
                 };
+                monitor.clear_progress_bars();
                 if *bytes {
                     println!("{size}");
                 } else {
@@ -507,7 +523,7 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                Archive::open(open_transport(archive)?)?.validate(&options)?;
+                Archive::open(open_transport(archive)?)?.validate(&options, monitor)?;
                 if global_error_count() > 0 || global_warn_count() > 0 {
                     warn!("Archive has some problems.");
                 } else {
@@ -534,7 +550,7 @@ impl Command {
                     start_time: !*short,
                     backup_duration: !*short,
                 };
-                conserve::show_versions(&archive, &options, &mut stdout)?;
+                conserve::show_versions(&archive, &options, monitor)?;
             }
         }
         Ok(ExitCode::Success)
@@ -610,20 +626,25 @@ fn main() -> Result<ExitCode> {
         UtcOffset::current_local_offset().expect("get local time offset");
     let args = Args::parse();
     let start_time = Instant::now();
-    if !args.no_progress {
-        progress::ProgressImpl::Terminal.activate();
-    }
     let console_level = if args.debug {
         Level::TRACE
     } else {
         Level::INFO
     };
-    if args.metrics_json.is_some() {
-        warn!("--metrics-json is no longer supported");
-    }
-    let _flush_guard = ui::termui::enable_tracing(&args.trace_time, console_level, &args.log_json);
-    let result = args.command.run();
+    let monitor = Arc::new(TermUiMonitor::new(!args.no_progress));
+    let _flush_tracing = enable_tracing(&monitor, &args.trace_time, console_level, &args.log_json);
+    let result = args.command.run(monitor.clone());
     debug!(elapsed = ?start_time.elapsed());
+    if let Some(metrics_path) = args.metrics_json {
+        serde_json::to_writer_pretty(
+            File::options()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(metrics_path)?,
+            monitor.counters(),
+        )?;
+    }
     let error_count = global_error_count();
     let warn_count = global_warn_count();
     match result {

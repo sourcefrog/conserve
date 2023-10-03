@@ -24,10 +24,12 @@ use time::OffsetDateTime;
 use tracing::{debug, debug_span, error};
 
 use crate::compress::snappy::{Compressor, Decompressor};
+use crate::counters::Counter;
 use crate::entry::{EntryValue, KindMeta};
 use crate::kind::Kind;
+use crate::monitor::Monitor;
 use crate::owner::Owner;
-use crate::stats::{IndexReadStats, IndexWriterStats};
+use crate::stats::IndexReadStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
 use crate::unix_mode::UnixMode;
@@ -185,13 +187,13 @@ pub struct IndexWriter {
     /// Index hunk number, starting at 0.
     sequence: u32,
 
+    /// Number of hunks actually written.
+    hunks_written: usize,
+
     /// The last filename from the previous hunk, to enforce ordering. At the
     /// start of the first hunk this is empty; at the start of a later hunk it's
     /// the last path from the previous hunk.
     check_order: apath::DebugCheckOrder,
-
-    /// Statistics about work done while writing this index.
-    pub stats: IndexWriterStats,
 
     compressor: Compressor,
 }
@@ -204,16 +206,16 @@ impl IndexWriter {
             transport,
             entries: Vec::new(),
             sequence: 0,
+            hunks_written: 0,
             check_order: apath::DebugCheckOrder::new(),
-            stats: IndexWriterStats::default(),
             compressor: Compressor::new(),
         }
     }
 
     /// Finish the last hunk of this index, and return the stats.
-    pub fn finish(mut self) -> Result<IndexWriterStats> {
-        self.finish_hunk()?;
-        Ok(self.stats)
+    pub fn finish(mut self, monitor: Arc<dyn Monitor>) -> Result<usize> {
+        self.finish_hunk(monitor)?;
+        Ok(self.hunks_written)
     }
 
     /// Write new index entries.
@@ -235,7 +237,7 @@ impl IndexWriter {
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the buffer to start receiving
     /// entries for the next hunk.
-    pub fn finish_hunk(&mut self) -> Result<()> {
+    pub fn finish_hunk(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
         if self.entries.is_empty() {
             return Ok(());
         }
@@ -254,9 +256,10 @@ impl IndexWriter {
         }
         let compressed_bytes = self.compressor.compress(&json)?;
         self.transport.write_file(&relpath, &compressed_bytes)?;
-        self.stats.index_hunks += 1;
-        self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
-        self.stats.uncompressed_index_bytes += json.len() as u64;
+        self.hunks_written += 1;
+        monitor.count(Counter::IndexWrites, 1);
+        monitor.count(Counter::IndexWriteCompressedBytes, compressed_bytes.len());
+        monitor.count(Counter::IndexWriteUncompressedBytes, json.len());
         self.entries.clear(); // Ready for the next hunk.
         self.sequence += 1;
         Ok(())
@@ -274,6 +277,7 @@ fn hunk_relpath(hunk_number: u32) -> String {
     format!("{:05}/{:09}", hunk_number / HUNKS_PER_SUBDIR, hunk_number)
 }
 
+// TODO: Maybe this isn't adding much on top of the hunk iter?
 #[derive(Debug, Clone)]
 pub struct IndexRead {
     /// Transport pointing to this index directory.
@@ -419,6 +423,7 @@ impl IndexHunkIter {
 }
 
 /// Read out all the entries from a stored index, in apath order.
+// TODO: Maybe fold this into stitch.rs; we'd rarely want them without stitching...
 pub struct IndexEntryIter<HI: Iterator<Item = Vec<IndexEntry>>> {
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
@@ -515,6 +520,8 @@ impl<HI: Iterator<Item = Vec<IndexEntry>>> IndexEntryIter<HI> {
 mod tests {
     use tempfile::TempDir;
 
+    use crate::monitor::collect::CollectMonitor;
+
     use super::transport::local::LocalTransport;
     use super::*;
 
@@ -565,7 +572,7 @@ mod tests {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/zzz"));
         ib.push_entry(sample_entry("/aaa"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
     }
 
     #[test]
@@ -573,7 +580,7 @@ mod tests {
     fn index_builder_checks_names() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("../escapecat"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
     }
 
     #[test]
@@ -583,7 +590,7 @@ mod tests {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/again"));
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
     }
 
     #[test]
@@ -592,9 +599,9 @@ mod tests {
     fn no_duplicate_paths_across_hunks() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
     }
 
     #[test]
@@ -605,22 +612,18 @@ mod tests {
     #[test]
     fn basic() {
         let (testdir, mut ib) = setup();
+        let monitor = CollectMonitor::arc();
         ib.append_entries(&mut vec![sample_entry("/apple"), sample_entry("/banana")]);
-        let stats = ib.finish().unwrap();
+        let hunks = ib.finish(monitor.clone()).unwrap();
+        assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
 
-        assert_eq!(stats.index_hunks, 1);
-        assert!(stats.compressed_index_bytes > 30);
-        assert!(
-            stats.compressed_index_bytes <= 125,
-            "expected shorter compressed index: {}",
-            stats.compressed_index_bytes
-        );
-        assert!(stats.uncompressed_index_bytes > 100);
-        assert!(
-            stats.uncompressed_index_bytes < 250,
-            "expected shorter uncompressed index: {}",
-            stats.uncompressed_index_bytes
-        );
+        assert_eq!(hunks, 1);
+        let counters = monitor.counters();
+        dbg!(&counters);
+        assert!(counters.get(Counter::IndexWriteCompressedBytes) > 30);
+        assert!(counters.get(Counter::IndexWriteCompressedBytes) < 125,);
+        assert!(counters.get(Counter::IndexWriteUncompressedBytes) > 100);
+        assert!(counters.get(Counter::IndexWriteUncompressedBytes) < 250);
 
         assert!(
             std::fs::metadata(testdir.path().join("00000").join("000000000"))
@@ -641,9 +644,9 @@ mod tests {
     fn multiple_hunks() {
         let (testdir, mut ib) = setup();
         ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
 
         let index_read = IndexRead::open_path(testdir.path());
         let it = index_read.iter_entries();
@@ -674,9 +677,9 @@ mod tests {
     fn iter_hunks_advance_to_after() {
         let (testdir, mut ib) = setup();
         ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
 
         let index_read = IndexRead::open_path(testdir.path());
         let names: Vec<String> = index_read
@@ -758,13 +761,13 @@ mod tests {
         ib.push_entry(sample_entry("/bar"));
         ib.push_entry(sample_entry("/foo"));
         ib.push_entry(sample_entry("/foobar"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
 
         // Make multiple hunks to test traversal across hunks.
         ib.push_entry(sample_entry("/g01"));
         ib.push_entry(sample_entry("/g02"));
         ib.push_entry(sample_entry("/g03"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
 
         // Advance to /foo and read on from there.
         let mut it = IndexRead::open_path(testdir.path()).iter_entries();
@@ -799,9 +802,9 @@ mod tests {
         for i in 0..100_000 {
             ib.push_entry(sample_entry(&format!("/{i:0>10}")));
         }
-        ib.finish_hunk()?;
+        ib.finish_hunk(CollectMonitor::arc())?;
         // Think about, but don't actually add some files
-        ib.finish_hunk()?;
+        ib.finish_hunk(CollectMonitor::arc())?;
         let read_index = IndexRead::open_path(testdir.path());
         assert_eq!(read_index.iter_hunks().count(), 1);
         Ok(())

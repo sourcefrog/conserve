@@ -23,23 +23,22 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
 
 use bytes::Bytes;
 use lru::LruCache;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-#[allow(unused_imports)]
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 use tracing::{instrument, trace};
 
 use crate::backup::BackupStats;
 use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
-use crate::progress::{Bar, Progress};
+use crate::counters::Counter;
+use crate::monitor::Monitor;
 use crate::transport::{ListDir, Transport};
 use crate::*;
 
@@ -118,19 +117,19 @@ impl BlockDir {
         &self,
         block_data: Bytes,
         stats: &mut BackupStats,
+        monitor: Arc<dyn Monitor>,
     ) -> Result<BlockHash> {
         let hash = BlockHash::hash_bytes(&block_data);
         let uncomp_len = block_data.len() as u64;
-        if self.contains(&hash)? {
+        if self.contains(&hash, monitor.clone())? {
             stats.deduplicated_blocks += 1;
             stats.deduplicated_bytes += uncomp_len;
+            monitor.count(Counter::DeduplicatedBlocks, 1);
+            monitor.count(Counter::DeduplicatedBlockBytes, block_data.len());
             return Ok(hash);
         }
         let compressed = Compressor::new().compress(&block_data)?;
-        self.cache
-            .write()
-            .expect("Lock cache")
-            .put(hash.clone(), block_data);
+        monitor.count(Counter::BlockWriteUncompressedBytes, block_data.len());
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
         let relpath = block_relpath(&hash);
@@ -139,6 +138,14 @@ impl BlockDir {
         stats.written_blocks += 1;
         stats.uncompressed_bytes += uncomp_len;
         stats.compressed_bytes += comp_len;
+        monitor.count(Counter::BlockWrites, 1);
+        monitor.count(Counter::BlockWriteCompressedBytes, compressed.len());
+        // Only update caches after everything succeeded
+        self.cache
+            .write()
+            .expect("Lock cache")
+            .put(hash.clone(), block_data);
+        self.exists.write().unwrap().push(hash.clone(), ());
         Ok(hash)
     }
 
@@ -150,13 +157,15 @@ impl BlockDir {
     /// an interrupted operation on a local filesystem to leave an empty file.
     /// So, these are specifically treated as missing, so there's a chance to heal
     /// them later.
-    pub fn contains(&self, hash: &BlockHash) -> Result<bool> {
+    pub fn contains(&self, hash: &BlockHash, monitor: Arc<dyn Monitor>) -> Result<bool> {
         if self.cache.read().expect("Lock cache").contains(hash)
             || self.exists.read().unwrap().contains(hash)
         {
+            monitor.count(Counter::BlockExistenceCacheHit, 1);
             self.stats.cache_hit.fetch_add(1, Relaxed);
             return Ok(true);
         }
+        monitor.count(Counter::BlockExistenceCacheMiss, 1);
         match self.transport.metadata(&block_relpath(hash)) {
             Err(err) if err.is_not_found() => Ok(false),
             Err(err) => {
@@ -177,8 +186,8 @@ impl BlockDir {
     }
 
     /// Read back some content addressed by an [Address] (a block hash, start and end).
-    pub fn read_address(&self, address: &Address) -> Result<Bytes> {
-        let bytes = self.get_block_content(&address.hash)?;
+    pub fn read_address(&self, address: &Address, monitor: Arc<dyn Monitor>) -> Result<Bytes> {
+        let bytes = self.get_block_content(&address.hash, monitor)?;
         let len = address.len as usize;
         let start = address.start as usize;
         let end = start + len;
@@ -195,13 +204,15 @@ impl BlockDir {
     /// Return the entire contents of the block.
     ///
     /// Checks that the hash is correct with the contents.
-    #[instrument(skip(self))]
-    pub fn get_block_content(&self, hash: &BlockHash) -> Result<Bytes> {
+    #[instrument(skip(self, monitor))]
+    pub fn get_block_content(&self, hash: &BlockHash, monitor: Arc<dyn Monitor>) -> Result<Bytes> {
         if let Some(hit) = self.cache.write().expect("Lock cache").get(hash) {
+            monitor.count(Counter::BlockContentCacheHit, 1);
             self.stats.cache_hit.fetch_add(1, Relaxed);
             trace!("Block cache hit");
             return Ok(hit.clone());
         }
+        monitor.count(Counter::BlockContentCacheMiss, 1);
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
         let compressed_bytes = self.transport.read_file(&block_relpath)?;
@@ -217,12 +228,18 @@ impl BlockDir {
             .put(hash.clone(), decompressed_bytes.clone());
         self.exists.write().unwrap().put(hash.clone(), ());
         self.stats.read_blocks.fetch_add(1, Relaxed);
+        monitor.count(Counter::BlockReads, 1);
         self.stats
             .read_block_compressed_bytes
             .fetch_add(compressed_bytes.len(), Relaxed);
+        monitor.count(Counter::BlockReadCompressedBytes, compressed_bytes.len());
         self.stats
             .read_block_uncompressed_bytes
             .fetch_add(decompressed_bytes.len(), Relaxed);
+        monitor.count(
+            Counter::BlockReadUncompressedBytes,
+            decompressed_bytes.len(),
+        );
         Ok(decompressed_bytes)
     }
 
@@ -251,13 +268,21 @@ impl BlockDir {
     }
 
     /// Return all the blocknames in the blockdir, in arbitrary order.
-    pub fn iter_block_names(&self) -> Result<impl Iterator<Item = BlockHash>> {
-        // TODO: Read subdirs in parallel.
+    pub fn blocks(
+        &self,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<impl ParallelIterator<Item = BlockHash>> {
         let transport = self.transport.clone();
-        Ok(self
-            .subdirs()?
-            .into_iter()
-            .map(move |subdir_name| transport.list_dir(&subdir_name))
+        let task = monitor.start_task("List block subdir".to_string());
+        let subdirs = self.subdirs()?;
+        task.set_total(subdirs.len());
+        Ok(subdirs
+            .into_par_iter()
+            .map(move |subdir_name| {
+                let r = transport.list_dir(&subdir_name);
+                task.increment(1);
+                r
+            })
             .filter_map(|iter_or| {
                 if let Err(ref err) = iter_or {
                     error!(%err, "Error listing block subdirectory");
@@ -269,57 +294,36 @@ impl BlockDir {
             .filter_map(|name| name.parse().ok()))
     }
 
-    /// Return all the blocknames in the blockdir, while showing progress.
-    pub fn block_names_set(&self) -> Result<HashSet<BlockHash>> {
-        // TODO: We could estimate time remaining by accounting for how
-        // many prefixes are present and how many have been read.
-        let bar = Bar::new();
-        Ok(self
-            .iter_block_names()?
-            .enumerate()
-            .map(|(count, hash)| {
-                bar.post(Progress::ListBlocks { count });
-                hash
-            })
-            .collect())
-    }
-
     /// Check format invariants of the BlockDir.
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub fn validate(&self) -> Result<HashMap<BlockHash, usize>> {
+    pub fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
         // TODO: Warn on blocks in the wrong subdir.
         debug!("Start list blocks");
-        let blocks = self.block_names_set()?;
-        let total_blocks = blocks.len();
-        debug!("Check {total_blocks} blocks");
-        let blocks_done = AtomicUsize::new(0);
-        let bytes_done = AtomicU64::new(0);
-        let start = Instant::now();
-        let task = Bar::new();
+        let blocks = self
+            .blocks(monitor.clone())?
+            .collect::<HashSet<BlockHash>>();
+        debug!("Check {} blocks", blocks.len());
+        let task = monitor.start_task("Validate blocks".to_string());
+        task.set_total(blocks.len());
         let block_lens = blocks
             .into_par_iter()
-            .flat_map(|hash| match self.get_block_content(&hash) {
-                Ok(bytes) => {
-                    let len = bytes.len();
-                    let len64 = len as u64;
-                    task.post(Progress::ValidateBlocks {
-                        blocks_done: blocks_done.fetch_add(1, Ordering::Relaxed) + 1,
-                        total_blocks,
-                        bytes_done: bytes_done.fetch_add(len64, Ordering::Relaxed) + len64,
-                        start,
-                    });
-                    Some((hash, len))
-                }
-                Err(err) => {
-                    error!(%err, %hash, "Error reading block content");
-                    None
-                }
-            })
+            .flat_map(
+                |hash| match self.get_block_content(&hash, monitor.clone()) {
+                    Ok(bytes) => {
+                        task.increment(1);
+                        Some((hash, bytes.len()))
+                    }
+                    Err(err) => {
+                        error!(%err, %hash, "Error reading block content");
+                        None
+                    }
+                },
+            )
             .collect();
         Ok(block_lens)
     }
@@ -337,29 +341,42 @@ pub struct BlockDirStats {
 mod test {
     use std::fs::OpenOptions;
 
+    use crate::monitor::collect::CollectMonitor;
     use crate::transport::open_local_transport;
 
     use super::*;
     use tempfile::TempDir;
     #[test]
     fn empty_block_file_counts_as_not_present() {
+        // Due to an interruption or system crash we might end up with a block
+        // file with 0 bytes. It's not valid compressed data. We just treat
+        // the block as not present at all.
         let tempdir = TempDir::new().unwrap();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
+        let monitor = CollectMonitor::arc();
         let hash = blockdir
-            .store_or_deduplicate(Bytes::from("stuff"), &mut stats)
+            .store_or_deduplicate(Bytes::from("stuff"), &mut stats, monitor.clone())
             .unwrap();
-        assert!(blockdir.contains(&hash).unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockWrites), 1);
+        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 0);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
+        assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1); // Since we just wrote it, we know it's there.
 
         // Open again to get a fresh cache
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let monitor = CollectMonitor::arc();
         OpenOptions::new()
             .write(true)
             .truncate(true)
             .create(false)
             .open(tempdir.path().join(block_relpath(&hash)))
             .expect("Truncate block");
-        assert!(!blockdir.contains(&hash).unwrap());
+        assert!(!blockdir.contains(&hash, monitor.clone()).unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
     }
 
     #[test]
@@ -369,18 +386,25 @@ mod test {
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let hash = blockdir
-            .store_or_deduplicate(content.clone(), &mut stats)
+            .store_or_deduplicate(content.clone(), &mut stats, CollectMonitor::arc())
             .unwrap();
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
 
-        assert!(blockdir.contains(&hash).unwrap());
+        let monitor = CollectMonitor::arc();
+        assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1);
 
-        let retrieved = blockdir.get_block_content(&hash).unwrap();
+        let monitor = CollectMonitor::arc();
+        let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
         assert_eq!(content, retrieved);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 1);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 0);
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit against the value written
 
-        let retrieved = blockdir.get_block_content(&hash).unwrap();
+        let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 2);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 0);
         assert_eq!(content, retrieved);
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 3); // hit again
     }
@@ -391,22 +415,31 @@ mod test {
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
+        let monitor = CollectMonitor::arc();
         let hash = blockdir
-            .store_or_deduplicate(content.clone(), &mut stats)
+            .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
             .unwrap();
 
         // reopen
+        let monitor = CollectMonitor::arc();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
-        assert!(blockdir.contains(&hash).unwrap());
+        assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
-        assert!(blockdir.contains(&hash).unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);
+
+        assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
-        assert!(blockdir.contains(&hash).unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1);
+
+        assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 2);
 
         // actually reading the content is a miss
-        let retrieved = blockdir.get_block_content(&hash).unwrap();
+        let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
         assert_eq!(content, retrieved);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 1);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 0);
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit again
     }
 }
