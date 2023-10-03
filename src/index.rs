@@ -279,6 +279,7 @@ fn hunk_relpath(hunk_number: u32) -> String {
     format!("{:05}/{:09}", hunk_number / HUNKS_PER_SUBDIR, hunk_number)
 }
 
+// TODO: Maybe this isn't adding much on top of the hunk iter?
 #[derive(Debug, Clone)]
 pub struct IndexRead {
     /// Transport pointing to this index directory.
@@ -424,6 +425,7 @@ impl IndexHunkIter {
 }
 
 /// Read out all the entries from a stored index, in apath order.
+// TODO: Maybe fold this into stitch.rs; we'd rarely want them without stitching...
 pub struct IndexEntryIter<HI: Iterator<Item = Vec<IndexEntry>>> {
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
