@@ -111,6 +111,7 @@ pub fn restore(
                     path,
                     unix_mode: entry.unix_mode(),
                     mtime: entry.mtime(),
+                    owner: entry.owner().clone(),
                 })
             }
             Kind::File => {
@@ -163,6 +164,7 @@ struct DirDeferral {
     path: PathBuf,
     unix_mode: UnixMode,
     mtime: OffsetDateTime,
+    owner: Owner,
 }
 
 fn apply_deferrals(deferrals: &[DirDeferral]) -> Result<RestoreStats> {
@@ -171,8 +173,13 @@ fn apply_deferrals(deferrals: &[DirDeferral]) -> Result<RestoreStats> {
         path,
         unix_mode,
         mtime,
+        owner,
     } in deferrals
     {
+        if let Err(err) = owner.set_owner(path) {
+            error!(?path, ?err, "Error restoring ownership");
+            stats.errors += 1;
+        }
         if let Err(err) = unix_mode.set_permissions(path) {
             error!(?path, ?err, "Failed to set directory permissions");
             stats.errors += 1;
@@ -254,7 +261,8 @@ fn restore_file(
 }
 
 #[cfg(unix)]
-fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<()> {
+fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<RestoreStats> {
+    let mut stats = RestoreStats::default();
     use std::os::unix::fs as unix_fs;
     if let Some(ref target) = entry.symlink_target() {
         if let Err(source) = unix_fs::symlink(target, path) {
@@ -262,6 +270,10 @@ fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<()> {
                 path: path.to_owned(),
                 source,
             });
+        }
+        if let Err(err) = &entry.owner().set_owner(path) {
+            error!(?path, ?err, "Error restoring ownership");
+            stats.errors += 1;
         }
         let mtime = entry.mtime().to_file_time();
         if let Err(source) = set_symlink_file_times(path, mtime, mtime) {
@@ -272,15 +284,16 @@ fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<()> {
         }
     } else {
         error!(apath = ?entry.apath(), "No target in symlink entry");
+        stats.errors += 1;
     }
-    Ok(())
+    Ok(stats)
 }
 
 #[cfg(not(unix))]
 #[mutants::skip]
-fn restore_symlink(_restore_path: &Path, entry: &IndexEntry) -> Result<()> {
+fn restore_symlink(_restore_path: &Path, entry: &IndexEntry) -> Result<RestoreStats> {
     // TODO: Add a test with a canned index containing a symlink, and expect
     // it cannot be restored on Windows and can be on Unix.
     warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
-    Ok(())
+    Ok(RestoreStats::default())
 }

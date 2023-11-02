@@ -15,17 +15,15 @@
 //! Unix implementation of file ownership.
 
 use std::io;
-use std::os::unix::fs::MetadataExt;
+use std::os::unix::fs::{lchown, MetadataExt};
 use std::sync::Mutex;
 use std::{fs, path::Path};
 
 use lazy_static::lazy_static;
-use nix::errno::Errno;
-use nix::unistd;
 use uzers::{Groups, Users, UsersCache};
 
 use super::Owner;
-use crate::{Error, Result};
+use crate::Result;
 
 lazy_static! {
     static ref USERS_CACHE: Mutex<UsersCache> = Mutex::new(UsersCache::new());
@@ -44,34 +42,29 @@ impl From<&fs::Metadata> for Owner {
     }
 }
 
-#[mutants::skip] // TODO: Test that at least groups are restored!
+#[mutants::skip] // TODO: Difficult to test as non-root but we could at least test that at least groups are restored!
 pub(crate) fn set_owner(owner: &Owner, path: &Path) -> Result<()> {
     let users_cache = USERS_CACHE.lock().unwrap();
     let uid_opt = owner
         .user
         .as_ref()
         .and_then(|user| users_cache.get_user_by_name(&user))
-        .map(|user| user.uid())
-        .map(unistd::Uid::from_raw);
+        .map(|user| user.uid());
     let gid_opt = owner
         .group
         .as_ref()
         .and_then(|group| users_cache.get_group_by_name(&group))
-        .map(|group| group.gid())
-        .map(unistd::Gid::from_raw);
+        .map(|group| group.gid());
     drop(users_cache);
     // TODO: use `std::os::unix::fs::chown(path, uid, gid)?;` once stable
-    match unistd::chown(path, uid_opt, gid_opt) {
+    match lchown(path, uid_opt, gid_opt) {
         Ok(()) => Ok(()),
-        Err(Errno::EPERM) => {
+        Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
             // If the restore is not run as root (or with special capabilities)
             // then we probably can't set ownership, and there's no point
             // complaining
             Ok(())
         }
-        Err(errno) => Err(Error::SetOwner {
-            path: path.to_path_buf(),
-            source: io::Error::from_raw_os_error(errno as i32),
-        }),
+        Err(err) => Err(err.into()),
     }
 }
