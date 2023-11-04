@@ -65,6 +65,10 @@ jobs:
         uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-mutants
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt
       - name: Run mutant tests
         # Can't use --all-features here because BLAKE2 SIMD needs unstable...
         # Don't use the S3 features because they require AWS credentials for realistic
