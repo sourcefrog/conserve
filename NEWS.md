@@ -1,12 +1,14 @@
 # Conserve release history
 
-## Unreleased
+## 23.11.0
 
 - Fixed: Restore now sets Unix user/group ownership on symlinks and directories. Previously, only file ownership was restored. (Setting file ownership typically requires restoring as root.)
 
 - Performance: Also keep a cache of the existence of blocks that have not yet been read.
 
 - Changed: The format and keys written by `--metrics-json` has changed.
+
+- Changed: New more detailed progress display, especially during backup.
 
 ## 23.9.0
 
