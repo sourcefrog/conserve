@@ -10,6 +10,7 @@ examine_globs = [
     "src/blockdir.rs",
     "src/blockhash.rs",
     "src/bin/conserve.rs",
+    "src/change.rs",
     "src/counters.rs",
     "src/jsonio.rs",
     "src/restore.rs",
