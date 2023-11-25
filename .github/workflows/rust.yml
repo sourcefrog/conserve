@@ -22,9 +22,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         features: ["", "s3"]
+        version: [stable, nightly, "1.73"]
 
     steps:
       - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.version }}
+          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.features }}
@@ -60,6 +65,10 @@ jobs:
         uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-mutants
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt
       - name: Run mutant tests
         # Can't use --all-features here because BLAKE2 SIMD needs unstable...
         # Don't use the S3 features because they require AWS credentials for realistic
