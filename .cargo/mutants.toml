@@ -1,7 +1,11 @@
 # Controls tests with `cargo mutants`
 
 # Skip some relatively unimportant functions and traits for now.
-exclude_re = ["<impl Display"]
+exclude_re = [
+    "<impl Display",
+    # spins forever returning empty vecs
+    "replace <impl Iterator for IterStitchedIndexHunks>::next -> Option<Self::Item> with Some\\(Default::default\\(\\)\\)",
+]
 
 # Include only files that are currently well-tested.
 examine_globs = [
@@ -14,6 +18,7 @@ examine_globs = [
     "src/counters.rs",
     "src/jsonio.rs",
     "src/restore.rs",
+    "src/stitch.rs",
     "src/transport.rs",
     "src/transport/local.rs",
 ]
