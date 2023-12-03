@@ -1,4 +1,4 @@
-// Copyright 2021 Martin Pool.
+// Copyright 2021-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,11 +13,14 @@
 //! Tests for the Conserve library API.
 
 mod apath;
+mod archive;
 mod backup;
+mod bandid;
 mod blockhash;
 mod damaged;
 mod delete;
 mod diff;
+mod format_flags;
 mod gc;
 mod live_tree;
 mod old_archives;

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2021 Martin Pool.
+// Copyright 2021-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,12 +13,12 @@
 
 //! Test `conserve diff`.
 
-use std::fs;
-
 use assert_cmd::prelude::*;
+use indoc::indoc;
 use predicates::prelude::*;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use serde_json::Value;
 
 use crate::run_conserve;
 
@@ -27,21 +27,6 @@ fn setup() -> (ScratchArchive, TreeFixture) {
     let tf = TreeFixture::new();
     tf.create_file_with_contents("hello.c", b"void main() {}");
     tf.create_dir("subdir");
-    run_conserve()
-        .arg("backup")
-        .arg(af.path())
-        .arg(tf.path())
-        .assert()
-        .success();
-    (af, tf)
-}
-
-#[cfg(unix)]
-fn setup_symlink() -> (ScratchArchive, TreeFixture) {
-    let af = ScratchArchive::new();
-    let tf = TreeFixture::new();
-    tf.create_dir("subdir");
-    tf.create_symlink("subdir/link", "target");
     run_conserve()
         .arg("backup")
         .arg(af.path())
@@ -71,7 +56,7 @@ fn no_changes() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout(".\t/\n.\t/hello.c\n.\t/subdir\n")
+        .stdout(". /\n. /hello.c\n. /subdir\n")
         .stderr(predicate::str::is_empty());
 }
 
@@ -79,7 +64,8 @@ fn no_changes() {
 fn add_entries() {
     let (af, tf) = setup();
     tf.create_dir("src");
-    tf.create_file_with_contents("src/new.rs", b"pub fn main() {}");
+    let new_rs_content = b"pub fn main() {}";
+    tf.create_file_with_contents("src/new.rs", new_rs_content);
 
     run_conserve()
         .arg("diff")
@@ -87,8 +73,39 @@ fn add_entries() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout("+\t/src\n+\t/src/new.rs\n")
+        .stdout(indoc! {"
+            + /src
+            + /src/new.rs
+        "})
         .stderr(predicate::str::is_empty());
+
+    // Inspect json diff
+    let command = run_conserve()
+        .args(["diff", "-j"])
+        .arg(af.path())
+        .arg(tf.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+    let diff_json = &command.get_output().stdout;
+    println!("{}", std::str::from_utf8(diff_json).unwrap());
+    let diff = serde_json::Deserializer::from_slice(diff_json)
+        .into_iter::<Value>()
+        .collect::<Result<Vec<Value>, _>>()
+        .unwrap();
+    println!("{diff:#?}");
+    assert_eq!(diff.len(), 2);
+    assert_eq!(diff[0]["apath"], "/src");
+    assert_eq!(diff[0]["added"]["kind"], "Dir");
+    assert_eq!(diff[0]["added"]["size"], Value::Null);
+    assert!(diff[0]["added"]["mtime"].is_string());
+    // User/group currently only added on Unix.
+    // assert!(diff[0]["added"]["user"].is_string());
+    // assert!(diff[0]["added"]["group"].is_string());
+    assert_eq!(diff[1]["apath"], "/src/new.rs");
+    assert_eq!(diff[1]["added"]["kind"], "File");
+    assert_eq!(diff[1]["added"]["size"], new_rs_content.len());
+    assert!(diff[1]["added"]["mtime"].is_string());
 }
 
 #[test]
@@ -102,7 +119,7 @@ fn remove_file() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout("-\t/hello.c\n")
+        .stdout("- /hello.c\n")
         .stderr(predicate::str::is_empty());
 
     run_conserve()
@@ -112,7 +129,7 @@ fn remove_file() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout(".\t/\n-\t/hello.c\n.\t/subdir\n")
+        .stdout(". /\n- /hello.c\n. /subdir\n")
         .stderr(predicate::str::is_empty());
 }
 
@@ -128,7 +145,9 @@ fn change_kind() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout("*\t/subdir\n")
+        .stdout(indoc! {"
+            * /subdir
+        "})
         .stderr(predicate::str::is_empty());
 
     run_conserve()
@@ -138,7 +157,11 @@ fn change_kind() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout(".\t/\n.\t/hello.c\n*\t/subdir\n")
+        .stdout(indoc! {"
+            . /
+            . /hello.c
+            * /subdir
+            "})
         .stderr(predicate::str::is_empty());
 }
 
@@ -154,7 +177,9 @@ fn change_file_content() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout("*\t/hello.c\n")
+        .stdout(indoc! {"
+            * /hello.c
+            "})
         .stderr(predicate::str::is_empty());
 
     run_conserve()
@@ -164,58 +189,10 @@ fn change_file_content() {
         .arg(tf.path())
         .assert()
         .success()
-        .stdout(".\t/\n*\t/hello.c\n.\t/subdir\n")
-        .stderr(predicate::str::is_empty());
-}
-
-#[cfg(unix)]
-#[test]
-pub fn symlink_unchanged() {
-    let (af, tf) = setup_symlink();
-
-    run_conserve()
-        .arg("diff")
-        .arg(af.path())
-        .arg(tf.path())
-        .assert()
-        .success()
-        .stdout("")
-        .stderr(predicate::str::is_empty());
-
-    run_conserve()
-        .arg("diff")
-        .arg("--include-unchanged")
-        .arg(af.path())
-        .arg(tf.path())
-        .assert()
-        .success()
-        .stdout(".\t/\n.\t/subdir\n.\t/subdir/link\n")
-        .stderr(predicate::str::is_empty());
-}
-
-#[cfg(unix)]
-#[test]
-pub fn symlink_changed() {
-    let (af, tf) = setup_symlink();
-    fs::remove_file(tf.path().join("subdir/link")).unwrap();
-    tf.create_symlink("subdir/link", "newtarget");
-
-    run_conserve()
-        .arg("diff")
-        .arg(af.path())
-        .arg(tf.path())
-        .assert()
-        .success()
-        .stdout("*\t/subdir/link\n")
-        .stderr(predicate::str::is_empty());
-
-    run_conserve()
-        .arg("diff")
-        .arg("--include-unchanged")
-        .arg(af.path())
-        .arg(tf.path())
-        .assert()
-        .success()
-        .stdout(".\t/\n.\t/subdir\n*\t/subdir/link\n")
+        .stdout(indoc! {"
+            . /
+            * /hello.c
+            . /subdir
+            "})
         .stderr(predicate::str::is_empty());
 }

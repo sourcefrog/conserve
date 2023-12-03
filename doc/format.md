@@ -119,11 +119,6 @@ In Conserve 0.6, only bands with a single integer, called a _top level band_,
 are generated or supported. Top level bands contain an index listing every entry
 present in that tree. Top level bands are numbered sequentially from `b0000`.
 
-Bands that are not top-level are _child bands_, and their _parent band_ is the
-band with the last component of their name removed. Child bands' index contains
-only the changes relative to their parent band's index. (Child bands are not
-implemented as of Conserve 0.6.)
-
 A band can be _complete_, while it is receiving data, or _incomplete_ when
 everything from the source has been written. Bands may remain incomplete
 indefinitely, across multiple Conserve invocations, until they are finished.
@@ -158,6 +153,9 @@ The head file contains:
 - `start_time`: The Unix time, in seconds, when the band was started.
 - `band_format_version`: The minimum program version to correctly read this
   band.
+- `format_flags`: A list of strings indicating capabilities required to read
+  this band correctly. If this is set and non-empty, then the `band_format_version`
+  must be at least 23.2.0.
 
 ### Band tail file
 
@@ -169,6 +167,10 @@ Band footer contains:
 - `end_time`: The Unix time, in seconds, that the band ended.
 - `index_hunk_count`: The number of index hunks that should be present for this
   band. (Since 0.6.4.)
+
+## Format flags
+
+(None are defined yet.)
 
 ## Data block directory
 
@@ -212,6 +214,10 @@ An index entry is a json dict with keys
 - `mtime`: integer seconds past the Unix epoch
 - `mtime_nanos`: (optional) fractional part of the mtime, as nanoseconds.
 - `kind`: one of `"File"`, `"Dir"`, `"Symlink"`
+- `unix_mode`: the unix mode bits consisting of the sticky bit, set uid bit, 
+    set gid bit, and permission bits
+- `user`: optionally, a string specifying the file owner
+- `group`: optionally, a string specifying the primary group owner
 - `addrs`: a list of tuples of:
   - `hash`: data block hash: from the current or any parent directory
   - `start`: the offset within the uncompressed content of the block for the

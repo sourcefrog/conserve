@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2018, 2020, 2021 Martin Pool.
+// Copyright 2018-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,8 +17,16 @@
 //! file (typically stdout).
 
 use std::borrow::Cow;
+use std::convert::TryInto;
 use std::io::{BufWriter, Write};
+use std::sync::Arc;
 
+use time::format_description::well_known::Rfc3339;
+use time::UtcOffset;
+use tracing::error;
+
+use crate::misc::duration_to_hms;
+use crate::termui::TermUiMonitor;
 use crate::*;
 
 /// Options controlling the behavior of `show_versions`.
@@ -33,15 +41,15 @@ pub struct ShowVersionsOptions {
     pub start_time: bool,
     /// Show how much time the backup took, or "incomplete" if it never finished.
     pub backup_duration: bool,
-    /// Show times in UTC rather than the local timezone.
-    pub utc: bool,
+    /// Show times in this zone.
+    pub timezone: Option<UtcOffset>,
 }
 
-/// Print a list of versions, one per line.
+/// Print a list of versions, one per line, on stdout.
 pub fn show_versions(
     archive: &Archive,
     options: &ShowVersionsOptions,
-    w: &mut dyn Write,
+    monitor: Arc<TermUiMonitor>,
 ) -> Result<()> {
     let mut band_ids = archive.list_band_ids()?;
     if options.newest_first {
@@ -49,62 +57,66 @@ pub fn show_versions(
     }
     for band_id in band_ids {
         if !(options.tree_size || options.start_time || options.backup_duration) {
-            writeln!(w, "{}", band_id)?;
+            println!("{}", band_id);
             continue;
         }
         let mut l: Vec<String> = Vec::new();
-        l.push(format!("{:<20}", band_id));
-        let band = match Band::open(archive, &band_id) {
+        l.push(format!("{band_id:<20}"));
+        let band = match Band::open(archive, band_id) {
             Ok(band) => band,
-            Err(e) => {
-                ui::problem(&format!("Failed to open band {:?}: {:?}", band_id, e));
+            Err(err) => {
+                error!("Failed to open band {band_id:?}: {err}");
                 continue;
             }
         };
         let info = match band.get_info() {
             Ok(info) => info,
-            Err(e) => {
-                ui::problem(&format!("Failed to read band tail {:?}: {:?}", band_id, e));
+            Err(err) => {
+                error!("Failed to read band tail {band_id:?}: {err}");
                 continue;
             }
         };
 
         if options.start_time {
-            let start_time = info.start_time;
-            let start_time_str = if options.utc {
-                start_time.format(crate::TIMESTAMP_FORMAT)
-            } else {
-                start_time
-                    .with_timezone(&chrono::Local)
-                    .format(crate::TIMESTAMP_FORMAT)
-            };
-            l.push(format!("{:<10}", start_time_str));
+            let mut start_time = info.start_time;
+            if let Some(timezone) = options.timezone {
+                start_time = start_time.to_offset(timezone);
+            }
+            l.push(format!(
+                "{date:<25}", // "yyyy-mm-ddThh:mm:ss+oooo" => 25
+                date = start_time.format(&Rfc3339).unwrap(),
+            ));
         }
 
         if options.backup_duration {
             let duration_str: Cow<str> = if info.is_closed {
-                info.end_time
-                    .and_then(|et| (et - info.start_time).to_std().ok())
-                    .map(crate::ui::duration_to_hms)
-                    .map(Cow::Owned)
-                    .unwrap_or(Cow::Borrowed("unknown"))
+                if let Some(end_time) = info.end_time {
+                    let duration = end_time - info.start_time;
+                    if let Ok(duration) = duration.try_into() {
+                        duration_to_hms(duration).into()
+                    } else {
+                        Cow::Borrowed("negative")
+                    }
+                } else {
+                    Cow::Borrowed("unknown")
+                }
             } else {
                 Cow::Borrowed("incomplete")
             };
-            l.push(format!("{:>10}", duration_str));
+            l.push(format!("{duration_str:>10}"));
         }
 
         if options.tree_size {
             let tree_mb_str = crate::misc::bytes_to_human_mb(
                 archive
-                    .open_stored_tree(BandSelectionPolicy::Specified(band_id.clone()))?
-                    .size(Exclude::nothing())?
+                    .open_stored_tree(BandSelectionPolicy::Specified(band_id))?
+                    .size(Exclude::nothing(), monitor.clone())?
                     .file_bytes,
             );
-            l.push(format!("{:>14}", tree_mb_str,));
+            l.push(format!("{tree_mb_str:>14}",));
         }
-
-        writeln!(w, "{}", l.join(" "))?;
+        monitor.clear_progress_bars(); // to avoid fighting with stdout
+        println!("{}", l.join(" "));
     }
     Ok(())
 }
@@ -114,24 +126,27 @@ pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
     let bw = BufWriter::new(w);
     let index_entries: Vec<IndexEntry> = band.index().iter_entries().collect();
     serde_json::ser::to_writer_pretty(bw, &index_entries)
-        .map_err(|source| Error::SerializeIndex { source })
+        .map_err(|source| Error::SerializeJson { source })
 }
 
-pub fn show_entry_names<E: Entry, I: Iterator<Item = E>>(it: I, w: &mut dyn Write) -> Result<()> {
+pub fn show_entry_names<E: EntryTrait, I: Iterator<Item = E>>(
+    it: I,
+    w: &mut dyn Write,
+    long_listing: bool,
+) -> Result<()> {
     let mut bw = BufWriter::new(w);
     for entry in it {
-        writeln!(bw, "{}", entry.apath())?;
-    }
-    Ok(())
-}
-
-pub fn show_diff<D: Iterator<Item = DiffEntry>>(diff: D, w: &mut dyn Write) -> Result<()> {
-    // TODO: Consider whether the actual files have changed.
-    // TODO: Summarize diff.
-    // TODO: Optionally include unchanged files.
-    let mut bw = BufWriter::new(w);
-    for de in diff {
-        writeln!(bw, "{}", de)?;
+        if long_listing {
+            writeln!(
+                bw,
+                "{} {} {}",
+                entry.unix_mode(),
+                entry.owner(),
+                entry.apath()
+            )?;
+        } else {
+            writeln!(bw, "{}", entry.apath())?;
+        }
     }
     Ok(())
 }

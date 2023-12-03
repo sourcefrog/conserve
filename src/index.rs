@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,21 +14,27 @@
 //! Index lists the files in a band in the archive.
 
 use std::cmp::Ordering;
-use std::io;
 use std::iter::Peekable;
 use std::path::Path;
 use std::sync::Arc;
 use std::vec;
 
+use itertools::Itertools;
+use time::OffsetDateTime;
+use tracing::{debug, debug_span, error};
+
 use crate::compress::snappy::{Compressor, Decompressor};
+use crate::counters::Counter;
+use crate::entry::{EntryValue, KindMeta};
 use crate::kind::Kind;
-use crate::stats::{IndexReadStats, IndexWriterStats};
+use crate::monitor::Monitor;
+use crate::owner::Owner;
+use crate::stats::IndexReadStats;
 use crate::transport::local::LocalTransport;
 use crate::transport::Transport;
-use crate::unix_time::UnixTime;
+use crate::unix_mode::UnixMode;
+use crate::unix_time::FromUnixAndNanos;
 use crate::*;
-
-pub const MAX_ENTRIES_PER_HUNK: usize = 1000;
 
 pub const HUNKS_PER_SUBDIR: u32 = 10_000;
 
@@ -48,6 +54,14 @@ pub struct IndexEntry {
     /// File modification time, in whole seconds past the Unix epoch.
     #[serde(default)]
     pub mtime: i64,
+
+    /// Discretionary Access Control permissions (such as read/write/execute on unix)
+    #[serde(default)]
+    pub unix_mode: UnixMode,
+
+    /// User and Group names of the owners of the file
+    #[serde(default, flatten, skip_serializing_if = "Owner::is_none")]
+    pub owner: Owner,
 
     /// Fractional nanoseconds for modification time.
     ///
@@ -74,7 +88,35 @@ pub struct IndexEntry {
 }
 // GRCOV_EXCLUDE_STOP
 
-impl Entry for IndexEntry {
+impl From<IndexEntry> for EntryValue {
+    fn from(index_entry: IndexEntry) -> EntryValue {
+        let kind_meta = match index_entry.kind {
+            Kind::File => KindMeta::File {
+                size: index_entry.addrs.iter().map(|a| a.len).sum(),
+            },
+            Kind::Symlink => KindMeta::Symlink {
+                // TODO: Should not be fatal
+                target: index_entry
+                    .target
+                    .expect("symlink entry should have a target"),
+            },
+            Kind::Dir => KindMeta::Dir,
+            Kind::Unknown => KindMeta::Unknown,
+        };
+        EntryValue {
+            apath: index_entry.apath,
+            kind_meta,
+            mtime: OffsetDateTime::from_unix_seconds_and_nanos(
+                index_entry.mtime,
+                index_entry.mtime_nanos,
+            ),
+            unix_mode: index_entry.unix_mode,
+            owner: index_entry.owner,
+        }
+    }
+}
+
+impl EntryTrait for IndexEntry {
     /// Return apath relative to the top of the tree.
     fn apath(&self) -> &Apath {
         &self.apath
@@ -86,11 +128,8 @@ impl Entry for IndexEntry {
     }
 
     #[inline]
-    fn mtime(&self) -> UnixTime {
-        UnixTime {
-            secs: self.mtime,
-            nanosecs: self.mtime_nanos,
-        }
+    fn mtime(&self) -> OffsetDateTime {
+        OffsetDateTime::from_unix_seconds_and_nanos(self.mtime, self.mtime_nanos)
     }
 
     /// Size of the file, if it is a file. None for directories and symlinks.
@@ -100,14 +139,22 @@ impl Entry for IndexEntry {
 
     /// Target of the symlink, if this is a symlink.
     #[inline]
-    fn symlink_target(&self) -> &Option<String> {
-        &self.target
+    fn symlink_target(&self) -> Option<&str> {
+        self.target.as_deref()
+    }
+
+    fn unix_mode(&self) -> UnixMode {
+        self.unix_mode
+    }
+
+    fn owner(&self) -> &Owner {
+        &self.owner
     }
 }
 
 impl IndexEntry {
     /// Copy the metadata, but not the body content, from another entry.
-    pub(crate) fn metadata_from<E: Entry>(source: &E) -> IndexEntry {
+    pub(crate) fn metadata_from(source: &EntryValue) -> IndexEntry {
         let mtime = source.mtime();
         assert_eq!(
             source.symlink_target().is_some(),
@@ -117,9 +164,11 @@ impl IndexEntry {
             apath: source.apath().clone(),
             kind: source.kind(),
             addrs: Vec::new(),
-            target: source.symlink_target().clone(),
-            mtime: mtime.secs,
-            mtime_nanos: mtime.nanosecs,
+            target: source.symlink_target().map(|t| t.to_owned()),
+            mtime: mtime.unix_timestamp(),
+            mtime_nanos: mtime.nanosecond(),
+            unix_mode: source.unix_mode(),
+            owner: source.owner().to_owned(),
         }
     }
 }
@@ -138,13 +187,13 @@ pub struct IndexWriter {
     /// Index hunk number, starting at 0.
     sequence: u32,
 
+    /// Number of hunks actually written.
+    hunks_written: usize,
+
     /// The last filename from the previous hunk, to enforce ordering. At the
     /// start of the first hunk this is empty; at the start of a later hunk it's
     /// the last path from the previous hunk.
     check_order: apath::DebugCheckOrder,
-
-    /// Statistics about work done while writing this index.
-    pub stats: IndexWriterStats,
 
     compressor: Compressor,
 }
@@ -152,21 +201,21 @@ pub struct IndexWriter {
 /// Accumulate and write out index entries into files in an index directory.
 impl IndexWriter {
     /// Make a new builder that will write files into the given directory.
-    pub fn new(transport: Box<dyn Transport>) -> IndexWriter {
+    pub fn new(transport: Arc<dyn Transport>) -> IndexWriter {
         IndexWriter {
-            transport: Arc::from(transport),
-            entries: Vec::<IndexEntry>::with_capacity(MAX_ENTRIES_PER_HUNK),
+            transport,
+            entries: Vec::new(),
             sequence: 0,
+            hunks_written: 0,
             check_order: apath::DebugCheckOrder::new(),
-            stats: IndexWriterStats::default(),
             compressor: Compressor::new(),
         }
     }
 
     /// Finish the last hunk of this index, and return the stats.
-    pub fn finish(mut self) -> Result<IndexWriterStats> {
-        self.finish_hunk()?;
-        Ok(self.stats)
+    pub fn finish(mut self, monitor: Arc<dyn Monitor>) -> Result<usize> {
+        self.finish_hunk(monitor)?;
+        Ok(self.hunks_written)
     }
 
     /// Write new index entries.
@@ -188,7 +237,7 @@ impl IndexWriter {
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the buffer to start receiving
     /// entries for the next hunk.
-    pub fn finish_hunk(&mut self) -> Result<()> {
+    pub fn finish_hunk(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
         if self.entries.is_empty() {
             return Ok(());
         }
@@ -201,25 +250,16 @@ impl IndexWriter {
             self.check_order.check(&self.entries.last().unwrap().apath);
         }
         let relpath = hunk_relpath(self.sequence);
-        let write_error = |source| Error::WriteIndex {
-            path: relpath.clone(),
-            source,
-        };
-        let json =
-            serde_json::to_vec(&self.entries).map_err(|source| Error::SerializeIndex { source })?;
+        let json = serde_json::to_vec(&self.entries)?;
         if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
-            self.transport
-                .create_dir(&subdir_relpath(self.sequence))
-                .map_err(write_error)?;
+            self.transport.create_dir(&subdir_relpath(self.sequence))?;
         }
         let compressed_bytes = self.compressor.compress(&json)?;
-        self.transport
-            .write_file(&relpath, compressed_bytes)
-            .map_err(write_error)?;
-
-        self.stats.index_hunks += 1;
-        self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
-        self.stats.uncompressed_index_bytes += json.len() as u64;
+        self.transport.write_file(&relpath, &compressed_bytes)?;
+        self.hunks_written += 1;
+        monitor.count(Counter::IndexWrites, 1);
+        monitor.count(Counter::IndexWriteCompressedBytes, compressed_bytes.len());
+        monitor.count(Counter::IndexWriteUncompressedBytes, json.len());
         self.entries.clear(); // Ready for the next hunk.
         self.sequence += 1;
         Ok(())
@@ -237,6 +277,7 @@ fn hunk_relpath(hunk_number: u32) -> String {
     format!("{:05}/{:09}", hunk_number / HUNKS_PER_SUBDIR, hunk_number)
 }
 
+// TODO: Maybe this isn't adding much on top of the hunk iter?
 #[derive(Debug, Clone)]
 pub struct IndexRead {
     /// Transport pointing to this index directory.
@@ -246,36 +287,11 @@ pub struct IndexRead {
 impl IndexRead {
     #[allow(unused)]
     pub(crate) fn open_path(path: &Path) -> IndexRead {
-        IndexRead::open(Box::new(LocalTransport::new(path)))
+        IndexRead::open(Arc::new(LocalTransport::new(path)))
     }
 
-    pub(crate) fn open(transport: Box<dyn Transport>) -> IndexRead {
-        IndexRead {
-            transport: Arc::from(transport),
-        }
-    }
-
-    /// Return the (1-based) number of index hunks in an index directory.
-    pub fn count_hunks(&self) -> Result<u32> {
-        // TODO: Might be faster to list the directory than to probe for all of them.
-        // TODO: Perhaps, list the directories and cope cleanly with
-        // one hunk being missing.
-        for i in 0.. {
-            let path = hunk_relpath(i);
-            if !self
-                .transport
-                .is_file(&path)
-                .map_err(|source| Error::ReadIndex { source, path })?
-            {
-                // If hunk 1 is missing, 1 hunks exists.
-                return Ok(i);
-            }
-        }
-        unreachable!();
-    }
-
-    pub fn estimate_entry_count(&self) -> Result<u64> {
-        Ok(u64::from(self.count_hunks()?) * (MAX_ENTRIES_PER_HUNK as u64))
+    pub(crate) fn open(transport: Arc<dyn Transport>) -> IndexRead {
+        IndexRead { transport }
     }
 
     /// Make an iterator that will return all entries in this band.
@@ -286,8 +302,27 @@ impl IndexRead {
 
     /// Make an iterator that returns hunks of entries from this index.
     pub fn iter_hunks(&self) -> IndexHunkIter {
+        let _span = debug_span!("iter_hunks", ?self.transport).entered();
+        // All hunk numbers present in all directories.
+        let subdirs = self
+            .transport
+            .list_dir("")
+            .expect("list index dir") // TODO: Don't panic
+            .dirs
+            .into_iter()
+            .sorted()
+            .collect_vec();
+        debug!(?subdirs);
+        let hunks = subdirs
+            .into_iter()
+            .filter_map(|dir| self.transport.list_dir(&dir).ok())
+            .flat_map(|list| list.files)
+            .filter_map(|f| f.parse::<u32>().ok())
+            .sorted()
+            .collect_vec();
+        debug!(?hunks);
         IndexHunkIter {
-            next_hunk_number: 0,
+            hunks: hunks.into_iter(),
             transport: Arc::clone(&self.transport),
             decompressor: Decompressor::new(),
             stats: IndexReadStats::default(),
@@ -300,7 +335,7 @@ impl IndexRead {
 ///
 /// Each returned item is a vec of (typically up to a thousand) index entries.
 pub struct IndexHunkIter {
-    next_hunk_number: u32,
+    hunks: std::vec::IntoIter<u32>,
     /// The `i` directory within the band where all files for this index are written.
     transport: Arc<dyn Transport>,
     decompressor: Decompressor,
@@ -314,16 +349,13 @@ impl Iterator for IndexHunkIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let hunk_number = self.next_hunk_number;
-            let entries = match self.read_next_hunk() {
+            let hunk_number = self.hunks.next()?;
+            let entries = match self.read_next_hunk(hunk_number) {
                 Ok(None) => return None,
                 Ok(Some(entries)) => entries,
                 Err(err) => {
                     self.stats.errors += 1;
-                    ui::problem(&format!(
-                        "Error reading index hunk {:?}: {:?} ",
-                        hunk_number, err
-                    ));
+                    error!("Error reading index hunk {hunk_number:?}: {err}");
                     continue;
                 }
             };
@@ -362,31 +394,24 @@ impl IndexHunkIter {
         }
     }
 
-    fn read_next_hunk(&mut self) -> Result<Option<Vec<IndexEntry>>> {
-        let path = &hunk_relpath(self.next_hunk_number);
-        // Whether we succeed or fail, don't try to read this hunk again.
-        self.next_hunk_number += 1;
-        let compressed_bytes = match self.transport.read_file(path) {
+    fn read_next_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
+        let path = hunk_relpath(hunk_number);
+        let compressed_bytes = match self.transport.read_file(&path) {
             Ok(b) => b,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            Err(err) if err.is_not_found() => {
                 // TODO: Cope with one hunk being missing, while there are still
                 // later-numbered hunks. This would require reading the whole
                 // list of hunks first.
                 return Ok(None);
             }
-            Err(source) => {
-                return Err(Error::ReadIndex {
-                    path: path.clone(),
-                    source,
-                });
-            }
+            Err(source) => return Err(Error::Transport { source }),
         };
         self.stats.index_hunks += 1;
         self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
         let index_bytes = self.decompressor.decompress(&compressed_bytes)?;
         self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
         let entries: Vec<IndexEntry> =
-            serde_json::from_slice(index_bytes).map_err(|source| Error::DeserializeIndex {
+            serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeJson {
                 path: path.clone(),
                 source,
             })?;
@@ -398,6 +423,7 @@ impl IndexHunkIter {
 }
 
 /// Read out all the entries from a stored index, in apath order.
+// TODO: Maybe fold this into stitch.rs; we'd rarely want them without stitching...
 pub struct IndexEntryIter<HI: Iterator<Item = Vec<IndexEntry>>> {
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
@@ -494,12 +520,14 @@ impl<HI: Iterator<Item = Vec<IndexEntry>>> IndexEntryIter<HI> {
 mod tests {
     use tempfile::TempDir;
 
+    use crate::monitor::collect::CollectMonitor;
+
     use super::transport::local::LocalTransport;
     use super::*;
 
     fn setup() -> (TempDir, IndexWriter) {
         let testdir = TempDir::new().unwrap();
-        let ib = IndexWriter::new(Box::new(LocalTransport::new(testdir.path())));
+        let ib = IndexWriter::new(Arc::new(LocalTransport::new(testdir.path())));
         (testdir, ib)
     }
 
@@ -511,6 +539,8 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            unix_mode: Default::default(),
+            owner: Default::default(),
         }
     }
 
@@ -523,14 +553,17 @@ mod tests {
             kind: Kind::File,
             addrs: vec![],
             target: None,
+            unix_mode: Default::default(),
+            owner: Default::default(),
         }];
         let index_json = serde_json::to_string(&entries).unwrap();
-        println!("{}", index_json);
+        println!("{index_json}");
         assert_eq!(
             index_json,
             "[{\"apath\":\"/a/b\",\
              \"kind\":\"File\",\
-             \"mtime\":1461736377}]"
+             \"mtime\":1461736377,\
+             \"unix_mode\":null}]"
         );
     }
 
@@ -539,7 +572,7 @@ mod tests {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/zzz"));
         ib.push_entry(sample_entry("/aaa"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
     }
 
     #[test]
@@ -547,7 +580,7 @@ mod tests {
     fn index_builder_checks_names() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("../escapecat"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
     }
 
     #[test]
@@ -557,7 +590,7 @@ mod tests {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/again"));
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
     }
 
     #[test]
@@ -566,9 +599,9 @@ mod tests {
     fn no_duplicate_paths_across_hunks() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
     }
 
     #[test]
@@ -579,18 +612,18 @@ mod tests {
     #[test]
     fn basic() {
         let (testdir, mut ib) = setup();
+        let monitor = CollectMonitor::arc();
         ib.append_entries(&mut vec![sample_entry("/apple"), sample_entry("/banana")]);
-        let stats = ib.finish().unwrap();
+        let hunks = ib.finish(monitor.clone()).unwrap();
+        assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
 
-        assert_eq!(stats.index_hunks, 1);
-        assert!(stats.compressed_index_bytes > 30);
-        assert!(
-            stats.compressed_index_bytes < 70,
-            "expected shorter compressed index: {}",
-            stats.compressed_index_bytes
-        );
-        assert!(stats.uncompressed_index_bytes > 100);
-        assert!(stats.uncompressed_index_bytes < 200);
+        assert_eq!(hunks, 1);
+        let counters = monitor.counters();
+        dbg!(&counters);
+        assert!(counters.get(Counter::IndexWriteCompressedBytes) > 30);
+        assert!(counters.get(Counter::IndexWriteCompressedBytes) < 125,);
+        assert!(counters.get(Counter::IndexWriteUncompressedBytes) > 100);
+        assert!(counters.get(Counter::IndexWriteUncompressedBytes) < 250);
 
         assert!(
             std::fs::metadata(testdir.path().join("00000").join("000000000"))
@@ -611,9 +644,9 @@ mod tests {
     fn multiple_hunks() {
         let (testdir, mut ib) = setup();
         ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
 
         let index_read = IndexRead::open_path(testdir.path());
         let it = index_read.iter_entries();
@@ -644,9 +677,9 @@ mod tests {
     fn iter_hunks_advance_to_after() {
         let (testdir, mut ib) = setup();
         ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
 
         let index_read = IndexRead::open_path(testdir.path());
         let names: Vec<String> = index_read
@@ -728,13 +761,13 @@ mod tests {
         ib.push_entry(sample_entry("/bar"));
         ib.push_entry(sample_entry("/foo"));
         ib.push_entry(sample_entry("/foobar"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
 
         // Make multiple hunks to test traversal across hunks.
         ib.push_entry(sample_entry("/g01"));
         ib.push_entry(sample_entry("/g02"));
         ib.push_entry(sample_entry("/g03"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk(CollectMonitor::arc()).unwrap();
 
         // Advance to /foo and read on from there.
         let mut it = IndexRead::open_path(testdir.path()).iter_entries();
@@ -766,14 +799,14 @@ mod tests {
     #[test]
     fn no_final_empty_hunk() -> Result<()> {
         let (testdir, mut ib) = setup();
-        for i in 0..MAX_ENTRIES_PER_HUNK {
-            ib.push_entry(sample_entry(&format!("/{:0>10}", i)));
+        for i in 0..100_000 {
+            ib.push_entry(sample_entry(&format!("/{i:0>10}")));
         }
-        ib.finish_hunk()?;
+        ib.finish_hunk(CollectMonitor::arc())?;
         // Think about, but don't actually add some files
-        ib.finish_hunk()?;
+        ib.finish_hunk(CollectMonitor::arc())?;
         let read_index = IndexRead::open_path(testdir.path());
-        assert_eq!(read_index.count_hunks()?, 1);
+        assert_eq!(read_index.iter_hunks().count(), 1);
         Ok(())
     }
 }

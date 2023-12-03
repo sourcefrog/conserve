@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,24 +14,102 @@
 //! An entry representing a file, directory, etc, in either a
 //! stored tree or local tree.
 
+use std::borrow::Borrow;
 use std::fmt::Debug;
 
+use serde::Serialize;
+use time::OffsetDateTime;
+
 use crate::kind::Kind;
-use crate::unix_time::UnixTime;
+use crate::owner::Owner;
+use crate::unix_mode::UnixMode;
 use crate::*;
 
-pub trait Entry: Debug + Eq + PartialEq {
+/// A description of an file, directory, or symlink in a tree, independent
+/// of whether it's recorded in a archive (an [IndexEntry]), or
+/// in a source tree.
+// TODO: Maybe keep this entirely in memory and explicitly look things
+// up when needed.
+pub trait EntryTrait: Debug {
     fn apath(&self) -> &Apath;
     fn kind(&self) -> Kind;
-    fn mtime(&self) -> UnixTime;
+    fn mtime(&self) -> OffsetDateTime;
     fn size(&self) -> Option<u64>;
-    fn symlink_target(&self) -> &Option<String>;
+    fn symlink_target(&self) -> Option<&str>;
+    fn unix_mode(&self) -> UnixMode;
+    fn owner(&self) -> &Owner;
+}
 
-    /// True if the metadata supports an assumption the file contents have
-    /// not changed.
-    fn is_unchanged_from<O: Entry>(&self, basis_entry: &O) -> bool {
-        basis_entry.kind() == self.kind()
-            && basis_entry.mtime() == self.mtime()
-            && basis_entry.size() == self.size()
+/// Per-kind metadata.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind")]
+pub enum KindMeta {
+    File { size: u64 },
+    Dir,
+    Symlink { target: String },
+    Unknown,
+}
+
+impl From<&KindMeta> for Kind {
+    fn from(from: &KindMeta) -> Kind {
+        match from {
+            KindMeta::Dir => Kind::Dir,
+            KindMeta::File { .. } => Kind::File,
+            KindMeta::Symlink { .. } => Kind::Symlink,
+            KindMeta::Unknown => Kind::Unknown,
+        }
+    }
+}
+
+/// An in-memory [Entry] describing a file/dir/symlink, with no addresses.
+#[derive(Debug, Serialize, Clone, Eq, PartialEq)]
+pub struct EntryValue {
+    pub(crate) apath: Apath,
+
+    /// Is it a file, dir, or symlink, and for files the size and for symlinks the target.
+    #[serde(flatten)]
+    pub(crate) kind_meta: KindMeta,
+
+    /// Modification time.
+    pub(crate) mtime: OffsetDateTime,
+    pub(crate) unix_mode: UnixMode,
+    #[serde(flatten)]
+    pub(crate) owner: Owner,
+}
+
+impl<B: Borrow<EntryValue> + Debug> EntryTrait for B {
+    fn apath(&self) -> &Apath {
+        &self.borrow().apath
+    }
+
+    fn kind(&self) -> Kind {
+        Kind::from(&self.borrow().kind_meta)
+    }
+
+    fn mtime(&self) -> OffsetDateTime {
+        self.borrow().mtime
+    }
+
+    fn size(&self) -> Option<u64> {
+        if let KindMeta::File { size } = self.borrow().kind_meta {
+            Some(size)
+        } else {
+            None
+        }
+    }
+
+    fn symlink_target(&self) -> Option<&str> {
+        match &self.borrow().kind_meta {
+            KindMeta::Symlink { target } => Some(target),
+            _ => None,
+        }
+    }
+
+    fn unix_mode(&self) -> UnixMode {
+        self.borrow().unix_mode
+    }
+
+    fn owner(&self) -> &Owner {
+        &self.borrow().owner
     }
 }

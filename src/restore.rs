@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,77 +16,67 @@ use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Arc;
 use std::{fs, time::Instant};
 
-use filetime::{set_file_handle_times, set_symlink_file_times};
+use filetime::set_file_handle_times;
+#[cfg(unix)]
+use filetime::set_symlink_file_times;
+use time::OffsetDateTime;
+use tracing::{error, instrument, trace, warn};
 
 use crate::band::BandSelectionPolicy;
-use crate::entry::Entry;
+use crate::counters::Counter;
 use crate::io::{directory_is_empty, ensure_dir_exists};
+use crate::monitor::Monitor;
 use crate::stats::RestoreStats;
-use crate::unix_time::UnixTime;
+use crate::unix_mode::UnixMode;
+use crate::unix_time::ToFileTime;
 use crate::*;
 
 /// Description of how to restore a tree.
-#[derive(Debug)]
-pub struct RestoreOptions {
-    pub print_filenames: bool,
+// #[derive(Debug)]
+pub struct RestoreOptions<'cb> {
     pub exclude: Exclude,
     /// Restore only this subdirectory.
     pub only_subtree: Option<Apath>,
     pub overwrite: bool,
     // The band to select, or by default the last complete one.
     pub band_selection: BandSelectionPolicy,
+
+    // Call this callback as each entry is successfully restored.
+    pub change_callback: Option<ChangeCallback<'cb>>,
 }
 
-impl Default for RestoreOptions {
+impl Default for RestoreOptions<'_> {
     fn default() -> Self {
         RestoreOptions {
-            print_filenames: false,
             overwrite: false,
             band_selection: BandSelectionPolicy::LatestClosed,
             exclude: Exclude::nothing(),
             only_subtree: None,
+            change_callback: None,
         }
-    }
-}
-
-struct ProgressModel {
-    filename: String,
-    bytes_done: u64,
-}
-
-impl nutmeg::Model for ProgressModel {
-    fn render(&mut self, _width: usize) -> String {
-        format!(
-            "Restoring: {} MB\n{}",
-            self.bytes_done / 1_000_000,
-            self.filename
-        )
     }
 }
 
 /// Restore a selected version, or by default the latest, to a destination directory.
 pub fn restore(
     archive: &Archive,
-    destination_path: &Path,
+    destination: &Path,
     options: &RestoreOptions,
+    monitor: Arc<dyn Monitor>,
 ) -> Result<RestoreStats> {
     let st = archive.open_stored_tree(options.band_selection.clone())?;
-    let mut rt = if options.overwrite {
-        RestoreTree::create_overwrite(destination_path)
-    } else {
-        RestoreTree::create(destination_path)
-    }?;
+    ensure_dir_exists(destination)?;
+    if !options.overwrite && !directory_is_empty(destination)? {
+        return Err(Error::DestinationNotEmpty);
+    }
     let mut stats = RestoreStats::default();
-    let progress_bar = nutmeg::View::new(
-        ProgressModel {
-            filename: String::new(),
-            bytes_done: 0,
-        },
-        ui::nutmeg_options(),
-    );
+    let task = monitor.start_task("Restore".to_string());
     let start = Instant::now();
+    let block_dir = archive.block_dir();
     // // This causes us to walk the source tree twice, which is probably an acceptable option
     // // since it's nice to see realistic overall progress. We could keep all the entries
     // // in memory, and maybe we should, but it might get unreasonably big.
@@ -102,165 +92,208 @@ pub fn restore(
         options.only_subtree.clone().unwrap_or_else(Apath::root),
         options.exclude.clone(),
     )?;
+    let mut deferrals = Vec::new();
     for entry in entry_iter {
-        if options.print_filenames {
-            progress_bar.message(&format!("{}\n", entry.apath()));
-        }
-        progress_bar.update(|model| model.filename = entry.apath().to_string());
-        if let Err(e) = match entry.kind() {
+        task.set_name(format!("Restore {}", entry.apath));
+        let path = destination.join(&entry.apath[1..]);
+        match entry.kind() {
             Kind::Dir => {
+                monitor.count(Counter::Dirs, 1);
                 stats.directories += 1;
-                rt.copy_dir(&entry)
+                if let Err(err) = fs::create_dir_all(&path) {
+                    if err.kind() != io::ErrorKind::AlreadyExists {
+                        error!(?path, ?err, "Failed to create directory");
+                        stats.errors += 1;
+                        continue;
+                    }
+                }
+                deferrals.push(DirDeferral {
+                    path,
+                    unix_mode: entry.unix_mode(),
+                    mtime: entry.mtime(),
+                    owner: entry.owner().clone(),
+                })
             }
             Kind::File => {
                 stats.files += 1;
-                let result = rt.copy_file(&entry, &st).map(|s| stats += s);
-                if let Some(bytes) = entry.size() {
-                    progress_bar.update(|model| model.bytes_done += bytes);
+                monitor.count(Counter::Files, 1);
+                match restore_file(path.clone(), &entry, block_dir, monitor.clone()) {
+                    Err(err) => {
+                        error!(?err, ?path, "Failed to restore file");
+                        stats.errors += 1;
+                        continue;
+                    }
+                    Ok(s) => {
+                        monitor.count(Counter::FileBytes, s.uncompressed_file_bytes as usize);
+                        stats += s;
+                    }
                 }
-                result
             }
             Kind::Symlink => {
+                monitor.count(Counter::Symlinks, 1);
                 stats.symlinks += 1;
-                rt.copy_symlink(&entry)
+                if let Err(err) = restore_symlink(&path, &entry) {
+                    error!(?path, ?err, "Failed to restore symlink");
+                    stats.errors += 1;
+                    continue;
+                }
             }
             Kind::Unknown => {
                 stats.unknown_kind += 1;
-                // TODO: Perhaps eventually we could backup and restore pipes,
-                // sockets, etc. Or at least count them. For now, silently skip.
-                // https://github.com/sourcefrog/conserve/issues/82
-                continue;
+                warn!(apath = ?entry.apath(), "Unknown file kind");
             }
-        } {
-            ui::show_error(&e);
-            stats.errors += 1;
-            continue;
+        };
+        if let Some(cb) = options.change_callback.as_ref() {
+            // Since we only restore to empty directories they're all added.
+            cb(&EntryChange::added(&entry))?;
         }
     }
-    stats += rt.finish()?;
+    stats += apply_deferrals(&deferrals)?;
     stats.elapsed = start.elapsed();
+    stats.block_cache_hits = block_dir.stats.cache_hit.load(Relaxed);
     // TODO: Merge in stats from the tree iter and maybe the source tree?
     Ok(stats)
 }
 
-/// A write-only tree on the filesystem, as a restore destination.
-#[derive(Debug)]
-pub struct RestoreTree {
+/// Recorded changes to apply to directories after all their contents
+/// have been applied.
+///
+/// For example we might want to make the directory read-only, but we
+/// shouldn't do that until we added all the children.
+struct DirDeferral {
     path: PathBuf,
-
-    dir_mtimes: Vec<(PathBuf, UnixTime)>,
+    unix_mode: UnixMode,
+    mtime: OffsetDateTime,
+    owner: Owner,
 }
 
-impl RestoreTree {
-    fn new(path: PathBuf) -> RestoreTree {
-        RestoreTree {
-            path,
-            dir_mtimes: Vec::new(),
+fn apply_deferrals(deferrals: &[DirDeferral]) -> Result<RestoreStats> {
+    let mut stats = RestoreStats::default();
+    for DirDeferral {
+        path,
+        unix_mode,
+        mtime,
+        owner,
+    } in deferrals
+    {
+        if let Err(err) = owner.set_owner(path) {
+            error!(?path, ?err, "Error restoring ownership");
+            stats.errors += 1;
+        }
+        if let Err(err) = unix_mode.set_permissions(path) {
+            error!(?path, ?err, "Failed to set directory permissions");
+            stats.errors += 1;
+        }
+        if let Err(err) = filetime::set_file_mtime(path, (*mtime).to_file_time()) {
+            error!(?path, ?err, "Failed to set directory mtime");
+            stats.errors += 1;
         }
     }
+    Ok(stats)
+}
 
-    /// Create a RestoreTree.
-    ///
-    /// The destination must either not yet exist, or be an empty directory.
-    pub fn create<P: Into<PathBuf>>(path: P) -> Result<RestoreTree> {
-        let path = path.into();
-        match ensure_dir_exists(&path).and_then(|()| directory_is_empty(&path)) {
-            Err(source) => Err(Error::Restore { path, source }),
-            Ok(true) => Ok(RestoreTree::new(path)),
-            Ok(false) => Err(Error::DestinationNotEmpty { path }),
-        }
-    }
-
-    /// Create a RestoreTree, even if the destination directory is not empty.
-    pub fn create_overwrite(path: &Path) -> Result<RestoreTree> {
-        Ok(RestoreTree::new(path.to_path_buf()))
-    }
-
-    fn rooted_path(&self, apath: &Apath) -> PathBuf {
-        // Remove initial slash so that the apath is relative to the destination.
-        self.path.join(&apath[1..])
-    }
-
-    fn finish(self) -> Result<RestoreStats> {
-        for (path, time) in self.dir_mtimes {
-            if let Err(err) = filetime::set_file_mtime(path, time.into()) {
-                ui::problem(&format!("Failed to set directory mtime: {:?}", err));
-            }
-        }
-        Ok(RestoreStats::default())
-    }
-
-    fn copy_dir<E: Entry>(&mut self, entry: &E) -> Result<()> {
-        let path = self.rooted_path(entry.apath());
-        if let Err(source) = fs::create_dir_all(&path) {
-            if source.kind() != io::ErrorKind::AlreadyExists {
-                return Err(Error::Restore { path, source });
-            }
-        }
-        self.dir_mtimes.push((path, entry.mtime()));
-        Ok(())
-    }
-
-    /// Copy in the contents of a file from another tree.
-    fn copy_file<R: ReadTree>(
-        &mut self,
-        source_entry: &R::Entry,
-        from_tree: &R,
-    ) -> Result<RestoreStats> {
-        // TODO: Restore permissions.
-        let path = self.rooted_path(source_entry.apath());
-        let restore_err = |source| Error::Restore {
+/// Copy in the contents of a file from another tree.
+#[instrument(skip(source_entry, block_dir, monitor))]
+fn restore_file(
+    path: PathBuf,
+    source_entry: &IndexEntry,
+    block_dir: &BlockDir,
+    monitor: Arc<dyn Monitor>,
+) -> Result<RestoreStats> {
+    let mut stats = RestoreStats::default();
+    let mut out = File::create(&path).map_err(|err| {
+        error!(?path, ?err, "Error creating destination file");
+        Error::Restore {
             path: path.clone(),
-            source,
-        };
-        let mut restore_file = File::create(&path).map_err(restore_err)?;
-        // TODO: Read one block at a time: don't pull all the contents into memory.
-        let content = &mut from_tree.file_contents(source_entry)?;
-        let bytes_copied = std::io::copy(content, &mut restore_file).map_err(restore_err)?;
-        restore_file.flush().map_err(restore_err)?;
-
-        let mtime = Some(source_entry.mtime().into());
-        set_file_handle_times(&restore_file, mtime, mtime).map_err(|source| {
-            Error::RestoreModificationTime {
+            source: err,
+        }
+    })?;
+    let mut len = 0u64;
+    for addr in &source_entry.addrs {
+        // TODO: We could combine small parts
+        // in memory, and then write them in a single system call. However
+        // for the probably common cases of files with one part, or
+        // many larger parts, sending everything through a BufWriter is
+        // probably a waste.
+        let bytes = block_dir
+            .read_address(addr, monitor.clone())
+            .map_err(|err| {
+                error!(?path, ?err, "Failed to read block content for file");
+                err
+            })?;
+        out.write_all(&bytes).map_err(|err| {
+            error!(?path, ?err, "Failed to write content to restore file");
+            Error::Restore {
                 path: path.clone(),
-                source,
+                source: err,
             }
         })?;
+        len += bytes.len() as u64;
+    }
+    stats.uncompressed_file_bytes = len;
+    out.flush().map_err(|source| Error::Restore {
+        path: path.clone(),
+        source,
+    })?;
 
-        // TODO: Accumulate more stats.
-        Ok(RestoreStats {
-            uncompressed_file_bytes: bytes_copied,
-            ..RestoreStats::default()
-        })
+    let mtime = Some(source_entry.mtime().to_file_time());
+    set_file_handle_times(&out, mtime, mtime).map_err(|source| Error::RestoreModificationTime {
+        path: path.clone(),
+        source,
+    })?;
+
+    // Restore permissions only if there are mode bits stored in the archive
+    if let Err(err) = source_entry.unix_mode().set_permissions(&path) {
+        error!(?path, ?err, "Error restoring unix permissions");
+        stats.errors += 1;
     }
 
-    #[cfg(unix)]
-    fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()> {
-        use std::os::unix::fs as unix_fs;
-        if let Some(ref target) = entry.symlink_target() {
-            let path = self.rooted_path(entry.apath());
-            if let Err(source) = unix_fs::symlink(target, &path) {
-                return Err(Error::Restore { path, source });
-            }
-            let mtime = entry.mtime().into();
-            if let Err(source) = set_symlink_file_times(&path, mtime, mtime) {
-                return Err(Error::RestoreModificationTime { path, source });
-            }
-        } else {
-            // TODO: Treat as an error.
-            ui::problem(&format!("No target in symlink entry {}", entry.apath()));
+    // Restore ownership if possible.
+    // TODO: Stats and warnings if a user or group is specified in the index but
+    // does not exist on the local system.
+    if let Err(err) = &source_entry.owner().set_owner(&path) {
+        error!(?path, ?err, "Error restoring ownership");
+        stats.errors += 1;
+    }
+    // TODO: Accumulate more stats.
+    trace!("Restored file");
+    Ok(stats)
+}
+
+#[cfg(unix)]
+fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<RestoreStats> {
+    let mut stats = RestoreStats::default();
+    use std::os::unix::fs as unix_fs;
+    if let Some(ref target) = entry.symlink_target() {
+        if let Err(source) = unix_fs::symlink(target, path) {
+            return Err(Error::Restore {
+                path: path.to_owned(),
+                source,
+            });
         }
-        Ok(())
+        if let Err(err) = &entry.owner().set_owner(path) {
+            error!(?path, ?err, "Error restoring ownership");
+            stats.errors += 1;
+        }
+        let mtime = entry.mtime().to_file_time();
+        if let Err(source) = set_symlink_file_times(path, mtime, mtime) {
+            return Err(Error::RestoreModificationTime {
+                path: path.to_owned(),
+                source,
+            });
+        }
+    } else {
+        error!(apath = ?entry.apath(), "No target in symlink entry");
+        stats.errors += 1;
     }
+    Ok(stats)
+}
 
-    #[cfg(not(unix))]
-    fn copy_symlink<E: Entry>(&mut self, entry: &E) -> Result<()> {
-        // TODO: Add a test with a canned index containing a symlink, and expect
-        // it cannot be restored on Windows and can be on Unix.
-        ui::problem(&format!(
-            "Can't restore symlinks on non-Unix: {}",
-            entry.apath()
-        ));
-        Ok(())
-    }
+#[cfg(not(unix))]
+#[mutants::skip]
+fn restore_symlink(_restore_path: &Path, entry: &IndexEntry) -> Result<RestoreStats> {
+    // TODO: Add a test with a canned index containing a symlink, and expect
+    // it cannot be restored on Windows and can be on Unix.
+    warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
+    Ok(RestoreStats::default())
 }

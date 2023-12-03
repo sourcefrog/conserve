@@ -33,7 +33,7 @@
 
 use crate::*;
 
-const GC_LOCK: &str = "GC_LOCK";
+pub static GC_LOCK: &str = "GC_LOCK";
 
 #[derive(Debug)]
 pub struct GarbageCollectionLock {
@@ -55,13 +55,13 @@ impl GarbageCollectionLock {
     pub fn new(archive: &Archive) -> Result<GarbageCollectionLock> {
         let archive = archive.clone();
         let band_id = archive.last_band_id()?;
-        if let Some(band_id) = band_id.clone() {
-            if !archive.band_is_closed(&band_id)? {
+        if let Some(band_id) = band_id {
+            if !archive.band_is_closed(band_id)? {
                 return Err(Error::DeleteWithIncompleteBackup { band_id });
             }
         }
         if archive.transport().is_file(GC_LOCK).unwrap_or(true) {
-            return Err(Error::GarbageCollectionLockHeld {});
+            return Err(Error::GarbageCollectionLockHeld);
         }
         archive.transport().write_file(GC_LOCK, b"{}\n")?;
         Ok(GarbageCollectionLock { archive, band_id })
@@ -90,7 +90,7 @@ impl GarbageCollectionLock {
         if self.band_id == current_last_band_id {
             Ok(())
         } else {
-            Err(Error::DeleteWithConcurrentActivity)
+            Err(Error::GarbageCollectionLockHeldDuringBackup)
         }
     }
 }
@@ -100,7 +100,7 @@ impl Drop for GarbageCollectionLock {
         if let Err(err) = self.archive.transport().remove_file(GC_LOCK) {
             // Print directly to stderr, in case the UI structure is in a
             // bad state during unwind.
-            eprintln!("Failed to delete GC_LOCK: {:?}", err)
+            eprintln!("Failed to delete GC_LOCK: {err:?}")
         }
     }
 }
@@ -108,6 +108,7 @@ impl Drop for GarbageCollectionLock {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::monitor::collect::CollectMonitor;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     #[test]
@@ -126,7 +127,13 @@ mod test {
     fn completed_backup_ok() {
         let archive = ScratchArchive::new();
         let source = TreeFixture::new();
-        backup(&archive, &source.live_tree(), &BackupOptions::default()).unwrap();
+        backup(
+            &archive,
+            source.path(),
+            &BackupOptions::default(),
+            CollectMonitor::arc(),
+        )
+        .unwrap();
         let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
         delete_guard.check().unwrap();
     }
@@ -136,9 +143,14 @@ mod test {
         let archive = ScratchArchive::new();
         let source = TreeFixture::new();
         let _delete_guard = GarbageCollectionLock::new(&archive).unwrap();
-        let backup_result = backup(&archive, &source.live_tree(), &BackupOptions::default());
+        let backup_result = backup(
+            &archive,
+            source.path(),
+            &BackupOptions::default(),
+            CollectMonitor::arc(),
+        );
         assert_eq!(
-            backup_result.err().expect("backup fails").to_string(),
+            backup_result.expect_err("backup fails").to_string(),
             "Archive is locked for garbage collection"
         );
     }
@@ -161,10 +173,10 @@ mod test {
         let _lock1 = GarbageCollectionLock::new(&archive).unwrap();
         // Should not be able to create a second lock while one gc is running.
         let lock2_result = GarbageCollectionLock::new(&archive);
-        match lock2_result {
-            Err(Error::GarbageCollectionLockHeld) => (),
-            other => panic!("unexpected result {:?}", other),
-        };
+        assert_eq!(
+            lock2_result.unwrap_err().to_string(),
+            "Archive is locked for garbage collection"
+        );
     }
 
     #[test]

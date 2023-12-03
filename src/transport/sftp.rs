@@ -9,11 +9,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use tracing::{debug, info, trace};
+use tracing::{error, info, trace, warn};
 use url::Url;
 
-use super::{DirEntry, Transport};
-use crate::{Kind, Result};
+use crate::Kind;
+
+use super::{Error, ErrorKind, ListDir, Result, Transport};
 
 /// Archive file I/O over SFTP.
 #[derive(Clone)]
@@ -31,18 +32,34 @@ impl SftpTransport {
             url.host_str().expect("url must have a host"),
             url.port().unwrap_or(22)
         );
-        let tcp_stream = TcpStream::connect(&addr)?;
+        let tcp_stream = TcpStream::connect(addr).map_err(|err| {
+            error!(?err, ?url, "Error opening SSH TCP connection");
+            io_error(err, url.as_ref())
+        })?;
         trace!("got tcp connection");
-        let mut session = ssh2::Session::new()?;
+        let mut session = ssh2::Session::new().map_err(|err| {
+            error!(?err, "Error opening SSH session");
+            ssh_error(err, url.as_ref())
+        })?;
         session.set_tcp_stream(tcp_stream);
-        session.handshake()?;
+        session.handshake().map_err(|err| {
+            error!(?err, "Error in SSH handshake");
+            ssh_error(err, url.as_ref())
+        })?;
         trace!(
             "SSH hands shaken, banner: {}",
             session.banner().unwrap_or("(none)")
         );
-        session.userauth_agent(url.username())?;
+        let username = url.username();
+        session.userauth_agent(username).map_err(|err| {
+            error!(?err, username, "Error in SSH user auth with agent");
+            ssh_error(err, url.as_ref())
+        })?;
         trace!("Authenticated!");
-        let sftp = session.sftp()?;
+        let sftp = session.sftp().map_err(|err| {
+            error!(?err, "Error opening SFTP session");
+            ssh_error(err, url.as_ref())
+        })?;
         Ok(SftpTransport {
             sftp: Arc::new(sftp),
             url: url.clone(),
@@ -50,11 +67,11 @@ impl SftpTransport {
         })
     }
 
-    fn lstat(&self, path: &str) -> io::Result<ssh2::FileStat> {
+    fn lstat(&self, path: &str) -> Result<ssh2::FileStat> {
         trace!("lstat {path}");
         self.sftp
             .lstat(&self.base_path.join(path))
-            .map_err(translate_error)
+            .map_err(|err| ssh_error(err, path))
     }
 }
 
@@ -66,43 +83,63 @@ impl fmt::Debug for SftpTransport {
     }
 }
 
-/// Map other errors to io::Error that aren't handled by libssh.
-///
-/// See https://github.com/alexcrichton/ssh2-rs/issues/244.
-fn translate_error(err: ssh2::Error) -> io::Error {
-    debug!(?err);
-    match err.code() {
-        ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_NO_SUCH_FILE)
-        | ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_NO_SUCH_PATH) => {
-            io::Error::new(io::ErrorKind::NotFound, err)
-        }
-        _ => io::Error::from(err),
-    }
-}
-
 impl Transport for SftpTransport {
-    fn iter_dir_entries(
-        &self,
-        path: &str,
-    ) -> io::Result<Box<dyn Iterator<Item = io::Result<super::DirEntry>>>> {
+    fn list_dir(&self, path: &str) -> Result<ListDir> {
         let full_path = &self.base_path.join(path);
         trace!("iter_dir_entries {:?}", full_path);
-        let dir = self.sftp.opendir(&full_path)?;
-        Ok(Box::new(ReadDir(dir)))
+        let mut files = Vec::new();
+        let mut dirs = Vec::new();
+        let mut dir = self.sftp.opendir(full_path).map_err(|err| {
+            error!(?err, ?full_path, "Error opening directory");
+            ssh_error(err, full_path.to_string_lossy().as_ref())
+        })?;
+        loop {
+            match dir.readdir() {
+                Ok((pathbuf, file_stat)) => {
+                    let name = pathbuf.to_string_lossy().into();
+                    if name == "." || name == ".." {
+                        continue;
+                    }
+                    trace!("read dir got name {}", name);
+                    match file_stat.file_type().into() {
+                        Kind::File => files.push(name),
+                        Kind::Dir => dirs.push(name),
+                        _ => (),
+                    }
+                }
+                Err(err) if err.code() == ssh2::ErrorCode::Session(-16) => {
+                    // Apparently there's no symbolic version for it, but this is the error
+                    // code.
+                    // <https://github.com/alexcrichton/ssh2-rs/issues/140>
+                    trace!("read dir end");
+                    break;
+                }
+                Err(err) => {
+                    info!("SFTP error {:?}", err);
+                    return Err(ssh_error(err, path));
+                }
+            }
+        }
+        Ok(ListDir { files, dirs })
     }
 
-    fn read_file(&self, path: &str) -> io::Result<Bytes> {
+    fn read_file(&self, path: &str) -> Result<Bytes> {
         let full_path = self.base_path.join(path);
         trace!("attempt open {}", full_path.display());
         let mut buf = Vec::with_capacity(2 << 20);
-        let mut file = self.sftp.open(&full_path).map_err(translate_error)?;
-        let len = file.read_to_end(&mut buf)?;
+        let mut file = self
+            .sftp
+            .open(&full_path)
+            .map_err(|err| ssh_error(err, path))?;
+        let len = file
+            .read_to_end(&mut buf)
+            .map_err(|err| io_error(err, path))?;
         assert_eq!(len, buf.len());
         trace!("read {} bytes from {}", len, full_path.display());
         Ok(buf.into())
     }
 
-    fn create_dir(&self, relpath: &str) -> io::Result<()> {
+    fn create_dir(&self, relpath: &str) -> Result<()> {
         let full_path = self.base_path.join(relpath);
         trace!("create_dir {:?}", full_path);
         match self.sftp.mkdir(&full_path, 0o700) {
@@ -111,21 +148,27 @@ impl Transport for SftpTransport {
                 // openssh seems to say failure for "directory exists" :/
                 Ok(())
             }
-            Err(err) => Err(translate_error(err)),
+            Err(err) => {
+                warn!(?err, ?relpath);
+                Err(ssh_error(err, relpath))
+            }
         }
     }
 
-    fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()> {
+    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
         let full_path = self.base_path.join(relpath);
         trace!("write_file {:>9} bytes to {:?}", content.len(), full_path);
-        let mut file = self.sftp.create(&full_path).map_err(translate_error)?;
+        let mut file = self.sftp.create(&full_path).map_err(|err| {
+            warn!(?err, ?relpath, "sftp error creating file");
+            ssh_error(err, relpath)
+        })?;
         file.write_all(content).map_err(|err| {
-            debug!("sftp error {err:?} writing {full_path:?}");
-            err
+            warn!(?err, ?full_path, "sftp error writing file");
+            io_error(err, relpath)
         })
     }
 
-    fn metadata(&self, relpath: &str) -> io::Result<super::Metadata> {
+    fn metadata(&self, relpath: &str) -> Result<super::Metadata> {
         let full_path = self.base_path.join(relpath);
         let stat = self.lstat(relpath)?;
         trace!("metadata {full_path:?}");
@@ -135,66 +178,55 @@ impl Transport for SftpTransport {
         })
     }
 
-    fn remove_file(&self, relpath: &str) -> io::Result<()> {
+    fn remove_file(&self, relpath: &str) -> Result<()> {
         let full_path = self.base_path.join(relpath);
         trace!("remove_file {full_path:?}");
-        self.sftp.unlink(&full_path).map_err(translate_error)
+        self.sftp
+            .unlink(&full_path)
+            .map_err(|err| ssh_error(err, relpath))
     }
 
-    fn remove_dir(&self, relpath: &str) -> io::Result<()> {
-        let full_path = self.base_path.join(relpath);
-        trace!("remove_dir {full_path:?}");
-        self.sftp.rmdir(&full_path).map_err(translate_error)
+    fn remove_dir_all(&self, path: &str) -> Result<()> {
+        trace!(?path, "SftpTransport::remove_dir_all");
+        let mut dirs_to_walk = vec![path.to_owned()];
+        let mut dirs_to_delete = vec![path.to_owned()];
+        while let Some(dir) = dirs_to_walk.pop() {
+            trace!(?dir, "Walk down dir");
+            let list = self.list_dir(&dir)?;
+            for file in list.files {
+                self.remove_file(&format!("{dir}/{file}"))?;
+            }
+            list.dirs
+                .iter()
+                .map(|subdir| format!("{dir}/{subdir}"))
+                .for_each(|p| {
+                    dirs_to_delete.push(p.clone());
+                    dirs_to_walk.push(p)
+                });
+        }
+        // Consume them in the reverse order discovered, so bottom up
+        for dir in dirs_to_delete.iter().rev() {
+            let full_path = self.base_path.join(dir);
+            trace!(?dir, "rmdir");
+            self.sftp
+                .rmdir(&full_path)
+                .map_err(|err| ssh_error(err, dir))?;
+        }
+        Ok(())
+        // let full_path = self.base_path.join(relpath);
+        // trace!("remove_dir {full_path:?}");
+        // self.sftp.rmdir(&full_path).map_err(translate_error)
     }
 
-    fn sub_transport(&self, relpath: &str) -> Box<dyn Transport> {
+    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
         let base_path = self.base_path.join(relpath);
         let mut url = self.url.clone();
         url.set_path(base_path.to_str().unwrap());
-        Box::new(SftpTransport {
+        Arc::new(SftpTransport {
             url,
             sftp: Arc::clone(&self.sftp),
             base_path,
         })
-    }
-
-    fn url_scheme(&self) -> &'static str {
-        "sftp"
-    }
-}
-
-struct ReadDir(ssh2::File);
-
-impl Iterator for ReadDir {
-    type Item = io::Result<super::DirEntry>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.0.readdir() {
-                Ok((pathbuf, file_stat)) => {
-                    let name = pathbuf.to_string_lossy().into();
-                    if name == "." || name == ".." {
-                        continue;
-                    }
-                    trace!("read dir got name {}", name);
-                    return Some(Ok(DirEntry {
-                        name,
-                        kind: file_stat.file_type().into(),
-                    }));
-                }
-                Err(err) if err.code() == ssh2::ErrorCode::Session(-16) => {
-                    // Apparently there's no symbolic version for it, but this is the error
-                    // code.
-                    // <https://github.com/alexcrichton/ssh2-rs/issues/140>
-                    trace!("read dir end");
-                    return None;
-                }
-                Err(err) => {
-                    info!("SFTP error {:?}", err);
-                    return Some(Err(err.into()));
-                }
-            }
-        }
     }
 }
 
@@ -207,5 +239,35 @@ impl From<ssh2::FileType> for Kind {
             Symlink => Kind::Symlink,
             _ => Kind::Unknown,
         }
+    }
+}
+
+impl From<ssh2::ErrorCode> for ErrorKind {
+    fn from(code: ssh2::ErrorCode) -> Self {
+        // Map other errors to io::Error that aren't handled by libssh.
+        //
+        // See https://github.com/alexcrichton/ssh2-rs/issues/244.
+        match code {
+            ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_NO_SUCH_FILE)
+            | ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_NO_SUCH_PATH) => ErrorKind::NotFound,
+            // TODO: Others
+            _ => ErrorKind::Other,
+        }
+    }
+}
+
+fn ssh_error(source: ssh2::Error, path: &str) -> super::Error {
+    super::Error {
+        kind: source.code().into(),
+        source: Some(Box::new(source)),
+        path: Some(path.to_owned()),
+    }
+}
+
+fn io_error(source: io::Error, path: &str) -> Error {
+    Error {
+        kind: source.kind().into(),
+        source: Some(Box::new(source)),
+        path: Some(path.to_owned()),
     }
 }

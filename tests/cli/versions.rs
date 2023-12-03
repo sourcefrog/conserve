@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2021 Martin Pool.
+// Copyright 2021-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
 
 use assert_cmd::prelude::*;
 use conserve::test_fixtures::ScratchArchive;
+use indoc::indoc;
 use predicates::function::function;
 use predicates::prelude::*;
 
@@ -23,22 +24,20 @@ use crate::run_conserve;
 #[test]
 fn utc() {
     run_conserve()
-        .args(&["versions", "--utc", "testdata/archive/simple/v0.6.10"])
+        .args(["versions", "--utc", "testdata/archive/simple/v0.6.10"])
         .assert()
         .success()
-        .stdout(
-            "\
-b0000                2021-03-04 13:21:15       0:00
-b0001                2021-03-04 13:21:30       0:00
-b0002                2021-03-04 13:27:28       0:00
-",
-        );
+        .stdout(indoc! { "
+            b0000                2021-03-04T13:21:15Z            0:00
+            b0001                2021-03-04T13:21:30Z            0:00
+            b0002                2021-03-04T13:27:28Z            0:00
+            "});
 }
 
 #[test]
 fn newest_first() {
     run_conserve()
-        .args(&[
+        .args([
             "versions",
             "--newest",
             "--utc",
@@ -47,13 +46,11 @@ fn newest_first() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(
-            "\
-b0002                2021-03-04 13:27:28       0:00
-b0001                2021-03-04 13:21:30       0:00
-b0000                2021-03-04 13:21:15       0:00
-",
-        );
+        .stdout(indoc! { "
+            b0002                2021-03-04T13:27:28Z            0:00
+            b0001                2021-03-04T13:21:30Z            0:00
+            b0000                2021-03-04T13:21:15Z            0:00
+        "});
 }
 
 #[test]
@@ -61,7 +58,7 @@ fn local_time() {
     // Without --utc we don't know exactly what times will be produced,
     // and it's hard to control the timezone for tests on Windows.
     run_conserve()
-        .args(&["versions", "testdata/archive/simple/v0.6.10"])
+        .args(["versions", "testdata/archive/simple/v0.6.10"])
         .assert()
         .success()
         .stdout(function(|s: &str| s.lines().count() == 3));
@@ -70,7 +67,7 @@ fn local_time() {
 #[test]
 fn short() {
     run_conserve()
-        .args(&["versions", "--short", "testdata/archive/simple/v0.6.10"])
+        .args(["versions", "--short", "testdata/archive/simple/v0.6.10"])
         .assert()
         .success()
         .stdout(
@@ -85,7 +82,7 @@ b0002
 #[test]
 fn tree_sizes() {
     run_conserve()
-        .args(&[
+        .args([
             "versions",
             "--sizes",
             "--utc",
@@ -93,13 +90,11 @@ fn tree_sizes() {
         ])
         .assert()
         .success()
-        .stdout(
-            "\
-b0000                2021-03-04 13:21:15       0:00           0 MB
-b0001                2021-03-04 13:21:30       0:00           0 MB
-b0002                2021-03-04 13:27:28       0:00           0 MB
-",
-        );
+        .stdout(indoc! { "
+            b0000                2021-03-04T13:21:15Z            0:00           0 MB
+            b0001                2021-03-04T13:21:30Z            0:00           0 MB
+            b0002                2021-03-04T13:27:28Z            0:00           0 MB
+            "});
 }
 
 #[test]
@@ -108,7 +103,7 @@ fn short_newest_first() {
     af.store_two_versions();
 
     run_conserve()
-        .args(&["versions", "--short", "--newest"])
+        .args(["versions", "--short", "--newest"])
         .arg(af.path())
         .assert()
         .success()

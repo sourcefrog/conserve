@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2022 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,11 +15,16 @@
 
 use std::collections::vec_deque::VecDeque;
 use std::fs;
+use std::fs::File;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
+use tracing::{error, warn};
+
+use crate::entry::{EntryValue, KindMeta};
+use crate::owner::Owner;
 use crate::stats::LiveTreeIterStats;
-use crate::unix_time::UnixTime;
+use crate::unix_mode::UnixMode;
 use crate::*;
 
 /// A real tree on the filesystem, for use as a backup source or restore destination.
@@ -45,89 +50,71 @@ impl LiveTree {
     pub fn path(&self) -> &Path {
         &self.path
     }
-}
 
-/// An in-memory Entry describing a file/dir/symlink in a live tree.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LiveEntry {
-    apath: Apath,
-    kind: Kind,
-    mtime: UnixTime,
-    size: Option<u64>,
-    symlink_target: Option<String>,
+    /// Open a file inside the tree to read.
+    pub fn open_file(&self, entry: &EntryValue) -> Result<File> {
+        assert_eq!(entry.kind(), Kind::File);
+        let path = self.relative_path(&entry.apath);
+        fs::File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
+    }
 }
 
 impl tree::ReadTree for LiveTree {
-    type Entry = LiveEntry;
-    type R = std::fs::File;
+    type Entry = EntryValue;
     type IT = Iter;
 
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
         Iter::new(&self.path, subtree, exclude)
     }
-
-    fn file_contents(&self, entry: &LiveEntry) -> Result<Self::R> {
-        assert_eq!(entry.kind(), Kind::File);
-        let path = self.relative_path(&entry.apath);
-        fs::File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
-    }
-
-    fn estimate_count(&self) -> Result<u64> {
-        // TODO: This stats the file and builds an entry about them, just to
-        // throw it away. We could perhaps change the iter to optionally do
-        // less work.
-        Ok(self
-            .iter_entries(Apath::root(), Exclude::nothing())?
-            .count() as u64)
-    }
 }
 
-impl Entry for LiveEntry {
-    fn apath(&self) -> &Apath {
-        &self.apath
-    }
-
-    fn kind(&self) -> Kind {
-        self.kind
-    }
-
-    fn mtime(&self) -> UnixTime {
-        self.mtime
-    }
-
-    fn size(&self) -> Option<u64> {
-        self.size
-    }
-
-    fn symlink_target(&self) -> &Option<String> {
-        &self.symlink_target
-    }
-}
-
-impl LiveEntry {
-    fn from_fs_metadata(
-        apath: Apath,
-        metadata: &fs::Metadata,
-        symlink_target: Option<String>,
-    ) -> LiveEntry {
-        // TODO: Could we read the symlink target here, rather than in the caller?
-        let mtime = metadata
-            .modified()
-            .expect("Failed to get file mtime")
-            .into();
-        let size = if metadata.is_file() {
-            Some(metadata.len())
-        } else {
-            None
-        };
-        LiveEntry {
-            apath,
-            kind: metadata.file_type().into(),
-            mtime,
-            symlink_target,
-            size,
+fn entry_from_fs_metadata(
+    apath: Apath,
+    source_path: &Path,
+    metadata: &fs::Metadata,
+) -> Result<EntryValue> {
+    let mtime = metadata
+        .modified()
+        .expect("Failed to get file mtime")
+        .into();
+    let kind_meta = if metadata.is_file() {
+        KindMeta::File {
+            size: metadata.len(),
         }
-    }
+    } else if metadata.is_dir() {
+        KindMeta::Dir
+    } else if metadata.is_symlink() {
+        let t = match source_path.read_link() {
+            Ok(t) => t,
+            Err(e) => {
+                error!("Failed to read target of symlink {source_path:?}: {e}");
+                return Err(e.into());
+            }
+        };
+        let target = match t.into_os_string().into_string() {
+            Ok(t) => t,
+            Err(e) => {
+                error!("Failed to decode target of symlink {source_path:?}: {e:?}");
+                return Err(Error::UnsupportedTargetEncoding {
+                    path: source_path.to_owned(),
+                });
+            }
+        };
+        KindMeta::Symlink { target }
+    } else {
+        return Err(Error::UnsupportedSourceKind {
+            path: source_path.to_owned(),
+        });
+    };
+    let owner = Owner::from(metadata);
+    let unix_mode = UnixMode::from(metadata.permissions());
+    Ok(EntryValue {
+        apath,
+        mtime,
+        kind_meta,
+        unix_mode,
+        owner,
+    })
 }
 
 /// Recursive iterator of the contents of a live tree.
@@ -148,7 +135,7 @@ pub struct Iter {
 
     /// All entries that have been seen but not yet returned by the iterator, in the order they
     /// should be returned.
-    entry_deque: VecDeque<LiveEntry>,
+    entry_deque: VecDeque<EntryValue>,
 
     /// Check that emitted paths are in the right order.
     check_order: apath::DebugCheckOrder,
@@ -163,13 +150,14 @@ impl Iter {
     /// Construct a new iter that will visit everything below this root path,
     /// subject to some exclusions
     fn new(root_path: &Path, subtree: Apath, exclude: Exclude) -> Result<Iter> {
-        let start_metadata = fs::symlink_metadata(&subtree.below(root_path))?;
+        let start_path = subtree.below(root_path);
+        let start_metadata = fs::symlink_metadata(&start_path)?;
         // Preload iter to return the root and then recurse into it.
-        let entry_deque: VecDeque<LiveEntry> = [LiveEntry::from_fs_metadata(
+        let entry_deque: VecDeque<EntryValue> = [entry_from_fs_metadata(
             subtree.clone(),
+            &start_path,
             &start_metadata,
-            None,
-        )]
+        )?]
         .into();
         // TODO: Consider the case where the root is not actually a directory?
         // Should that be supported?
@@ -191,12 +179,12 @@ impl Iter {
     fn visit_next_directory(&mut self, parent_apath: &Apath) {
         self.stats.directories_visited += 1;
         // Tuples of (name, entry) so that we can sort children by name.
-        let mut children = Vec::<(String, LiveEntry)>::new();
+        let mut children = Vec::<(String, EntryValue)>::new();
         let dir_path = parent_apath.below(&self.root_path);
         let dir_iter = match fs::read_dir(&dir_path) {
             Ok(i) => i,
-            Err(e) => {
-                ui::problem(&format!("Error reading directory {:?}: {}", &dir_path, e));
+            Err(err) => {
+                error!("Error reading directory {dir_path:?}: {err}");
                 return;
             }
         };
@@ -204,11 +192,8 @@ impl Iter {
         for dir_entry in dir_iter {
             let dir_entry = match dir_entry {
                 Ok(dir_entry) => dir_entry,
-                Err(e) => {
-                    ui::problem(&format!(
-                        "Error reading next entry from directory {:?}: {}",
-                        &dir_path, e
-                    ));
+                Err(err) => {
+                    error!("Error reading next entry from directory {dir_path:?}: {err}");
                     continue;
                 }
             };
@@ -216,10 +201,7 @@ impl Iter {
             let child_name = match child_osstr.to_str() {
                 Some(c) => c,
                 None => {
-                    ui::problem(&format!(
-                        "Couldn't decode filename {:?} in {:?}",
-                        child_osstr, dir_path,
-                    ));
+                    error!("Couldn't decode filename {child_osstr:?} in {dir_path:?}",);
                     continue;
                 }
             };
@@ -233,24 +215,18 @@ impl Iter {
             let ft = match dir_entry.file_type() {
                 Ok(ft) => ft,
                 Err(e) => {
-                    ui::problem(&format!(
-                        "Error getting type of {:?} during iteration: {}",
-                        child_apath, e
-                    ));
+                    error!("Error getting type of {child_apath:?} during iteration: {e}");
                     continue;
                 }
             };
             if ft.is_dir() {
                 // TODO: Count them?
                 // TODO: Perhaps an option to back them up anyhow?
-                match cachedir::is_tagged(&dir_entry.path()) {
+                match cachedir::is_tagged(dir_entry.path()) {
                     Ok(true) => continue,
                     Ok(false) => (),
                     Err(e) => {
-                        ui::problem(&format!(
-                            "Error checking CACHEDIR.TAG in {:?}: {}",
-                            dir_entry, e
-                        ));
+                        error!("Error checking CACHEDIR.TAG in {dir_entry:?}: {e}");
                     }
                 }
             }
@@ -262,16 +238,10 @@ impl Iter {
                         ErrorKind::NotFound => {
                             // Fairly harmless, and maybe not even worth logging. Just a race
                             // between listing the directory and looking at the contents.
-                            ui::problem(&format!(
-                                "File disappeared during iteration: {:?}: {}",
-                                child_apath, e
-                            ));
+                            warn!("File disappeared during iteration: {child_apath:?}: {e}");
                         }
                         _ => {
-                            ui::problem(&format!(
-                                "Failed to read source metadata from {:?}: {}",
-                                child_apath, e
-                            ));
+                            error!("Failed to read source metadata from {child_apath:?}: {e}");
                             self.stats.metadata_error += 1;
                         }
                     };
@@ -279,39 +249,23 @@ impl Iter {
                 }
             };
 
-            // TODO: Move this into LiveEntry::from_fs_metadata, once there's a
-            // global way for it to complain about errors.
-            let target: Option<String> = if ft.is_symlink() {
-                let t = match dir_path.join(dir_entry.file_name()).read_link() {
-                    Ok(t) => t,
-                    Err(e) => {
-                        ui::problem(&format!(
-                            "Failed to read target of symlink {:?}: {}",
-                            child_apath, e
-                        ));
-                        continue;
-                    }
-                };
-                match t.into_os_string().into_string() {
-                    Ok(t) => Some(t),
-                    Err(e) => {
-                        ui::problem(&format!(
-                            "Failed to decode target of symlink {:?}: {:?}",
-                            child_apath, e
-                        ));
-                        continue;
-                    }
-                }
-            } else {
-                None
-            };
             if ft.is_dir() {
                 subdir_apaths.push(child_apath.clone());
             }
-            children.push((
-                child_name.to_string(),
-                LiveEntry::from_fs_metadata(child_apath, &metadata, target),
-            ));
+            let child_path = dir_path.join(dir_entry.file_name());
+            let entry = match entry_from_fs_metadata(child_apath, &child_path, &metadata) {
+                Ok(entry) => entry,
+                Err(Error::UnsupportedSourceKind { .. }) => {
+                    // It's not too surprising that there would be fifos or sockets or files
+                    // we don't support; don't log them.
+                    continue;
+                }
+                Err(err) => {
+                    error!("Failed to build entry for {child_path:?}: {err:?}");
+                    continue;
+                }
+            };
+            children.push((child_name.to_string(), entry));
         }
         // To get the right overall tree ordering, any new subdirectories
         // discovered here should be visited together in apath order, but before
@@ -338,9 +292,9 @@ impl Iter {
 // subdirectories are then visited, also in sorted order, before returning to
 // any higher-level directories.
 impl Iterator for Iter {
-    type Item = LiveEntry;
+    type Item = EntryValue;
 
-    fn next(&mut self) -> Option<LiveEntry> {
+    fn next(&mut self) -> Option<EntryValue> {
         loop {
             if let Some(entry) = self.entry_deque.pop_front() {
                 // Have already found some entries, so just return the first.

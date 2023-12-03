@@ -96,32 +96,32 @@ touch or rewrite any files other than those being deleted.
 Storage to cloud object stores, local disks, and removable media are all
 important. Conserve should rely on only features common across all of them.
 
-- You can write whole files, but not update in place.
+* You can write whole files, but not update in place.
 
-- May have relatively long per-file latency on both read and write.
+* May have relatively long per-file latency on both read and write.
 
-- Storage bandwidth may be relatively limited relative to the source tree
+* Storage bandwidth may be relatively limited relative to the source tree
   size.
 
-- No filesystem metadata (ownership etc) can be stored directly; it must
+* No filesystem metadata (ownership etc) can be stored directly; it must
   be encoded
 
-- You can list directories (or, "list files starting with a certain prefix")
+* You can list directories (or, "list files starting with a certain prefix")
 
-- May or may not be case sensitive.
+* May or may not be case sensitive.
 
-- Can't detect whether an empty directory exists or not, and might not have a
+* Can't detect whether an empty directory exists or not, and might not have a
   strong concept of directories, perhaps only ordered names.
 
-- Do not assume that renaming over an existing file is allowed or disallowed.
+* Do not assume that renaming over an existing file is allowed or disallowed.
 
-- Conserve can cache information onto the source machine's local disk, but of
+* Conserve can cache information onto the source machine's local disk, but of
   course this cache may be lost or may need to be disabled. (We don't currently
   do this, and it would keep things simpler and more robust not to.)
 
-- Connection may be lost and the backup terminated at any point.
+* Connection may be lost and the backup terminated at any point.
 
-- No guarantee of read-after-write consistency. (In practice, perhaps several
+* No guarantee of read-after-write consistency. (In practice, perhaps several
   seconds after writing the change will be visible.)
 
 We cannot assume a remote smart server: the only network calls are
@@ -181,7 +181,7 @@ archive.
 
 It's very possible that the size of the source relative to the IO bandwidth of
 the destination means writing all the new data will take hours. This can most
-easily happen on the first backup, but als on incremental backups.
+easily happen on the first backup, but also on incremental backups.
 
 In that case the backup may be interrupted - by the user interrupting it,
 machine going to sleep, or losing connectivity, or rebooting.
@@ -208,7 +208,6 @@ This excludes a few design options taken by other programs:
 Remembering a save-point on the source machine seems more dangerous than  looking
 in the archive to see what's been stored.
 
-
 ## Validation
 
 Test restores of the whole tree take a long time and users don't do them
@@ -224,13 +223,11 @@ to the source directory, to catch corruption or Conserve bugs.  These can
 flag false-positive if there have been intended changes to the source
 directory after the backup, so the results need to be understandable.
 
-
 ## Hands-off
 
 Conserve will let you set up cron jobs to do daily backups, verification,
 and retrenchment, and it should then run hands off and entirely unattended.
 (Users should also do a black-box restore test, which should never fail.)
-
 
 ## UI
 

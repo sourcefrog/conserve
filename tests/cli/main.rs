@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2016-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,13 +13,17 @@
 
 //! Run conserve CLI as a subprocess and test it.
 
+use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::process::Command;
 
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
+use assert_fs::NamedTempFile;
 use assert_fs::TempDir;
+use indoc::indoc;
 use predicates::prelude::*;
+use serde_json::Deserializer;
 use url::Url;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
@@ -28,7 +32,16 @@ mod backup;
 mod delete;
 mod diff;
 mod exclude;
+mod ls;
+mod trace;
+mod validate;
 mod versions;
+
+#[cfg(unix)]
+mod unix {
+    mod diff;
+    mod permissions;
+}
 
 fn run_conserve() -> Command {
     let mut command = Command::cargo_bin("conserve").expect("locate conserve binary");
@@ -43,7 +56,7 @@ fn no_args() {
         .assert()
         .failure()
         .stdout(predicate::str::is_empty())
-        .stderr(predicate::str::contains("USAGE:"));
+        .stderr(predicate::str::contains("Usage:"));
 }
 
 #[test]
@@ -70,7 +83,9 @@ fn clean_error_on_non_archive() {
         .arg(".")
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Not a Conserve archive"));
+        .stderr(predicate::str::contains(
+            "Not a Conserve archive (no CONSERVE header found)",
+        ));
 }
 
 #[test]
@@ -85,7 +100,7 @@ fn basic_backup() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with("Created new archive"));
+        .stdout(predicate::str::is_empty());
 
     // New archive contains no versions.
     run_conserve()
@@ -100,7 +115,7 @@ fn basic_backup() {
     assert!(src.is_dir());
 
     run_conserve()
-        .args(&["ls", "--source"])
+        .args(["ls", "--source"])
         .arg(&src)
         .assert()
         .success()
@@ -113,7 +128,7 @@ fn basic_backup() {
         );
 
     run_conserve()
-        .args(&["size", "-s"])
+        .args(["size", "-s"])
         .arg(&src)
         .assert()
         .success()
@@ -127,12 +142,12 @@ fn basic_backup() {
         .arg(&src)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with("Backup complete.\n"));
+        .stderr(predicate::str::contains("Backup complete."))
+        .stdout(predicate::str::is_empty());
     // TODO: Now inspect the archive.
 
     run_conserve()
-        .args(&["size"])
+        .args(["size"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -140,7 +155,7 @@ fn basic_backup() {
         .stdout("0 MB\n"); // "contents"
 
     run_conserve()
-        .args(&["versions", "--short"])
+        .args(["versions", "--short"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -158,7 +173,7 @@ fn basic_backup() {
     };
 
     run_conserve()
-        .args(&["debug", "blocks"])
+        .args(["debug", "blocks"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -166,7 +181,7 @@ fn basic_backup() {
         .stdout(predicate::function(is_expected_blocks));
 
     run_conserve()
-        .args(&["debug", "referenced"])
+        .args(["debug", "referenced"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -174,7 +189,7 @@ fn basic_backup() {
         .stdout(predicate::function(is_expected_blocks));
 
     run_conserve()
-        .args(&["debug", "unreferenced"])
+        .args(["debug", "unreferenced"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -182,7 +197,7 @@ fn basic_backup() {
         .stdout("");
 
     run_conserve()
-        .args(&["debug", "index"])
+        .args(["debug", "index"])
         .arg(&arch_dir)
         .assert()
         .success()
@@ -209,6 +224,7 @@ fn basic_backup() {
 
     // TODO: Factor out comparison to expected tree.
     let restore_dir = TempDir::new().unwrap();
+    let restore_json = NamedTempFile::new("restore.json").unwrap();
 
     // Also try --no-progress here; should make no difference because these tests run
     // without a pty.
@@ -216,18 +232,20 @@ fn basic_backup() {
         .arg("restore")
         .arg("-v")
         .arg("--no-progress")
+        .arg("--no-stats")
         .arg(&arch_dir)
         .arg(restore_dir.path())
+        .arg("--changes-json")
+        .arg(restore_json.path())
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::starts_with(
-            "/\n\
-             /hello\n\
-             /subdir\n\
-             /subdir/subfile\n\
-             Restore complete.\n",
-        ));
+        .stdout(indoc! { "
+             + /
+             + /hello
+             + /subdir
+             + /subdir/subfile
+        " });
 
     restore_dir
         .child("subdir")
@@ -241,6 +259,19 @@ fn basic_backup() {
         .child("subfile")
         .assert("I like Rust\n");
 
+    let json = read_to_string(restore_json.path()).unwrap();
+    dbg!(&json);
+    let changes: Vec<serde_json::Value> = Deserializer::from_str(&json)
+        .into_iter::<serde_json::Value>()
+        .map(Result::unwrap)
+        .collect();
+    dbg!(&changes);
+    assert_eq!(changes.len(), 4);
+    assert_eq!(changes[0]["apath"], "/");
+    assert_eq!(changes[1]["apath"], "/hello");
+    assert_eq!(changes[2]["apath"], "/subdir");
+    assert_eq!(changes[3]["apath"], "/subdir/subfile");
+
     // Try to restore again over the same directory: should decline.
     run_conserve()
         .arg("restore")
@@ -249,14 +280,16 @@ fn basic_backup() {
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Destination directory not empty"));
+        .stderr(predicate::str::contains(
+            "Destination directory is not empty",
+        ));
 
     // Restore with specified band id / backup version.
     {
         let restore_dir2 = TempDir::new().unwrap();
         // Try to restore again over the same directory: should decline.
         run_conserve()
-            .args(&["restore", "-b", "b0"])
+            .args(["restore", "-b", "b0"])
             .arg(&arch_dir)
             .arg(restore_dir2.path())
             .assert()
@@ -267,11 +300,11 @@ fn basic_backup() {
     // Validate
     run_conserve()
         .arg("validate")
-        .arg(&arch_dir)
+        .arg(arch_dir)
         .assert()
         .success()
-        .stderr(predicate::str::is_empty())
-        .stdout(predicate::str::contains("Archive is OK.\n"));
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("Archive is OK.\n"));
 
     // TODO: Compare vs source tree.
 }
@@ -290,21 +323,22 @@ fn empty_archive() {
         .arg(restore_dir.path())
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Archive has no bands"));
+        .stderr(predicate::str::contains("Archive is empty"));
 
     run_conserve()
         .arg("ls")
         .arg(&adir)
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Archive has no bands"));
+        .stderr(predicate::str::contains("Archive is empty"));
 
     run_conserve()
         .arg("versions")
         .arg(&adir)
         .assert()
         .success()
-        .stdout(predicate::str::is_empty());
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::is_empty());
 
     run_conserve().arg("gc").arg(adir).assert().success();
 }
@@ -335,29 +369,20 @@ fn incomplete_version() {
         .arg(af.path())
         .assert()
         .failure()
-        .stdout(predicate::str::contains("incomplete and may be in use"));
-}
-
-#[test]
-fn validate_non_fatal_problems_nonzero_result() {
-    run_conserve()
-        .args(&["validate", "testdata/damaged/missing-block/"])
-        .assert()
-        .stdout(predicate::str::contains("Archive has some problems."))
-        .code(2);
+        .stderr(predicate::str::contains("incomplete and may be in use"));
 }
 
 #[test]
 fn restore_only_subtree() {
     let dest = TempDir::new().unwrap();
     run_conserve()
-        .args(&[
+        .args([
             "restore",
             "testdata/archive/minimal/v0.6.3/",
             "--only",
             "/subdir",
         ])
-        .arg(&dest.path())
+        .arg(dest.path())
         .assert()
         .success();
 
@@ -377,9 +402,9 @@ fn size_exclude() {
     source.create_file_with_contents("junk", b"01234567890123456789");
 
     run_conserve()
-        .args(&["size", "--bytes", "--source"])
-        .arg(&source.path())
-        .args(&["--exclude=/junk"])
+        .args(["size", "--bytes", "--source"])
+        .arg(source.path())
+        .args(["--exclude=/junk"])
         .assert()
         .success()
         .stdout("10\n");

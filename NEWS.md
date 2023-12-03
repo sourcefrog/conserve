@@ -1,6 +1,76 @@
 # Conserve release history
 
-## Unreleased
+## 23.11.0
+
+- Fixed: Restore now sets Unix user/group ownership on symlinks and directories. Previously, only file ownership was restored. (Setting file ownership typically requires restoring as root.)
+
+- Performance: Also keep a cache of the existence of blocks that have not yet been read.
+
+- Changed: The format and keys written by `--metrics-json` has changed.
+
+- Changed: New more detailed progress display, especially during backup.
+
+## 23.9.0
+
+- S3 support! Enable it with `cargo install --features s3`, then e.g. `cargo backup s3://mybucket.example/`.
+
+- Performance: A simple cache of retrieved decompressed blocks now speeds up restores, especially on relatively slow storage like S3.
+
+- `--debug` now shows on stderr only debug messages from Conserve itself and not
+  from dependencies. All the messages are still recorded to the `--log-json` file
+  if that is given.
+
+- Robustness: during backup, if the blocks referenced by the previous version are missing
+  or zero length, write new blocks rather than referencing them. This allows the archive
+  to better recover from filesystem corruption so that at least new backups are fully readable.
+
+- Deprecate low-value `--metrics-json`.
+
+## 23.5.0
+
+- Better progress bars for various operations including `validate`.
+
+- Don't complain if unable to chown during restore; this is normal when not run as root.
+
+- New `--log-json` global option to capture all logs, and `--metrics-json` to write out counters.
+
+- New internal non-breaking format change: backups (in the band header) can now declare some
+  format flags needed to read the backup correctly. If any format flags are set then at least
+  Conserve 23.2.0 is needed to read the backup.
+
+- New `--changes-json` option to `restore` and `backup`.
+
+- `diff` output format has changed slightly to be the same as `backup`.
+
+- New `diff --json` and `ls --json`.
+
+## 23.1.1
+
+- Fixed: User and group mappings are now cached in memory. This fixes a performance regression in
+  restore on the order of 10%.
+
+- Changed: Timestamps in `conserve versions` are now in RFC 3339 format, including a `T` between
+  the date and the time, and a timezone indicator.
+
+## 23.1.0
+
+- Switched to CalVer versioning.
+
+- New: Support for storing, restoring, and listing Unix owner, group, and permissions.
+  Thanks to @believeinlain.
+
+- Fixed: `--exclude /a` now also excludes everything under `/a` from listing, diff, restore, etc.
+  (Previously you would have to write `/a/**`.)
+
+- Fixed: `validate` should not complain about `GC_LOCK` or `.DS_Store` files in the archive directory.
+
+## v0.6.16
+
+Released 2022-08-12
+
+- Fixed: Previously, if the first backup in an archive was incomplete, Conserve
+  could get painfully slow, due to a bug that caused it to repeatedly reread
+  the incomplete index. (Thanks to WolverinDEV.)
 
 - Archives may be specified as URLs: currently only as `file:///` URLs.
 
@@ -8,7 +78,7 @@
   or changed files (and currently only plain files), and the file state is shown
   by a single-character prefix similar to `conserve diff`, rather than a suffix.
 
-- Changed to use [Nutmeg](https://libs.rs/nutmeg) to draw progress bars, 
+- Changed to use [Nutmeg](https://libs.rs/nutmeg) to draw progress bars,
   which changes their appearance somewhat.
 
 - Added a `--no-progress` option.

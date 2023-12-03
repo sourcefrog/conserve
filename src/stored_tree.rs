@@ -18,23 +18,25 @@
 //! across incremental backups, hiding from the caller that data may be distributed across
 //! multiple index files, bands, and blocks.
 
+use std::sync::Arc;
+
 use crate::blockdir::BlockDir;
 use crate::stitch::IterStitchedIndexHunks;
-use crate::stored_file::{ReadStoredFile, StoredFile};
 use crate::*;
 
 /// Read index and file contents for a version stored in the archive.
+#[derive(Debug)]
 pub struct StoredTree {
     band: Band,
     archive: Archive,
-    block_dir: BlockDir,
+    block_dir: Arc<BlockDir>,
 }
 
 impl StoredTree {
-    pub(crate) fn open(archive: &Archive, band_id: &BandId) -> Result<StoredTree> {
+    pub(crate) fn open(archive: &Archive, band_id: BandId) -> Result<StoredTree> {
         Ok(StoredTree {
             band: Band::open(archive, band_id)?,
-            block_dir: archive.block_dir().clone(),
+            block_dir: archive.block_dir.clone(),
             archive: archive.clone(),
         })
     }
@@ -47,29 +49,22 @@ impl StoredTree {
         self.band.is_closed()
     }
 
-    /// Open a file stored within this tree.
-    fn open_stored_file(&self, entry: &IndexEntry) -> StoredFile {
-        StoredFile::open(self.block_dir.clone(), entry.addrs.clone())
+    pub fn block_dir(&self) -> &BlockDir {
+        &self.block_dir
     }
 }
 
 impl ReadTree for StoredTree {
-    type R = ReadStoredFile;
     type Entry = IndexEntry;
     type IT = index::IndexEntryIter<stitch::IterStitchedIndexHunks>;
 
     /// Return an iter of index entries in this stored tree.
+    // TODO: Should return an iter of Result<Entry> so that we can inspect them...
     fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
-        Ok(IterStitchedIndexHunks::new(&self.archive, self.band.id())
-            .iter_entries(subtree, exclude))
-    }
-
-    fn file_contents(&self, entry: &Self::Entry) -> Result<Self::R> {
-        Ok(self.open_stored_file(entry).into_read())
-    }
-
-    fn estimate_count(&self) -> Result<u64> {
-        self.band.index().estimate_entry_count()
+        Ok(
+            IterStitchedIndexHunks::new(&self.archive, Some(self.band.id()))
+                .iter_entries(subtree, exclude),
+        )
     }
 }
 
@@ -88,7 +83,7 @@ mod test {
         let last_band_id = af.last_band_id().unwrap().unwrap();
         let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
 
-        assert_eq!(*st.band().id(), last_band_id);
+        assert_eq!(st.band().id(), last_band_id);
 
         let names: Vec<String> = st
             .iter_entries(Apath::root(), Exclude::nothing())
@@ -113,11 +108,12 @@ mod test {
     #[test]
     pub fn cant_open_no_versions() {
         let af = ScratchArchive::new();
-        match af.open_stored_tree(BandSelectionPolicy::Latest) {
-            Err(Error::ArchiveEmpty) => (),
-            Err(other) => panic!("unexpected result {:?}", other),
-            Ok(_) => panic!("unexpected success"),
-        }
+        assert_eq!(
+            af.open_stored_tree(BandSelectionPolicy::Latest)
+                .unwrap_err()
+                .to_string(),
+            "Archive is empty"
+        );
     }
 
     #[test]

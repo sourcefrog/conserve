@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 use crate::backup::BackupOptions;
+use crate::monitor::collect::CollectMonitor;
 use crate::*;
 
 /// A temporary archive, deleted when it goes out of scope.
@@ -65,10 +66,10 @@ impl ScratchArchive {
         }
 
         let options = &BackupOptions::default();
-        backup(&self.archive, &srcdir.live_tree(), options).unwrap();
+        backup(&self.archive, srcdir.path(), options, CollectMonitor::arc()).unwrap();
 
         srcdir.create_file("hello2");
-        backup(&self.archive, &srcdir.live_tree(), options).unwrap();
+        backup(&self.archive, srcdir.path(), options, CollectMonitor::arc()).unwrap();
     }
 
     pub fn transport(&self) -> &dyn Transport {
@@ -185,4 +186,18 @@ impl Default for TreeFixture {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Collect apaths from an iterator into a list of string.
+///
+/// This is more loosely typed but useful for tests.
+pub fn entry_iter_to_apath_strings<EntryIter, E>(entry_iter: EntryIter) -> Vec<String>
+where
+    EntryIter: IntoIterator<Item = E>,
+    E: EntryTrait,
+{
+    entry_iter
+        .into_iter()
+        .map(|entry| entry.apath().clone().into())
+        .collect()
 }

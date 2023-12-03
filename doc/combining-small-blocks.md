@@ -2,6 +2,8 @@
 
 <https://github.com/sourcefrog/conserve/issues/66>
 
+**Status: ✅ Implemented, although some optimizations are still possible.**
+
 ## Summary
 
 Store, within the blockdir, _combined blocks_ which compress, as a single unit,

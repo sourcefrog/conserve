@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,10 +14,10 @@
 use std::fmt;
 use std::time::Duration;
 
-use derive_more::{Add, AddAssign, Sum};
+use derive_more::{Add, AddAssign};
 use thousands::Separable;
 
-use crate::ui::duration_to_hms;
+use crate::misc::duration_to_hms;
 
 pub fn mb_string(s: u64) -> String {
     (s / 1_000_000).separate_with_commas()
@@ -32,11 +32,15 @@ fn ratio(uncompressed: u64, compressed: u64) -> f64 {
     }
 }
 
-fn write_size<I: Into<u64>>(w: &mut fmt::Formatter<'_>, label: &str, value: I) {
+pub(crate) fn write_size<I: Into<u64>>(w: &mut fmt::Formatter<'_>, label: &str, value: I) {
     writeln!(w, "{:>12} MB   {}", mb_string(value.into()), label).unwrap();
 }
 
-fn write_compressed_size(w: &mut fmt::Formatter<'_>, compressed: u64, uncompressed: u64) {
+pub(crate) fn write_compressed_size(
+    w: &mut fmt::Formatter<'_>,
+    compressed: u64,
+    uncompressed: u64,
+) {
     write_size(w, "uncompressed", uncompressed);
     write_size(
         w,
@@ -45,7 +49,7 @@ fn write_compressed_size(w: &mut fmt::Formatter<'_>, compressed: u64, uncompress
     );
 }
 
-fn write_count<I: Into<usize>>(w: &mut fmt::Formatter<'_>, label: &str, value: I) {
+pub(crate) fn write_count<I: Into<usize>>(w: &mut fmt::Formatter<'_>, label: &str, value: I) {
     writeln!(
         w,
         "{:>12}      {}",
@@ -55,7 +59,11 @@ fn write_count<I: Into<usize>>(w: &mut fmt::Formatter<'_>, label: &str, value: I
     .unwrap();
 }
 
-fn write_duration(w: &mut fmt::Formatter<'_>, label: &str, duration: Duration) -> fmt::Result {
+pub(crate) fn write_duration(
+    w: &mut fmt::Formatter<'_>,
+    label: &str,
+    duration: Duration,
+) -> fmt::Result {
     writeln!(w, "{:>12}      {}", duration_to_hms(duration), label)
 }
 
@@ -67,82 +75,12 @@ pub struct Sizes {
     pub uncompressed: u64,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Add, AddAssign, Sum)]
-pub struct ValidateStats {
-    /// Count of files in the wrong place.
-    pub structure_problems: usize,
-    pub io_errors: usize,
-
-    /// Failed to open a band.
-    pub band_open_errors: usize,
-    pub band_metadata_problems: usize,
-    pub missing_band_heads: usize,
-
-    /// Failed to open a stored tree.
-    pub tree_open_errors: usize,
-    pub tree_validate_errors: usize,
-
-    /// Count of files not expected to be in the archive.
-    pub unexpected_files: usize,
-
-    /// Number of blocks read.
-    pub block_read_count: u64,
-    /// Number of blocks that failed to read back.
-    pub block_error_count: usize,
-    pub block_missing_count: usize,
-    pub block_too_short: usize,
-
-    pub elapsed: Duration,
-}
-
-impl fmt::Display for ValidateStats {
-    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.has_problems() {
-            writeln!(w, "VALIDATION FOUND PROBLEMS")?;
-        } else {
-            writeln!(w, "No problems found in archive")?;
-        }
-
-        write_count(w, "structure problems", self.structure_problems);
-        write_count(w, "IO errors", self.io_errors);
-        write_count(w, "band open errors", self.band_open_errors);
-        write_count(w, "band metadata errors", self.band_metadata_problems);
-        write_count(w, "missing band heads", self.missing_band_heads);
-        write_count(w, "tree open errors", self.tree_open_errors);
-        write_count(w, "tree validate errors", self.tree_validate_errors);
-        write_count(w, "unexpected files", self.unexpected_files);
-        writeln!(w).unwrap();
-        write_count(w, "block errors", self.block_error_count);
-        write_count(w, "blocks missing", self.block_too_short);
-        write_count(w, "blocks too short", self.block_missing_count);
-        writeln!(w).unwrap();
-
-        write_count(w, "blocks read", self.block_read_count as usize);
-        write_duration(w, "elapsed", self.elapsed)?;
-
-        Ok(())
-    }
-}
-
-impl ValidateStats {
-    pub fn has_problems(&self) -> bool {
-        self.block_error_count > 0 || self.io_errors > 0 || self.block_missing_count > 0
-    }
-}
-
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct IndexReadStats {
     pub index_hunks: usize,
     pub uncompressed_index_bytes: u64,
     pub compressed_index_bytes: u64,
     pub errors: usize,
-}
-
-#[derive(Add, AddAssign, Clone, Debug, Default, Eq, PartialEq)]
-pub struct IndexWriterStats {
-    pub index_hunks: usize,
-    pub uncompressed_index_bytes: u64,
-    pub compressed_index_bytes: u64,
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
@@ -165,6 +103,8 @@ pub struct RestoreStats {
     pub uncompressed_file_bytes: u64,
 
     pub elapsed: Duration,
+
+    pub block_cache_hits: usize,
 }
 
 impl fmt::Display for RestoreStats {
@@ -177,79 +117,7 @@ impl fmt::Display for RestoreStats {
         write_count(w, "unsupported file kind", self.unknown_kind);
         writeln!(w).unwrap();
 
-        write_count(w, "errors", self.errors);
-        write_duration(w, "elapsed", self.elapsed)?;
-
-        Ok(())
-    }
-}
-
-#[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
-pub struct BackupStats {
-    // TODO: Have separate more-specific stats for backup and restore, and then
-    // each can have a single Display method.
-    // TODO: Include source file bytes, including unmodified files.
-    pub files: usize,
-    pub symlinks: usize,
-    pub directories: usize,
-    pub unknown_kind: usize,
-
-    pub unmodified_files: usize,
-    pub modified_files: usize,
-    pub new_files: usize,
-
-    /// Bytes that matched an existing block.
-    pub deduplicated_bytes: u64,
-    /// Bytes that were stored as new blocks, before compression.
-    pub uncompressed_bytes: u64,
-    pub compressed_bytes: u64,
-
-    pub deduplicated_blocks: usize,
-    pub written_blocks: usize,
-    /// Blocks containing combined small files.
-    pub combined_blocks: usize,
-
-    pub empty_files: usize,
-    pub small_combined_files: usize,
-    pub single_block_files: usize,
-    pub multi_block_files: usize,
-
-    pub errors: usize,
-
-    pub index_builder_stats: IndexWriterStats,
-    pub elapsed: Duration,
-}
-
-impl fmt::Display for BackupStats {
-    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_count(w, "files:", self.files);
-        write_count(w, "  unmodified files", self.unmodified_files);
-        write_count(w, "  modified files", self.modified_files);
-        write_count(w, "  new files", self.new_files);
-        write_count(w, "symlinks", self.symlinks);
-        write_count(w, "directories", self.directories);
-        write_count(w, "unsupported file kind", self.unknown_kind);
-        writeln!(w).unwrap();
-
-        write_count(w, "files stored:", self.new_files + self.modified_files);
-        write_count(w, "  empty files", self.empty_files);
-        write_count(w, "  small combined files", self.small_combined_files);
-        write_count(w, "  single block files", self.single_block_files);
-        write_count(w, "  multi-block files", self.multi_block_files);
-        writeln!(w).unwrap();
-
-        write_count(w, "data blocks deduplicated:", self.deduplicated_blocks);
-        write_size(w, "  saved", self.deduplicated_bytes);
-        writeln!(w).unwrap();
-
-        write_count(w, "new data blocks written:", self.written_blocks);
-        write_count(w, "  blocks of combined files", self.combined_blocks);
-        write_compressed_size(w, self.compressed_bytes, self.uncompressed_bytes);
-        writeln!(w).unwrap();
-
-        let idx = &self.index_builder_stats;
-        write_count(w, "new index hunks", idx.index_hunks);
-        write_compressed_size(w, idx.compressed_index_bytes, idx.uncompressed_index_bytes);
+        write_count(w, "block cache hits", self.block_cache_hits);
         writeln!(w).unwrap();
 
         write_count(w, "errors", self.errors);

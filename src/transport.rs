@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Martin Pool.
+// Copyright 2020, 2021, 2022, 2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,11 +14,12 @@
 //!
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
-use std::io;
 use std::path::Path;
+use std::sync::Arc;
+use std::{error, fmt, io, result};
 
 use bytes::Bytes;
-use tracing::trace;
+use derive_more::Display;
 use url::Url;
 
 use crate::*;
@@ -28,27 +29,36 @@ pub mod sftp;
 
 use local::LocalTransport;
 
+#[cfg(feature = "s3")]
+pub mod s3;
+
 /// Open a `Transport` to access a local directory.
 ///
 /// `s` may be a local path or a URL.
-pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
+pub fn open_transport(s: &str) -> crate::Result<Arc<dyn Transport>> {
     if let Ok(url) = Url::parse(s) {
         match url.scheme() {
-            "file" => Ok(Box::new(LocalTransport::new(
+            "file" => Ok(Arc::new(LocalTransport::new(
                 &url.to_file_path().expect("extract URL file path"),
             ))),
+            #[cfg(feature = "s3")]
+            "s3" => Ok(s3::S3Transport::new(&url)?),
             d if d.len() == 1 => {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
-                Ok(Box::new(LocalTransport::new(Path::new(s))))
+                Ok(Arc::new(LocalTransport::new(Path::new(s))))
             }
-            "sftp" => Ok(Box::new(sftp::SftpTransport::new(&url)?)),
-            other => Err(Error::UrlScheme {
+            "sftp" => Ok(Arc::new(sftp::SftpTransport::new(&url)?)),
+            other => Err(crate::Error::UrlScheme {
                 scheme: other.to_owned(),
             }),
         }
     } else {
-        Ok(Box::new(LocalTransport::new(Path::new(s))))
+        Ok(Arc::new(LocalTransport::new(Path::new(s))))
     }
+}
+
+pub fn open_local_transport(path: &Path) -> crate::Result<Arc<dyn Transport>> {
+    Ok(Arc::new(LocalTransport::new(path)))
 }
 
 /// Abstracted filesystem IO to access an archive.
@@ -64,55 +74,24 @@ pub fn open_transport(s: &str) -> Result<Box<dyn Transport>> {
 /// Files in Conserve archives have bounded size and fit in memory so this does not need to
 /// support streaming or partial reads and writes.
 pub trait Transport: Send + Sync + std::fmt::Debug {
-    /// Read the contents of a directory under this transport, without recursing down.
-    ///
-    /// Returned entries are in arbitrary order and may be interleaved with errors.
-    ///
-    /// The result should not contain entries for "." and "..".
-    fn iter_dir_entries(
-        &self,
-        path: &str,
-    ) -> io::Result<Box<dyn Iterator<Item = io::Result<DirEntry>>>>;
-
-    /// As a convenience, read all filenames from the directory into vecs of
-    /// dirs and files.
+    /// List a directory, separating out file and subdirectory names.
     ///
     /// Names are in the arbitrary order that they're returned from the transport.
     ///
     /// Any error during iteration causes overall failure.
-    fn list_dir_names(&self, relpath: &str) -> io::Result<ListDirNames> {
-        let mut names = ListDirNames::default();
-        for dir_entry in self.iter_dir_entries(relpath)? {
-            let dir_entry = dir_entry?;
-            match dir_entry.kind {
-                Kind::Dir => names.dirs.push(dir_entry.name),
-                Kind::File => names.files.push(dir_entry.name),
-                _ => (),
-            }
-        }
-        Ok(names)
-    }
+    fn list_dir(&self, relpath: &str) -> Result<ListDir>;
 
     /// Get one complete file into a caller-provided buffer.
     ///
     /// Files in the archive are of bounded size, so it's OK to always read them entirely into
     /// memory, and this is simple to support on all implementations.
-    fn read_file(&self, path: &str) -> io::Result<Bytes>;
-
-    /// Check if a directory exists.
-    fn is_dir(&self, path: &str) -> io::Result<bool> {
-        match self.metadata(path) {
-            Ok(metadata) => Ok(metadata.kind == Kind::Dir),
-            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
-            Err(err) => Err(err),
-        }
-    }
+    fn read_file(&self, path: &str) -> Result<Bytes>;
 
     /// Check if a regular file exists.
-    fn is_file(&self, path: &str) -> io::Result<bool> {
+    fn is_file(&self, path: &str) -> Result<bool> {
         match self.metadata(path) {
             Ok(metadata) => Ok(metadata.kind == Kind::File),
-            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
             Err(err) => Err(err),
         }
     }
@@ -122,44 +101,30 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// If the directory already exists, it's not an error.
     ///
     /// This function does not create missing parent directories.
-    fn create_dir(&self, relpath: &str) -> io::Result<()>;
+    fn create_dir(&self, relpath: &str) -> Result<()>;
 
     /// Write a complete file.
     ///
     /// As much as possible, the file should be written atomically so that it is only visible with
     /// the complete content. On a local filesystem the content is written to a temporary file and
     /// then renamed.
-    ///
     /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
-    fn write_file(&self, relpath: &str, content: &[u8]) -> io::Result<()>;
+    ///
+    /// If the file exists it is replaced. (Across transports, and particularly on S3,
+    /// we can't rely on detecting existing files.)
+    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
 
     /// Get metadata about a file.
-    fn metadata(&self, relpath: &str) -> io::Result<Metadata>;
+    fn metadata(&self, relpath: &str) -> Result<Metadata>;
 
     /// Delete a file.
-    fn remove_file(&self, relpath: &str) -> io::Result<()>;
-
-    /// Delete an empty directory.
-    fn remove_dir(&self, relpath: &str) -> io::Result<()>;
+    fn remove_file(&self, relpath: &str) -> Result<()>;
 
     /// Delete a directory and all its contents.
-    fn remove_dir_all(&self, relpath: &str) -> io::Result<()> {
-        trace!("remove_dir_all {relpath:?}");
-        let dir_names = self.list_dir_names(relpath)?;
-        for file_name in dir_names.files {
-            self.remove_file(&format!("{}/{}", relpath, file_name))?;
-        }
-        for dir_name in dir_names.dirs {
-            self.remove_dir_all(&format!("{}/{}", relpath, dir_name))?;
-        }
-        self.remove_dir(&relpath)
-    }
+    fn remove_dir_all(&self, relpath: &str) -> Result<()>;
 
     /// Make a new transport addressing a subdirectory.
-    fn sub_transport(&self, relpath: &str) -> Box<dyn Transport>;
-
-    /// Return a URL scheme describing this transport, such as "file".
-    fn url_scheme(&self) -> &'static str;
+    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport>;
 }
 
 /// A directory entry read from a transport.
@@ -183,7 +148,90 @@ pub struct Metadata {
 
 /// A list of all the files and directories in a directory.
 #[derive(Debug, Default, Eq, PartialEq)]
-pub struct ListDirNames {
+pub struct ListDir {
     pub files: Vec<String>,
     pub dirs: Vec<String>,
 }
+
+/// A transport error, as a generalization of IO errors.
+#[derive(Debug)]
+pub struct Error {
+    /// What type of generally known error?
+    kind: ErrorKind,
+    /// The underlying error: for example an IO or S3 error.
+    source: Option<Box<dyn error::Error + Send + Sync>>,
+    /// The affected path, possibly relative to the transport.
+    path: Option<String>,
+}
+
+/// General categories of transport errors.
+#[derive(Debug, Display, PartialEq, Eq, Clone, Copy)]
+pub enum ErrorKind {
+    #[display(fmt = "Not found")]
+    NotFound,
+
+    #[display(fmt = "Already exists")]
+    AlreadyExists,
+
+    #[display(fmt = "Permission denied")]
+    PermissionDenied,
+
+    #[display(fmt = "Other transport error")]
+    Other,
+}
+
+impl From<io::ErrorKind> for ErrorKind {
+    fn from(kind: io::ErrorKind) -> Self {
+        match kind {
+            io::ErrorKind::NotFound => ErrorKind::NotFound,
+            io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
+            io::ErrorKind::PermissionDenied => ErrorKind::PermissionDenied,
+            _ => ErrorKind::Other,
+        }
+    }
+}
+
+impl Error {
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+
+    pub(self) fn io_error(path: &Path, source: io::Error) -> Error {
+        Error {
+            kind: source.kind().into(),
+            source: Some(Box::new(source)),
+            path: Some(path.to_string_lossy().to_string()),
+        }
+    }
+
+    pub fn is_not_found(&self) -> bool {
+        self.kind == ErrorKind::NotFound
+    }
+
+    /// The transport-relative path where this error occurred, if known.
+    pub fn path(&self) -> Option<&str> {
+        self.path.as_deref()
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.kind)?;
+        if let Some(ref path) = self.path {
+            write!(f, ": {}", path)?;
+        }
+        if let Some(source) = &self.source {
+            // I'm not sure we should write this here; it might be repetitive.
+            write!(f, ": {source}")?;
+        }
+        Ok(())
+    }
+}
+
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        self.source.as_ref().map(|s| &**s as _)
+    }
+}
+
+type Result<T> = result::Result<T, Error>;

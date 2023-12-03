@@ -3,7 +3,6 @@
 <https://github.com/sourcefrog/conserve/>
 
 [![GitHub build status](https://github.com/sourcefrog/conserve/workflows/Rust/badge.svg?branch=main)](https://github.com/sourcefrog/conserve/actions?query=workflow%3ARust)
-[![cargo-audit](https://github.com/sourcefrog/conserve/actions/workflows/cargo-audit.yml/badge.svg)](https://github.com/sourcefrog/conserve/actions/workflows/cargo-audit.yml)
 [![crates.io](https://img.shields.io/crates/v/conserve.svg)](https://crates.io/crates/conserve)
 ![Maturity: Beta](https://img.shields.io/badge/maturity-beta-yellow.svg)
 
@@ -45,20 +44,20 @@ Conserve's [guiding principles](doc/manifesto.md):
 
 Conserve storage is within an _archive_ directory created by `conserve init`:
 
-    $ conserve init /backup/home.cons
+    conserve init /backup/home.cons
 
 `conserve backup` copies a source directory into a new _version_ within the
 archive. Conserve copies files, directories, and (on Unix) symlinks. If the
 `conserve backup` command completes successfully (copying the whole source
 tree), the backup is considered _complete_.
 
-    $ conserve backup /backup/home.cons ~ --exclude /.cache
+    conserve backup /backup/home.cons ~ --exclude /.cache
 
 `conserve diff` shows what's different between an archive and a source
 directory. It should typically be given the same `--exclude` options as were
 used to make the backup.
 
-    $ conserve diff /backup/home.cons ~ --exclude /.cache
+    conserve diff /backup/home.cons ~ --exclude /.cache
 
 `conserve versions` lists the versions in an archive, whether or not the backup
 is _complete_, the time at which the backup started, and the time taken to
@@ -77,15 +76,19 @@ that read a band from an archive, it operates on the most recent by default, and
 you can specify a different version using `-b`. (You can also omit leading zeros
 from the backup version.)
 
-    $ conserve ls -b b0 /backup/home.cons | less
+    conserve ls -b b0 /backup/home.cons | less
 
 `conserve restore` copies a version back out of an archive:
 
-    $ conserve restore /backup/home.cons /tmp/trial-restore
+    conserve restore /backup/home.cons /tmp/trial-restore
 
 `conserve validate` checks the integrity of an archive:
 
-    $ conserve validate /backup/home.cons
+    conserve validate /backup/home.cons
+
+`conserve delete` deletes specific named backups from an archive:
+
+    conserve delete /backup/home.cons -b b1
 
 ## Exclusions
 
@@ -106,6 +109,23 @@ crate.
 Directories marked with [`CACHEDIR.TAG`](https://bford.info/cachedir/) are
 automatically excluded from backups.
 
+## S3 support
+
+From 23.9 Conserve supports storing backups in Amazon S3. AWS IAM credentials are
+read from the standard sources: the environment, config file, or, on EC2, the instance metadata service.
+
+S3 support can be turned off by passing `cargo install --no-default-features`. (There's no
+runtime impact if it is not used, but it does add a lot of build-time dependencies.)
+
+To use this, just specify an S3 URL for the archive location. The bucket must already exist.
+
+    conserve init s3://my-bucket/
+    conserve backup s3://my-bucket/ ~
+
+Files are written in the `INTELLIGENT_TIERING` storage class.
+
+(This should work on API-compatible services but has not been tested; experience reports are welcome.)
+
 ## Install
 
 To build Conserve you need [Rust][rust] and a C compiler that can be used by
@@ -120,7 +140,6 @@ To install from a git checkout, run
     cargo install -f --path .
 
 [rust]: https://rustup.rs/
-[sourcefrog]: http://sourcefrog.net/
 
 On nightly Rust only, you can enable a potential speed-up to the blake2 hashes
 with
@@ -149,43 +168,22 @@ use an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers):
 
 - [Release notes](NEWS.md)
 
-## Limitations
+## Performance on Windows
 
-Conserve can reasonably be used for backups today: the format is stable, in my
-use it's reliable, and the basic features are complete.
+Windows Defender and Windows Search Indexing can severely slow down any program that does intensive file IO, including Conserve. I recommend you exclude the backup directory from both systems.
 
-Be aware that Conserve is developed as a part-time non-commercial project and
-there's no guarantee of support.
+## Project status
 
-Some other limitations:
+Conserve is at a reasonable level of maturity; the format is stable and the basic features are complete. I have used it as a primary backup system for over a year.
+There is still room for several performance improvements and features.
 
-- [Permissions and ownership are not stored](https://github.com/sourcefrog/conserve/issues/46).
+The current data format (called "0.6") will be readable by future releases for at least two years.
 
-For more future features, see
-<https://github.com/sourcefrog/conserve/wiki/Ideas>.
-
-Prior to 1.0, data formats may change on each minor version number change (0.x):
-you should restore using the same version that you used to make the backup.
-
-[5]: https://github.com/sourcefrog/conserve/issues/5
-[8]: https://github.com/sourcefrog/conserve/issues/8
-[32]: https://github.com/sourcefrog/conserve/issues/32
-[41]: https://github.com/sourcefrog/conserve/issues/41
-[42]: https://github.com/sourcefrog/conserve/issues/42
-[43]: https://github.com/sourcefrog/conserve/issues/43
-
-For a longer list see the [issue tracker][issues] and [milestones][milestones].
-
-[issues]: https://github.com/sourcefrog/conserve/issues
-[milestones]: https://github.com/sourcefrog/conserve/milestones
-
-Windows Defender and Windows Search Indexing can slow the system down severely
-when Conserve is making a backup. I recommend you exclude the backup directory
-from both systems.
+Be aware Conserve is developed as a part-time non-commercial project and there's no guarantee of support or reliability. Bug reports are welcome but I cannot promise they will receive a resolution within any particular time frame.
 
 ## Licence and non-warranty
 
-Copyright 2012-2021 [Martin Pool][sourcefrog], mbp@sourcefrog.net.
+Copyright 2012-2023 Martin Pool.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software

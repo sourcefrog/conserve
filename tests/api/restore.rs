@@ -1,4 +1,4 @@
-// Copyright 2015, 2016, 2017, 2019, 2020 Martin Pool.
+// Copyright 2015-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -10,18 +10,19 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Tests focussed on restore.
+//! Tests focused on restore.
 
+use std::cell::RefCell;
 #[cfg(unix)]
 use std::fs::{read_link, symlink_metadata};
 use std::path::PathBuf;
 
+use conserve::monitor::collect::CollectMonitor;
 use filetime::{set_symlink_file_times, FileTime};
 use tempfile::TempDir;
 
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
-use conserve::unix_time::UnixTime;
 use conserve::*;
 
 #[test]
@@ -29,12 +30,37 @@ fn simple_restore() {
     let af = ScratchArchive::new();
     af.store_two_versions();
     let destdir = TreeFixture::new();
-
-    let options = RestoreOptions::default();
     let restore_archive = Archive::open_path(af.path()).unwrap();
-    let stats = restore(&restore_archive, destdir.path(), &options).expect("restore");
+    let restored_names = RefCell::new(Vec::new());
+    let options = RestoreOptions {
+        change_callback: Some(Box::new(|entry_change| {
+            restored_names.borrow_mut().push(entry_change.apath.clone());
+            Ok(())
+        })),
+        ..Default::default()
+    };
+    let stats = restore(
+        &restore_archive,
+        destdir.path(),
+        &options,
+        CollectMonitor::arc(),
+    )
+    .expect("restore");
 
     assert_eq!(stats.files, 3);
+    let mut expected_names = vec![
+        "/",
+        "/hello",
+        "/hello2",
+        "/link",
+        "/subdir",
+        "/subdir/subfile",
+    ];
+    if !SYMLINKS_SUPPORTED {
+        expected_names.retain(|n| *n != "/link");
+    }
+    drop(options);
+    assert_eq!(restored_names.into_inner(), expected_names);
 
     let dest = &destdir.path();
     assert!(dest.join("hello").is_file());
@@ -42,7 +68,7 @@ fn simple_restore() {
     assert!(dest.join("subdir").is_dir());
     assert!(dest.join("subdir").join("subfile").is_file());
     if SYMLINKS_SUPPORTED {
-        let dest = std::fs::read_link(&dest.join("link")).unwrap();
+        let dest = std::fs::read_link(dest.join("link")).unwrap();
         assert_eq!(dest.to_string_lossy(), "target");
     }
 
@@ -60,7 +86,8 @@ fn restore_specified_band() {
         band_selection: BandSelectionPolicy::Specified(band_id),
         ..RestoreOptions::default()
     };
-    let stats = restore(&archive, destdir.path(), &options).expect("restore");
+    let stats =
+        restore(&archive, destdir.path(), &options, CollectMonitor::arc()).expect("restore");
     // Does not have the 'hello2' file added in the second version.
     assert_eq!(stats.files, 2);
 }
@@ -71,10 +98,17 @@ pub fn decline_to_overwrite() {
     af.store_two_versions();
     let destdir = TreeFixture::new();
     destdir.create_file("existing");
-    let restore_err_str = RestoreTree::create(destdir.path().to_owned())
-        .unwrap_err()
+    let options = RestoreOptions {
+        ..RestoreOptions::default()
+    };
+    assert!(!options.overwrite, "overwrite is false by default");
+    let restore_err_str = restore(&af, destdir.path(), &options, CollectMonitor::arc())
+        .expect_err("restore should fail if the destination exists")
         .to_string();
-    assert!(restore_err_str.contains("Destination directory not empty"));
+    assert!(
+        restore_err_str.contains("Destination directory is not empty"),
+        "Unexpected error message: {restore_err_str:?}"
+    );
 }
 
 #[test]
@@ -89,7 +123,13 @@ pub fn forced_overwrite() {
         overwrite: true,
         ..RestoreOptions::default()
     };
-    let stats = restore(&restore_archive, destdir.path(), &options).expect("restore");
+    let stats = restore(
+        &restore_archive,
+        destdir.path(),
+        &options,
+        CollectMonitor::arc(),
+    )
+    .expect("restore");
     assert_eq!(stats.files, 3);
     let dest = &destdir.path();
     assert!(dest.join("hello").is_file());
@@ -104,10 +144,16 @@ fn exclude_files() {
     let restore_archive = Archive::open_path(af.path()).unwrap();
     let options = RestoreOptions {
         overwrite: true,
-        exclude: Exclude::from_strings(&["/**/subfile"]).unwrap(),
+        exclude: Exclude::from_strings(["/**/subfile"]).unwrap(),
         ..RestoreOptions::default()
     };
-    let stats = restore(&restore_archive, destdir.path(), &options).expect("restore");
+    let stats = restore(
+        &restore_archive,
+        destdir.path(),
+        &options,
+        CollectMonitor::arc(),
+    )
+    .expect("restore");
 
     let dest = &destdir.path();
     assert!(dest.join("hello").is_file());
@@ -119,26 +165,36 @@ fn exclude_files() {
 #[test]
 #[cfg(unix)]
 fn restore_symlink() {
+    use conserve::monitor::collect::CollectMonitor;
+
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
 
     srcdir.create_symlink("symlink", "target");
-    let years_ago = UnixTime {
-        secs: 189216000,
-        nanosecs: 0,
-    };
-    let mtime: FileTime = years_ago.into();
-    set_symlink_file_times(&srcdir.path().join("symlink"), mtime, mtime).unwrap();
+    let years_ago = FileTime::from_unix_time(189216000, 0);
+    set_symlink_file_times(srcdir.path().join("symlink"), years_ago, years_ago).unwrap();
 
-    backup(&af, &srcdir.live_tree(), &Default::default()).unwrap();
+    backup(
+        &af,
+        srcdir.path(),
+        &Default::default(),
+        CollectMonitor::arc(),
+    )
+    .unwrap();
 
     let restore_dir = TempDir::new().unwrap();
-    restore(&af, restore_dir.path(), &Default::default()).unwrap();
+    restore(
+        &af,
+        restore_dir.path(),
+        &Default::default(),
+        CollectMonitor::arc(),
+    )
+    .unwrap();
 
     let restored_symlink_path = restore_dir.path().join("symlink");
     let sym_meta = symlink_metadata(&restored_symlink_path).unwrap();
     assert!(sym_meta.file_type().is_symlink());
-    assert_eq!(UnixTime::from(sym_meta.modified().unwrap()), years_ago);
+    assert_eq!(FileTime::from(sym_meta.modified().unwrap()), years_ago);
     assert_eq!(
         read_link(&restored_symlink_path).unwrap(),
         PathBuf::from("target")

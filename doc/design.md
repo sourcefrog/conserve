@@ -98,7 +98,7 @@ the filesystem behavior, they should notice the band has already been created,
 and abort.
 
 Index blocks are written by atomically renaming them in to place. If the block
-already exists, the new version (with identical contents) is simpy discarded.
+already exists, the new version (with identical contents) is simply discarded.
 So, concurrent writes of blocks are safe, and indeed can happen from multiple
 threads in the same process.
 
@@ -196,7 +196,7 @@ well as to the terminal, and at a different level of detail. This implies:
 - Since the terminal UI is a log target, it must be constructed just once near
   program startup, and therefore it cannot be on during in-process tests.
 
-Progess bars are drawn only for the small number of main loops that are expected
+Progress bars are drawn only for the small number of main loops that are expected
 to take a long time, and don't implicitly pop up due to IO.
 
 ## Diff

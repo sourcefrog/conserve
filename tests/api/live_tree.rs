@@ -1,4 +1,4 @@
-// Copyright 2021, 2022 Martin Pool.
+// Copyright 2021-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -11,9 +11,9 @@
 // GNU General Public License for more details.
 
 use pretty_assertions::assert_eq;
-use regex::Regex;
 
-use conserve::test_fixtures::TreeFixture;
+use conserve::entry::EntryValue;
+use conserve::test_fixtures::{entry_iter_to_apath_strings, TreeFixture};
 use conserve::*;
 
 #[test]
@@ -33,11 +33,11 @@ fn list_simple_directory() {
     tf.create_dir("jelly");
     tf.create_dir("jam/.etc");
     let lt = LiveTree::open(tf.path()).unwrap();
-    let result: Vec<LiveEntry> = lt
+    let result: Vec<EntryValue> = lt
         .iter_entries(Apath::root(), Exclude::nothing())
         .unwrap()
         .collect();
-    let names = entry_iter_to_apath_strings(result.clone());
+    let names = entry_iter_to_apath_strings(&result);
     // First one is the root
     assert_eq!(
         names,
@@ -53,8 +53,9 @@ fn list_simple_directory() {
     );
 
     let repr = format!("{:?}", &result[6]);
-    let re = Regex::new(r#"LiveEntry \{ apath: Apath\("/jam/apricot"\), kind: File, mtime: UnixTime \{ [^)]* \}, size: Some\(8\), symlink_target: None \}"#).unwrap();
-    assert!(re.is_match(&repr));
+    println!("{repr}");
+    assert!(repr.starts_with("EntryValue {"));
+    assert!(repr.contains("Apath(\"/jam/apricot\")"));
 
     // TODO: Somehow get the stats out of the iterator.
     // assert_eq!(source_iter.stats.directories_visited, 4);
@@ -72,7 +73,7 @@ fn exclude_entries_directory() {
     tf.create_file("baz/bas");
     tf.create_file("baz/test");
 
-    let exclude = Exclude::from_strings(&["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
+    let exclude = Exclude::from_strings(["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let names = entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), exclude).unwrap());
@@ -123,24 +124,10 @@ fn exclude_cachedir() {
     tf.create_file("a");
     let cache_dir = tf.create_dir("cache");
     tf.create_dir("cache/1");
-    cachedir::add_tag(&cache_dir).unwrap();
+    cachedir::add_tag(cache_dir).unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let names =
         entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), Exclude::nothing()).unwrap());
     assert_eq!(names, ["/", "/a"]);
-}
-
-/// Collect apaths from an iterator into a list of string.
-///
-/// This is more loosely typed but useful for tests.
-fn entry_iter_to_apath_strings<EntryIter, E>(entry_iter: EntryIter) -> Vec<String>
-where
-    EntryIter: IntoIterator<Item = E>,
-    E: Entry,
-{
-    entry_iter
-        .into_iter()
-        .map(|entry| entry.apath().clone().into())
-        .collect()
 }

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2020, Martin Pool.
+// Copyright 2020-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,27 +14,34 @@
 //! Test validation of archives with some problems.
 
 use std::path::Path;
+use std::sync::Arc;
+
+use conserve::monitor::collect::CollectMonitor;
+use tracing_test::traced_test;
 
 use conserve::*;
 
+#[traced_test]
 #[test]
-fn missing_block() -> Result<()> {
+fn missing_block_when_checking_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
-
-    let validate_stats = archive.validate(&ValidateOptions::default())?;
-    assert!(validate_stats.has_problems());
-    assert_eq!(validate_stats.block_missing_count, 1);
+    archive.validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))?;
+    assert!(logs_contain(
+        "Referenced block missing block_hash=fec91c70284c72d0d4e3684788a90de9338a5b2f47f01fedbe203cafd68708718ae5672d10eca804a8121904047d40d1d6cf11e7a76419357a9469af41f22d01"));
     Ok(())
 }
 
+#[traced_test]
 #[test]
 fn missing_block_skip_block_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
-
-    let validate_stats = archive.validate(&ValidateOptions {
-        skip_block_hashes: true,
-    })?;
-    assert!(validate_stats.has_problems());
-    assert_eq!(validate_stats.block_missing_count, 1);
+    archive.validate(
+        &ValidateOptions {
+            skip_block_hashes: true,
+        },
+        Arc::new(CollectMonitor::new()),
+    )?;
+    assert!(logs_contain(
+        "Referenced block missing block_hash=fec91c70284c72d0d4e3684788a90de9338a5b2f47f01fedbe203cafd68708718ae5672d10eca804a8121904047d40d1d6cf11e7a76419357a9469af41f22d01"));
     Ok(())
 }

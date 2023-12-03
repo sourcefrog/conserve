@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2016-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,10 +16,12 @@
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use conserve::monitor::collect::CollectMonitor;
 use predicates::prelude::*;
 
 use conserve::test_fixtures::ScratchArchive;
 use conserve::BandId;
+use rayon::prelude::ParallelIterator;
 
 use crate::run_conserve;
 
@@ -29,15 +31,21 @@ fn delete_both_bands() {
     af.store_two_versions();
 
     run_conserve()
-        .args(&["delete"])
-        .args(&["-b", "b0000"])
-        .args(&["-b", "b0001"])
+        .args(["delete"])
+        .args(["-b", "b0000"])
+        .args(["-b", "b0001"])
         .arg(af.path())
         .assert()
         .success();
 
     assert_eq!(af.list_band_ids().unwrap().len(), 0);
-    assert_eq!(af.block_dir().block_names().unwrap().count(), 0);
+    assert_eq!(
+        af.block_dir()
+            .blocks(CollectMonitor::arc())
+            .unwrap()
+            .count(),
+        0
+    );
 }
 
 #[test]
@@ -46,8 +54,8 @@ fn delete_first_version() {
     af.store_two_versions();
 
     run_conserve()
-        .args(&["delete"])
-        .args(&["-b", "b0"])
+        .args(["delete"])
+        .args(["-b", "b0"])
         .arg(af.path())
         .assert()
         .success();
@@ -55,7 +63,13 @@ fn delete_first_version() {
     assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[1])]);
     // b0 contains two small files packed into the same block, which is not deleted.
     // b1 (not deleted) adds one additional block, which is still referenced.
-    assert_eq!(af.block_dir().block_names().unwrap().count(), 2);
+    assert_eq!(
+        af.block_dir()
+            .blocks(CollectMonitor::arc())
+            .unwrap()
+            .count(),
+        2
+    );
 
     let rd = TempDir::new().unwrap();
     run_conserve()
@@ -83,15 +97,21 @@ fn delete_second_version() {
     af.store_two_versions();
 
     run_conserve()
-        .args(&["delete"])
-        .args(&["-b", "b1"])
+        .args(["delete"])
+        .args(["-b", "b1"])
         .arg(af.path())
         .assert()
         .success();
 
     assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[0])]);
     // b0 contains two small files packed into the same block.
-    assert_eq!(af.block_dir().block_names().unwrap().count(), 1);
+    assert_eq!(
+        af.block_dir()
+            .blocks(CollectMonitor::arc())
+            .unwrap()
+            .count(),
+        1
+    );
 
     let rd = TempDir::new().unwrap();
     run_conserve()
@@ -118,18 +138,13 @@ fn delete_second_version() {
 fn delete_nonexistent_band() {
     let af = ScratchArchive::new();
 
-    let pred_fn = predicate::str::is_match(
-        r"conserve error: Failed to delete band b0000
-  caused by: (No such file or directory|The system cannot find the file specified\.) \(os error \d+\)
-",
-        )
-        .unwrap();
-
     run_conserve()
-        .args(&["delete"])
-        .args(&["-b", "b0000"])
+        .args(["delete"])
+        .args(["-b", "b0000"])
         .arg(af.path())
         .assert()
-        .stdout(pred_fn)
+        .stderr(predicate::str::contains(
+            "ERROR conserve: Band not found: b0000",
+        ))
         .failure();
 }

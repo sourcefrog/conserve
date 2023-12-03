@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016, 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2016-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,7 +12,10 @@
 // GNU General Public License for more details.
 
 use assert_cmd::prelude::*;
+use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use indoc::indoc;
+use predicates::prelude::*;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 
@@ -33,9 +36,9 @@ fn exclude_option_ordering() {
     src.create_dir("subdir");
 
     run_conserve()
-        .args(&["backup", "--exclude", "**/target"])
-        .arg(&arch_dir)
-        .arg(&src.path())
+        .args(["backup", "--exclude", "**/target"])
+        .arg(arch_dir)
+        .arg(src.path())
         .assert()
         .success();
 }
@@ -50,16 +53,16 @@ fn exclude_simple_glob() {
     src.create_file("src/hello.o");
 
     run_conserve()
-        .args(&["backup", "-v", "--exclude", "*.o", "--no-stats"])
-        .arg(&af.path())
-        .arg(&src.path())
+        .args(["backup", "-v", "--exclude", "*.o", "--no-stats"])
+        .arg(af.path())
+        .arg(src.path())
         .assert()
         .stdout("+ /src/hello.c\n")
         .success();
 
     run_conserve()
-        .args(&["ls"])
-        .arg(&af.path())
+        .args(["ls"])
+        .arg(af.path())
         .assert()
         .stdout("/\n/src\n/src/hello.c\n")
         .success();
@@ -76,16 +79,16 @@ fn exclude_glob_only_in_root() {
     src.create_file("src/hello.o");
 
     run_conserve()
-        .args(&["backup", "-v", "--exclude", "/*.o", "--no-stats"])
-        .arg(&af.path())
-        .arg(&src.path())
+        .args(["backup", "-v", "--exclude", "/*.o", "--no-stats"])
+        .arg(af.path())
+        .arg(src.path())
         .assert()
         .stdout("+ /src/hello.c\n+ /src/hello.o\n")
         .success();
 
     run_conserve()
-        .args(&["ls"])
-        .arg(&af.path())
+        .args(["ls"])
+        .arg(af.path())
         .assert()
         .stdout("/\n/src\n/src/hello.c\n/src/hello.o\n")
         .success();
@@ -107,15 +110,15 @@ fn exclude_suffix_pattern() {
     src.create_dir("subproj/target/release");
 
     run_conserve()
-        .args(&["backup", "-v", "--exclude", "target/{release,debug}"])
-        .arg(&af.path())
-        .arg(&src.path())
+        .args(["backup", "-v", "--exclude", "target/{release,debug}"])
+        .arg(af.path())
+        .arg(src.path())
         .assert()
         .success();
 
     run_conserve()
-        .args(&["ls"])
-        .arg(&af.path())
+        .args(["ls"])
+        .arg(af.path())
         .assert()
         .stdout("/\n/release\n/src\n/subproj\n/target\n/src/hello.rs\n/subproj/target\n")
         .success();
@@ -137,11 +140,58 @@ fn exclude_from_file() {
     );
 
     run_conserve()
-        .args(&["backup", "-v", "--exclude-from"])
-        .arg(&src.path().join("exclude"))
-        .arg(&af.path())
-        .args(&["--exclude=*~"])
-        .arg(&src.path())
+        .args(["backup", "-v", "--exclude-from"])
+        .arg(src.path().join("exclude"))
+        .arg(af.path())
+        .args(["--exclude=*~"])
+        .arg(src.path())
         .assert()
         .success();
+}
+
+/// `--exclude /subtree` should also exclude everything under it.
+///
+/// <https://github.com/sourcefrog/conserve/issues/160>
+#[test]
+fn ls_exclude_excludes_subtrees() {
+    run_conserve()
+        .args([
+            "ls",
+            "--exclude",
+            "/subdir",
+            "testdata/archive/simple/v0.6.10",
+        ])
+        .assert()
+        .success()
+        .stdout(indoc! { "
+            /
+            /hello
+        "})
+        .stderr("");
+}
+
+/// `--exclude /subtree` should also exclude everything under it.
+///
+/// <https://github.com/sourcefrog/conserve/issues/160>
+#[test]
+fn restore_exclude_excludes_subtrees() {
+    let dest = TempDir::new().unwrap();
+    run_conserve()
+        .args([
+            "restore",
+            "-v",
+            "--no-stats",
+            "--exclude",
+            "/subdir",
+            "testdata/archive/simple/v0.6.10",
+        ])
+        .arg(dest.path())
+        .assert()
+        .success()
+        .stdout(indoc! { "
+            + /
+            + /hello
+        "})
+        .stderr("");
+    dest.child("subdir").assert(predicate::path::missing());
 }

@@ -13,12 +13,11 @@
 use assert_fs::prelude::*;
 use url::Url;
 
-use conserve::transport::{open_transport, ListDirNames};
+use conserve::transport::{open_transport, ListDir};
 
 #[test]
 fn open_local() {
-    let transport = open_transport("/backup").unwrap();
-    assert_eq!(transport.url_scheme(), "file");
+    open_transport("/backup").unwrap();
 }
 
 #[test]
@@ -30,10 +29,10 @@ fn list_dir_names() {
 
     let url = Url::from_directory_path(temp.path()).unwrap();
     dbg!(&url);
-    let transport = open_transport(&url.as_str()).unwrap();
+    let transport = open_transport(url.as_str()).unwrap();
     dbg!(&transport);
 
-    let ListDirNames { mut files, dirs } = transport.list_dir_names("").unwrap();
+    let ListDir { mut files, dirs } = transport.list_dir("").unwrap();
     assert_eq!(dirs, ["a dir"]);
     files.sort();
     assert_eq!(files, ["a file", "another file"]);
@@ -43,15 +42,15 @@ fn list_dir_names() {
 
 #[test]
 fn parse_location_urls() {
-    fn parsed_scheme(s: &str) -> &'static str {
-        open_transport(s).unwrap().url_scheme()
+    for n in [
+        "./relative",
+        "/backup/repo.c6",
+        "../backup/repo.c6",
+        "c:/backup/repo",
+        r"c:\backup\repo\",
+    ] {
+        assert!(open_transport(n).is_ok(), "Failed to parse {n:?}");
     }
-
-    assert_eq!(parsed_scheme("./relative"), "file");
-    assert_eq!(parsed_scheme("/backup/repo.c6"), "file");
-    assert_eq!(parsed_scheme("../backup/repo.c6"), "file");
-    assert_eq!(parsed_scheme("c:/backup/repo"), "file");
-    assert_eq!(parsed_scheme(r#"c:\backup\repo\"#), "file");
 }
 
 #[test]

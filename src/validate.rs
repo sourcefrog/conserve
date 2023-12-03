@@ -1,4 +1,4 @@
-// Copyright 2017, 2018, 2019, 2020, 2021, 2022 Martin Pool.
+// Copyright 2017-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,108 +12,95 @@
 
 use std::cmp::max;
 use std::collections::HashMap;
-use std::time::Instant;
+use std::fmt::Debug;
+use std::sync::Arc;
 
-use crate::blockdir::Address;
+use tracing::{debug, error};
+
+use crate::misc::ResultExt;
+use crate::monitor::Monitor;
 use crate::*;
 
-pub(crate) struct BlockLengths(pub(crate) HashMap<BlockHash, u64>);
-
+/// Options to [Archive::validate].
 #[derive(Debug, Default)]
 pub struct ValidateOptions {
     /// Assume blocks that are present have the right content: don't read and hash them.
     pub skip_block_hashes: bool,
 }
 
-impl BlockLengths {
-    fn new() -> BlockLengths {
-        BlockLengths(HashMap::new())
-    }
-
-    fn add(&mut self, addr: Address) {
-        let end = addr.start + addr.len;
-        if let Some(al) = self.0.get_mut(&addr.hash) {
-            *al = max(*al, end)
-        } else {
-            self.0.insert(addr.hash, end);
-        }
-    }
-
-    fn update(&mut self, b: BlockLengths) {
-        for (bh, bl) in b.0 {
-            self.0
-                .entry(bh)
-                .and_modify(|al| *al = max(*al, bl))
-                .or_insert(bl);
-        }
-    }
-}
-
+/// Validate the indexes of all bands.
+///
+/// Returns the lengths of all blocks that were referenced, so that the caller can check
+/// that all blocks are present and long enough.
 pub(crate) fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
-) -> (BlockLengths, ValidateStats) {
-    let mut stats = ValidateStats::default();
-    let mut block_lens = BlockLengths::new();
-    struct ProgressModel {
-        bands_done: usize,
-        bands_total: usize,
-        start: Instant,
-    }
-    impl nutmeg::Model for ProgressModel {
-        fn render(&mut self, _width: usize) -> String {
-            format!(
-                "Check index {}/{}, {} done, {} remaining",
-                self.bands_done,
-                self.bands_total,
-                nutmeg::percent_done(self.bands_done, self.bands_total),
-                nutmeg::estimate_remaining(&self.start, self.bands_done, self.bands_total)
-            )
-        }
-    }
-    let view = nutmeg::View::new(
-        ProgressModel {
-            start: Instant::now(),
-            bands_done: 0,
-            bands_total: band_ids.len(),
-        },
-        ui::nutmeg_options(),
-    );
-    for band_id in band_ids {
-        if let Ok(b) = Band::open(archive, band_id) {
-            if b.validate(&mut stats).is_err() {
-                stats.band_metadata_problems += 1;
+    monitor: Arc<dyn Monitor>,
+) -> Result<HashMap<BlockHash, u64>> {
+    let mut block_lens = HashMap::new();
+    let task = monitor.start_task("Validate indexes".to_string());
+    task.set_total(band_ids.len());
+    'band: for band_id in band_ids.iter() {
+        task.increment(1);
+        let band = match Band::open(archive, *band_id) {
+            Ok(band) => band,
+            Err(err) => {
+                error!(%err, %band_id, "Error opening band");
+                continue 'band;
             }
-        } else {
-            stats.band_open_errors += 1;
-            continue;
-        }
-        if let Ok(st) = archive.open_stored_tree(BandSelectionPolicy::Specified(band_id.clone())) {
-            if let Ok((st_block_lens, st_stats)) = validate_stored_tree(&st) {
-                stats += st_stats;
-                block_lens.update(st_block_lens);
-            } else {
-                stats.tree_validate_errors += 1
+        };
+        if let Err(err) = band.validate() {
+            error!(%err, %band_id, "Error validating band");
+            continue 'band;
+        };
+        let st = match archive.open_stored_tree(BandSelectionPolicy::Specified(*band_id)) {
+            Err(err) => {
+                error!(%err, %band_id, "Error validating stored tree");
+                continue 'band;
             }
-        } else {
-            stats.tree_open_errors += 1;
-            continue;
-        }
-        view.update(|model| model.bands_done += 1);
+            Ok(st) => st,
+        };
+        let band_block_lens = match validate_stored_tree(&st, monitor.as_ref()) {
+            Err(err) => {
+                error!(%err, %band_id, "Error validating stored tree");
+                continue 'band;
+            }
+            Ok(block_lens) => block_lens,
+        };
+        merge_block_lens(&mut block_lens, &band_block_lens);
     }
-    (block_lens, stats)
+    Ok(block_lens)
 }
 
-pub(crate) fn validate_stored_tree(st: &StoredTree) -> Result<(BlockLengths, ValidateStats)> {
-    let mut block_lens = BlockLengths::new();
-    let stats = ValidateStats::default();
+fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash, u64>) {
+    for (bh, bl) in from {
+        into.entry(bh.clone())
+            .and_modify(|l| *l = max(*l, *bl))
+            .or_insert(*bl);
+    }
+}
+
+fn validate_stored_tree(st: &StoredTree, monitor: &dyn Monitor) -> Result<HashMap<BlockHash, u64>> {
+    // TODO: Check other entry properties are correct.
+    // TODO: Check they're in apath order.
+    // TODO: Count progress for index blocks within one tree?
+    let _task = monitor.start_task(format!("Validate stored tree {}", st.band().id()));
+    let mut block_lens = HashMap::new();
     for entry in st
-        .iter_entries(Apath::root(), Exclude::nothing())?
+        .iter_entries(Apath::root(), Exclude::nothing())
+        .our_inspect_err(|err| error!(%err, "Error iterating index entries"))?
         .filter(|entry| entry.kind() == Kind::File)
     {
+        // TODO: Read index hunks, count into the task per hunk. Then, we can
+        // read hunks in parallel.
         for addr in entry.addrs {
-            block_lens.add(addr)
+            let end = addr.start + addr.len;
+            block_lens
+                .entry(addr.hash.clone())
+                .and_modify(|l| *l = max(*l, end))
+                .or_insert(end);
         }
     }
-    Ok((block_lens, stats))
+    debug!(blocks = %block_lens.len(), band_id = ?st.band().id(), "Validated stored tree");
+    Ok(block_lens)
 }
