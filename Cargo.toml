@@ -11,6 +11,21 @@ repository = "https://github.com/sourcefrog/conserve/"
 version = "23.11.0"
 rust-version = "1.73"
 
+[features]
+# default = ["s3"]
+blake2_simd_asm = ["blake2-rfc/simd_asm"]
+openssh_sftp = ["dep:openssh", "dep:openssh-sftp-client", "dep:tokio"]
+s3 = [
+    "dep:aws-config",
+    "dep:aws-sdk-s3",
+    "dep:aws-types",
+    "dep:base64",
+    "dep:crc32c",
+    "dep:futures",
+    "dep:tokio",
+]
+s3-integration-test = ["s3"]
+
 [[bin]]
 doc = false
 name = "conserve"
@@ -35,6 +50,8 @@ itertools = "0.11"
 lazy_static = "1.4.0"
 lru = "0.11"
 mutants = "0.0.3"
+openssh = { version = "0.10", optional = true }
+openssh-sftp-client = { version = "0.14", optional = true }
 rayon = "1.3.0"
 readahead-iterator = "0.1.1"
 regex = "1.3.9"
@@ -90,20 +107,6 @@ proptest-derive = "0.4"
 rand = "0.8"
 rstest = { version = "0.18", default-features = false }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
-
-[features]
-# default = ["s3"]
-blake2_simd_asm = ["blake2-rfc/simd_asm"]
-s3 = [
-    "dep:aws-config",
-    "dep:aws-sdk-s3",
-    "dep:aws-types",
-    "dep:base64",
-    "dep:crc32c",
-    "dep:futures",
-    "dep:tokio",
-]
-s3-integration-test = ["s3"]
 
 [lib]
 doctest = false
