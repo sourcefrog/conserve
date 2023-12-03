@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 use bytes::BytesMut;
 use derive_more::{Add, AddAssign};
 use itertools::Itertools;
-use tracing::{error, trace, warn};
+use tracing::{error, warn};
 
 use crate::blockdir::Address;
 use crate::change::Change;
@@ -154,8 +154,12 @@ impl BackupWriter {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
-        let basis_index = IterStitchedIndexHunks::new(archive, archive.last_band_id()?)
-            .iter_entries(Apath::root(), Exclude::nothing());
+        let basis_index = if let Some(basis_band_id) = archive.last_band_id()? {
+            IterStitchedIndexHunks::new(archive, basis_band_id)
+        } else {
+            IterStitchedIndexHunks::empty(archive)
+        }
+        .iter_entries(Apath::root(), Exclude::nothing());
 
         // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;
@@ -178,7 +182,6 @@ impl BackupWriter {
 
     /// Write out any pending data blocks, and then the pending index entries.
     fn flush_group(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
-        trace!("flush index hunk group");
         let (stats, mut entries) = self.file_combiner.drain(monitor.clone())?;
         self.stats += stats;
         self.index_builder.append_entries(&mut entries);
