@@ -80,3 +80,29 @@ jobs:
         with:
           name: mutation-report
           path: mutants.out
+
+  incremental-mutants:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Relative diff
+        run: |
+          git branch -av
+          git diff origin/${{ github.base_ref }}.. | tee git.diff
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: beta
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install --path .
+      - name: Mutants
+        run: |
+          cargo mutants --no-shuffle -vV --in-diff git.diff
+      - name: Archive mutants.out
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: mutants-incremental.out
+          path: mutants.out
