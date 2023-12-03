@@ -154,8 +154,12 @@ impl BackupWriter {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
-        let basis_index = IterStitchedIndexHunks::new(archive, archive.last_band_id()?)
-            .iter_entries(Apath::root(), Exclude::nothing());
+        let basis_index = if let Some(basis_band_id) = archive.last_band_id()? {
+            IterStitchedIndexHunks::new(archive, basis_band_id)
+        } else {
+            IterStitchedIndexHunks::empty(archive)
+        }
+        .iter_entries(Apath::root(), Exclude::nothing());
 
         // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;
