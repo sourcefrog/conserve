@@ -100,7 +100,7 @@ jobs:
         with:
           toolchain: beta
       - uses: Swatinem/rust-cache@v2
-      - run: cargo install --path .
+      - run: cargo install cargo-mutants
       - name: Mutants
         run: |
           cargo mutants --no-shuffle -vV --in-diff git.diff
