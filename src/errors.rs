@@ -153,12 +153,6 @@ pub enum Error {
         source: snap::Error,
     },
 
-    #[error("SSH error")]
-    Ssh {
-        #[from]
-        source: ssh2::Error,
-    },
-
     #[error(transparent)]
     Transport {
         #[from]
