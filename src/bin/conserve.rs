@@ -317,10 +317,6 @@ impl Command {
                     )?,
                     ..Default::default()
                 };
-                if *long_listing || *verbose {
-                    // TODO(CON-23): Really Nutmeg should coordinate stdout and stderr...
-                    // todo!("Disable progress bars!");
-                }
                 let stats = backup(
                     &Archive::open(open_transport(archive)?)?,
                     source,
