@@ -85,7 +85,7 @@ jobs:
           name: mutation-report
           path: mutants.out
 
-  incremental-mutants:
+  pr-mutants:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
