@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2020, 2022 Martin Pool.
+// Copyright 2020-2023 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -29,15 +29,13 @@ use conserve::*;
 use time::OffsetDateTime;
 use tracing_test::traced_test;
 
+use crate::{copy_testdata_archive, testdata_archive_path};
+
 const MINIMAL_ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.10", "0.6.2", "0.6.3", "0.6.9", "0.6.17"];
 
 fn open_old_archive(ver: &str, name: &str) -> Archive {
-    Archive::open_path(Path::new(&archive_testdata_path(name, ver)))
+    Archive::open_path(Path::new(&testdata_archive_path(name, ver)))
         .expect("Failed to open archive")
-}
-
-fn archive_testdata_path(name: &str, ver: &str) -> String {
-    format!("testdata/archive/{name}/v{ver}/")
 }
 
 #[test]
@@ -204,12 +202,7 @@ fn restore_modify_backup() {
 
         // Write back into a new copy of the archive, without modifying the
         // testdata in the source tree.
-        let new_archive_temp = TempDir::new().unwrap();
-        let stored_archive_path = archive_testdata_path("minimal", ver);
-        let new_archive_path = new_archive_temp.path().join("archive");
-        cp_r::CopyOptions::default()
-            .copy_tree(stored_archive_path, &new_archive_path)
-            .expect("copy archive tree");
+        let archive_temp = copy_testdata_archive("minimal", ver);
 
         working_tree
             .child("empty")
@@ -221,7 +214,7 @@ fn restore_modify_backup() {
         )
         .expect("overwrite file");
 
-        let new_archive = Archive::open_path(&new_archive_path).expect("Open new archive");
+        let new_archive = Archive::open_path(archive_temp.path()).expect("Open new archive");
         let emitted = RefCell::new(Vec::new());
         let backup_stats = backup(
             &new_archive,
@@ -281,6 +274,6 @@ fn restore_modify_backup() {
         assert_eq!(backup_stats.errors, 0);
 
         working_tree.close().expect("Cleanup working tree");
-        new_archive_temp.close().expect("Cleanup copied archive");
+        archive_temp.close().expect("Cleanup copied archive");
     }
 }

@@ -12,6 +12,10 @@
 
 //! Tests for the Conserve library API.
 
+use std::path::{Path, PathBuf};
+
+use tempfile::TempDir;
+
 mod apath;
 mod archive;
 mod backup;
@@ -26,3 +30,20 @@ mod live_tree;
 mod old_archives;
 mod restore;
 mod transport;
+
+/// Make a copy of a archive testdata.
+fn copy_testdata_archive(name: &str, version: &str) -> TempDir {
+    let temp = TempDir::with_prefix(format!("conserve-api-test-{}-{}", name, version))
+        .expect("create temp dir");
+    let stored_archive_path = testdata_archive_path(name, version);
+    cp_r::CopyOptions::default()
+        .copy_tree(stored_archive_path, temp.path())
+        .expect("copy archive tree");
+    temp
+}
+
+fn testdata_archive_path(name: &str, version: &str) -> PathBuf {
+    Path::new("testdata/archive")
+        .join(name)
+        .join(format!("v{version}/"))
+}
