@@ -28,6 +28,7 @@ mod format_flags;
 mod gc;
 mod live_tree;
 mod old_archives;
+mod owner;
 mod restore;
 mod transport;
 
