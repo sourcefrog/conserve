@@ -44,7 +44,9 @@ mod unix {
 }
 
 fn run_conserve() -> Command {
-    Command::cargo_bin("conserve").expect("locate conserve binary")
+    let mut command = Command::cargo_bin("conserve").expect("locate conserve binary");
+    command.env_remove("RUST_LOG");
+    command
 }
 
 #[test]

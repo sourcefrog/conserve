@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 use bytes::BytesMut;
 use derive_more::{Add, AddAssign};
 use itertools::Itertools;
-use tracing::{error, warn};
+use tracing::{error, trace, warn};
 
 use crate::blockdir::Address;
 use crate::change::Change;
@@ -239,24 +239,23 @@ impl BackupWriter {
         monitor.count(Counter::Files, 1);
         let apath = source_entry.apath();
         let result = if let Some(basis_entry) = self.basis_index.advance_to(apath) {
-            if entry_metadata_unchanged(source_entry, &basis_entry) {
-                if basis_entry
-                    .addrs
-                    .iter()
-                    .map(|addr| &addr.hash)
-                    .unique()
-                    .all(|hash| {
-                        self.block_dir
-                            .contains(hash, monitor.clone())
-                            .unwrap_or(false)
-                    })
-                {
+            if content_heuristically_unchanged(source_entry, &basis_entry) {
+                if all_blocks_present(&basis_entry.addrs, &self.block_dir, &monitor) {
                     self.stats.unmodified_files += 1;
-                    let change = Some(EntryChange::unchanged(&basis_entry));
-                    self.index_builder.push_entry(basis_entry);
-                    return Ok(change);
+                    let new_entry = IndexEntry {
+                        addrs: basis_entry.addrs.clone(),
+                        ..IndexEntry::metadata_from(source_entry)
+                    };
+                    let change = if new_entry == basis_entry {
+                        EntryChange::unchanged(&basis_entry)
+                    } else {
+                        trace!(%apath, "Content same, metadata changed");
+                        EntryChange::changed(&basis_entry, source_entry)
+                    };
+                    self.index_builder.push_entry(new_entry);
+                    return Ok(Some(change));
                 } else {
-                    warn!("Some blocks referenced by {apath:?} are missing from the blockdir; file will be stored again");
+                    warn!(%apath, "Some referenced blocks are missing or truncated; file will be stored again");
                     self.stats.modified_files += 1;
                     self.stats.replaced_damaged_blocks += 1;
                     Some(EntryChange::changed(&basis_entry, source_entry))
@@ -313,6 +312,18 @@ impl BackupWriter {
         // TODO: Emit the actual change.
         Ok(None)
     }
+}
+
+fn all_blocks_present(
+    addresses: &[Address],
+    block_dir: &BlockDir,
+    monitor: &Arc<dyn Monitor>,
+) -> bool {
+    addresses
+        .iter()
+        .map(|addr| &addr.hash)
+        .unique()
+        .all(|hash| block_dir.contains(hash, monitor.clone()).unwrap_or(false))
 }
 
 fn store_file_content(
@@ -504,12 +515,13 @@ impl FileCombiner {
 /// not changed, without reading the file content.
 ///
 /// Caution: this does not check the symlink target.
-fn entry_metadata_unchanged<E: EntryTrait, O: EntryTrait>(new_entry: &E, basis_entry: &O) -> bool {
+fn content_heuristically_unchanged<E: EntryTrait, O: EntryTrait>(
+    new_entry: &E,
+    basis_entry: &O,
+) -> bool {
     basis_entry.kind() == new_entry.kind()
         && basis_entry.mtime() == new_entry.mtime()
         && basis_entry.size() == new_entry.size()
-        && basis_entry.unix_mode() == new_entry.unix_mode()
-        && basis_entry.owner() == new_entry.owner()
 }
 
 #[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
