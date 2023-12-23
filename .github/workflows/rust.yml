@@ -80,7 +80,7 @@ jobs:
         # Can't use --all-features here because BLAKE2 SIMD needs unstable...
         # Don't use the S3 features because they require AWS credentials for realistic
         # testing.
-        run:
+        run: >
           cargo mutants --no-shuffle -vV --cargo-arg --no-default-features
           --shard ${{ matrix.shard }}/8
       - name: Archive results
@@ -109,8 +109,8 @@ jobs:
         uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-mutants
-      - name: Mutants
-        run: |
+      - name: cargo-mutants
+        run: >
           cargo mutants --no-shuffle -vV --in-diff git.diff
       - name: Archive mutants.out
         uses: actions/upload-artifact@v3
