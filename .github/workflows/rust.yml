@@ -61,6 +61,9 @@ jobs:
   cargo-mutants:
     runs-on: ubuntu-latest
     # Don't run expensive mutant tests until we know the build is clean.
+    strategy:
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     needs: [tests, pr-mutants]
     steps:
       - name: Checkout
@@ -77,7 +80,9 @@ jobs:
         # Can't use --all-features here because BLAKE2 SIMD needs unstable...
         # Don't use the S3 features because they require AWS credentials for realistic
         # testing.
-        run: cargo mutants --no-shuffle -vV --cargo-arg --no-default-features
+        run:
+          cargo mutants --no-shuffle -vV --cargo-arg --no-default-features
+          --shard ${{ matrix.shard }}/8
       - name: Archive results
         uses: actions/upload-artifact@v3
         if: always()
