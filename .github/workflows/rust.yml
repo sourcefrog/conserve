@@ -65,8 +65,10 @@ jobs:
     needs: [pr-mutants]
     # Don't run expensive mutant tests until we know the build is clean.
     strategy:
+      # We want to see all the missed mutants so don't fail fast.
+      fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -84,7 +86,7 @@ jobs:
         # testing.
         run: >
           cargo mutants --no-shuffle -vV --cargo-arg --no-default-features
-          --shard ${{ matrix.shard }}/8
+          --shard ${{ matrix.shard }}/4
       - name: Archive results
         uses: actions/upload-artifact@v3
         if: always()
