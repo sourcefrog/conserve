@@ -61,7 +61,7 @@ jobs:
   cargo-mutants:
     runs-on: ubuntu-latest
     # Don't run expensive mutant tests until we know the build is clean.
-    needs: tests
+    needs: [tests, pr-mutants]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
