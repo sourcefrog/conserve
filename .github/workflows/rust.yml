@@ -100,7 +100,10 @@ jobs:
         with:
           toolchain: beta
       - uses: Swatinem/rust-cache@v2
-      - run: cargo install cargo-mutants
+      - name: Install cargo-mutants
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-mutants
       - name: Mutants
         run: |
           cargo mutants --no-shuffle -vV --in-diff git.diff
