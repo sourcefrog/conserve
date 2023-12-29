@@ -35,6 +35,8 @@ pub mod live_tree;
 mod merge;
 pub mod misc;
 pub mod monitor;
+#[cfg(feature = "mount-archive")]
+mod mount;
 pub mod owner;
 pub mod restore;
 pub mod show;
@@ -69,6 +71,8 @@ pub use crate::kind::Kind;
 pub use crate::live_tree::LiveTree;
 pub use crate::merge::MergeTrees;
 pub use crate::misc::bytes_to_human_mb;
+#[cfg(feature = "mount-archive")]
+pub use crate::mount::mount;
 pub use crate::owner::Owner;
 pub use crate::restore::{restore, RestoreOptions};
 pub use crate::show::{show_versions, ShowVersionsOptions};

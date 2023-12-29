@@ -158,6 +158,13 @@ pub enum Error {
         #[from]
         source: transport::Error,
     },
+
+    #[cfg(feature = "mount-archive")]
+    #[error(transparent)]
+    Projection {
+        #[from]
+        source: windows_projfs::Error,
+    },
 }
 
 impl From<jsonio::Error> for Error {

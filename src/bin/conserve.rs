@@ -170,6 +170,21 @@ enum Command {
         long_listing: bool,
     },
 
+    /// Mount the archive as projection.
+    #[cfg(feature = "mount-archive")]
+    Mount {
+        /// The archive to mount
+        archive: String,
+
+        /// Target folder where the archive should be mounted to
+        destination: PathBuf,
+
+        /// Create the target folder and remove all temporarly created
+        /// files on exit
+        #[arg(long, default_value_t = true)]
+        cleanup: bool,
+    },
+
     /// Copy a stored tree to a restore directory.
     Restore {
         archive: String,
@@ -456,6 +471,15 @@ impl Command {
                 } else {
                     show::show_entry_names(entry_iter, &mut stdout, *long_listing)?;
                 }
+            }
+            #[cfg(feature = "mount-archive")]
+            Command::Mount {
+                archive,
+                destination,
+                cleanup,
+            } => {
+                let archive = Archive::open(open_transport(archive)?)?;
+                mount(archive, destination, *cleanup)?;
             }
             Command::Restore {
                 archive,
