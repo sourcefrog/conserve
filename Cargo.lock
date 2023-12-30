@@ -2941,9 +2941,9 @@ dependencies = [
 
 [[package]]
 name = "windows-projfs"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90f405570663a441ceb10b307fc4a0230ca2bec02d0691f2e422d1d67607a44a"
+checksum = "ac3c87ccd8945e09a06fbdc0104d06537c05f6e1da7463a5f4194189c744392f"
 dependencies = [
  "libloading",
  "log",

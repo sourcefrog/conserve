@@ -65,7 +65,7 @@ uzers = "0.11"
 nix = { version = "0.27", features = ["fs", "user"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-projfs = { version = "0.1.5", features = ["dynamic-import"] }
+windows-projfs = { version = "0.1.6", features = ["dynamic-import"] }
 
 [dependencies.clap]
 version = "4.3"
