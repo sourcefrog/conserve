@@ -7,16 +7,19 @@ use std::{
     fs,
     io::{self, ErrorKind, Read},
     iter::Peekable,
+    ops::ControlFlow,
     path::{Component, Path},
     sync::{Arc, Mutex},
+    time::Duration,
 };
-use tracing::info;
+use tracing::{info, trace};
 
 use bytes::Bytes;
 use itertools::Itertools;
 use tracing::{debug, warn};
 use windows_projfs::{
-    DirectoryEntry, DirectoryInfo, FileInfo, ProjectedFileSystem, ProjectedFileSystemSource,
+    DirectoryEntry, DirectoryInfo, FileInfo, Notification, ProjectedFileSystem,
+    ProjectedFileSystemSource,
 };
 
 use crate::{
@@ -250,6 +253,19 @@ impl Read for StoredFileReader {
     }
 }
 
+const UNIX_WIN_DIFF_SECS: i64 = 11644473600;
+fn unix_time_to_windows(unix_seconds: i64, unix_nanos: u32) -> u64 {
+    if unix_seconds < -UNIX_WIN_DIFF_SECS {
+        return 0;
+    }
+
+    let win_seconds = (unix_seconds + UNIX_WIN_DIFF_SECS) as u64;
+    return win_seconds * 1_000_000_000 / 100 + (unix_nanos / 100) as u64;
+}
+
+/* https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants */
+const FILE_ATTRIBUTE_READONLY: u32 = 0x00000001;
+
 impl Into<Option<DirectoryEntry>> for IndexEntry {
     fn into(self) -> Option<DirectoryEntry> {
         let file_name = self.apath.split("/").last()?;
@@ -265,6 +281,12 @@ impl Into<Option<DirectoryEntry>> for IndexEntry {
                 FileInfo {
                     file_name: file_name.to_string(),
                     file_size: self.addrs.iter().map(|block| block.len).sum(),
+                    file_attributes: FILE_ATTRIBUTE_READONLY,
+
+                    /* currently conserve does not differentiate between the different time stamps */
+                    creation_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
+                    last_access_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
+                    last_write_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
 
                     ..Default::default()
                 }
@@ -339,6 +361,7 @@ impl ArchiveProjectionSource {
     }
 
     fn serve_dir(&self, path: &Path) -> Result<Vec<DirectoryEntry>> {
+        trace!("serve_dir {}", path.display());
         let mut components = path
             .components()
             .map(Component::as_os_str)
@@ -412,25 +435,13 @@ impl ArchiveProjectionSource {
 
         Ok(entries)
     }
-}
 
-impl ProjectedFileSystemSource for ArchiveProjectionSource {
-    fn list_directory(&self, path: &Path) -> Vec<DirectoryEntry> {
-        match self.serve_dir(path) {
-            Ok(entries) => entries,
-            Err(error) => {
-                warn!("Failed to serve {}: {}", path.display(), error);
-                vec![]
-            }
-        }
-    }
-
-    fn stream_file_content(
+    fn serve_file(
         &self,
         path: &Path,
         byte_offset: usize,
         length: usize,
-    ) -> std::io::Result<Box<dyn Read>> {
+    ) -> io::Result<Box<dyn Read>> {
         let mut components = path
             .components()
             .map(Component::as_os_str)
@@ -471,7 +482,7 @@ impl ProjectedFileSystemSource for ArchiveProjectionSource {
         let file_size: u64 = index_entry.addrs.iter().map(|addr| addr.len).sum();
 
         info!(
-            "Serving {}/{} ({}/{} bytes)",
+            "Serving {}{} ({}/{} bytes)",
             stored_tree.band().id(),
             target_path,
             length,
@@ -488,6 +499,49 @@ impl ProjectedFileSystemSource for ArchiveProjectionSource {
     }
 }
 
+impl ProjectedFileSystemSource for ArchiveProjectionSource {
+    fn list_directory(&self, path: &Path) -> Vec<DirectoryEntry> {
+        match self.serve_dir(path) {
+            Ok(entries) => entries,
+            Err(error) => {
+                warn!("Failed to serve {}: {}", path.display(), error);
+                vec![]
+            }
+        }
+    }
+
+    fn stream_file_content(
+        &self,
+        path: &Path,
+        byte_offset: usize,
+        length: usize,
+    ) -> std::io::Result<Box<dyn Read>> {
+        trace!("stream_file_content {}", path.display());
+        match self.serve_file(path, byte_offset, length) {
+            Ok(reader) => Ok(reader),
+            Err(error) => {
+                if error.kind() != ErrorKind::NotFound {
+                    warn!("Failed to serve file {}: {}", path.display(), error);
+                }
+
+                Err(error)
+            }
+        }
+    }
+
+    fn handle_notification(&self, notification: &Notification) -> ControlFlow<()> {
+        if notification.is_cancelable()
+            && !matches!(notification, Notification::FilePreConvertToFull(_))
+        {
+            /* try to cancel everything, except retriving data */
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+}
+
+const ERROR_CODE_VIRTUALIZATION_TEMPORARILY_UNAVAILABLE: i32 = 369;
 pub fn mount(archive: Archive, destination: &Path, clean: bool) -> Result<()> {
     if clean {
         if destination.exists() {
@@ -514,8 +568,8 @@ pub fn mount(archive: Archive, destination: &Path, clean: bool) -> Result<()> {
             trees: Default::default(),
         }),
     };
-    let _projection = ProjectedFileSystem::new(destination, source)?;
 
+    let projection = ProjectedFileSystem::new(destination, source)?;
     info!("Projection started at {}.", destination.display());
     {
         println!("Press any key to stop the projection...");
@@ -524,10 +578,21 @@ pub fn mount(archive: Archive, destination: &Path, clean: bool) -> Result<()> {
     }
 
     info!("Stopping projection.");
+    drop(projection);
+
     if clean {
         debug!("Removing destination {}", destination.display());
-        if let Err(err) = fs::remove_dir_all(destination) {
-            warn!("Failed to clean up projection destination: {}", err);
+        let mut attempt_count = 0;
+        while let Err(err) = fs::remove_dir_all(destination) {
+            attempt_count += 1;
+            if err.raw_os_error().unwrap_or_default()
+                != ERROR_CODE_VIRTUALIZATION_TEMPORARILY_UNAVAILABLE
+                || attempt_count > 5
+            {
+                warn!("Failed to clean up projection destination: {}", err);
+                break;
+            }
+            std::thread::sleep(Duration::from_secs(1));
         }
     }
 

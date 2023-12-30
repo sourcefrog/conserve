@@ -303,6 +303,11 @@ impl IndexRead {
         }
     }
 
+    /// Clone the read index.
+    /// Note:
+    /// This has several side effects:
+    /// - Depending on the implementation of the decompressor, duplicate might not be a cheap option.
+    /// - Every read index has its own unique read stats, therefore the clone does not inherit the read stats.
     pub(crate) fn duplicate(&self) -> Self {
         Self::open(self.transport.clone())
     }
