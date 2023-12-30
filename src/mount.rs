@@ -10,7 +10,7 @@ use std::{
     path::{Component, Path},
     sync::{Arc, Mutex},
 };
-use tracing::{info, trace};
+use tracing::info;
 
 use bytes::Bytes;
 use itertools::Itertools;
@@ -31,9 +31,9 @@ use crate::{
 };
 
 macro_rules! static_dir {
-    ($name:literal) => {
+    ($name:expr) => {
         DirectoryInfo {
-            name: $name.to_string(),
+            name: ($name).to_string(),
         }
         .into()
     };
@@ -185,7 +185,7 @@ struct StoredFileReader {
 
 impl StoredFileReader {
     pub fn new(
-        stored_tree: StoredTree,
+        stored_tree: Arc<StoredTree>,
         entry: IndexEntry,
         byte_offset: u64,
         monitor: Arc<dyn Monitor>,
@@ -282,11 +282,29 @@ impl Into<Option<DirectoryEntry>> for IndexEntry {
     }
 }
 
-struct ProjectionHunkHelper {
+struct ProjectionCache {
+    archive: Archive,
     hunks: BTreeMap<BandId, HunkHelper>,
+    trees: BTreeMap<BandId, Arc<StoredTree>>,
 }
 
-impl ProjectionHunkHelper {
+impl ProjectionCache {
+    pub fn get_or_open_tree(&mut self, policy: BandSelectionPolicy) -> Result<&Arc<StoredTree>> {
+        let band_id = self.archive.resolve_band_id(policy)?;
+        match self.trees.entry(band_id) {
+            Entry::Occupied(entry) => Ok(entry.into_mut()),
+            Entry::Vacant(entry) => {
+                info!("Opening band {}", band_id);
+
+                let stored_tree = self
+                    .archive
+                    .open_stored_tree(BandSelectionPolicy::Specified(band_id))?;
+
+                Ok(entry.insert(Arc::new(stored_tree)))
+            }
+        }
+    }
+
     pub fn get_or_create_helper(&mut self, stored_tree: &StoredTree) -> Result<&HunkHelper> {
         match self.hunks.entry(stored_tree.band().id()) {
             Entry::Occupied(entry) => Ok(entry.into_mut()),
@@ -302,7 +320,7 @@ impl ProjectionHunkHelper {
 
 struct ArchiveProjectionSource {
     archive: Archive,
-    hunk_helper: Mutex<ProjectionHunkHelper>,
+    cache: Mutex<ProjectionCache>,
 }
 
 impl ArchiveProjectionSource {
@@ -341,11 +359,7 @@ impl ArchiveProjectionSource {
                         .archive
                         .list_band_ids()?
                         .into_iter()
-                        .map(|band_id| {
-                            DirectoryEntry::Directory(DirectoryInfo {
-                                name: format!("{}", band_id),
-                            })
-                        })
+                        .map(|band_id| static_dir!(format!("{}", band_id)))
                         .collect();
 
                     return Ok(entries);
@@ -354,13 +368,14 @@ impl ArchiveProjectionSource {
             _ => return Ok(vec![]),
         };
 
-        let stored_tree = self.archive.open_stored_tree(target_band)?;
         let target_path = components.fold(Apath::root(), |path, component| path.append(&component));
+        let (stored_tree, dir_hunks) = {
+            let mut cache = self.cache.lock().unwrap();
+            let stored_tree = cache.get_or_open_tree(target_band)?.clone();
+            let hunk_helper = cache.get_or_create_helper(&stored_tree)?;
+            let dir_hunks = hunk_helper.find_hunks_for_subdir(&target_path, false);
 
-        let dir_hunks = {
-            let mut hunk_helper = self.hunk_helper.lock().unwrap();
-            let hunk_helper = hunk_helper.get_or_create_helper(&stored_tree)?;
-            hunk_helper.find_hunks_for_subdir(&target_path, false)
+            (stored_tree, dir_hunks)
         };
 
         let tree_index = stored_tree.band().index();
@@ -424,22 +439,23 @@ impl ProjectedFileSystemSource for ArchiveProjectionSource {
         let target_band = Self::parse_path_band_policy(&mut components)
             .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?;
 
-        let stored_tree = self
-            .archive
-            .open_stored_tree(target_band)
-            .map_err(io::Error::other)?;
-
         let target_path = components.fold(Apath::root(), |path, component| path.append(&component));
+        let (stored_tree, file_hunk) = {
+            let mut cache = self.cache.lock().unwrap();
+            let stored_tree = cache
+                .get_or_open_tree(target_band)
+                .map_err(io::Error::other)?
+                .clone();
 
-        let file_hunk = {
-            let mut hunk_helper = self.hunk_helper.lock().unwrap();
-            let hunk_helper = hunk_helper
+            let hunk_helper = cache
                 .get_or_create_helper(&stored_tree)
                 .map_err(io::Error::other)?;
 
-            hunk_helper
+            let file_hunk = hunk_helper
                 .find_hunk_for_file(&target_path)
-                .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?
+                .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?;
+
+            (stored_tree, file_hunk)
         };
 
         let index_entry = stored_tree
@@ -452,7 +468,15 @@ impl ProjectedFileSystemSource for ArchiveProjectionSource {
             .find(|entry| entry.apath == target_path)
             .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?;
 
-        trace!("Serving {}/{}", stored_tree.band().id(), target_path);
+        let file_size: u64 = index_entry.addrs.iter().map(|addr| addr.len).sum();
+
+        info!(
+            "Serving {}/{} ({}/{} bytes)",
+            stored_tree.band().id(),
+            target_path,
+            length,
+            file_size
+        );
         let reader = StoredFileReader::new(
             stored_tree,
             index_entry,
@@ -482,19 +506,24 @@ pub fn mount(archive: Archive, destination: &Path, clean: bool) -> Result<()> {
     }
 
     let source = ArchiveProjectionSource {
-        archive,
-        hunk_helper: Mutex::new(ProjectionHunkHelper {
+        archive: archive.clone(),
+        cache: Mutex::new(ProjectionCache {
+            archive,
+
             hunks: Default::default(),
+            trees: Default::default(),
         }),
     };
     let _projection = ProjectedFileSystem::new(destination, source)?;
 
+    info!("Projection started at {}.", destination.display());
     {
         println!("Press any key to stop the projection...");
         let mut stdin = io::stdin();
         let _ = stdin.read(&mut [0u8]).unwrap();
     }
 
+    info!("Stopping projection.");
     if clean {
         debug!("Removing destination {}", destination.display());
         if let Err(err) = fs::remove_dir_all(destination) {
