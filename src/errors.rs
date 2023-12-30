@@ -159,7 +159,7 @@ pub enum Error {
         source: transport::Error,
     },
 
-    #[cfg(feature = "mount-archive")]
+    #[cfg(windows)]
     #[error(transparent)]
     Projection {
         #[from]

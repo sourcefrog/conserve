@@ -36,7 +36,10 @@ use crate::{
 macro_rules! static_dir {
     ($name:expr) => {
         DirectoryInfo {
-            name: ($name).to_string(),
+            directory_name: ($name).to_string(),
+            directory_attributes: DIRECTORY_ATTRIBUTES,
+
+            ..Default::default()
         }
         .into()
     };
@@ -265,6 +268,12 @@ fn unix_time_to_windows(unix_seconds: i64, unix_nanos: u32) -> u64 {
 
 /* https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants */
 const FILE_ATTRIBUTE_READONLY: u32 = 0x00000001;
+const FILE_ATTRIBUTE_DIRECTORY: u32 = 0x00000010;
+const FILE_ATTRIBUTE_NOT_CONTENT_INDEXED: u32 = 0x00002000;
+const FILE_ATTRIBUTE_RECALL_ON_OPEN: u32 = 0x00040000;
+
+/* Note: Using FILE_ATTRIBUTE_READONLY on directories will cause the explorer to *always* list all second level subdirectory entries */
+const DIRECTORY_ATTRIBUTES: u32 = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED | FILE_ATTRIBUTE_RECALL_ON_OPEN;
 
 impl Into<Option<DirectoryEntry>> for IndexEntry {
     fn into(self) -> Option<DirectoryEntry> {
@@ -272,7 +281,13 @@ impl Into<Option<DirectoryEntry>> for IndexEntry {
         if self.kind == Kind::Dir {
             Some(
                 DirectoryInfo {
-                    name: file_name.to_string(),
+                    directory_name: file_name.to_string(),
+                    directory_attributes: DIRECTORY_ATTRIBUTES,
+                    
+                    /* currently conserve does not differentiate between the different time stamps */
+                    creation_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
+                    last_access_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
+                    last_write_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
                 }
                 .into(),
             )

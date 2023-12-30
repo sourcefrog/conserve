@@ -171,7 +171,7 @@ enum Command {
     },
 
     /// Mount the archive as projection.
-    #[cfg(feature = "mount-archive")]
+    #[cfg(windows)]
     Mount {
         /// The archive to mount
         archive: String,
@@ -472,7 +472,7 @@ impl Command {
                     show::show_entry_names(entry_iter, &mut stdout, *long_listing)?;
                 }
             }
-            #[cfg(feature = "mount-archive")]
+            #[cfg(windows)]
             Command::Mount {
                 archive,
                 destination,
