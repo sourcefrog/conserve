@@ -1,18 +1,19 @@
+use lru::LruCache;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    collections::{btree_map::Entry, BTreeMap},
     ffi::OsStr,
     fs,
     io::{self, ErrorKind, Read},
     iter::Peekable,
+    num::NonZeroUsize,
     ops::ControlFlow,
-    path::{Component, Path},
+    path::{Component, Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tracing::{info, trace};
+use tracing::{error, info, trace};
 
 use bytes::Bytes;
 use itertools::Itertools;
@@ -24,13 +25,11 @@ use windows_projfs::{
 
 use crate::{
     counters::Counter,
-    index::IndexEntryIter,
     monitor::{
         task::{Task, TaskList},
         Monitor, Problem,
     },
-    Apath, Archive, BandId, BandSelectionPolicy, Exclude, IndexEntry, IndexRead, Kind, Result,
-    StoredTree,
+    Apath, Archive, BandId, BandSelectionPolicy, IndexEntry, IndexRead, Kind, Result, StoredTree,
 };
 
 macro_rules! static_dir {
@@ -273,94 +272,118 @@ const FILE_ATTRIBUTE_NOT_CONTENT_INDEXED: u32 = 0x00002000;
 const FILE_ATTRIBUTE_RECALL_ON_OPEN: u32 = 0x00040000;
 
 /* Note: Using FILE_ATTRIBUTE_READONLY on directories will cause the explorer to *always* list all second level subdirectory entries */
-const DIRECTORY_ATTRIBUTES: u32 = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED | FILE_ATTRIBUTE_RECALL_ON_OPEN;
+const DIRECTORY_ATTRIBUTES: u32 =
+    FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED | FILE_ATTRIBUTE_RECALL_ON_OPEN;
 
-impl Into<Option<DirectoryEntry>> for IndexEntry {
-    fn into(self) -> Option<DirectoryEntry> {
-        let file_name = self.apath.split("/").last()?;
-        if self.kind == Kind::Dir {
-            Some(
-                DirectoryInfo {
-                    directory_name: file_name.to_string(),
-                    directory_attributes: DIRECTORY_ATTRIBUTES,
-                    
-                    /* currently conserve does not differentiate between the different time stamps */
-                    creation_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
-                    last_access_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
-                    last_write_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
-                }
-                .into(),
-            )
-        } else if self.kind == Kind::File {
-            Some(
-                FileInfo {
-                    file_name: file_name.to_string(),
-                    file_size: self.addrs.iter().map(|block| block.len).sum(),
-                    file_attributes: FILE_ATTRIBUTE_READONLY,
+fn index_entry_to_directory_entry(entry: &IndexEntry) -> Option<DirectoryEntry> {
+    let file_name = entry.apath.split("/").last()?;
+    if entry.kind == Kind::Dir {
+        Some(
+            DirectoryInfo {
+                directory_name: file_name.to_string(),
+                directory_attributes: DIRECTORY_ATTRIBUTES,
 
-                    /* currently conserve does not differentiate between the different time stamps */
-                    creation_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
-                    last_access_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
-                    last_write_time: unix_time_to_windows(self.mtime, self.mtime_nanos),
+                /* currently conserve does not differentiate between the different time stamps */
+                creation_time: unix_time_to_windows(entry.mtime, entry.mtime_nanos),
+                last_access_time: unix_time_to_windows(entry.mtime, entry.mtime_nanos),
+                last_write_time: unix_time_to_windows(entry.mtime, entry.mtime_nanos),
+            }
+            .into(),
+        )
+    } else if entry.kind == Kind::File {
+        Some(
+            FileInfo {
+                file_name: file_name.to_string(),
+                file_size: entry.addrs.iter().map(|block| block.len).sum(),
+                file_attributes: FILE_ATTRIBUTE_READONLY,
 
-                    ..Default::default()
-                }
-                .into(),
-            )
-        } else if self.kind == Kind::Symlink {
-            /*
-             * Awaiting https://github.com/WolverinDEV/windows-projfs/issues/3 to be resolved
-             * before we can implement symlinks.
-             */
-            None
-        } else {
-            None
-        }
+                /* currently conserve does not differentiate between the different time stamps */
+                creation_time: unix_time_to_windows(entry.mtime, entry.mtime_nanos),
+                last_access_time: unix_time_to_windows(entry.mtime, entry.mtime_nanos),
+                last_write_time: unix_time_to_windows(entry.mtime, entry.mtime_nanos),
+
+                ..Default::default()
+            }
+            .into(),
+        )
+    } else if entry.kind == Kind::Symlink {
+        /*
+         * Awaiting https://github.com/WolverinDEV/windows-projfs/issues/3 to be resolved
+         * before we can implement symlinks.
+         */
+        None
+    } else {
+        None
     }
 }
 
-struct ProjectionCache {
+struct ArchiveProjectionSource {
     archive: Archive,
-    hunks: BTreeMap<BandId, HunkHelper>,
-    trees: BTreeMap<BandId, Arc<StoredTree>>,
+
+    stored_tree_cache: Mutex<LruCache<BandId, Arc<StoredTree>>>,
+
+    hunk_helper_cache: Mutex<LruCache<BandId, Arc<HunkHelper>>>,
+
+    /*
+     * Cache the last accessed hunks to improve directory travesal speed.
+     */
+    hunk_content_cache: Mutex<LruCache<(BandId, u32), Arc<Vec<IndexEntry>>>>,
+
+    /*
+     * The Windows file explorer has the tendency to query some directories multiple times in a row.
+     * Also if the user navigates up/down, allow this cache to help.
+     */
+    serve_dir_cache: Mutex<LruCache<PathBuf, Vec<DirectoryEntry>>>,
 }
 
-impl ProjectionCache {
-    pub fn get_or_open_tree(&mut self, policy: BandSelectionPolicy) -> Result<&Arc<StoredTree>> {
+impl ArchiveProjectionSource {
+    pub fn load_hunk_contents(
+        &self,
+        stored_tree: &StoredTree,
+        hunk_id: u32,
+    ) -> Result<Arc<Vec<IndexEntry>>> {
+        let band_id = stored_tree.band().id();
+        self.hunk_content_cache
+            .lock()
+            .unwrap()
+            .try_get_or_insert((band_id, hunk_id), || {
+                let mut index = stored_tree.band().index();
+                Ok(Arc::new(index.read_hunk(hunk_id)?.unwrap_or_default()))
+            })
+            .cloned()
+    }
+
+    pub fn get_or_open_tree(&self, policy: BandSelectionPolicy) -> Result<Arc<StoredTree>> {
         let band_id = self.archive.resolve_band_id(policy)?;
-        match self.trees.entry(band_id) {
-            Entry::Occupied(entry) => Ok(entry.into_mut()),
-            Entry::Vacant(entry) => {
+        self.stored_tree_cache
+            .lock()
+            .unwrap()
+            .try_get_or_insert(band_id, || {
                 info!("Opening band {}", band_id);
 
                 let stored_tree = self
                     .archive
                     .open_stored_tree(BandSelectionPolicy::Specified(band_id))?;
 
-                Ok(entry.insert(Arc::new(stored_tree)))
-            }
-        }
+                Ok(Arc::new(stored_tree))
+            })
+            .cloned()
     }
 
-    pub fn get_or_create_helper(&mut self, stored_tree: &StoredTree) -> Result<&HunkHelper> {
-        match self.hunks.entry(stored_tree.band().id()) {
-            Entry::Occupied(entry) => Ok(entry.into_mut()),
-            Entry::Vacant(entry) => {
+    pub fn get_or_create_hunk_helper(&self, stored_tree: &StoredTree) -> Result<Arc<HunkHelper>> {
+        let band_id = stored_tree.band().id();
+        self.hunk_helper_cache
+            .lock()
+            .unwrap()
+            .try_get_or_insert(band_id, || {
                 info!("Caching files for band {}", stored_tree.band().id());
 
                 let helper = HunkHelper::from_index(&stored_tree.band().index())?;
-                Ok(entry.insert(helper))
-            }
-        }
+                Ok(Arc::new(helper))
+            })
+            .cloned()
     }
-}
 
-struct ArchiveProjectionSource {
-    archive: Archive,
-    cache: Mutex<ProjectionCache>,
-}
-
-impl ArchiveProjectionSource {
     fn parse_path_band_policy(
         components: &mut dyn Iterator<Item = Cow<'_, str>>,
     ) -> Option<BandSelectionPolicy> {
@@ -376,7 +399,8 @@ impl ArchiveProjectionSource {
     }
 
     fn serve_dir(&self, path: &Path) -> Result<Vec<DirectoryEntry>> {
-        trace!("serve_dir {}", path.display());
+        debug!("Serving directory {}", path.display());
+
         let mut components = path
             .components()
             .map(Component::as_os_str)
@@ -407,25 +431,25 @@ impl ArchiveProjectionSource {
         };
 
         let target_path = components.fold(Apath::root(), |path, component| path.append(&component));
-        let (stored_tree, dir_hunks) = {
-            let mut cache = self.cache.lock().unwrap();
-            let stored_tree = cache.get_or_open_tree(target_band)?.clone();
-            let hunk_helper = cache.get_or_create_helper(&stored_tree)?;
-            let dir_hunks = hunk_helper.find_hunks_for_subdir(&target_path, false);
+        let stored_tree = self.get_or_open_tree(target_band)?;
+        let hunk_helper = self.get_or_create_hunk_helper(&stored_tree)?;
+        let dir_hunks = hunk_helper.find_hunks_for_subdir(&target_path, false);
 
-            (stored_tree, dir_hunks)
-        };
+        let hunks = dir_hunks
+            .into_iter()
+            .flat_map(|hunk_id| self.load_hunk_contents(&stored_tree, hunk_id).ok())
+            .collect_vec();
 
-        let tree_index = stored_tree.band().index();
-        let iterator = IndexEntryIter::new(
-            tree_index.iter_hunks(dir_hunks.into_iter()),
-            target_path.clone(),
-            Exclude::nothing(),
-        );
+        let iterator = hunks.iter().map(|e| &**e).flatten();
 
         let path_prefix = target_path.to_string();
         let entries = iterator
             .filter(|entry| {
+                if !entry.apath.starts_with(&path_prefix) {
+                    /* Not the directory we're interested in */
+                    return false;
+                }
+
                 if entry.apath.len() <= path_prefix.len() {
                     /*
                      * Skipping the containing directory entry which is eqal to path_prefix.
@@ -445,7 +469,7 @@ impl ArchiveProjectionSource {
 
                 true
             })
-            .filter_map(IndexEntry::into)
+            .filter_map(index_entry_to_directory_entry)
             .collect_vec();
 
         Ok(entries)
@@ -466,37 +490,28 @@ impl ArchiveProjectionSource {
             .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?;
 
         let target_path = components.fold(Apath::root(), |path, component| path.append(&component));
-        let (stored_tree, file_hunk) = {
-            let mut cache = self.cache.lock().unwrap();
-            let stored_tree = cache
-                .get_or_open_tree(target_band)
-                .map_err(io::Error::other)?
-                .clone();
+        let stored_tree = self
+            .get_or_open_tree(target_band)
+            .map_err(io::Error::other)?;
 
-            let hunk_helper = cache
-                .get_or_create_helper(&stored_tree)
-                .map_err(io::Error::other)?;
-
-            let file_hunk = hunk_helper
-                .find_hunk_for_file(&target_path)
-                .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?;
-
-            (stored_tree, file_hunk)
-        };
-
-        let index_entry = stored_tree
-            .band()
-            .index()
-            .read_hunk(file_hunk)
-            .map_err(io::Error::other)?
-            .unwrap_or_default()
-            .into_iter()
-            .find(|entry| entry.apath == target_path)
+        let hunk_helper = self
+            .get_or_create_hunk_helper(&stored_tree)
+            .map_err(io::Error::other)?;
+        let file_hunk = hunk_helper
+            .find_hunk_for_file(&target_path)
             .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?;
+
+        let index_entry = self
+            .load_hunk_contents(&stored_tree, file_hunk)
+            .map_err(io::Error::other)?
+            .iter()
+            .find(|entry| entry.apath == target_path)
+            .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?
+            .clone();
 
         let file_size: u64 = index_entry.addrs.iter().map(|addr| addr.len).sum();
 
-        info!(
+        debug!(
             "Serving {}{} ({}/{} bytes)",
             stored_tree.band().id(),
             target_path,
@@ -516,8 +531,25 @@ impl ArchiveProjectionSource {
 
 impl ProjectedFileSystemSource for ArchiveProjectionSource {
     fn list_directory(&self, path: &Path) -> Vec<DirectoryEntry> {
+        let cached_result = self
+            .serve_dir_cache
+            .lock()
+            .ok()
+            .and_then(|mut cache| cache.get(path).cloned());
+
+        if let Some(cached_result) = cached_result {
+            return cached_result;
+        }
+
         match self.serve_dir(path) {
-            Ok(entries) => entries,
+            Ok(entries) => {
+                self.serve_dir_cache
+                    .lock()
+                    .unwrap()
+                    .push(path.to_owned(), entries.clone());
+
+                entries
+            }
             Err(error) => {
                 warn!("Failed to serve {}: {}", path.display(), error);
                 vec![]
@@ -560,34 +592,35 @@ const ERROR_CODE_VIRTUALIZATION_TEMPORARILY_UNAVAILABLE: i32 = 369;
 pub fn mount(archive: Archive, destination: &Path, clean: bool) -> Result<()> {
     if clean {
         if destination.exists() {
-            eprintln!("The destination already exists.");
-            eprintln!("Please ensure, that the destination does not exists.");
+            error!("The destination already exists.");
+            error!("Please ensure, that the destination does not exists.");
             return Ok(());
         }
 
         fs::create_dir_all(destination)?;
     } else {
         if !destination.exists() {
-            eprintln!("The destination does not exists.");
-            eprintln!("Please ensure, that the destination does exist prior mounting.");
+            error!("The destination does not exists.");
+            error!("Please ensure, that the destination does exist prior mounting.");
             return Ok(());
         }
     }
 
     let source = ArchiveProjectionSource {
         archive: archive.clone(),
-        cache: Mutex::new(ProjectionCache {
-            archive,
 
-            hunks: Default::default(),
-            trees: Default::default(),
-        }),
+        /* cache at most 16 different bands in parallel */
+        stored_tree_cache: Mutex::new(LruCache::new(NonZeroUsize::new(16).unwrap())),
+        hunk_helper_cache: Mutex::new(LruCache::new(NonZeroUsize::new(16).unwrap())),
+
+        hunk_content_cache: Mutex::new(LruCache::new(NonZeroUsize::new(64).unwrap())),
+        serve_dir_cache: Mutex::new(LruCache::new(NonZeroUsize::new(32).unwrap())),
     };
 
     let projection = ProjectedFileSystem::new(destination, source)?;
     info!("Projection started at {}.", destination.display());
     {
-        println!("Press any key to stop the projection...");
+        info!("Press any key to stop the projection...");
         let mut stdin = io::stdin();
         let _ = stdin.read(&mut [0u8]).unwrap();
     }
