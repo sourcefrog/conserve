@@ -398,6 +398,25 @@ impl ArchiveProjectionSource {
         }
     }
 
+    fn band_id_to_directory_info(&self, policy: BandSelectionPolicy) -> Option<DirectoryInfo> {
+        let stored_tree = self.get_or_open_tree(policy).ok()?;
+        let band_info = stored_tree.band().get_info().ok()?;
+
+        let timestamp = unix_time_to_windows(
+            band_info.start_time.unix_timestamp(),
+            band_info.start_time.unix_timestamp_nanos() as u32,
+        );
+
+        Some(DirectoryInfo {
+            directory_name: format!("{}", band_info.id),
+            directory_attributes: DIRECTORY_ATTRIBUTES,
+
+            creation_time: timestamp,
+            last_access_time: timestamp,
+            last_write_time: timestamp,
+        })
+    }
+
     fn serve_dir(&self, path: &Path) -> Result<Vec<DirectoryEntry>> {
         debug!("Serving directory {}", path.display());
 
@@ -409,7 +428,15 @@ impl ArchiveProjectionSource {
         let target_band = match components.next().as_deref() {
             None => {
                 /* Virtual root, display channel selection */
-                return Ok(vec![static_dir!("latest"), static_dir!("all")]);
+                let mut entries = Vec::with_capacity(2);
+                entries.push(static_dir!("all"));
+                if let Some(mut info) = self.band_id_to_directory_info(BandSelectionPolicy::Latest)
+                {
+                    info.directory_name = "latest".to_string();
+                    entries.push(DirectoryEntry::Directory(info))
+                }
+
+                return Ok(entries);
             }
             Some("latest") => BandSelectionPolicy::Latest,
             Some("all") => {
@@ -421,7 +448,10 @@ impl ArchiveProjectionSource {
                         .archive
                         .list_band_ids()?
                         .into_iter()
-                        .map(|band_id| static_dir!(format!("{}", band_id)))
+                        .filter_map(|band_id| {
+                            self.band_id_to_directory_info(BandSelectionPolicy::Specified(band_id))
+                                .map(DirectoryEntry::Directory)
+                        })
                         .collect();
 
                     return Ok(entries);
