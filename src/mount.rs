@@ -1,12 +1,16 @@
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     borrow::Cow,
+    cmp::Ordering,
+    collections::{btree_map::Entry, BTreeMap},
     ffi::OsStr,
     fs,
     io::{self, ErrorKind, Read},
     iter::Peekable,
     path::{Component, Path},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
+use tracing::{info, trace};
 
 use bytes::Bytes;
 use itertools::Itertools;
@@ -22,7 +26,8 @@ use crate::{
         task::{Task, TaskList},
         Monitor, Problem,
     },
-    Apath, Archive, BandId, BandSelectionPolicy, Exclude, IndexEntry, Kind, Result,
+    Apath, Archive, BandId, BandSelectionPolicy, Exclude, IndexEntry, IndexRead, Kind, Result,
+    StoredTree,
 };
 
 macro_rules! static_dir {
@@ -52,6 +57,199 @@ impl Monitor for VoidMonitor {
     }
 }
 
+#[derive(Debug)]
+struct HunkMetaInfo {
+    index: u32,
+
+    start_path: Apath,
+    end_path: Apath,
+}
+
+struct HunkHelper {
+    hunks: Vec<HunkMetaInfo>,
+}
+
+impl HunkHelper {
+    pub fn from_index(index: &IndexRead) -> Result<Self> {
+        let mut hunk_info = index
+            .hunks_available()?
+            .into_par_iter()
+            .map(move |hunk_index| {
+                let mut index = index.duplicate();
+                let entries = index.read_hunk(hunk_index)?;
+                let meta_info = if let Some(entries) = entries {
+                    if let (Some(first), Some(last)) = (entries.first(), entries.last()) {
+                        Some(HunkMetaInfo {
+                            index: hunk_index,
+
+                            start_path: first.apath.clone(),
+                            end_path: last.apath.clone(),
+                        })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                Ok(meta_info)
+            })
+            .map(Result::ok)
+            .flatten()
+            .filter_map(|entry| entry)
+            .collect::<Vec<_>>();
+
+        /* After parallel execution bring all hunks back into order */
+        hunk_info.sort_by_key(|info| info.index);
+        Ok(Self { hunks: hunk_info })
+    }
+
+    pub fn find_hunk_for_file(&self, path: &Apath) -> Option<u32> {
+        let hunk_index = self.hunks.binary_search_by(|entry| {
+            match (entry.start_path.cmp(&path), entry.end_path.cmp(&path)) {
+                (Ordering::Less, Ordering::Less) => Ordering::Less,
+                (Ordering::Greater, Ordering::Greater) => Ordering::Greater,
+                _ => Ordering::Equal,
+            }
+        });
+
+        let hunk_index = match hunk_index {
+            Ok(index) => index,
+            Err(index) => index,
+        };
+
+        if hunk_index >= self.hunks.len() {
+            None
+        } else {
+            Some(self.hunks[hunk_index].index)
+        }
+    }
+
+    pub fn find_hunks_for_subdir(&self, path: &Apath, recursive: bool) -> Vec<u32> {
+        /*
+         * Appending an empty string to the path allows us to search for the first file
+         * in the target directory. This is needed as a file and a directory with the same name are not
+         * stored in succession.
+         *
+         * Example (from the apath test):
+         *  - /b/a
+         *  - /b/b
+         *  - /b/c
+         *  - /b/a/c
+         *  - /b/b/c
+         */
+        let search_path = path.append("");
+        let directory_start_hunk = match self.hunks.binary_search_by(|entry| {
+            match (
+                entry.start_path.cmp(&search_path),
+                entry.end_path.cmp(&search_path),
+            ) {
+                (Ordering::Less, Ordering::Less) => Ordering::Less,
+                (Ordering::Greater, Ordering::Greater) => Ordering::Greater,
+                _ => Ordering::Equal,
+            }
+        }) {
+            Ok(hunk) => hunk,
+            Err(hunk) => hunk,
+        };
+
+        if directory_start_hunk >= self.hunks.len() {
+            return vec![];
+        }
+
+        let mut result = Vec::new();
+        result.push(self.hunks[directory_start_hunk].index);
+        for hunk in &self.hunks[directory_start_hunk + 1..] {
+            if !path.is_prefix_of(&hunk.start_path) {
+                break;
+            }
+
+            if !recursive {
+                if hunk.start_path[path.len() + 1..].contains("/") {
+                    /* hunk does already contain directory content */
+                    break;
+                }
+            }
+
+            /* hunk still contains subtree elements of that path */
+            result.push(hunk.index);
+        }
+
+        result
+    }
+}
+
+struct StoredFileReader {
+    iter: Peekable<Box<dyn Iterator<Item = Result<Bytes>>>>,
+}
+
+impl StoredFileReader {
+    pub fn new(
+        stored_tree: StoredTree,
+        entry: IndexEntry,
+        byte_offset: u64,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<Self> {
+        let file_content = entry
+            .addrs
+            .into_iter()
+            .scan(byte_offset, |skip_bytes, mut entry| {
+                if *skip_bytes == 0 {
+                    Some(entry)
+                } else if *skip_bytes < entry.len {
+                    entry.len -= *skip_bytes;
+                    entry.start += *skip_bytes;
+                    *skip_bytes = 0;
+                    Some(entry)
+                } else {
+                    *skip_bytes -= entry.len;
+                    None
+                }
+            })
+            .map::<Result<Bytes>, _>(move |entry| {
+                let content = stored_tree
+                    .block_dir()
+                    .get_block_content(&entry.hash, monitor.clone())?;
+
+                Ok(content.slice((entry.start as usize)..(entry.start + entry.len) as usize))
+            });
+
+        Ok(Self {
+            iter: (Box::new(file_content) as Box<dyn Iterator<Item = Result<Bytes>>>).peekable(),
+        })
+    }
+}
+
+impl Read for StoredFileReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut bytes_written = 0;
+
+        while bytes_written < buf.len() {
+            let current_chunk = match self.iter.peek_mut() {
+                Some(Ok(value)) => value,
+                Some(Err(_)) => {
+                    return Err(io::Error::other(self.iter.next().unwrap().unwrap_err()))
+                }
+                None => break,
+            };
+
+            let bytes_pending = (buf.len() - bytes_written).min(current_chunk.len());
+
+            buf[bytes_written..(bytes_written + bytes_pending)]
+                .copy_from_slice(&current_chunk[0..bytes_pending]);
+            bytes_written += bytes_pending;
+
+            if bytes_pending == current_chunk.len() {
+                let _ = self.iter.next();
+            } else {
+                *current_chunk = current_chunk.slice(bytes_pending..);
+            }
+        }
+
+        Ok(bytes_written)
+    }
+}
+
 impl Into<Option<DirectoryEntry>> for IndexEntry {
     fn into(self) -> Option<DirectoryEntry> {
         let file_name = self.apath.split("/").last()?;
@@ -67,6 +265,7 @@ impl Into<Option<DirectoryEntry>> for IndexEntry {
                 FileInfo {
                     file_name: file_name.to_string(),
                     file_size: self.addrs.iter().map(|block| block.len).sum(),
+
                     ..Default::default()
                 }
                 .into(),
@@ -83,8 +282,27 @@ impl Into<Option<DirectoryEntry>> for IndexEntry {
     }
 }
 
+struct ProjectionHunkHelper {
+    hunks: BTreeMap<BandId, HunkHelper>,
+}
+
+impl ProjectionHunkHelper {
+    pub fn get_or_create_helper(&mut self, stored_tree: &StoredTree) -> Result<&HunkHelper> {
+        match self.hunks.entry(stored_tree.band().id()) {
+            Entry::Occupied(entry) => Ok(entry.into_mut()),
+            Entry::Vacant(entry) => {
+                info!("Caching files for band {}", stored_tree.band().id());
+
+                let helper = HunkHelper::from_index(&stored_tree.band().index())?;
+                Ok(entry.insert(helper))
+            }
+        }
+    }
+}
+
 struct ArchiveProjectionSource {
     archive: Archive,
+    hunk_helper: Mutex<ProjectionHunkHelper>,
 }
 
 impl ArchiveProjectionSource {
@@ -138,10 +356,16 @@ impl ArchiveProjectionSource {
 
         let stored_tree = self.archive.open_stored_tree(target_band)?;
         let target_path = components.fold(Apath::root(), |path, component| path.append(&component));
-        let tree_index = stored_tree.band().index();
 
+        let dir_hunks = {
+            let mut hunk_helper = self.hunk_helper.lock().unwrap();
+            let hunk_helper = hunk_helper.get_or_create_helper(&stored_tree)?;
+            hunk_helper.find_hunks_for_subdir(&target_path, false)
+        };
+
+        let tree_index = stored_tree.band().index();
         let iterator = IndexEntryIter::new(
-            tree_index.iter_hunks(),
+            tree_index.iter_hunks(dir_hunks.into_iter()),
             target_path.clone(),
             Exclude::nothing(),
         );
@@ -172,48 +396,6 @@ impl ArchiveProjectionSource {
             .collect_vec();
 
         Ok(entries)
-    }
-}
-
-struct BytesIteratorReader {
-    iter: Peekable<Box<dyn Iterator<Item = Result<Bytes>>>>,
-}
-
-impl BytesIteratorReader {
-    pub fn new(iter: Box<dyn Iterator<Item = Result<Bytes>>>) -> Self {
-        Self {
-            iter: iter.peekable(),
-        }
-    }
-}
-
-impl Read for BytesIteratorReader {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let mut bytes_written = 0;
-
-        while bytes_written < buf.len() {
-            let current_chunk = match self.iter.peek_mut() {
-                Some(Ok(value)) => value,
-                Some(Err(_)) => {
-                    return Err(io::Error::other(self.iter.next().unwrap().unwrap_err()))
-                }
-                None => break,
-            };
-
-            let bytes_pending = (buf.len() - bytes_written).min(current_chunk.len());
-
-            buf[bytes_written..(bytes_written + bytes_pending)]
-                .copy_from_slice(&current_chunk[0..bytes_pending]);
-            bytes_written += bytes_pending;
-
-            if bytes_pending == current_chunk.len() {
-                let _ = self.iter.next();
-            } else {
-                *current_chunk = current_chunk.slice(bytes_pending..);
-            }
-        }
-
-        Ok(bytes_written)
     }
 }
 
@@ -248,39 +430,36 @@ impl ProjectedFileSystemSource for ArchiveProjectionSource {
             .map_err(io::Error::other)?;
 
         let target_path = components.fold(Apath::root(), |path, component| path.append(&component));
+
+        let file_hunk = {
+            let mut hunk_helper = self.hunk_helper.lock().unwrap();
+            let hunk_helper = hunk_helper
+                .get_or_create_helper(&stored_tree)
+                .map_err(io::Error::other)?;
+
+            hunk_helper
+                .find_hunk_for_file(&target_path)
+                .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?
+        };
+
         let index_entry = stored_tree
             .band()
             .index()
-            .iter_entries()
+            .read_hunk(file_hunk)
+            .map_err(io::Error::other)?
+            .unwrap_or_default()
+            .into_iter()
             .find(|entry| entry.apath == target_path)
             .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?;
 
-        let void_monitor = Arc::new(VoidMonitor);
-
-        let file_content = index_entry
-            .addrs
-            .into_iter()
-            .scan(byte_offset as u64, |skip_bytes, mut entry| {
-                if *skip_bytes == 0 {
-                    Some(entry)
-                } else if *skip_bytes < entry.len {
-                    entry.len -= *skip_bytes;
-                    entry.start += *skip_bytes;
-                    *skip_bytes = 0;
-                    Some(entry)
-                } else {
-                    *skip_bytes -= entry.len;
-                    None
-                }
-            })
-            .map(move |entry| {
-                let content = stored_tree
-                    .block_dir()
-                    .get_block_content(&entry.hash, void_monitor.clone())?;
-                Ok(content.slice((entry.start as usize)..(entry.start + entry.len) as usize))
-            });
-
-        let reader = BytesIteratorReader::new(Box::new(file_content));
+        trace!("Serving {}/{}", stored_tree.band().id(), target_path);
+        let reader = StoredFileReader::new(
+            stored_tree,
+            index_entry,
+            byte_offset as u64,
+            Arc::new(VoidMonitor),
+        )
+        .map_err(io::Error::other)?;
         Ok(Box::new(reader.take(length as u64)))
     }
 }
@@ -302,7 +481,12 @@ pub fn mount(archive: Archive, destination: &Path, clean: bool) -> Result<()> {
         }
     }
 
-    let source = ArchiveProjectionSource { archive };
+    let source = ArchiveProjectionSource {
+        archive,
+        hunk_helper: Mutex::new(ProjectionHunkHelper {
+            hunks: Default::default(),
+        }),
+    };
     let _projection = ProjectedFileSystem::new(destination, source)?;
 
     {
