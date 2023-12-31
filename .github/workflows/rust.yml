@@ -26,7 +26,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         features: ["", "s3"]
-        version: [stable, nightly, "1.73"]
+        version: [stable, nightly, "1.75"]
 
     steps:
       - uses: actions/checkout@v3
@@ -43,8 +43,7 @@ jobs:
           cargo --version
           rustc --version
       - name: Build
-        run:
-          cargo build --all-targets --no-default-features --features=${{
+        run: cargo build --all-targets --no-default-features --features=${{
           matrix.features }}
       - name: Test
         run:
@@ -77,8 +76,7 @@ jobs:
         # Can't use --all-features here because BLAKE2 SIMD needs unstable...
         # Don't use the S3 features because they require AWS credentials for realistic
         # testing.
-        run:
-          cargo mutants -j2 --no-shuffle -vV --cargo-arg --no-default-features
+        run: cargo mutants -j2 --no-shuffle -vV --cargo-arg --no-default-features
       - name: Archive results
         uses: actions/upload-artifact@v3
         with:
