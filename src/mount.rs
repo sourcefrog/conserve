@@ -109,9 +109,9 @@ impl HunkHelper {
         Ok(Self { hunks: hunk_info })
     }
 
-    pub fn find_hunk_for_file(&self, path: &Apath) -> Option<u32> {
+    pub fn find_hunk_index_for_file(&self, path: &Apath) -> Option<usize> {
         let hunk_index = self.hunks.binary_search_by(|entry| {
-            match (entry.start_path.cmp(&path), entry.end_path.cmp(&path)) {
+            match (entry.start_path.cmp(path), entry.end_path.cmp(path)) {
                 (Ordering::Less, Ordering::Less) => Ordering::Less,
                 (Ordering::Greater, Ordering::Greater) => Ordering::Greater,
                 _ => Ordering::Equal,
@@ -126,8 +126,13 @@ impl HunkHelper {
         if hunk_index >= self.hunks.len() {
             None
         } else {
-            Some(self.hunks[hunk_index].index)
+            Some(hunk_index)
         }
+    }
+
+    pub fn find_hunk_for_file(&self, path: &Apath) -> Option<u32> {
+        self.find_hunk_index_for_file(path)
+            .map(|index| self.hunks[index].index)
     }
 
     pub fn find_hunks_for_subdir(&self, path: &Apath, recursive: bool) -> Vec<u32> {
@@ -144,23 +149,10 @@ impl HunkHelper {
          *  - /b/b/c
          */
         let search_path = path.append("");
-        let directory_start_hunk = match self.hunks.binary_search_by(|entry| {
-            match (
-                entry.start_path.cmp(&search_path),
-                entry.end_path.cmp(&search_path),
-            ) {
-                (Ordering::Less, Ordering::Less) => Ordering::Less,
-                (Ordering::Greater, Ordering::Greater) => Ordering::Greater,
-                _ => Ordering::Equal,
-            }
-        }) {
-            Ok(hunk) => hunk,
-            Err(hunk) => hunk,
+        let directory_start_hunk = match self.find_hunk_index_for_file(&search_path) {
+            Some(index) => index,
+            None => return vec![],
         };
-
-        if directory_start_hunk >= self.hunks.len() {
-            return vec![];
-        }
 
         let mut result = Vec::new();
         result.push(self.hunks[directory_start_hunk].index);
@@ -169,11 +161,9 @@ impl HunkHelper {
                 break;
             }
 
-            if !recursive {
-                if hunk.start_path[path.len() + 1..].contains("/") {
-                    /* hunk does already contain directory content */
-                    break;
-                }
+            if !recursive && hunk.start_path[path.len() + 1..].contains('/') {
+                /* hunk does already contain directory content */
+                break;
             }
 
             /* hunk still contains subtree elements of that path */
@@ -262,7 +252,7 @@ fn unix_time_to_windows(unix_seconds: i64, unix_nanos: u32) -> u64 {
     }
 
     let win_seconds = (unix_seconds + UNIX_WIN_DIFF_SECS) as u64;
-    return win_seconds * 1_000_000_000 / 100 + (unix_nanos / 100) as u64;
+    win_seconds * 1_000_000_000 / 100 + (unix_nanos / 100) as u64
 }
 
 /* https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants */
@@ -276,7 +266,7 @@ const DIRECTORY_ATTRIBUTES: u32 =
     FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED | FILE_ATTRIBUTE_RECALL_ON_OPEN;
 
 fn index_entry_to_directory_entry(entry: &IndexEntry) -> Option<DirectoryEntry> {
-    let file_name = entry.apath.split("/").last()?;
+    let file_name = entry.apath.split('/').last()?;
     if entry.kind == Kind::Dir {
         Some(
             DirectoryInfo {
@@ -301,17 +291,9 @@ fn index_entry_to_directory_entry(entry: &IndexEntry) -> Option<DirectoryEntry> 
                 creation_time: unix_time_to_windows(entry.mtime, entry.mtime_nanos),
                 last_access_time: unix_time_to_windows(entry.mtime, entry.mtime_nanos),
                 last_write_time: unix_time_to_windows(entry.mtime, entry.mtime_nanos),
-
-                ..Default::default()
             }
             .into(),
         )
-    } else if entry.kind == Kind::Symlink {
-        /*
-         * Awaiting https://github.com/WolverinDEV/windows-projfs/issues/3 to be resolved
-         * before we can implement symlinks.
-         */
-        None
     } else {
         None
     }
@@ -327,6 +309,7 @@ struct ArchiveProjectionSource {
     /*
      * Cache the last accessed hunks to improve directory travesal speed.
      */
+    #[allow(clippy::type_complexity)]
     hunk_content_cache: Mutex<LruCache<(BandId, u32), Arc<Vec<IndexEntry>>>>,
 
     /*
@@ -359,7 +342,7 @@ impl ArchiveProjectionSource {
             .lock()
             .unwrap()
             .try_get_or_insert(band_id, || {
-                info!("Opening band {}", band_id);
+                debug!("Opening band {}", band_id);
 
                 let stored_tree = self
                     .archive
@@ -376,6 +359,7 @@ impl ArchiveProjectionSource {
             .lock()
             .unwrap()
             .try_get_or_insert(band_id, || {
+                /* Inform the user that this band has been cached as this is most likely a heavy operaton (cpu and memory wise) */
                 info!("Caching files for band {}", stored_tree.band().id());
 
                 let helper = HunkHelper::from_index(&stored_tree.band().index())?;
@@ -391,8 +375,7 @@ impl ArchiveProjectionSource {
             Some("latest") => Some(BandSelectionPolicy::Latest),
             Some("all") => components
                 .next()
-                .map(|band_id| band_id.parse::<BandId>().ok())
-                .flatten()
+                .and_then(|band_id| band_id.parse::<BandId>().ok())
                 .map(BandSelectionPolicy::Specified),
             _ => None,
         }
@@ -470,7 +453,7 @@ impl ArchiveProjectionSource {
             .flat_map(|hunk_id| self.load_hunk_contents(&stored_tree, hunk_id).ok())
             .collect_vec();
 
-        let iterator = hunks.iter().map(|e| &**e).flatten();
+        let iterator = hunks.iter().flat_map(|e| &**e);
 
         let path_prefix = target_path.to_string();
         let entries = iterator
@@ -483,16 +466,12 @@ impl ArchiveProjectionSource {
                 if entry.apath.len() <= path_prefix.len() {
                     /*
                      * Skipping the containing directory entry which is eqal to path_prefix.
-                     *
-                     * Note:
-                     * We're not filtering for entries which are not contained within target_path as the
-                     * IndexEntryIter already does this.
                      */
                     return false;
                 }
 
-                let file_name = &entry.apath[path_prefix.len()..].trim_start_matches("/");
-                if file_name.contains("/") {
+                let file_name = &entry.apath[path_prefix.len()..].trim_start_matches('/');
+                if file_name.contains('/') {
                     /* entry is a file which is within a sub-directory */
                     return false;
                 }
@@ -628,12 +607,10 @@ pub fn mount(archive: Archive, destination: &Path, clean: bool) -> Result<()> {
         }
 
         fs::create_dir_all(destination)?;
-    } else {
-        if !destination.exists() {
-            error!("The destination does not exists.");
-            error!("Please ensure, that the destination does exist prior mounting.");
-            return Ok(());
-        }
+    } else if !destination.exists() {
+        error!("The destination does not exists.");
+        error!("Please ensure, that the destination does exist prior mounting.");
+        return Ok(());
     }
 
     let source = ArchiveProjectionSource {
