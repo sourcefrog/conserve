@@ -111,6 +111,10 @@ impl<E> Change<E> {
         matches!(self, Change::Unchanged { .. })
     }
 
+    pub fn is_changed(&self) -> bool {
+        matches!(self, Change::Changed { .. })
+    }
+
     /// Return the primary metadata: the new version, unless this entry was
     /// deleted in which case the old version.
     pub fn primary_metadata(&self) -> &E {
