@@ -118,3 +118,41 @@ fn chgrp_reported_as_changed() {
     assert!(changes[0].change.is_changed());
     assert!(!changes[0].change.is_unchanged());
 }
+
+#[cfg(unix)]
+#[test]
+fn symlink_target_change_reported_as_changed() {
+    use std::fs::remove_file;
+    use std::path::Path;
+
+    let a = ScratchArchive::new();
+    let tf = TreeFixture::new();
+    tf.create_symlink("link", "target");
+    backup(
+        &a,
+        tf.path(),
+        &BackupOptions::default(),
+        CollectMonitor::arc(),
+    )
+    .unwrap();
+
+    let link_path = tf.path().join("link");
+    remove_file(&link_path).unwrap();
+    std::os::unix::fs::symlink("new-target", &link_path).unwrap();
+    let st = a.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+    assert_eq!(
+        std::fs::read_link(&link_path).unwrap(),
+        Path::new("new-target")
+    );
+
+    let options = DiffOptions {
+        include_unchanged: false,
+        ..DiffOptions::default()
+    };
+    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options).unwrap().collect();
+    dbg!(&changes);
+    assert_eq!(changes.len(), 1);
+    assert_eq!(changes[0].apath, "/link");
+    assert!(changes[0].change.is_changed());
+    assert!(!changes[0].change.is_unchanged());
+}
