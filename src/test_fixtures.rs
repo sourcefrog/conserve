@@ -207,7 +207,7 @@ where
 ///
 /// Panics if there is no such group, or if the list of groups can't be retrieved,
 /// which is always the case on macOS.
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 pub fn arbitrary_secondary_group() -> u32 {
     let groups = nix::unistd::getgroups().expect("getgroups");
     let primary_group = nix::unistd::getgid();
@@ -220,7 +220,7 @@ pub fn arbitrary_secondary_group() -> u32 {
 
 #[cfg(test)]
 mod test {
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     #[test]
     fn arbitrary_secondary_group_is_found() {
         let gid = super::arbitrary_secondary_group();

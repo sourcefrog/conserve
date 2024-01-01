@@ -85,7 +85,9 @@ fn mtime_only_change_reported_as_changed() {
     assert!(changes[0].change.is_changed());
 }
 
-#[cfg(unix)]
+// Test only on Linux, as macOS doesn't seem to have a way to get all groups
+// (see https://docs.rs/nix/latest/nix/unistd/fn.getgroups.html).
+#[cfg(target_os = "linux")]
 #[test]
 fn chgrp_reported_as_changed() {
     use std::os::unix::fs::chown;
