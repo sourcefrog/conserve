@@ -27,6 +27,7 @@ cachedir = "0.3"
 clicolors-control = "1.0"
 crc32c = { version = "0.6", optional = true }
 derive_more = "0.99"
+fail = "0.5.1"
 filetime = "0.2"
 futures = { version = "0.3", optional = true }
 globset = "0.4.5"
@@ -110,3 +111,7 @@ doctest = false
 
 [profile.release]
 debug = true
+
+[[test]]
+name = "failpoints"
+required-features = ["fail/failpoints"]
