@@ -165,9 +165,7 @@ The library should support several modes of UI:
 1. Primarily, the text UI presented by the `conserve` binary, on a terminal that
    allows cursor control.
 
-In this case the terminal is inherently a global singleton across the process,
-and all the different uses need to be coordinated. Most importantly, log output
-must interleave with progress bars.
+   In this case the terminal is inherently a global singleton across the process, and all the different uses need to be coordinated. Most importantly, log output must interleave with progress bars.
 
 2. Noninteractive text output, when there is no terminal. This should be similar
    to the terminal, but with progress bars and interactive input turned off.
