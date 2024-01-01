@@ -33,7 +33,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.version }}
-          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.features }}
@@ -55,8 +54,19 @@ jobs:
       # that it did not notice before.
       # - name: clippy
       #   run: cargo clippy --all-targets -- -d clippy::all
-      # - name: rustfmt
-      #   run: cargo fmt --all -- --check
+
+  # Run rustfmt separately so that it does not block test results
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt check
+        run: cargo fmt --all -- --check
 
   cargo-mutants:
     runs-on: ubuntu-latest
