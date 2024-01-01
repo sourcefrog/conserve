@@ -1,8 +1,5 @@
-use lru::LruCache;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     borrow::Cow,
-    cmp::Ordering,
     ffi::OsStr,
     fs,
     io::{self, ErrorKind, Read},
@@ -13,166 +10,23 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tracing::{error, info, trace};
 
 use bytes::Bytes;
 use itertools::Itertools;
-use tracing::{debug, warn};
+use lru::LruCache;
+use tracing::{debug, error, info, warn};
 use windows_projfs::{
     DirectoryEntry, DirectoryInfo, FileInfo, Notification, ProjectedFileSystem,
     ProjectedFileSystemSource,
 };
 
 use crate::{
-    counters::Counter,
-    monitor::{
-        task::{Task, TaskList},
-        Monitor, Problem,
-    },
-    Apath, Archive, BandId, BandSelectionPolicy, IndexEntry, IndexRead, Kind, Result, StoredTree,
+    hunk_index::IndexHunkIndex,
+    monitor::{void::VoidMonitor, Monitor},
+    Apath, Archive, BandId, BandSelectionPolicy, IndexEntry, Kind, Result, StoredTree,
 };
 
-macro_rules! static_dir {
-    ($name:expr) => {
-        DirectoryInfo {
-            directory_name: ($name).to_string(),
-            directory_attributes: DIRECTORY_ATTRIBUTES,
-
-            ..Default::default()
-        }
-        .into()
-    };
-}
-
-struct VoidMonitor;
-impl Monitor for VoidMonitor {
-    fn count(&self, _counter: Counter, _increment: usize) {}
-
-    fn set_counter(&self, _counter: Counter, _value: usize) {}
-
-    fn problem(&self, _problem: Problem) {}
-
-    fn start_task(&self, name: String) -> Task {
-        /*
-         * All data related to the target task will be dropped
-         * as soon the callee drops the task.
-         */
-        let mut list = TaskList::default();
-        list.start_task(name)
-    }
-}
-
-#[derive(Debug)]
-struct HunkMetaInfo {
-    index: u32,
-
-    start_path: Apath,
-    end_path: Apath,
-}
-
-struct HunkHelper {
-    hunks: Vec<HunkMetaInfo>,
-}
-
-impl HunkHelper {
-    pub fn from_index(index: &IndexRead) -> Result<Self> {
-        let mut hunk_info = index
-            .hunks_available()?
-            .into_par_iter()
-            .map(move |hunk_index| {
-                let mut index = index.duplicate();
-                let entries = index.read_hunk(hunk_index)?;
-                let meta_info = if let Some(entries) = entries {
-                    if let (Some(first), Some(last)) = (entries.first(), entries.last()) {
-                        Some(HunkMetaInfo {
-                            index: hunk_index,
-
-                            start_path: first.apath.clone(),
-                            end_path: last.apath.clone(),
-                        })
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-
-                Ok(meta_info)
-            })
-            .map(Result::ok)
-            .flatten()
-            .filter_map(|entry| entry)
-            .collect::<Vec<_>>();
-
-        /* After parallel execution bring all hunks back into order */
-        hunk_info.sort_by_key(|info| info.index);
-        Ok(Self { hunks: hunk_info })
-    }
-
-    pub fn find_hunk_index_for_file(&self, path: &Apath) -> Option<usize> {
-        let hunk_index = self.hunks.binary_search_by(|entry| {
-            match (entry.start_path.cmp(path), entry.end_path.cmp(path)) {
-                (Ordering::Less, Ordering::Less) => Ordering::Less,
-                (Ordering::Greater, Ordering::Greater) => Ordering::Greater,
-                _ => Ordering::Equal,
-            }
-        });
-
-        let hunk_index = match hunk_index {
-            Ok(index) => index,
-            Err(index) => index,
-        };
-
-        if hunk_index >= self.hunks.len() {
-            None
-        } else {
-            Some(hunk_index)
-        }
-    }
-
-    pub fn find_hunk_for_file(&self, path: &Apath) -> Option<u32> {
-        self.find_hunk_index_for_file(path)
-            .map(|index| self.hunks[index].index)
-    }
-
-    pub fn find_hunks_for_subdir(&self, path: &Apath, recursive: bool) -> Vec<u32> {
-        /*
-         * Appending an empty string to the path allows us to search for the first file
-         * in the target directory. This is needed as a file and a directory with the same name are not
-         * stored in succession.
-         *
-         * Example (from the apath test):
-         *  - /b/a
-         *  - /b/b
-         *  - /b/c
-         *  - /b/a/c
-         *  - /b/b/c
-         */
-        let search_path = path.append("");
-        let directory_start_hunk = match self.find_hunk_index_for_file(&search_path) {
-            Some(index) => index,
-            None => return vec![],
-        };
-
-        let mut result = Vec::new();
-        result.push(self.hunks[directory_start_hunk].index);
-        for hunk in &self.hunks[directory_start_hunk + 1..] {
-            if !path.is_prefix_of(&hunk.start_path) {
-                break;
-            }
-
-            if !recursive && hunk.start_path[path.len() + 1..].contains('/') {
-                /* hunk does already contain directory content */
-                break;
-            }
-
-            /* hunk still contains subtree elements of that path */
-            result.push(hunk.index);
-        }
-
-        result
-    }
-}
+use super::MountOptions;
 
 struct StoredFileReader {
     iter: Peekable<Box<dyn Iterator<Item = Result<Bytes>>>>,
@@ -304,7 +158,7 @@ struct ArchiveProjectionSource {
 
     stored_tree_cache: Mutex<LruCache<BandId, Arc<StoredTree>>>,
 
-    hunk_helper_cache: Mutex<LruCache<BandId, Arc<HunkHelper>>>,
+    hunk_index_cache: Mutex<LruCache<BandId, Arc<IndexHunkIndex>>>,
 
     /*
      * Cache the last accessed hunks to improve directory travesal speed.
@@ -353,16 +207,19 @@ impl ArchiveProjectionSource {
             .cloned()
     }
 
-    pub fn get_or_create_hunk_helper(&self, stored_tree: &StoredTree) -> Result<Arc<HunkHelper>> {
+    pub fn get_or_create_hunk_index(
+        &self,
+        stored_tree: &StoredTree,
+    ) -> Result<Arc<IndexHunkIndex>> {
         let band_id = stored_tree.band().id();
-        self.hunk_helper_cache
+        self.hunk_index_cache
             .lock()
             .unwrap()
             .try_get_or_insert(band_id, || {
                 /* Inform the user that this band has been cached as this is most likely a heavy operaton (cpu and memory wise) */
                 info!("Caching files for band {}", stored_tree.band().id());
 
-                let helper = HunkHelper::from_index(&stored_tree.band().index())?;
+                let helper = IndexHunkIndex::from_index(&stored_tree.band().index())?;
                 Ok(Arc::new(helper))
             })
             .cloned()
@@ -410,9 +267,14 @@ impl ArchiveProjectionSource {
 
         let target_band = match components.next().as_deref() {
             None => {
-                /* Virtual root, display channel selection */
+                /* Virtual root, display band selection */
                 let mut entries = Vec::with_capacity(2);
-                entries.push(static_dir!("all"));
+                entries.push(DirectoryEntry::Directory(DirectoryInfo {
+                    directory_name: "all".to_string(),
+                    directory_attributes: DIRECTORY_ATTRIBUTES,
+
+                    ..Default::default()
+                }));
                 if let Some(mut info) = self.band_id_to_directory_info(BandSelectionPolicy::Latest)
                 {
                     info.directory_name = "latest".to_string();
@@ -445,8 +307,8 @@ impl ArchiveProjectionSource {
 
         let target_path = components.fold(Apath::root(), |path, component| path.append(&component));
         let stored_tree = self.get_or_open_tree(target_band)?;
-        let hunk_helper = self.get_or_create_hunk_helper(&stored_tree)?;
-        let dir_hunks = hunk_helper.find_hunks_for_subdir(&target_path, false);
+        let hunk_index = self.get_or_create_hunk_index(&stored_tree)?;
+        let dir_hunks = hunk_index.find_hunks_for_subdir(&target_path, false);
 
         let hunks = dir_hunks
             .into_iter()
@@ -503,10 +365,10 @@ impl ArchiveProjectionSource {
             .get_or_open_tree(target_band)
             .map_err(io::Error::other)?;
 
-        let hunk_helper = self
-            .get_or_create_hunk_helper(&stored_tree)
+        let hunk_index = self
+            .get_or_create_hunk_index(&stored_tree)
             .map_err(io::Error::other)?;
-        let file_hunk = hunk_helper
+        let file_hunk = hunk_index
             .find_hunk_for_file(&target_path)
             .ok_or(io::Error::new(ErrorKind::NotFound, "invalid path"))?;
 
@@ -572,7 +434,6 @@ impl ProjectedFileSystemSource for ArchiveProjectionSource {
         byte_offset: usize,
         length: usize,
     ) -> std::io::Result<Box<dyn Read>> {
-        trace!("stream_file_content {}", path.display());
         match self.serve_file(path, byte_offset, length) {
             Ok(reader) => Ok(reader),
             Err(error) => {
@@ -598,8 +459,8 @@ impl ProjectedFileSystemSource for ArchiveProjectionSource {
 }
 
 const ERROR_CODE_VIRTUALIZATION_TEMPORARILY_UNAVAILABLE: i32 = 369;
-pub fn mount(archive: Archive, destination: &Path, clean: bool) -> Result<()> {
-    if clean {
+pub fn mount(archive: Archive, destination: &Path, options: MountOptions) -> Result<()> {
+    if options.clean {
         if destination.exists() {
             error!("The destination already exists.");
             error!("Please ensure, that the destination does not exists.");
@@ -618,7 +479,7 @@ pub fn mount(archive: Archive, destination: &Path, clean: bool) -> Result<()> {
 
         /* cache at most 16 different bands in parallel */
         stored_tree_cache: Mutex::new(LruCache::new(NonZeroUsize::new(16).unwrap())),
-        hunk_helper_cache: Mutex::new(LruCache::new(NonZeroUsize::new(16).unwrap())),
+        hunk_index_cache: Mutex::new(LruCache::new(NonZeroUsize::new(16).unwrap())),
 
         hunk_content_cache: Mutex::new(LruCache::new(NonZeroUsize::new(64).unwrap())),
         serve_dir_cache: Mutex::new(LruCache::new(NonZeroUsize::new(32).unwrap())),
@@ -635,7 +496,7 @@ pub fn mount(archive: Archive, destination: &Path, clean: bool) -> Result<()> {
     info!("Stopping projection.");
     drop(projection);
 
-    if clean {
+    if options.clean {
         debug!("Removing destination {}", destination.display());
         let mut attempt_count = 0;
         while let Err(err) = fs::remove_dir_all(destination) {

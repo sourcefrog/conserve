@@ -4,6 +4,7 @@
 
 pub mod collect;
 pub mod task;
+pub mod void;
 
 use std::fmt::Debug;
 

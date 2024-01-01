@@ -479,7 +479,8 @@ impl Command {
                 cleanup,
             } => {
                 let archive = Archive::open(open_transport(archive)?)?;
-                mount(archive, destination, *cleanup)?;
+                let options = MountOptions { clean: *cleanup };
+                mount(archive, destination, options)?;
             }
             Command::Restore {
                 archive,
