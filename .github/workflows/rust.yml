@@ -26,7 +26,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         features: ["", "s3"]
-        version: [stable, nightly, "1.73"]
+        version: [stable, nightly, "1.75"]
 
     steps:
       - uses: actions/checkout@v3
@@ -42,8 +42,7 @@ jobs:
           cargo --version
           rustc --version
       - name: Build
-        run:
-          cargo build --all-targets --no-default-features --features=${{
+        run: cargo build --all-targets --no-default-features --features=${{
           matrix.features }}
       - name: Test
         run:

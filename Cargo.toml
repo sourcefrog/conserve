@@ -9,7 +9,7 @@ name = "conserve"
 readme = "README.md"
 repository = "https://github.com/sourcefrog/conserve/"
 version = "23.11.0"
-rust-version = "1.73"
+rust-version = "1.75"
 
 [[bin]]
 doc = false
@@ -63,6 +63,9 @@ indoc = "2.0"
 [target.'cfg(unix)'.dependencies]
 uzers = "0.11"
 nix = { version = "0.27", features = ["fs", "user"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-projfs = { version = "0.1.6", features = ["dynamic-import"] }
 
 [dependencies.clap]
 version = "4.3"
