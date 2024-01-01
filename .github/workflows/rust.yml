@@ -42,13 +42,13 @@ jobs:
           cargo --version
           rustc --version
       - name: Build
-        run:
+        run: >
           cargo build --all-targets --no-default-features --features=${{
-          matrix.features }}
+          matrix.features }} --features fail/failpoints
       - name: Test
-        run:
-          cargo test --no-default-features --features=${{ matrix.features }} --
-          --include-ignored
+        run: >
+          cargo test --no-default-features --features=${{ matrix.features }}
+          --features fail/failpoints -- --include-ignored
       # Clippy and rustfmt are excellent tools but are turned off here because it's too
       # easy for PRs to fail due to irrelevant changes including Clippy flagging problems
       # that it did not notice before.
@@ -96,7 +96,7 @@ jobs:
         # testing.
         run: >
           cargo mutants --no-shuffle -vV --cargo-arg --no-default-features
-          --shard ${{ matrix.shard }}/4
+          --shard ${{ matrix.shard }}/4 -- --features fail/failpoints
       - name: Archive results
         uses: actions/upload-artifact@v3
         if: always()
@@ -125,7 +125,8 @@ jobs:
           tool: cargo-mutants
       - name: Mutants in diff
         run: >
-          cargo mutants --no-shuffle -vV --in-diff git.diff
+          cargo mutants --no-shuffle -vV --in-diff git.diff -- --features
+          fail/failpoints
       - name: Archive mutants.out
         uses: actions/upload-artifact@v3
         if: always()
