@@ -49,11 +49,6 @@ jobs:
         run: >
           cargo test --no-default-features --features=${{ matrix.features }}
           --features fail/failpoints -- --include-ignored
-      # Clippy and rustfmt are excellent tools but are turned off here because it's too
-      # easy for PRs to fail due to irrelevant changes including Clippy flagging problems
-      # that it did not notice before.
-      # - name: clippy
-      #   run: cargo clippy --all-targets -- -d clippy::all
 
   # Run rustfmt separately so that it does not block test results
   rustfmt:
@@ -67,6 +62,17 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: rustfmt check
         run: cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy
+        run: cargo clippy --all-targets -- --deny clippy::all
 
   cargo-mutants:
     runs-on: ubuntu-latest
