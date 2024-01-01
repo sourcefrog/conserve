@@ -60,15 +60,22 @@ jobs:
 
   cargo-mutants:
     runs-on: ubuntu-latest
+    # Don't run expensive mutant tests until we know the build is clean, and recently
+    # touched code is clean.
+    needs: [pr-mutants]
     # Don't run expensive mutant tests until we know the build is clean.
-    needs: tests
+    strategy:
+      # We want to see all the missed mutants so don't fail fast.
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Install cargo-mutants
-        uses: baptiste0928/cargo-install@v2
+      - uses: taiki-e/install-action@v2
+        name: Install cargo-mutants using install-action
         with:
-          crate: cargo-mutants
+          tool: cargo-mutants
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -77,10 +84,12 @@ jobs:
         # Can't use --all-features here because BLAKE2 SIMD needs unstable...
         # Don't use the S3 features because they require AWS credentials for realistic
         # testing.
-        run:
-          cargo mutants -j2 --no-shuffle -vV --cargo-arg --no-default-features
+        run: >
+          cargo mutants --no-shuffle -vV --cargo-arg --no-default-features
+          --shard ${{ matrix.shard }}/4
       - name: Archive results
         uses: actions/upload-artifact@v3
+        if: always()
         with:
           name: mutation-report
           path: mutants.out
@@ -100,9 +109,12 @@ jobs:
         with:
           toolchain: beta
       - uses: Swatinem/rust-cache@v2
-      - run: cargo install cargo-mutants
-      - name: Mutants
-        run: |
+      - uses: taiki-e/install-action@v2
+        name: Install cargo-mutants using install-action
+        with:
+          tool: cargo-mutants
+      - name: Mutants in diff
+        run: >
           cargo mutants --no-shuffle -vV --in-diff git.diff
       - name: Archive mutants.out
         uses: actions/upload-artifact@v3
