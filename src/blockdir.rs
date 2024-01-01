@@ -42,7 +42,7 @@ use crate::monitor::Monitor;
 use crate::transport::{ListDir, Transport};
 use crate::*;
 
-const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
+// const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
 
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
@@ -290,8 +290,8 @@ impl BlockDir {
                 iter_or.ok()
             })
             .flat_map(|ListDir { files, .. }| files)
-            .filter(|name| name.len() == BLOCKDIR_FILE_NAME_LEN && !name.starts_with(TMP_PREFIX))
-            .filter_map(|name| name.parse().ok()))
+            .filter_map(|name| // drop any invalid names, including temp files
+                name.parse().ok()))
     }
 
     /// Check format invariants of the BlockDir.
