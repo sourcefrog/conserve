@@ -483,9 +483,6 @@ impl Command {
                         &changes_json.as_deref(),
                     )?,
                 };
-                if *verbose || *long_listing {
-                    // todo!("Disable progress bar");
-                }
                 let stats = restore(&archive, destination, &options, monitor)?;
                 debug!("Restore complete");
                 if !no_stats {
