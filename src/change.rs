@@ -29,10 +29,6 @@ pub struct EntryChange {
 }
 
 impl EntryChange {
-    pub fn is_unchanged(&self) -> bool {
-        self.change.is_unchanged()
-    }
-
     pub(crate) fn diff_metadata<AE: EntryTrait, BE: EntryTrait>(a: &AE, b: &BE) -> Self {
         debug_assert_eq!(a.apath(), b.apath());
         let ak = a.kind();

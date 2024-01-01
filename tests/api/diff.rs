@@ -49,9 +49,11 @@ fn diff_unchanged() {
     dbg!(&changes);
     assert_eq!(changes.len(), 2); // Root directory and the file "/thing".
     assert_eq!(changes[0].apath, "/");
-    assert!(changes[0].is_unchanged());
+    assert!(changes[0].change.is_unchanged());
+    assert!(!changes[0].change.is_changed());
     assert_eq!(changes[1].apath, "/thing");
-    assert!(changes[1].is_unchanged());
+    assert!(changes[1].change.is_unchanged());
+    assert!(!changes[1].change.is_changed());
 
     // Excluding unchanged elements
     let options = DiffOptions {
@@ -83,6 +85,7 @@ fn mtime_only_change_reported_as_changed() {
     assert_eq!(changes.len(), 1);
     assert_eq!(changes[0].apath, "/thing");
     assert!(changes[0].change.is_changed());
+    assert!(!changes[0].change.is_unchanged());
 }
 
 // Test only on Linux, as macOS doesn't seem to have a way to get all groups
@@ -113,4 +116,5 @@ fn chgrp_reported_as_changed() {
     assert_eq!(changes.len(), 1);
     assert_eq!(changes[0].apath, "/thing");
     assert!(changes[0].change.is_changed());
+    assert!(!changes[0].change.is_unchanged());
 }
