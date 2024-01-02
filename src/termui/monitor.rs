@@ -1,4 +1,4 @@
-// Copyright 2023 Martin Pool
+// Copyright 2023-2024 Martin Pool
 
 //! Monitor on a terminal UI.
 
@@ -10,10 +10,12 @@ use std::time::Duration;
 
 use nutmeg::{Destination, View};
 use thousands::Separable;
+use tracing::error;
 
 use crate::counters::{Counter, Counters};
 use crate::monitor::task::{Task, TaskList};
-use crate::monitor::{Monitor, Problem};
+use crate::monitor::Monitor;
+use crate::Error;
 
 pub struct TermUiMonitor {
     // operation: Operation,
@@ -109,9 +111,8 @@ impl Monitor for TermUiMonitor {
         self.counters.set(counter, value)
     }
 
-    fn problem(&self, problem: Problem) {
-        // TODO: Colorful styling; maybe also send it to trace??
-        self.view.message(format!("Problem: {:?}", problem));
+    fn error(&self, error: Error) {
+        error!(target: "conserve", "{error}");
     }
 
     fn start_task(&self, name: String) -> Task {

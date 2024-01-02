@@ -1,15 +1,15 @@
-// Copyright 2023 Martin Pool
+// Copyright 2023-2024 Martin Pool
 
 //! Communication from the library to a monitor: a test, a UI, etc.
 
 pub mod collect;
 pub mod task;
 
-use std::fmt::Debug;
-
 use self::task::Task;
 use crate::counters::Counter;
 
+/// A monitor receives events from the library and may collect them, report them
+/// to the terminal, log them, etc.
 pub trait Monitor: Send + Sync + 'static {
     /// Notify that a counter increased by a given amount.
     fn count(&self, counter: Counter, increment: usize);
@@ -17,14 +17,8 @@ pub trait Monitor: Send + Sync + 'static {
     /// Set the absolute value of a counter.
     fn set_counter(&self, counter: Counter, value: usize);
 
-    /// Notify that a problem occurred.
-    fn problem(&self, problem: Problem);
+    /// A non-fatal error occurred.
+    fn error(&self, error: crate::Error);
 
     fn start_task(&self, name: String) -> Task;
-}
-
-#[derive(Debug)]
-pub enum Problem {
-    /// Some generic error.
-    Error(crate::Error),
 }
