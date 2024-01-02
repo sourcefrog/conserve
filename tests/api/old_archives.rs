@@ -21,6 +21,7 @@ use std::sync::Arc;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use conserve::counters::Counter;
 use conserve::monitor::collect::CollectMonitor;
 use predicates::prelude::*;
 use pretty_assertions::assert_eq;
@@ -140,7 +141,7 @@ fn restore_old_archive() {
 
         let archive = open_old_archive(ver, "minimal");
         let monitor = CollectMonitor::arc();
-        let restore_stats = restore(
+        restore(
             &archive,
             dest.path(),
             &RestoreOptions::default(),
@@ -148,9 +149,9 @@ fn restore_old_archive() {
         )
         .expect("restore");
 
-        assert_eq!(restore_stats.files, 2);
-        assert_eq!(restore_stats.symlinks, 0);
-        assert_eq!(restore_stats.directories, 2);
+        monitor.assert_counter(Counter::Symlinks, 0);
+        monitor.assert_counter(Counter::Files, 2);
+        monitor.assert_counter(Counter::Dirs, 2);
         monitor.assert_no_errors();
 
         dest.child("hello").assert("hello world\n");

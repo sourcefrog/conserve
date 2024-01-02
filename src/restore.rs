@@ -12,13 +12,10 @@
 
 //! Restore from the archive to the filesystem.
 
-use std::fs::File;
-use std::io;
-use std::io::Write;
+use std::fs::{self, File};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
-use std::{fs, time::Instant};
 
 use fail::fail_point;
 use filetime::set_file_handle_times;
@@ -31,7 +28,6 @@ use crate::band::BandSelectionPolicy;
 use crate::counters::Counter;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::monitor::Monitor;
-use crate::stats::RestoreStats;
 use crate::unix_mode::UnixMode;
 use crate::unix_time::ToFileTime;
 use crate::*;
@@ -68,15 +64,13 @@ pub fn restore(
     destination: &Path,
     options: &RestoreOptions,
     monitor: Arc<dyn Monitor>,
-) -> Result<RestoreStats> {
+) -> Result<()> {
     let st = archive.open_stored_tree(options.band_selection.clone())?;
     ensure_dir_exists(destination)?;
     if !options.overwrite && !directory_is_empty(destination)? {
         return Err(Error::DestinationNotEmpty);
     }
-    let mut stats = RestoreStats::default();
     let task = monitor.start_task("Restore".to_string());
-    let start = Instant::now();
     let block_dir = archive.block_dir();
     // // This causes us to walk the source tree twice, which is probably an acceptable option
     // // since it's nice to see realistic overall progress. We could keep all the entries
@@ -100,7 +94,6 @@ pub fn restore(
         match entry.kind() {
             Kind::Dir => {
                 monitor.count(Counter::Dirs, 1);
-                stats.directories += 1;
                 if *entry.apath() != Apath::root() {
                     if let Err(err) = create_dir(&path) {
                         if err.kind() != io::ErrorKind::AlreadyExists {
@@ -120,22 +113,14 @@ pub fn restore(
                 })
             }
             Kind::File => {
-                stats.files += 1;
                 monitor.count(Counter::Files, 1);
-                match restore_file(path.clone(), &entry, block_dir, monitor.clone()) {
-                    Err(err) => {
-                        monitor.error(err);
-                        continue;
-                    }
-                    Ok(s) => {
-                        monitor.count(Counter::FileBytes, s.uncompressed_file_bytes as usize);
-                        stats += s;
-                    }
+                if let Err(err) = restore_file(path.clone(), &entry, block_dir, monitor.clone()) {
+                    monitor.error(err);
+                    continue;
                 }
             }
             Kind::Symlink => {
                 monitor.count(Counter::Symlinks, 1);
-                stats.symlinks += 1;
                 if let Err(err) = restore_symlink(&path, &entry) {
                     monitor.error(err);
                     continue;
@@ -153,9 +138,7 @@ pub fn restore(
         }
     }
     apply_deferrals(&deferrals, monitor.clone())?;
-    stats.elapsed = start.elapsed();
-    stats.block_cache_hits = block_dir.stats.cache_hit.load(Relaxed);
-    Ok(stats)
+    Ok(())
 }
 
 fn create_dir(path: &Path) -> io::Result<()> {
@@ -217,13 +200,11 @@ fn restore_file(
     source_entry: &IndexEntry,
     block_dir: &BlockDir,
     monitor: Arc<dyn Monitor>,
-) -> Result<RestoreStats> {
-    let mut stats = RestoreStats::default();
+) -> Result<()> {
     let mut out = File::create(&path).map_err(|err| Error::RestoreFile {
         path: path.clone(),
         source: err,
     })?;
-    let mut len = 0u64;
     for addr in &source_entry.addrs {
         // TODO: We could combine small parts
         // in memory, and then write them in a single system call. However
@@ -241,9 +222,8 @@ fn restore_file(
             path: path.clone(),
             source: err,
         })?;
-        len += bytes.len() as u64;
+        monitor.count(Counter::FileBytes, bytes.len());
     }
-    stats.uncompressed_file_bytes = len;
     out.flush().map_err(|source| Error::RestoreFile {
         path: path.clone(),
         source,
@@ -274,7 +254,7 @@ fn restore_file(
     }
     // TODO: Accumulate more stats.
     trace!("Restored file");
-    Ok(stats)
+    Ok(())
 }
 
 #[cfg(unix)]

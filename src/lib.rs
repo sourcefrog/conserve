@@ -72,7 +72,7 @@ pub use crate::misc::bytes_to_human_mb;
 pub use crate::owner::Owner;
 pub use crate::restore::{restore, RestoreOptions};
 pub use crate::show::{show_versions, ShowVersionsOptions};
-pub use crate::stats::{DeleteStats, RestoreStats};
+pub use crate::stats::DeleteStats;
 pub use crate::stored_tree::StoredTree;
 pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadTree, TreeSize};

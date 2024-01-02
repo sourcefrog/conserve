@@ -467,11 +467,12 @@ impl Command {
                 exclude,
                 exclude_from,
                 only_subtree,
-                no_stats,
                 long_listing,
+                no_stats,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open(open_transport(archive)?)?;
+                let _ = no_stats; // accepted but ignored; we never currently print stats
                 let options = RestoreOptions {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     only_subtree: only_subtree.clone(),
@@ -483,11 +484,8 @@ impl Command {
                         &changes_json.as_deref(),
                     )?,
                 };
-                let stats = restore(&archive, destination, &options, monitor)?;
+                restore(&archive, destination, &options, monitor)?;
                 debug!("Restore complete");
-                if !no_stats {
-                    debug!(%stats);
-                }
             }
             Command::Size {
                 stos,

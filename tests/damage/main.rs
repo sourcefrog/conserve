@@ -23,6 +23,7 @@ use rstest::rstest;
 use tracing_test::traced_test;
 // use predicates::prelude::*;
 
+use conserve::counters::Counter;
 use conserve::monitor::collect::CollectMonitor;
 use conserve::{
     backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait,
@@ -142,15 +143,14 @@ fn backup_after_damage(
     {
         let restore_dir = TempDir::new().unwrap();
         let monitor = CollectMonitor::arc();
-        let restore_stats = restore(
+        restore(
             &archive,
             restore_dir.path(),
             &RestoreOptions::default(),
             monitor.clone(),
         )
         .expect("restore second backup");
-        dbg!(&restore_stats);
-        assert_eq!(restore_stats.files, 1);
+        monitor.assert_counter(Counter::Files, 1);
         monitor.assert_no_errors();
 
         // Since the second backup rewrote the single file in the backup (and the root dir),

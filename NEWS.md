@@ -1,5 +1,9 @@
 # Conserve release history
 
+## Unreleased
+
+- `restore` no longer prints stats, due to internal changes; this will be restored later.
+
 ## 23.11.0
 
 - Fixed: Restore now sets Unix user/group ownership on symlinks and directories. Previously, only file ownership was restored. (Setting file ownership typically requires restoring as root.)

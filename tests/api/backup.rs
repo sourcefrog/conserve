@@ -59,7 +59,7 @@ pub fn simple_backup() {
     assert!(archive.band_exists(BandId::zero()).unwrap());
     assert!(archive.band_is_closed(BandId::zero()).unwrap());
     assert!(!archive.band_exists(BandId::new(&[1])).unwrap());
-    let copy_stats = restore(
+    restore(
         &archive,
         restore_dir.path(),
         &RestoreOptions::default(),
@@ -67,7 +67,7 @@ pub fn simple_backup() {
     )
     .expect("restore");
 
-    assert_eq!(copy_stats.uncompressed_file_bytes, 8);
+    monitor.assert_counter(Counter::FileBytes, 8);
 }
 
 #[test]
@@ -109,15 +109,15 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     assert!(band_info.is_closed);
     assert!(band_info.end_time.is_some());
 
-    let copy_stats = restore(
+    let monitor = CollectMonitor::arc();
+    restore(
         &archive,
         restore_dir.path(),
         &RestoreOptions::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .expect("restore");
-
-    assert_eq!(copy_stats.uncompressed_file_bytes, 8);
+    monitor.assert_counter(Counter::FileBytes, 8);
     // TODO: Read back contents of that file.
     // TODO: Check index stats.
     // TODO: Check what was restored.
@@ -211,7 +211,8 @@ fn large_file() {
     let af = ScratchArchive::new();
     let tf = TreeFixture::new();
 
-    let large_content = vec![b'a'; 4 << 20];
+    let file_size = 4 << 20;
+    let large_content = vec![b'a'; file_size];
     tf.create_file_with_contents("large", &large_content);
 
     let monitor = CollectMonitor::arc();
@@ -237,14 +238,17 @@ fn large_file() {
     // Try to restore it
     let rd = TempDir::new().unwrap();
     let restore_archive = Archive::open_path(af.path()).unwrap();
-    let restore_stats = restore(
+    let monitor = CollectMonitor::arc();
+    restore(
         &restore_archive,
         rd.path(),
         &RestoreOptions::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .expect("restore");
-    assert_eq!(restore_stats.files, 1);
+    monitor.assert_no_errors();
+    monitor.assert_counter(Counter::Files, 1);
+    monitor.assert_counter(Counter::FileBytes, file_size);
 
     let content = std::fs::read(rd.path().join("large")).unwrap();
     assert_eq!(large_content, content);

@@ -91,37 +91,6 @@ pub struct LiveTreeIterStats {
     pub entries_returned: usize,
 }
 
-#[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
-pub struct RestoreStats {
-    pub files: usize,
-    pub symlinks: usize,
-    pub directories: usize,
-
-    pub uncompressed_file_bytes: u64,
-
-    pub elapsed: Duration,
-
-    pub block_cache_hits: usize,
-}
-
-impl fmt::Display for RestoreStats {
-    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_count(w, "files:", self.files);
-        write_size(w, "  ", self.uncompressed_file_bytes);
-
-        write_count(w, "symlinks", self.symlinks);
-        write_count(w, "directories", self.directories);
-        writeln!(w).unwrap();
-
-        write_count(w, "block cache hits", self.block_cache_hits);
-        writeln!(w).unwrap();
-
-        write_duration(w, "elapsed", self.elapsed)?;
-
-        Ok(())
-    }
-}
-
 #[derive(Add, AddAssign, Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct DeleteStats {
     pub deleted_band_count: usize,

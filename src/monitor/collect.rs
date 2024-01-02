@@ -44,6 +44,14 @@ impl CollectMonitor {
         assert!(errors.is_empty(), "Unexpected errors: {errors:#?}");
     }
 
+    pub fn assert_counter(&self, counter: Counter, expected: usize) {
+        let actual = self.counters.get(counter);
+        assert_eq!(
+            actual, expected,
+            "Expected counter {counter:?} to be {expected}, but was {actual}",
+        );
+    }
+
     pub fn take_started_files(&self) -> Vec<Apath> {
         take(self.started_files.lock().unwrap().as_mut())
     }

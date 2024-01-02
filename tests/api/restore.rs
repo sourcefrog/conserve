@@ -17,6 +17,7 @@ use std::cell::RefCell;
 use std::fs::{read_link, symlink_metadata};
 use std::path::PathBuf;
 
+use conserve::counters::Counter;
 use conserve::monitor::collect::CollectMonitor;
 use filetime::{set_symlink_file_times, FileTime};
 use tempfile::TempDir;
@@ -39,15 +40,11 @@ fn simple_restore() {
         })),
         ..Default::default()
     };
-    let stats = restore(
-        &restore_archive,
-        destdir.path(),
-        &options,
-        CollectMonitor::arc(),
-    )
-    .expect("restore");
+    let monitor = CollectMonitor::arc();
+    restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
 
-    assert_eq!(stats.files, 3);
+    monitor.assert_no_errors();
+    monitor.assert_counter(Counter::Files, 3);
     let mut expected_names = vec![
         "/",
         "/hello",
@@ -86,10 +83,11 @@ fn restore_specified_band() {
         band_selection: BandSelectionPolicy::Specified(band_id),
         ..RestoreOptions::default()
     };
-    let stats =
-        restore(&archive, destdir.path(), &options, CollectMonitor::arc()).expect("restore");
+    let monitor = CollectMonitor::arc();
+    restore(&archive, destdir.path(), &options, monitor.clone()).expect("restore");
+    monitor.assert_no_errors();
     // Does not have the 'hello2' file added in the second version.
-    assert_eq!(stats.files, 2);
+    monitor.assert_counter(Counter::Files, 2);
 }
 
 #[test]
@@ -123,15 +121,11 @@ pub fn forced_overwrite() {
         overwrite: true,
         ..RestoreOptions::default()
     };
-    let stats = restore(
-        &restore_archive,
-        destdir.path(),
-        &options,
-        CollectMonitor::arc(),
-    )
-    .expect("restore");
-    assert_eq!(stats.files, 3);
-    let dest = &destdir.path();
+    let monitor = CollectMonitor::arc();
+    restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
+    monitor.assert_no_errors();
+    monitor.assert_counter(Counter::Files, 3);
+    let dest = destdir.path();
     assert!(dest.join("hello").is_file());
     assert!(dest.join("existing").is_file());
 }
@@ -147,19 +141,15 @@ fn exclude_files() {
         exclude: Exclude::from_strings(["/**/subfile"]).unwrap(),
         ..RestoreOptions::default()
     };
-    let stats = restore(
-        &restore_archive,
-        destdir.path(),
-        &options,
-        CollectMonitor::arc(),
-    )
-    .expect("restore");
+    let monitor = CollectMonitor::arc();
+    restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
 
-    let dest = &destdir.path();
+    let dest = destdir.path();
     assert!(dest.join("hello").is_file());
     assert!(dest.join("hello2").is_file());
     assert!(dest.join("subdir").is_dir());
-    assert_eq!(stats.files, 2);
+    monitor.assert_no_errors();
+    monitor.assert_counter(Counter::Files, 2);
 }
 
 #[test]
@@ -174,20 +164,16 @@ fn restore_symlink() {
     let years_ago = FileTime::from_unix_time(189216000, 0);
     set_symlink_file_times(srcdir.path().join("symlink"), years_ago, years_ago).unwrap();
 
-    backup(
-        &af,
-        srcdir.path(),
-        &Default::default(),
-        CollectMonitor::arc(),
-    )
-    .unwrap();
+    let monitor = CollectMonitor::arc();
+    backup(&af, srcdir.path(), &Default::default(), monitor.clone()).unwrap();
 
     let restore_dir = TempDir::new().unwrap();
+    let monitor = CollectMonitor::arc();
     restore(
         &af,
         restore_dir.path(),
         &Default::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .unwrap();
 
