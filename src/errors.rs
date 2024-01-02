@@ -124,8 +124,27 @@ pub enum Error {
     #[error("Failed to read source tree {:?}", path)]
     ListSourceTree { path: PathBuf, source: io::Error },
 
-    #[error("Failed to restore {:?}", path)]
-    Restore { path: PathBuf, source: io::Error },
+    #[error("Failed to restore file {:?}", path)]
+    RestoreFile { path: PathBuf, source: io::Error },
+
+    #[error("Failed to restore symlink {path:?}")]
+    RestoreSymlink { path: PathBuf, source: io::Error },
+
+    #[error("Failed to read block content {hash} for {apath}")]
+    RestoreFileBlock {
+        apath: Apath,
+        hash: BlockHash,
+        source: Box<Error>,
+    },
+
+    #[error("Failed to restore directory {:?}", path)]
+    RestoreDirectory { path: PathBuf, source: io::Error },
+
+    #[error("Failed to restore ownership of {:?}", path)]
+    RestoreOwnership { path: PathBuf, source: io::Error },
+
+    #[error("Failed to restore permissions on {:?}", path)]
+    RestorePermissions { path: PathBuf, source: io::Error },
 
     #[error("Failed to restore modification time on {:?}", path)]
     RestoreModificationTime { path: PathBuf, source: io::Error },

@@ -30,6 +30,6 @@ impl From<&Metadata> for Owner {
     }
 }
 
-pub fn set_owner(_owner: &Owner, _path: &Path) -> Result<()> {
+pub fn set_owner(_owner: &Owner, _path: &Path) -> io::Result<()> {
     Ok(())
 }

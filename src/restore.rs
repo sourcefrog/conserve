@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
 use time::OffsetDateTime;
-use tracing::{error, instrument, trace, warn};
+use tracing::{instrument, trace, warn};
 
 use crate::band::BandSelectionPolicy;
 use crate::counters::Counter;
@@ -101,11 +101,16 @@ pub fn restore(
             Kind::Dir => {
                 monitor.count(Counter::Dirs, 1);
                 stats.directories += 1;
-                if let Err(err) = create_dir(&path) {
-                    if err.kind() != io::ErrorKind::AlreadyExists {
-                        error!(?path, ?err, "Failed to create directory");
-                        stats.errors += 1;
-                        continue;
+                if *entry.apath() != Apath::root() {
+                    if let Err(err) = create_dir(&path) {
+                        if err.kind() != io::ErrorKind::AlreadyExists {
+                            monitor.error(Error::RestoreDirectory {
+                                path: path.clone(),
+                                source: err,
+                            });
+                            stats.errors += 1;
+                            continue;
+                        }
                     }
                 }
                 deferrals.push(DirDeferral {
@@ -120,8 +125,7 @@ pub fn restore(
                 monitor.count(Counter::Files, 1);
                 match restore_file(path.clone(), &entry, block_dir, monitor.clone()) {
                     Err(err) => {
-                        // TODO: Report it to the monitor too?
-                        error!(?err, ?path, "Failed to restore file");
+                        monitor.error(err);
                         stats.errors += 1;
                         continue;
                     }
@@ -135,14 +139,16 @@ pub fn restore(
                 monitor.count(Counter::Symlinks, 1);
                 stats.symlinks += 1;
                 if let Err(err) = restore_symlink(&path, &entry) {
-                    error!(?path, ?err, "Failed to restore symlink");
+                    monitor.error(err);
                     stats.errors += 1;
                     continue;
                 }
             }
             Kind::Unknown => {
+                monitor.error(Error::InvalidMetadata {
+                    details: format!("Unknown file kind {:?}", entry.apath()),
+                });
                 stats.unknown_kind += 1;
-                warn!(apath = ?entry.apath(), "Unknown file kind");
             }
         };
         if let Some(cb) = options.change_callback.as_ref() {
@@ -150,7 +156,7 @@ pub fn restore(
             cb(&EntryChange::added(&entry))?;
         }
     }
-    stats += apply_deferrals(&deferrals)?;
+    stats += apply_deferrals(&deferrals, monitor.clone())?;
     stats.elapsed = start.elapsed();
     stats.block_cache_hits = block_dir.stats.cache_hit.load(Relaxed);
     // TODO: Merge in stats from the tree iter and maybe the source tree?
@@ -158,7 +164,7 @@ pub fn restore(
 }
 
 fn create_dir(path: &Path) -> io::Result<()> {
-    fail_point!("conserve::restore::create-dir", |_| {
+    fail_point!("restore::create-dir", |_| {
         Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "Simulated failure",
@@ -179,7 +185,7 @@ struct DirDeferral {
     owner: Owner,
 }
 
-fn apply_deferrals(deferrals: &[DirDeferral]) -> Result<RestoreStats> {
+fn apply_deferrals(deferrals: &[DirDeferral], monitor: Arc<dyn Monitor>) -> Result<RestoreStats> {
     let mut stats = RestoreStats::default();
     for DirDeferral {
         path,
@@ -188,16 +194,25 @@ fn apply_deferrals(deferrals: &[DirDeferral]) -> Result<RestoreStats> {
         owner,
     } in deferrals
     {
-        if let Err(err) = owner.set_owner(path) {
-            error!(?path, ?err, "Error restoring ownership");
+        if let Err(source) = owner.set_owner(path) {
+            monitor.error(Error::RestoreOwnership {
+                path: path.clone(),
+                source,
+            });
             stats.errors += 1;
         }
-        if let Err(err) = unix_mode.set_permissions(path) {
-            error!(?path, ?err, "Failed to set directory permissions");
+        if let Err(source) = unix_mode.set_permissions(path) {
+            monitor.error(Error::RestorePermissions {
+                path: path.clone(),
+                source,
+            });
             stats.errors += 1;
         }
-        if let Err(err) = filetime::set_file_mtime(path, (*mtime).to_file_time()) {
-            error!(?path, ?err, "Failed to set directory mtime");
+        if let Err(source) = filetime::set_file_mtime(path, (*mtime).to_file_time()) {
+            monitor.error(Error::RestoreModificationTime {
+                path: path.clone(),
+                source,
+            });
             stats.errors += 1;
         }
     }
@@ -213,12 +228,9 @@ fn restore_file(
     monitor: Arc<dyn Monitor>,
 ) -> Result<RestoreStats> {
     let mut stats = RestoreStats::default();
-    let mut out = File::create(&path).map_err(|err| {
-        error!(?path, ?err, "Error creating destination file");
-        Error::Restore {
-            path: path.clone(),
-            source: err,
-        }
+    let mut out = File::create(&path).map_err(|err| Error::RestoreFile {
+        path: path.clone(),
+        source: err,
     })?;
     let mut len = 0u64;
     for addr in &source_entry.addrs {
@@ -229,21 +241,19 @@ fn restore_file(
         // probably a waste.
         let bytes = block_dir
             .read_address(addr, monitor.clone())
-            .map_err(|err| {
-                error!(?path, ?err, "Failed to read block content for file");
-                err
+            .map_err(|source| Error::RestoreFileBlock {
+                apath: source_entry.apath.clone(),
+                hash: addr.hash.clone(),
+                source: Box::new(source),
             })?;
-        out.write_all(&bytes).map_err(|err| {
-            error!(?path, ?err, "Failed to write content to restore file");
-            Error::Restore {
-                path: path.clone(),
-                source: err,
-            }
+        out.write_all(&bytes).map_err(|err| Error::RestoreFile {
+            path: path.clone(),
+            source: err,
         })?;
         len += bytes.len() as u64;
     }
     stats.uncompressed_file_bytes = len;
-    out.flush().map_err(|source| Error::Restore {
+    out.flush().map_err(|source| Error::RestoreFile {
         path: path.clone(),
         source,
     })?;
@@ -255,16 +265,22 @@ fn restore_file(
     })?;
 
     // Restore permissions only if there are mode bits stored in the archive
-    if let Err(err) = source_entry.unix_mode().set_permissions(&path) {
-        error!(?path, ?err, "Error restoring unix permissions");
+    if let Err(source) = source_entry.unix_mode().set_permissions(&path) {
+        monitor.error(Error::RestorePermissions {
+            path: path.clone(),
+            source,
+        });
         stats.errors += 1;
     }
 
     // Restore ownership if possible.
     // TODO: Stats and warnings if a user or group is specified in the index but
     // does not exist on the local system.
-    if let Err(err) = &source_entry.owner().set_owner(&path) {
-        error!(?path, ?err, "Error restoring ownership");
+    if let Err(source) = source_entry.owner().set_owner(&path) {
+        monitor.error(Error::RestoreOwnership {
+            path: path.clone(),
+            source,
+        });
         stats.errors += 1;
     }
     // TODO: Accumulate more stats.
@@ -273,19 +289,20 @@ fn restore_file(
 }
 
 #[cfg(unix)]
-fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<RestoreStats> {
-    let mut stats = RestoreStats::default();
+fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<()> {
     use std::os::unix::fs as unix_fs;
     if let Some(ref target) = entry.symlink_target() {
         if let Err(source) = unix_fs::symlink(target, path) {
-            return Err(Error::Restore {
+            return Err(Error::RestoreSymlink {
                 path: path.to_owned(),
                 source,
             });
         }
-        if let Err(err) = &entry.owner().set_owner(path) {
-            error!(?path, ?err, "Error restoring ownership");
-            stats.errors += 1;
+        if let Err(source) = entry.owner().set_owner(path) {
+            return Err(Error::RestoreOwnership {
+                path: path.to_owned(),
+                source,
+            });
         }
         let mtime = entry.mtime().to_file_time();
         if let Err(source) = set_symlink_file_times(path, mtime, mtime) {
@@ -295,17 +312,18 @@ fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<RestoreStats> {
             });
         }
     } else {
-        error!(apath = ?entry.apath(), "No target in symlink entry");
-        stats.errors += 1;
+        return Err(Error::InvalidMetadata {
+            details: format!("No target in symlink entry {:?}", entry.apath()),
+        });
     }
-    Ok(stats)
+    Ok(())
 }
 
 #[cfg(not(unix))]
 #[mutants::skip]
-fn restore_symlink(_restore_path: &Path, entry: &IndexEntry) -> Result<RestoreStats> {
+fn restore_symlink(_restore_path: &Path, entry: &IndexEntry) -> Result<()> {
     // TODO: Add a test with a canned index containing a symlink, and expect
     // it cannot be restored on Windows and can be on Unix.
     warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
-    Ok(RestoreStats::default())
+    Ok(())
 }
