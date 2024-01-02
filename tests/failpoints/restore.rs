@@ -6,7 +6,7 @@ use std::io;
 use std::path::Path;
 
 use assert_fs::TempDir;
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use conserve::transport::open_local_transport;
 use fail::FailScenario;
 
@@ -23,7 +23,7 @@ fn create_dir_permission_denied() {
         ..RestoreOptions::default()
     };
     let restore_tmp = TempDir::new().unwrap();
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     let stats = restore(&archive, restore_tmp.path(), &options, monitor.clone()).expect("Restore");
     dbg!(&stats);
     let errors = monitor.take_errors();

@@ -22,7 +22,7 @@ use std::sync::Arc;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use conserve::counters::Counter;
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use predicates::prelude::*;
 use pretty_assertions::assert_eq;
 
@@ -82,7 +82,7 @@ fn validate_archive() {
         let archive = open_old_archive(ver, "minimal");
 
         archive
-            .validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))
+            .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
             .expect("validate archive");
         assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     }
@@ -140,7 +140,7 @@ fn restore_old_archive() {
         println!("restore {} to {:?}", ver, dest.path());
 
         let archive = open_old_archive(ver, "minimal");
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         restore(
             &archive,
             dest.path(),
@@ -198,7 +198,7 @@ fn restore_modify_backup() {
             &archive,
             working_tree.path(),
             &RestoreOptions::default(),
-            CollectMonitor::arc(),
+            TestMonitor::arc(),
         )
         .expect("restore");
 
@@ -230,7 +230,7 @@ fn restore_modify_backup() {
                 })),
                 ..Default::default()
             },
-            CollectMonitor::arc(),
+            TestMonitor::arc(),
         )
         .expect("Backup modified tree");
 

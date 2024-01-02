@@ -179,7 +179,7 @@ fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<Band
 mod test {
     use super::*;
     use crate::counters::Counter;
-    use crate::monitor::collect::CollectMonitor;
+    use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
@@ -222,7 +222,7 @@ mod test {
         //   1 was deleted in b2, 2 is carried over from b2,
         //   and 3 is carried over from b1.
 
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id(), BandId::zero());
         let mut ib = band.index_builder();
@@ -239,7 +239,7 @@ mod test {
             "2 hunks were finished"
         );
 
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0001");
         let mut ib = band.index_builder();
@@ -254,7 +254,7 @@ mod test {
         band.close(2)?;
 
         // b2
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0002");
         let mut ib = band.index_builder();
@@ -275,7 +275,7 @@ mod test {
         assert_eq!(band.id().to_string(), "b0004");
 
         // b5
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0005");
         let mut ib = band.index_builder();
@@ -321,7 +321,7 @@ mod test {
             &af,
             tf.path(),
             &BackupOptions::default(),
-            CollectMonitor::arc(),
+            TestMonitor::arc(),
         )
         .expect("backup should work");
 

@@ -24,7 +24,7 @@ use tracing_test::traced_test;
 // use predicates::prelude::*;
 
 use conserve::counters::Counter;
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use conserve::{
     backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait,
     Exclude, RestoreOptions, ValidateOptions,
@@ -86,7 +86,7 @@ fn backup_after_damage(
         &archive,
         source_dir.path(),
         &backup_options,
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("initial backup");
 
@@ -104,7 +104,7 @@ fn backup_after_damage(
         &archive,
         source_dir.path(),
         &backup_options,
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("write second backup after damage");
     dbg!(&backup_stats);
@@ -142,7 +142,7 @@ fn backup_after_damage(
     // Can restore the second backup
     {
         let restore_dir = TempDir::new().unwrap();
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         restore(
             &archive,
             restore_dir.path(),
@@ -182,6 +182,6 @@ fn backup_after_damage(
     // Validation completes although with warnings.
     // TODO: This should return problems that we can inspect.
     archive
-        .validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))
+        .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
         .expect("validate");
 }

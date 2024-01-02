@@ -15,7 +15,7 @@
 use filetime::{set_file_mtime, FileTime};
 use itertools::Itertools;
 
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 use conserve::*;
 
@@ -24,13 +24,7 @@ fn create_tree() -> (ScratchArchive, TreeFixture) {
     let a = ScratchArchive::new();
     let tf = TreeFixture::new();
     tf.create_file_with_contents("thing", b"contents of thing");
-    let stats = backup(
-        &a,
-        tf.path(),
-        &BackupOptions::default(),
-        CollectMonitor::arc(),
-    )
-    .unwrap();
+    let stats = backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc()).unwrap();
     assert_eq!(stats.new_files, 1);
     (a, tf)
 }
@@ -128,13 +122,7 @@ fn symlink_target_change_reported_as_changed() {
     let a = ScratchArchive::new();
     let tf = TreeFixture::new();
     tf.create_symlink("link", "target");
-    backup(
-        &a,
-        tf.path(),
-        &BackupOptions::default(),
-        CollectMonitor::arc(),
-    )
-    .unwrap();
+    backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc()).unwrap();
 
     let link_path = tf.path().join("link");
     remove_file(&link_path).unwrap();

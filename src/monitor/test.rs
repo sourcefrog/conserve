@@ -19,31 +19,41 @@ use crate::{Apath, Error};
 ///
 /// Totals of counters are kept.
 #[derive(Default)]
-pub struct CollectMonitor {
+pub struct TestMonitor {
     errors: Mutex<Vec<Error>>,
     counters: Counters,
     started_files: Mutex<Vec<Apath>>,
     task_list: Mutex<TaskList>,
 }
 
-impl CollectMonitor {
+impl TestMonitor {
     pub fn new() -> Self {
-        CollectMonitor::default()
+        TestMonitor::default()
+    }
+
+    /// Construct a new TestMonitor and wrap it in an Arc.
+    pub fn arc() -> Arc<TestMonitor> {
+        Arc::new(TestMonitor::new())
     }
 
     pub fn get_counter(&self, counter: Counter) -> usize {
         self.counters.get(counter)
     }
 
+    /// Return the list of errors, and clear it.
     pub fn take_errors(&self) -> Vec<Error> {
         take(self.errors.lock().unwrap().as_mut())
     }
 
+    /// Assert that no errors have yet occurred (since the list was cleared.)
+    ///
+    /// Panic if any errors have been reported.
     pub fn assert_no_errors(&self) {
         let errors = self.errors.lock().unwrap();
         assert!(errors.is_empty(), "Unexpected errors: {errors:#?}");
     }
 
+    /// Assert the expected value of a counter.
     pub fn assert_counter(&self, counter: Counter, expected: usize) {
         let actual = self.counters.get(counter);
         assert_eq!(
@@ -56,16 +66,12 @@ impl CollectMonitor {
         take(self.started_files.lock().unwrap().as_mut())
     }
 
-    pub fn arc() -> Arc<CollectMonitor> {
-        Arc::new(CollectMonitor::new())
-    }
-
     pub fn counters(&self) -> &Counters {
         &self.counters
     }
 }
 
-impl Monitor for CollectMonitor {
+impl Monitor for TestMonitor {
     fn count(&self, counter: Counter, increment: usize) {
         self.counters.count(counter, increment)
     }

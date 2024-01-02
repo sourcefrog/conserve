@@ -18,7 +18,7 @@ use std::fs::{read_link, symlink_metadata};
 use std::path::PathBuf;
 
 use conserve::counters::Counter;
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use filetime::{set_symlink_file_times, FileTime};
 use tempfile::TempDir;
 
@@ -40,7 +40,7 @@ fn simple_restore() {
         })),
         ..Default::default()
     };
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
 
     monitor.assert_no_errors();
@@ -83,7 +83,7 @@ fn restore_specified_band() {
         band_selection: BandSelectionPolicy::Specified(band_id),
         ..RestoreOptions::default()
     };
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     restore(&archive, destdir.path(), &options, monitor.clone()).expect("restore");
     monitor.assert_no_errors();
     // Does not have the 'hello2' file added in the second version.
@@ -100,7 +100,7 @@ pub fn decline_to_overwrite() {
         ..RestoreOptions::default()
     };
     assert!(!options.overwrite, "overwrite is false by default");
-    let restore_err_str = restore(&af, destdir.path(), &options, CollectMonitor::arc())
+    let restore_err_str = restore(&af, destdir.path(), &options, TestMonitor::arc())
         .expect_err("restore should fail if the destination exists")
         .to_string();
     assert!(
@@ -121,7 +121,7 @@ pub fn forced_overwrite() {
         overwrite: true,
         ..RestoreOptions::default()
     };
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
     monitor.assert_no_errors();
     monitor.assert_counter(Counter::Files, 3);
@@ -141,7 +141,7 @@ fn exclude_files() {
         exclude: Exclude::from_strings(["/**/subfile"]).unwrap(),
         ..RestoreOptions::default()
     };
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
 
     let dest = destdir.path();
@@ -155,7 +155,7 @@ fn exclude_files() {
 #[test]
 #[cfg(unix)]
 fn restore_symlink() {
-    use conserve::monitor::collect::CollectMonitor;
+    use conserve::monitor::test::TestMonitor;
 
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
@@ -164,11 +164,11 @@ fn restore_symlink() {
     let years_ago = FileTime::from_unix_time(189216000, 0);
     set_symlink_file_times(srcdir.path().join("symlink"), years_ago, years_ago).unwrap();
 
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     backup(&af, srcdir.path(), &Default::default(), monitor.clone()).unwrap();
 
     let restore_dir = TempDir::new().unwrap();
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     restore(
         &af,
         restore_dir.path(),

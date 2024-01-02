@@ -343,7 +343,7 @@ mod test {
 
     use tempfile::TempDir;
 
-    use crate::monitor::collect::CollectMonitor;
+    use crate::monitor::test::TestMonitor;
     use crate::transport::open_local_transport;
 
     use super::*;
@@ -356,7 +356,7 @@ mod test {
         let tempdir = TempDir::new().unwrap();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let hash = blockdir
             .store_or_deduplicate(Bytes::from("stuff"), &mut stats, monitor.clone())
             .unwrap();
@@ -369,7 +369,7 @@ mod test {
 
         // Open again to get a fresh cache
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -385,7 +385,7 @@ mod test {
     fn temp_files_are_not_returned_as_blocks() {
         let tempdir = TempDir::new().unwrap();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let subdir = tempdir.path().join(subdir_relpath("123"));
         create_dir(&subdir).unwrap();
         write(
@@ -407,16 +407,16 @@ mod test {
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let hash = blockdir
-            .store_or_deduplicate(content.clone(), &mut stats, CollectMonitor::arc())
+            .store_or_deduplicate(content.clone(), &mut stats, TestMonitor::arc())
             .unwrap();
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
 
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1);
 
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
         assert_eq!(content, retrieved);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 1);
@@ -436,13 +436,13 @@ mod test {
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let hash = blockdir
             .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
             .unwrap();
 
         // reopen
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);

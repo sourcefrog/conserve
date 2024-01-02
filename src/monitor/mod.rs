@@ -2,8 +2,8 @@
 
 //! Communication from the library to a monitor: a test, a UI, etc.
 
-pub mod collect;
 pub mod task;
+pub mod test;
 
 use self::task::Task;
 use crate::counters::Counter;
