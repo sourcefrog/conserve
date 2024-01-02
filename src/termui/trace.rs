@@ -73,7 +73,6 @@ pub fn enable_tracing(
         }
         Registry::default()
             .with(console_layer)
-            .with(crate::trace_counter::CounterLayer())
             .with(json_layer)
             .init();
         flush_guard

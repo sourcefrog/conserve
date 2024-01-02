@@ -193,9 +193,10 @@ impl BlockDir {
         let end = start + len;
         let actual_len = bytes.len();
         if end > actual_len {
-            return Err(Error::AddressTooLong {
-                address: address.to_owned(),
+            return Err(Error::BlockTooShort {
+                hash: address.hash.clone(),
                 actual_len,
+                referenced_len: len,
             });
         }
         Ok(bytes.slice(start..end))

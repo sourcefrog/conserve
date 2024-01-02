@@ -2,8 +2,8 @@
 
 //! Monitor on a terminal UI.
 
-use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
 use std::thread::{sleep, spawn, JoinHandle};
 use std::time::Duration;
@@ -30,6 +30,8 @@ pub struct TermUiMonitor {
     poller: Option<JoinHandle<()>>,
     /// True to ask the poller thread to stop, during drop.
     stop_poller: Arc<AtomicBool>,
+    /// Number of errors reported.
+    error_count: AtomicUsize,
 }
 
 /// The nutmeg model.
@@ -74,6 +76,7 @@ impl TermUiMonitor {
             view,
             poller,
             stop_poller,
+            error_count: AtomicUsize::new(0),
         }
     }
 
@@ -88,6 +91,11 @@ impl TermUiMonitor {
 
     pub fn counters(&self) -> &Counters {
         &self.counters
+    }
+
+    /// Return the number of errors reported.
+    pub fn error_count(&self) -> usize {
+        self.error_count.load(Relaxed)
     }
 }
 
@@ -113,6 +121,7 @@ impl Monitor for TermUiMonitor {
 
     fn error(&self, error: Error) {
         error!(target: "conserve", "{error}");
+        self.error_count.fetch_add(1, Relaxed);
     }
 
     fn start_task(&self, name: String) -> Task {

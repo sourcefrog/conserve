@@ -22,7 +22,6 @@ use std::time::Instant;
 
 use clap::{Parser, Subcommand};
 use conserve::change::Change;
-use conserve::trace_counter::{global_error_count, global_warn_count};
 use rayon::prelude::ParallelIterator;
 use time::UtcOffset;
 #[allow(unused_imports)]
@@ -514,8 +513,8 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                Archive::open(open_transport(archive)?)?.validate(&options, monitor)?;
-                if global_error_count() != 0 || global_warn_count() != 0 {
+                Archive::open(open_transport(archive)?)?.validate(&options, monitor.clone())?;
+                if monitor.error_count() != 0 {
                     warn!("Archive has some problems.");
                 } else {
                     info!("Archive is OK.");
@@ -636,18 +635,12 @@ fn main() -> Result<ExitCode> {
             monitor.counters(),
         )?;
     }
-    let error_count = global_error_count();
-    let warn_count = global_warn_count();
     match result {
         Err(err) => {
             error!("{err:#}");
-            debug!(error_count, warn_count);
             Ok(ExitCode::Failure)
         }
-        Ok(ExitCode::Success) if error_count != 0 || warn_count != 0 => {
-            debug!(error_count, warn_count);
-            Ok(ExitCode::NonFatalErrors)
-        }
+        Ok(ExitCode::Success) if monitor.error_count() != 0 => Ok(ExitCode::NonFatalErrors),
         Ok(exit_code) => Ok(exit_code),
     }
 }

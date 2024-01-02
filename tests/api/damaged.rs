@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2020-2023 Martin Pool.
+// Copyright 2020-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,7 +14,6 @@
 //! Test validation of archives with some problems.
 
 use std::path::Path;
-use std::sync::Arc;
 
 use conserve::monitor::test::TestMonitor;
 use tracing_test::traced_test;
@@ -25,9 +24,14 @@ use conserve::*;
 #[test]
 fn missing_block_when_checking_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
-    archive.validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))?;
-    assert!(logs_contain(
-        "Referenced block missing block_hash=fec91c70284c72d0d4e3684788a90de9338a5b2f47f01fedbe203cafd68708718ae5672d10eca804a8121904047d40d1d6cf11e7a76419357a9469af41f22d01"));
+    let monitor = TestMonitor::arc();
+    archive
+        .validate(&ValidateOptions::default(), monitor.clone())
+        .unwrap();
+    let errors = monitor.take_errors();
+    dbg!(&errors);
+    assert_eq!(errors.len(), 1);
+    assert!(matches!(errors[0], Error::BlockMissing { .. }));
     Ok(())
 }
 
@@ -35,13 +39,16 @@ fn missing_block_when_checking_hashes() -> Result<()> {
 #[test]
 fn missing_block_skip_block_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
+    let monitor = TestMonitor::arc();
     archive.validate(
         &ValidateOptions {
             skip_block_hashes: true,
         },
-        Arc::new(TestMonitor::new()),
+        monitor.clone(),
     )?;
-    assert!(logs_contain(
-        "Referenced block missing block_hash=fec91c70284c72d0d4e3684788a90de9338a5b2f47f01fedbe203cafd68708718ae5672d10eca804a8121904047d40d1d6cf11e7a76419357a9469af41f22d01"));
+    let errors = monitor.take_errors();
+    dbg!(&errors);
+    assert_eq!(errors.len(), 1);
+    assert!(matches!(errors[0], Error::BlockMissing { .. }));
     Ok(())
 }
