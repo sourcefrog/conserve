@@ -121,6 +121,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::*;
     use crate::*;
 
@@ -130,12 +131,13 @@ mod tests {
     fn merge_entry_trees() {
         let ta = TreeFixture::new();
         let tb = TreeFixture::new();
+        let monitor = TestMonitor::arc();
         let di = MergeTrees::new(
             ta.live_tree()
-                .iter_entries(Apath::root(), Exclude::nothing())
+                .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
                 .unwrap(),
             tb.live_tree()
-                .iter_entries(Apath::root(), Exclude::nothing())
+                .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
                 .unwrap(),
         )
         .collect::<Vec<_>>();

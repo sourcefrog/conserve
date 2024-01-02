@@ -168,6 +168,7 @@ fn backup_after_damage(
             BandSelectionPolicy::Latest,
             Apath::root(),
             Exclude::nothing(),
+            TestMonitor::arc(),
         )
         .expect("iter entries")
         .map(|e| e.apath().to_string())

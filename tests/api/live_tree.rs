@@ -10,6 +10,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+use conserve::monitor::test::TestMonitor;
 use pretty_assertions::assert_eq;
 
 use conserve::entry::EntryValue;
@@ -34,7 +35,7 @@ fn list_simple_directory() {
     tf.create_dir("jam/.etc");
     let lt = LiveTree::open(tf.path()).unwrap();
     let result: Vec<EntryValue> = lt
-        .iter_entries(Apath::root(), Exclude::nothing())
+        .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
         .unwrap()
         .collect();
     let names = entry_iter_to_apath_strings(&result);
@@ -76,7 +77,10 @@ fn exclude_entries_directory() {
     let exclude = Exclude::from_strings(["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
-    let names = entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), exclude).unwrap());
+    let names = entry_iter_to_apath_strings(
+        lt.iter_entries(Apath::root(), exclude, TestMonitor::arc())
+            .unwrap(),
+    );
 
     // First one is the root
     assert_eq!(names, ["/", "/baz", "/baz/test"]);
@@ -94,8 +98,10 @@ fn symlinks() {
     tf.create_symlink("from", "to");
 
     let lt = LiveTree::open(tf.path()).unwrap();
-    let names =
-        entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), Exclude::nothing()).unwrap());
+    let names = entry_iter_to_apath_strings(
+        lt.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .unwrap(),
+    );
 
     assert_eq!(names, ["/", "/from"]);
 }
@@ -112,7 +118,7 @@ fn iter_subtree_entries() {
     let lt = LiveTree::open(tf.path()).unwrap();
 
     let names = entry_iter_to_apath_strings(
-        lt.iter_entries("/subdir".into(), Exclude::nothing())
+        lt.iter_entries("/subdir".into(), Exclude::nothing(), TestMonitor::arc())
             .unwrap(),
     );
     assert_eq!(names, ["/subdir", "/subdir/a", "/subdir/b"]);
@@ -127,7 +133,9 @@ fn exclude_cachedir() {
     cachedir::add_tag(cache_dir).unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
-    let names =
-        entry_iter_to_apath_strings(lt.iter_entries(Apath::root(), Exclude::nothing()).unwrap());
+    let names = entry_iter_to_apath_strings(
+        lt.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .unwrap(),
+    );
     assert_eq!(names, ["/", "/a"]);
 }

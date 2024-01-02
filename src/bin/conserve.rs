@@ -394,7 +394,7 @@ impl Command {
                     include_unchanged: *include_unchanged,
                 };
                 let mut bw = BufWriter::new(stdout);
-                for change in diff(&st, &lt, &options)? {
+                for change in diff(&st, &lt, &options, monitor.clone())? {
                     if *json {
                         serde_json::to_writer(&mut bw, &change)?;
                     } else {
@@ -438,14 +438,15 @@ impl Command {
                         // TODO: Option for subtree.
                         Box::new(
                             stored_tree_from_opt(archive, &stos.backup)?
-                                .iter_entries(Apath::root(), exclude)?
+                                .iter_entries(Apath::root(), exclude, monitor.clone())?
                                 .map(|it| it.into()),
                         )
                     } else {
-                        Box::new(
-                            LiveTree::open(stos.source.clone().unwrap())?
-                                .iter_entries(Apath::root(), exclude)?,
-                        )
+                        Box::new(LiveTree::open(stos.source.clone().unwrap())?.iter_entries(
+                            Apath::root(),
+                            exclude,
+                            monitor.clone(),
+                        )?)
                     };
                 monitor.clear_progress_bars();
                 if *json {

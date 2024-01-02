@@ -100,16 +100,18 @@ fn long_listing_old_archive() {
         let mut stdout = Vec::<u8>::new();
 
         // show archive contents
+        let monitor = TestMonitor::arc();
         show::show_entry_names(
             archive
                 .open_stored_tree(BandSelectionPolicy::Latest)
                 .unwrap()
-                .iter_entries(Apath::root(), Exclude::nothing())
+                .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
                 .unwrap(),
             &mut stdout,
             true,
         )
         .unwrap();
+        monitor.assert_no_errors();
 
         if first_with_perms.matches(&semver::Version::parse(ver).unwrap()) {
             assert_eq!(

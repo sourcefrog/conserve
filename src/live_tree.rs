@@ -18,10 +18,12 @@ use std::fs;
 use std::fs::File;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use tracing::{error, warn};
 
 use crate::entry::{EntryValue, KindMeta};
+use crate::monitor::Monitor;
 use crate::owner::Owner;
 use crate::stats::LiveTreeIterStats;
 use crate::unix_mode::UnixMode;
@@ -63,7 +65,12 @@ impl tree::ReadTree for LiveTree {
     type Entry = EntryValue;
     type IT = Iter;
 
-    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
+    fn iter_entries(
+        &self,
+        subtree: Apath,
+        exclude: Exclude,
+        _monitor: Arc<dyn Monitor>,
+    ) -> Result<Self::IT> {
         Iter::new(&self.path, subtree, exclude)
     }
 }

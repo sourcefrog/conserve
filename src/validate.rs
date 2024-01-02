@@ -48,7 +48,7 @@ pub(crate) fn validate_bands(
                 continue 'band;
             }
         };
-        if let Err(err) = band.validate() {
+        if let Err(err) = band.validate(monitor.clone()) {
             monitor.error(err);
             continue 'band;
         };
@@ -59,7 +59,7 @@ pub(crate) fn validate_bands(
             }
             Ok(st) => st,
         };
-        let band_block_lens = match validate_stored_tree(&st, monitor.as_ref()) {
+        let band_block_lens = match validate_stored_tree(&st, monitor.clone()) {
             Err(err) => {
                 monitor.error(err);
                 continue 'band;
@@ -79,14 +79,17 @@ fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash
     }
 }
 
-fn validate_stored_tree(st: &StoredTree, monitor: &dyn Monitor) -> Result<HashMap<BlockHash, u64>> {
+fn validate_stored_tree(
+    st: &StoredTree,
+    monitor: Arc<dyn Monitor>,
+) -> Result<HashMap<BlockHash, u64>> {
     // TODO: Check other entry properties are correct.
     // TODO: Check they're in apath order.
     // TODO: Count progress for index blocks within one tree?
     let _task = monitor.start_task(format!("Validate stored tree {}", st.band().id()));
     let mut block_lens = HashMap::new();
     for entry in st
-        .iter_entries(Apath::root(), Exclude::nothing())?
+        .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())?
         .filter(|entry| entry.kind() == Kind::File)
     {
         // TODO: Read index hunks, count into the task per hunk. Then, we can

@@ -292,8 +292,9 @@ fn mtime_before_epoch() {
     set_file_mtime(file_path, t1969).expect("Failed to set file times");
 
     let lt = LiveTree::open(tf.path()).unwrap();
+    let monitor = TestMonitor::arc();
     let entries = lt
-        .iter_entries(Apath::root(), Exclude::nothing())
+        .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
         .unwrap()
         .collect::<Vec<_>>();
 
@@ -364,7 +365,7 @@ pub fn empty_file_uses_zero_blocks() {
     // Read back the empty file
     let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
     let empty_entry = st
-        .iter_entries(Apath::root(), Exclude::nothing())
+        .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
         .unwrap()
         .find(|i| &i.apath == "/empty")
         .expect("found one entry");
@@ -532,14 +533,14 @@ fn many_small_files_combined_to_one_block() {
 
     let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
     let mut entry_iter = tree
-        .iter_entries(Apath::root(), Exclude::nothing())
+        .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
         .unwrap();
     assert_eq!(entry_iter.next().unwrap().apath(), "/");
     for (i, entry) in entry_iter.enumerate() {
         assert_eq!(entry.apath().to_string(), format!("/file{i:04}"));
     }
     assert_eq!(
-        tree.iter_entries(Apath::root(), Exclude::nothing())
+        tree.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
             .unwrap()
             .count(),
         2000
@@ -585,14 +586,14 @@ pub fn mixed_medium_small_files_two_hunks() {
 
     let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
     let mut entry_iter = tree
-        .iter_entries(Apath::root(), Exclude::nothing())
+        .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
         .unwrap();
     assert_eq!(entry_iter.next().unwrap().apath(), "/");
     for (i, entry) in entry_iter.enumerate() {
         assert_eq!(entry.apath().to_string(), format!("/file{i:04}"));
     }
     assert_eq!(
-        tree.iter_entries(Apath::root(), Exclude::nothing())
+        tree.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
             .unwrap()
             .count(),
         2000

@@ -127,9 +127,10 @@ impl Archive {
         band_selection: BandSelectionPolicy,
         subtree: Apath,
         exclude: Exclude,
+        monitor: Arc<dyn Monitor>,
     ) -> Result<impl Iterator<Item = IndexEntry>> {
         self.open_stored_tree(band_selection)?
-            .iter_entries(subtree, exclude)
+            .iter_entries(subtree, exclude, monitor)
     }
 
     /// Returns a vector of band ids, in sorted order from first to last.

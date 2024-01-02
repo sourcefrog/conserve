@@ -86,6 +86,7 @@ pub fn restore(
     let entry_iter = st.iter_entries(
         options.only_subtree.clone().unwrap_or_else(Apath::root),
         options.exclude.clone(),
+        monitor.clone(),
     )?;
     let mut deferrals = Vec::new();
     for entry in entry_iter {
