@@ -31,7 +31,7 @@ use bytes::Bytes;
 use lru::LruCache;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 use tracing::{instrument, trace};
 
 use crate::backup::BackupStats;
@@ -220,7 +220,6 @@ impl BlockDir {
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
         if actual_hash != *hash {
-            error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
             return Err(Error::BlockCorrupt { hash: hash.clone() });
         }
         self.cache
@@ -284,14 +283,16 @@ impl BlockDir {
                 task.increment(1);
                 r
             })
-            .filter_map(|iter_or| {
-                if let Err(ref err) = iter_or {
-                    error!(%err, "Error listing block subdirectory");
+            .filter_map(move |iter_or| match iter_or {
+                Err(source) => {
+                    monitor.error(Error::ListBlocks { source });
+                    None
                 }
-                iter_or.ok()
+                Ok(ListDir { files, .. }) => Some(files),
             })
-            .flat_map(|ListDir { files, .. }| files)
+            .flatten()
             .filter_map(|name| // drop any invalid names, including temp files
+                // TODO: Report errors on bad names?
                 name.parse().ok()))
     }
 
@@ -320,7 +321,7 @@ impl BlockDir {
                         Some((hash, bytes.len()))
                     }
                     Err(err) => {
-                        error!(%err, %hash, "Error reading block content");
+                        monitor.error(err);
                         None
                     }
                 },

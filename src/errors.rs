@@ -38,6 +38,12 @@ pub enum Error {
         referenced_len: usize,
     },
 
+    #[error("Failed to list blocks")]
+    ListBlocks {
+        #[source]
+        source: transport::Error,
+    },
+
     #[error("Not a Conserve archive (no CONSERVE header found)")]
     NotAnArchive,
 
