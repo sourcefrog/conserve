@@ -15,6 +15,7 @@
 //! Windows null implementation of file ownership.
 
 use std::fs::Metadata;
+use std::io;
 use std::path::Path;
 
 use super::Owner;
