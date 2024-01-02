@@ -53,5 +53,5 @@ pub fn diff(
         .readahead(readahead);
     Ok(MergeTrees::new(ait, bit)
         .map(|me| me.to_entry_change())
-        .filter(move |c: &EntryChange| include_unchanged || !c.is_unchanged()))
+        .filter(move |c: &EntryChange| include_unchanged || !c.change.is_unchanged()))
 }

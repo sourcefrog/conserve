@@ -110,6 +110,7 @@ impl Monitor for TermUiMonitor {
     }
 
     fn problem(&self, problem: Problem) {
+        // TODO: Colorful styling; maybe also send it to trace??
         self.view.message(format!("Problem: {:?}", problem));
     }
 

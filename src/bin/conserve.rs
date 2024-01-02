@@ -483,9 +483,6 @@ impl Command {
                         &changes_json.as_deref(),
                     )?,
                 };
-                if *verbose || *long_listing {
-                    // todo!("Disable progress bar");
-                }
                 let stats = restore(&archive, destination, &options, monitor)?;
                 debug!("Restore complete");
                 if !no_stats {
@@ -520,7 +517,7 @@ impl Command {
                     skip_block_hashes: *quick,
                 };
                 Archive::open(open_transport(archive)?)?.validate(&options, monitor)?;
-                if global_error_count() > 0 || global_warn_count() > 0 {
+                if global_error_count() != 0 || global_warn_count() != 0 {
                     warn!("Archive has some problems.");
                 } else {
                     info!("Archive is OK.");
@@ -646,11 +643,11 @@ fn main() -> Result<ExitCode> {
     match result {
         Err(err) => {
             error!("{err:#}");
-            debug!(error_count, warn_count,);
+            debug!(error_count, warn_count);
             Ok(ExitCode::Failure)
         }
-        Ok(ExitCode::Success) if error_count > 0 || warn_count > 0 => {
-            debug!(error_count, warn_count,);
+        Ok(ExitCode::Success) if error_count != 0 || warn_count != 0 => {
+            debug!(error_count, warn_count);
             Ok(ExitCode::NonFatalErrors)
         }
         Ok(exit_code) => Ok(exit_code),

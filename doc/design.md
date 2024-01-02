@@ -165,9 +165,7 @@ The library should support several modes of UI:
 1. Primarily, the text UI presented by the `conserve` binary, on a terminal that
    allows cursor control.
 
-In this case the terminal is inherently a global singleton across the process,
-and all the different uses need to be coordinated. Most importantly, log output
-must interleave with progress bars.
+   In this case the terminal is inherently a global singleton across the process, and all the different uses need to be coordinated. Most importantly, log output must interleave with progress bars.
 
 2. Noninteractive text output, when there is no terminal. This should be similar
    to the terminal, but with progress bars and interactive input turned off.
@@ -182,10 +180,8 @@ must interleave with progress bars.
    in a limited way. (Tests that run the `conserve` binary as a subprocess have
    more freedom, including running it on a pseudoterminal.)
 
-This is not implemented yet, but Conserve should migrate to using Rust's
-(fairly) standard `log` crate. Listeners for logs can be configured only
-globally and only once. There should be an option to write logs to a file, as
-well as to the terminal, and at a different level of detail. This implies:
+Conserve writes messages to Rust's widely-used `tracing` crate. Logs can be written to a file with `--log-json`.
+well as to the terminal, and at a different level of detail.
 
 - The library will emit logs but will not by default configure any log targets,
   so that applications can choose the target they want.

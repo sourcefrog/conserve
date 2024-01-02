@@ -42,7 +42,7 @@ use crate::monitor::Monitor;
 use crate::transport::{ListDir, Transport};
 use crate::*;
 
-const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
+// const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
 
 /// Take this many characters from the block hash to form the subdirectory name.
 const SUBDIR_NAME_CHARS: usize = 3;
@@ -290,8 +290,8 @@ impl BlockDir {
                 iter_or.ok()
             })
             .flat_map(|ListDir { files, .. }| files)
-            .filter(|name| name.len() == BLOCKDIR_FILE_NAME_LEN && !name.starts_with(TMP_PREFIX))
-            .filter_map(|name| name.parse().ok()))
+            .filter_map(|name| // drop any invalid names, including temp files
+                name.parse().ok()))
     }
 
     /// Check format invariants of the BlockDir.
@@ -339,13 +339,15 @@ pub struct BlockDirStats {
 
 #[cfg(test)]
 mod test {
-    use std::fs::OpenOptions;
+    use std::fs::{create_dir, write, OpenOptions};
+
+    use tempfile::TempDir;
 
     use crate::monitor::collect::CollectMonitor;
     use crate::transport::open_local_transport;
 
     use super::*;
-    use tempfile::TempDir;
+
     #[test]
     fn empty_block_file_counts_as_not_present() {
         // Due to an interruption or system crash we might end up with a block
@@ -377,6 +379,25 @@ mod test {
         assert!(!blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
+    }
+
+    #[test]
+    fn temp_files_are_not_returned_as_blocks() {
+        let tempdir = TempDir::new().unwrap();
+        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let monitor = CollectMonitor::arc();
+        let subdir = tempdir.path().join(subdir_relpath("123"));
+        create_dir(&subdir).unwrap();
+        write(
+            subdir.join(format!("{}{}", TMP_PREFIX, "123123123")),
+            b"123",
+        )
+        .unwrap();
+        let blocks = blockdir
+            .blocks(monitor.clone())
+            .unwrap()
+            .collect::<Vec<_>>();
+        assert_eq!(blocks, []);
     }
 
     #[test]

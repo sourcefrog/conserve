@@ -20,6 +20,7 @@ use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
 use std::{fs, time::Instant};
 
+use fail::fail_point;
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
@@ -100,7 +101,7 @@ pub fn restore(
             Kind::Dir => {
                 monitor.count(Counter::Dirs, 1);
                 stats.directories += 1;
-                if let Err(err) = fs::create_dir_all(&path) {
+                if let Err(err) = create_dir(&path) {
                     if err.kind() != io::ErrorKind::AlreadyExists {
                         error!(?path, ?err, "Failed to create directory");
                         stats.errors += 1;
@@ -119,6 +120,7 @@ pub fn restore(
                 monitor.count(Counter::Files, 1);
                 match restore_file(path.clone(), &entry, block_dir, monitor.clone()) {
                     Err(err) => {
+                        // TODO: Report it to the monitor too?
                         error!(?err, ?path, "Failed to restore file");
                         stats.errors += 1;
                         continue;
@@ -153,6 +155,16 @@ pub fn restore(
     stats.block_cache_hits = block_dir.stats.cache_hit.load(Relaxed);
     // TODO: Merge in stats from the tree iter and maybe the source tree?
     Ok(stats)
+}
+
+fn create_dir(path: &Path) -> io::Result<()> {
+    fail_point!("conserve::restore::create-dir", |_| {
+        Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "Simulated failure",
+        ))
+    });
+    fs::create_dir(path)
 }
 
 /// Recorded changes to apply to directories after all their contents
