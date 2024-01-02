@@ -39,6 +39,11 @@ impl CollectMonitor {
         take(self.errors.lock().unwrap().as_mut())
     }
 
+    pub fn assert_no_errors(&self) {
+        let errors = self.errors.lock().unwrap();
+        assert!(errors.is_empty(), "Unexpected errors: {errors:#?}");
+    }
+
     pub fn take_started_files(&self) -> Vec<Apath> {
         take(self.started_files.lock().unwrap().as_mut())
     }

@@ -139,21 +139,24 @@ fn backup_after_damage(
     }
 
     // Can restore the second backup
-    let restore_dir = TempDir::new().unwrap();
-    let restore_stats = restore(
-        &archive,
-        restore_dir.path(),
-        &RestoreOptions::default(),
-        CollectMonitor::arc(),
-    )
-    .expect("restore second backup");
-    dbg!(&restore_stats);
-    assert_eq!(restore_stats.files, 1);
-    assert_eq!(restore_stats.errors, 0);
+    {
+        let restore_dir = TempDir::new().unwrap();
+        let monitor = CollectMonitor::arc();
+        let restore_stats = restore(
+            &archive,
+            restore_dir.path(),
+            &RestoreOptions::default(),
+            monitor.clone(),
+        )
+        .expect("restore second backup");
+        dbg!(&restore_stats);
+        assert_eq!(restore_stats.files, 1);
+        monitor.assert_no_errors();
 
-    // Since the second backup rewrote the single file in the backup (and the root dir),
-    // we should get all the content back out.
-    assert_paths!(source_dir.path(), restore_dir.path());
+        // Since the second backup rewrote the single file in the backup (and the root dir),
+        // we should get all the content back out.
+        assert_paths!(source_dir.path(), restore_dir.path());
+    }
 
     // You can see both versions.
     let versions = archive.list_band_ids().expect("list versions");

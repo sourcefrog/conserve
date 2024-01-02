@@ -41,6 +41,5 @@ fn create_dir_permission_denied() {
     } else {
         panic!("Unexpected error {:?}", errors[1]);
     }
-    assert_eq!(stats.errors, 2);
     scenario.teardown();
 }

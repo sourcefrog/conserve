@@ -108,7 +108,6 @@ pub fn restore(
                                 path: path.clone(),
                                 source: err,
                             });
-                            stats.errors += 1;
                             continue;
                         }
                     }
@@ -126,7 +125,6 @@ pub fn restore(
                 match restore_file(path.clone(), &entry, block_dir, monitor.clone()) {
                     Err(err) => {
                         monitor.error(err);
-                        stats.errors += 1;
                         continue;
                     }
                     Ok(s) => {
@@ -140,7 +138,6 @@ pub fn restore(
                 stats.symlinks += 1;
                 if let Err(err) = restore_symlink(&path, &entry) {
                     monitor.error(err);
-                    stats.errors += 1;
                     continue;
                 }
             }
@@ -148,7 +145,6 @@ pub fn restore(
                 monitor.error(Error::InvalidMetadata {
                     details: format!("Unknown file kind {:?}", entry.apath()),
                 });
-                stats.unknown_kind += 1;
             }
         };
         if let Some(cb) = options.change_callback.as_ref() {
@@ -156,10 +152,9 @@ pub fn restore(
             cb(&EntryChange::added(&entry))?;
         }
     }
-    stats += apply_deferrals(&deferrals, monitor.clone())?;
+    apply_deferrals(&deferrals, monitor.clone())?;
     stats.elapsed = start.elapsed();
     stats.block_cache_hits = block_dir.stats.cache_hit.load(Relaxed);
-    // TODO: Merge in stats from the tree iter and maybe the source tree?
     Ok(stats)
 }
 
@@ -185,8 +180,7 @@ struct DirDeferral {
     owner: Owner,
 }
 
-fn apply_deferrals(deferrals: &[DirDeferral], monitor: Arc<dyn Monitor>) -> Result<RestoreStats> {
-    let mut stats = RestoreStats::default();
+fn apply_deferrals(deferrals: &[DirDeferral], monitor: Arc<dyn Monitor>) -> Result<()> {
     for DirDeferral {
         path,
         unix_mode,
@@ -199,24 +193,21 @@ fn apply_deferrals(deferrals: &[DirDeferral], monitor: Arc<dyn Monitor>) -> Resu
                 path: path.clone(),
                 source,
             });
-            stats.errors += 1;
         }
         if let Err(source) = unix_mode.set_permissions(path) {
             monitor.error(Error::RestorePermissions {
                 path: path.clone(),
                 source,
             });
-            stats.errors += 1;
         }
         if let Err(source) = filetime::set_file_mtime(path, (*mtime).to_file_time()) {
             monitor.error(Error::RestoreModificationTime {
                 path: path.clone(),
                 source,
             });
-            stats.errors += 1;
         }
     }
-    Ok(stats)
+    Ok(())
 }
 
 /// Copy in the contents of a file from another tree.
@@ -270,7 +261,6 @@ fn restore_file(
             path: path.clone(),
             source,
         });
-        stats.errors += 1;
     }
 
     // Restore ownership if possible.
@@ -281,7 +271,6 @@ fn restore_file(
             path: path.clone(),
             source,
         });
-        stats.errors += 1;
     }
     // TODO: Accumulate more stats.
     trace!("Restored file");

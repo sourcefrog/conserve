@@ -139,18 +139,19 @@ fn restore_old_archive() {
         println!("restore {} to {:?}", ver, dest.path());
 
         let archive = open_old_archive(ver, "minimal");
+        let monitor = CollectMonitor::arc();
         let restore_stats = restore(
             &archive,
             dest.path(),
             &RestoreOptions::default(),
-            CollectMonitor::arc(),
+            monitor.clone(),
         )
         .expect("restore");
 
         assert_eq!(restore_stats.files, 2);
         assert_eq!(restore_stats.symlinks, 0);
         assert_eq!(restore_stats.directories, 2);
-        assert_eq!(restore_stats.errors, 0);
+        monitor.assert_no_errors();
 
         dest.child("hello").assert("hello world\n");
         dest.child("subdir").assert(predicate::path::is_dir());
