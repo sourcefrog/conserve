@@ -16,7 +16,7 @@
 use std::fs::{remove_file, OpenOptions};
 use std::path::{Path, PathBuf};
 
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use conserve::transport::open_local_transport;
 use conserve::{Archive, BandId, BlockHash};
 use itertools::Itertools;
@@ -85,7 +85,7 @@ impl DamageLocation {
                         .expect("open archive");
                 let block_dir = archive.block_dir();
                 let block_hash = block_dir
-                    .blocks(CollectMonitor::arc())
+                    .blocks(TestMonitor::arc())
                     .expect("list blocks")
                     .collect::<Vec<BlockHash>>()
                     .into_iter()

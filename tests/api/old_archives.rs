@@ -21,7 +21,8 @@ use std::sync::Arc;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use conserve::monitor::collect::CollectMonitor;
+use conserve::counters::Counter;
+use conserve::monitor::test::TestMonitor;
 use predicates::prelude::*;
 use pretty_assertions::assert_eq;
 
@@ -81,7 +82,7 @@ fn validate_archive() {
         let archive = open_old_archive(ver, "minimal");
 
         archive
-            .validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))
+            .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
             .expect("validate archive");
         assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     }
@@ -99,16 +100,18 @@ fn long_listing_old_archive() {
         let mut stdout = Vec::<u8>::new();
 
         // show archive contents
+        let monitor = TestMonitor::arc();
         show::show_entry_names(
             archive
                 .open_stored_tree(BandSelectionPolicy::Latest)
                 .unwrap()
-                .iter_entries(Apath::root(), Exclude::nothing())
+                .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
                 .unwrap(),
             &mut stdout,
             true,
         )
         .unwrap();
+        monitor.assert_no_errors();
 
         if first_with_perms.matches(&semver::Version::parse(ver).unwrap()) {
             assert_eq!(
@@ -139,18 +142,19 @@ fn restore_old_archive() {
         println!("restore {} to {:?}", ver, dest.path());
 
         let archive = open_old_archive(ver, "minimal");
-        let restore_stats = restore(
+        let monitor = TestMonitor::arc();
+        restore(
             &archive,
             dest.path(),
             &RestoreOptions::default(),
-            CollectMonitor::arc(),
+            monitor.clone(),
         )
         .expect("restore");
 
-        assert_eq!(restore_stats.files, 2);
-        assert_eq!(restore_stats.symlinks, 0);
-        assert_eq!(restore_stats.directories, 2);
-        assert_eq!(restore_stats.errors, 0);
+        monitor.assert_counter(Counter::Symlinks, 0);
+        monitor.assert_counter(Counter::Files, 2);
+        monitor.assert_counter(Counter::Dirs, 2);
+        monitor.assert_no_errors();
 
         dest.child("hello").assert("hello world\n");
         dest.child("subdir").assert(predicate::path::is_dir());
@@ -196,7 +200,7 @@ fn restore_modify_backup() {
             &archive,
             working_tree.path(),
             &RestoreOptions::default(),
-            CollectMonitor::arc(),
+            TestMonitor::arc(),
         )
         .expect("restore");
 
@@ -228,7 +232,7 @@ fn restore_modify_backup() {
                 })),
                 ..Default::default()
             },
-            CollectMonitor::arc(),
+            TestMonitor::arc(),
         )
         .expect("Backup modified tree");
 

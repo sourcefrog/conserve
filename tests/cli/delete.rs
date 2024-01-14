@@ -16,7 +16,7 @@
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use predicates::prelude::*;
 
 use conserve::test_fixtures::ScratchArchive;
@@ -40,10 +40,7 @@ fn delete_both_bands() {
 
     assert_eq!(af.list_band_ids().unwrap().len(), 0);
     assert_eq!(
-        af.block_dir()
-            .blocks(CollectMonitor::arc())
-            .unwrap()
-            .count(),
+        af.block_dir().blocks(TestMonitor::arc()).unwrap().count(),
         0
     );
 }
@@ -64,10 +61,7 @@ fn delete_first_version() {
     // b0 contains two small files packed into the same block, which is not deleted.
     // b1 (not deleted) adds one additional block, which is still referenced.
     assert_eq!(
-        af.block_dir()
-            .blocks(CollectMonitor::arc())
-            .unwrap()
-            .count(),
+        af.block_dir().blocks(TestMonitor::arc()).unwrap().count(),
         2
     );
 
@@ -106,10 +100,7 @@ fn delete_second_version() {
     assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[0])]);
     // b0 contains two small files packed into the same block.
     assert_eq!(
-        af.block_dir()
-            .blocks(CollectMonitor::arc())
-            .unwrap()
-            .count(),
+        af.block_dir().blocks(TestMonitor::arc()).unwrap().count(),
         1
     );
 

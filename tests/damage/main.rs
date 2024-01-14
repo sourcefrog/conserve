@@ -23,7 +23,8 @@ use rstest::rstest;
 use tracing_test::traced_test;
 // use predicates::prelude::*;
 
-use conserve::monitor::collect::CollectMonitor;
+use conserve::counters::Counter;
+use conserve::monitor::test::TestMonitor;
 use conserve::{
     backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait,
     Exclude, RestoreOptions, ValidateOptions,
@@ -85,7 +86,7 @@ fn backup_after_damage(
         &archive,
         source_dir.path(),
         &backup_options,
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("initial backup");
 
@@ -103,7 +104,7 @@ fn backup_after_damage(
         &archive,
         source_dir.path(),
         &backup_options,
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("write second backup after damage");
     dbg!(&backup_stats);
@@ -139,21 +140,23 @@ fn backup_after_damage(
     }
 
     // Can restore the second backup
-    let restore_dir = TempDir::new().unwrap();
-    let restore_stats = restore(
-        &archive,
-        restore_dir.path(),
-        &RestoreOptions::default(),
-        CollectMonitor::arc(),
-    )
-    .expect("restore second backup");
-    dbg!(&restore_stats);
-    assert_eq!(restore_stats.files, 1);
-    assert_eq!(restore_stats.errors, 0);
+    {
+        let restore_dir = TempDir::new().unwrap();
+        let monitor = TestMonitor::arc();
+        restore(
+            &archive,
+            restore_dir.path(),
+            &RestoreOptions::default(),
+            monitor.clone(),
+        )
+        .expect("restore second backup");
+        monitor.assert_counter(Counter::Files, 1);
+        monitor.assert_no_errors();
 
-    // Since the second backup rewrote the single file in the backup (and the root dir),
-    // we should get all the content back out.
-    assert_paths!(source_dir.path(), restore_dir.path());
+        // Since the second backup rewrote the single file in the backup (and the root dir),
+        // we should get all the content back out.
+        assert_paths!(source_dir.path(), restore_dir.path());
+    }
 
     // You can see both versions.
     let versions = archive.list_band_ids().expect("list versions");
@@ -165,6 +168,7 @@ fn backup_after_damage(
             BandSelectionPolicy::Latest,
             Apath::root(),
             Exclude::nothing(),
+            TestMonitor::arc(),
         )
         .expect("iter entries")
         .map(|e| e.apath().to_string())
@@ -179,6 +183,6 @@ fn backup_after_damage(
     // Validation completes although with warnings.
     // TODO: This should return problems that we can inspect.
     archive
-        .validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))
+        .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
         .expect("validate");
 }

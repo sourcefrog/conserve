@@ -15,7 +15,7 @@
 use filetime::{set_file_mtime, FileTime};
 use itertools::Itertools;
 
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 use conserve::*;
 
@@ -24,13 +24,7 @@ fn create_tree() -> (ScratchArchive, TreeFixture) {
     let a = ScratchArchive::new();
     let tf = TreeFixture::new();
     tf.create_file_with_contents("thing", b"contents of thing");
-    let stats = backup(
-        &a,
-        tf.path(),
-        &BackupOptions::default(),
-        CollectMonitor::arc(),
-    )
-    .unwrap();
+    let stats = backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc()).unwrap();
     assert_eq!(stats.new_files, 1);
     (a, tf)
 }
@@ -45,7 +39,10 @@ fn diff_unchanged() {
         include_unchanged: true,
         ..DiffOptions::default()
     };
-    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options).unwrap().collect();
+    let monitor = TestMonitor::arc();
+    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options, monitor.clone())
+        .unwrap()
+        .collect();
     dbg!(&changes);
     assert_eq!(changes.len(), 2); // Root directory and the file "/thing".
     assert_eq!(changes[0].apath, "/");
@@ -60,7 +57,9 @@ fn diff_unchanged() {
         include_unchanged: false,
         ..DiffOptions::default()
     };
-    let changes = diff(&st, &tf.live_tree(), &options).unwrap().collect_vec();
+    let changes = diff(&st, &tf.live_tree(), &options, TestMonitor::arc())
+        .unwrap()
+        .collect_vec();
     println!("changes with include_unchanged=false:\n{changes:#?}");
     assert_eq!(changes.len(), 0);
 }
@@ -80,7 +79,9 @@ fn mtime_only_change_reported_as_changed() {
         include_unchanged: false,
         ..DiffOptions::default()
     };
-    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options).unwrap().collect();
+    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options, TestMonitor::arc())
+        .unwrap()
+        .collect();
     dbg!(&changes);
     assert_eq!(changes.len(), 1);
     assert_eq!(changes[0].apath, "/thing");
@@ -111,7 +112,9 @@ fn chgrp_reported_as_changed() {
         include_unchanged: false,
         ..DiffOptions::default()
     };
-    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options).unwrap().collect();
+    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options, TestMonitor::arc())
+        .unwrap()
+        .collect();
     dbg!(&changes);
     assert_eq!(changes.len(), 1);
     assert_eq!(changes[0].apath, "/thing");
@@ -128,13 +131,7 @@ fn symlink_target_change_reported_as_changed() {
     let a = ScratchArchive::new();
     let tf = TreeFixture::new();
     tf.create_symlink("link", "target");
-    backup(
-        &a,
-        tf.path(),
-        &BackupOptions::default(),
-        CollectMonitor::arc(),
-    )
-    .unwrap();
+    backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc()).unwrap();
 
     let link_path = tf.path().join("link");
     remove_file(&link_path).unwrap();
@@ -149,7 +146,9 @@ fn symlink_target_change_reported_as_changed() {
         include_unchanged: false,
         ..DiffOptions::default()
     };
-    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options).unwrap().collect();
+    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options, TestMonitor::arc())
+        .unwrap()
+        .collect();
     dbg!(&changes);
     assert_eq!(changes.len(), 1);
     assert_eq!(changes[0].apath, "/link");

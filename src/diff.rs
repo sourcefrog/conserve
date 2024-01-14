@@ -15,8 +15,11 @@
 //!
 //! See also [conserve::show_diff] to format the diff as text.
 
+use std::sync::Arc;
+
 use readahead_iterator::IntoReadahead;
 
+use crate::monitor::Monitor;
 use crate::*;
 
 #[derive(Debug)]
@@ -41,14 +44,15 @@ pub fn diff(
     st: &StoredTree,
     lt: &LiveTree,
     options: &DiffOptions,
+    monitor: Arc<dyn Monitor>,
 ) -> Result<impl Iterator<Item = EntryChange>> {
     let readahead = 1000;
     let include_unchanged: bool = options.include_unchanged; // Copy out to avoid lifetime problems in the callback
     let ait = st
-        .iter_entries(Apath::root(), options.exclude.clone())?
+        .iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?
         .readahead(readahead);
     let bit = lt
-        .iter_entries(Apath::root(), options.exclude.clone())?
+        .iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?
         .filter(|le| le.kind() != Kind::Unknown)
         .readahead(readahead);
     Ok(MergeTrees::new(ait, bit)

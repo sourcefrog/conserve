@@ -13,7 +13,7 @@
 //! Tests for storing file ownership/user/group.
 
 use conserve::backup::{backup, BackupOptions};
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use conserve::{restore, Archive, RestoreOptions};
 
 use crate::copy_testdata_archive;
@@ -31,7 +31,7 @@ fn adding_owners_to_old_archive_does_not_rewrite_blocks() {
     let archive_temp = copy_testdata_archive("minimal", "0.6.0");
     let restore_temp = tempfile::tempdir().expect("create temp dir");
     let archive = Archive::open_path(archive_temp.path()).expect("open archive");
-    let restore_monitor = CollectMonitor::arc();
+    let restore_monitor = TestMonitor::arc();
     restore(
         &archive,
         restore_temp.path(),
@@ -41,7 +41,7 @@ fn adding_owners_to_old_archive_does_not_rewrite_blocks() {
     .expect("restore");
 
     // Now backup again without making any changes.
-    let backup_monitor = CollectMonitor::arc();
+    let backup_monitor = TestMonitor::arc();
     let stats = backup(
         &archive,
         restore_temp.path(),

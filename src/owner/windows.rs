@@ -15,6 +15,7 @@
 //! Windows null implementation of file ownership.
 
 use std::fs::Metadata;
+use std::io;
 use std::path::Path;
 
 use super::Owner;
@@ -30,6 +31,6 @@ impl From<&Metadata> for Owner {
     }
 }
 
-pub fn set_owner(_owner: &Owner, _path: &Path) -> Result<()> {
+pub fn set_owner(_owner: &Owner, _path: &Path) -> io::Result<()> {
     Ok(())
 }

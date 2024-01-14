@@ -31,7 +31,7 @@ use bytes::Bytes;
 use lru::LruCache;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 use tracing::{instrument, trace};
 
 use crate::backup::BackupStats;
@@ -193,9 +193,10 @@ impl BlockDir {
         let end = start + len;
         let actual_len = bytes.len();
         if end > actual_len {
-            return Err(Error::AddressTooLong {
-                address: address.to_owned(),
+            return Err(Error::BlockTooShort {
+                hash: address.hash.clone(),
                 actual_len,
+                referenced_len: len,
             });
         }
         Ok(bytes.slice(start..end))
@@ -219,7 +220,6 @@ impl BlockDir {
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
         if actual_hash != *hash {
-            error!(%hash, %actual_hash, %block_relpath, "Block file has wrong hash");
             return Err(Error::BlockCorrupt { hash: hash.clone() });
         }
         self.cache
@@ -283,14 +283,16 @@ impl BlockDir {
                 task.increment(1);
                 r
             })
-            .filter_map(|iter_or| {
-                if let Err(ref err) = iter_or {
-                    error!(%err, "Error listing block subdirectory");
+            .filter_map(move |iter_or| match iter_or {
+                Err(source) => {
+                    monitor.error(Error::ListBlocks { source });
+                    None
                 }
-                iter_or.ok()
+                Ok(ListDir { files, .. }) => Some(files),
             })
-            .flat_map(|ListDir { files, .. }| files)
+            .flatten()
             .filter_map(|name| // drop any invalid names, including temp files
+                // TODO: Report errors on bad names?
                 name.parse().ok()))
     }
 
@@ -319,7 +321,7 @@ impl BlockDir {
                         Some((hash, bytes.len()))
                     }
                     Err(err) => {
-                        error!(%err, %hash, "Error reading block content");
+                        monitor.error(err);
                         None
                     }
                 },
@@ -343,7 +345,7 @@ mod test {
 
     use tempfile::TempDir;
 
-    use crate::monitor::collect::CollectMonitor;
+    use crate::monitor::test::TestMonitor;
     use crate::transport::open_local_transport;
 
     use super::*;
@@ -356,7 +358,7 @@ mod test {
         let tempdir = TempDir::new().unwrap();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let hash = blockdir
             .store_or_deduplicate(Bytes::from("stuff"), &mut stats, monitor.clone())
             .unwrap();
@@ -369,7 +371,7 @@ mod test {
 
         // Open again to get a fresh cache
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -385,7 +387,7 @@ mod test {
     fn temp_files_are_not_returned_as_blocks() {
         let tempdir = TempDir::new().unwrap();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let subdir = tempdir.path().join(subdir_relpath("123"));
         create_dir(&subdir).unwrap();
         write(
@@ -407,16 +409,16 @@ mod test {
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let hash = blockdir
-            .store_or_deduplicate(content.clone(), &mut stats, CollectMonitor::arc())
+            .store_or_deduplicate(content.clone(), &mut stats, TestMonitor::arc())
             .unwrap();
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
 
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1);
 
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
         assert_eq!(content, retrieved);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 1);
@@ -436,13 +438,13 @@ mod test {
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let hash = blockdir
             .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
             .unwrap();
 
         // reopen
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
         assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);

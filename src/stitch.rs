@@ -28,9 +28,12 @@
 //!   seen.
 //! * Bands might be deleted, so their numbers are not contiguous.
 
-use tracing::{error, trace};
+use std::sync::Arc;
+
+use tracing::trace;
 
 use crate::index::{IndexEntryIter, IndexHunkIter};
+use crate::monitor::Monitor;
 use crate::*;
 
 pub struct IterStitchedIndexHunks {
@@ -40,6 +43,8 @@ pub struct IterStitchedIndexHunks {
     archive: Archive,
 
     state: State,
+
+    monitor: Arc<dyn Monitor>,
 }
 
 /// What state is a stitch iter in, and what should happen next?
@@ -70,19 +75,25 @@ impl IterStitchedIndexHunks {
     /// the same point in the previous band, continuing backwards recursively
     /// until either there are no more previous indexes, or a complete index
     /// is found.
-    pub(crate) fn new(archive: &Archive, band_id: BandId) -> IterStitchedIndexHunks {
+    pub(crate) fn new(
+        archive: &Archive,
+        band_id: BandId,
+        monitor: Arc<dyn Monitor>,
+    ) -> IterStitchedIndexHunks {
         IterStitchedIndexHunks {
             archive: archive.clone(),
             last_apath: None,
             state: State::BeforeBand(band_id),
+            monitor,
         }
     }
 
-    pub(crate) fn empty(archive: &Archive) -> IterStitchedIndexHunks {
+    pub(crate) fn empty(archive: &Archive, monitor: Arc<dyn Monitor>) -> IterStitchedIndexHunks {
         IterStitchedIndexHunks {
             archive: archive.clone(),
             last_apath: None,
             state: State::Done,
+            monitor,
         }
     }
 
@@ -132,7 +143,7 @@ impl Iterator for IterStitchedIndexHunks {
                             }
                         }
                         Err(err) => {
-                            error!(?band_id, ?err, "Failed to open next band");
+                            self.monitor.error(err);
                             State::AfterBand(*band_id)
                         }
                     }
@@ -179,7 +190,7 @@ fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<Band
 mod test {
     use super::*;
     use crate::counters::Counter;
-    use crate::monitor::collect::CollectMonitor;
+    use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
@@ -196,7 +207,7 @@ mod test {
     }
 
     fn simple_ls(archive: &Archive, band_id: BandId) -> String {
-        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, band_id)
+        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, band_id, TestMonitor::arc())
             .flatten()
             .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
             .collect();
@@ -222,7 +233,7 @@ mod test {
         //   1 was deleted in b2, 2 is carried over from b2,
         //   and 3 is carried over from b1.
 
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id(), BandId::zero());
         let mut ib = band.index_builder();
@@ -239,7 +250,7 @@ mod test {
             "2 hunks were finished"
         );
 
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0001");
         let mut ib = band.index_builder();
@@ -254,7 +265,7 @@ mod test {
         band.close(2)?;
 
         // b2
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0002");
         let mut ib = band.index_builder();
@@ -275,7 +286,7 @@ mod test {
         assert_eq!(band.id().to_string(), "b0004");
 
         // b5
-        let monitor = CollectMonitor::arc();
+        let monitor = TestMonitor::arc();
         let band = Band::create(&af)?;
         assert_eq!(band.id().to_string(), "b0005");
         let mut ib = band.index_builder();
@@ -321,7 +332,7 @@ mod test {
             &af,
             tf.path(),
             &BackupOptions::default(),
-            CollectMonitor::arc(),
+            TestMonitor::arc(),
         )
         .expect("backup should work");
 
@@ -330,10 +341,12 @@ mod test {
 
         let band_id = band_ids.first().expect("expected at least one band");
 
-        let mut iter = IterStitchedIndexHunks::new(&af, *band_id);
+        let monitor = TestMonitor::arc();
+        let mut iter = IterStitchedIndexHunks::new(&af, *band_id, monitor.clone());
         // Get the first and only index entry.
         // `index_hunks` and `band_id` should be `Some`.
         assert!(iter.next().is_some());
+        monitor.assert_no_errors();
 
         // Remove the band head. This band can not be opened anymore.
         // If accessed this should fail the test.
@@ -344,5 +357,11 @@ mod test {
         for _ in 0..10 {
             assert!(iter.next().is_none());
         }
+
+        // It's not an error (at the moment) because a band with no head effectively doesn't exist.
+        // (Maybe later the presence of a band directory with no head file should raise a warning.)
+        let errors = monitor.take_errors();
+        dbg!(&errors);
+        assert_eq!(errors.len(), 0);
     }
 }

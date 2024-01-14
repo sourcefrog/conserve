@@ -22,7 +22,6 @@ use std::time::Instant;
 
 use clap::{Parser, Subcommand};
 use conserve::change::Change;
-use conserve::trace_counter::{global_error_count, global_warn_count};
 use rayon::prelude::ParallelIterator;
 use time::UtcOffset;
 #[allow(unused_imports)]
@@ -395,7 +394,7 @@ impl Command {
                     include_unchanged: *include_unchanged,
                 };
                 let mut bw = BufWriter::new(stdout);
-                for change in diff(&st, &lt, &options)? {
+                for change in diff(&st, &lt, &options, monitor.clone())? {
                     if *json {
                         serde_json::to_writer(&mut bw, &change)?;
                     } else {
@@ -439,14 +438,15 @@ impl Command {
                         // TODO: Option for subtree.
                         Box::new(
                             stored_tree_from_opt(archive, &stos.backup)?
-                                .iter_entries(Apath::root(), exclude)?
+                                .iter_entries(Apath::root(), exclude, monitor.clone())?
                                 .map(|it| it.into()),
                         )
                     } else {
-                        Box::new(
-                            LiveTree::open(stos.source.clone().unwrap())?
-                                .iter_entries(Apath::root(), exclude)?,
-                        )
+                        Box::new(LiveTree::open(stos.source.clone().unwrap())?.iter_entries(
+                            Apath::root(),
+                            exclude,
+                            monitor.clone(),
+                        )?)
                     };
                 monitor.clear_progress_bars();
                 if *json {
@@ -467,11 +467,12 @@ impl Command {
                 exclude,
                 exclude_from,
                 only_subtree,
-                no_stats,
                 long_listing,
+                no_stats,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
                 let archive = Archive::open(open_transport(archive)?)?;
+                let _ = no_stats; // accepted but ignored; we never currently print stats
                 let options = RestoreOptions {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     only_subtree: only_subtree.clone(),
@@ -483,11 +484,8 @@ impl Command {
                         &changes_json.as_deref(),
                     )?,
                 };
-                let stats = restore(&archive, destination, &options, monitor)?;
+                restore(&archive, destination, &options, monitor)?;
                 debug!("Restore complete");
-                if !no_stats {
-                    debug!(%stats);
-                }
             }
             Command::Size {
                 stos,
@@ -516,8 +514,8 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                Archive::open(open_transport(archive)?)?.validate(&options, monitor)?;
-                if global_error_count() != 0 || global_warn_count() != 0 {
+                Archive::open(open_transport(archive)?)?.validate(&options, monitor.clone())?;
+                if monitor.error_count() != 0 {
                     warn!("Archive has some problems.");
                 } else {
                     info!("Archive is OK.");
@@ -638,18 +636,12 @@ fn main() -> Result<ExitCode> {
             monitor.counters(),
         )?;
     }
-    let error_count = global_error_count();
-    let warn_count = global_warn_count();
     match result {
         Err(err) => {
             error!("{err:#}");
-            debug!(error_count, warn_count);
             Ok(ExitCode::Failure)
         }
-        Ok(ExitCode::Success) if error_count != 0 || warn_count != 0 => {
-            debug!(error_count, warn_count);
-            Ok(ExitCode::NonFatalErrors)
-        }
+        Ok(ExitCode::Success) if monitor.error_count() != 0 => Ok(ExitCode::NonFatalErrors),
         Ok(exit_code) => Ok(exit_code),
     }
 }

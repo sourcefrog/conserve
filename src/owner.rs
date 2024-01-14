@@ -18,6 +18,7 @@
 //! be restored on a different system.
 
 use std::fmt::Display;
+use std::io;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -44,7 +45,7 @@ impl Owner {
         self.user.is_none() && self.group.is_none()
     }
 
-    pub fn set_owner<P: AsRef<Path>>(&self, path: P) -> crate::Result<()> {
+    pub fn set_owner<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
         set_owner(self, path.as_ref())
     }
 }

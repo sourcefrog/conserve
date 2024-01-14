@@ -22,7 +22,7 @@ use std::time::Instant;
 use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 use crate::blockhash::BlockHash;
 use crate::jsonio::{read_json, write_json};
@@ -127,9 +127,10 @@ impl Archive {
         band_selection: BandSelectionPolicy,
         subtree: Apath,
         exclude: Exclude,
+        monitor: Arc<dyn Monitor>,
     ) -> Result<impl Iterator<Item = IndexEntry>> {
         self.open_stored_tree(band_selection)?
-            .iter_entries(subtree, exclude)
+            .iter_entries(subtree, exclude, monitor)
     }
 
     /// Returns a vector of band ids, in sorted order from first to last.
@@ -311,7 +312,7 @@ impl Archive {
     /// tracing messages. This function only returns an error if validation
     /// stops due to a fatal error.
     pub fn validate(&self, options: &ValidateOptions, monitor: Arc<dyn Monitor>) -> Result<()> {
-        self.validate_archive_dir()?;
+        self.validate_archive_dir(monitor.clone())?;
 
         debug!("List bands...");
         let band_ids = self.list_band_ids()?;
@@ -328,9 +329,9 @@ impl Archive {
             // TODO: Check for unexpected files or directories in the blockdir.
             let present_blocks: HashSet<BlockHash> =
                 self.block_dir.blocks(monitor.clone())?.collect();
-            for block_hash in referenced_lens.keys() {
-                if !present_blocks.contains(block_hash) {
-                    error!(%block_hash, "Referenced block missing");
+            for hash in referenced_lens.keys() {
+                if !present_blocks.contains(hash) {
+                    monitor.error(Error::BlockMissing { hash: hash.clone() })
                 }
             }
         } else {
@@ -339,25 +340,24 @@ impl Archive {
             let block_lengths: HashMap<BlockHash, usize> =
                 self.block_dir.validate(monitor.clone())?;
             // 3b. Check that all referenced ranges are inside the present data.
-            for (block_hash, referenced_len) in referenced_lens {
-                if let Some(&actual_len) = block_lengths.get(&block_hash) {
+            for (hash, referenced_len) in referenced_lens {
+                if let Some(&actual_len) = block_lengths.get(&hash) {
                     if referenced_len > actual_len as u64 {
-                        error!(
-                            %block_hash,
-                            referenced_len,
+                        monitor.error(Error::BlockTooShort {
+                            hash: hash.clone(),
                             actual_len,
-                            "Block is shorter than referenced length"
-                        );
+                            referenced_len: referenced_len as usize,
+                        });
                     }
                 } else {
-                    error!(%block_hash, "Referenced block missing");
+                    monitor.error(Error::BlockMissing { hash: hash.clone() })
                 }
             }
         }
         Ok(())
     }
 
-    fn validate_archive_dir(&self) -> Result<()> {
+    fn validate_archive_dir(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
@@ -366,7 +366,9 @@ impl Archive {
             if let Ok(band_id) = dir_name.parse::<BandId>() {
                 if !seen_bands.insert(band_id) {
                     // TODO: Test this
-                    error!(%band_id, "Duplicated band directory");
+                    monitor.error(Error::InvalidMetadata {
+                        details: format!("Duplicated band directory for {band_id:?}"),
+                    });
                 }
             } else if !dir_name.eq_ignore_ascii_case(BLOCK_DIR) {
                 // TODO: The whole path not just the filename

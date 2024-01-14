@@ -12,7 +12,7 @@
 
 //! Test garbage collection.
 
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 use conserve::*;
 use rayon::prelude::ParallelIterator;
@@ -32,13 +32,13 @@ fn unreferenced_blocks() {
         &archive,
         tf.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("backup");
 
     // Delete the band and index
     std::fs::remove_dir_all(archive.path().join("b0000")).unwrap();
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
 
     let unreferenced: Vec<BlockHash> = archive
         .unreferenced_blocks(monitor.clone())
@@ -115,7 +115,7 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
     let lock1 = GarbageCollectionLock::new(&archive)?;
 
     // Backup should fail while gc lock is held.
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     let backup_result = backup(
         &archive,
         tf.path(),
