@@ -5,6 +5,13 @@ on:
     branches:
       - main
   pull_request:
+    paths:
+      - Cargo.*
+      - .cargo/**
+      - .github/workflows/rust.yml
+      - src/**
+      - tests/**
+      - testdata/**
 
 # see https://matklad.github.io/2021/09/04/fast-rust-builds.html
 env:
