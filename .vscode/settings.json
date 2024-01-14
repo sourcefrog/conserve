@@ -1,6 +1,0 @@
-{
-  "markdownlint.config": {
-    "MD024": false // Allow multiple headers with the same content; exists in NEWS historically
-  },
-  "rust-analyzer.linkedProjects": ["./Cargo.toml"]
-}

@@ -10,4 +10,4 @@ perf.old
 mutants.out
 mutants.out.old
 .cargo/config.toml
-.vscode/launch.json*
+.vscode/
