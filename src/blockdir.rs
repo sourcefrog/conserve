@@ -90,7 +90,7 @@ pub fn block_relpath(hash: &BlockHash) -> String {
 impl BlockDir {
     pub fn open(transport: Arc<dyn Transport>) -> BlockDir {
         /// Cache this many blocks in memory.
-        // TODO: Change to a cache that tracks the size of strored blocks?
+        // TODO: Change to a cache that tracks the size of stored blocks?
         // As a safe conservative value, 100 blocks of 20MB each would be 2GB.
         const BLOCK_CACHE_SIZE: usize = 100;
 
