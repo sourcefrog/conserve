@@ -123,10 +123,11 @@ mod tests {
 
     #[test]
     fn simple_globs() {
-        let vec = vec!["fo*", "foo", "bar*"];
+        let vec = vec!["foo*", "quo", "bar*"];
         let exclude = Exclude::from_strings(vec).unwrap();
 
         // Matches in the root
+        assert!(exclude.matches("/quo"));
         assert!(exclude.matches("/foo"));
         assert!(exclude.matches("/foobar"));
         assert!(exclude.matches("/barBaz"));
@@ -151,17 +152,19 @@ mod tests {
 
     #[test]
     fn path_parse() {
-        let exclude = Exclude::from_strings(["fo*/bar/baz*"]).unwrap();
-        assert!(exclude.matches("/foo/bar/baz.rs"))
+        let exclude = Exclude::from_strings(["foo*/bar/baz*"]).unwrap();
+        assert!(exclude.matches("/foo1/bar/baz.rs"))
     }
 
     #[test]
     fn extended_pattern_parse() {
-        // Note that these are globs, not regexps, so "fo?" means "fo" followed by one character.
-        let exclude = Exclude::from_strings(["fo?", "ba[abc]", "[!a-z]"]).unwrap();
-        assert!(exclude.matches("/foo"));
-        assert!(!exclude.matches("/fo"));
-        assert!(exclude.matches("/baa"));
+        // Note that these are globs, not regexps, so "foo?" means "foo" followed by one character.
+        let exclude = Exclude::from_strings(["foo?", "bar[abc]", "[!a-z]"]).unwrap();
+        assert!(exclude.matches("/foox"));
+        assert!(!exclude.matches("/foo"));
+        assert!(!exclude.matches("/bar"));
+        assert!(exclude.matches("/bara"));
+        assert!(exclude.matches("/barb"));
         assert!(exclude.matches("/1"));
         assert!(!exclude.matches("/a"));
     }

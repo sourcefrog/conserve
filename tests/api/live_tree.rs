@@ -74,7 +74,7 @@ fn exclude_entries_directory() {
     tf.create_file("baz/bas");
     tf.create_file("baz/test");
 
-    let exclude = Exclude::from_strings(["/**/fooo*", "/**/ba[pqr]", "/**/*bas"]).unwrap();
+    let exclude = Exclude::from_strings(["/**/fooo*", "/**/??[rs]", "/**/*bas"]).unwrap();
 
     let lt = LiveTree::open(tf.path()).unwrap();
     let names = entry_iter_to_apath_strings(
