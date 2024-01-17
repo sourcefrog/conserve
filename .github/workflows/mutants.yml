@@ -30,8 +30,7 @@ jobs:
           rustc --version
       - name: Test
         run: >
-          cargo test --all-features --features fail/failpoints --
-          --include-ignored
+          cargo test --features fail/failpoints -- --include-ignored
 
   cargo-mutants:
     runs-on: ubuntu-latest
