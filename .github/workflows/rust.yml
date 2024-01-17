@@ -81,45 +81,10 @@ jobs:
       - name: clippy
         run: cargo clippy --all-targets -- --deny clippy::all
 
-  cargo-mutants:
-    runs-on: ubuntu-latest
-    # Don't run expensive mutant tests until we know the build is clean, and recently
-    # touched code is clean.
-    needs: [pr-mutants]
-    # Don't run expensive mutant tests until we know the build is clean.
-    strategy:
-      # We want to see all the missed mutants so don't fail fast.
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2, 3]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - uses: taiki-e/install-action@v2
-        name: Install cargo-mutants using install-action
-        with:
-          tool: cargo-mutants
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          components: rustfmt
-      - name: Run mutant tests
-        # Can't use --all-features here because BLAKE2 SIMD needs unstable...
-        # Don't use the S3 features because they require AWS credentials for realistic
-        # testing.
-        run: >
-          cargo mutants --no-shuffle -vV --cargo-arg --no-default-features
-          --shard ${{ matrix.shard }}/4 -- --features fail/failpoints
-      - name: Archive results
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: mutation-report
-          path: mutants.out
-
   pr-mutants:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    needs: [tests]
     steps:
       - uses: actions/checkout@v3
         with:

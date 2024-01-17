@@ -1,0 +1,69 @@
+name: Mutants
+
+on:
+  workflow_dispatch: # i.e. manually
+
+# see https://matklad.github.io/2021/09/04/fast-rust-builds.html
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CI: 1
+  RUST_BACKTRACE: short
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.version }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.features }}
+      - name: Show version
+        run: |
+          rustup show
+          cargo --version
+          rustc --version
+      - name: Test
+        run: >
+          cargo test --all-features --features fail/failpoints --
+          --include-ignored
+
+  cargo-mutants:
+    runs-on: ubuntu-latest
+    needs: [tests]
+    strategy:
+      # We want to see all the missed mutants so don't fail fast.
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: taiki-e/install-action@v2
+        name: Install cargo-mutants using install-action
+        with:
+          tool: cargo-mutants
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Run mutant tests
+        # Can't use --all-features here because BLAKE2 SIMD needs unstable...
+        # Don't use the S3 features because they require AWS credentials for realistic
+        # testing.
+        run: >
+          cargo mutants --no-shuffle -vV --cargo-arg --no-default-features
+          --shard ${{ matrix.shard }}/4 -- --features fail/failpoints
+      - name: Archive results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: mutation-report
+          path: mutants.out
