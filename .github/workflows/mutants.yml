@@ -53,7 +53,6 @@ jobs:
           toolchain: stable
       - uses: swatinem/rust-cache@v2
       - name: Run mutant tests
-        # Can't use --all-features here because BLAKE2 SIMD needs unstable...
         # Don't use the S3 features because they require AWS credentials for realistic
         # testing.
         run: >
