@@ -77,9 +77,22 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@v2
       - name: clippy
         run: cargo clippy --all-targets -- --deny clippy::all
+
+  # Not all features can be run: s3 integration tests require credentials.
+  # But all of them should compile.
+  check-all-features:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: swatinem/rust-cache@v2
+      - name: clippy
+        run: cargo clippy --all-targets --all-features -- --deny clippy::all
 
   pr-mutants:
     runs-on: ubuntu-latest
