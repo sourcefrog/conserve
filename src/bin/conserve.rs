@@ -20,6 +20,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
+use clap::builder::{styling, Styles};
 use clap::{Parser, Subcommand};
 use conserve::change::Change;
 use rayon::prelude::ParallelIterator;
@@ -37,8 +38,17 @@ use conserve::*;
 /// looking at the environment once multiple threads are running.
 static LOCAL_OFFSET: RwLock<UtcOffset> = RwLock::new(UtcOffset::UTC);
 
+#[mutants::skip] // only visual effects, not worth testing
+fn clap_styles() -> Styles {
+    styling::Styles::styled()
+        .header(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+        .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+        .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
+        .placeholder(styling::AnsiColor::Cyan.on_default())
+}
+
 #[derive(Debug, Parser)]
-#[command(author, about, version)]
+#[command(author, about, version, styles(clap_styles()))]
 struct Args {
     #[command(subcommand)]
     command: Command,
@@ -113,8 +123,11 @@ enum Command {
 
     /// Compare a stored tree to a source directory.
     Diff {
+        /// Path or URL of an existing archive.
         archive: String,
+        /// Source directory to compare to.
         source: PathBuf,
+        /// Select the version from the archive to compare: by default, the latest.
         #[arg(long, short)]
         backup: Option<BandId>,
         #[arg(long, short)]
