@@ -94,7 +94,8 @@ tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 [features]
 # default = ["s3"]
-blake2_simd_asm = ["blake2-rfc/simd_asm"]
+# blake2-rfc/simd_asm needs nightly, so it's no longer a feature here so that --all-features works on stable.
+# blake2_simd_asm = ["blake2-rfc/simd_asm"]
 s3 = [
     "dep:aws-config",
     "dep:aws-sdk-s3",
