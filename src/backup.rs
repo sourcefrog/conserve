@@ -46,13 +46,16 @@ pub struct BackupOptions<'cb> {
 
     pub max_entries_per_hunk: usize,
 
-    // Call this callback as each entry is successfully stored.
+    /// Call this callback as each entry is successfully stored.
     pub change_callback: Option<ChangeCallback<'cb>>,
 
     pub max_block_size: usize,
 
     /// Combine files smaller than this into a single block.
     pub small_file_cap: u64,
+
+    /// Record the user/group owners on Unix.
+    pub owner: bool,
 }
 
 impl Default for BackupOptions<'_> {
@@ -63,6 +66,7 @@ impl Default for BackupOptions<'_> {
             change_callback: None,
             max_block_size: 20 << 20,
             small_file_cap: 1 << 20,
+            owner: true,
         }
     }
 }
@@ -98,7 +102,10 @@ pub fn backup(
     let entry_iter =
         source_tree.iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
-        for entry in entry_group {
+        for mut entry in entry_group {
+            if !options.owner {
+                entry.owner.clear();
+            }
             match writer.copy_entry(&entry, &source_tree, options, monitor.clone()) {
                 Err(err) => {
                     monitor.error(err);

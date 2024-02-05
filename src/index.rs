@@ -154,6 +154,8 @@ impl EntryTrait for IndexEntry {
 
 impl IndexEntry {
     /// Copy the metadata, but not the body content, from another entry.
+    ///
+    /// The result has no blocks.
     pub(crate) fn metadata_from(source: &EntryValue) -> IndexEntry {
         let mtime = source.mtime();
         assert_eq!(
