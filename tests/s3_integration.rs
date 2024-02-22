@@ -74,7 +74,11 @@ impl TempBucket {
 
     async fn setup_bucket(bucket_name: &str, client: &aws_sdk_s3::Client) {
         println!("make a bucket");
-        let region = client.config().region().unwrap().as_ref();
+        let region = client
+            .config()
+            .region()
+            .expect("AWS config from environment specifies a region")
+            .as_ref();
         dbg!(&region);
 
         client
