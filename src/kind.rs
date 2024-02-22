@@ -14,7 +14,6 @@
 //! An entry representing a file, directory, etc, in either a
 //! stored tree or local tree.
 
-use std::convert::From;
 use std::fmt::Debug;
 use std::fs::FileType;
 

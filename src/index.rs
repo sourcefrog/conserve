@@ -25,14 +25,10 @@ use tracing::{debug, debug_span, error};
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
-use crate::entry::{EntryValue, KindMeta};
-use crate::kind::Kind;
+use crate::entry::KindMeta;
 use crate::monitor::Monitor;
-use crate::owner::Owner;
 use crate::stats::IndexReadStats;
 use crate::transport::local::LocalTransport;
-use crate::transport::Transport;
-use crate::unix_mode::UnixMode;
 use crate::unix_time::FromUnixAndNanos;
 use crate::*;
 
@@ -524,7 +520,6 @@ mod tests {
 
     use crate::monitor::test::TestMonitor;
 
-    use super::transport::local::LocalTransport;
     use super::*;
 
     fn setup() -> (TempDir, IndexWriter) {

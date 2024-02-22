@@ -22,7 +22,6 @@ use std::path::{Path, PathBuf};
 
 use tempfile::TempDir;
 
-use crate::backup::BackupOptions;
 use crate::monitor::test::TestMonitor;
 use crate::*;
 

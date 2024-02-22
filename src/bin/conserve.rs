@@ -28,10 +28,7 @@ use time::UtcOffset;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
 
-use conserve::backup::BackupOptions;
 use conserve::termui::{enable_tracing, TermUiMonitor, TraceTimeStyle};
-use conserve::ReadTree;
-use conserve::RestoreOptions;
 use conserve::*;
 
 /// Local timezone offset, calculated once at startup, to avoid issues about

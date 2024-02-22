@@ -20,7 +20,6 @@
 
 use std::sync::Arc;
 
-use crate::blockdir::BlockDir;
 use crate::monitor::Monitor;
 use crate::stitch::IterStitchedIndexHunks;
 use crate::*;

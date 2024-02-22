@@ -13,7 +13,6 @@
 use conserve::monitor::test::TestMonitor;
 use pretty_assertions::assert_eq;
 
-use conserve::entry::EntryValue;
 use conserve::test_fixtures::{entry_iter_to_apath_strings, TreeFixture};
 use conserve::*;
 

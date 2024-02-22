@@ -14,7 +14,6 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
-use std::convert::TryInto;
 use std::fmt;
 use std::io::prelude::*;
 use std::mem::take;
@@ -31,12 +30,10 @@ use tracing::{trace, warn};
 use crate::blockdir::Address;
 use crate::change::Change;
 use crate::counters::Counter;
-use crate::entry::EntryValue;
 use crate::io::read_with_retries;
 use crate::monitor::Monitor;
 use crate::stats::{write_compressed_size, write_count, write_duration, write_size};
 use crate::stitch::IterStitchedIndexHunks;
-use crate::tree::ReadTree;
 use crate::*;
 
 /// Configuration of how to make a backup.

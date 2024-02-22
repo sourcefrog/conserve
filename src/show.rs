@@ -17,7 +17,6 @@
 //! file (typically stdout).
 
 use std::borrow::Cow;
-use std::convert::TryInto;
 use std::io::{BufWriter, Write};
 use std::sync::Arc;
 

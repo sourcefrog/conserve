@@ -24,11 +24,9 @@ use filetime::set_symlink_file_times;
 use time::OffsetDateTime;
 use tracing::{instrument, trace, warn};
 
-use crate::band::BandSelectionPolicy;
 use crate::counters::Counter;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::monitor::Monitor;
-use crate::unix_mode::UnixMode;
 use crate::unix_time::ToFileTime;
 use crate::*;
 

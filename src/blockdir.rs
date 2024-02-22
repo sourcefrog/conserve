@@ -22,7 +22,6 @@
 //! The structure is: archive > blockdir > subdir > file.
 
 use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, RwLock};
@@ -34,12 +33,10 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use tracing::{instrument, trace};
 
-use crate::backup::BackupStats;
-use crate::blockhash::BlockHash;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
 use crate::monitor::Monitor;
-use crate::transport::{ListDir, Transport};
+use crate::transport::ListDir;
 use crate::*;
 
 // const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;

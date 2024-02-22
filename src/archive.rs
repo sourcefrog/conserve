@@ -24,11 +24,9 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
-use crate::blockhash::BlockHash;
 use crate::jsonio::{read_json, write_json};
 use crate::monitor::Monitor;
 use crate::transport::local::LocalTransport;
-use crate::transport::Transport;
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";

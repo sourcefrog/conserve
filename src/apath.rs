@@ -18,7 +18,7 @@
 //!
 //! Apaths in memory are simply strings.
 
-use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
+use std::cmp::{Ordering, PartialEq};
 use std::ffi::OsStr;
 use std::fmt;
 use std::fmt::{Display, Formatter};

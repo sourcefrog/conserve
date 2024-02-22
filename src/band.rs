@@ -32,7 +32,7 @@ use tracing::{debug, warn};
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
 use crate::monitor::Monitor;
-use crate::transport::{ListDir, Transport};
+use crate::transport::ListDir;
 use crate::*;
 
 static INDEX_DIR: &str = "i";

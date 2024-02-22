@@ -22,11 +22,9 @@ use std::sync::Arc;
 
 use tracing::{error, warn};
 
-use crate::entry::{EntryValue, KindMeta};
+use crate::entry::KindMeta;
 use crate::monitor::Monitor;
-use crate::owner::Owner;
 use crate::stats::LiveTreeIterStats;
-use crate::unix_mode::UnixMode;
 use crate::*;
 
 /// A real tree on the filesystem, for use as a backup source or restore destination.
