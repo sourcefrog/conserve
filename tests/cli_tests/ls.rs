@@ -17,7 +17,7 @@ use assert_cmd::prelude::*;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 
-use super::run_conserve;
+use crate::run_conserve;
 
 #[test]
 fn ls_json() {
