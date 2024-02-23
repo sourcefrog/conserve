@@ -27,7 +27,23 @@ Beyond general Rust style, there is a [Conserve style guide](doc/style.md)
 covering items such as naming. The existing code does not all comply to it, but
 it sets a direction.
 
-## Testing
+## Running the tests
+
+`cargo test` runs all the tests that are fast and have no external dependencies.
+This is enough for normal iterative development. There are also some special tests.
+
+`cargo test -- --include-ignored` runs some property-based tests that are slower (taking about a minute).
+
+`cargo test --features fail/failpoints` runs tests that use Rust [failpoints](https://docs.rs/fail/) to exercise error handling.
+
+`cargo test --features s3-integration-tests` runs tests that create real AWS S3 buckets and objects. These tests are slow and require AWS credentials to be set up. The buckets should be automatically cleaned up after the tests, but be aware that they are real resources and may incur (small) costs. I'd recommend you run this with credentials for an account that doesn't contain any important data, just in case.
+
+## Adding new tests
+
+It's important that Conserve is well tested. However, adding tests can sometimes
+be harder than writing the code itself, especially for complex or subtle tests
+or if you're new to the codebase. So feel free to ask for help or to put up a PR
+that is not yet well tested.
 
 Code can be tested in any of five different places:
 
