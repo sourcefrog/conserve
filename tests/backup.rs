@@ -16,16 +16,14 @@ use std::sync::Arc;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use conserve::counters::Counter;
-use conserve::monitor::test::TestMonitor;
 use filetime::{set_file_mtime, FileTime};
 use rayon::prelude::ParallelIterator;
-
-use conserve::kind::Kind;
-use conserve::test_fixtures::ScratchArchive;
-use conserve::test_fixtures::TreeFixture;
-use conserve::*;
 use tracing_test::traced_test;
+
+use conserve::counters::Counter;
+use conserve::monitor::test::TestMonitor;
+use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::*;
 
 const HELLO_HASH: &str =
     "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
