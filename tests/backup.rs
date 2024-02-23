@@ -21,6 +21,7 @@ use conserve::monitor::test::TestMonitor;
 use filetime::{set_file_mtime, FileTime};
 use rayon::prelude::ParallelIterator;
 
+use conserve::kind::Kind;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;

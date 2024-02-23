@@ -30,7 +30,8 @@ use conserve::*;
 use time::OffsetDateTime;
 use tracing_test::traced_test;
 
-use crate::{copy_testdata_archive, testdata_archive_path};
+mod util;
+use util::{copy_testdata_archive, testdata_archive_path};
 
 const MINIMAL_ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.10", "0.6.2", "0.6.3", "0.6.9", "0.6.17"];
 
