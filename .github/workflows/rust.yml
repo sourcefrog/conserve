@@ -36,7 +36,7 @@ jobs:
         version: [stable, nightly, "1.73"]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.version }}
@@ -61,7 +61,7 @@ jobs:
   rustfmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -70,10 +70,23 @@ jobs:
       - name: rustfmt check
         run: cargo fmt --all -- --check
 
+  # S3 integration tests can't run from CI because they need credentials, but we
+  # can at least make sure that they compile.
+  build-large-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: swatinem/rust-cache@v2
+      - name: cargo build
+        run: cargo build --all-targets --features s3,s3-integration-test
+
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -99,7 +112,7 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: [tests]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Relative diff
