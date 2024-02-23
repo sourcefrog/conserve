@@ -12,7 +12,7 @@ use serde_json::json;
 use serde_json::{Deserializer, Value};
 use tracing::Level;
 
-use super::run_conserve;
+use crate::run_conserve;
 
 fn read_log_json(path: &Path) -> Vec<serde_json::Value> {
     let json_content = std::fs::read_to_string(path).unwrap();
