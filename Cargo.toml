@@ -63,7 +63,7 @@ indoc = "2.0"
 
 [target.'cfg(unix)'.dependencies]
 uzers = "0.11"
-nix = { version = "0.27", features = ["fs", "user"] }
+nix = { version = "0.28", features = ["fs", "user"] }
 
 [dependencies.clap]
 version = "4.3"
