@@ -33,7 +33,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         features: ["", "s3"]
-        version: [stable, nightly, "1.73"]
+        version: [stable, nightly, "1.74"]
 
     steps:
       - uses: actions/checkout@v4
