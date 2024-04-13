@@ -21,23 +21,22 @@ exclude_re = [
 # I test for mutants on Unix so skip Windows code.
 examine_globs = [
     "src/apath.rs",
-#     # "src/backup.rs",
-#     # "src/bandid.rs",
-#     "src/blockdir.rs",
-#     "src/blockhash.rs",
-#     "src/bin/conserve.rs",
-#     "src/change.rs",
-#     "src/counters.rs",
-#     "src/jsonio.rs",
-#     "src/restore.rs",
-#     "src/stitch.rs",
-#     # "src/transport.rs",
-#     "src/transport/local.rs",
+    "src/bandid.rs",
+    #     # "src/backup.rs",
+    #     "src/blockdir.rs",
+    #     "src/blockhash.rs",
+    #     "src/bin/conserve.rs",
+    #     "src/change.rs",
+    #     "src/counters.rs",
+    #     "src/jsonio.rs",
+    #     "src/restore.rs",
+    #     "src/stitch.rs",
+    #     # "src/transport.rs",
+    #     "src/transport/local.rs",
 ]
 
 exclude_globs = [
     "backup.rs",            # almost well tested but some gaps
-    "bandid.rs",            # almost well tested but some gaps
     "metric_recorder.rs",
     "progress.rs",
     "src/progress/term.rs",
