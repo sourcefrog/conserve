@@ -169,5 +169,5 @@ jobs:
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: mutation-report
+          name: mutants-${{ matrix.shard }}.out
           path: mutants.out
