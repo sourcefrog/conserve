@@ -89,7 +89,7 @@ pretty_assertions = "1.0"
 proptest = "1.0"
 proptest-derive = "0.4"
 rand = "0.8"
-rstest = { version = "0.18", default-features = false }
+rstest = { version = "0.19", default-features = false }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 [features]
