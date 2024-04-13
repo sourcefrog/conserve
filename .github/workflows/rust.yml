@@ -26,7 +26,27 @@ env:
 # TODO: Add -D warnings when that's clean on Windows.
 
 jobs:
+  # Run tests just on Ubuntu to establish that things basically work,
+  # before launching mutants etc
+  quick-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: swatinem/rust-cache@v2
+      - name: Show version
+        run: |
+          rustup show
+          cargo --version
+          rustc --version
+      - name: Test
+        run: >
+          cargo test --features fail/failpoints
+
   tests:
+    needs: [quick-test]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
@@ -110,7 +130,7 @@ jobs:
   pr-mutants:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
-    needs: [tests]
+    needs: [quick-test]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -140,7 +160,7 @@ jobs:
 
   cargo-mutants:
     runs-on: ubuntu-latest
-    needs: [tests]
+    needs: [quick-test]
     strategy:
       # We want to see all the missed mutants so don't fail fast.
       fail-fast: false
