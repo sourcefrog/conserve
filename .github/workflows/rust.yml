@@ -132,7 +132,7 @@ jobs:
           cargo mutants --no-shuffle -vV --in-diff git.diff -- --features
           fail/failpoints
       - name: Archive mutants.out
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: mutants-incremental.out
@@ -166,7 +166,7 @@ jobs:
             -- \
             --features fail/failpoints
       - name: Archive results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: mutants-${{ matrix.shard }}.out
