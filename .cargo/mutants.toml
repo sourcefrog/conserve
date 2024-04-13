@@ -22,14 +22,14 @@ exclude_re = [
 examine_globs = [
     "src/apath.rs",
     "src/bandid.rs",
+    "src/blockdir.rs",
     "src/blockhash.rs",
+    "src/change.rs",
+    "src/counters.rs",
     "src/jsonio.rs",
+    # "src/restore.rs", # really close but not quite covered
     #     # "src/backup.rs",
-    #     "src/blockdir.rs",
     #     "src/bin/conserve.rs",
-    #     "src/change.rs",
-    #     "src/counters.rs",
-    #     "src/restore.rs",
     #     "src/stitch.rs",
     #     # "src/transport.rs",
     #     "src/transport/local.rs",
