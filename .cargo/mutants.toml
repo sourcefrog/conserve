@@ -7,21 +7,6 @@ exclude_re = [
     "replace <impl Iterator for IterStitchedIndexHunks>::next -> Option<Self::Item> with Some\\(Default::default\\(\\)\\)",
 ]
 
-# examine_globs = [
-#     # "src/backup.rs",
-#     # "src/bandid.rs",
-#     "src/blockdir.rs",
-#     "src/blockhash.rs",
-#     "src/bin/conserve.rs",
-#     "src/change.rs",
-#     "src/counters.rs",
-#     "src/jsonio.rs",
-#     "src/restore.rs",
-#     "src/stitch.rs",
-#     # "src/transport.rs",
-#     "src/transport/local.rs",
-# ]
-
 # Include only files that are currently well-tested; most of the others should
 # be tested eventually (https://github.com/sourcefrog/conserve/issues/241.
 #
@@ -34,6 +19,22 @@ exclude_re = [
 # text format might change.
 #
 # I test for mutants on Unix so skip Windows code.
+examine_globs = [
+    "src/apath.rs",
+#     # "src/backup.rs",
+#     # "src/bandid.rs",
+#     "src/blockdir.rs",
+#     "src/blockhash.rs",
+#     "src/bin/conserve.rs",
+#     "src/change.rs",
+#     "src/counters.rs",
+#     "src/jsonio.rs",
+#     "src/restore.rs",
+#     "src/stitch.rs",
+#     # "src/transport.rs",
+#     "src/transport/local.rs",
+]
+
 exclude_globs = [
     "backup.rs",            # almost well tested but some gaps
     "bandid.rs",            # almost well tested but some gaps
