@@ -27,11 +27,11 @@ examine_globs = [
     "src/change.rs",
     "src/counters.rs",
     "src/jsonio.rs",
+    "src/stitch.rs",
     # "src/restore.rs", # really close but not quite covered
     #     # "src/backup.rs",
     #     "src/bin/conserve.rs",
-    #     "src/stitch.rs",
-    #     # "src/transport.rs",
+    "src/transport.rs",
     #     "src/transport/local.rs",
 ]
 
