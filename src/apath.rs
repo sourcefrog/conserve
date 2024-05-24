@@ -139,12 +139,6 @@ impl From<Apath> for String {
     }
 }
 
-impl<'a> From<&'a Apath> for &'a str {
-    fn from(a: &'a Apath) -> &'a str {
-        &a.0
-    }
-}
-
 impl<'a> From<&'a str> for Apath {
     fn from(s: &'a str) -> Apath {
         assert!(Apath::is_valid(s), "invalid apath: {s:?}");
@@ -315,6 +309,47 @@ mod test {
     fn parse() {
         let apath: Apath = "/something".parse().unwrap();
         assert_eq!(apath.to_string(), "/something");
+    }
+
+    #[test]
+    fn apath_eq_str() {
+        let apath: Apath = "/something".parse().unwrap();
+        assert_eq!(apath, "/something");
+        assert_ne!(apath, "/something/else");
+    }
+
+    #[test]
+    fn str_eq_apath() {
+        let apath: Apath = "/something".parse().unwrap();
+        assert_eq!("/something", apath);
+        assert_ne!("/something/else", apath);
+    }
+
+    #[test]
+    fn eq_apath() {
+        let apath: Apath = "/something".parse().unwrap();
+        assert_eq!(apath, Apath::from("/something"));
+        assert_ne!(apath, Apath::from("/something/else"));
+    }
+
+    #[test]
+    fn asref_str() {
+        let apath: Apath = "/something".parse().unwrap();
+        let s: &str = apath.as_ref();
+        assert_eq!(s, "/something");
+    }
+
+    #[test]
+    fn display_apath() {
+        let apath: Apath = "/something".parse().unwrap();
+        assert_eq!(format!("{}", apath), "/something");
+    }
+
+    #[test]
+    fn str_from_apath() {
+        let apath: Apath = "/something".parse().unwrap();
+        let s: &str = apath.as_ref();
+        assert_eq!(s, "/something");
     }
 
     #[test]
