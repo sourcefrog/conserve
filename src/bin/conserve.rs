@@ -15,7 +15,7 @@
 
 use std::cell::RefCell;
 use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Write};
+use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
@@ -188,7 +188,7 @@ enum Command {
         /// Target folder where the archive should be mounted to
         destination: PathBuf,
 
-        /// Create the target folder and remove all temporarly created
+        /// Create the target folder and remove all temporarily created
         /// files on exit
         #[arg(long, default_value_t = true)]
         cleanup: bool,
@@ -490,7 +490,33 @@ impl Command {
             } => {
                 let archive = Archive::open(open_transport(archive)?)?;
                 let options = MountOptions { clean: *cleanup };
-                mount(archive, destination, options)?;
+                let projection = match mount(archive, destination, options) {
+                    Ok(handle) => handle,
+                    Err(Error::MountDestinationExists) => {
+                        error!("The destination already exists.");
+                        error!("Please ensure, that the destination does not exists.");
+                        return Ok(ExitCode::Failure);
+                    }
+                    Err(Error::MountDestinationDoesNotExists) => {
+                        error!("The destination does not exists.");
+                        error!("Please ensure, that the destination does exist prior mounting.");
+                        return Ok(ExitCode::Failure);
+                    }
+                    Err(error) => return Err(error),
+                };
+
+                info!(
+                    "Projection started at {}.",
+                    projection.mount_root().display()
+                );
+                {
+                    info!("Press any key to stop the projection...");
+                    let mut stdin = io::stdin();
+                    let _ = stdin.read(&mut [0u8]).unwrap();
+                }
+
+                info!("Stopping projection.");
+                drop(projection);
             }
             Command::Restore {
                 archive,

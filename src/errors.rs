@@ -170,6 +170,12 @@ pub enum Error {
     #[error("This feature is not implemented")]
     NotImplemented,
 
+    #[error("The destination already exists")]
+    MountDestinationExists,
+
+    #[error("The destination does not exists")]
+    MountDestinationDoesNotExists,
+
     /// Generic IO error.
     #[error(transparent)]
     IOError {

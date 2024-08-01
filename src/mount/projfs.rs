@@ -14,7 +14,7 @@ use std::{
 use bytes::Bytes;
 use itertools::Itertools;
 use lru::LruCache;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 use windows_projfs::{
     DirectoryEntry, DirectoryInfo, FileInfo, Notification, ProjectedFileSystem,
     ProjectedFileSystemSource,
@@ -23,10 +23,10 @@ use windows_projfs::{
 use crate::{
     hunk_index::IndexHunkIndex,
     monitor::{void::VoidMonitor, Monitor},
-    Apath, Archive, BandId, BandSelectionPolicy, IndexEntry, Kind, Result, StoredTree,
+    Apath, Archive, BandId, BandSelectionPolicy, Error, IndexEntry, Kind, Result, StoredTree,
 };
 
-use super::MountOptions;
+use super::{MountHandle, MountOptions};
 
 struct StoredFileReader {
     iter: Peekable<Box<dyn Iterator<Item = Result<Bytes>>>>,
@@ -161,7 +161,7 @@ struct ArchiveProjectionSource {
     hunk_index_cache: Mutex<LruCache<BandId, Arc<IndexHunkIndex>>>,
 
     /*
-     * Cache the last accessed hunks to improve directory travesal speed.
+     * Cache the last accessed hunks to improve directory traversal speed.
      */
     #[allow(clippy::type_complexity)]
     hunk_content_cache: Mutex<LruCache<(BandId, u32), Arc<Vec<IndexEntry>>>>,
@@ -216,7 +216,7 @@ impl ArchiveProjectionSource {
             .lock()
             .unwrap()
             .try_get_or_insert(band_id, || {
-                /* Inform the user that this band has been cached as this is most likely a heavy operaton (cpu and memory wise) */
+                /* Inform the user that this band has been cached as this is most likely a heavy operation (cpu and memory wise) */
                 info!("Caching files for band {}", stored_tree.band().id());
 
                 let helper = IndexHunkIndex::from_index(&stored_tree.band().index())?;
@@ -450,7 +450,7 @@ impl ProjectedFileSystemSource for ArchiveProjectionSource {
         if notification.is_cancelable()
             && !matches!(notification, Notification::FilePreConvertToFull(_))
         {
-            /* try to cancel everything, except retriving data */
+            /* try to cancel everything, except retrieving data */
             ControlFlow::Break(())
         } else {
             ControlFlow::Continue(())
@@ -459,19 +459,51 @@ impl ProjectedFileSystemSource for ArchiveProjectionSource {
 }
 
 const ERROR_CODE_VIRTUALIZATION_TEMPORARILY_UNAVAILABLE: i32 = 369;
-pub fn mount(archive: Archive, destination: &Path, options: MountOptions) -> Result<()> {
+struct WindowsMountHandle {
+    _projection: ProjectedFileSystem,
+    path: PathBuf,
+    cleanup: bool,
+}
+
+impl Drop for WindowsMountHandle {
+    fn drop(&mut self) {
+        if self.cleanup {
+            debug!("Removing destination {}", self.path.display());
+            let mut attempt_count = 0;
+            while let Err(err) = fs::remove_dir_all(&self.path) {
+                attempt_count += 1;
+                if err.raw_os_error().unwrap_or_default()
+                    != ERROR_CODE_VIRTUALIZATION_TEMPORARILY_UNAVAILABLE
+                    || attempt_count > 5
+                {
+                    warn!("Failed to clean up projection destination: {}", err);
+                    break;
+                }
+                std::thread::sleep(Duration::from_secs(1));
+            }
+        }
+    }
+}
+
+impl MountHandle for WindowsMountHandle {
+    fn mount_root(&self) -> &Path {
+        &self.path
+    }
+}
+
+pub fn mount(
+    archive: Archive,
+    destination: &Path,
+    options: MountOptions,
+) -> Result<Box<dyn MountHandle>> {
     if options.clean {
         if destination.exists() {
-            error!("The destination already exists.");
-            error!("Please ensure, that the destination does not exists.");
-            return Ok(());
+            return Err(Error::MountDestinationExists);
         }
 
         fs::create_dir_all(destination)?;
     } else if !destination.exists() {
-        error!("The destination does not exists.");
-        error!("Please ensure, that the destination does exist prior mounting.");
-        return Ok(());
+        return Err(Error::MountDestinationDoesNotExists);
     }
 
     let source = ArchiveProjectionSource {
@@ -486,31 +518,12 @@ pub fn mount(archive: Archive, destination: &Path, options: MountOptions) -> Res
     };
 
     let projection = ProjectedFileSystem::new(destination, source)?;
-    info!("Projection started at {}.", destination.display());
-    {
-        info!("Press any key to stop the projection...");
-        let mut stdin = io::stdin();
-        let _ = stdin.read(&mut [0u8]).unwrap();
-    }
+    let handle: Box<dyn MountHandle> = Box::new(WindowsMountHandle {
+        _projection: projection,
 
-    info!("Stopping projection.");
-    drop(projection);
+        path: destination.to_owned(),
+        cleanup: options.clean,
+    });
 
-    if options.clean {
-        debug!("Removing destination {}", destination.display());
-        let mut attempt_count = 0;
-        while let Err(err) = fs::remove_dir_all(destination) {
-            attempt_count += 1;
-            if err.raw_os_error().unwrap_or_default()
-                != ERROR_CODE_VIRTUALIZATION_TEMPORARILY_UNAVAILABLE
-                || attempt_count > 5
-            {
-                warn!("Failed to clean up projection destination: {}", err);
-                break;
-            }
-            std::thread::sleep(Duration::from_secs(1));
-        }
-    }
-
-    Ok(())
+    Ok(handle)
 }

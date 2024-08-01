@@ -13,7 +13,18 @@ pub struct MountOptions {
     pub clean: bool,
 }
 
-pub fn mount(archive: Archive, destination: &Path, options: MountOptions) -> Result<()> {
+/// Handle for the mount controller.
+/// Once dropped, the projection will be stopped and if specified so by MountOptions cleaned.
+pub trait MountHandle {
+    /// Returns the root path where the archive has been mounted.
+    fn mount_root(&self) -> &Path;
+}
+
+pub fn mount(
+    archive: Archive,
+    destination: &Path,
+    options: MountOptions,
+) -> Result<Box<dyn MountHandle>> {
     #[cfg(windows)]
     return projfs::mount(archive, destination, options);
 
