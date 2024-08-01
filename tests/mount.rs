@@ -42,6 +42,7 @@ fn mount_unix_not_implemented() {
 }
 
 #[test]
+#[cfg(not(unix))]
 fn mount_empty() {
     let archive = ScratchArchive::new();
     let mountdir = TempDir::new().unwrap();
@@ -59,6 +60,7 @@ fn mount_empty() {
 }
 
 #[test]
+#[cfg(not(unix))]
 fn mount_sub_dirs() {
     let archive = ScratchArchive::new();
     {
@@ -117,6 +119,7 @@ fn mount_sub_dirs() {
 }
 
 #[test]
+#[cfg(not(unix))]
 fn mount_file_versions() {
     let archive = ScratchArchive::new();
     {
@@ -206,6 +209,7 @@ fn mount_file_versions() {
 }
 
 #[test]
+#[cfg(not(unix))]
 fn mount_cleanup() {
     let archive = ScratchArchive::new();
     {
