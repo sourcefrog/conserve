@@ -20,9 +20,6 @@ use std::fmt::Debug;
 use serde::Serialize;
 use time::OffsetDateTime;
 
-use crate::kind::Kind;
-use crate::owner::Owner;
-use crate::unix_mode::UnixMode;
 use crate::*;
 
 /// A description of an file, directory, or symlink in a tree, independent

@@ -12,7 +12,6 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::convert::TryInto;
 use std::fs::{create_dir, File};
 use std::io;
 use std::io::prelude::*;

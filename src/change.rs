@@ -29,10 +29,6 @@ pub struct EntryChange {
 }
 
 impl EntryChange {
-    pub fn is_unchanged(&self) -> bool {
-        self.change.is_unchanged()
-    }
-
     pub(crate) fn diff_metadata<AE: EntryTrait, BE: EntryTrait>(a: &AE, b: &BE) -> Self {
         debug_assert_eq!(a.apath(), b.apath());
         let ak = a.kind();
@@ -109,6 +105,10 @@ pub enum Change<E> {
 impl<E> Change<E> {
     pub fn is_unchanged(&self) -> bool {
         matches!(self, Change::Unchanged { .. })
+    }
+
+    pub fn is_changed(&self) -> bool {
+        matches!(self, Change::Changed { .. })
     }
 
     /// Return the primary metadata: the new version, unless this entry was

@@ -20,7 +20,7 @@
 
 use std::sync::Arc;
 
-use crate::blockdir::BlockDir;
+use crate::monitor::Monitor;
 use crate::stitch::IterStitchedIndexHunks;
 use crate::*;
 
@@ -60,15 +60,24 @@ impl ReadTree for StoredTree {
 
     /// Return an iter of index entries in this stored tree.
     // TODO: Should return an iter of Result<Entry> so that we can inspect them...
-    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT> {
-        Ok(IterStitchedIndexHunks::new(&self.archive, self.band.id())
-            .iter_entries(subtree, exclude))
+    fn iter_entries(
+        &self,
+        subtree: Apath,
+        exclude: Exclude,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<Self::IT> {
+        Ok(
+            IterStitchedIndexHunks::new(&self.archive, self.band.id(), monitor)
+                .iter_entries(subtree, exclude),
+        )
     }
 }
 
 #[cfg(test)]
 mod test {
     use std::path::Path;
+
+    use crate::monitor::test::TestMonitor;
 
     use super::super::test_fixtures::*;
     use super::super::*;
@@ -83,8 +92,9 @@ mod test {
 
         assert_eq!(st.band().id(), last_band_id);
 
+        let monitor = TestMonitor::arc();
         let names: Vec<String> = st
-            .iter_entries(Apath::root(), Exclude::nothing())
+            .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
             .unwrap()
             .map(|e| e.apath.into())
             .collect();
@@ -121,8 +131,9 @@ mod test {
             .open_stored_tree(BandSelectionPolicy::Latest)
             .unwrap();
 
+        let monitor = TestMonitor::arc();
         let names: Vec<String> = st
-            .iter_entries("/subdir".into(), Exclude::nothing())
+            .iter_entries("/subdir".into(), Exclude::nothing(), monitor.clone())
             .unwrap()
             .map(|entry| entry.apath.into())
             .collect();

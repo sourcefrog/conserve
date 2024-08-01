@@ -1,0 +1,4 @@
+{
+  "MD024": false, // Allow multiple headers with the same content; exists in NEWS historically
+  "MD013": false // Allow long lines
+}

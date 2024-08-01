@@ -18,6 +18,7 @@
 //! be restored on a different system.
 
 use std::fmt::Display;
+use std::io;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -34,7 +35,7 @@ use windows::set_owner;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Owner {
-    /// TODO: Maybe the strings can be 'static references to the cache?
+    // TODO: Maybe the strings can be 'static references to the cache?
     pub user: Option<String>,
     pub group: Option<String>,
 }
@@ -44,8 +45,13 @@ impl Owner {
         self.user.is_none() && self.group.is_none()
     }
 
-    pub fn set_owner<P: AsRef<Path>>(&self, path: P) -> crate::Result<()> {
+    pub fn set_owner<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
         set_owner(self, path.as_ref())
+    }
+
+    pub fn clear(&mut self) {
+        self.user = None;
+        self.group = None;
     }
 }
 

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2016-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -11,18 +11,19 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-use conserve::blockhash::BlockHash;
-use std::str::FromStr;
+//! Run conserve CLI as a subprocess and test it.
 
-#[test]
-fn to_from_string() {
-    let hex_hash = concat!(
-        "00000000000000000000000000000000",
-        "00000000000000000000000000000000",
-        "00000000000000000000000000000000",
-        "00000000000000000000000000000000",
-    );
-    let hash = BlockHash::from_str(hex_hash).unwrap();
-    let hash2 = hash;
-    assert_eq!(hash2.to_string(), hex_hash);
+mod backup;
+mod delete;
+mod diff;
+mod exclude;
+pub mod ls;
+mod trace;
+mod validate;
+mod versions;
+
+#[cfg(unix)]
+mod unix {
+    mod diff;
+    mod permissions;
 }

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
-use crate::blockdir::Address;
 use crate::*;
 
 /// Conserve specific error.
@@ -29,8 +28,21 @@ pub enum Error {
     #[error("Block file {hash:?} corrupt: does not have the expected hash")]
     BlockCorrupt { hash: BlockHash },
 
-    #[error("{address:?} extends beyond decompressed block length {actual_len:?}")]
-    AddressTooLong { address: Address, actual_len: usize },
+    #[error("Referenced block {hash} is missing")]
+    BlockMissing { hash: BlockHash },
+
+    #[error("Block {hash} is too short: actual len {actual_len}, referenced len {referenced_len}")]
+    BlockTooShort {
+        hash: BlockHash,
+        actual_len: usize,
+        referenced_len: usize,
+    },
+
+    #[error("Failed to list blocks")]
+    ListBlocks {
+        #[source]
+        source: transport::Error,
+    },
 
     #[error("Not a Conserve archive (no CONSERVE header found)")]
     NotAnArchive,
@@ -124,8 +136,27 @@ pub enum Error {
     #[error("Failed to read source tree {:?}", path)]
     ListSourceTree { path: PathBuf, source: io::Error },
 
-    #[error("Failed to restore {:?}", path)]
-    Restore { path: PathBuf, source: io::Error },
+    #[error("Failed to restore file {:?}", path)]
+    RestoreFile { path: PathBuf, source: io::Error },
+
+    #[error("Failed to restore symlink {path:?}")]
+    RestoreSymlink { path: PathBuf, source: io::Error },
+
+    #[error("Failed to read block content {hash} for {apath}")]
+    RestoreFileBlock {
+        apath: Apath,
+        hash: BlockHash,
+        source: Box<Error>,
+    },
+
+    #[error("Failed to restore directory {:?}", path)]
+    RestoreDirectory { path: PathBuf, source: io::Error },
+
+    #[error("Failed to restore ownership of {:?}", path)]
+    RestoreOwnership { path: PathBuf, source: io::Error },
+
+    #[error("Failed to restore permissions on {:?}", path)]
+    RestorePermissions { path: PathBuf, source: io::Error },
 
     #[error("Failed to restore modification time on {:?}", path)]
     RestoreModificationTime { path: PathBuf, source: io::Error },

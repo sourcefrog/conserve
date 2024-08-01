@@ -14,7 +14,6 @@
 //! Block hash address type.
 
 use std::cmp::Ordering;
-use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
@@ -215,5 +214,18 @@ mod test {
         );
         let h2 = BlockHash::from_str(&hs).unwrap();
         assert_eq!(h, h2);
+    }
+
+    #[test]
+    fn to_from_string() {
+        let hex_hash = concat!(
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000000",
+        );
+        let hash = BlockHash::from_str(hex_hash).unwrap();
+        let hash2 = hash;
+        assert_eq!(hash2.to_string(), hex_hash);
     }
 }

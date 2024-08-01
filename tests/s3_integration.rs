@@ -21,13 +21,12 @@
 
 use std::str::FromStr;
 
-use ::aws_config::AppName;
+use ::aws_config::{AppName, BehaviorVersion};
 use assert_cmd::Command;
 use aws_sdk_s3::types::{
     BucketLifecycleConfiguration, BucketLocationConstraint, CreateBucketConfiguration,
     ExpirationStatus, LifecycleExpiration, LifecycleRule, LifecycleRuleFilter,
 };
-use futures::stream::StreamExt;
 use indoc::indoc;
 use rand::Rng;
 use time::macros::format_description;
@@ -62,7 +61,11 @@ impl TempBucket {
             conserve::version()
         ))
         .unwrap();
-        let config = runtime.block_on(::aws_config::from_env().app_name(app_name).load());
+        let config = runtime.block_on(
+            ::aws_config::defaults(BehaviorVersion::latest())
+                .app_name(app_name)
+                .load(),
+        );
         let client = aws_sdk_s3::Client::new(&config);
         runtime.block_on(TempBucket::setup_bucket(&bucket_name, &client));
         TempBucket {
@@ -74,7 +77,11 @@ impl TempBucket {
 
     async fn setup_bucket(bucket_name: &str, client: &aws_sdk_s3::Client) {
         println!("make a bucket");
-        let region = client.config().region().unwrap().as_ref();
+        let region = client
+            .config()
+            .region()
+            .expect("AWS config from environment specifies a region")
+            .as_ref();
         dbg!(&region);
 
         client
@@ -101,9 +108,11 @@ impl TempBucket {
                             .filter(LifecycleRuleFilter::ObjectSizeGreaterThan(0))
                             .status(ExpirationStatus::Enabled)
                             .expiration(LifecycleExpiration::builder().days(7).build())
-                            .build(),
+                            .build()
+                            .expect("Build S3 lifecycle rule"),
                     )
-                    .build(),
+                    .build()
+                    .expect("Build S3 lifecycle configuration"),
             )
             .send()
             .await

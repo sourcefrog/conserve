@@ -1,6 +1,6 @@
 // Conserve backup system.
 // Copyright 2022 Stephanie Aelmore.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@ use lazy_static::lazy_static;
 use uzers::{Groups, Users, UsersCache};
 
 use super::Owner;
-use crate::Result;
 
 lazy_static! {
     static ref USERS_CACHE: Mutex<UsersCache> = Mutex::new(UsersCache::new());
@@ -43,7 +42,7 @@ impl From<&fs::Metadata> for Owner {
 }
 
 #[mutants::skip] // TODO: Difficult to test as non-root but we could at least test that at least groups are restored!
-pub(crate) fn set_owner(owner: &Owner, path: &Path) -> Result<()> {
+pub(crate) fn set_owner(owner: &Owner, path: &Path) -> io::Result<()> {
     let users_cache = USERS_CACHE.lock().unwrap();
     let uid_opt = owner
         .user
@@ -65,6 +64,6 @@ pub(crate) fn set_owner(owner: &Owner, path: &Path) -> Result<()> {
             // complaining
             Ok(())
         }
-        Err(err) => Err(err.into()),
+        Err(err) => Err(err),
     }
 }

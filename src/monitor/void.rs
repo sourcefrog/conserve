@@ -2,7 +2,7 @@ use crate::counters::Counter;
 
 use super::{
     task::{Task, TaskList},
-    Monitor, Problem,
+    Monitor,
 };
 
 /// A monitor that does not capture any information.
@@ -13,7 +13,7 @@ impl Monitor for VoidMonitor {
 
     fn set_counter(&self, _counter: Counter, _value: usize) {}
 
-    fn problem(&self, _problem: Problem) {}
+    fn error(&self, _error: crate::Error) {}
 
     fn start_task(&self, name: String) -> Task {
         /*

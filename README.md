@@ -141,10 +141,9 @@ To install from a git checkout, run
 
 [rust]: https://rustup.rs/
 
-On nightly Rust only, you can enable a potential speed-up to the blake2 hashes
-with
+On nightly Rust only, and only on x86_64, you can enable a slight speed-up with
 
-    cargo +nightly install -f --path . --features blake2_simd_asm
+    cargo +nightly install -f --path . --features blake2-rfc/simd_asm
 
 ### Arch Linux
 

@@ -11,7 +11,27 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+/*!
+ * Damage tests
+ *
+ * Conserve tries to still allow the archive to be read, and future backups to be written,
+ * even if some files are damaged: truncated, corrupt, missing, or unreadable.
+ *
+ * This is not yet achieved in every case, but the format and code are designed to
+ * work towards this goal.
+ *
+ * These API tests write an archive, create some damage, and then try to read other
+ * information, write future backups, and validate.
+ *
+ * These are implemented as API tests for the sake of execution speed and ease of examining the results.
+ *
+ * "Damage strategies" are a combination of a "damage action" (which could be deleting or
+ * truncating a file) and a "damage location" which selects the file to damage.
+ */
+
 use std::fs::rename;
+use std::fs::{remove_file, OpenOptions};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use assert_fs::prelude::*;
@@ -19,18 +39,18 @@ use assert_fs::TempDir;
 use dir_assert::assert_paths;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
+use rayon::prelude::ParallelIterator;
 use rstest::rstest;
 use tracing_test::traced_test;
 // use predicates::prelude::*;
 
-use conserve::monitor::collect::CollectMonitor;
+use conserve::counters::Counter;
+use conserve::monitor::test::TestMonitor;
+use conserve::transport::open_local_transport;
 use conserve::{
-    backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait,
-    Exclude, RestoreOptions, ValidateOptions,
+    backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, BlockHash,
+    EntryTrait, Exclude, RestoreOptions, ValidateOptions,
 };
-
-mod damage;
-use damage::{DamageAction, DamageLocation};
 
 // TODO: Test restore from a partially damaged backup.
 // TODO: Test that you can delete a damaged backup; then there are no problems.
@@ -85,7 +105,7 @@ fn backup_after_damage(
         &archive,
         source_dir.path(),
         &backup_options,
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("initial backup");
 
@@ -103,7 +123,7 @@ fn backup_after_damage(
         &archive,
         source_dir.path(),
         &backup_options,
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("write second backup after damage");
     dbg!(&backup_stats);
@@ -139,21 +159,23 @@ fn backup_after_damage(
     }
 
     // Can restore the second backup
-    let restore_dir = TempDir::new().unwrap();
-    let restore_stats = restore(
-        &archive,
-        restore_dir.path(),
-        &RestoreOptions::default(),
-        CollectMonitor::arc(),
-    )
-    .expect("restore second backup");
-    dbg!(&restore_stats);
-    assert_eq!(restore_stats.files, 1);
-    assert_eq!(restore_stats.errors, 0);
+    {
+        let restore_dir = TempDir::new().unwrap();
+        let monitor = TestMonitor::arc();
+        restore(
+            &archive,
+            restore_dir.path(),
+            &RestoreOptions::default(),
+            monitor.clone(),
+        )
+        .expect("restore second backup");
+        monitor.assert_counter(Counter::Files, 1);
+        monitor.assert_no_errors();
 
-    // Since the second backup rewrote the single file in the backup (and the root dir),
-    // we should get all the content back out.
-    assert_paths!(source_dir.path(), restore_dir.path());
+        // Since the second backup rewrote the single file in the backup (and the root dir),
+        // we should get all the content back out.
+        assert_paths!(source_dir.path(), restore_dir.path());
+    }
 
     // You can see both versions.
     let versions = archive.list_band_ids().expect("list versions");
@@ -165,6 +187,7 @@ fn backup_after_damage(
             BandSelectionPolicy::Latest,
             Apath::root(),
             Exclude::nothing(),
+            TestMonitor::arc(),
         )
         .expect("iter entries")
         .map(|e| e.apath().to_string())
@@ -179,6 +202,84 @@ fn backup_after_damage(
     // Validation completes although with warnings.
     // TODO: This should return problems that we can inspect.
     archive
-        .validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))
+        .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
         .expect("validate");
+}
+
+/// A way of damaging a file in an archive.
+#[derive(Debug, Clone)]
+pub enum DamageAction {
+    /// Truncate the file to zero bytes.
+    Truncate,
+
+    /// Delete the file.
+    Delete,
+    // TODO: Also test other types of damage, including
+    // permission denied (as a kind of IOError), and binary junk.
+}
+
+impl DamageAction {
+    /// Apply this damage to a file.
+    ///
+    /// The file must already exist.
+    pub fn damage(&self, path: &Path) {
+        assert!(path.exists(), "Path to be damaged does not exist: {path:?}");
+        match self {
+            DamageAction::Truncate => {
+                OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .open(path)
+                    .expect("truncate file");
+            }
+            DamageAction::Delete => {
+                remove_file(path).expect("delete file");
+            }
+        }
+    }
+}
+
+/// An abstract description of which file will be damaged.
+///
+/// Bands are identified by untyped integers for brevity in rstest names.
+#[derive(Debug, Clone)]
+pub enum DamageLocation {
+    /// Delete the head of a band.
+    BandHead(u32),
+    BandTail(u32),
+    /// Damage a block, identified by its index in the sorted list of all blocks in the archive,
+    /// to avoid needing to hardcode a hash in the test.
+    Block(usize),
+    // TODO: Also test damage to other files: index hunks, archive header, etc.
+}
+
+impl DamageLocation {
+    /// Find the specific path for this location, within an archive.
+    pub fn to_path(&self, archive_dir: &Path) -> PathBuf {
+        match self {
+            DamageLocation::BandHead(band_id) => archive_dir
+                .join(BandId::from(*band_id).to_string())
+                .join("BANDHEAD"),
+            DamageLocation::BandTail(band_id) => archive_dir
+                .join(BandId::from(*band_id).to_string())
+                .join("BANDTAIL"),
+            DamageLocation::Block(block_index) => {
+                let archive =
+                    Archive::open(open_local_transport(archive_dir).expect("open transport"))
+                        .expect("open archive");
+                let block_dir = archive.block_dir();
+                let block_hash = block_dir
+                    .blocks(TestMonitor::arc())
+                    .expect("list blocks")
+                    .collect::<Vec<BlockHash>>()
+                    .into_iter()
+                    .sorted()
+                    .nth(*block_index)
+                    .expect("Archive has an nth block");
+                archive_dir
+                    .join("d")
+                    .join(conserve::blockdir::block_relpath(&block_hash))
+            }
+        }
+    }
 }

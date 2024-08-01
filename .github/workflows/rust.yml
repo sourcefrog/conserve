@@ -5,6 +5,13 @@ on:
     branches:
       - main
   pull_request:
+    paths:
+      - Cargo.*
+      - .cargo/**
+      - .github/workflows/rust.yml
+      - src/**
+      - tests/**
+      - testdata/**
 
 # see https://matklad.github.io/2021/09/04/fast-rust-builds.html
 env:
@@ -29,7 +36,7 @@ jobs:
         version: [stable, nightly, "1.75"]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.version }}
@@ -45,20 +52,15 @@ jobs:
         run: cargo build --all-targets --no-default-features --features=${{
           matrix.features }}
       - name: Test
-        run:
-          cargo test --no-default-features --features=${{ matrix.features }} --
-          --include-ignored
-      # Clippy and rustfmt are excellent tools but are turned off here because it's too
-      # easy for PRs to fail due to irrelevant changes including Clippy flagging problems
-      # that it did not notice before.
-      # - name: clippy
-      #   run: cargo clippy --all-targets -- -d clippy::all
+        run: >
+          cargo test --no-default-features --features=${{ matrix.features }}
+          --features fail/failpoints -- --include-ignored
 
   # Run rustfmt separately so that it does not block test results
   rustfmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -67,47 +69,49 @@ jobs:
       - name: rustfmt check
         run: cargo fmt --all -- --check
 
-  cargo-mutants:
+  # S3 integration tests can't run from CI because they need credentials, but we
+  # can at least make sure that they compile.
+  build-large-tests:
     runs-on: ubuntu-latest
-    # Don't run expensive mutant tests until we know the build is clean, and recently
-    # touched code is clean.
-    needs: [pr-mutants]
-    # Don't run expensive mutant tests until we know the build is clean.
-    strategy:
-      # We want to see all the missed mutants so don't fail fast.
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2, 3]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - uses: taiki-e/install-action@v2
-        name: Install cargo-mutants using install-action
-        with:
-          tool: cargo-mutants
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          components: rustfmt
-      - name: Run mutant tests
-        # Can't use --all-features here because BLAKE2 SIMD needs unstable...
-        # Don't use the S3 features because they require AWS credentials for realistic
-        # testing.
-        run: >
-          cargo mutants --no-shuffle -vV --cargo-arg --no-default-features
-          --shard ${{ matrix.shard }}/4
-      - name: Archive results
-        uses: actions/upload-artifact@v3
-        if: always()
+      - uses: swatinem/rust-cache@v2
+      - name: cargo build
+        run: cargo build --all-targets --features s3,s3-integration-test
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          name: mutation-report
-          path: mutants.out
+          toolchain: stable
+      - uses: swatinem/rust-cache@v2
+      - name: clippy
+        run: cargo clippy --all-targets -- --deny clippy::all
+
+  # Not all features can be run: s3 integration tests require credentials.
+  # But all of them should compile.
+  check-all-features:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: swatinem/rust-cache@v2
+      - name: clippy
+        run: cargo clippy --all-targets --all-features -- --deny clippy::all
 
   pr-mutants:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    needs: [tests]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Relative diff
@@ -124,7 +128,8 @@ jobs:
           tool: cargo-mutants
       - name: Mutants in diff
         run: >
-          cargo mutants --no-shuffle -vV --in-diff git.diff
+          cargo mutants --no-shuffle -vV --in-diff git.diff -- --features
+          fail/failpoints
       - name: Archive mutants.out
         uses: actions/upload-artifact@v3
         if: always()

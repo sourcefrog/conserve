@@ -31,6 +31,7 @@ impl FromUnixAndNanos for OffsetDateTime {
     }
 }
 
+#[allow(unused)] // really unused at present, but might be useful
 pub(crate) trait ToOffsetDateTime {
     fn to_offset_date_time(&self) -> OffsetDateTime;
 }

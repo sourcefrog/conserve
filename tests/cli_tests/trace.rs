@@ -2,10 +2,12 @@
 
 //! Tests for trace-related options and behaviors of the Conserve CLI.
 
+use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
+use assert_fs::TempDir;
 use predicates::prelude::*;
 
-use super::*;
+use crate::run_conserve;
 
 #[test]
 fn no_trace_timestamps_by_default() {

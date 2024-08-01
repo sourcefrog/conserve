@@ -12,7 +12,7 @@
 
 //! Test deletion.
 
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::*;
 
@@ -25,7 +25,7 @@ fn delete_all_bands() {
         .delete_bands(
             &[BandId::new(&[0]), BandId::new(&[1])],
             &Default::default(),
-            CollectMonitor::arc(),
+            TestMonitor::arc(),
         )
         .expect("delete_bands");
 
