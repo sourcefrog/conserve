@@ -1,3 +1,8 @@
+# Check install from crates.io works, both with and without --locked.
+#
+# This is mostly to check for loose dependencies that might have broken
+# the build after it was released.
+
 on:
   push:
     paths:
