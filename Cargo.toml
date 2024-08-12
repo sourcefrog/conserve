@@ -25,7 +25,7 @@ blake2-rfc = "0.2.18"
 bytes = "1.5"
 cachedir = "0.3"
 clicolors-control = "1.0"
-crc32c = { version = "0.6.5", optional = true }
+crc32c = { version = "0.6.6", optional = true }
 derive_more = "0.99"
 fail = { version = "0.5.1" }
 filetime = "0.2"
@@ -93,7 +93,7 @@ rstest = { version = "0.19", default-features = false }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 [features]
-# default = ["s3"]
+default = ["s3"]
 # blake2-rfc/simd_asm needs nightly, so it's no longer a feature here so that --all-features works on stable.
 # blake2_simd_asm = ["blake2-rfc/simd_asm"]
 s3 = [
