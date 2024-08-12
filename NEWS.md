@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fixed: `restore --only` specifying a subdirectory no longer fails due to parent directories missing from the destination.
+
+- Fixed: More detail about the causes of errors in the log.
+
 - `restore` no longer prints stats, due to internal changes; this will be restored later.
 
 - Minimum Rust version increased to 1.74 due to updated dependencies.
