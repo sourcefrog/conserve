@@ -12,7 +12,7 @@
 
 //! Restore from the archive to the filesystem.
 
-use std::fs::{self, File};
+use std::fs::{create_dir_all, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -147,7 +147,8 @@ fn create_dir(path: &Path) -> io::Result<()> {
             "Simulated failure",
         ))
     });
-    fs::create_dir(path)
+    // Create all the parents in case we're restoring only a nested subtree.
+    create_dir_all(path)
 }
 
 /// Recorded changes to apply to directories after all their contents

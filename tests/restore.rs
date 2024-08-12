@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,6 +13,7 @@
 //! Tests focused on restore.
 
 use std::cell::RefCell;
+use std::fs::{create_dir, write};
 #[cfg(unix)]
 use std::fs::{read_link, symlink_metadata};
 use std::path::PathBuf;
@@ -88,6 +89,44 @@ fn restore_specified_band() {
     monitor.assert_no_errors();
     // Does not have the 'hello2' file added in the second version.
     monitor.assert_counter(Counter::Files, 2);
+}
+
+/// Restoring a subdirectory works, and restores the parent directories:
+///
+/// <https://github.com/sourcefrog/conserve/issues/268>
+#[test]
+fn restore_only_subdir() {
+    // We need the selected directory to be more than one level down, because the bug was that
+    // its parent was not created.
+    let backup_monitor = TestMonitor::arc();
+    let src = TempDir::new().unwrap();
+    create_dir(src.path().join("parent")).unwrap();
+    create_dir(src.path().join("parent/sub")).unwrap();
+    write(src.path().join("parent/sub/file"), b"hello").unwrap();
+    let af = ScratchArchive::new();
+    backup(
+        &af,
+        src.path(),
+        &BackupOptions::default(),
+        backup_monitor.clone(),
+    )
+    .unwrap();
+    backup_monitor.assert_counter(Counter::Files, 1);
+    backup_monitor.assert_no_errors();
+
+    let destdir = TreeFixture::new();
+    let restore_monitor = TestMonitor::arc();
+    let archive = Archive::open_path(af.path()).unwrap();
+    let options = RestoreOptions {
+        only_subtree: Some(Apath::from("/parent/sub")),
+        ..Default::default()
+    };
+    restore(&archive, destdir.path(), &options, restore_monitor.clone()).expect("restore");
+    restore_monitor.assert_no_errors();
+    assert!(destdir.path().join("parent").is_dir());
+    assert!(destdir.path().join("parent/sub/file").is_file());
+    dbg!(restore_monitor.counters());
+    restore_monitor.assert_counter(Counter::Files, 1);
 }
 
 #[test]
