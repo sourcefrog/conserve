@@ -167,6 +167,15 @@ pub enum Error {
     #[error("Unexpected file {path:?} in archive directory")]
     UnexpectedFile { path: String },
 
+    #[error("This feature is not implemented")]
+    NotImplemented,
+
+    #[error("The destination already exists")]
+    MountDestinationExists,
+
+    #[error("The destination does not exists")]
+    MountDestinationDoesNotExists,
+
     /// Generic IO error.
     #[error(transparent)]
     IOError {
@@ -188,6 +197,13 @@ pub enum Error {
     Transport {
         #[from]
         source: transport::Error,
+    },
+
+    #[cfg(windows)]
+    #[error(transparent)]
+    Projection {
+        #[from]
+        source: windows_projfs::Error,
     },
 }
 
