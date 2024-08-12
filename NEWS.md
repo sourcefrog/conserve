@@ -1,6 +1,6 @@
 # Conserve release history
 
-## Unreleased
+## 24.8.0
 
 - Fixed: `restore --only` specifying a subdirectory no longer fails due to parent directories missing from the destination.
 
