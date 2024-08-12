@@ -8,7 +8,7 @@ license = "GPL-2.0"
 name = "conserve"
 readme = "README.md"
 repository = "https://github.com/sourcefrog/conserve/"
-version = "23.11.0"
+version = "24.8.0"
 rust-version = "1.74"
 
 [[bin]]
@@ -22,7 +22,7 @@ aws-sdk-s3 = { version = "1.21", optional = true }
 aws-types = { version = "1.1", optional = true }
 base64 = { version = "0.22", optional = true }
 blake2-rfc = "0.2.18"
-bytes = "1.5"
+bytes = "1.7"
 cachedir = "0.3"
 clicolors-control = "1.0"
 crc32c = { version = "0.6.6", optional = true }
