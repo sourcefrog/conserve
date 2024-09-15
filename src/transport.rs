@@ -14,7 +14,7 @@
 //!
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
-use std::path::{absolute, Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::{error, fmt, io, result};
 
@@ -162,8 +162,6 @@ pub struct Error {
     source: Option<Box<dyn error::Error + Send + Sync>>,
     /// The affected URL, if known.
     url: Option<Url>,
-    /// The affected local path, if any.
-    path: Option<PathBuf>,
 }
 
 /// General categories of transport errors.
@@ -178,6 +176,9 @@ pub enum ErrorKind {
     #[display(fmt = "Permission denied")]
     PermissionDenied,
 
+    #[display(fmt = "Create transport error")]
+    CreateTransport,
+
     #[display(fmt = "Other transport error")]
     Other,
 }
@@ -187,31 +188,22 @@ impl Error {
         self.kind
     }
 
-    pub(self) fn io_error(path: &Path, source: io::Error) -> Error {
+    pub(self) fn io_error(url: Url, source: io::Error) -> Error {
         let kind = match source.kind() {
             io::ErrorKind::NotFound => ErrorKind::NotFound,
             io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
             io::ErrorKind::PermissionDenied => ErrorKind::PermissionDenied,
             _ => ErrorKind::Other,
         };
-        let url = absolute(path)
-            .ok()
-            .and_then(|path| Url::from_file_path(path).ok());
         Error {
             source: Some(Box::new(source)),
-            path: Some(path.to_owned()),
-            url,
+            url: Some(url),
             kind,
         }
     }
 
     pub fn is_not_found(&self) -> bool {
         self.kind == ErrorKind::NotFound
-    }
-
-    /// The local path where this error occurred, if known.
-    pub fn path(&self) -> Option<&Path> {
-        self.path.as_deref()
     }
 
     /// The URL where this error occurred, if known.
@@ -225,8 +217,6 @@ impl fmt::Display for Error {
         write!(f, "{}", self.kind)?;
         if let Some(ref url) = self.url {
             write!(f, ": {url}")?;
-        } else if let Some(ref path) = self.path {
-            write!(f, ": {}", path.to_string_lossy())?;
         }
         if let Some(source) = &self.source {
             // I'm not sure we should write this here; it might be repetitive.

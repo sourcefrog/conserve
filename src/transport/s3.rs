@@ -26,7 +26,6 @@
 
 use std::borrow::Cow;
 use std::fmt;
-use std::path::Path;
 use std::sync::Arc;
 
 use aws_config::{AppName, BehaviorVersion};
@@ -85,7 +84,11 @@ impl S3Transport {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .map_err(|err| Error::io_error(Path::new(""), err))?;
+            .map_err(|source| Error {
+                kind: ErrorKind::CreateTransport,
+                url: Some(base_url.to_owned()),
+                source: Some(Box::new(source)),
+            })?;
 
         let bucket = base_url.authority().to_owned();
         assert!(
@@ -252,7 +255,6 @@ impl Transport for S3Transport {
             .block_on(response.body.collect())
             .map_err(|source| Error {
                 kind: ErrorKind::Other,
-                path: None,
                 url: Some(self.url.join(&key).expect("join URL")),
                 source: Some(Box::new(source)),
             })?
@@ -411,7 +413,6 @@ where
     };
     Error {
         kind,
-        path: None,
         url: base.join(key.to_owned().as_ref()).ok(),
         source: Some(source.into()),
     }

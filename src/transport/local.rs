@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Martin Pool.
+// Copyright 2020-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -36,17 +36,21 @@ pub struct LocalTransport {
 
 impl LocalTransport {
     pub fn new(path: &Path) -> Self {
-        let abs_path = absolute(path).expect("absolute path");
         LocalTransport {
             root: path.to_owned(),
             // TODO: Maybe return an error on construction if we can't find the absolute path.
-            url: Url::from_directory_path(&abs_path).unwrap(),
+            url: Url::from_directory_path(absolute(path).expect("absolute path"))
+                .expect("path to URL"),
         }
     }
 
     pub fn full_path(&self, relpath: &str) -> PathBuf {
         debug_assert!(!relpath.contains("/../"), "path must not contain /../");
         self.root.join(relpath)
+    }
+
+    fn io_error(&self, relpath: &str, err: io::Error) -> Error {
+        Error::io_error(self.url.join(relpath).expect("join URL"), err)
     }
 }
 
@@ -60,7 +64,7 @@ impl Transport for LocalTransport {
         // let's pass them back as lossy UTF-8 so they can be reported at a higher level, for
         // example during validation.
         let path = self.full_path(relpath);
-        let fail = |err| Error::io_error(&path, err);
+        let fail = |err| self.io_error(relpath, err);
         let mut names = ListDir::default();
         for dir_entry in path.read_dir().map_err(fail)? {
             let dir_entry = dir_entry.map_err(fail)?;
@@ -94,8 +98,7 @@ impl Transport for LocalTransport {
             out_buf.truncate(actual_len);
             Ok(out_buf.into())
         }
-        let path = &self.full_path(relpath);
-        try_block(path).map_err(|err| Error::io_error(path, err))
+        try_block(&self.full_path(relpath)).map_err(|err| self.io_error(relpath, err))
     }
 
     fn is_file(&self, relpath: &str) -> Result<bool> {
@@ -109,7 +112,7 @@ impl Transport for LocalTransport {
             if err.kind() == io::ErrorKind::AlreadyExists {
                 Ok(())
             } else {
-                Err(super::Error::io_error(&path, err))
+                Err(self.io_error(relpath, err))
             }
         })
     }
@@ -118,7 +121,7 @@ impl Transport for LocalTransport {
     fn write_file(&self, relpath: &str, content: &[u8]) -> super::Result<()> {
         let full_path = self.full_path(relpath);
         let dir = full_path.parent().unwrap();
-        let context = |err| super::Error::io_error(&full_path, err);
+        let context = |err| self.io_error(relpath, err);
         let mut temp = tempfile::Builder::new()
             .prefix(crate::TMP_PREFIX)
             .tempfile_in(dir)
@@ -139,13 +142,12 @@ impl Transport for LocalTransport {
     }
 
     fn remove_file(&self, relpath: &str) -> super::Result<()> {
-        let path = self.full_path(relpath);
-        std::fs::remove_file(&path).map_err(|err| super::Error::io_error(&path, err))
+        std::fs::remove_file(self.full_path(relpath)).map_err(|err| self.io_error(relpath, err))
     }
 
     fn remove_dir_all(&self, relpath: &str) -> super::Result<()> {
         let path = self.full_path(relpath);
-        std::fs::remove_dir_all(&path).map_err(|err| super::Error::io_error(&path, err))
+        std::fs::remove_dir_all(&path).map_err(|err| self.io_error(relpath, err))
     }
 
     fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
@@ -161,8 +163,10 @@ impl Transport for LocalTransport {
     }
 
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
-        let path = self.root.join(relpath);
-        let fsmeta = path.metadata().map_err(|err| Error::io_error(&path, err))?;
+        let fsmeta = self
+            .full_path(relpath)
+            .metadata()
+            .map_err(|err| self.io_error(relpath, err))?;
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),
@@ -215,7 +219,15 @@ mod test {
         assert!(message.contains("Not found"));
         assert!(message.contains("nonexistent.json"));
 
-        assert!(err.path().expect("path").ends_with("nonexistent.json"));
+        assert_eq!(
+            err.url()
+                .expect("url")
+                .path_segments()
+                .expect("path")
+                .last()
+                .expect("has a path segment"),
+            "nonexistent.json"
+        );
         assert_eq!(err.kind(), transport::ErrorKind::NotFound);
         assert!(err.is_not_found());
 
