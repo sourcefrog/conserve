@@ -32,7 +32,7 @@ examine_globs = [
     #     # "src/backup.rs",
     #     "src/bin/conserve.rs",
     "src/transport.rs",
-    #     "src/transport/local.rs",
+    "src/transport/local.rs",
 ]
 
 exclude_globs = [
