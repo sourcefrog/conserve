@@ -118,6 +118,16 @@ impl Transport for LocalTransport {
     }
 
     #[instrument(skip(self, content))]
+    fn write_new_file(&self, relpath: &str, content: &[u8]) -> super::Result<()> {
+        File::options()
+            .create(true)
+            .write(true)
+            .open(&self.full_path(relpath))
+            .and_then(|mut file| file.write_all(content).and_then(|()| file.flush()))
+            .map_err(|err| self.io_error(relpath, err))
+    }
+
+    #[instrument(skip(self, content))]
     fn write_file(&self, relpath: &str, content: &[u8]) -> super::Result<()> {
         let full_path = self.full_path(relpath);
         let dir = full_path.parent().unwrap();

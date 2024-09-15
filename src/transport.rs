@@ -74,6 +74,11 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// Get the base URL for this transport.
     fn base_url(&self) -> &Url;
 
+    /// Get the URL for a file relative to this transport.
+    fn relative_file_url(&self, path: &str) -> Url {
+        self.base_url().join(path).expect("join relative file URL")
+    }
+
     /// List a directory, separating out file and subdirectory names.
     ///
     /// Names are in the arbitrary order that they're returned from the transport.
@@ -113,6 +118,9 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     /// If the file exists it is replaced. (Across transports, and particularly on S3,
     /// we can't rely on detecting existing files.)
     fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
+
+    /// Write a new file and error if the file exists.
+    fn write_new_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
 
     /// Get metadata about a file.
     fn metadata(&self, relpath: &str) -> Result<Metadata>;

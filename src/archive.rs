@@ -89,7 +89,7 @@ impl Archive {
 
     pub fn open(transport: Arc<dyn Transport>) -> Result<Archive> {
         let header: ArchiveHeader =
-            read_json(&transport, HEADER_FILENAME)?.ok_or(Error::NotAnArchive)?;
+            read_json(transport.as_ref(), HEADER_FILENAME)?.ok_or(Error::NotAnArchive)?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(Error::UnsupportedArchiveVersion {
                 version: header.conserve_archive_version,

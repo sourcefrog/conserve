@@ -56,12 +56,11 @@ where
 /// Read and deserialize uncompressed json from a file on a Transport.
 ///
 /// Returns None if the file does not exist.
-pub(crate) fn read_json<T, TR>(transport: &TR, path: &str) -> Result<Option<T>>
+pub(crate) fn read_json<T>(transport: &dyn Transport, path: &str) -> Result<Option<T>>
 where
     T: DeserializeOwned,
-    TR: AsRef<dyn Transport>,
 {
-    let bytes = match transport.as_ref().read_file(path) {
+    let bytes = match transport.read_file(path) {
         Ok(b) => b,
         Err(err) if err.is_not_found() => return Ok(None),
         Err(err) => return Err(err.into()),

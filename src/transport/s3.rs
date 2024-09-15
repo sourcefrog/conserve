@@ -290,6 +290,10 @@ impl Transport for S3Transport {
         Ok(())
     }
 
+    fn write_new_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
+        todo!()
+    }
+
     fn remove_file(&self, relpath: &str) -> Result<()> {
         let _span = trace_span!("S3Transport::remove_file", %relpath).entered();
         let key = self.join_path(relpath);

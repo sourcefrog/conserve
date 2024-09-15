@@ -180,8 +180,8 @@ impl Band {
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
         let transport = archive.transport().sub_transport(&band_id.to_string());
-        let head: Head =
-            read_json(&transport, BAND_HEAD_FILENAME)?.ok_or(Error::BandHeadMissing { band_id })?;
+        let head: Head = read_json(transport.as_ref(), BAND_HEAD_FILENAME)?
+            .ok_or(Error::BandHeadMissing { band_id })?;
         if let Some(version) = &head.band_format_version {
             if !band_version_supported(version) {
                 return Err(Error::UnsupportedBandVersion {
@@ -260,7 +260,7 @@ impl Band {
 
     /// Return info about the state of this band.
     pub fn get_info(&self) -> Result<Info> {
-        let tail_option: Option<Tail> = read_json(&self.transport, BAND_TAIL_FILENAME)?;
+        let tail_option: Option<Tail> = read_json(self.transport.as_ref(), BAND_TAIL_FILENAME)?;
         let start_time =
             OffsetDateTime::from_unix_timestamp(self.head.start_time).map_err(|_| {
                 Error::InvalidMetadata {
