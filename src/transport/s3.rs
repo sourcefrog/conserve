@@ -24,6 +24,7 @@
 //
 //    cargo mutants -f s3.rs --no-config -C --features=s3,s3-integration-test
 
+use std::borrow::Cow;
 use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
@@ -59,6 +60,8 @@ pub struct S3Transport {
 
     bucket: String,
     base_path: String,
+
+    url: Url,
 
     /// Storage class for new objects.
     storage_class: StorageClass,
@@ -118,11 +121,13 @@ impl S3Transport {
                 .trim_end_matches('/')
                 .to_owned();
         }
-        debug!(%bucket, %base_path);
+        let url = Url::parse(&format!("s3://{bucket}/{base_path}")).expect("valid s3 URL");
+        debug!(%base_url);
 
         Ok(Arc::new(S3Transport {
             bucket,
             base_path,
+            url,
             client: Arc::new(client),
             runtime: Arc::new(runtime),
             storage_class: StorageClass::IntelligentTiering,
@@ -178,6 +183,10 @@ fn join_paths(a: &str, b: &str) -> String {
 }
 
 impl Transport for S3Transport {
+    fn base_url(&self) -> &Url {
+        &self.url
+    }
+
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         let _span = trace_span!("S3Transport::list_file", %relpath).entered();
         let mut prefix = self.join_path(relpath);
@@ -359,8 +368,14 @@ impl Transport for S3Transport {
     }
 
     fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
+        let subdir = if relpath.ends_with('/') {
+            Cow::Borrowed(relpath)
+        } else {
+            Cow::Owned(format!("{relpath}/"))
+        };
         Arc::new(S3Transport {
             base_path: join_paths(&self.base_path, relpath),
+            url: self.url.join(&subdir).expect("join subdir URL"),
             bucket: self.bucket.clone(),
             runtime: self.runtime.clone(),
             client: self.client.clone(),

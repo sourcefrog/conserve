@@ -12,27 +12,35 @@
 
 //! Access to an archive on the local filesystem.
 
+use std::borrow::Cow;
 use std::fs::{create_dir, File};
 use std::io;
 use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::path::{absolute, Path, PathBuf};
 use std::sync::Arc;
 
 use bytes::Bytes;
 use tracing::{instrument, trace, warn};
+use url::Url;
 
 use super::{Error, ListDir, Metadata, Result, Transport};
 
 #[derive(Clone, Debug)]
 pub struct LocalTransport {
-    /// Root directory for this transport.
+    /// Base directory for this transport.
     root: PathBuf,
+
+    /// URL representation of the base directory.
+    url: Url,
 }
 
 impl LocalTransport {
     pub fn new(path: &Path) -> Self {
+        let abs_path = absolute(path).expect("absolute path");
         LocalTransport {
             root: path.to_owned(),
+            // TODO: Maybe return an error on construction if we can't find the absolute path.
+            url: Url::from_directory_path(&abs_path).unwrap(),
         }
     }
 
@@ -43,6 +51,10 @@ impl LocalTransport {
 }
 
 impl Transport for LocalTransport {
+    fn base_url(&self) -> &Url {
+        &self.url
+    }
+
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         // Archives should never normally contain non-UTF-8 (or even non-ASCII) filenames, but
         // let's pass them back as lossy UTF-8 so they can be reported at a higher level, for
@@ -137,8 +149,14 @@ impl Transport for LocalTransport {
     }
 
     fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
+        let subdir = if relpath.ends_with('/') {
+            Cow::Borrowed(relpath)
+        } else {
+            Cow::Owned(format!("{relpath}/"))
+        };
         Arc::new(LocalTransport {
             root: self.root.join(relpath),
+            url: self.url.join(&subdir).expect("join component to URL"),
         })
     }
 

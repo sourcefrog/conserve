@@ -71,6 +71,9 @@ pub fn open_local_transport(path: &Path) -> crate::Result<Arc<dyn Transport>> {
 /// Files in Conserve archives have bounded size and fit in memory so this does not need to
 /// support streaming or partial reads and writes.
 pub trait Transport: Send + Sync + std::fmt::Debug {
+    /// Get the base URL for this transport.
+    fn base_url(&self) -> &Url;
+
     /// List a directory, separating out file and subdirectory names.
     ///
     /// Names are in the arbitrary order that they're returned from the transport.
