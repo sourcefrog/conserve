@@ -227,7 +227,7 @@ impl Transport for S3Transport {
                         result.files.push(name.to_owned());
                     }
                 }
-                Some(Err(err)) => return Err(s3_error(prefix, err)),
+                Some(Err(err)) => return Err(s3_error(&self.url, prefix, err)),
                 None => break,
             }
         }
@@ -246,13 +246,14 @@ impl Transport for S3Transport {
         let response = self
             .runtime
             .block_on(request.send())
-            .map_err(|source| s3_error(key.clone(), source))?;
+            .map_err(|source| s3_error(&self.url, key.clone(), source))?;
         let body_bytes = self
             .runtime
             .block_on(response.body.collect())
             .map_err(|source| Error {
                 kind: ErrorKind::Other,
-                path: Some(key.clone()),
+                path: None,
+                url: Some(self.url.join(&key).expect("join URL")),
                 source: Some(Box::new(source)),
             })?
             .into_bytes();
@@ -282,7 +283,7 @@ impl Transport for S3Transport {
             .body(content.to_owned().into());
         let response = self.runtime.block_on(request.send());
         // trace!(?response);
-        response.map_err(|err| s3_error(key, err))?;
+        response.map_err(|err| s3_error(&self.url, key, err))?;
         trace!(body_len = content.len(), "wrote file");
         Ok(())
     }
@@ -293,7 +294,7 @@ impl Transport for S3Transport {
         let request = self.client.delete_object().bucket(&self.bucket).key(&key);
         let response = self.runtime.block_on(request.send());
         trace!(?response);
-        response.map_err(|err| s3_error(key, err))?;
+        response.map_err(|err| s3_error(&self.url, key, err))?;
         trace!("deleted file");
         Ok(())
     }
@@ -314,7 +315,7 @@ impl Transport for S3Transport {
         let mut n_files = 0;
         while let Some(response) = self.runtime.block_on(stream.next()) {
             for object in response
-                .map_err(|err| s3_error(prefix.clone(), err))?
+                .map_err(|err| s3_error(&self.url, prefix.clone(), err))?
                 .contents
                 .expect("ListObjectsV2Response has contents")
             {
@@ -327,7 +328,7 @@ impl Transport for S3Transport {
                             .key(&key)
                             .send(),
                     )
-                    .map_err(|err| s3_error(key, err))?;
+                    .map_err(|err| s3_error(&self.url, key, err))?;
                 n_files += 1;
             }
         }
@@ -356,7 +357,7 @@ impl Transport for S3Transport {
                 })
             }
             Err(err) => {
-                let translated = s3_error(key, err);
+                let translated = s3_error(&self.url, key, err);
                 if translated.is_not_found() {
                     trace!("file does not exist");
                 } else {
@@ -396,7 +397,7 @@ impl AsRef<dyn Transport> for S3Transport {
     }
 }
 
-fn s3_error<K, E, R>(key: K, source: SdkError<E, R>) -> Error
+fn s3_error<K, E, R>(base: &Url, key: K, source: SdkError<E, R>) -> Error
 where
     K: ToOwned<Owned = String>,
     E: std::error::Error + Send + Sync + 'static,
@@ -410,7 +411,8 @@ where
     };
     Error {
         kind,
-        path: Some(key.to_owned()),
+        path: None,
+        url: base.join(key.to_owned().as_ref()).ok(),
         source: Some(source.into()),
     }
 }

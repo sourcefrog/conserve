@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023 Martin Pool.
+// Copyright 2020-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 //!
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
-use std::path::Path;
+use std::path::{absolute, Path, PathBuf};
 use std::sync::Arc;
 use std::{error, fmt, io, result};
 
@@ -160,8 +160,10 @@ pub struct Error {
     kind: ErrorKind,
     /// The underlying error: for example an IO or S3 error.
     source: Option<Box<dyn error::Error + Send + Sync>>,
-    /// The affected path, possibly relative to the transport.
-    path: Option<String>,
+    /// The affected URL, if known.
+    url: Option<Url>,
+    /// The affected local path, if any.
+    path: Option<PathBuf>,
 }
 
 /// General categories of transport errors.
@@ -192,9 +194,13 @@ impl Error {
             io::ErrorKind::PermissionDenied => ErrorKind::PermissionDenied,
             _ => ErrorKind::Other,
         };
+        let url = absolute(path)
+            .ok()
+            .and_then(|path| Url::from_file_path(path).ok());
         Error {
             source: Some(Box::new(source)),
-            path: Some(path.to_string_lossy().to_string()),
+            path: Some(path.to_owned()),
+            url,
             kind,
         }
     }
@@ -203,17 +209,24 @@ impl Error {
         self.kind == ErrorKind::NotFound
     }
 
-    /// The transport-relative path where this error occurred, if known.
-    pub fn path(&self) -> Option<&str> {
+    /// The local path where this error occurred, if known.
+    pub fn path(&self) -> Option<&Path> {
         self.path.as_deref()
+    }
+
+    /// The URL where this error occurred, if known.
+    pub fn url(&self) -> Option<&Url> {
+        self.url.as_ref()
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind)?;
-        if let Some(ref path) = self.path {
-            write!(f, ": {}", path)?;
+        if let Some(ref url) = self.url {
+            write!(f, ": {url}")?;
+        } else if let Some(ref path) = self.path {
+            write!(f, ": {}", path.to_string_lossy())?;
         }
         if let Some(source) = &self.source {
             // I'm not sure we should write this here; it might be repetitive.
