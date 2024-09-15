@@ -13,7 +13,6 @@
 
 //! Read and write JSON files.
 
-use std::io;
 use std::path::PathBuf;
 
 use serde::de::DeserializeOwned;
@@ -22,12 +21,6 @@ use crate::transport::{self, Transport, WriteMode};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("IO error")]
-    Io {
-        #[from]
-        source: io::Error,
-    },
-
     #[error("JSON serialization error")]
     Json {
         source: serde_json::Error,

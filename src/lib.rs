@@ -32,6 +32,7 @@ pub mod index;
 mod io;
 mod jsonio;
 pub mod kind;
+pub mod lease;
 mod merge;
 pub mod misc;
 pub mod monitor;

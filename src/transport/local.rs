@@ -154,14 +154,14 @@ impl super::Protocol for Protocol {
         let path = self.full_path(relpath);
         tokio::fs::remove_file(&path)
             .await
-            .map_err(|err| super::Error::io_error(&path, err))
+            .map_err(|err| Error::io_error(&path, err))
     }
 
     async fn remove_dir_all(&self, relpath: &str) -> Result<()> {
         let path = self.full_path(relpath);
         tokio::fs::remove_dir_all(&path)
             .await
-            .map_err(|err| super::Error::io_error(&path, err))
+            .map_err(|err| Error::io_error(&path, err))
     }
 
     fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
