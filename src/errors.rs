@@ -210,7 +210,6 @@ pub enum Error {
 impl From<jsonio::Error> for Error {
     fn from(value: jsonio::Error) -> Self {
         match value {
-            jsonio::Error::Io { source } => Error::IOError { source },
             jsonio::Error::Json { source, path } => Error::DeserializeJson {
                 source,
                 path: path.to_string_lossy().into_owned(),
