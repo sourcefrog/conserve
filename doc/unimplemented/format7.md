@@ -2,7 +2,7 @@
 
 **⚠️ Unimplemented and not yet finalized.**
 
-This document describes a new archive format for Conserve.
+This document describes a new archive format for Conserve. This doc is somewhat out of date: some parts have been implemented.
 
 ## Goals
 
@@ -61,6 +61,8 @@ Index hunks will initially hold a limited number of entries, as they do in 0.6. 
 The band directory contains, as well as the head and tail, some _blocklist_ files. These are protos containing a list of hashes of index blocks. Each blocklist contains up to some limited number of blocks, say 1000.
 
 As index blocks are written, the blocklist containing them is repeatedly rewritten, so that if the backup is interrupted all the data written so far will still be retrievable. This is an exception to the general design rule that files are each only written once, but they are only rewritten within a limited time window within a single backup.
+
+The blocklist (or "meta-index?") should contain, as well as the hash of the blocks, the first and last apath used from within that block. We could allow these to identify just a subset of the block, to allow reuse of a mostly-unchanged block.
 
 (This desire to recover from interrupted backups explains why there is a simple linear list of blocks at the top of each backup, rather than a tree that rolls up to a single hash root.)
 

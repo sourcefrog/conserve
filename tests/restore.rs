@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,11 +13,13 @@
 //! Tests focused on restore.
 
 use std::cell::RefCell;
+use std::fs::{create_dir, write};
 #[cfg(unix)]
 use std::fs::{read_link, symlink_metadata};
 use std::path::PathBuf;
 
-use conserve::monitor::collect::CollectMonitor;
+use conserve::counters::Counter;
+use conserve::monitor::test::TestMonitor;
 use filetime::{set_symlink_file_times, FileTime};
 use tempfile::TempDir;
 
@@ -39,15 +41,11 @@ fn simple_restore() {
         })),
         ..Default::default()
     };
-    let stats = restore(
-        &restore_archive,
-        destdir.path(),
-        &options,
-        CollectMonitor::arc(),
-    )
-    .expect("restore");
+    let monitor = TestMonitor::arc();
+    restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
 
-    assert_eq!(stats.files, 3);
+    monitor.assert_no_errors();
+    monitor.assert_counter(Counter::Files, 3);
     let mut expected_names = vec![
         "/",
         "/hello",
@@ -86,10 +84,49 @@ fn restore_specified_band() {
         band_selection: BandSelectionPolicy::Specified(band_id),
         ..RestoreOptions::default()
     };
-    let stats =
-        restore(&archive, destdir.path(), &options, CollectMonitor::arc()).expect("restore");
+    let monitor = TestMonitor::arc();
+    restore(&archive, destdir.path(), &options, monitor.clone()).expect("restore");
+    monitor.assert_no_errors();
     // Does not have the 'hello2' file added in the second version.
-    assert_eq!(stats.files, 2);
+    monitor.assert_counter(Counter::Files, 2);
+}
+
+/// Restoring a subdirectory works, and restores the parent directories:
+///
+/// <https://github.com/sourcefrog/conserve/issues/268>
+#[test]
+fn restore_only_subdir() {
+    // We need the selected directory to be more than one level down, because the bug was that
+    // its parent was not created.
+    let backup_monitor = TestMonitor::arc();
+    let src = TempDir::new().unwrap();
+    create_dir(src.path().join("parent")).unwrap();
+    create_dir(src.path().join("parent/sub")).unwrap();
+    write(src.path().join("parent/sub/file"), b"hello").unwrap();
+    let af = ScratchArchive::new();
+    backup(
+        &af,
+        src.path(),
+        &BackupOptions::default(),
+        backup_monitor.clone(),
+    )
+    .unwrap();
+    backup_monitor.assert_counter(Counter::Files, 1);
+    backup_monitor.assert_no_errors();
+
+    let destdir = TreeFixture::new();
+    let restore_monitor = TestMonitor::arc();
+    let archive = Archive::open_path(af.path()).unwrap();
+    let options = RestoreOptions {
+        only_subtree: Some(Apath::from("/parent/sub")),
+        ..Default::default()
+    };
+    restore(&archive, destdir.path(), &options, restore_monitor.clone()).expect("restore");
+    restore_monitor.assert_no_errors();
+    assert!(destdir.path().join("parent").is_dir());
+    assert!(destdir.path().join("parent/sub/file").is_file());
+    dbg!(restore_monitor.counters());
+    restore_monitor.assert_counter(Counter::Files, 1);
 }
 
 #[test]
@@ -102,7 +139,7 @@ pub fn decline_to_overwrite() {
         ..RestoreOptions::default()
     };
     assert!(!options.overwrite, "overwrite is false by default");
-    let restore_err_str = restore(&af, destdir.path(), &options, CollectMonitor::arc())
+    let restore_err_str = restore(&af, destdir.path(), &options, TestMonitor::arc())
         .expect_err("restore should fail if the destination exists")
         .to_string();
     assert!(
@@ -123,15 +160,11 @@ pub fn forced_overwrite() {
         overwrite: true,
         ..RestoreOptions::default()
     };
-    let stats = restore(
-        &restore_archive,
-        destdir.path(),
-        &options,
-        CollectMonitor::arc(),
-    )
-    .expect("restore");
-    assert_eq!(stats.files, 3);
-    let dest = &destdir.path();
+    let monitor = TestMonitor::arc();
+    restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
+    monitor.assert_no_errors();
+    monitor.assert_counter(Counter::Files, 3);
+    let dest = destdir.path();
     assert!(dest.join("hello").is_file());
     assert!(dest.join("existing").is_file());
 }
@@ -147,25 +180,21 @@ fn exclude_files() {
         exclude: Exclude::from_strings(["/**/subfile"]).unwrap(),
         ..RestoreOptions::default()
     };
-    let stats = restore(
-        &restore_archive,
-        destdir.path(),
-        &options,
-        CollectMonitor::arc(),
-    )
-    .expect("restore");
+    let monitor = TestMonitor::arc();
+    restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
 
-    let dest = &destdir.path();
+    let dest = destdir.path();
     assert!(dest.join("hello").is_file());
     assert!(dest.join("hello2").is_file());
     assert!(dest.join("subdir").is_dir());
-    assert_eq!(stats.files, 2);
+    monitor.assert_no_errors();
+    monitor.assert_counter(Counter::Files, 2);
 }
 
 #[test]
 #[cfg(unix)]
 fn restore_symlink() {
-    use conserve::monitor::collect::CollectMonitor;
+    use conserve::monitor::test::TestMonitor;
 
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
@@ -174,20 +203,16 @@ fn restore_symlink() {
     let years_ago = FileTime::from_unix_time(189216000, 0);
     set_symlink_file_times(srcdir.path().join("symlink"), years_ago, years_ago).unwrap();
 
-    backup(
-        &af,
-        srcdir.path(),
-        &Default::default(),
-        CollectMonitor::arc(),
-    )
-    .unwrap();
+    let monitor = TestMonitor::arc();
+    backup(&af, srcdir.path(), &Default::default(), monitor.clone()).unwrap();
 
     let restore_dir = TempDir::new().unwrap();
+    let monitor = TestMonitor::arc();
     restore(
         &af,
         restore_dir.path(),
         &Default::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .unwrap();
 

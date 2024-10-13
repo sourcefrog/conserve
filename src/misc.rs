@@ -83,26 +83,6 @@ pub(crate) fn compression_ratio(s: &Sizes) -> f64 {
     }
 }
 
-/// Adds `Result::inspect_err` which is not yet stabilized.
-pub(crate) trait ResultExt {
-    type T;
-    type E;
-    fn our_inspect_err<F: FnOnce(&Self::E)>(self, f: F) -> Self;
-}
-
-impl<T, E> ResultExt for std::result::Result<T, E> {
-    type T = T;
-    type E = E;
-
-    #[inline]
-    fn our_inspect_err<F: FnOnce(&E)>(self, f: F) -> Self {
-        if let Err(ref e) = self {
-            f(e);
-        }
-        self
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

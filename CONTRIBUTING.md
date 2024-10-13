@@ -27,16 +27,35 @@ Beyond general Rust style, there is a [Conserve style guide](doc/style.md)
 covering items such as naming. The existing code does not all comply to it, but
 it sets a direction.
 
-## Testing
+## Running the tests
+
+`cargo test` runs all the tests that are fast and have no external dependencies.
+This is enough for normal iterative development. There are also some special tests.
+
+`cargo test -- --include-ignored` runs some property-based tests that are slower (taking about a minute).
+
+`cargo test --features fail/failpoints` runs tests that use Rust [failpoints](https://docs.rs/fail/) to exercise error handling.
+
+`cargo test --features s3-integration-tests` runs tests that create real AWS S3 buckets and objects. These tests are slow and require AWS credentials to be set up. The buckets should be automatically cleaned up after the tests, but be aware that they are real resources and may incur (small) costs. I'd recommend you run this with credentials for an account that doesn't contain any important data, just in case.
+
+## Adding new tests
+
+It's important that Conserve is well tested. However, adding tests can sometimes
+be harder than writing the code itself, especially for complex or subtle tests
+or if you're new to the codebase. So feel free to ask for help or to put up a PR
+that is not yet well tested.
+
+It's also important that the tests are very deterministic and hermetic.
 
 Code can be tested in any of five different places:
 
-- Public API tests, in `tests/api`. All core features should be exercised here,
-  although some edge cases that can't be reached through the public API could be
-  left for unit tests.
+- API tests, as "unit tests" within the implementation modules. Focus tests on
+  using the public API to test the implementation, although it's OK to call
+  private functions if that's the most practical way to test something important.
 
 - Black-box tests that run the Conserve CLI as a binary, in `tests/cli`. All the
-  main uses of the CLI should be exercised here.
+  main uses of the CLI should be exercised here. However, running the binary is
+  somewhat slower than calling functions directly.
 
 - Time-consuming tests, using proptest, in `tests/expensive`. These are
   `#[ignore]` at the test level, and only run by
@@ -46,10 +65,7 @@ Code can be tested in any of five different places:
   small examples. These are somewhat slow to build so are used only in cases
   where an example is especially helpful in describing the API.
 
-- Individual functions, as unit tests within the implementation module. Prefer
-  this for things that are important to test, but not exposed or not easily
-  testable through the public API. Most things should be tested through the
-  public API and not inside the implementation.
+- API integration tests for things that don't fit well in a single module.
 
 If it's hard to work out how to test your change please feel free to put up a
 draft PR with no tests and just ask.

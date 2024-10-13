@@ -7,22 +7,9 @@ exclude_re = [
     "replace <impl Iterator for IterStitchedIndexHunks>::next -> Option<Self::Item> with Some\\(Default::default\\(\\)\\)",
 ]
 
-# Include only files that are currently well-tested.
-examine_globs = [
-    "src/backup.rs",
-    "src/bandid.rs",
-    "src/blockdir.rs",
-    "src/blockhash.rs",
-    "src/bin/conserve.rs",
-    "src/change.rs",
-    "src/counters.rs",
-    "src/jsonio.rs",
-    "src/restore.rs",
-    "src/stitch.rs",
-    "src/transport.rs",
-    "src/transport/local.rs",
-]
-
+# Include only files that are currently well-tested; most of the others should
+# be tested eventually (https://github.com/sourcefrog/conserve/issues/241.
+#
 # Skip S3 which is hard to test hermetically without AWS creds.
 #
 # Skip console and progress code which seems like a low priority
@@ -32,12 +19,30 @@ examine_globs = [
 # text format might change.
 #
 # I test for mutants on Unix so skip Windows code.
-# exclude_globs = [
-#     "metric_recorder.rs",
-#     "progress.rs",
-#     "src/progress/term.rs",
-#     "src/transport/s3.rs",
-#     "src/ui/termui.rs",
-#     "src/owner/windows.rs",
-#     "stats.rs",
-# ]
+examine_globs = [
+    "src/apath.rs",
+    "src/bandid.rs",
+    "src/blockdir.rs",
+    "src/blockhash.rs",
+    "src/change.rs",
+    "src/counters.rs",
+    "src/jsonio.rs",
+    "src/stitch.rs",
+    # "src/restore.rs", # really close but not quite covered
+    #     # "src/backup.rs",
+    #     "src/bin/conserve.rs",
+    "src/transport.rs",
+    #     "src/transport/local.rs",
+]
+
+exclude_globs = [
+    "backup.rs",            # almost well tested but some gaps
+    "metric_recorder.rs",
+    "progress.rs",
+    "src/progress/term.rs",
+    "src/transport.rs",     # almost well tested but some gaps
+    "src/transport/s3.rs",
+    "src/ui/termui.rs",
+    "src/owner/windows.rs",
+    "stats.rs",
+]

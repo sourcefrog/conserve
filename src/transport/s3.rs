@@ -1,4 +1,4 @@
-// Copyright 2023 Martin Pool.
+// Copyright 2023-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
 
-use aws_config::AppName;
+use aws_config::{AppName, BehaviorVersion};
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
 use aws_sdk_s3::operation::get_object::GetObjectError;
@@ -41,7 +41,6 @@ use aws_types::region::Region;
 use aws_types::SdkConfig;
 use base64::Engine;
 use bytes::Bytes;
-use futures::stream::StreamExt;
 use tokio::runtime::Runtime;
 use tracing::{debug, trace, trace_span};
 use url::Url;
@@ -75,6 +74,8 @@ impl fmt::Debug for S3Transport {
     }
 }
 
+// Clippy false positive here: https://github.com/rust-lang/rust-clippy/issues/12444
+#[allow(clippy::assigning_clones)]
 impl S3Transport {
     pub fn new(base_url: &Url) -> Result<Arc<Self>> {
         // Like in <https://tokio.rs/tokio/topics/bridging>.
@@ -132,7 +133,7 @@ impl S3Transport {
 fn load_aws_config(runtime: &Runtime, region: Option<String>) -> SdkConfig {
     // Use us-east-1 at least for looking up the bucket's region, if
     // none is known yet.
-    let loader = aws_config::from_env()
+    let loader = aws_config::defaults(BehaviorVersion::latest())
         .app_name(AppName::new(format!("conserve-{}", crate::version())).unwrap())
         .region(Region::new(
             region.unwrap_or_else(|| "us-east-1".to_owned()),
@@ -333,8 +334,10 @@ impl Transport for S3Transport {
         // trace!(?response);
         match response {
             Ok(response) => {
+                // TODO: Soft errors on unexpected API responses
                 let len = response
                     .content_length
+                    .expect("S3 HeadObject response should have a content_length")
                     .try_into()
                     .expect("Content length non-negative");
                 trace!(?len, "File exists");

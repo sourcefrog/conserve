@@ -29,7 +29,12 @@ pub trait ReadTree {
     /// Errors reading individual paths or directories are sent to the UI and
     /// counted, but are not treated as fatal, and don't appear as Results in the
     /// iterator.
-    fn iter_entries(&self, subtree: Apath, exclude: Exclude) -> Result<Self::IT>;
+    fn iter_entries(
+        &self,
+        subtree: Apath,
+        exclude: Exclude,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<Self::IT>;
 
     /// Measure the tree size.
     ///
@@ -37,7 +42,7 @@ pub trait ReadTree {
     fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
         let mut file_bytes = 0u64;
         let task = monitor.start_task("Measure tree".to_string());
-        for e in self.iter_entries(Apath::root(), exclude)? {
+        for e in self.iter_entries(Apath::root(), exclude, monitor.clone())? {
             // While just measuring size, ignore directories/files we can't stat.
             if let Some(bytes) = e.size() {
                 monitor.count(Counter::Files, 1);

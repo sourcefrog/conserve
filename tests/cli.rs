@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2016-2023 Martin Pool.
+// Copyright 2016-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,6 +12,8 @@
 // GNU General Public License for more details.
 
 //! Run conserve CLI as a subprocess and test it.
+
+mod cli_tests;
 
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -27,21 +29,6 @@ use serde_json::Deserializer;
 use url::Url;
 
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
-
-mod backup;
-mod delete;
-mod diff;
-mod exclude;
-mod ls;
-mod trace;
-mod validate;
-mod versions;
-
-#[cfg(unix)]
-mod unix {
-    mod diff;
-    mod permissions;
-}
 
 fn run_conserve() -> Command {
     let mut command = Command::cargo_bin("conserve").expect("locate conserve binary");

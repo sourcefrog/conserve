@@ -57,7 +57,6 @@ pub fn enable_tracing(
             let file_writer = OpenOptions::new()
                 .create(true)
                 .append(true)
-                .write(true)
                 .read(false)
                 .open(json_path)
                 .expect("open json log file");
@@ -74,7 +73,6 @@ pub fn enable_tracing(
         }
         Registry::default()
             .with(console_layer)
-            .with(crate::trace_counter::CounterLayer())
             .with(json_layer)
             .init();
         flush_guard

@@ -16,16 +16,14 @@ use std::sync::Arc;
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use conserve::counters::Counter;
-use conserve::monitor::collect::CollectMonitor;
 use filetime::{set_file_mtime, FileTime};
 use rayon::prelude::ParallelIterator;
-
-use conserve::kind::Kind;
-use conserve::test_fixtures::ScratchArchive;
-use conserve::test_fixtures::TreeFixture;
-use conserve::*;
 use tracing_test::traced_test;
+
+use conserve::counters::Counter;
+use conserve::monitor::test::TestMonitor;
+use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::*;
 
 const HELLO_HASH: &str =
     "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
@@ -37,7 +35,7 @@ pub fn simple_backup() {
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
 
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     let backup_stats = backup(
         &af,
         srcdir.path(),
@@ -59,7 +57,7 @@ pub fn simple_backup() {
     assert!(archive.band_exists(BandId::zero()).unwrap());
     assert!(archive.band_is_closed(BandId::zero()).unwrap());
     assert!(!archive.band_exists(BandId::new(&[1])).unwrap());
-    let copy_stats = restore(
+    restore(
         &archive,
         restore_dir.path(),
         &RestoreOptions::default(),
@@ -67,7 +65,7 @@ pub fn simple_backup() {
     )
     .expect("restore");
 
-    assert_eq!(copy_stats.uncompressed_file_bytes, 8);
+    monitor.assert_counter(Counter::FileBytes, 8);
 }
 
 #[test]
@@ -85,7 +83,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
         exclude,
         ..BackupOptions::default()
     };
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     let stats = backup(&af, srcdir.path(), &options, monitor.clone()).expect("backup");
 
     check_backup(&af);
@@ -109,20 +107,20 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     assert!(band_info.is_closed);
     assert!(band_info.end_time.is_some());
 
-    let copy_stats = restore(
+    let monitor = TestMonitor::arc();
+    restore(
         &archive,
         restore_dir.path(),
         &RestoreOptions::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .expect("restore");
-
-    assert_eq!(copy_stats.uncompressed_file_bytes, 8);
+    monitor.assert_counter(Counter::FileBytes, 8);
     // TODO: Read back contents of that file.
     // TODO: Check index stats.
     // TODO: Check what was restored.
 
-    af.validate(&ValidateOptions::default(), Arc::new(CollectMonitor::new()))
+    af.validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
         .unwrap();
     assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     Ok(())
@@ -147,7 +145,7 @@ pub fn backup_more_excludes() {
         exclude,
         ..Default::default()
     };
-    let stats = backup(&af, srcdir.path(), &options, CollectMonitor::arc()).expect("backup");
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).expect("backup");
 
     assert_eq!(1, stats.written_blocks);
     assert_eq!(1, stats.files);
@@ -183,7 +181,7 @@ fn check_backup(af: &ScratchArchive) {
     assert!(file_entry.mtime > 0);
 
     assert_eq!(
-        af.referenced_blocks(&af.list_band_ids().unwrap(), CollectMonitor::arc())
+        af.referenced_blocks(&af.list_band_ids().unwrap(), TestMonitor::arc())
             .unwrap()
             .into_iter()
             .map(|h| h.to_string())
@@ -192,16 +190,14 @@ fn check_backup(af: &ScratchArchive) {
     );
     assert_eq!(
         af.block_dir()
-            .blocks(CollectMonitor::arc())
+            .blocks(TestMonitor::arc())
             .unwrap()
             .map(|h| h.to_string())
             .collect::<Vec<String>>(),
         vec![HELLO_HASH]
     );
     assert_eq!(
-        af.unreferenced_blocks(CollectMonitor::arc())
-            .unwrap()
-            .count(),
+        af.unreferenced_blocks(TestMonitor::arc()).unwrap().count(),
         0
     );
 }
@@ -211,10 +207,11 @@ fn large_file() {
     let af = ScratchArchive::new();
     let tf = TreeFixture::new();
 
-    let large_content = vec![b'a'; 4 << 20];
+    let file_size = 4 << 20;
+    let large_content = vec![b'a'; file_size];
     tf.create_file_with_contents("large", &large_content);
 
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     let backup_stats = backup(
         &af,
         tf.path(),
@@ -237,14 +234,17 @@ fn large_file() {
     // Try to restore it
     let rd = TempDir::new().unwrap();
     let restore_archive = Archive::open_path(af.path()).unwrap();
-    let restore_stats = restore(
+    let monitor = TestMonitor::arc();
+    restore(
         &restore_archive,
         rd.path(),
         &RestoreOptions::default(),
-        CollectMonitor::arc(),
+        monitor.clone(),
     )
     .expect("restore");
-    assert_eq!(restore_stats.files, 1);
+    monitor.assert_no_errors();
+    monitor.assert_counter(Counter::Files, 1);
+    monitor.assert_counter(Counter::FileBytes, file_size);
 
     let content = std::fs::read(rd.path().join("large")).unwrap();
     assert_eq!(large_content, content);
@@ -267,7 +267,7 @@ fn source_unreadable() {
         &af,
         tf.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("backup");
     assert_eq!(stats.errors, 1);
@@ -290,8 +290,9 @@ fn mtime_before_epoch() {
     set_file_mtime(file_path, t1969).expect("Failed to set file times");
 
     let lt = LiveTree::open(tf.path()).unwrap();
+    let monitor = TestMonitor::arc();
     let entries = lt
-        .iter_entries(Apath::root(), Exclude::nothing())
+        .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
         .unwrap()
         .collect::<Vec<_>>();
 
@@ -303,7 +304,7 @@ fn mtime_before_epoch() {
         &af,
         tf.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("backup shouldn't crash on before-epoch mtimes");
 }
@@ -319,7 +320,7 @@ pub fn symlink() {
         &af,
         srcdir.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("backup");
 
@@ -352,7 +353,7 @@ pub fn empty_file_uses_zero_blocks() {
         &af,
         srcdir.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .unwrap();
 
@@ -362,7 +363,7 @@ pub fn empty_file_uses_zero_blocks() {
     // Read back the empty file
     let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
     let empty_entry = st
-        .iter_entries(Apath::root(), Exclude::nothing())
+        .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
         .unwrap()
         .find(|i| &i.apath == "/empty")
         .expect("found one entry");
@@ -374,7 +375,7 @@ pub fn empty_file_uses_zero_blocks() {
         &af,
         dest.path(),
         &RestoreOptions::default(),
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .expect("restore");
     // TODO: Check restore stats.
@@ -389,7 +390,7 @@ pub fn detect_unmodified() {
     srcdir.create_file("bbb");
 
     let options = BackupOptions::default();
-    let stats = backup(&af, srcdir.path(), &options, CollectMonitor::arc()).unwrap();
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 2);
@@ -397,7 +398,7 @@ pub fn detect_unmodified() {
 
     // Make a second backup from the same tree, and we should see that
     // both files are unmodified.
-    let stats = backup(&af, srcdir.path(), &options, CollectMonitor::arc()).unwrap();
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 0);
@@ -407,7 +408,7 @@ pub fn detect_unmodified() {
     // as unmodified.
     srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
-    let stats = backup(&af, srcdir.path(), &options, CollectMonitor::arc()).unwrap();
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 0);
@@ -423,7 +424,7 @@ pub fn detect_minimal_mtime_change() {
     srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
     let options = BackupOptions::default();
-    let stats = backup(&af, srcdir.path(), &options, CollectMonitor::arc()).unwrap();
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 2);
@@ -445,7 +446,7 @@ pub fn detect_minimal_mtime_change() {
         }
     }
 
-    let stats = backup(&af, srcdir.path(), &options, CollectMonitor::arc()).unwrap();
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).unwrap();
     assert_eq!(stats.files, 2);
     assert_eq!(stats.unmodified_files, 1);
 }
@@ -461,7 +462,7 @@ fn small_files_combined_two_backups() {
         &af,
         srcdir.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .unwrap();
     // Although the two files have the same content, we do not yet dedupe them
@@ -479,7 +480,7 @@ fn small_files_combined_two_backups() {
         &af,
         srcdir.path(),
         &BackupOptions::default(),
-        CollectMonitor::arc(),
+        TestMonitor::arc(),
     )
     .unwrap();
     assert_eq!(stats2.new_files, 1);
@@ -488,10 +489,7 @@ fn small_files_combined_two_backups() {
     assert_eq!(stats2.combined_blocks, 1);
 
     assert_eq!(
-        af.block_dir()
-            .blocks(CollectMonitor::arc())
-            .unwrap()
-            .count(),
+        af.block_dir().blocks(TestMonitor::arc()).unwrap().count(),
         2
     );
 }
@@ -513,7 +511,7 @@ fn many_small_files_combined_to_one_block() {
         max_entries_per_hunk: 1000,
         ..Default::default()
     };
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     let stats = backup(&af, srcdir.path(), &backup_options, monitor.clone()).expect("backup");
     assert_eq!(
         monitor.get_counter(Counter::IndexWrites),
@@ -533,14 +531,14 @@ fn many_small_files_combined_to_one_block() {
 
     let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
     let mut entry_iter = tree
-        .iter_entries(Apath::root(), Exclude::nothing())
+        .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
         .unwrap();
     assert_eq!(entry_iter.next().unwrap().apath(), "/");
     for (i, entry) in entry_iter.enumerate() {
         assert_eq!(entry.apath().to_string(), format!("/file{i:04}"));
     }
     assert_eq!(
-        tree.iter_entries(Apath::root(), Exclude::nothing())
+        tree.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
             .unwrap()
             .count(),
         2000
@@ -566,7 +564,7 @@ pub fn mixed_medium_small_files_two_hunks() {
         small_file_cap: 100_000,
         ..Default::default()
     };
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     let stats = backup(&af, srcdir.path(), &backup_options, monitor.clone()).expect("backup");
     assert_eq!(
         monitor.get_counter(Counter::IndexWrites),
@@ -586,14 +584,14 @@ pub fn mixed_medium_small_files_two_hunks() {
 
     let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
     let mut entry_iter = tree
-        .iter_entries(Apath::root(), Exclude::nothing())
+        .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
         .unwrap();
     assert_eq!(entry_iter.next().unwrap().apath(), "/");
     for (i, entry) in entry_iter.enumerate() {
         assert_eq!(entry.apath().to_string(), format!("/file{i:04}"));
     }
     assert_eq!(
-        tree.iter_entries(Apath::root(), Exclude::nothing())
+        tree.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
             .unwrap()
             .count(),
         2000
@@ -607,7 +605,7 @@ fn detect_unchanged_from_stitched_index() {
     srcdir.create_file("a");
     srcdir.create_file("b");
     // Use small hunks for easier manipulation.
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     let stats = backup(
         &af,
         srcdir.path(),
@@ -623,7 +621,7 @@ fn detect_unchanged_from_stitched_index() {
     assert_eq!(monitor.get_counter(Counter::IndexWrites), 3,);
 
     // Make a second backup, with the first file changed.
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     srcdir.create_file_with_contents("a", b"new a contents");
     let stats = backup(
         &af,
@@ -647,7 +645,7 @@ fn detect_unchanged_from_stitched_index() {
 
     // The third backup should see nothing changed, by looking at the stitched
     // index from both b0 and b1.
-    let monitor = CollectMonitor::arc();
+    let monitor = TestMonitor::arc();
     let stats = backup(
         &af,
         srcdir.path(),

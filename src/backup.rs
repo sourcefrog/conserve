@@ -14,7 +14,6 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
-use std::convert::TryInto;
 use std::fmt;
 use std::io::prelude::*;
 use std::mem::take;
@@ -26,17 +25,15 @@ use std::time::{Duration, Instant};
 use bytes::BytesMut;
 use derive_more::{Add, AddAssign};
 use itertools::Itertools;
-use tracing::{error, trace, warn};
+use tracing::{trace, warn};
 
 use crate::blockdir::Address;
 use crate::change::Change;
 use crate::counters::Counter;
-use crate::entry::EntryValue;
 use crate::io::read_with_retries;
 use crate::monitor::Monitor;
 use crate::stats::{write_compressed_size, write_count, write_duration, write_size};
 use crate::stitch::IterStitchedIndexHunks;
-use crate::tree::ReadTree;
 use crate::*;
 
 /// Configuration of how to make a backup.
@@ -46,13 +43,16 @@ pub struct BackupOptions<'cb> {
 
     pub max_entries_per_hunk: usize,
 
-    // Call this callback as each entry is successfully stored.
+    /// Call this callback as each entry is successfully stored.
     pub change_callback: Option<ChangeCallback<'cb>>,
 
     pub max_block_size: usize,
 
     /// Combine files smaller than this into a single block.
     pub small_file_cap: u64,
+
+    /// Record the user/group owners on Unix.
+    pub owner: bool,
 }
 
 impl Default for BackupOptions<'_> {
@@ -63,6 +63,7 @@ impl Default for BackupOptions<'_> {
             change_callback: None,
             max_block_size: 20 << 20,
             small_file_cap: 1 << 20,
+            owner: true,
         }
     }
 }
@@ -89,18 +90,22 @@ pub fn backup(
     monitor: Arc<dyn Monitor>,
 ) -> Result<BackupStats> {
     let start = Instant::now();
-    let mut writer = BackupWriter::begin(archive, options)?;
+    let mut writer = BackupWriter::begin(archive, options, monitor.clone())?;
     let mut stats = BackupStats::default();
     let source_tree = LiveTree::open(source_path)?;
 
     let task = monitor.start_task("Backup".to_string());
 
-    let entry_iter = source_tree.iter_entries(Apath::root(), options.exclude.clone())?;
+    let entry_iter =
+        source_tree.iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?;
     for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
-        for entry in entry_group {
+        for mut entry in entry_group {
+            if !options.owner {
+                entry.owner.clear();
+            }
             match writer.copy_entry(&entry, &source_tree, options, monitor.clone()) {
                 Err(err) => {
-                    error!(?entry, ?err, "Error copying entry to backup");
+                    monitor.error(err);
                     stats.errors += 1;
                     continue;
                 }
@@ -150,14 +155,18 @@ impl BackupWriter {
     /// Create a new BackupWriter.
     ///
     /// This currently makes a new top-level band.
-    pub fn begin(archive: &Archive, options: &BackupOptions) -> Result<Self> {
+    pub fn begin(
+        archive: &Archive,
+        options: &BackupOptions,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<Self> {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
         let basis_index = if let Some(basis_band_id) = archive.last_band_id()? {
-            IterStitchedIndexHunks::new(archive, basis_band_id)
+            IterStitchedIndexHunks::new(archive, basis_band_id, monitor)
         } else {
-            IterStitchedIndexHunks::empty(archive)
+            IterStitchedIndexHunks::empty(archive, monitor)
         }
         .iter_entries(Apath::root(), Exclude::nothing());
 

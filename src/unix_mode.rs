@@ -38,7 +38,6 @@ use std::io;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use unix_mode;
 
 #[derive(Debug, Default, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct UnixMode(Option<u32>);

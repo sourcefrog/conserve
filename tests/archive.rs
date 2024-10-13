@@ -20,7 +20,7 @@ use assert_fs::prelude::*;
 use assert_fs::TempDir;
 
 use conserve::archive::Archive;
-use conserve::monitor::collect::CollectMonitor;
+use conserve::monitor::test::TestMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::Band;
 use conserve::BandId;
@@ -80,16 +80,13 @@ fn empty_archive() {
         "Archive should have no bands yet"
     );
     assert_eq!(
-        af.referenced_blocks(&af.list_band_ids().unwrap(), CollectMonitor::arc())
+        af.referenced_blocks(&af.list_band_ids().unwrap(), TestMonitor::arc())
             .unwrap()
             .len(),
         0
     );
     assert_eq!(
-        af.block_dir()
-            .blocks(CollectMonitor::arc())
-            .unwrap()
-            .count(),
+        af.block_dir().blocks(TestMonitor::arc()).unwrap().count(),
         0
     );
 }
@@ -118,16 +115,13 @@ fn create_bands() {
     assert_eq!(af.last_band_id().unwrap(), Some(BandId::new(&[1])));
 
     assert_eq!(
-        af.referenced_blocks(&af.list_band_ids().unwrap(), CollectMonitor::arc())
+        af.referenced_blocks(&af.list_band_ids().unwrap(), TestMonitor::arc())
             .unwrap()
             .len(),
         0
     );
     assert_eq!(
-        af.block_dir()
-            .blocks(CollectMonitor::arc())
-            .unwrap()
-            .count(),
+        af.block_dir().blocks(TestMonitor::arc()).unwrap().count(),
         0
     );
 }

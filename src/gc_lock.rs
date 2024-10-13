@@ -108,7 +108,7 @@ impl Drop for GarbageCollectionLock {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::monitor::collect::CollectMonitor;
+    use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
     #[test]
@@ -131,7 +131,7 @@ mod test {
             &archive,
             source.path(),
             &BackupOptions::default(),
-            CollectMonitor::arc(),
+            TestMonitor::arc(),
         )
         .unwrap();
         let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
@@ -147,7 +147,7 @@ mod test {
             &archive,
             source.path(),
             &BackupOptions::default(),
-            CollectMonitor::arc(),
+            TestMonitor::arc(),
         );
         assert_eq!(
             backup_result.expect_err("backup fails").to_string(),
