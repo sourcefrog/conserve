@@ -50,8 +50,14 @@ impl SftpTransport {
             "SSH hands shaken, banner: {}",
             session.banner().unwrap_or("(none)")
         );
-        let username = url.username();
-        session.userauth_agent(username).map_err(|err| {
+        let username = match url.username() {
+            "" => {
+                trace!("Take default SSH username from environment");
+                whoami::username()
+            }
+            u => u.to_owned(),
+        };
+        session.userauth_agent(&username).map_err(|err| {
             error!(?err, username, "Error in SSH user auth with agent");
             ssh_error(err, url.as_ref())
         })?;
