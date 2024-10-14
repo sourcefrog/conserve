@@ -22,6 +22,7 @@ s3 = [
     "dep:tokio",
 ]
 s3-integration-test = ["s3"]
+sftp = ["dep:ssh2"]
 
 [[bin]]
 doc = false
@@ -56,7 +57,7 @@ semver = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 snap = "1.0.0"
-ssh2 = { version = "0.9.4" }
+ssh2 = { version = "0.9.4", optional = true }
 strum = "0.26"
 strum_macros = "0.26"
 tempfile = "3"

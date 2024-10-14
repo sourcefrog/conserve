@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023 Martin Pool.
+// Copyright 2020-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ use url::Url;
 use crate::*;
 
 pub mod local;
+#[cfg(feature = "sftp")]
 pub mod sftp;
 
 use local::LocalTransport;
@@ -47,6 +48,7 @@ pub fn open_transport(s: &str) -> crate::Result<Arc<dyn Transport>> {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Arc::new(LocalTransport::new(Path::new(s))))
             }
+            #[cfg(feature = "sftp")]
             "sftp" => Ok(Arc::new(sftp::SftpTransport::new(&url)?)),
             other => Err(crate::Error::UrlScheme {
                 scheme: other.to_owned(),
