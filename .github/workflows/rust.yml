@@ -165,7 +165,7 @@ jobs:
       # We want to see all the missed mutants so don't fail fast.
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -183,7 +183,7 @@ jobs:
         run: |
           cargo mutants --no-shuffle -vV --cargo-arg=--no-default-features \
             --in-place \
-            --baseline=skip --shard ${{ matrix.shard }}/4 \
+            --baseline=skip --shard ${{ matrix.shard }}/10 \
             -- \
             --features fail/failpoints
       - name: Archive results
