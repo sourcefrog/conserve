@@ -53,7 +53,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         features: ["", "s3"]
-        version: [stable, nightly, "1.74"]
+        version: [stable, nightly, "1.78"]
 
     steps:
       - uses: actions/checkout@v4
@@ -92,7 +92,7 @@ jobs:
 
   # S3 integration tests can't run from CI because they need credentials, but we
   # can at least make sure that they compile.
-  build-large-tests:
+  build-all-features:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -101,22 +101,9 @@ jobs:
           toolchain: stable
       - uses: swatinem/rust-cache@v2
       - name: cargo build
-        run: cargo build --all-targets --features s3,s3-integration-test
+        run: cargo build --all-targets --all-features
 
   clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-      - uses: swatinem/rust-cache@v2
-      - name: clippy
-        run: cargo clippy --all-targets -- --deny clippy::all
-
-  # Not all features can be run: s3 integration tests require credentials.
-  # But all of them should compile.
-  check-all-features:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -165,7 +152,7 @@ jobs:
       # We want to see all the missed mutants so don't fail fast.
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -183,7 +170,7 @@ jobs:
         run: |
           cargo mutants --no-shuffle -vV --cargo-arg=--no-default-features \
             --in-place \
-            --baseline=skip --shard ${{ matrix.shard }}/4 \
+            --baseline=skip --shard ${{ matrix.shard }}/10 \
             -- \
             --features fail/failpoints
       - name: Archive results
