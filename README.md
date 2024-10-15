@@ -140,9 +140,12 @@ To install from a git checkout, run
 
 [rust]: https://rustup.rs/
 
-On nightly Rust only, and only on x86_64, you can enable a slight speed-up with
+### Optional features
 
-    cargo +nightly install -f --path . --features blake2-rfc/simd_asm
+The following options can be enabled with `--features`:
+
+* `s3`: support for storing backups in Amazon S3 (or compatible services)
+* `sftp`: support for storing backups on SFTP servers, addressed with `sftp://` URLs
 
 ### Arch Linux
 
