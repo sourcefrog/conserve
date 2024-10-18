@@ -59,12 +59,12 @@ fn unsupported_location_urls() {
         open_transport("http://conserve.example/repo")
             .unwrap_err()
             .to_string(),
-        "Unsupported URL scheme \"http\""
+        "Unsupported URL scheme: http://conserve.example/repo"
     );
     assert_eq!(
         open_transport("ftp://user@conserve.example/repo")
             .unwrap_err()
             .to_string(),
-        "Unsupported URL scheme \"ftp\""
+        "Unsupported URL scheme: ftp://user@conserve.example/repo"
     );
 }

@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 use crate::monitor::test::TestMonitor;
+use crate::transport::Transport2;
 use crate::*;
 
 /// A temporary archive, deleted when it goes out of scope.
@@ -71,7 +72,7 @@ impl ScratchArchive {
         backup(&self.archive, srcdir.path(), options, TestMonitor::arc()).unwrap();
     }
 
-    pub fn transport(&self) -> &dyn Transport {
+    pub fn transport(&self) -> &Transport2 {
         self.archive.transport()
     }
 }

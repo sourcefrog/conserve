@@ -13,18 +13,19 @@
 //! Access to an archive on the local filesystem.
 
 use std::fs::{create_dir, File};
-use std::io;
+use std::{io, path};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use bytes::Bytes;
 use tracing::{instrument, trace, warn};
+use url::Url;
 
 use super::{Error, ListDir, Metadata, Result, Transport};
 
 #[derive(Clone, Debug)]
-pub struct LocalTransport {
+struct LocalTransport {
     /// Root directory for this transport.
     root: PathBuf,
 }
@@ -155,6 +156,71 @@ impl Transport for LocalTransport {
 impl AsRef<dyn Transport> for LocalTransport {
     fn as_ref(&self) -> &(dyn Transport + 'static) {
         self
+    }
+}
+
+pub(super) struct Protocol {
+    path: PathBuf,
+    url: Url,
+}
+
+impl Protocol {
+    pub(super) fn new(path: &Path) -> Self {
+        Protocol {
+            path: path.to_owned(),
+            url: Url::from_directory_path(path::absolute(path).expect("make path absolute")).expect("convert path to URL"),
+        }
+    }
+}
+
+impl super::Protocol for Protocol {
+    fn url(&self) -> &Url {
+        &self.url
+    }
+
+    fn read_file(&self, relpath: &str) -> Result<Bytes> {
+        let path = self.path.join(relpath);
+        let mut out_buf = Vec::new();
+        // TODO: Maybe get the file length and preallocate the buffer
+        File::open(&path)
+            .and_then(|mut file| file.read_to_end(&mut out_buf))
+            .map_err(|err| Error::io_error(&path, err))?;
+        Ok(out_buf.into())
+    }
+
+    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
+        LocalTransport::new(&self.path).write_file(relpath, content)
+    }
+
+    fn list_dir(&self, relpath: &str) -> Result<ListDir> {
+        LocalTransport::new(&self.path).list_dir(relpath)
+    }
+
+    fn create_dir(&self, relpath: &str) -> Result<()> {
+        LocalTransport::new(&self.path).create_dir(relpath)
+    }
+
+    fn metadata(&self, relpath: &str) -> Result<Metadata> {
+        LocalTransport::new(&self.path).metadata(relpath)
+    }
+
+    fn remove_file(&self, relpath: &str) -> Result<()> {
+        LocalTransport::new(&self.path).remove_file(relpath)
+    }
+
+    fn remove_dir_all(&self, relpath: &str) -> Result<()> {
+        LocalTransport::new(&self.path).remove_dir_all(relpath)
+    }
+
+    fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
+        Arc::new(Protocol {
+            path: self.path.join(relpath),
+            url: self.url.join(relpath).expect("join URL"),
+        })
+    }
+
+    fn local_path(&self) -> Option<PathBuf> {
+        Some(self.path.clone())
     }
 }
 

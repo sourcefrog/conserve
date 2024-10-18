@@ -20,13 +20,14 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use itertools::Itertools;
+use jsonio::write_json;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
+use transport::Transport2;
 
-use crate::jsonio::{read_json, write_json};
+use crate::jsonio::read_json;
 use crate::monitor::Monitor;
-use crate::transport::local::LocalTransport;
 use crate::*;
 
 const HEADER_FILENAME: &str = "CONSERVE";
@@ -39,7 +40,7 @@ pub struct Archive {
     pub(crate) block_dir: Arc<BlockDir>,
 
     /// Transport to the root directory of the archive.
-    transport: Arc<dyn Transport>,
+    transport: Transport2,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,24 +57,21 @@ pub struct DeleteOptions {
 impl Archive {
     /// Make a new archive in a local directory.
     pub fn create_path(path: &Path) -> Result<Archive> {
-        Archive::create(Arc::new(LocalTransport::new(path)))
+        Archive::create(Transport2::local(path))
     }
 
     /// Make a new archive in a new directory accessed by a Transport.
-    pub fn create(transport: Arc<dyn Transport>) -> Result<Archive> {
+    pub fn create(transport: Transport2) -> Result<Archive> {
         transport.create_dir("")?;
         let names = transport.list_dir("")?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
             return Err(Error::NewArchiveDirectoryNotEmpty);
         }
         let block_dir = Arc::new(BlockDir::create(transport.sub_transport(BLOCK_DIR))?);
-        write_json(
-            &transport,
-            HEADER_FILENAME,
-            &ArchiveHeader {
-                conserve_archive_version: String::from(ARCHIVE_VERSION),
-            },
-        )?;
+        let header = ArchiveHeader {
+            conserve_archive_version: String::from(ARCHIVE_VERSION),
+        };
+        write_json(&transport, HEADER_FILENAME, &header)?;
         Ok(Archive {
             block_dir,
             transport,
@@ -84,10 +82,10 @@ impl Archive {
     ///
     /// Checks that the header is correct.
     pub fn open_path(path: &Path) -> Result<Archive> {
-        Archive::open(Arc::new(LocalTransport::new(path)))
+        Archive::open(Transport2::local(path))
     }
 
-    pub fn open(transport: Arc<dyn Transport>) -> Result<Archive> {
+    pub fn open(transport: Transport2) -> Result<Archive> {
         let header: ArchiveHeader =
             read_json(&transport, HEADER_FILENAME)?.ok_or(Error::NotAnArchive)?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
@@ -108,7 +106,7 @@ impl Archive {
     }
 
     pub fn band_exists(&self, band_id: BandId) -> Result<bool> {
-        self.transport
+        self.transport()
             .is_file(&format!("{}/{}", band_id, crate::BAND_HEAD_FILENAME))
             .map_err(Error::from)
     }
@@ -138,8 +136,8 @@ impl Archive {
         Ok(band_ids)
     }
 
-    pub(crate) fn transport(&self) -> &dyn Transport {
-        self.transport.as_ref()
+    pub(crate) fn transport(&self) -> &Transport2 {
+        &self.transport
     }
 
     pub fn resolve_band_id(&self, band_selection: BandSelectionPolicy) -> Result<BandId> {

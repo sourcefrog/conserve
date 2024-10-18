@@ -36,7 +36,7 @@ use tracing::{instrument, trace};
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
 use crate::monitor::Monitor;
-use crate::transport::ListDir;
+use crate::transport::{Transport2,ListDir};
 use crate::*;
 
 // const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
@@ -65,7 +65,7 @@ pub struct Address {
 /// A readable, writable directory within a band holding data blocks.
 #[derive(Debug)]
 pub struct BlockDir {
-    transport: Arc<dyn Transport>,
+    transport: Transport2,
     pub stats: BlockDirStats,
     // TODO: There are fancier caches and they might help, but this one works, and Stretto did not work for me.
     cache: RwLock<LruCache<BlockHash, Bytes>>,
@@ -85,7 +85,7 @@ pub fn block_relpath(hash: &BlockHash) -> String {
 }
 
 impl BlockDir {
-    pub fn open(transport: Arc<dyn Transport>) -> BlockDir {
+    pub fn open(transport: Transport2) -> BlockDir {
         /// Cache this many blocks in memory.
         // TODO: Change to a cache that tracks the size of stored blocks?
         // As a safe conservative value, 100 blocks of 20MB each would be 2GB.
@@ -102,7 +102,7 @@ impl BlockDir {
         }
     }
 
-    pub fn create(transport: Arc<dyn Transport>) -> Result<BlockDir> {
+    pub fn create(transport: Transport2) -> Result<BlockDir> {
         transport.create_dir("")?;
         Ok(BlockDir::open(transport))
     }

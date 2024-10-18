@@ -16,6 +16,24 @@ use crate::Kind;
 
 use super::{Error, ErrorKind, ListDir, Result, Transport};
 
+pub(super) struct Protocol {
+    transport: SftpTransport,
+}
+
+impl Protocol {
+    pub fn new(url: &Url) -> Result<Self> {
+        Ok(Protocol {
+            transport: SftpTransport::new(url)?,
+        })
+    }
+}
+
+impl super::Protocol for Protocol {
+    fn read_file(&self, relpath: &str) -> Result<Bytes> {
+        self.transport.read_file(relpath)
+    }
+}
+
 /// Archive file I/O over SFTP.
 #[derive(Clone)]
 pub struct SftpTransport {

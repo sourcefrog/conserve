@@ -9,7 +9,7 @@ name = "conserve"
 readme = "README.md"
 repository = "https://github.com/sourcefrog/conserve/"
 version = "24.8.0"
-rust-version = "1.78"
+rust-version = "1.79"
 
 [features]
 s3 = [

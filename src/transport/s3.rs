@@ -47,6 +47,24 @@ use url::Url;
 
 use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, Transport};
 
+pub(super) struct Protocol {
+    s3transport: Arc<S3Transport>,
+}
+
+impl Protocol {
+    pub(super) fn new(url: &Url) -> Result<Self> {
+        Ok(Protocol {
+            s3transport: S3Transport::new(url)?,
+        })
+    }
+}
+
+impl super::Protocol for Protocol {
+    fn read_file(&self, relpath: &str) -> Result<Bytes> {
+        self.s3transport.read_file(relpath)
+    }
+}
+
 pub struct S3Transport {
     /// Tokio runtime specifically for S3 IO.
     ///

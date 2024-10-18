@@ -22,13 +22,13 @@ use std::vec;
 use itertools::Itertools;
 use time::OffsetDateTime;
 use tracing::{debug, debug_span, error};
+use transport::Transport2;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
 use crate::entry::KindMeta;
 use crate::monitor::Monitor;
 use crate::stats::IndexReadStats;
-use crate::transport::local::LocalTransport;
 use crate::unix_time::FromUnixAndNanos;
 use crate::*;
 
@@ -177,7 +177,7 @@ impl IndexEntry {
 /// hunks preserve apath order.
 pub struct IndexWriter {
     /// The `i` directory within the band where all files for this index are written.
-    transport: Arc<dyn Transport>,
+    transport: Transport2,
 
     /// Currently queued entries to be written out, in arbitrary order.
     entries: Vec<IndexEntry>,
@@ -199,7 +199,7 @@ pub struct IndexWriter {
 /// Accumulate and write out index entries into files in an index directory.
 impl IndexWriter {
     /// Make a new builder that will write files into the given directory.
-    pub fn new(transport: Arc<dyn Transport>) -> IndexWriter {
+    pub fn new(transport: Transport2) -> IndexWriter {
         IndexWriter {
             transport,
             entries: Vec::new(),
@@ -279,16 +279,17 @@ fn hunk_relpath(hunk_number: u32) -> String {
 #[derive(Debug, Clone)]
 pub struct IndexRead {
     /// Transport pointing to this index directory.
-    transport: Arc<dyn Transport>,
+    transport: Transport2,
 }
 
 impl IndexRead {
     #[allow(unused)]
+    // TODO: Deprecate, use Transport?
     pub(crate) fn open_path(path: &Path) -> IndexRead {
-        IndexRead::open(Arc::new(LocalTransport::new(path)))
+        IndexRead::open(Transport2::local(path))
     }
 
-    pub(crate) fn open(transport: Arc<dyn Transport>) -> IndexRead {
+    pub(crate) fn open(transport: Transport2) -> IndexRead {
         IndexRead { transport }
     }
 
@@ -321,7 +322,7 @@ impl IndexRead {
         debug!(?hunks);
         IndexHunkIter {
             hunks: hunks.into_iter(),
-            transport: Arc::clone(&self.transport),
+            transport: self.transport.clone(),
             decompressor: Decompressor::new(),
             stats: IndexReadStats::default(),
             after: None,
@@ -335,7 +336,7 @@ impl IndexRead {
 pub struct IndexHunkIter {
     hunks: std::vec::IntoIter<u32>,
     /// The `i` directory within the band where all files for this index are written.
-    transport: Arc<dyn Transport>,
+    transport: Transport2,
     decompressor: Decompressor,
     pub stats: IndexReadStats,
     /// If set, yield only entries ordered after this apath.
@@ -524,7 +525,7 @@ mod tests {
 
     fn setup() -> (TempDir, IndexWriter) {
         let testdir = TempDir::new().unwrap();
-        let ib = IndexWriter::new(Arc::new(LocalTransport::new(testdir.path())));
+        let ib = IndexWriter::new(Transport2::local(testdir.path()));
         (testdir, ib)
     }
 
