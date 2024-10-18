@@ -175,10 +175,9 @@ fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<Band
         // TODO: It might be faster to list the present bands and calculate
         // from that, rather than walking backwards one at a time...
         if let Some(prev_band_id) = band_id.previous() {
-            if archive.band_exists(prev_band_id).unwrap_or(false) {
-                return Some(prev_band_id);
-            } else {
-                band_id = prev_band_id;
+            band_id = prev_band_id;
+            if archive.band_exists(band_id).unwrap_or(false) {
+                return Some(band_id);
             }
         } else {
             return None;

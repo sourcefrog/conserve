@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023 Martin Pool.
+// Copyright 2020-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -25,6 +25,9 @@ use url::Url;
 use crate::*;
 
 pub mod local;
+#[cfg(feature = "sftp")]
+pub mod sftp;
+
 use local::LocalTransport;
 
 #[cfg(feature = "s3")]
@@ -45,6 +48,8 @@ pub fn open_transport(s: &str) -> crate::Result<Arc<dyn Transport>> {
                 // Probably a Windows path with drive letter, like "c:/thing", not actually a URL.
                 Ok(Arc::new(LocalTransport::new(Path::new(s))))
             }
+            #[cfg(feature = "sftp")]
+            "sftp" => Ok(Arc::new(sftp::SftpTransport::new(&url)?)),
             other => Err(crate::Error::UrlScheme {
                 scheme: other.to_owned(),
             }),
@@ -177,22 +182,27 @@ pub enum ErrorKind {
     Other,
 }
 
+impl From<io::ErrorKind> for ErrorKind {
+    fn from(kind: io::ErrorKind) -> Self {
+        match kind {
+            io::ErrorKind::NotFound => ErrorKind::NotFound,
+            io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
+            io::ErrorKind::PermissionDenied => ErrorKind::PermissionDenied,
+            _ => ErrorKind::Other,
+        }
+    }
+}
+
 impl Error {
     pub fn kind(&self) -> ErrorKind {
         self.kind
     }
 
     pub(self) fn io_error(path: &Path, source: io::Error) -> Error {
-        let kind = match source.kind() {
-            io::ErrorKind::NotFound => ErrorKind::NotFound,
-            io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
-            io::ErrorKind::PermissionDenied => ErrorKind::PermissionDenied,
-            _ => ErrorKind::Other,
-        };
         Error {
+            kind: source.kind().into(),
             source: Some(Box::new(source)),
             path: Some(path.to_string_lossy().to_string()),
-            kind,
         }
     }
 
