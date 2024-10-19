@@ -76,10 +76,10 @@ impl Transport {
             }
 
             #[cfg(feature = "s3")]
-            "s3" => Arc::new(s3::Protocol::new(&url)?),
+            "s3" => Arc::new(s3::Protocol::new(url)?),
 
             #[cfg(feature = "sftp")]
-            "sftp" => Arc::new(sftp::Protocol::new(&url)?),
+            "sftp" => Arc::new(sftp::Protocol::new(url)?),
 
             _other => {
                 return Err(Error {
