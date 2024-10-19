@@ -36,7 +36,7 @@ use tracing::{instrument, trace};
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
 use crate::monitor::Monitor;
-use crate::transport::{Transport2,ListDir};
+use crate::transport::{ListDir, Transport2};
 use crate::*;
 
 // const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;

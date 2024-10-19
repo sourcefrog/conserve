@@ -58,7 +58,7 @@ pub fn open_local_transport(path: &Path) -> Result<Transport2> {
 /// support streaming or partial reads and writes.
 #[derive(Clone)]
 pub struct Transport2 {
-    protocol: Arc<dyn Protocol+ 'static>,
+    protocol: Arc<dyn Protocol + 'static>,
 }
 
 impl Transport2 {
@@ -102,9 +102,7 @@ impl Transport2 {
                 })
             }
         };
-        Ok(Transport2 {
-            protocol,
-        })
+        Ok(Transport2 { protocol })
     }
 
     /// Get one complete file into a caller-provided buffer.

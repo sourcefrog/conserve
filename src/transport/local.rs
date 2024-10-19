@@ -13,10 +13,10 @@
 //! Access to an archive on the local filesystem.
 
 use std::fs::{create_dir, File};
-use std::{io, path};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::{io, path};
 
 use bytes::Bytes;
 use tracing::{instrument, trace, warn};
@@ -168,7 +168,8 @@ impl Protocol {
     pub(super) fn new(path: &Path) -> Self {
         Protocol {
             path: path.to_owned(),
-            url: Url::from_directory_path(path::absolute(path).expect("make path absolute")).expect("convert path to URL"),
+            url: Url::from_directory_path(path::absolute(path).expect("make path absolute"))
+                .expect("convert path to URL"),
         }
     }
 }

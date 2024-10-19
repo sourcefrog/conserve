@@ -49,12 +49,14 @@ use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, Transport};
 
 pub(super) struct Protocol {
     s3transport: Arc<S3Transport>,
+    url: Url,
 }
 
 impl Protocol {
     pub(super) fn new(url: &Url) -> Result<Self> {
         Ok(Protocol {
             s3transport: S3Transport::new(url)?,
+            url: url.to_owned(),
         })
     }
 }
@@ -62,6 +64,47 @@ impl Protocol {
 impl super::Protocol for Protocol {
     fn read_file(&self, relpath: &str) -> Result<Bytes> {
         self.s3transport.read_file(relpath)
+    }
+
+    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
+        self.s3transport.write_file(relpath, content)
+    }
+
+    fn list_dir(&self, relpath: &str) -> Result<ListDir> {
+        self.s3transport.list_dir(relpath)
+    }
+
+    fn create_dir(&self, relpath: &str) -> Result<()> {
+        self.s3transport.create_dir(relpath)
+    }
+
+    fn metadata(&self, relpath: &str) -> Result<Metadata> {
+        self.s3transport.metadata(relpath)
+    }
+
+    fn remove_file(&self, relpath: &str) -> Result<()> {
+        self.s3transport.remove_file(relpath)
+    }
+
+    fn remove_dir_all(&self, relpath: &str) -> Result<()> {
+        self.s3transport.remove_dir_all(relpath)
+    }
+
+    fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
+        Arc::new(Protocol {
+            s3transport: Arc::new(S3Transport {
+                base_path: self.s3transport.join_path(relpath),
+                bucket: self.s3transport.bucket.clone(),
+                runtime: self.s3transport.runtime.clone(),
+                client: self.s3transport.client.clone(),
+                storage_class: self.s3transport.storage_class.clone(),
+            }),
+            url: self.url.join(relpath).expect("URL join"),
+        })
+    }
+
+    fn url(&self) -> &Url {
+        &self.url
     }
 }
 
@@ -92,7 +135,6 @@ impl fmt::Debug for S3Transport {
     }
 }
 
-// Clippy false positive here: https://github.com/rust-lang/rust-clippy/issues/12444
 #[allow(clippy::assigning_clones)]
 impl S3Transport {
     pub fn new(base_url: &Url) -> Result<Arc<Self>> {
