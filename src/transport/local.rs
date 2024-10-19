@@ -322,7 +322,7 @@ mod test {
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();
 
-        let sub_transport = transport.sub_transport("aaa");
+        let sub_transport = transport.chdir("aaa");
         let sub_list = sub_transport.list_dir("").unwrap();
 
         assert_eq!(sub_list.dirs, ["bbb"]);

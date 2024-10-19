@@ -42,7 +42,7 @@ fn unknown_format_flag_fails_to_open() {
         "format_flags": ["wibble"]
     });
     af.transport()
-        .sub_transport("b0000")
+        .chdir("b0000")
         .write_file("BANDHEAD", &serde_json::to_vec(&head).unwrap())
         .unwrap();
 

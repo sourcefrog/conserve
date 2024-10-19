@@ -110,7 +110,7 @@ impl Transport {
     }
 
     /// Make a new transport addressing a subdirectory.
-    pub fn sub_transport(&self, relpath: &str) -> Self {
+    pub fn chdir(&self, relpath: &str) -> Self {
         Transport {
             protocol: self.protocol.chdir(relpath),
         }

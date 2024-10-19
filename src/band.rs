@@ -144,7 +144,7 @@ impl Band {
         let band_id = archive
             .last_band_id()?
             .map_or_else(BandId::zero, |b| b.next_sibling());
-        let transport = archive.transport().sub_transport(&band_id.to_string());
+        let transport = archive.transport().chdir(&band_id.to_string());
         transport.create_dir("")?;
         transport.create_dir(INDEX_DIR)?;
         let band_format_version = if format_flags.is_empty() {
@@ -180,7 +180,7 @@ impl Band {
 
     /// Open the band with the given id.
     pub fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
-        let transport = archive.transport().sub_transport(&band_id.to_string());
+        let transport = archive.transport().chdir(&band_id.to_string());
         let head: Head =
             read_json(&transport, BAND_HEAD_FILENAME)?.ok_or(Error::BandHeadMissing { band_id })?;
         if let Some(version) = &head.band_format_version {
@@ -251,12 +251,12 @@ impl Band {
     }
 
     pub fn index_builder(&self) -> IndexWriter {
-        IndexWriter::new(self.transport.sub_transport(INDEX_DIR))
+        IndexWriter::new(self.transport.chdir(INDEX_DIR))
     }
 
     /// Get read-only access to the index of this band.
     pub fn index(&self) -> IndexRead {
-        IndexRead::open(self.transport.sub_transport(INDEX_DIR))
+        IndexRead::open(self.transport.chdir(INDEX_DIR))
     }
 
     /// Return info about the state of this band.
