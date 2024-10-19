@@ -343,7 +343,6 @@ mod test {
     use tempfile::TempDir;
 
     use crate::monitor::test::TestMonitor;
-    use crate::transport::open_local_transport;
 
     use super::*;
 
@@ -353,7 +352,7 @@ mod test {
         // file with 0 bytes. It's not valid compressed data. We just treat
         // the block as not present at all.
         let tempdir = TempDir::new().unwrap();
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport2::local(tempdir.path()));
         let mut stats = BackupStats::default();
         let monitor = TestMonitor::arc();
         let hash = blockdir
@@ -367,7 +366,7 @@ mod test {
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1); // Since we just wrote it, we know it's there.
 
         // Open again to get a fresh cache
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport2::local(tempdir.path()));
         let monitor = TestMonitor::arc();
         OpenOptions::new()
             .write(true)
@@ -383,7 +382,7 @@ mod test {
     #[test]
     fn temp_files_are_not_returned_as_blocks() {
         let tempdir = TempDir::new().unwrap();
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport2::local(tempdir.path()));
         let monitor = TestMonitor::arc();
         let subdir = tempdir.path().join(subdir_relpath("123"));
         create_dir(&subdir).unwrap();
@@ -402,7 +401,7 @@ mod test {
     #[test]
     fn cache_hit() {
         let tempdir = TempDir::new().unwrap();
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport2::local(tempdir.path()));
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let hash = blockdir
@@ -432,7 +431,7 @@ mod test {
     #[test]
     fn existence_cache_hit() {
         let tempdir = TempDir::new().unwrap();
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport2::local(tempdir.path()));
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let monitor = TestMonitor::arc();
@@ -442,7 +441,7 @@ mod test {
 
         // reopen
         let monitor = TestMonitor::arc();
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport2::local(tempdir.path()));
         assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);

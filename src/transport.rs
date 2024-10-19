@@ -31,19 +31,6 @@ pub mod sftp;
 #[cfg(feature = "s3")]
 pub mod s3;
 
-/// Open a `Transport` to access a local directory.
-///
-/// `s` may be a local path or a URL.
-// TODO: Deprecate for Transport::new
-pub fn open_transport(s: &str) -> crate::Result<Transport2> {
-    Ok(Transport2::new(s)?)
-}
-
-// TODO: Deprecate and use Transport2::local
-pub fn open_local_transport(path: &Path) -> Result<Transport2> {
-    Ok(Transport2::local(path))
-}
-
 /// Abstracted filesystem IO to access an archive.
 ///
 /// This supports operations that are common across local filesystems, SFTP, and cloud storage, and
@@ -89,7 +76,7 @@ impl Transport2 {
             }
 
             #[cfg(feature = "s3")]
-            "s3" => Arc::new(s3::Protocol::new(&url)?),
+            "s3" => Arc::new(s3::Protocol::new(&url)),
 
             #[cfg(feature = "sftp")]
             "sftp" => Arc::new(sftp::Protocol::new(&url)?),
