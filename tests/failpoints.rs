@@ -19,8 +19,8 @@ use assert_fs::TempDir;
 use conserve::monitor::test::TestMonitor;
 use fail::FailScenario;
 
+use crate::transport::Transport;
 use conserve::*;
-use transport::Transport;
 
 #[test]
 fn create_dir_permission_denied() {

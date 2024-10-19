@@ -28,9 +28,9 @@ use time::UtcOffset;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
 
+use crate::transport::Transport;
 use conserve::termui::{enable_tracing, TermUiMonitor, TraceTimeStyle};
 use conserve::*;
-use transport::Transport;
 
 /// Local timezone offset, calculated once at startup, to avoid issues about
 /// looking at the environment once multiple threads are running.

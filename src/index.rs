@@ -19,10 +19,10 @@ use std::path::Path;
 use std::sync::Arc;
 use std::vec;
 
+use crate::transport::Transport;
 use itertools::Itertools;
 use time::OffsetDateTime;
 use tracing::{debug, debug_span, error};
-use transport::Transport;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;

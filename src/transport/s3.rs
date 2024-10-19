@@ -76,10 +76,7 @@ impl Protocol {
             .map_err(|err| Error::io_error(Path::new(""), err))?;
 
         let bucket = url.authority().to_owned();
-        assert!(
-            !bucket.is_empty(),
-            "S3 bucket name is empty in {url:?}"
-        );
+        assert!(!bucket.is_empty(), "S3 bucket name is empty in {url:?}");
 
         // Find the bucket region.
         let config = load_aws_config(&runtime, None);
