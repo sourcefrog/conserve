@@ -32,6 +32,38 @@ impl super::Protocol for Protocol {
     fn read_file(&self, relpath: &str) -> Result<Bytes> {
         self.transport.read_file(relpath)
     }
+
+    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
+        todo!()
+    }
+
+    fn list_dir(&self, relpath: &str) -> Result<ListDir> {
+        todo!()
+    }
+
+    fn create_dir(&self, relpath: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn metadata(&self, relpath: &str) -> Result<super::Metadata> {
+        todo!()
+    }
+
+    fn remove_file(&self, relpath: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn remove_dir_all(&self, relpath: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
+        todo!()
+    }
+
+    fn url(&self) -> &Url {
+        todo!()
+    }
 }
 
 /// Archive file I/O over SFTP.
