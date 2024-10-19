@@ -28,7 +28,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tracing::{debug, warn};
-use transport::Transport2;
+use transport::Transport;
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
@@ -76,7 +76,7 @@ pub struct Band {
     band_id: BandId,
 
     /// Transport pointing to the archive directory.
-    transport: Transport2,
+    transport: Transport,
 
     /// Deserialized band head info.
     head: Head,

@@ -15,11 +15,11 @@ use std::path::Path;
 use assert_fs::prelude::*;
 use url::Url;
 
-use conserve::transport::{ListDir, Transport2};
+use conserve::transport::{ListDir, Transport};
 
 #[test]
 fn open_local() {
-    Transport2::local(Path::new("/backup"));
+    Transport::local(Path::new("/backup"));
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn list_dir_names() {
 
     let url = Url::from_directory_path(temp.path()).unwrap();
     dbg!(&url);
-    let transport = Transport2::new(url.as_str()).unwrap();
+    let transport = Transport::new(url.as_str()).unwrap();
     dbg!(&transport);
 
     let ListDir { mut files, dirs } = transport.list_dir("").unwrap();
@@ -51,20 +51,20 @@ fn parse_location_urls() {
         "c:/backup/repo",
         r"c:\backup\repo\",
     ] {
-        assert!(Transport2::new(n).is_ok(), "Failed to parse {n:?}");
+        assert!(Transport::new(n).is_ok(), "Failed to parse {n:?}");
     }
 }
 
 #[test]
 fn unsupported_location_urls() {
     assert_eq!(
-        Transport2::new("http://conserve.example/repo")
+        Transport::new("http://conserve.example/repo")
             .unwrap_err()
             .to_string(),
         "Unsupported URL scheme: http://conserve.example/repo"
     );
     assert_eq!(
-        Transport2::new("ftp://user@conserve.example/repo")
+        Transport::new("ftp://user@conserve.example/repo")
             .unwrap_err()
             .to_string(),
         "Unsupported URL scheme: ftp://user@conserve.example/repo"

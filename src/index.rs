@@ -22,7 +22,7 @@ use std::vec;
 use itertools::Itertools;
 use time::OffsetDateTime;
 use tracing::{debug, debug_span, error};
-use transport::Transport2;
+use transport::Transport;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
@@ -177,7 +177,7 @@ impl IndexEntry {
 /// hunks preserve apath order.
 pub struct IndexWriter {
     /// The `i` directory within the band where all files for this index are written.
-    transport: Transport2,
+    transport: Transport,
 
     /// Currently queued entries to be written out, in arbitrary order.
     entries: Vec<IndexEntry>,
@@ -199,7 +199,7 @@ pub struct IndexWriter {
 /// Accumulate and write out index entries into files in an index directory.
 impl IndexWriter {
     /// Make a new builder that will write files into the given directory.
-    pub fn new(transport: Transport2) -> IndexWriter {
+    pub fn new(transport: Transport) -> IndexWriter {
         IndexWriter {
             transport,
             entries: Vec::new(),
@@ -279,17 +279,17 @@ fn hunk_relpath(hunk_number: u32) -> String {
 #[derive(Debug, Clone)]
 pub struct IndexRead {
     /// Transport pointing to this index directory.
-    transport: Transport2,
+    transport: Transport,
 }
 
 impl IndexRead {
     #[allow(unused)]
     // TODO: Deprecate, use Transport?
     pub(crate) fn open_path(path: &Path) -> IndexRead {
-        IndexRead::open(Transport2::local(path))
+        IndexRead::open(Transport::local(path))
     }
 
-    pub(crate) fn open(transport: Transport2) -> IndexRead {
+    pub(crate) fn open(transport: Transport) -> IndexRead {
         IndexRead { transport }
     }
 
@@ -336,7 +336,7 @@ impl IndexRead {
 pub struct IndexHunkIter {
     hunks: std::vec::IntoIter<u32>,
     /// The `i` directory within the band where all files for this index are written.
-    transport: Transport2,
+    transport: Transport,
     decompressor: Decompressor,
     pub stats: IndexReadStats,
     /// If set, yield only entries ordered after this apath.
@@ -525,7 +525,7 @@ mod tests {
 
     fn setup() -> (TempDir, IndexWriter) {
         let testdir = TempDir::new().unwrap();
-        let ib = IndexWriter::new(Transport2::local(testdir.path()));
+        let ib = IndexWriter::new(Transport::local(testdir.path()));
         (testdir, ib)
     }
 

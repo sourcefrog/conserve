@@ -46,7 +46,7 @@ use tracing_test::traced_test;
 
 use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
-use conserve::transport::Transport2;
+use conserve::transport::Transport;
 use conserve::{
     backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, BlockHash,
     EntryTrait, Exclude, RestoreOptions, ValidateOptions,
@@ -113,7 +113,7 @@ fn backup_after_damage(
     action.damage(&location.to_path(&archive_dir));
 
     // Open the archive again to avoid cache effects.
-    let archive = Archive::open(Transport2::local(archive_dir.path())).expect("open archive");
+    let archive = Archive::open(Transport::local(archive_dir.path())).expect("open archive");
 
     // A second backup should succeed.
     changes.apply(&source_dir);
@@ -262,7 +262,7 @@ impl DamageLocation {
                 .join(BandId::from(*band_id).to_string())
                 .join("BANDTAIL"),
             DamageLocation::Block(block_index) => {
-                let archive = Archive::open(Transport2::local(archive_dir)).expect("open archive");
+                let archive = Archive::open(Transport::local(archive_dir)).expect("open archive");
                 let block_dir = archive.block_dir();
                 let block_hash = block_dir
                     .blocks(TestMonitor::arc())

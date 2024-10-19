@@ -167,7 +167,7 @@ mod test {
 
     use super::*;
     use crate::kind::Kind;
-    use crate::transport::{self, Transport2};
+    use crate::transport::{self, Transport};
 
     #[test]
     fn read_file() {
@@ -177,7 +177,7 @@ mod test {
 
         temp.child(filename).write_str(content).unwrap();
 
-        let transport = Transport2::local(temp.path());
+        let transport = Transport::local(temp.path());
         let buf = transport.read_file(filename).unwrap();
         assert_eq!(buf, content.as_bytes());
 
@@ -187,7 +187,7 @@ mod test {
     #[test]
     fn read_file_not_found() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport2::local(temp.path());
+        let transport = Transport::local(temp.path());
 
         let err = transport
             .read_file("nonexistent.json")
@@ -213,7 +213,7 @@ mod test {
         let filename = "poem.txt";
         temp.child(filename).write_str(content).unwrap();
 
-        let transport = Transport2::local(temp.path());
+        let transport = Transport::local(temp.path());
 
         assert_eq!(
             transport.metadata(filename).unwrap(),
@@ -235,7 +235,7 @@ mod test {
             .write_str("Morning coffee")
             .unwrap();
 
-        let transport = Transport2::local(temp.path());
+        let transport = Transport::local(temp.path());
         let root_list = transport.list_dir(".").unwrap();
         assert_eq!(root_list.files, ["root file"]);
         assert_eq!(root_list.dirs, ["subdir"]);
@@ -253,7 +253,7 @@ mod test {
     #[test]
     fn write_file() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport2::local(temp.path());
+        let transport = Transport::local(temp.path());
 
         transport.create_dir("subdir").unwrap();
         transport
@@ -275,7 +275,7 @@ mod test {
         use std::os::unix::prelude::PermissionsExt;
 
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport2::local(temp.path());
+        let transport = Transport::local(temp.path());
         temp.child("file").touch().unwrap();
         fs::set_permissions(temp.child("file").path(), fs::Permissions::from_mode(0o000))
             .expect("set_permissions");
@@ -288,7 +288,7 @@ mod test {
     #[test]
     fn write_file_can_overwrite() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport2::local(temp.path());
+        let transport = Transport::local(temp.path());
         let filename = "filename";
         transport
             .write_file(filename, b"original content")
@@ -305,7 +305,7 @@ mod test {
     #[test]
     fn create_existing_dir() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport2::local(temp.path());
+        let transport = Transport::local(temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
@@ -317,7 +317,7 @@ mod test {
     #[test]
     fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport2::local(temp.path());
+        let transport = Transport::local(temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();
@@ -334,7 +334,7 @@ mod test {
     #[test]
     fn remove_dir_all() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport2::local(temp.path());
+        let transport = Transport::local(temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();

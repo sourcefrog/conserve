@@ -24,7 +24,7 @@ use jsonio::write_json;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
-use transport::Transport2;
+use transport::Transport;
 
 use crate::jsonio::read_json;
 use crate::monitor::Monitor;
@@ -40,7 +40,7 @@ pub struct Archive {
     pub(crate) block_dir: Arc<BlockDir>,
 
     /// Transport to the root directory of the archive.
-    transport: Transport2,
+    transport: Transport,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,11 +57,11 @@ pub struct DeleteOptions {
 impl Archive {
     /// Make a new archive in a local directory.
     pub fn create_path(path: &Path) -> Result<Archive> {
-        Archive::create(Transport2::local(path))
+        Archive::create(Transport::local(path))
     }
 
     /// Make a new archive in a new directory accessed by a Transport.
-    pub fn create(transport: Transport2) -> Result<Archive> {
+    pub fn create(transport: Transport) -> Result<Archive> {
         transport.create_dir("")?;
         let names = transport.list_dir("")?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
@@ -82,10 +82,10 @@ impl Archive {
     ///
     /// Checks that the header is correct.
     pub fn open_path(path: &Path) -> Result<Archive> {
-        Archive::open(Transport2::local(path))
+        Archive::open(Transport::local(path))
     }
 
-    pub fn open(transport: Transport2) -> Result<Archive> {
+    pub fn open(transport: Transport) -> Result<Archive> {
         let header: ArchiveHeader =
             read_json(&transport, HEADER_FILENAME)?.ok_or(Error::NotAnArchive)?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
@@ -136,7 +136,7 @@ impl Archive {
         Ok(band_ids)
     }
 
-    pub(crate) fn transport(&self) -> &Transport2 {
+    pub(crate) fn transport(&self) -> &Transport {
         &self.transport
     }
 

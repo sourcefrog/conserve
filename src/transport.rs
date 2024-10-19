@@ -44,14 +44,14 @@ pub mod s3;
 /// Files in Conserve archives have bounded size and fit in memory so this does not need to
 /// support streaming or partial reads and writes.
 #[derive(Clone)]
-pub struct Transport2 {
+pub struct Transport {
     protocol: Arc<dyn Protocol + 'static>,
 }
 
-impl Transport2 {
+impl Transport {
     /// Open a new local transport addressing a filesystem directory.
     pub fn local(path: &Path) -> Self {
-        Transport2 {
+        Transport {
             protocol: Arc::new(local::Protocol::new(path)),
         }
     }
@@ -59,9 +59,9 @@ impl Transport2 {
     /// Open a new transport from a string that might be a URL or local path.
     pub fn new(s: &str) -> Result<Self> {
         if let Ok(url) = Url::parse(s) {
-            Transport2::from_url(&url)
+            Transport::from_url(&url)
         } else {
-            Ok(Transport2::local(Path::new(s)))
+            Ok(Transport::local(Path::new(s)))
         }
     }
 
@@ -76,7 +76,7 @@ impl Transport2 {
             }
 
             #[cfg(feature = "s3")]
-            "s3" => Arc::new(s3::Protocol::new(&url)),
+            "s3" => Arc::new(s3::Protocol::new(&url)?),
 
             #[cfg(feature = "sftp")]
             "sftp" => Arc::new(sftp::Protocol::new(&url)?),
@@ -89,7 +89,7 @@ impl Transport2 {
                 })
             }
         };
-        Ok(Transport2 { protocol })
+        Ok(Transport { protocol })
     }
 
     /// Get one complete file into a caller-provided buffer.
@@ -111,7 +111,7 @@ impl Transport2 {
 
     /// Make a new transport addressing a subdirectory.
     pub fn sub_transport(&self, relpath: &str) -> Self {
-        Transport2 {
+        Transport {
             protocol: self.protocol.chdir(relpath),
         }
     }
@@ -157,7 +157,7 @@ impl Transport2 {
     }
 }
 
-impl fmt::Debug for Transport2 {
+impl fmt::Debug for Transport {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Transport2({})", self.url())
     }
@@ -184,50 +184,6 @@ trait Protocol: Send + Sync {
     fn local_path(&self) -> Option<PathBuf> {
         None
     }
-}
-
-pub trait Transport: Send + Sync + std::fmt::Debug {
-    fn list_dir(&self, relpath: &str) -> Result<ListDir>;
-
-    fn read_file(&self, path: &str) -> Result<Bytes>;
-
-    fn is_file(&self, path: &str) -> Result<bool> {
-        match self.metadata(path) {
-            Ok(metadata) => Ok(metadata.kind == Kind::File),
-            Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
-            Err(err) => Err(err),
-        }
-    }
-
-    /// Create a directory, if it does not exist.
-    ///
-    /// If the directory already exists, it's not an error.
-    ///
-    /// This function does not create missing parent directories.
-    fn create_dir(&self, relpath: &str) -> Result<()>;
-
-    /// Write a complete file.
-    ///
-    /// As much as possible, the file should be written atomically so that it is only visible with
-    /// the complete content. On a local filesystem the content is written to a temporary file and
-    /// then renamed.
-    /// If a temporary file is used, the name should start with `crate::TMP_PREFIX`.
-    ///
-    /// If the file exists it is replaced. (Across transports, and particularly on S3,
-    /// we can't rely on detecting existing files.)
-    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
-
-    /// Get metadata about a file.
-    fn metadata(&self, relpath: &str) -> Result<Metadata>;
-
-    /// Delete a file.
-    fn remove_file(&self, relpath: &str) -> Result<()>;
-
-    /// Delete a directory and all its contents.
-    fn remove_dir_all(&self, relpath: &str) -> Result<()>;
-
-    /// Make a new transport addressing a subdirectory.
-    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport>;
 }
 
 /// A directory entry read from a transport.
@@ -346,11 +302,11 @@ type Result<T> = result::Result<T, Error>;
 mod test {
     use std::path::Path;
 
-    use super::Transport2;
+    use super::Transport;
 
     #[test]
     fn get_path_from_local_transport() {
-        let transport = Transport2::local(Path::new("/tmp"));
+        let transport = Transport::local(Path::new("/tmp"));
         assert_eq!(transport.local_path().as_deref(), Some(Path::new("/tmp")));
     }
 }

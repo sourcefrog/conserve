@@ -20,13 +20,13 @@ use conserve::monitor::test::TestMonitor;
 use fail::FailScenario;
 
 use conserve::*;
-use transport::Transport2;
+use transport::Transport;
 
 #[test]
 fn create_dir_permission_denied() {
     let scenario = FailScenario::setup();
     fail::cfg("restore::create-dir", "return").unwrap();
-    let archive = Archive::open(Transport2::local(Path::new(
+    let archive = Archive::open(Transport::local(Path::new(
         "testdata/archive/simple/v0.6.10",
     )))
     .unwrap();
