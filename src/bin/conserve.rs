@@ -28,6 +28,7 @@ use time::UtcOffset;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
 
+use crate::transport::Transport;
 use conserve::termui::{enable_tracing, TermUiMonitor, TraceTimeStyle};
 use conserve::*;
 
@@ -327,7 +328,7 @@ impl Command {
                     ..Default::default()
                 };
                 let stats = backup(
-                    &Archive::open(open_transport(archive)?)?,
+                    &Archive::open(Transport::new(archive)?)?,
                     source,
                     &options,
                     monitor,
@@ -338,7 +339,7 @@ impl Command {
             }
             Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open(open_transport(archive)?)?
+                for hash in Archive::open(Transport::new(archive)?)?
                     .block_dir()
                     .blocks(monitor)?
                     .collect::<Vec<BlockHash>>()
@@ -353,7 +354,7 @@ impl Command {
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                let archive = Archive::open(open_transport(archive)?)?;
+                let archive = Archive::open(Transport::new(archive)?)?;
                 for hash in archive.referenced_blocks(&archive.list_band_ids()?, monitor)? {
                     writeln!(bw, "{hash}")?;
                 }
@@ -361,7 +362,7 @@ impl Command {
             Command::Debug(Debug::Unreferenced { archive }) => {
                 print!(
                     "{}",
-                    Archive::open(open_transport(archive)?)?
+                    Archive::open(Transport::new(archive)?)?
                         .unreferenced_blocks(monitor)?
                         .map(|hash| format!("{}\n", hash))
                         .collect::<Vec<String>>()
@@ -375,7 +376,7 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let stats = Archive::open(open_transport(archive)?)?.delete_bands(
+                let stats = Archive::open(Transport::new(archive)?)?.delete_bands(
                     backup,
                     &DeleteOptions {
                         dry_run: *dry_run,
@@ -418,7 +419,7 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let archive = Archive::open(open_transport(archive)?)?;
+                let archive = Archive::open(Transport::new(archive)?)?;
                 let stats = archive.delete_bands(
                     &[],
                     &DeleteOptions {
@@ -432,7 +433,7 @@ impl Command {
                 }
             }
             Command::Init { archive } => {
-                Archive::create(open_transport(archive)?)?;
+                Archive::create(Transport::new(archive)?)?;
                 debug!("Created new archive in {archive:?}");
             }
             Command::Ls {
@@ -481,7 +482,7 @@ impl Command {
                 no_stats,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
-                let archive = Archive::open(open_transport(archive)?)?;
+                let archive = Archive::open(Transport::new(archive)?)?;
                 let _ = no_stats; // accepted but ignored; we never currently print stats
                 let options = RestoreOptions {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
@@ -524,7 +525,7 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                Archive::open(open_transport(archive)?)?.validate(&options, monitor.clone())?;
+                Archive::open(Transport::new(archive)?)?.validate(&options, monitor.clone())?;
                 if monitor.error_count() != 0 {
                     warn!("Archive has some problems.");
                 } else {
@@ -543,7 +544,7 @@ impl Command {
                 } else {
                     Some(*LOCAL_OFFSET.read().unwrap())
                 };
-                let archive = Archive::open(open_transport(archive)?)?;
+                let archive = Archive::open(Transport::new(archive)?)?;
                 let options = ShowVersionsOptions {
                     newest_first: *newest,
                     tree_size: *sizes,
@@ -559,7 +560,7 @@ impl Command {
 }
 
 fn stored_tree_from_opt(archive_location: &str, backup: &Option<BandId>) -> Result<StoredTree> {
-    let archive = Archive::open(open_transport(archive_location)?)?;
+    let archive = Archive::open(Transport::new(archive_location)?)?;
     let policy = band_selection_policy_from_opt(backup);
     archive.open_stored_tree(policy)
 }

@@ -9,23 +9,21 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use tracing::{error, info, trace, warn};
+use tracing::{error, info, instrument, trace, warn};
 use url::Url;
 
 use crate::Kind;
 
-use super::{Error, ErrorKind, ListDir, Result, Transport};
+use super::{Error, ErrorKind, ListDir, Result};
 
-/// Archive file I/O over SFTP.
-#[derive(Clone)]
-pub struct SftpTransport {
+pub(super) struct Protocol {
     url: Url,
     sftp: Arc<ssh2::Sftp>,
     base_path: PathBuf,
 }
 
-impl SftpTransport {
-    pub fn new(url: &Url) -> Result<SftpTransport> {
+impl Protocol {
+    pub fn new(url: &Url) -> Result<Self> {
         assert_eq!(url.scheme(), "sftp");
         let addr = format!(
             "{}:{}",
@@ -66,9 +64,9 @@ impl SftpTransport {
             error!(?err, "Error opening SFTP session");
             ssh_error(err, url.as_ref())
         })?;
-        Ok(SftpTransport {
+        Ok(Protocol {
+            url: url.to_owned(),
             sftp: Arc::new(sftp),
-            url: url.clone(),
             base_path: url.path().into(),
         })
     }
@@ -81,15 +79,7 @@ impl SftpTransport {
     }
 }
 
-impl fmt::Debug for SftpTransport {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SftpTransport")
-            .field("url", &self.url)
-            .finish()
-    }
-}
-
-impl Transport for SftpTransport {
+impl super::Protocol for Protocol {
     fn list_dir(&self, path: &str) -> Result<ListDir> {
         let full_path = &self.base_path.join(path);
         trace!("iter_dir_entries {:?}", full_path);
@@ -192,8 +182,8 @@ impl Transport for SftpTransport {
             .map_err(|err| ssh_error(err, relpath))
     }
 
+    #[instrument]
     fn remove_dir_all(&self, path: &str) -> Result<()> {
-        trace!(?path, "SftpTransport::remove_dir_all");
         let mut dirs_to_walk = vec![path.to_owned()];
         let mut dirs_to_delete = vec![path.to_owned()];
         while let Some(dir) = dirs_to_walk.pop() {
@@ -224,15 +214,26 @@ impl Transport for SftpTransport {
         // self.sftp.rmdir(&full_path).map_err(translate_error)
     }
 
-    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
+    fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
         let base_path = self.base_path.join(relpath);
-        let mut url = self.url.clone();
-        url.set_path(base_path.to_str().unwrap());
-        Arc::new(SftpTransport {
+        let url = self.url.join(relpath).expect("join URL");
+        Arc::new(Protocol {
             url,
             sftp: Arc::clone(&self.sftp),
             base_path,
         })
+    }
+
+    fn url(&self) -> &Url {
+        &self.url
+    }
+}
+
+impl fmt::Debug for Protocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("sftp::Protocol")
+            .field("url", &self.url)
+            .finish()
     }
 }
 
