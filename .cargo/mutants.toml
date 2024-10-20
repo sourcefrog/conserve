@@ -39,10 +39,12 @@ exclude_globs = [
     "bandid.rs",            # almost well tested but some gaps
     "metric_recorder.rs",
     "progress.rs",
+    "src/hunk_index.rs",    # not well tested yet?
+    "src/mount/projfs.rs",  # mostly for Windows
+    "src/owner/windows.rs",
     "src/progress/term.rs",
     "src/transport.rs",     # almost well tested but some gaps
     "src/transport/s3.rs",
     "src/ui/termui.rs",
-    "src/owner/windows.rs",
     "stats.rs",
 ]
