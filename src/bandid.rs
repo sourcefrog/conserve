@@ -49,6 +49,9 @@ impl BandId {
     ///
     /// Currently only implemented for top-level bands.
     #[must_use]
+    #[mutants::skip]
+    // TODO: Mutating this currently causes a hang; it ought to be fixed by changing stitch to
+    // list the bands that are present rather than repeatedly subtracting.
     pub fn previous(&self) -> Option<BandId> {
         if self.0 == 0 {
             None

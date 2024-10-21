@@ -114,8 +114,7 @@ automatically excluded from backups.
 From 23.9 Conserve supports storing backups in Amazon S3. AWS IAM credentials are
 read from the standard sources: the environment, config file, or, on EC2, the instance metadata service.
 
-S3 support can be turned off by passing `cargo install --no-default-features`. (There's no
-runtime impact if it is not used, but it does add a lot of build-time dependencies.)
+S3 support is not built by default, but can be turned on by passing `cargo install --features s3`.
 
 To use this, just specify an S3 URL for the archive location. The bucket must already exist.
 
@@ -141,9 +140,12 @@ To install from a git checkout, run
 
 [rust]: https://rustup.rs/
 
-On nightly Rust only, and only on x86_64, you can enable a slight speed-up with
+### Optional features
 
-    cargo +nightly install -f --path . --features blake2-rfc/simd_asm
+The following options can be enabled with `--features`:
+
+* `s3`: support for storing backups in Amazon S3 (or compatible services)
+* `sftp`: support for storing backups on SFTP servers, addressed with `sftp://` URLs
 
 ### Arch Linux
 

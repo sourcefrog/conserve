@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Changed: S3 is no longer built by default, because it adds many dependencies. It can be turned on again with `--features s3`.
+
+## 24.8.0
+
+- Fixed: `restore --only` specifying a subdirectory no longer fails due to parent directories missing from the destination.
+
+- Fixed: More detail about the causes of errors in the log.
+
 - `restore` no longer prints stats, due to internal changes; this will be restored later.
 
 - Minimum Rust version increased to 1.74 due to updated dependencies.

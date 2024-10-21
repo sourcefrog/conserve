@@ -116,7 +116,7 @@ pub struct DecodeFilenameError<'name> {
     name: &'name OsStr,
 }
 
-impl<'name> fmt::Display for DecodeFilenameError<'name> {
+impl fmt::Display for DecodeFilenameError<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Couldn't decode filename {:?}", self.name)
     }
@@ -136,12 +136,6 @@ impl fmt::Display for ApathParseError {
 impl From<Apath> for String {
     fn from(a: Apath) -> String {
         a.0
-    }
-}
-
-impl<'a> From<&'a Apath> for &'a str {
-    fn from(a: &'a Apath) -> &'a str {
-        &a.0
     }
 }
 
@@ -315,6 +309,47 @@ mod test {
     fn parse() {
         let apath: Apath = "/something".parse().unwrap();
         assert_eq!(apath.to_string(), "/something");
+    }
+
+    #[test]
+    fn apath_eq_str() {
+        let apath: Apath = "/something".parse().unwrap();
+        assert_eq!(apath, "/something");
+        assert_ne!(apath, "/something/else");
+    }
+
+    #[test]
+    fn str_eq_apath() {
+        let apath: Apath = "/something".parse().unwrap();
+        assert_eq!("/something", apath);
+        assert_ne!("/something/else", apath);
+    }
+
+    #[test]
+    fn eq_apath() {
+        let apath: Apath = "/something".parse().unwrap();
+        assert_eq!(apath, Apath::from("/something"));
+        assert_ne!(apath, Apath::from("/something/else"));
+    }
+
+    #[test]
+    fn asref_str() {
+        let apath: Apath = "/something".parse().unwrap();
+        let s: &str = apath.as_ref();
+        assert_eq!(s, "/something");
+    }
+
+    #[test]
+    fn display_apath() {
+        let apath: Apath = "/something".parse().unwrap();
+        assert_eq!(format!("{}", apath), "/something");
+    }
+
+    #[test]
+    fn str_from_apath() {
+        let apath: Apath = "/something".parse().unwrap();
+        let s: &str = apath.as_ref();
+        assert_eq!(s, "/something");
     }
 
     #[test]

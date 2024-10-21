@@ -20,14 +20,13 @@ pub trait MountHandle {
     fn mount_root(&self) -> &Path;
 }
 
-pub fn mount(
-    archive: Archive,
-    destination: &Path,
-    options: MountOptions,
-) -> Result<Box<dyn MountHandle>> {
-    #[cfg(windows)]
-    return projfs::mount(archive, destination, options);
-
+#[cfg(windows)]
+pub use projfs::mount;
     #[cfg(not(windows))]
-    return Err(crate::Error::NotImplemented);
+pub fn mount(
+    _archive: Archive,
+    _destination: &Path,
+    _options: MountOptions,
+) -> Result<Box<dyn MountHandle>> {
+    Err(crate::Error::NotImplemented)
 }

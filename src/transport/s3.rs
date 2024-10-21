@@ -45,9 +45,10 @@ use tokio::runtime::Runtime;
 use tracing::{debug, trace, trace_span};
 use url::Url;
 
-use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, Transport};
+use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result};
 
-pub struct S3Transport {
+pub(super) struct Protocol {
+    url: Url,
     /// Tokio runtime specifically for S3 IO.
     ///
     /// S3 SDK is built on Tokio but the rest of Conserve uses threads.
@@ -64,31 +65,18 @@ pub struct S3Transport {
     storage_class: StorageClass,
 }
 
-impl fmt::Debug for S3Transport {
-    #[mutants::skip] // unimportant to test
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("S3Transport")
-            .field("bucket", &self.bucket)
-            .field("base_path", &self.base_path)
-            .finish()
-    }
-}
+impl Protocol {
+    pub(super) fn new(url: &Url) -> Result<Self> {
+        assert_eq!(url.scheme(), "s3");
 
-// Clippy false positive here: https://github.com/rust-lang/rust-clippy/issues/12444
-#[allow(clippy::assigning_clones)]
-impl S3Transport {
-    pub fn new(base_url: &Url) -> Result<Arc<Self>> {
         // Like in <https://tokio.rs/tokio/topics/bridging>.
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .map_err(|err| Error::io_error(Path::new(""), err))?;
 
-        let bucket = base_url.authority().to_owned();
-        assert!(
-            !bucket.is_empty(),
-            "S3 bucket name is empty in {base_url:?}"
-        );
+        let bucket = url.authority().to_owned();
+        assert!(!bucket.is_empty(), "S3 bucket name is empty in {url:?}");
 
         // Find the bucket region.
         let config = load_aws_config(&runtime, None);
@@ -110,7 +98,7 @@ impl S3Transport {
         let config = load_aws_config(&runtime, region);
         let client = aws_sdk_s3::Client::new(&config);
 
-        let mut base_path = base_url.path().to_owned();
+        let mut base_path = url.path().to_owned();
         if !base_path.is_empty() {
             base_path = base_path
                 .strip_prefix('/')
@@ -120,13 +108,28 @@ impl S3Transport {
         }
         debug!(%bucket, %base_path);
 
-        Ok(Arc::new(S3Transport {
+        Ok(Protocol {
             bucket,
             base_path,
             client: Arc::new(client),
             runtime: Arc::new(runtime),
             storage_class: StorageClass::IntelligentTiering,
-        }))
+            url: url.to_owned(),
+        })
+    }
+
+    fn join_path(&self, relpath: &str) -> String {
+        join_paths(&self.base_path, relpath)
+    }
+}
+
+impl fmt::Debug for Protocol {
+    #[mutants::skip] // unimportant to test
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("conserve::transport::s3::Protocol")
+            .field("bucket", &self.bucket)
+            .field("base_path", &self.base_path)
+            .finish()
     }
 }
 
@@ -177,7 +180,7 @@ fn join_paths(a: &str, b: &str) -> String {
     result
 }
 
-impl Transport for S3Transport {
+impl super::Protocol for Protocol {
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         let _span = trace_span!("S3Transport::list_file", %relpath).entered();
         let mut prefix = self.join_path(relpath);
@@ -358,26 +361,19 @@ impl Transport for S3Transport {
         }
     }
 
-    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
-        Arc::new(S3Transport {
+    fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
+        Arc::new(Protocol {
             base_path: join_paths(&self.base_path, relpath),
             bucket: self.bucket.clone(),
             runtime: self.runtime.clone(),
             client: self.client.clone(),
             storage_class: self.storage_class.clone(),
+            url: self.url.join(relpath).expect("join URL"),
         })
     }
-}
 
-impl S3Transport {
-    fn join_path(&self, relpath: &str) -> String {
-        join_paths(&self.base_path, relpath)
-    }
-}
-
-impl AsRef<dyn Transport> for S3Transport {
-    fn as_ref(&self) -> &(dyn Transport + 'static) {
-        self
+    fn url(&self) -> &Url {
+        &self.url
     }
 }
 
