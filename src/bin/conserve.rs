@@ -494,13 +494,11 @@ impl Command {
                 let projection = match mount(archive, destination, options) {
                     Ok(handle) => handle,
                     Err(Error::MountDestinationExists) => {
-                        error!("The destination already exists.");
-                        error!("Please ensure, that the destination does not exists.");
+                        error!("Mount point {} already exists", destination.display());
                         return Ok(ExitCode::Failure);
                     }
                     Err(Error::MountDestinationDoesNotExists) => {
-                        error!("The destination does not exists.");
-                        error!("Please ensure, that the destination does exist prior mounting.");
+                        error!("Mount destination {} does not exist", destination.display());
                         return Ok(ExitCode::Failure);
                     }
                     Err(error) => return Err(error),
