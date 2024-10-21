@@ -489,7 +489,7 @@ impl Command {
                 destination,
                 cleanup,
             } => {
-                let archive = Archive::open(open_transport(archive)?)?;
+                let archive = Archive::open(Transport::new(archive)?)?;
                 let options = MountOptions { clean: *cleanup };
                 let projection = match mount(archive, destination, options) {
                     Ok(handle) => handle,
