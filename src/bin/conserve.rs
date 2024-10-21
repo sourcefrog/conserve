@@ -15,7 +15,7 @@
 
 use std::cell::RefCell;
 use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Write};
+use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
@@ -180,6 +180,21 @@ enum Command {
         long_listing: bool,
     },
 
+    /// Mount the archive as projection.
+    #[cfg(windows)]
+    Mount {
+        /// The archive to mount
+        archive: String,
+
+        /// Target folder where the archive should be mounted to
+        destination: PathBuf,
+
+        /// Create the target folder and remove all temporarily created
+        /// files on exit
+        #[arg(long, default_value_t = true)]
+        cleanup: bool,
+    },
+
     /// Copy a stored tree to a restore directory.
     Restore {
         archive: String,
@@ -306,7 +321,7 @@ impl std::process::Termination for ExitCode {
 
 impl Command {
     fn run(&self, monitor: Arc<TermUiMonitor>) -> Result<ExitCode> {
-        let mut stdout = std::io::stdout();
+        let mut stdout = io::stdout();
         match self {
             Command::Backup {
                 archive,
@@ -467,6 +482,40 @@ impl Command {
                 } else {
                     show::show_entry_names(entry_iter, &mut stdout, *long_listing)?;
                 }
+            }
+            #[cfg(windows)]
+            Command::Mount {
+                archive,
+                destination,
+                cleanup,
+            } => {
+                let archive = Archive::open(Transport::new(archive)?)?;
+                let options = MountOptions { clean: *cleanup };
+                let projection = match mount(archive, destination, options) {
+                    Ok(handle) => handle,
+                    Err(Error::MountDestinationExists) => {
+                        error!("Mount point {} already exists", destination.display());
+                        return Ok(ExitCode::Failure);
+                    }
+                    Err(Error::MountDestinationDoesNotExists) => {
+                        error!("Mount destination {} does not exist", destination.display());
+                        return Ok(ExitCode::Failure);
+                    }
+                    Err(error) => return Err(error),
+                };
+
+                info!(
+                    "Projection started at {}.",
+                    projection.mount_root().display()
+                );
+                {
+                    info!("Press any key to stop the projection...");
+                    let mut stdin = io::stdin();
+                    let _ = stdin.read(&mut [0u8]).unwrap();
+                }
+
+                info!("Stopping projection.");
+                drop(projection);
             }
             Command::Restore {
                 archive,
