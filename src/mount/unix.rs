@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use crate::{Archive, Result, Error};
 use super::{MountHandle, MountOptions};
+use crate::{Archive, Error, Result};
 
 pub fn mount(
     _archive: Archive,
