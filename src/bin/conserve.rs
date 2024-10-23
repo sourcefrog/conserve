@@ -180,7 +180,22 @@ enum Command {
         long_listing: bool,
     },
 
-    /// Mount the archive as projection.
+    /// Mount the archive as a filesystem.
+    ///
+    /// Files and directories from all previous backups are visible.
+    ///
+    /// This is currently only supported on Windows.
+    ///
+    /// On Windows you must first enable the Projected Filesystem feature by running this command
+    /// in an elevated PowerShell:
+    ///
+    ///     Enable-WindowsOptionalFeature -Online -FeatureName Client-ProjFS -NoRestart
+    ///
+    /// ProjFS by default retains extracted files in the destination directory. This can make
+    /// access to the archive faster on subsequent mounts, but will use more disk space.
+    ///
+    /// If `--cleanup-projfs` is set, then the directory will be deleted when the projection is stopped.
+    /// Also, if this option is set, the destination directory must not exist.
     #[cfg(windows)]
     Mount {
         /// The archive to mount
@@ -191,8 +206,8 @@ enum Command {
 
         /// Create the target folder and remove all temporarily created
         /// files on exit
-        #[arg(long, default_value_t = true)]
-        cleanup: bool,
+        #[arg(long)]
+        cleanup_projfs: bool,
     },
 
     /// Copy a stored tree to a restore directory.
@@ -487,7 +502,7 @@ impl Command {
             Command::Mount {
                 archive,
                 destination,
-                cleanup,
+                cleanup_projfs: cleanup,
             } => {
                 use std::io::Read;
 
