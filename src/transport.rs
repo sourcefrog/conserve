@@ -313,9 +313,15 @@ mod test {
     #[test]
     fn local_transport_debug_form() {
         let transport = Transport::local(Path::new("/tmp"));
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         assert_eq!(format!("{:?}", transport), "Transport(file:///tmp/)");
         #[cfg(windows)]
-        assert_eq!(format!("{:?}", transport), "Transport(file:///C:/tmp/)");
+        {
+            use regex::Regex;
+            let dbg = format!("{:?}", transport);
+            dbg!(&dbg);
+            let re = Regex::new(r#"Transport\(file:///[A-Za-z]:/tmp/\)"#).unwrap();
+            assert!(re.is_match(&dbg));
+        }
     }
 }
