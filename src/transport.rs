@@ -159,7 +159,7 @@ impl Transport {
 
 impl fmt::Debug for Transport {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Transport2({})", self.url())
+        write!(f, "Transport({})", self.url())
     }
 }
 
@@ -308,5 +308,14 @@ mod test {
     fn get_path_from_local_transport() {
         let transport = Transport::local(Path::new("/tmp"));
         assert_eq!(transport.local_path().as_deref(), Some(Path::new("/tmp")));
+    }
+
+    #[test]
+    fn local_transport_debug_form() {
+        let transport = Transport::local(Path::new("/tmp"));
+        #[cfg(not(windows))]
+        assert_eq!(format!("{:?}", transport), "Transport(file:///tmp/)");
+        #[cfg(windows)]
+        assert_eq!(format!("{:?}", transport), "Transport(file:///C:/tmp/)");
     }
 }
