@@ -19,7 +19,6 @@ use std::io;
 use std::path::Path;
 
 use super::Owner;
-use crate::Result;
 
 impl From<&Metadata> for Owner {
     fn from(_: &Metadata) -> Self {
