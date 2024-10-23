@@ -313,6 +313,9 @@ mod test {
     #[test]
     fn local_transport_debug_form() {
         let transport = Transport::local(Path::new("/tmp"));
+        #[cfg(not(windows))]
         assert_eq!(format!("{:?}", transport), "Transport(file:///tmp/)");
+        #[cfg(windows)]
+        assert_eq!(format!("{:?}", transport), "Transport(file:///C:/tmp/)");
     }
 }
