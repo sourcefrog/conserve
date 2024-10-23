@@ -1,3 +1,9 @@
+// TODO: This uses single indexes, but for consistency with the rest of Conserve
+// it should probably use stitched indexes, so that it sees the continuation
+// of interrupted backups.
+
+// TODO: Unit tests.
+
 use std::cmp::Ordering;
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -24,7 +30,7 @@ impl IndexHunkIndex {
     ///
     /// Note:
     /// Depending on the index size this might not be a cheap operation
-    /// as we loop trough every hunk and read its contents.
+    /// as we loop through every hunk and read its contents.
     pub fn from_index(index: &IndexRead) -> Result<Self> {
         let mut hunk_info = index
             .hunks_available()?
