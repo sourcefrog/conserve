@@ -15,7 +15,7 @@
 
 use std::cell::RefCell;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufWriter, Read, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
@@ -489,6 +489,8 @@ impl Command {
                 destination,
                 cleanup,
             } => {
+                use std::io::Read;
+
                 let archive = Archive::open(Transport::new(archive)?)?;
                 let options = MountOptions { clean: *cleanup };
                 let projection = match mount(archive, destination, options) {

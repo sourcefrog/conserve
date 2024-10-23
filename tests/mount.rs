@@ -11,6 +11,7 @@ use conserve::{
 };
 use tempfile::TempDir;
 
+#[cfg(windows)]
 fn read_dir(path: &Path) -> Vec<(bool, String)> {
     fs::read_dir(path)
         .unwrap()
