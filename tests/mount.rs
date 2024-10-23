@@ -1,3 +1,6 @@
+// Mostly inactive on Unix, as the mount function is not implemented for Unix.
+#![cfg_attr(not(windows), allow(unused))]
+
 use std::{
     fs::{self},
     path::Path,

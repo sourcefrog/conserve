@@ -4,6 +4,9 @@
 
 // TODO: Unit tests.
 
+// This is currently only used by projfs, but is not inherently Windows-specific.
+#![cfg_attr(not(windows), allow(unused))]
+
 use std::cmp::Ordering;
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};

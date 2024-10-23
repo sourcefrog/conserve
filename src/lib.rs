@@ -27,7 +27,6 @@ pub mod entry;
 pub mod errors;
 pub mod excludes;
 mod gc_lock;
-#[cfg(windows)] // currently only used by projfs
 mod hunk_index;
 pub mod index;
 mod io;
