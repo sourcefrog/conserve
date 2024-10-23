@@ -1,9 +1,10 @@
 use std::path::Path;
 
-use crate::{Archive, Result};
-
 #[cfg(windows)]
 mod projfs;
+
+#[cfg(unix)]
+mod unix;
 
 /// Options for mounting an archive
 /// into an existing file systems.
@@ -22,11 +23,6 @@ pub trait MountHandle {
 
 #[cfg(windows)]
 pub use projfs::mount;
-    #[cfg(not(windows))]
-pub fn mount(
-    _archive: Archive,
-    _destination: &Path,
-    _options: MountOptions,
-) -> Result<Box<dyn MountHandle>> {
-    Err(crate::Error::NotImplemented)
-}
+
+#[cfg(unix)]
+pub use unix::mount;
