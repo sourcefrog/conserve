@@ -177,9 +177,14 @@ impl Transport for LocalTransport {
             .full_path(relpath)
             .metadata()
             .map_err(|err| self.io_error(relpath, err))?;
+        let modified = fsmeta
+            .modified()
+            .map_err(|err| self.io_error(relpath, err))?
+            .into();
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),
+            modified,
         })
     }
 }
@@ -193,9 +198,12 @@ impl AsRef<dyn Transport> for LocalTransport {
 #[cfg(test)]
 mod test {
     use std::error::Error;
+    use std::time::Duration;
 
+    use assert_cmd::assert;
     use assert_fs::prelude::*;
     use predicates::prelude::*;
+    use time::OffsetDateTime;
 
     use super::*;
     use crate::kind::Kind;
@@ -255,13 +263,12 @@ mod test {
 
         let transport = LocalTransport::new(temp.path());
 
-        assert_eq!(
-            transport.metadata(filename).unwrap(),
-            Metadata {
-                len: 24,
-                kind: Kind::File
-            }
-        );
+        let metadata = transport.metadata(filename).unwrap();
+        dbg!(&metadata);
+
+        assert_eq!(metadata.len, 24);
+        assert_eq!(metadata.kind, Kind::File);
+        assert!(metadata.modified + Duration::from_secs(60) > OffsetDateTime::now_utc());
         assert!(transport.metadata("nopoem").unwrap_err().is_not_found());
     }
 

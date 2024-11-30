@@ -27,6 +27,7 @@
 use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use aws_config::{AppName, BehaviorVersion};
 use aws_sdk_s3::error::SdkError;
@@ -356,10 +357,18 @@ impl Transport for S3Transport {
                     .expect("S3 HeadObject response should have a content_length")
                     .try_into()
                     .expect("Content length non-negative");
+                let modified = response
+                    .last_modified
+                    .expect("S3 HeadObject response should have a last_modified");
+                let modified: SystemTime = modified
+                    .try_into()
+                    .expect("S3 last_modified is valid SystemTime");
+                let modified = modified.into();
                 trace!(?len, "File exists");
                 Ok(Metadata {
                     kind: Kind::File,
                     len,
+                    modified,
                 })
             }
             Err(err) => {
