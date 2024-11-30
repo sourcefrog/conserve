@@ -27,6 +27,7 @@
 use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use aws_config::{AppName, BehaviorVersion};
 use aws_sdk_s3::error::SdkError;
@@ -41,6 +42,7 @@ use aws_types::region::Region;
 use aws_types::SdkConfig;
 use base64::Engine;
 use bytes::Bytes;
+use time::OffsetDateTime;
 use tokio::runtime::Runtime;
 use tracing::{debug, instrument, trace, trace_span};
 use url::Url;
@@ -346,10 +348,17 @@ impl super::Protocol for Protocol {
                     .expect("S3 HeadObject response should have a content_length")
                     .try_into()
                     .expect("Content length non-negative");
+                let modified: SystemTime = response
+                    .last_modified
+                    .expect("S3 HeadObject response should have a last_modified")
+                    .try_into()
+                    .expect("S3 last_modified is valid SystemTime");
+                let modified: Option<OffsetDateTime> = Some(modified.into());
                 trace!(?len, "File exists");
                 Ok(Metadata {
                     kind: Kind::File,
                     len,
+                    modified,
                 })
             }
             Err(err) => {

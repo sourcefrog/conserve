@@ -20,6 +20,7 @@ use std::{error, fmt, io, result};
 
 use bytes::Bytes;
 use derive_more::Display;
+use time::OffsetDateTime;
 use url::Url;
 
 use crate::*;
@@ -212,6 +213,9 @@ pub struct Metadata {
 
     /// Kind of file.
     pub kind: Kind,
+
+    /// Last modified time, if known.
+    pub modified: Option<OffsetDateTime>,
 }
 
 /// A list of all the files and directories in a directory.

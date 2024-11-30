@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use time::OffsetDateTime;
 use tracing::{error, info, instrument, trace, warn};
 use url::Url;
 
@@ -188,9 +189,13 @@ impl super::Protocol for Protocol {
         let full_path = self.base_path.join(relpath);
         let stat = self.lstat(relpath)?;
         trace!("metadata {full_path:?}");
+        let modified: Option<OffsetDateTime> = stat
+            .mtime
+            .and_then(|mtime| OffsetDateTime::from_unix_timestamp(mtime as i64).ok());
         Ok(super::Metadata {
             kind: stat.file_type().into(),
             len: stat.size.unwrap_or_default(),
+            modified,
         })
     }
 
