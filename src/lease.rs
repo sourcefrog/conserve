@@ -2,20 +2,18 @@
 
 //! Leases controlling write access to an archive.
 
+use std::process;
 use std::{sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::OffsetDateTime;
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, trace, warn};
 use url::Url;
 
-use crate::{
-    jsonio::{self, read_json},
-    transport, Transport,
-};
+use crate::{transport, Transport};
 
-pub static LEASE_FILENAME: &str = "LEASE.json";
+pub static LEASE_FILENAME: &str = "LEASE";
 
 /// A lease on an archive.
 #[derive(Debug)]
@@ -35,6 +33,9 @@ pub enum Error {
         content: Box<LeaseContent>,
     },
 
+    #[error("Existing lease file {url} is corrupt")]
+    Corrupt { url: Url },
+
     #[error("Transport error on lease file: {source}")]
     Transport {
         #[from]
@@ -50,18 +51,19 @@ type Result<T> = std::result::Result<T, Error>;
 impl Lease {
     /// Acquire a lease, if one is available.
     ///
-    /// Returns [Error::Busy] if the lease is already held by another process.
+    /// Returns [Error::Busy] or [Error::Corrupt] if the lease is already held by another process.
     #[instrument]
-    pub fn acquire(transport: Arc<dyn Transport>) -> Result<Self> {
+    pub fn try_acquire(transport: Arc<dyn Transport>) -> Result<Self> {
         let lease_taken = OffsetDateTime::now_utc();
         let lease_expiry = lease_taken + Duration::from_secs(5 * 60);
         let content = LeaseContent {
             host: hostname::get()
                 .unwrap_or_default()
                 .to_string_lossy()
-                .into_owned(),
-            pid: std::process::id(),
-            client_version: crate::VERSION.to_string(),
+                .into_owned()
+                .into(),
+            pid: Some(process::id()),
+            client_version: Some(crate::VERSION.to_string()),
             lease_taken,
             lease_expiry,
         };
@@ -74,14 +76,17 @@ impl Lease {
         {
             if err.kind() == transport::ErrorKind::AlreadyExists {
                 match Lease::peek(transport.as_ref())? {
-                    Some(content) => {
+                    LeaseState::Held(content) => {
                         return Err(Error::Busy {
                             url,
                             content: Box::new(content),
                         })
                     }
-                    None => {
-                        debug!("Lease file disappeared after conflict");
+                    LeaseState::Corrupt(_mtime) => {
+                        return Err(Error::Corrupt { url });
+                    }
+                    LeaseState::Free => {
+                        debug!("Lease file disappeared after conflict; retrying");
                         continue;
                     }
                 }
@@ -107,26 +112,47 @@ impl Lease {
     }
 
     /// Return information about the current leaseholder, if any.
-    pub fn peek(transport: &dyn Transport) -> Result<Option<LeaseContent>> {
-        read_json(transport, LEASE_FILENAME).map_err(|err| match err {
-            jsonio::Error::Transport { source, .. } => Error::Transport { source },
-            jsonio::Error::Json { source, .. } => Error::Json {
-                source,
-                url: transport.base_url().join(LEASE_FILENAME).unwrap(),
-            },
-        })
+    pub fn peek(transport: &dyn Transport) -> Result<LeaseState> {
+        // TODO: Atomically get the content and mtime; that should be one call on s3.
+        let metadata = match transport.metadata(LEASE_FILENAME) {
+            Ok(m) => m,
+            Err(err) if err.is_not_found() => {
+                trace!("lease file not present");
+                return Ok(LeaseState::Free);
+            }
+            Err(err) => {
+                warn!(?err, "error getting lease file metadata");
+                return Err(err.into());
+            }
+        };
+        let bytes = transport.read_file(LEASE_FILENAME)?;
+        match serde_json::from_slice(&bytes) {
+            Ok(content) => Ok(LeaseState::Held(content)),
+            Err(err) => {
+                warn!(?err, "error deserializing lease file");
+                // We do still at least know that it's held, and when it was taken.
+                Ok(LeaseState::Corrupt(metadata.modified))
+            }
+        }
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum LeaseState {
+    Free,
+    Held(LeaseContent),
+    Corrupt(OffsetDateTime),
+}
+
 /// Contents of the lease file.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LeaseContent {
     /// Hostname of the client process
-    pub host: String,
+    pub host: Option<String>,
     /// Process id of the client.
-    pub pid: u32,
+    pub pid: Option<u32>,
     /// Conserve version string.
-    pub client_version: String,
+    pub client_version: Option<String>,
 
     /// Time when the lease was taken.
     #[serde(with = "time::serde::iso8601")]
@@ -139,25 +165,85 @@ pub struct LeaseContent {
 
 #[cfg(test)]
 mod test {
+    use std::fs::{write, File};
+    use std::process;
+
     use tempfile::TempDir;
 
     use crate::transport::open_local_transport;
 
-    use super::Lease;
+    use super::{Lease, LeaseState};
 
     #[test]
     fn take_lease() {
         let tmp = TempDir::new().unwrap();
         let transport = open_local_transport(tmp.path()).unwrap();
-        let lease = Lease::acquire(transport.clone()).unwrap();
-        assert!(tmp.path().join("LEASE.json").exists());
+        let lease = Lease::try_acquire(transport.clone()).unwrap();
+        assert!(tmp.path().join("LEASE").exists());
         assert!(lease.next_renewal > lease.lease_taken);
 
-        let peeked = Lease::peek(transport.as_ref()).unwrap().unwrap();
-        assert_eq!(peeked.host, hostname::get().unwrap().to_string_lossy());
-        assert_eq!(peeked.pid, std::process::id());
+        let peeked = Lease::peek(transport.as_ref()).unwrap();
+        let LeaseState::Held(content) = peeked else {
+            panic!("lease not held")
+        };
+        assert_eq!(
+            content.host.unwrap(),
+            hostname::get().unwrap().to_string_lossy()
+        );
+        assert_eq!(content.pid, Some(process::id()));
 
         lease.release().unwrap();
-        assert!(!tmp.path().join("LEASE.json").exists());
+        assert!(!tmp.path().join("LEASE").exists());
+    }
+
+    #[test]
+    fn peek_fixed_lease_content() {
+        let tmp = TempDir::new().unwrap();
+        let transport = open_local_transport(tmp.path()).unwrap();
+        write(
+            tmp.path().join("LEASE"),
+            r#"
+        {
+            "host": "somehost",
+            "pid": 1234,
+            "client_version": "0.1.2",
+            "lease_taken": "2021-01-01T12:34:56Z",
+            "lease_expiry": "2021-01-01T12:35:56Z"
+        }"#,
+        )
+        .unwrap();
+        let state = Lease::peek(transport.as_ref()).unwrap();
+        dbg!(&state);
+        match state {
+            LeaseState::Held(content) => {
+                assert_eq!(content.host.unwrap(), "somehost");
+                assert_eq!(content.pid, Some(1234));
+                assert_eq!(content.client_version.unwrap(), "0.1.2");
+                assert_eq!(content.lease_taken.year(), 2021);
+                assert_eq!(content.lease_expiry.year(), 2021);
+                assert_eq!(
+                    content.lease_expiry - content.lease_taken,
+                    time::Duration::seconds(60)
+                );
+            }
+            _ => panic!("lease should be recognized as held, got {state:?}"),
+        }
+    }
+
+    /// An empty lease file is judged by its mtime; the lease can be grabbed a while
+    /// after it was last written.
+    #[test]
+    fn peek_corrupt_empty_lease() {
+        let tmp = TempDir::new().unwrap();
+        let transport = open_local_transport(tmp.path()).unwrap();
+        File::create(tmp.path().join("LEASE")).unwrap();
+        let state = Lease::peek(transport.as_ref()).unwrap();
+        match state {
+            LeaseState::Corrupt(mtime) => {
+                let now = time::OffsetDateTime::now_utc();
+                assert!(now - mtime < time::Duration::seconds(15));
+            }
+            _ => panic!("lease should be recognized as corrupt, got {state:?}"),
+        }
     }
 }
