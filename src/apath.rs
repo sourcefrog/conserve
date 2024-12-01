@@ -116,7 +116,7 @@ pub struct DecodeFilenameError<'name> {
     name: &'name OsStr,
 }
 
-impl<'name> fmt::Display for DecodeFilenameError<'name> {
+impl fmt::Display for DecodeFilenameError<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Couldn't decode filename {:?}", self.name)
     }

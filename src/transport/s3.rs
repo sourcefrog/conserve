@@ -291,8 +291,8 @@ impl Transport for S3Transport {
         Ok(())
     }
 
-    fn write_new_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
-        todo!()
+    fn write_new_file(&self, _relpath: &str, _content: &[u8]) -> Result<()> {
+        unimplemented!("S3Transport::write_new_file");
     }
 
     fn remove_file(&self, relpath: &str) -> Result<()> {

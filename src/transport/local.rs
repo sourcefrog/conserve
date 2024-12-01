@@ -120,9 +120,9 @@ impl Transport for LocalTransport {
     #[instrument(skip(self, content))]
     fn write_new_file(&self, relpath: &str, content: &[u8]) -> super::Result<()> {
         File::options()
-            .create(true)
+            .create_new(true)
             .write(true)
-            .open(&self.full_path(relpath))
+            .open(self.full_path(relpath))
             .and_then(|mut file| file.write_all(content).and_then(|()| file.flush()))
             .map_err(|err| self.io_error(relpath, err))
     }
@@ -200,7 +200,6 @@ mod test {
     use std::error::Error;
     use std::time::Duration;
 
-    use assert_cmd::assert;
     use assert_fs::prelude::*;
     use predicates::prelude::*;
     use time::OffsetDateTime;
