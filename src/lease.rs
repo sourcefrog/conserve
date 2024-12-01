@@ -99,6 +99,7 @@ impl Lease {
             client_version: Some(crate::VERSION.to_string()),
             acquired: lease_taken,
             expiry: lease_expiry,
+            nonce: fastrand::u32(..),
         };
         let url = transport.url().join(LEASE_FILENAME).unwrap();
         let mut s: String = serde_json::to_string(&content).expect("serialize lease");
@@ -221,6 +222,8 @@ pub struct LeaseContent {
     pub pid: Option<u32>,
     /// Conserve version string.
     pub client_version: Option<String>,
+    /// Random nonce to distinguish different leases from the same client.
+    pub nonce: u32,
 
     /// Time when the lease was taken.
     #[serde(with = "time::serde::iso8601")]
@@ -330,7 +333,8 @@ mod test {
             "pid": 1234,
             "client_version": "0.1.2",
             "acquired": "2021-01-01T12:34:56Z",
-            "expiry": "2021-01-01T12:35:56Z"
+            "expiry": "2021-01-01T12:35:56Z",
+            "nonce": 12345
         }"#,
         )
         .unwrap();

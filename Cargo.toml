@@ -42,6 +42,7 @@ clicolors-control = "1.0"
 crc32c = { version = "0.6.6", optional = true }
 derive_more = "0.99"
 fail = { version = "0.5.1" }
+fastrand = "2.3.0"
 filetime = "0.2"
 futures = { version = "0.3", optional = true }
 globset = "0.4.5"
@@ -107,7 +108,6 @@ predicates = "3"
 pretty_assertions = "1.0"
 proptest = "1.5"
 proptest-derive = "0.5"
-rand = "0.8"
 rstest = { version = "0.19", default-features = false }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
