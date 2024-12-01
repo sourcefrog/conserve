@@ -1,4 +1,4 @@
-// Copyright 2024 Martin Pool
+// Copyright 2024-2025 Martin Pool
 
 //! Leases controlling write access to an archive.
 
@@ -19,9 +19,11 @@ pub static LEASE_FILENAME: &str = "LEASE";
 #[derive(Debug)]
 pub struct Lease {
     transport: Transport,
-    lease_taken: OffsetDateTime,
+    content: LeaseContent,
     /// The next refresh after this time must rewrite the lease.
     next_renewal: OffsetDateTime,
+    /// How often should we renew the lease?
+    renewal_interval: Duration,
 }
 
 #[non_exhaustive]
@@ -44,18 +46,47 @@ pub enum Error {
 
     #[error("JSON serialization error in lease {url}: {source}")]
     Json { source: serde_json::Error, url: Url },
+
+    #[error("Lease {url} was stolen: {content:?}")]
+    Stolen {
+        url: Url,
+        content: Box<LeaseContent>,
+    },
+
+    #[error("Lease {url} disappeared")]
+    Disappeared { url: Url },
 }
 
 type Result<T> = std::result::Result<T, Error>;
+
+/// Options controlling lease behavior, exposed for testing.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LeaseOptions {
+    /// How long do leases last before they're assumed stale?
+    lease_expiry: Duration,
+
+    /// Renew the lease soon after it becomes this old.
+    renewal_interval: Duration,
+}
+
+impl Default for LeaseOptions {
+    fn default() -> Self {
+        Self {
+            lease_expiry: Duration::from_secs(60),
+            renewal_interval: Duration::from_secs(10),
+        }
+    }
+}
 
 impl Lease {
     /// Acquire a lease, if one is available.
     ///
     /// Returns [Error::Busy] or [Error::Corrupt] if the lease is already held by another process.
     #[instrument]
-    pub fn acquire(transport: &Transport) -> Result<Self> {
+    pub fn acquire(transport: &Transport, lease_options: &LeaseOptions) -> Result<Self> {
+        trace!("trying to acquire lease");
         let lease_taken = OffsetDateTime::now_utc();
-        let lease_expiry = lease_taken + Duration::from_secs(5 * 60);
+        let lease_expiry = lease_taken + lease_options.lease_expiry;
         let content = LeaseContent {
             host: hostname::get()
                 .unwrap_or_default()
@@ -64,8 +95,8 @@ impl Lease {
                 .into(),
             pid: Some(process::id()),
             client_version: Some(crate::VERSION.to_string()),
-            lease_taken,
-            lease_expiry,
+            acquired: lease_taken,
+            expiry: lease_expiry,
         };
         let url = transport.relative_file_url(LEASE_FILENAME);
         let mut s: String = serde_json::to_string(&content).expect("serialize lease");
@@ -94,9 +125,43 @@ impl Lease {
         let next_renewal = lease_taken + Duration::from_secs(60);
         Ok(Lease {
             transport: transport.clone(),
-            lease_taken,
+            content,
             next_renewal,
+            renewal_interval: lease_options.renewal_interval,
         })
+    }
+
+    /// Unconditionally renew a held lease, after checking that it was not stolen.
+    ///
+    /// This takes the existing lease and returns a new one only if renewal succeeds.
+    pub fn renew(mut self) -> Result<Self> {
+        let state = Lease::peek(&self.transport)?;
+        let url = self.transport.relative_file_url(LEASE_FILENAME);
+        match state {
+            LeaseState::Held(content) => {
+                if content != self.content {
+                    warn!(actual = ?content, expected = ?self.content, "lease stolen");
+                    return Err(Error::Stolen {
+                        url,
+                        content: Box::new(content),
+                    });
+                }
+            }
+            LeaseState::Free => {
+                warn!("lease file disappeared");
+                return Err(Error::Disappeared { url });
+            }
+            LeaseState::Corrupt(_mtime) => {
+                warn!("lease file is corrupt");
+                return Err(Error::Corrupt { url });
+            }
+        }
+        self.content.acquired = OffsetDateTime::now_utc();
+        self.next_renewal = self.content.acquired + self.renewal_interval;
+        let json: String = serde_json::to_string(&self.content).expect("serialize lease");
+        self.transport
+            .write(LEASE_FILENAME, json.as_bytes(), WriteMode::Overwrite)?;
+        Ok(self)
     }
 
     #[instrument]
@@ -141,7 +206,7 @@ pub enum LeaseState {
 }
 
 /// Contents of the lease file.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct LeaseContent {
     /// Hostname of the client process
     pub host: Option<String>,
@@ -152,29 +217,35 @@ pub struct LeaseContent {
 
     /// Time when the lease was taken.
     #[serde(with = "time::serde::iso8601")]
-    pub lease_taken: OffsetDateTime,
+    pub acquired: OffsetDateTime,
 
     /// Unix time after which this lease is stale.
     #[serde(with = "time::serde::iso8601")]
-    pub lease_expiry: OffsetDateTime,
+    pub expiry: OffsetDateTime,
 }
 
 #[cfg(test)]
 mod test {
     use std::fs::{write, File};
     use std::process;
+    use std::time::Duration;
 
+    use assert_matches::assert_matches;
     use tempfile::TempDir;
 
     use super::*;
 
     #[test]
     fn take_lease() {
+        let options = super::LeaseOptions {
+            lease_expiry: Duration::from_secs(60),
+            renewal_interval: Duration::from_secs(10),
+        };
         let tmp = TempDir::new().unwrap();
         let transport = &Transport::local(tmp.path());
-        let lease = Lease::acquire(transport).unwrap();
+        let lease = Lease::acquire(transport, &options).unwrap();
         assert!(tmp.path().join("LEASE").exists());
-        assert!(lease.next_renewal > lease.lease_taken);
+        let orig_lease_taken = lease.content.acquired;
 
         let peeked = Lease::peek(transport).unwrap();
         let LeaseState::Held(content) = peeked else {
@@ -186,8 +257,58 @@ mod test {
         );
         assert_eq!(content.pid, Some(process::id()));
 
+        let lease = lease.renew().unwrap();
+        let state2 = Lease::peek(transport).unwrap();
+        match state2 {
+            LeaseState::Held(content) => {
+                assert!(content.acquired > orig_lease_taken);
+            }
+            _ => panic!("lease should be held, got {state2:?}"),
+        }
+
         lease.release().unwrap();
         assert!(!tmp.path().join("LEASE").exists());
+    }
+
+    #[test]
+    fn fail_to_renew_deleted_lease() {
+        let options = super::LeaseOptions {
+            lease_expiry: Duration::from_secs(60),
+            renewal_interval: Duration::from_secs(10),
+        };
+        let tmp = TempDir::new().unwrap();
+        let transport = Transport::local(tmp.path());
+        let lease = Lease::acquire(&transport, &options).unwrap();
+        assert!(tmp.path().join("LEASE").exists());
+
+        transport.remove_file(LEASE_FILENAME).unwrap();
+
+        let result = lease.renew();
+        assert_matches!(result, Err(super::Error::Disappeared { .. }));
+    }
+
+    #[test]
+    fn fail_to_renew_stolen_lease() {
+        let options = super::LeaseOptions {
+            lease_expiry: Duration::from_secs(60),
+            renewal_interval: Duration::from_secs(10),
+        };
+        let tmp = TempDir::new().unwrap();
+        let transport = Transport::local(tmp.path());
+        let lease1 = Lease::acquire(&transport, &options).unwrap();
+        assert!(tmp.path().join("LEASE").exists());
+
+        // Delete the lease to make it easy to steal.
+        transport.remove_file(LEASE_FILENAME).unwrap();
+        let lease2 = Lease::acquire(&transport, &options).unwrap();
+        assert!(tmp.path().join("LEASE").exists());
+
+        // Renewal through the first handle should now fail.
+        let result = lease1.renew();
+        assert_matches!(result, Err(super::Error::Stolen { .. }));
+
+        // Lease 2 can still renew.
+        lease2.renew().unwrap();
     }
 
     #[test]
@@ -201,8 +322,8 @@ mod test {
             "host": "somehost",
             "pid": 1234,
             "client_version": "0.1.2",
-            "lease_taken": "2021-01-01T12:34:56Z",
-            "lease_expiry": "2021-01-01T12:35:56Z"
+            "acquired": "2021-01-01T12:34:56Z",
+            "expiry": "2021-01-01T12:35:56Z"
         }"#,
         )
         .unwrap();
@@ -213,10 +334,10 @@ mod test {
                 assert_eq!(content.host.unwrap(), "somehost");
                 assert_eq!(content.pid, Some(1234));
                 assert_eq!(content.client_version.unwrap(), "0.1.2");
-                assert_eq!(content.lease_taken.year(), 2021);
-                assert_eq!(content.lease_expiry.year(), 2021);
+                assert_eq!(content.acquired.year(), 2021);
+                assert_eq!(content.expiry.year(), 2021);
                 assert_eq!(
-                    content.lease_expiry - content.lease_taken,
+                    content.expiry - content.acquired,
                     time::Duration::seconds(60)
                 );
             }
