@@ -14,7 +14,7 @@ use url::Url;
 
 use crate::Kind;
 
-use super::{Error, ErrorKind, ListDir, Result};
+use super::{Error, ErrorKind, ListDir, Result, WriteMode};
 
 pub(super) struct Protocol {
     url: Url,
@@ -151,15 +151,25 @@ impl super::Protocol for Protocol {
         }
     }
 
-    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
+    fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let full_path = self.base_path.join(relpath);
-        trace!("write_file {:>9} bytes to {:?}", content.len(), full_path);
-        let mut file = self.sftp.create(&full_path).map_err(|err| {
-            warn!(?err, ?relpath, "sftp error creating file");
-            ssh_error(err, relpath)
-        })?;
+        trace!("write_file {:>9} bytes to {full_path:?}", content.len());
+        let flags = ssh2::OpenFlags::WRITE
+            | ssh2::OpenFlags::CREATE
+            | match write_mode {
+                WriteMode::CreateNew => ssh2::OpenFlags::EXCLUSIVE,
+                WriteMode::Overwrite => ssh2::OpenFlags::TRUNCATE,
+            };
+        let mut file = self
+            .sftp
+            .open_mode(&full_path, flags, 0o644, ssh2::OpenType::File)
+            .map_err(|err| {
+                warn!(?err, ?relpath, "sftp error creating file");
+                ssh_error(err, relpath)
+            })?;
         file.write_all(content).map_err(|err| {
             warn!(?err, ?full_path, "sftp error writing file");
+            // TODO: Delete the file?
             io_error(err, relpath)
         })
     }

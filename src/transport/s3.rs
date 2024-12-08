@@ -45,7 +45,7 @@ use tokio::runtime::Runtime;
 use tracing::{debug, trace, trace_span};
 use url::Url;
 
-use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result};
+use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, WriteMode};
 
 pub(super) struct Protocol {
     url: Url,
@@ -261,7 +261,7 @@ impl super::Protocol for Protocol {
         Ok(())
     }
 
-    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
+    fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let _span = trace_span!("S3Transport::write_file", %relpath).entered();
         let key = self.join_path(relpath);
         let crc32c =
