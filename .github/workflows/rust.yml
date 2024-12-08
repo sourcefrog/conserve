@@ -162,12 +162,11 @@ jobs:
       - name: Run mutant tests
         # Don't use the S3 features because they require AWS credentials for realistic
         # testing.
-        run: >
-          cargo mutants --no-shuffle -vV
-            --in-place
-            --baseline=skip --shard ${{ matrix.shard }}/10
-            --
-            --features fail/failpoints
+        run: |
+          cargo mutants --no-shuffle -vV --in-place --baseline=skip \
+          --shard ${{ matrix.shard }}/10 \
+          -- \
+          --features fail/failpoints
       - name: Archive results
         uses: actions/upload-artifact@v4
         if: always()
