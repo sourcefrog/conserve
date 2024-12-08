@@ -42,7 +42,7 @@ use aws_types::SdkConfig;
 use base64::Engine;
 use bytes::Bytes;
 use tokio::runtime::Runtime;
-use tracing::{debug, trace, trace_span};
+use tracing::{debug, instrument, trace, trace_span};
 use url::Url;
 
 use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, WriteMode};
@@ -261,12 +261,12 @@ impl super::Protocol for Protocol {
         Ok(())
     }
 
+    #[instrument(skip(self, content))]
     fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
-        let _span = trace_span!("S3Transport::write_file", %relpath).entered();
         let key = self.join_path(relpath);
         let crc32c =
             base64::engine::general_purpose::STANDARD.encode(crc32c::crc32c(content).to_be_bytes());
-        let request = self
+        let mut request = self
             .client
             .put_object()
             .bucket(&self.bucket)
@@ -274,6 +274,9 @@ impl super::Protocol for Protocol {
             .storage_class(self.storage_class.clone())
             .checksum_crc32_c(crc32c)
             .body(content.to_owned().into());
+        if write_mode == WriteMode::CreateNew {
+            request = request.if_none_match("*");
+        }
         let response = self.runtime.block_on(request.send());
         // trace!(?response);
         response.map_err(|err| s3_error(key, err))?;
