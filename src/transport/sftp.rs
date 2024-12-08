@@ -153,7 +153,10 @@ impl super::Protocol for Protocol {
 
     fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let full_path = self.base_path.join(relpath);
-        trace!("write_file {:>9} bytes to {full_path:?}", content.len());
+        trace!(
+            "write_file {len:>9} bytes to {full_path:?}",
+            len = content.len()
+        );
         let flags = ssh2::OpenFlags::WRITE
             | ssh2::OpenFlags::CREATE
             | match write_mode {
@@ -167,11 +170,18 @@ impl super::Protocol for Protocol {
                 warn!(?err, ?relpath, "sftp error creating file");
                 ssh_error(err, relpath)
             })?;
-        file.write_all(content).map_err(|err| {
+        if let Err(err) = file.write_all(content) {
             warn!(?err, ?full_path, "sftp error writing file");
-            // TODO: Delete the file?
-            io_error(err, relpath)
-        })
+            if let Err(err2) = self.sftp.unlink(&full_path) {
+                warn!(
+                    ?err2,
+                    ?full_path,
+                    "sftp error unlinking file after write error"
+                );
+            }
+            return Err(super::Error::io_error(&full_path, err));
+        }
+        Ok(())
     }
 
     fn metadata(&self, relpath: &str) -> Result<super::Metadata> {
