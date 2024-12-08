@@ -116,8 +116,8 @@ impl Transport {
         }
     }
 
-    pub fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
-        self.protocol.write_file(relpath, content)
+    pub fn write_file(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()> {
+        self.protocol.write_file(relpath, content, mode)
     }
 
     pub fn create_dir(&self, relpath: &str) -> Result<()> {
@@ -163,9 +163,18 @@ impl fmt::Debug for Transport {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WriteMode {
+    /// Create the file if it does not exist, or overwrite it if it does.
+    Overwrite,
+
+    /// Create the file if it does not exist, or fail if it does.
+    CreateNew,
+}
+
 trait Protocol: Send + Sync {
     fn read_file(&self, path: &str) -> Result<Bytes>;
-    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
+    fn write_file(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()>;
     fn list_dir(&self, relpath: &str) -> Result<ListDir>;
     fn create_dir(&self, relpath: &str) -> Result<()>;
     fn metadata(&self, relpath: &str) -> Result<Metadata>;

@@ -31,6 +31,8 @@
 //! delete but before starting to actually delete them, we check that no
 //! new bands have been created.
 
+use transport::WriteMode;
+
 use crate::*;
 
 pub static GC_LOCK: &str = "GC_LOCK";
@@ -63,7 +65,9 @@ impl GarbageCollectionLock {
         if archive.transport().is_file(GC_LOCK).unwrap_or(true) {
             return Err(Error::GarbageCollectionLockHeld);
         }
-        archive.transport().write_file(GC_LOCK, b"{}\n")?;
+        archive
+            .transport()
+            .write_file(GC_LOCK, b"{}\n", WriteMode::CreateNew)?;
         Ok(GarbageCollectionLock { archive, band_id })
     }
 
