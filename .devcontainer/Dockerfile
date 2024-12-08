@@ -4,15 +4,16 @@
 ARG VARIANT="bullseye"
 FROM mcr.microsoft.com/vscode/devcontainers/base:0-${VARIANT}
 
-# Install Rust
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
-    && . "$HOME/.cargo/env" \
-    && rustup install stable \
-    && rustup component add rust-analyzer clipy \
-    && rustup default stable
+RUN apt-get update
+RUN apt-get install -y build-essential openssl pkg-config
+RUN apt-get dist-upgrade -y
 
-# Install common Rust tools
-RUN cargo install cargo-edit
+# # Install Rust
+# RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
+#     && . "$HOME/.cargo/env" \
+#     && rustup component add rust-analyzer clippy \
+#     && rustup install stable \
+#     && rustup default stable
 
 # [Optional] Uncomment this section to install additional packages.
 # RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
