@@ -114,8 +114,6 @@ automatically excluded from backups.
 From 23.9 Conserve supports storing backups in Amazon S3. AWS IAM credentials are
 read from the standard sources: the environment, config file, or, on EC2, the instance metadata service.
 
-S3 support is not built by default, but can be turned on by passing `cargo install --features s3`.
-
 To use this, just specify an S3 URL for the archive location. The bucket must already exist.
 
     conserve init s3://my-bucket/
@@ -142,10 +140,10 @@ To install from a git checkout, run
 
 ### Optional features
 
-The following options can be enabled with `--features`:
+The following features are enabled by default, but can be turned off with `cargo install --no-default-features` if they are not needed:
 
-* `s3`: support for storing backups in Amazon S3 (or compatible services)
-* `sftp`: support for storing backups on SFTP servers, addressed with `sftp://` URLs
+- `s3`: support for storing backups in Amazon S3 (or compatible services)
+- `sftp`: support for storing backups on SFTP servers, addressed with `sftp://` URLs
 
 ### Arch Linux
 
