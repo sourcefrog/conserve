@@ -32,6 +32,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use tracing::{instrument, trace};
+use transport::WriteMode;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
@@ -131,7 +132,19 @@ impl BlockDir {
         let hex_hash = hash.to_string();
         let relpath = block_relpath(&hash);
         self.transport.create_dir(subdir_relpath(&hex_hash))?;
-        self.transport.write_file(&relpath, &compressed)?;
+        match self
+            .transport
+            .write_file(&relpath, &compressed, WriteMode::CreateNew)
+        {
+            Ok(()) => {}
+            Err(err) if err.kind() == transport::ErrorKind::AlreadyExists => {
+                // let's assume the contents are correct
+            }
+            Err(err) => {
+                warn!(?err, ?hash, "Error writing block");
+                return Err(err.into());
+            }
+        }
         stats.written_blocks += 1;
         stats.uncompressed_bytes += uncomp_len;
         stats.compressed_bytes += comp_len;
@@ -386,11 +399,8 @@ mod test {
         let monitor = TestMonitor::arc();
         let subdir = tempdir.path().join(subdir_relpath("123"));
         create_dir(&subdir).unwrap();
-        write(
-            subdir.join(format!("{}{}", TMP_PREFIX, "123123123")),
-            b"123",
-        )
-        .unwrap();
+        // Write a temp file as was created by earlier versions of the code.
+        write(subdir.join("tmp123123123"), b"123").unwrap();
         let blocks = blockdir
             .blocks(monitor.clone())
             .unwrap()
