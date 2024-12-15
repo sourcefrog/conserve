@@ -52,7 +52,6 @@ jobs:
       fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
-        features: ["", "s3"]
         version: [stable, nightly, "1.79"]
 
     steps:
@@ -61,8 +60,6 @@ jobs:
         with:
           toolchain: ${{ matrix.version }}
       - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.features }}
       - name: Show version
         run: |
           rustup show
@@ -70,12 +67,10 @@ jobs:
           rustc --version
       - name: Build
         run: >
-          cargo build --all-targets --no-default-features --features=${{
-          matrix.features }} --features fail/failpoints
+          cargo build --all-targets --features fail/failpoints
       - name: Test
         run: >
-          cargo test --no-default-features --features=${{ matrix.features }}
-          --features fail/failpoints -- --include-ignored
+          cargo test --features fail/failpoints -- --include-ignored
 
   # Run rustfmt separately so that it does not block test results
   rustfmt:
@@ -136,8 +131,8 @@ jobs:
           tool: cargo-mutants
       - name: Mutants in diff
         run: >
-          cargo mutants --no-shuffle -vV --in-diff git.diff --in-place -- --features
-          fail/failpoints
+          cargo mutants --no-shuffle -vV --in-diff git.diff --in-place --
+          --features fail/failpoints
       - name: Archive mutants.out
         uses: actions/upload-artifact@v4
         if: always()
@@ -168,11 +163,10 @@ jobs:
         # Don't use the S3 features because they require AWS credentials for realistic
         # testing.
         run: |
-          cargo mutants --no-shuffle -vV --cargo-arg=--no-default-features \
-            --in-place \
-            --baseline=skip --shard ${{ matrix.shard }}/10 \
-            -- \
-            --features fail/failpoints
+          cargo mutants --no-shuffle -vV --in-place --baseline=skip \
+          --shard ${{ matrix.shard }}/10 \
+          -- \
+          --features fail/failpoints
       - name: Archive results
         uses: actions/upload-artifact@v4
         if: always()
