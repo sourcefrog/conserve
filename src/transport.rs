@@ -239,11 +239,11 @@ pub struct ListDir {
 #[derive(Debug)]
 pub struct Error {
     /// What type of generally known error?
-    kind: ErrorKind,
+    pub kind: ErrorKind,
     /// The underlying error: for example an IO or S3 error.
-    source: Option<Box<dyn error::Error + Send + Sync>>,
+    pub source: Option<Box<dyn error::Error + Send + Sync>>,
     /// The affected URL, if known.
-    url: Option<Url>,
+    pub url: Option<Url>,
 }
 
 /// General categories of transport errors.

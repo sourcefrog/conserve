@@ -32,12 +32,12 @@ impl Protocol {
             url.port().unwrap_or(22)
         );
         let tcp_stream = TcpStream::connect(addr).map_err(|err| {
-            error!(?err, ?url, "Error opening TCP connection");
+            error!(?err, ?url, "Error opening SSH TCP connection");
             io_error(err, url)
         })?;
         trace!("got tcp connection");
         let mut session = ssh2::Session::new().map_err(|err| {
-            error!(?err, "Error creating SSH session");
+            error!(?err, "Error opening SSH session");
             ssh_error(err, url)
         })?;
         session.set_tcp_stream(tcp_stream);
@@ -79,16 +79,20 @@ impl Protocol {
             .map_err(|err| self.ssh_error(err, path))
     }
 
-    fn ssh_error(&self, source: ssh2::Error, path: &str) -> super::Error {
-        ssh_error(source, self.url.join(path).as_ref().unwrap_or(&self.url))
-    }
-
     fn io_error(&self, source: io::Error, path: &str) -> Error {
         Error {
             kind: source.kind().into(),
             source: Some(Box::new(source)),
             url: self.url.join(path).ok(),
         }
+    }
+
+    fn relative_url(&self, path: &str) -> Url {
+        self.url.join(path).expect("join URL")
+    }
+
+    fn ssh_error(&self, source: ssh2::Error, path: &str) -> Error {
+        ssh_error(source, &self.relative_url(path))
     }
 }
 
@@ -116,7 +120,7 @@ impl super::Protocol for Protocol {
         let mut dirs = Vec::new();
         let mut dir = self.sftp.opendir(full_path).map_err(|err| {
             error!(?err, ?full_path, "Error opening directory");
-            self.ssh_error(err, full_path.to_string_lossy().as_ref())
+            self.ssh_error(err, path)
         })?;
         loop {
             match dir.readdir() {
@@ -150,7 +154,8 @@ impl super::Protocol for Protocol {
 
     fn read_file(&self, path: &str) -> Result<Bytes> {
         let full_path = self.base_path.join(path);
-        trace!("attempt open {}", full_path.display());
+        let url = &self.url.join(path).expect("join URL");
+        trace!("read {url}");
         let mut buf = Vec::with_capacity(2 << 20);
         let mut file = self
             .sftp
@@ -208,7 +213,11 @@ impl super::Protocol for Protocol {
                     "sftp error unlinking file after write error"
                 );
             }
-            return Err(super::Error::io_error(self.url.join(relpath).unwrap(), err));
+            return Err(super::Error {
+                url: Some(self.relative_url(relpath)),
+                source: Some(Box::new(err)),
+                kind: ErrorKind::Other,
+            });
         }
         Ok(())
     }
@@ -267,9 +276,6 @@ impl super::Protocol for Protocol {
                 .map_err(|err| self.ssh_error(err, dir))?;
         }
         Ok(())
-        // let full_path = self.base_path.join(relpath);
-        // trace!("remove_dir {full_path:?}");
-        // self.sftp.rmdir(&full_path).map_err(translate_error)
     }
 
     fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
