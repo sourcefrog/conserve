@@ -3,7 +3,7 @@
 //! Leases controlling write access to an archive.
 
 use std::process;
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -11,19 +11,22 @@ use time::OffsetDateTime;
 use tracing::{debug, instrument, trace, warn};
 use url::Url;
 
-use crate::{transport, Transport};
+use crate::transport::WriteMode;
+use crate::{transport, transport::Transport};
 
 pub static LEASE_FILENAME: &str = "LEASE";
 
 /// A lease on an archive.
 #[derive(Debug)]
 pub struct Lease {
-    transport: Arc<dyn Transport>,
+    transport: Transport,
     content: LeaseContent,
     /// The next refresh after this time must rewrite the lease.
     next_renewal: OffsetDateTime,
     /// How often should we renew the lease?
     renewal_interval: Duration,
+    /// URL of the lease file.
+    url: Url,
 }
 
 #[non_exhaustive]
@@ -82,10 +85,7 @@ impl Lease {
     /// Acquire a lease, if one is available.
     ///
     /// Returns [Error::Busy] or [Error::Corrupt] if the lease is already held by another process.
-    pub fn try_acquire(
-        transport: Arc<dyn Transport>,
-        lease_options: &LeaseOptions,
-    ) -> Result<Self> {
+    pub fn try_acquire(transport: &Transport, lease_options: &LeaseOptions) -> Result<Self> {
         trace!("trying to acquire lease");
         let lease_taken = OffsetDateTime::now_utc();
         let lease_expiry = lease_taken + lease_options.lease_expiry;
@@ -101,15 +101,14 @@ impl Lease {
             expiry: lease_expiry,
             nonce: rand::random(),
         };
-        let url = transport.relative_file_url(LEASE_FILENAME);
+        let url = transport.url().join(LEASE_FILENAME).unwrap();
         let mut s: String = serde_json::to_string(&content).expect("serialize lease");
         s.push('\n');
-        while let Err(err) = transport
-            .as_ref()
-            .write_new_file(LEASE_FILENAME, s.as_bytes())
+        while let Err(err) =
+            transport.write_file(LEASE_FILENAME, s.as_bytes(), WriteMode::CreateNew)
         {
             if err.kind() == transport::ErrorKind::AlreadyExists {
-                match Lease::peek(transport.as_ref())? {
+                match Lease::peek(transport)? {
                     LeaseState::Held(content) => {
                         return Err(Error::Busy {
                             url,
@@ -130,10 +129,11 @@ impl Lease {
         }
         let next_renewal = lease_taken + Duration::from_secs(60);
         Ok(Lease {
-            transport,
+            transport: transport.clone(),
             content,
             next_renewal,
             renewal_interval: lease_options.renewal_interval,
+            url,
         })
     }
 
@@ -141,31 +141,37 @@ impl Lease {
     ///
     /// This takes the existing lease and returns a new one only if renewal succeeds.
     pub fn renew(mut self) -> Result<Self> {
-        let state = Lease::peek(self.transport.as_ref())?;
-        let url = self.transport.relative_file_url(LEASE_FILENAME);
+        let state = Lease::peek(&self.transport)?;
         match state {
             LeaseState::Held(content) => {
                 if content != self.content {
                     warn!(actual = ?content, expected = ?self.content, "lease stolen");
                     return Err(Error::Stolen {
-                        url,
+                        url: self.url.clone(),
                         content: Box::new(content),
                     });
                 }
             }
             LeaseState::Free => {
                 warn!("lease file disappeared");
-                return Err(Error::Disappeared { url });
+                return Err(Error::Disappeared {
+                    url: self.url.clone(),
+                });
             }
             LeaseState::Corrupt(_mtime) => {
                 warn!("lease file is corrupt");
-                return Err(Error::Corrupt { url });
+                return Err(Error::Corrupt {
+                    url: self.url.clone(),
+                });
             }
         }
         self.content.acquired = OffsetDateTime::now_utc();
         self.next_renewal = self.content.acquired + self.renewal_interval;
         let json: String = serde_json::to_string(&self.content).expect("serialize lease");
-        self.transport.write_file(LEASE_FILENAME, json.as_bytes())?;
+        // At this point we know the lease was, at least very recently, still held by us, so
+        // we can overwrite it.
+        self.transport
+            .write_file(LEASE_FILENAME, json.as_bytes(), WriteMode::Overwrite)?;
         Ok(self)
     }
 
@@ -173,13 +179,12 @@ impl Lease {
     pub fn release(self) -> Result<()> {
         // TODO: Check that it was not stolen?
         self.transport
-            .as_ref()
             .remove_file(LEASE_FILENAME)
             .map_err(Error::from)
     }
 
     /// Return information about the current leaseholder, if any.
-    pub fn peek(transport: &dyn Transport) -> Result<LeaseState> {
+    pub fn peek(transport: &Transport) -> Result<LeaseState> {
         // TODO: Atomically get the content and mtime; that should be one call on s3.
         let metadata = match transport.metadata(LEASE_FILENAME) {
             Ok(m) => m,
@@ -242,7 +247,7 @@ mod test {
     use tempfile::TempDir;
 
     use crate::lease::LEASE_FILENAME;
-    use crate::transport::open_local_transport;
+    use crate::transport::Transport;
 
     use super::{Lease, LeaseState};
 
@@ -253,12 +258,13 @@ mod test {
             renewal_interval: Duration::from_secs(10),
         };
         let tmp = TempDir::new().unwrap();
-        let transport = open_local_transport(tmp.path()).unwrap();
-        let lease = Lease::try_acquire(transport.clone(), &options).unwrap();
+        let transport = Transport::local(tmp.path());
+        let lease = Lease::try_acquire(&transport, &options)
+            .expect("original lease in new dir should be acquired");
         assert!(tmp.path().join("LEASE").exists());
         let orig_lease_taken = lease.content.acquired;
 
-        let peeked = Lease::peek(transport.as_ref()).unwrap();
+        let peeked = Lease::peek(&transport).expect("should be able to peek newly acquired lease");
         let LeaseState::Held(content) = peeked else {
             panic!("lease not held")
         };
@@ -268,8 +274,8 @@ mod test {
         );
         assert_eq!(content.pid, Some(process::id()));
 
-        let lease = lease.renew().unwrap();
-        let state2 = Lease::peek(transport.as_ref()).unwrap();
+        let lease = lease.renew().expect("renew already-held lease");
+        let state2 = Lease::peek(&transport).expect("should be able to peek renewed lease");
         match state2 {
             LeaseState::Held(content) => {
                 assert!(content.acquired > orig_lease_taken);
@@ -288,8 +294,8 @@ mod test {
             renewal_interval: Duration::from_secs(10),
         };
         let tmp = TempDir::new().unwrap();
-        let transport = open_local_transport(tmp.path()).unwrap();
-        let lease = Lease::try_acquire(transport.clone(), &options).unwrap();
+        let transport = Transport::local(tmp.path());
+        let lease = Lease::try_acquire(&transport, &options).unwrap();
         assert!(tmp.path().join("LEASE").exists());
 
         transport.remove_file(LEASE_FILENAME).unwrap();
@@ -305,13 +311,13 @@ mod test {
             renewal_interval: Duration::from_secs(10),
         };
         let tmp = TempDir::new().unwrap();
-        let transport = open_local_transport(tmp.path()).unwrap();
-        let lease1 = Lease::try_acquire(transport.clone(), &options).unwrap();
+        let transport = Transport::local(tmp.path());
+        let lease1 = Lease::try_acquire(&transport, &options).unwrap();
         assert!(tmp.path().join("LEASE").exists());
 
         // Delete the lease to make it easy to steal.
         transport.remove_file(LEASE_FILENAME).unwrap();
-        let lease2 = Lease::try_acquire(transport.clone(), &options).unwrap();
+        let lease2 = Lease::try_acquire(&transport, &options).unwrap();
         assert!(tmp.path().join("LEASE").exists());
 
         // Renewal through the first handle should now fail.
@@ -325,7 +331,7 @@ mod test {
     #[test]
     fn peek_fixed_lease_content() {
         let tmp = TempDir::new().unwrap();
-        let transport = open_local_transport(tmp.path()).unwrap();
+        let transport = Transport::local(tmp.path());
         write(
             tmp.path().join("LEASE"),
             r#"
@@ -339,7 +345,7 @@ mod test {
         }"#,
         )
         .unwrap();
-        let state = Lease::peek(transport.as_ref()).unwrap();
+        let state = Lease::peek(&transport).unwrap();
         dbg!(&state);
         match state {
             LeaseState::Held(content) => {
@@ -362,9 +368,9 @@ mod test {
     #[test]
     fn peek_corrupt_empty_lease() {
         let tmp = TempDir::new().unwrap();
-        let transport = open_local_transport(tmp.path()).unwrap();
+        let transport = Transport::local(tmp.path());
         File::create(tmp.path().join("LEASE")).unwrap();
-        let state = Lease::peek(transport.as_ref()).unwrap();
+        let state = Lease::peek(&transport).unwrap();
         match state {
             LeaseState::Corrupt(mtime) => {
                 let now = time::OffsetDateTime::now_utc();

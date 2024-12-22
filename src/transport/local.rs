@@ -12,41 +12,38 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::borrow::Cow;
-use std::fs::{create_dir, File};
-use std::io;
+use std::fs::{create_dir, remove_file, File};
 use std::io::prelude::*;
-use std::path::{absolute, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::{io, path};
 
 use bytes::Bytes;
-use tracing::{instrument, trace, warn};
+use tracing::{error, instrument, trace, warn};
 use url::Url;
 
-use super::{Error, ListDir, Metadata, Result, Transport};
+use super::{Error, ListDir, Metadata, Result, WriteMode};
 
-#[derive(Clone, Debug)]
-pub struct LocalTransport {
-    /// Base directory for this transport.
-    root: PathBuf,
+pub(super) struct Protocol {
+    /// Directory addressed by this protocol.
+    path: PathBuf,
 
-    /// URL representation of the base directory.
+    /// URL corresponding to the directory.
     url: Url,
 }
 
-impl LocalTransport {
-    pub fn new(path: &Path) -> Self {
-        LocalTransport {
-            root: path.to_owned(),
-            // TODO: Maybe return an error on construction if we can't find the absolute path.
-            url: Url::from_directory_path(absolute(path).expect("absolute path"))
-                .expect("path to URL"),
+impl Protocol {
+    pub(super) fn new(path: &Path) -> Self {
+        Protocol {
+            path: path.to_owned(),
+            url: Url::from_directory_path(path::absolute(path).expect("make path absolute"))
+                .expect("convert path to URL"),
         }
     }
 
-    pub fn full_path(&self, relpath: &str) -> PathBuf {
+    fn full_path(&self, relpath: &str) -> PathBuf {
         debug_assert!(!relpath.contains("/../"), "path must not contain /../");
-        self.root.join(relpath)
+        self.path.join(relpath)
     }
 
     fn io_error(&self, relpath: &str, err: io::Error) -> Error {
@@ -54,9 +51,48 @@ impl LocalTransport {
     }
 }
 
-impl Transport for LocalTransport {
-    fn base_url(&self) -> &Url {
+impl super::Protocol for Protocol {
+    fn url(&self) -> &Url {
         &self.url
+    }
+
+    #[instrument(skip(self))]
+    fn read_file(&self, relpath: &str) -> Result<Bytes> {
+        fn try_block(path: &Path) -> io::Result<Bytes> {
+            let mut file = File::open(path)?;
+            let mut out_buf = Vec::new();
+            let actual_len = file.read_to_end(&mut out_buf)?;
+            trace!("Read {actual_len} bytes");
+            Ok(out_buf.into())
+        }
+        try_block(&self.full_path(relpath)).map_err(|err| self.io_error(relpath, err))
+    }
+
+    #[instrument(skip(self, content))]
+    fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
+        let full_path = self.full_path(relpath);
+        let oops = |err| super::Error::io_error(self.url.join(relpath).unwrap(), err);
+        let mut options = File::options();
+        options.write(true);
+        match write_mode {
+            WriteMode::CreateNew => {
+                options.create_new(true);
+            }
+            WriteMode::Overwrite => {
+                options.create(true).truncate(true);
+            }
+        }
+        let mut file = options.open(&full_path).map_err(oops)?;
+        if let Err(err) = file.write_all(content) {
+            error!("Failed to write {full_path:?}: {err:?}");
+            drop(file);
+            if let Err(err2) = remove_file(&full_path) {
+                error!("Failed to remove {full_path:?}: {err2:?}");
+            }
+            return Err(oops(err));
+        }
+        trace!("Wrote {} bytes", content.len());
+        Ok(())
     }
 
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
@@ -83,29 +119,6 @@ impl Transport for LocalTransport {
         Ok(names)
     }
 
-    #[instrument(skip(self))]
-    fn read_file(&self, relpath: &str) -> Result<Bytes> {
-        fn try_block(path: &Path) -> io::Result<Bytes> {
-            let mut file = File::open(path)?;
-            let estimated_len: usize = file
-                .metadata()?
-                .len()
-                .try_into()
-                .expect("File size fits in usize");
-            let mut out_buf = Vec::with_capacity(estimated_len);
-            let actual_len = file.read_to_end(&mut out_buf)?;
-            trace!("Read {actual_len} bytes");
-            out_buf.truncate(actual_len);
-            Ok(out_buf.into())
-        }
-        try_block(&self.full_path(relpath)).map_err(|err| self.io_error(relpath, err))
-    }
-
-    fn is_file(&self, relpath: &str) -> Result<bool> {
-        let path = self.full_path(relpath);
-        Ok(path.is_file())
-    }
-
     fn create_dir(&self, relpath: &str) -> super::Result<()> {
         let path = self.full_path(relpath);
         create_dir(&path).or_else(|err| {
@@ -117,59 +130,12 @@ impl Transport for LocalTransport {
         })
     }
 
-    #[instrument(skip(self, content))]
-    fn write_new_file(&self, relpath: &str, content: &[u8]) -> super::Result<()> {
-        File::options()
-            .create_new(true)
-            .write(true)
-            .open(self.full_path(relpath))
-            .and_then(|mut file| file.write_all(content).and_then(|()| file.flush()))
-            .map_err(|err| self.io_error(relpath, err))
-    }
-
-    #[instrument(skip(self, content))]
-    fn write_file(&self, relpath: &str, content: &[u8]) -> super::Result<()> {
-        let full_path = self.full_path(relpath);
-        let dir = full_path.parent().unwrap();
-        let context = |err| self.io_error(relpath, err);
-        let mut temp = tempfile::Builder::new()
-            .prefix(crate::TMP_PREFIX)
-            .tempfile_in(dir)
-            .map_err(context)?;
-        if let Err(err) = temp.write_all(content) {
-            let _ = temp.close();
-            warn!("Failed to write {:?}: {:?}", relpath, err);
-            return Err(context(err));
-        }
-        if let Err(persist_error) = temp.persist(&full_path) {
-            warn!("Failed to persist {:?}: {:?}", full_path, persist_error);
-            persist_error.file.close().map_err(context)?;
-            Err(context(persist_error.error))
-        } else {
-            trace!("Wrote {} bytes", content.len());
-            Ok(())
-        }
-    }
-
     fn remove_file(&self, relpath: &str) -> super::Result<()> {
         std::fs::remove_file(self.full_path(relpath)).map_err(|err| self.io_error(relpath, err))
     }
 
     fn remove_dir_all(&self, relpath: &str) -> super::Result<()> {
-        let path = self.full_path(relpath);
-        std::fs::remove_dir_all(&path).map_err(|err| self.io_error(relpath, err))
-    }
-
-    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
-        let subdir = if relpath.ends_with('/') {
-            Cow::Borrowed(relpath)
-        } else {
-            Cow::Owned(format!("{relpath}/"))
-        };
-        Arc::new(LocalTransport {
-            root: self.root.join(relpath),
-            url: self.url.join(&subdir).expect("join component to URL"),
-        })
+        std::fs::remove_dir_all(self.full_path(relpath)).map_err(|err| self.io_error(relpath, err))
     }
 
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
@@ -187,11 +153,16 @@ impl Transport for LocalTransport {
             modified,
         })
     }
-}
 
-impl AsRef<dyn Transport> for LocalTransport {
-    fn as_ref(&self) -> &(dyn Transport + 'static) {
-        self
+    fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
+        Arc::new(Protocol {
+            path: self.path.join(relpath),
+            url: self.url.join(relpath).expect("join URL"),
+        })
+    }
+
+    fn local_path(&self) -> Option<PathBuf> {
+        Some(self.path.clone())
     }
 }
 
@@ -206,7 +177,7 @@ mod test {
 
     use super::*;
     use crate::kind::Kind;
-    use crate::transport;
+    use crate::transport::{self, Transport};
 
     #[test]
     fn read_file() {
@@ -216,7 +187,7 @@ mod test {
 
         temp.child(filename).write_str(content).unwrap();
 
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
         let buf = transport.read_file(filename).unwrap();
         assert_eq!(buf, content.as_bytes());
 
@@ -226,7 +197,7 @@ mod test {
     #[test]
     fn read_file_not_found() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
 
         let err = transport
             .read_file("nonexistent.json")
@@ -260,7 +231,7 @@ mod test {
         let filename = "poem.txt";
         temp.child(filename).write_str(content).unwrap();
 
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
 
         let metadata = transport.metadata(filename).unwrap();
         dbg!(&metadata);
@@ -281,7 +252,7 @@ mod test {
             .write_str("Morning coffee")
             .unwrap();
 
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
         let root_list = transport.list_dir(".").unwrap();
         assert_eq!(root_list.files, ["root file"]);
         assert_eq!(root_list.dirs, ["subdir"]);
@@ -299,11 +270,15 @@ mod test {
     #[test]
     fn write_file() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
 
         transport.create_dir("subdir").unwrap();
         transport
-            .write_file("subdir/subfile", b"Must I paint you a picture?")
+            .write_file(
+                "subdir/subfile",
+                b"Must I paint you a picture?",
+                WriteMode::CreateNew,
+            )
             .unwrap();
 
         temp.child("subdir").assert(predicate::path::is_dir());
@@ -321,7 +296,7 @@ mod test {
         use std::os::unix::prelude::PermissionsExt;
 
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
         temp.child("file").touch().unwrap();
         fs::set_permissions(temp.child("file").path(), fs::Permissions::from_mode(0o000))
             .expect("set_permissions");
@@ -334,13 +309,13 @@ mod test {
     #[test]
     fn write_file_can_overwrite() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
         let filename = "filename";
         transport
-            .write_file(filename, b"original content")
+            .write_file(filename, b"original content", WriteMode::Overwrite)
             .expect("first write succeeds");
         transport
-            .write_file(filename, b"new content")
+            .write_file(filename, b"new content", WriteMode::Overwrite)
             .expect("write over existing file succeeds");
         assert_eq!(
             transport.read_file(filename).unwrap().as_ref(),
@@ -351,7 +326,7 @@ mod test {
     #[test]
     fn create_existing_dir() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
@@ -363,12 +338,12 @@ mod test {
     #[test]
     fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();
 
-        let sub_transport = transport.sub_transport("aaa");
+        let sub_transport = transport.chdir("aaa");
         let sub_list = sub_transport.list_dir("").unwrap();
 
         assert_eq!(sub_list.dirs, ["bbb"]);
@@ -380,7 +355,7 @@ mod test {
     #[test]
     fn remove_dir_all() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();

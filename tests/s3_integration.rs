@@ -1,4 +1,4 @@
-// Copyright 2023 Martin Pool
+// Copyright 2023-2024 Martin Pool
 
 #![cfg(feature = "s3-integration-test")]
 
@@ -97,23 +97,23 @@ impl TempBucket {
             .expect("Create bucket");
         println!("Created bucket {bucket_name}");
 
+        let lifecycle_configuration = BucketLifecycleConfiguration::builder()
+            .rules(
+                LifecycleRule::builder()
+                    .id("delete-after-7d")
+                    .filter(LifecycleRuleFilter::builder().prefix("").build())
+                    .status(ExpirationStatus::Enabled)
+                    .expiration(LifecycleExpiration::builder().days(7).build())
+                    .build()
+                    .expect("Build S3 lifecycle rule"),
+            )
+            .build()
+            .expect("Build S3 lifecycle configuration");
+        dbg!(&lifecycle_configuration);
         client
             .put_bucket_lifecycle_configuration()
             .bucket(bucket_name)
-            .lifecycle_configuration(
-                BucketLifecycleConfiguration::builder()
-                    .rules(
-                        LifecycleRule::builder()
-                            .id("delete-after-7d")
-                            .filter(LifecycleRuleFilter::ObjectSizeGreaterThan(0))
-                            .status(ExpirationStatus::Enabled)
-                            .expiration(LifecycleExpiration::builder().days(7).build())
-                            .build()
-                            .expect("Build S3 lifecycle rule"),
-                    )
-                    .build()
-                    .expect("Build S3 lifecycle configuration"),
-            )
+            .lifecycle_configuration(lifecycle_configuration)
             .send()
             .await
             .expect("Set bucket lifecycle");

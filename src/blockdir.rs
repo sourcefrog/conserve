@@ -32,11 +32,12 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use tracing::{instrument, trace};
+use transport::WriteMode;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
 use crate::monitor::Monitor;
-use crate::transport::ListDir;
+use crate::transport::{ListDir, Transport};
 use crate::*;
 
 // const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
@@ -65,7 +66,7 @@ pub struct Address {
 /// A readable, writable directory within a band holding data blocks.
 #[derive(Debug)]
 pub struct BlockDir {
-    transport: Arc<dyn Transport>,
+    transport: Transport,
     pub stats: BlockDirStats,
     // TODO: There are fancier caches and they might help, but this one works, and Stretto did not work for me.
     cache: RwLock<LruCache<BlockHash, Bytes>>,
@@ -85,7 +86,7 @@ pub fn block_relpath(hash: &BlockHash) -> String {
 }
 
 impl BlockDir {
-    pub fn open(transport: Arc<dyn Transport>) -> BlockDir {
+    pub fn open(transport: Transport) -> BlockDir {
         /// Cache this many blocks in memory.
         // TODO: Change to a cache that tracks the size of stored blocks?
         // As a safe conservative value, 100 blocks of 20MB each would be 2GB.
@@ -102,7 +103,7 @@ impl BlockDir {
         }
     }
 
-    pub fn create(transport: Arc<dyn Transport>) -> Result<BlockDir> {
+    pub fn create(transport: Transport) -> Result<BlockDir> {
         transport.create_dir("")?;
         Ok(BlockDir::open(transport))
     }
@@ -131,7 +132,19 @@ impl BlockDir {
         let hex_hash = hash.to_string();
         let relpath = block_relpath(&hash);
         self.transport.create_dir(subdir_relpath(&hex_hash))?;
-        self.transport.write_file(&relpath, &compressed)?;
+        match self
+            .transport
+            .write_file(&relpath, &compressed, WriteMode::CreateNew)
+        {
+            Ok(()) => {}
+            Err(err) if err.kind() == transport::ErrorKind::AlreadyExists => {
+                // let's assume the contents are correct
+            }
+            Err(err) => {
+                warn!(?err, ?hash, "Error writing block");
+                return Err(err.into());
+            }
+        }
         stats.written_blocks += 1;
         stats.uncompressed_bytes += uncomp_len;
         stats.compressed_bytes += comp_len;
@@ -343,7 +356,6 @@ mod test {
     use tempfile::TempDir;
 
     use crate::monitor::test::TestMonitor;
-    use crate::transport::open_local_transport;
 
     use super::*;
 
@@ -353,7 +365,7 @@ mod test {
         // file with 0 bytes. It's not valid compressed data. We just treat
         // the block as not present at all.
         let tempdir = TempDir::new().unwrap();
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport::local(tempdir.path()));
         let mut stats = BackupStats::default();
         let monitor = TestMonitor::arc();
         let hash = blockdir
@@ -367,7 +379,7 @@ mod test {
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1); // Since we just wrote it, we know it's there.
 
         // Open again to get a fresh cache
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport::local(tempdir.path()));
         let monitor = TestMonitor::arc();
         OpenOptions::new()
             .write(true)
@@ -383,15 +395,12 @@ mod test {
     #[test]
     fn temp_files_are_not_returned_as_blocks() {
         let tempdir = TempDir::new().unwrap();
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport::local(tempdir.path()));
         let monitor = TestMonitor::arc();
         let subdir = tempdir.path().join(subdir_relpath("123"));
         create_dir(&subdir).unwrap();
-        write(
-            subdir.join(format!("{}{}", TMP_PREFIX, "123123123")),
-            b"123",
-        )
-        .unwrap();
+        // Write a temp file as was created by earlier versions of the code.
+        write(subdir.join("tmp123123123"), b"123").unwrap();
         let blocks = blockdir
             .blocks(monitor.clone())
             .unwrap()
@@ -402,7 +411,7 @@ mod test {
     #[test]
     fn cache_hit() {
         let tempdir = TempDir::new().unwrap();
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport::local(tempdir.path()));
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let hash = blockdir
@@ -432,7 +441,7 @@ mod test {
     #[test]
     fn existence_cache_hit() {
         let tempdir = TempDir::new().unwrap();
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport::local(tempdir.path()));
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let monitor = TestMonitor::arc();
@@ -442,7 +451,7 @@ mod test {
 
         // reopen
         let monitor = TestMonitor::arc();
-        let blockdir = BlockDir::open(open_local_transport(tempdir.path()).unwrap());
+        let blockdir = BlockDir::open(Transport::local(tempdir.path()));
         assert!(blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);

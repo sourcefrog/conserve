@@ -14,13 +14,9 @@
 
 use std::cell::RefCell;
 use std::fs::{create_dir, write};
-#[cfg(unix)]
-use std::fs::{read_link, symlink_metadata};
-use std::path::PathBuf;
 
 use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
-use filetime::{set_symlink_file_times, FileTime};
 use tempfile::TempDir;
 
 use conserve::test_fixtures::ScratchArchive;
@@ -194,6 +190,11 @@ fn exclude_files() {
 #[test]
 #[cfg(unix)]
 fn restore_symlink() {
+    use std::fs::{read_link, symlink_metadata};
+    use std::path::PathBuf;
+
+    use filetime::{set_symlink_file_times, FileTime};
+
     use conserve::monitor::test::TestMonitor;
 
     let af = ScratchArchive::new();
