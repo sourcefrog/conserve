@@ -209,7 +209,12 @@ mod test {
         assert!(message.contains("Not found"));
         assert!(message.contains("nonexistent.json"));
 
-        assert!(err.path().expect("path").ends_with("nonexistent.json"));
+        assert!(err
+            .url
+            .as_ref()
+            .expect("url")
+            .path()
+            .ends_with("/nonexistent.json"));
         assert_eq!(err.kind(), transport::ErrorKind::NotFound);
         assert!(err.is_not_found());
 

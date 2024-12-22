@@ -85,7 +85,7 @@ impl Transport {
             _other => {
                 return Err(Error {
                     kind: ErrorKind::UrlScheme,
-                    path: Some(url.as_str().to_owned()),
+                    url: Some(url.clone()),
                     source: None,
                 })
             }
@@ -229,11 +229,11 @@ pub struct ListDir {
 #[derive(Debug)]
 pub struct Error {
     /// What type of generally known error?
-    kind: ErrorKind,
+    pub kind: ErrorKind,
     /// The underlying error: for example an IO or S3 error.
-    source: Option<Box<dyn error::Error + Send + Sync>>,
-    /// The affected path, possibly relative to the transport.
-    path: Option<String>,
+    pub source: Option<Box<dyn error::Error + Send + Sync>>,
+    /// The affected URL, if known.
+    pub url: Option<Url>,
 }
 
 /// General categories of transport errors.
@@ -275,25 +275,20 @@ impl Error {
         Error {
             kind: source.kind().into(),
             source: Some(Box::new(source)),
-            path: Some(path.to_string_lossy().to_string()),
+            url: Url::from_file_path(path).ok(),
         }
     }
 
     pub fn is_not_found(&self) -> bool {
         self.kind == ErrorKind::NotFound
     }
-
-    /// The transport-relative path where this error occurred, if known.
-    pub fn path(&self) -> Option<&str> {
-        self.path.as_deref()
-    }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind)?;
-        if let Some(ref path) = self.path {
-            write!(f, ": {}", path)?;
+        if let Some(ref url) = self.url {
+            write!(f, ": {url}")?;
         }
         if let Some(source) = &self.source {
             // I'm not sure we should write this here; it might be repetitive.
