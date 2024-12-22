@@ -47,7 +47,7 @@ impl Protocol {
     }
 
     fn io_error(&self, relpath: &str, err: io::Error) -> Error {
-        Error::io_error(self.url.join(relpath).expect("join URL"), err)
+        Error::io_error(&self.path.join(relpath), err)
     }
 }
 
@@ -71,7 +71,7 @@ impl super::Protocol for Protocol {
     #[instrument(skip(self, content))]
     fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let full_path = self.full_path(relpath);
-        let oops = |err| super::Error::io_error(self.url.join(relpath).unwrap(), err);
+        let oops = |err| self.io_error(relpath, err);
         let mut options = File::options();
         options.write(true);
         match write_mode {

@@ -287,7 +287,7 @@ impl Error {
         self.kind
     }
 
-    pub(self) fn io_error(url: Url, source: io::Error) -> Error {
+    pub(self) fn io_error(path: &Path, source: io::Error) -> Error {
         let kind = match source.kind() {
             io::ErrorKind::NotFound => ErrorKind::NotFound,
             io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
@@ -297,7 +297,7 @@ impl Error {
 
         Error {
             source: Some(Box::new(source)),
-            url: Some(url),
+            url: Url::from_file_path(path).ok(),
             kind,
         }
     }

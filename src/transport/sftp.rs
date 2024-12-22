@@ -224,16 +224,19 @@ impl super::Protocol for Protocol {
 
     fn metadata(&self, relpath: &str) -> Result<super::Metadata> {
         let full_path = self.base_path.join(relpath);
-        let stat = self.lstat(relpath)?;
-        // TODO: runtime error, don't panic
-        let modified = OffsetDateTime::from_unix_timestamp(
-            stat.mtime
-                .expect("sftp stat has an mtime")
-                .try_into()
-                .unwrap(),
-        )
-        .expect("convert mtime");
         trace!("metadata {full_path:?}");
+        let stat = self.lstat(relpath)?;
+        let modified = stat
+            .mtime
+            .and_then(|mtime| OffsetDateTime::from_unix_timestamp(mtime as i64).ok())
+            .ok_or_else(|| {
+                warn!("No mtime for {full_path:?}");
+                super::Error {
+                    kind: ErrorKind::Other,
+                    source: None,
+                    url: Some(self.relative_url(relpath)),
+                }
+            })?;
         Ok(super::Metadata {
             kind: stat.file_type().into(),
             len: stat.size.unwrap_or_default(),
