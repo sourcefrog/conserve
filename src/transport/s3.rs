@@ -25,7 +25,6 @@
 //    cargo mutants -f s3.rs --no-config -C --features=s3,s3-integration-test
 
 use std::fmt;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -42,7 +41,6 @@ use aws_types::region::Region;
 use aws_types::SdkConfig;
 use base64::Engine;
 use bytes::Bytes;
-use time::OffsetDateTime;
 use tokio::runtime::Runtime;
 use tracing::{debug, instrument, trace, trace_span};
 use url::Url;
@@ -75,7 +73,11 @@ impl Protocol {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .map_err(|err| Error::io_error(Path::new(""), err))?;
+            .map_err(|source| Error {
+                kind: ErrorKind::CreateTransport,
+                url: Some(url.to_owned()),
+                source: Some(Box::new(source)),
+            })?;
 
         let bucket = url.authority().to_owned();
         assert!(!bucket.is_empty(), "S3 bucket name is empty in {url:?}");
@@ -371,12 +373,11 @@ impl super::Protocol for Protocol {
                     .expect("S3 HeadObject response should have a last_modified")
                     .try_into()
                     .expect("S3 last_modified is valid SystemTime");
-                let modified: Option<OffsetDateTime> = Some(modified.into());
                 trace!(?len, "File exists");
                 Ok(Metadata {
                     kind: Kind::File,
                     len,
-                    modified,
+                    modified: modified.into(),
                 })
             }
             Err(err) => {

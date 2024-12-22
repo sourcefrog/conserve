@@ -133,12 +133,10 @@ impl super::Protocol for Protocol {
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
         let path = self.full_path(relpath);
         let fsmeta = path.metadata().map_err(|err| Error::io_error(&path, err))?;
-        let modified = Some(
-            fsmeta
-                .modified()
-                .map_err(|err| Error::io_error(&path, err))?
-                .into(),
-        );
+        let modified = fsmeta
+            .modified()
+            .map_err(|err| Error::io_error(&path, err))?
+            .into();
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),
@@ -237,10 +235,7 @@ mod test {
 
         assert_eq!(metadata.len, 24);
         assert_eq!(metadata.kind, Kind::File);
-        assert!(
-            metadata.modified.expect("local metadata has an mtime") + Duration::from_secs(60)
-                > OffsetDateTime::now_utc()
-        );
+        assert!(metadata.modified + Duration::from_secs(60) > OffsetDateTime::now_utc());
         assert!(transport.metadata("nopoem").unwrap_err().is_not_found());
     }
 

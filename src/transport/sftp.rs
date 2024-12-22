@@ -202,9 +202,22 @@ impl super::Protocol for Protocol {
         let full_path = self.base_path.join(relpath);
         let stat = self.lstat(relpath)?;
         trace!("metadata {full_path:?}");
-        let modified: Option<OffsetDateTime> = stat
-            .mtime
-            .and_then(|mtime| OffsetDateTime::from_unix_timestamp(mtime as i64).ok());
+        let modified = stat.mtime.ok_or_else(|| {
+            warn!("No mtime for {full_path:?}");
+            super::Error {
+                kind: ErrorKind::Other,
+                source: None,
+                url: Some(self.relative_url(relpath)),
+            }
+        })?;
+        let modified = OffsetDateTime::from_unix_timestamp(modified as i64).map_err(|err| {
+            warn!("Invalid mtime for {full_path:?}");
+            super::Error {
+                kind: ErrorKind::Other,
+                source: Some(Box::new(err)),
+                url: Some(self.relative_url(relpath)),
+            }
+        })?;
         Ok(super::Metadata {
             kind: stat.file_type().into(),
             len: stat.size.unwrap_or_default(),

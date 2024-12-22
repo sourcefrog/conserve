@@ -46,6 +46,7 @@ pub mod s3;
 /// support streaming or partial reads and writes.
 #[derive(Clone)]
 pub struct Transport {
+    /// The concrete protocol implementation: local, S3, etc.
     protocol: Arc<dyn Protocol + 'static>,
 }
 
@@ -175,9 +176,18 @@ pub enum WriteMode {
 
 trait Protocol: Send + Sync {
     fn read_file(&self, path: &str) -> Result<Bytes>;
+
+    /// Write a complete file.
+    ///
+    /// Depending on the [WriteMode] this may either overwrite existing files, or error.
+    ///
+    /// As much as possible, the file should be written atomically so that it is only visible with
+    /// the complete content.
     fn write_file(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()>;
     fn list_dir(&self, relpath: &str) -> Result<ListDir>;
     fn create_dir(&self, relpath: &str) -> Result<()>;
+
+    /// Get metadata about a file.
     fn metadata(&self, relpath: &str) -> Result<Metadata>;
 
     /// Delete a file.
@@ -214,8 +224,8 @@ pub struct Metadata {
     /// Kind of file.
     pub kind: Kind,
 
-    /// Last modified time, if known.
-    pub modified: Option<OffsetDateTime>,
+    /// Last modified time.
+    pub modified: OffsetDateTime,
 }
 
 /// A list of all the files and directories in a directory.
@@ -248,6 +258,12 @@ pub enum ErrorKind {
     #[display(fmt = "Permission denied")]
     PermissionDenied,
 
+    #[display(fmt = "Create transport error")]
+    CreateTransport,
+
+    #[display(fmt = "Connect error")]
+    Connect,
+
     #[display(fmt = "Unsupported URL scheme")]
     UrlScheme,
 
@@ -272,15 +288,27 @@ impl Error {
     }
 
     pub(self) fn io_error(path: &Path, source: io::Error) -> Error {
+        let kind = match source.kind() {
+            io::ErrorKind::NotFound => ErrorKind::NotFound,
+            io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
+            io::ErrorKind::PermissionDenied => ErrorKind::PermissionDenied,
+            _ => ErrorKind::Other,
+        };
+
         Error {
-            kind: source.kind().into(),
             source: Some(Box::new(source)),
             url: Url::from_file_path(path).ok(),
+            kind,
         }
     }
 
     pub fn is_not_found(&self) -> bool {
         self.kind == ErrorKind::NotFound
+    }
+
+    /// The URL where this error occurred, if known.
+    pub fn url(&self) -> Option<&Url> {
+        self.url.as_ref()
     }
 }
 
