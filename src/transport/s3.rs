@@ -25,8 +25,8 @@
 //    cargo mutants -f s3.rs --no-config -C --features=s3,s3-integration-test
 
 use std::fmt;
-use std::path::Path;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use aws_config::{AppName, BehaviorVersion};
 use aws_sdk_s3::error::SdkError;
@@ -73,7 +73,11 @@ impl Protocol {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .map_err(|err| Error::io_error(Path::new(""), err))?;
+            .map_err(|source| Error {
+                kind: ErrorKind::CreateTransport,
+                url: Some(url.to_owned()),
+                source: Some(Box::new(source)),
+            })?;
 
         let bucket = url.authority().to_owned();
         assert!(!bucket.is_empty(), "S3 bucket name is empty in {url:?}");
@@ -120,6 +124,24 @@ impl Protocol {
 
     fn join_path(&self, relpath: &str) -> String {
         join_paths(&self.base_path, relpath)
+    }
+
+    fn s3_error<E, R>(&self, key: &str, source: SdkError<E, R>) -> Error
+    where
+        E: std::error::Error + Send + Sync + 'static,
+        R: std::fmt::Debug + Send + Sync + 'static,
+        ErrorKind: for<'a> From<&'a E>,
+    {
+        debug!(s3_error = ?source);
+        let kind = match &source {
+            SdkError::ServiceError(service_err) => ErrorKind::from(service_err.err()),
+            _ => ErrorKind::Other,
+        };
+        Error {
+            kind,
+            url: self.url.join(key).ok(),
+            source: Some(source.into()),
+        }
     }
 }
 
@@ -221,7 +243,7 @@ impl super::Protocol for Protocol {
                         result.files.push(name.to_owned());
                     }
                 }
-                Some(Err(err)) => return Err(s3_error(prefix, err)),
+                Some(Err(err)) => return Err(self.s3_error(&prefix, err)),
                 None => break,
             }
         }
@@ -240,13 +262,13 @@ impl super::Protocol for Protocol {
         let response = self
             .runtime
             .block_on(request.send())
-            .map_err(|source| s3_error(key.clone(), source))?;
+            .map_err(|source| self.s3_error(&key, source))?;
         let body_bytes = self
             .runtime
             .block_on(response.body.collect())
             .map_err(|source| Error {
                 kind: ErrorKind::Other,
-                path: Some(key.clone()),
+                url: self.url.join(relpath).ok(),
                 source: Some(Box::new(source)),
             })?
             .into_bytes();
@@ -279,7 +301,7 @@ impl super::Protocol for Protocol {
         }
         let response = self.runtime.block_on(request.send());
         // trace!(?response);
-        response.map_err(|err| s3_error(key, err))?;
+        response.map_err(|err| self.s3_error(&key, err))?;
         trace!(body_len = content.len(), "wrote file");
         Ok(())
     }
@@ -290,7 +312,7 @@ impl super::Protocol for Protocol {
         let request = self.client.delete_object().bucket(&self.bucket).key(&key);
         let response = self.runtime.block_on(request.send());
         trace!(?response);
-        response.map_err(|err| s3_error(key, err))?;
+        response.map_err(|err| self.s3_error(&key, err))?;
         trace!("deleted file");
         Ok(())
     }
@@ -311,7 +333,7 @@ impl super::Protocol for Protocol {
         let mut n_files = 0;
         while let Some(response) = self.runtime.block_on(stream.next()) {
             for object in response
-                .map_err(|err| s3_error(prefix.clone(), err))?
+                .map_err(|err| self.s3_error(&prefix, err))?
                 .contents
                 .expect("ListObjectsV2Response has contents")
             {
@@ -324,7 +346,7 @@ impl super::Protocol for Protocol {
                             .key(&key)
                             .send(),
                     )
-                    .map_err(|err| s3_error(key, err))?;
+                    .map_err(|err| self.s3_error(&key, err))?;
                 n_files += 1;
             }
         }
@@ -346,14 +368,20 @@ impl super::Protocol for Protocol {
                     .expect("S3 HeadObject response should have a content_length")
                     .try_into()
                     .expect("Content length non-negative");
+                let modified: SystemTime = response
+                    .last_modified
+                    .expect("S3 HeadObject response should have a last_modified")
+                    .try_into()
+                    .expect("S3 last_modified is valid SystemTime");
                 trace!(?len, "File exists");
                 Ok(Metadata {
                     kind: Kind::File,
                     len,
+                    modified: modified.into(),
                 })
             }
             Err(err) => {
-                let translated = s3_error(key, err);
+                let translated = self.s3_error(&key, err);
                 if translated.is_not_found() {
                     trace!("file does not exist");
                 } else {
@@ -377,25 +405,6 @@ impl super::Protocol for Protocol {
 
     fn url(&self) -> &Url {
         &self.url
-    }
-}
-
-fn s3_error<K, E, R>(key: K, source: SdkError<E, R>) -> Error
-where
-    K: ToOwned<Owned = String>,
-    E: std::error::Error + Send + Sync + 'static,
-    R: std::fmt::Debug + Send + Sync + 'static,
-    ErrorKind: for<'a> From<&'a E>,
-{
-    debug!(s3_error = ?source);
-    let kind = match &source {
-        SdkError::ServiceError(service_err) => ErrorKind::from(service_err.err()),
-        _ => ErrorKind::Other,
-    };
-    Error {
-        kind,
-        path: Some(key.to_owned()),
-        source: Some(source.into()),
     }
 }
 
