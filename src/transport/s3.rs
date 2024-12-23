@@ -110,15 +110,16 @@ impl Protocol {
                 .trim_end_matches('/')
                 .to_owned();
         }
-        debug!(%bucket, %base_path);
+        let url = Url::parse(&format!("s3://{bucket}/{base_path}")).expect("valid s3 URL");
+        debug!(%url);
 
         Ok(Protocol {
             bucket,
             base_path,
+            url,
             client: Arc::new(client),
             runtime: Arc::new(runtime),
             storage_class: StorageClass::IntelligentTiering,
-            url: url.to_owned(),
         })
     }
 
@@ -395,11 +396,11 @@ impl super::Protocol for Protocol {
     fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
         Arc::new(Protocol {
             base_path: join_paths(&self.base_path, relpath),
+            url: self.url.join(relpath).expect("join subdir URL"),
             bucket: self.bucket.clone(),
             runtime: self.runtime.clone(),
             client: self.client.clone(),
             storage_class: self.storage_class.clone(),
-            url: self.url.join(relpath).expect("join URL"),
         })
     }
 

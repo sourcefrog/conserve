@@ -31,6 +31,7 @@ pub mod index;
 mod io;
 mod jsonio;
 pub mod kind;
+pub mod lease;
 pub mod live_tree;
 mod merge;
 pub mod misc;

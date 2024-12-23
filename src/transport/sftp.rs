@@ -46,7 +46,7 @@ impl Protocol {
             ssh_error(err, url)
         })?;
         trace!(
-            "SSH hands shaken, banner: {}",
+            "SSH connected, banner: {}",
             session.banner().unwrap_or("(none)")
         );
         let username = match url.username() {
@@ -79,12 +79,36 @@ impl Protocol {
             .map_err(|err| self.ssh_error(err, path))
     }
 
+    fn io_error(&self, source: io::Error, path: &str) -> Error {
+        Error {
+            kind: source.kind().into(),
+            source: Some(Box::new(source)),
+            url: self.url.join(path).ok(),
+        }
+    }
+
     fn relative_url(&self, path: &str) -> Url {
         self.url.join(path).expect("join URL")
     }
 
     fn ssh_error(&self, source: ssh2::Error, path: &str) -> Error {
         ssh_error(source, &self.relative_url(path))
+    }
+}
+
+fn ssh_error(source: ssh2::Error, url: &Url) -> super::Error {
+    super::Error {
+        kind: source.code().into(),
+        source: Some(Box::new(source)),
+        url: Some(url.to_owned()),
+    }
+}
+
+fn io_error(source: io::Error, url: &Url) -> super::Error {
+    super::Error {
+        kind: source.kind().into(),
+        source: Some(Box::new(source)),
+        url: Some(url.to_owned()),
     }
 }
 
@@ -139,7 +163,7 @@ impl super::Protocol for Protocol {
             .map_err(|err| self.ssh_error(err, path))?;
         let len = file
             .read_to_end(&mut buf)
-            .map_err(|err| io_error(err, url))?;
+            .map_err(|err| self.io_error(err, path))?;
         assert_eq!(len, buf.len());
         trace!("read {} bytes from {}", len, full_path.display());
         Ok(buf.into())
@@ -200,24 +224,19 @@ impl super::Protocol for Protocol {
 
     fn metadata(&self, relpath: &str) -> Result<super::Metadata> {
         let full_path = self.base_path.join(relpath);
-        let stat = self.lstat(relpath)?;
         trace!("metadata {full_path:?}");
-        let modified = stat.mtime.ok_or_else(|| {
-            warn!("No mtime for {full_path:?}");
-            super::Error {
-                kind: ErrorKind::Other,
-                source: None,
-                url: Some(self.relative_url(relpath)),
-            }
-        })?;
-        let modified = OffsetDateTime::from_unix_timestamp(modified as i64).map_err(|err| {
-            warn!("Invalid mtime for {full_path:?}");
-            super::Error {
-                kind: ErrorKind::Other,
-                source: Some(Box::new(err)),
-                url: Some(self.relative_url(relpath)),
-            }
-        })?;
+        let stat = self.lstat(relpath)?;
+        let modified = stat
+            .mtime
+            .and_then(|mtime| OffsetDateTime::from_unix_timestamp(mtime as i64).ok())
+            .ok_or_else(|| {
+                warn!("No mtime for {full_path:?}");
+                super::Error {
+                    kind: ErrorKind::Other,
+                    source: None,
+                    url: Some(self.relative_url(relpath)),
+                }
+            })?;
         Ok(super::Metadata {
             kind: stat.file_type().into(),
             len: stat.size.unwrap_or_default(),
@@ -308,21 +327,5 @@ impl From<ssh2::ErrorCode> for ErrorKind {
             // TODO: Others
             _ => ErrorKind::Other,
         }
-    }
-}
-
-fn ssh_error(source: ssh2::Error, url: &Url) -> super::Error {
-    super::Error {
-        kind: source.code().into(),
-        source: Some(Box::new(source)),
-        url: Some(url.clone()),
-    }
-}
-
-fn io_error(source: io::Error, url: &Url) -> Error {
-    Error {
-        kind: source.kind().into(),
-        source: Some(Box::new(source)),
-        url: Some(url.clone()),
     }
 }
