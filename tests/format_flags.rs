@@ -5,6 +5,7 @@
 
 use conserve::test_fixtures::ScratchArchive;
 use conserve::*;
+use transport::WriteMode;
 
 #[test]
 // This can be updated if/when Conserve does start writing some flags by default.
@@ -42,8 +43,12 @@ fn unknown_format_flag_fails_to_open() {
         "format_flags": ["wibble"]
     });
     af.transport()
-        .sub_transport("b0000")
-        .write_file("BANDHEAD", &serde_json::to_vec(&head).unwrap())
+        .chdir("b0000")
+        .write_file(
+            "BANDHEAD",
+            &serde_json::to_vec(&head).unwrap(),
+            WriteMode::CreateNew,
+        )
         .unwrap();
 
     let err = Band::open(&af, BandId::zero()).unwrap_err();

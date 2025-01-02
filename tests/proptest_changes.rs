@@ -11,6 +11,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+#![allow(non_local_definitions)] // side effect of proptest macro?
+
 //! Try backing up and restoring various sequences of changes to a tree.
 
 use std::collections::BTreeMap;

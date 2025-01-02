@@ -24,9 +24,9 @@
 //
 //    cargo mutants -f s3.rs --no-config -C --features=s3,s3-integration-test
 
-use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use aws_config::{AppName, BehaviorVersion};
 use aws_sdk_s3::error::SdkError;
@@ -42,12 +42,13 @@ use aws_types::SdkConfig;
 use base64::Engine;
 use bytes::Bytes;
 use tokio::runtime::Runtime;
-use tracing::{debug, trace, trace_span};
+use tracing::{debug, instrument, trace, trace_span};
 use url::Url;
 
-use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, Transport};
+use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, WriteMode};
 
-pub struct S3Transport {
+pub(super) struct Protocol {
+    url: Url,
     /// Tokio runtime specifically for S3 IO.
     ///
     /// S3 SDK is built on Tokio but the rest of Conserve uses threads.
@@ -60,41 +61,26 @@ pub struct S3Transport {
     bucket: String,
     base_path: String,
 
-    url: Url,
-
     /// Storage class for new objects.
     storage_class: StorageClass,
 }
 
-impl fmt::Debug for S3Transport {
-    #[mutants::skip] // unimportant to test
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("S3Transport")
-            .field("bucket", &self.bucket)
-            .field("base_path", &self.base_path)
-            .finish()
-    }
-}
+impl Protocol {
+    pub(super) fn new(url: &Url) -> Result<Self> {
+        assert_eq!(url.scheme(), "s3");
 
-// Clippy false positive here: https://github.com/rust-lang/rust-clippy/issues/12444
-#[allow(clippy::assigning_clones)]
-impl S3Transport {
-    pub fn new(base_url: &Url) -> Result<Arc<Self>> {
         // Like in <https://tokio.rs/tokio/topics/bridging>.
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .map_err(|source| Error {
                 kind: ErrorKind::CreateTransport,
-                url: Some(base_url.to_owned()),
+                url: Some(url.to_owned()),
                 source: Some(Box::new(source)),
             })?;
 
-        let bucket = base_url.authority().to_owned();
-        assert!(
-            !bucket.is_empty(),
-            "S3 bucket name is empty in {base_url:?}"
-        );
+        let bucket = url.authority().to_owned();
+        assert!(!bucket.is_empty(), "S3 bucket name is empty in {url:?}");
 
         // Find the bucket region.
         let config = load_aws_config(&runtime, None);
@@ -116,7 +102,7 @@ impl S3Transport {
         let config = load_aws_config(&runtime, region);
         let client = aws_sdk_s3::Client::new(&config);
 
-        let mut base_path = base_url.path().to_owned();
+        let mut base_path = url.path().to_owned();
         if !base_path.is_empty() {
             base_path = base_path
                 .strip_prefix('/')
@@ -125,16 +111,48 @@ impl S3Transport {
                 .to_owned();
         }
         let url = Url::parse(&format!("s3://{bucket}/{base_path}")).expect("valid s3 URL");
-        debug!(%base_url);
+        debug!(%url);
 
-        Ok(Arc::new(S3Transport {
+        Ok(Protocol {
             bucket,
             base_path,
             url,
             client: Arc::new(client),
             runtime: Arc::new(runtime),
             storage_class: StorageClass::IntelligentTiering,
-        }))
+        })
+    }
+
+    fn join_path(&self, relpath: &str) -> String {
+        join_paths(&self.base_path, relpath)
+    }
+
+    fn s3_error<E, R>(&self, key: &str, source: SdkError<E, R>) -> Error
+    where
+        E: std::error::Error + Send + Sync + 'static,
+        R: std::fmt::Debug + Send + Sync + 'static,
+        ErrorKind: for<'a> From<&'a E>,
+    {
+        debug!(s3_error = ?source);
+        let kind = match &source {
+            SdkError::ServiceError(service_err) => ErrorKind::from(service_err.err()),
+            _ => ErrorKind::Other,
+        };
+        Error {
+            kind,
+            url: self.url.join(key).ok(),
+            source: Some(source.into()),
+        }
+    }
+}
+
+impl fmt::Debug for Protocol {
+    #[mutants::skip] // unimportant to test
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("conserve::transport::s3::Protocol")
+            .field("bucket", &self.bucket)
+            .field("base_path", &self.base_path)
+            .finish()
     }
 }
 
@@ -185,11 +203,7 @@ fn join_paths(a: &str, b: &str) -> String {
     result
 }
 
-impl Transport for S3Transport {
-    fn base_url(&self) -> &Url {
-        &self.url
-    }
-
+impl super::Protocol for Protocol {
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         let _span = trace_span!("S3Transport::list_file", %relpath).entered();
         let mut prefix = self.join_path(relpath);
@@ -230,7 +244,7 @@ impl Transport for S3Transport {
                         result.files.push(name.to_owned());
                     }
                 }
-                Some(Err(err)) => return Err(s3_error(&self.url, prefix, err)),
+                Some(Err(err)) => return Err(self.s3_error(&prefix, err)),
                 None => break,
             }
         }
@@ -249,13 +263,13 @@ impl Transport for S3Transport {
         let response = self
             .runtime
             .block_on(request.send())
-            .map_err(|source| s3_error(&self.url, key.clone(), source))?;
+            .map_err(|source| self.s3_error(&key, source))?;
         let body_bytes = self
             .runtime
             .block_on(response.body.collect())
             .map_err(|source| Error {
                 kind: ErrorKind::Other,
-                url: Some(self.url.join(&key).expect("join URL")),
+                url: self.url.join(relpath).ok(),
                 source: Some(Box::new(source)),
             })?
             .into_bytes();
@@ -270,12 +284,12 @@ impl Transport for S3Transport {
         Ok(())
     }
 
-    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
-        let _span = trace_span!("S3Transport::write_file", %relpath).entered();
+    #[instrument(skip(self, content))]
+    fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let key = self.join_path(relpath);
         let crc32c =
             base64::engine::general_purpose::STANDARD.encode(crc32c::crc32c(content).to_be_bytes());
-        let request = self
+        let mut request = self
             .client
             .put_object()
             .bucket(&self.bucket)
@@ -283,15 +297,14 @@ impl Transport for S3Transport {
             .storage_class(self.storage_class.clone())
             .checksum_crc32_c(crc32c)
             .body(content.to_owned().into());
+        if write_mode == WriteMode::CreateNew {
+            request = request.if_none_match("*");
+        }
         let response = self.runtime.block_on(request.send());
         // trace!(?response);
-        response.map_err(|err| s3_error(&self.url, key, err))?;
+        response.map_err(|err| self.s3_error(&key, err))?;
         trace!(body_len = content.len(), "wrote file");
         Ok(())
-    }
-
-    fn write_new_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
-        todo!()
     }
 
     fn remove_file(&self, relpath: &str) -> Result<()> {
@@ -300,7 +313,7 @@ impl Transport for S3Transport {
         let request = self.client.delete_object().bucket(&self.bucket).key(&key);
         let response = self.runtime.block_on(request.send());
         trace!(?response);
-        response.map_err(|err| s3_error(&self.url, key, err))?;
+        response.map_err(|err| self.s3_error(&key, err))?;
         trace!("deleted file");
         Ok(())
     }
@@ -321,7 +334,7 @@ impl Transport for S3Transport {
         let mut n_files = 0;
         while let Some(response) = self.runtime.block_on(stream.next()) {
             for object in response
-                .map_err(|err| s3_error(&self.url, prefix.clone(), err))?
+                .map_err(|err| self.s3_error(&prefix, err))?
                 .contents
                 .expect("ListObjectsV2Response has contents")
             {
@@ -334,7 +347,7 @@ impl Transport for S3Transport {
                             .key(&key)
                             .send(),
                     )
-                    .map_err(|err| s3_error(&self.url, key, err))?;
+                    .map_err(|err| self.s3_error(&key, err))?;
                 n_files += 1;
             }
         }
@@ -356,14 +369,20 @@ impl Transport for S3Transport {
                     .expect("S3 HeadObject response should have a content_length")
                     .try_into()
                     .expect("Content length non-negative");
+                let modified: SystemTime = response
+                    .last_modified
+                    .expect("S3 HeadObject response should have a last_modified")
+                    .try_into()
+                    .expect("S3 last_modified is valid SystemTime");
                 trace!(?len, "File exists");
                 Ok(Metadata {
                     kind: Kind::File,
                     len,
+                    modified: modified.into(),
                 })
             }
             Err(err) => {
-                let translated = s3_error(&self.url, key, err);
+                let translated = self.s3_error(&key, err);
                 if translated.is_not_found() {
                     trace!("file does not exist");
                 } else {
@@ -374,51 +393,19 @@ impl Transport for S3Transport {
         }
     }
 
-    fn sub_transport(&self, relpath: &str) -> Arc<dyn Transport> {
-        let subdir = if relpath.ends_with('/') {
-            Cow::Borrowed(relpath)
-        } else {
-            Cow::Owned(format!("{relpath}/"))
-        };
-        Arc::new(S3Transport {
+    fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
+        Arc::new(Protocol {
             base_path: join_paths(&self.base_path, relpath),
-            url: self.url.join(&subdir).expect("join subdir URL"),
+            url: self.url.join(relpath).expect("join subdir URL"),
             bucket: self.bucket.clone(),
             runtime: self.runtime.clone(),
             client: self.client.clone(),
             storage_class: self.storage_class.clone(),
         })
     }
-}
 
-impl S3Transport {
-    fn join_path(&self, relpath: &str) -> String {
-        join_paths(&self.base_path, relpath)
-    }
-}
-
-impl AsRef<dyn Transport> for S3Transport {
-    fn as_ref(&self) -> &(dyn Transport + 'static) {
-        self
-    }
-}
-
-fn s3_error<K, E, R>(base: &Url, key: K, source: SdkError<E, R>) -> Error
-where
-    K: ToOwned<Owned = String>,
-    E: std::error::Error + Send + Sync + 'static,
-    R: std::fmt::Debug + Send + Sync + 'static,
-    ErrorKind: for<'a> From<&'a E>,
-{
-    debug!(s3_error = ?source);
-    let kind = match &source {
-        SdkError::ServiceError(service_err) => ErrorKind::from(service_err.err()),
-        _ => ErrorKind::Other,
-    };
-    Error {
-        kind,
-        url: base.join(key.to_owned().as_ref()).ok(),
-        source: Some(source.into()),
+    fn url(&self) -> &Url {
+        &self.url
     }
 }
 

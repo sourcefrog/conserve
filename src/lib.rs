@@ -74,7 +74,6 @@ pub use crate::restore::{restore, RestoreOptions};
 pub use crate::show::{show_versions, ShowVersionsOptions};
 pub use crate::stats::DeleteStats;
 pub use crate::stored_tree::StoredTree;
-pub use crate::transport::{open_transport, Transport};
 pub use crate::tree::{ReadTree, TreeSize};
 pub use crate::unix_mode::UnixMode;
 pub use crate::validate::ValidateOptions;
@@ -93,9 +92,6 @@ pub fn version() -> &'static str {
 pub const ARCHIVE_VERSION: &str = "0.6";
 
 pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");
-
-/// Temporary files in the archive have this prefix.
-const TMP_PREFIX: &str = "tmp";
 
 /// Metadata file in the band directory.
 static BAND_HEAD_FILENAME: &str = "BANDHEAD";

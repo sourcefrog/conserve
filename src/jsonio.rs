@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 use serde::de::DeserializeOwned;
 
-use crate::transport::{self, Transport};
+use crate::transport::{self, Transport, WriteMode};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -37,10 +37,9 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Write uncompressed json to a file on a Transport.
-pub(crate) fn write_json<T, TR>(transport: &TR, relpath: &str, obj: &T) -> Result<()>
+pub(crate) fn write_json<T>(transport: &Transport, relpath: &str, obj: &T) -> Result<()>
 where
     T: serde::Serialize,
-    TR: AsRef<dyn Transport>,
 {
     let mut s: String = serde_json::to_string(&obj).map_err(|source| Error::Json {
         source,
@@ -48,15 +47,14 @@ where
     })?;
     s.push('\n');
     transport
-        .as_ref()
-        .write_file(relpath, s.as_bytes())
+        .write_file(relpath, s.as_bytes(), WriteMode::CreateNew)
         .map_err(Error::from)
 }
 
 /// Read and deserialize uncompressed json from a file on a Transport.
 ///
 /// Returns None if the file does not exist.
-pub(crate) fn read_json<T>(transport: &dyn Transport, path: &str) -> Result<Option<T>>
+pub(crate) fn read_json<T>(transport: &Transport, path: &str) -> Result<Option<T>>
 where
     T: DeserializeOwned,
 {
@@ -79,8 +77,6 @@ mod tests {
     use assert_fs::prelude::*;
     use serde::{Deserialize, Serialize};
 
-    use crate::transport::local::LocalTransport;
-
     use super::*;
 
     #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -98,7 +94,7 @@ mod tests {
         };
         let filename = "test.json";
 
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
         super::write_json(&transport, filename, &entry).unwrap();
 
         let json_child = temp.child("test.json");
@@ -114,7 +110,7 @@ mod tests {
             .write_str(r#"{"id": 42, "weather": "cold"}"#)
             .unwrap();
 
-        let transport = LocalTransport::new(temp.path());
+        let transport = Transport::local(temp.path());
         let content: TestContents = read_json(&transport, "test.json")
             .expect("no error")
             .expect("file exists");
