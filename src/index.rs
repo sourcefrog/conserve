@@ -23,6 +23,7 @@ use crate::transport::Transport;
 use itertools::Itertools;
 use time::OffsetDateTime;
 use tracing::{debug, debug_span, error};
+use transport::WriteMode;
 
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
@@ -253,7 +254,8 @@ impl IndexWriter {
             self.transport.create_dir(&subdir_relpath(self.sequence))?;
         }
         let compressed_bytes = self.compressor.compress(&json)?;
-        self.transport.write_file(&relpath, &compressed_bytes)?;
+        self.transport
+            .write_file(&relpath, &compressed_bytes, WriteMode::CreateNew)?;
         self.hunks_written += 1;
         monitor.count(Counter::IndexWrites, 1);
         monitor.count(Counter::IndexWriteCompressedBytes, compressed_bytes.len());

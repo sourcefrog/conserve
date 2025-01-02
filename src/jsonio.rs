@@ -18,7 +18,7 @@ use std::path::PathBuf;
 
 use serde::de::DeserializeOwned;
 
-use crate::transport::{self, Transport};
+use crate::transport::{self, Transport, WriteMode};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -54,7 +54,7 @@ where
     })?;
     s.push('\n');
     transport
-        .write_file(relpath, s.as_bytes())
+        .write_file(relpath, s.as_bytes(), WriteMode::CreateNew)
         .map_err(Error::from)
 }
 

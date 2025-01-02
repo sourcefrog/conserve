@@ -12,6 +12,7 @@ version = "23.11.0"
 rust-version = "1.79"
 
 [features]
+default = ["s3", "sftp"]
 s3 = [
     "dep:aws-config",
     "dep:aws-sdk-s3",

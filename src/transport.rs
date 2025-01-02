@@ -20,6 +20,7 @@ use std::{error, fmt, io, result};
 
 use bytes::Bytes;
 use derive_more::Display;
+use time::OffsetDateTime;
 use url::Url;
 
 use crate::*;
@@ -45,6 +46,7 @@ pub mod s3;
 /// support streaming or partial reads and writes.
 #[derive(Clone)]
 pub struct Transport {
+    /// The concrete protocol implementation: local, S3, etc.
     protocol: Arc<dyn Protocol + 'static>,
 }
 
@@ -84,7 +86,7 @@ impl Transport {
             _other => {
                 return Err(Error {
                     kind: ErrorKind::UrlScheme,
-                    path: Some(url.as_str().to_owned()),
+                    url: Some(url.clone()),
                     source: None,
                 })
             }
@@ -116,8 +118,8 @@ impl Transport {
         }
     }
 
-    pub fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
-        self.protocol.write_file(relpath, content)
+    pub fn write_file(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()> {
+        self.protocol.write_file(relpath, content, mode)
     }
 
     pub fn create_dir(&self, relpath: &str) -> Result<()> {
@@ -163,11 +165,29 @@ impl fmt::Debug for Transport {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WriteMode {
+    /// Create the file if it does not exist, or overwrite it if it does.
+    Overwrite,
+
+    /// Create the file if it does not exist, or fail if it does.
+    CreateNew,
+}
+
 trait Protocol: Send + Sync {
     fn read_file(&self, path: &str) -> Result<Bytes>;
-    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()>;
+
+    /// Write a complete file.
+    ///
+    /// Depending on the [WriteMode] this may either overwrite existing files, or error.
+    ///
+    /// As much as possible, the file should be written atomically so that it is only visible with
+    /// the complete content.
+    fn write_file(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()>;
     fn list_dir(&self, relpath: &str) -> Result<ListDir>;
     fn create_dir(&self, relpath: &str) -> Result<()>;
+
+    /// Get metadata about a file.
     fn metadata(&self, relpath: &str) -> Result<Metadata>;
 
     /// Delete a file.
@@ -203,6 +223,9 @@ pub struct Metadata {
 
     /// Kind of file.
     pub kind: Kind,
+
+    /// Last modified time.
+    pub modified: OffsetDateTime,
 }
 
 /// A list of all the files and directories in a directory.
@@ -216,11 +239,11 @@ pub struct ListDir {
 #[derive(Debug)]
 pub struct Error {
     /// What type of generally known error?
-    kind: ErrorKind,
+    pub kind: ErrorKind,
     /// The underlying error: for example an IO or S3 error.
-    source: Option<Box<dyn error::Error + Send + Sync>>,
-    /// The affected path, possibly relative to the transport.
-    path: Option<String>,
+    pub source: Option<Box<dyn error::Error + Send + Sync>>,
+    /// The affected URL, if known.
+    pub url: Option<Url>,
 }
 
 /// General categories of transport errors.
@@ -234,6 +257,12 @@ pub enum ErrorKind {
 
     #[display(fmt = "Permission denied")]
     PermissionDenied,
+
+    #[display(fmt = "Create transport error")]
+    CreateTransport,
+
+    #[display(fmt = "Connect error")]
+    Connect,
 
     #[display(fmt = "Unsupported URL scheme")]
     UrlScheme,
@@ -259,10 +288,17 @@ impl Error {
     }
 
     pub(self) fn io_error(path: &Path, source: io::Error) -> Error {
+        let kind = match source.kind() {
+            io::ErrorKind::NotFound => ErrorKind::NotFound,
+            io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,
+            io::ErrorKind::PermissionDenied => ErrorKind::PermissionDenied,
+            _ => ErrorKind::Other,
+        };
+
         Error {
-            kind: source.kind().into(),
             source: Some(Box::new(source)),
-            path: Some(path.to_string_lossy().to_string()),
+            url: Url::from_file_path(path).ok(),
+            kind,
         }
     }
 
@@ -270,17 +306,17 @@ impl Error {
         self.kind == ErrorKind::NotFound
     }
 
-    /// The transport-relative path where this error occurred, if known.
-    pub fn path(&self) -> Option<&str> {
-        self.path.as_deref()
+    /// The URL where this error occurred, if known.
+    pub fn url(&self) -> Option<&Url> {
+        self.url.as_ref()
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind)?;
-        if let Some(ref path) = self.path {
-            write!(f, ": {}", path)?;
+        if let Some(ref url) = self.url {
+            write!(f, ": {url}")?;
         }
         if let Some(source) = &self.source {
             // I'm not sure we should write this here; it might be repetitive.

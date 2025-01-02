@@ -95,9 +95,6 @@ pub const ARCHIVE_VERSION: &str = "0.6";
 
 pub const SYMLINKS_SUPPORTED: bool = cfg!(target_family = "unix");
 
-/// Temporary files in the archive have this prefix.
-const TMP_PREFIX: &str = "tmp";
-
 /// Metadata file in the band directory.
 static BAND_HEAD_FILENAME: &str = "BANDHEAD";
 

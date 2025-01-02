@@ -9,12 +9,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use time::OffsetDateTime;
 use tracing::{error, info, instrument, trace, warn};
 use url::Url;
 
 use crate::Kind;
 
-use super::{Error, ErrorKind, ListDir, Result};
+use super::{Error, ErrorKind, ListDir, Result, WriteMode};
 
 pub(super) struct Protocol {
     url: Url,
@@ -32,17 +33,17 @@ impl Protocol {
         );
         let tcp_stream = TcpStream::connect(addr).map_err(|err| {
             error!(?err, ?url, "Error opening SSH TCP connection");
-            io_error(err, url.as_ref())
+            io_error(err, url)
         })?;
         trace!("got tcp connection");
         let mut session = ssh2::Session::new().map_err(|err| {
             error!(?err, "Error opening SSH session");
-            ssh_error(err, url.as_ref())
+            ssh_error(err, url)
         })?;
         session.set_tcp_stream(tcp_stream);
         session.handshake().map_err(|err| {
             error!(?err, "Error in SSH handshake");
-            ssh_error(err, url.as_ref())
+            ssh_error(err, url)
         })?;
         trace!(
             "SSH hands shaken, banner: {}",
@@ -57,12 +58,12 @@ impl Protocol {
         };
         session.userauth_agent(&username).map_err(|err| {
             error!(?err, username, "Error in SSH user auth with agent");
-            ssh_error(err, url.as_ref())
+            ssh_error(err, url)
         })?;
         trace!("Authenticated!");
         let sftp = session.sftp().map_err(|err| {
             error!(?err, "Error opening SFTP session");
-            ssh_error(err, url.as_ref())
+            ssh_error(err, url)
         })?;
         Ok(Protocol {
             url: url.to_owned(),
@@ -75,7 +76,15 @@ impl Protocol {
         trace!("lstat {path}");
         self.sftp
             .lstat(&self.base_path.join(path))
-            .map_err(|err| ssh_error(err, path))
+            .map_err(|err| self.ssh_error(err, path))
+    }
+
+    fn relative_url(&self, path: &str) -> Url {
+        self.url.join(path).expect("join URL")
+    }
+
+    fn ssh_error(&self, source: ssh2::Error, path: &str) -> Error {
+        ssh_error(source, &self.relative_url(path))
     }
 }
 
@@ -87,7 +96,7 @@ impl super::Protocol for Protocol {
         let mut dirs = Vec::new();
         let mut dir = self.sftp.opendir(full_path).map_err(|err| {
             error!(?err, ?full_path, "Error opening directory");
-            ssh_error(err, full_path.to_string_lossy().as_ref())
+            self.ssh_error(err, path)
         })?;
         loop {
             match dir.readdir() {
@@ -112,7 +121,7 @@ impl super::Protocol for Protocol {
                 }
                 Err(err) => {
                     info!("SFTP error {:?}", err);
-                    return Err(ssh_error(err, path));
+                    return Err(self.ssh_error(err, path));
                 }
             }
         }
@@ -121,15 +130,16 @@ impl super::Protocol for Protocol {
 
     fn read_file(&self, path: &str) -> Result<Bytes> {
         let full_path = self.base_path.join(path);
-        trace!("attempt open {}", full_path.display());
+        let url = &self.url.join(path).expect("join URL");
+        trace!("read {url}");
         let mut buf = Vec::with_capacity(2 << 20);
         let mut file = self
             .sftp
             .open(&full_path)
-            .map_err(|err| ssh_error(err, path))?;
+            .map_err(|err| self.ssh_error(err, path))?;
         let len = file
             .read_to_end(&mut buf)
-            .map_err(|err| io_error(err, path))?;
+            .map_err(|err| io_error(err, url))?;
         assert_eq!(len, buf.len());
         trace!("read {} bytes from {}", len, full_path.display());
         Ok(buf.into())
@@ -146,31 +156,72 @@ impl super::Protocol for Protocol {
             }
             Err(err) => {
                 warn!(?err, ?relpath);
-                Err(ssh_error(err, relpath))
+                Err(self.ssh_error(err, relpath))
             }
         }
     }
 
-    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
+    fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let full_path = self.base_path.join(relpath);
-        trace!("write_file {:>9} bytes to {:?}", content.len(), full_path);
-        let mut file = self.sftp.create(&full_path).map_err(|err| {
-            warn!(?err, ?relpath, "sftp error creating file");
-            ssh_error(err, relpath)
-        })?;
-        file.write_all(content).map_err(|err| {
+        trace!(
+            "write_file {len:>9} bytes to {full_path:?}",
+            len = content.len()
+        );
+        let flags = ssh2::OpenFlags::WRITE
+            | ssh2::OpenFlags::CREATE
+            | match write_mode {
+                WriteMode::CreateNew => ssh2::OpenFlags::EXCLUSIVE,
+                WriteMode::Overwrite => ssh2::OpenFlags::TRUNCATE,
+            };
+        let mut file = self
+            .sftp
+            .open_mode(&full_path, flags, 0o644, ssh2::OpenType::File)
+            .map_err(|err| {
+                warn!(?err, ?relpath, "sftp error creating file");
+                self.ssh_error(err, relpath)
+            })?;
+        if let Err(err) = file.write_all(content) {
             warn!(?err, ?full_path, "sftp error writing file");
-            io_error(err, relpath)
-        })
+            if let Err(err2) = self.sftp.unlink(&full_path) {
+                warn!(
+                    ?err2,
+                    ?full_path,
+                    "sftp error unlinking file after write error"
+                );
+            }
+            return Err(super::Error {
+                url: Some(self.relative_url(relpath)),
+                source: Some(Box::new(err)),
+                kind: ErrorKind::Other,
+            });
+        }
+        Ok(())
     }
 
     fn metadata(&self, relpath: &str) -> Result<super::Metadata> {
         let full_path = self.base_path.join(relpath);
         let stat = self.lstat(relpath)?;
         trace!("metadata {full_path:?}");
+        let modified = stat.mtime.ok_or_else(|| {
+            warn!("No mtime for {full_path:?}");
+            super::Error {
+                kind: ErrorKind::Other,
+                source: None,
+                url: Some(self.relative_url(relpath)),
+            }
+        })?;
+        let modified = OffsetDateTime::from_unix_timestamp(modified as i64).map_err(|err| {
+            warn!("Invalid mtime for {full_path:?}");
+            super::Error {
+                kind: ErrorKind::Other,
+                source: Some(Box::new(err)),
+                url: Some(self.relative_url(relpath)),
+            }
+        })?;
         Ok(super::Metadata {
             kind: stat.file_type().into(),
             len: stat.size.unwrap_or_default(),
+            modified,
         })
     }
 
@@ -179,7 +230,7 @@ impl super::Protocol for Protocol {
         trace!("remove_file {full_path:?}");
         self.sftp
             .unlink(&full_path)
-            .map_err(|err| ssh_error(err, relpath))
+            .map_err(|err| self.ssh_error(err, relpath))
     }
 
     #[instrument]
@@ -206,12 +257,9 @@ impl super::Protocol for Protocol {
             trace!(?dir, "rmdir");
             self.sftp
                 .rmdir(&full_path)
-                .map_err(|err| ssh_error(err, dir))?;
+                .map_err(|err| self.ssh_error(err, dir))?;
         }
         Ok(())
-        // let full_path = self.base_path.join(relpath);
-        // trace!("remove_dir {full_path:?}");
-        // self.sftp.rmdir(&full_path).map_err(translate_error)
     }
 
     fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
@@ -263,18 +311,18 @@ impl From<ssh2::ErrorCode> for ErrorKind {
     }
 }
 
-fn ssh_error(source: ssh2::Error, path: &str) -> super::Error {
+fn ssh_error(source: ssh2::Error, url: &Url) -> super::Error {
     super::Error {
         kind: source.code().into(),
         source: Some(Box::new(source)),
-        path: Some(path.to_owned()),
+        url: Some(url.clone()),
     }
 }
 
-fn io_error(source: io::Error, path: &str) -> Error {
+fn io_error(source: io::Error, url: &Url) -> Error {
     Error {
         kind: source.kind().into(),
         source: Some(Box::new(source)),
-        path: Some(path.to_owned()),
+        url: Some(url.clone()),
     }
 }

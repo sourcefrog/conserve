@@ -19,10 +19,10 @@ use std::sync::Arc;
 use std::{io, path};
 
 use bytes::Bytes;
-use tracing::{instrument, trace, warn};
+use tracing::{error, instrument, trace, warn};
 use url::Url;
 
-use super::{Error, ListDir, Metadata, Result};
+use super::{Error, ListDir, Metadata, Result, WriteMode};
 
 pub(super) struct Protocol {
     path: PathBuf,
@@ -68,28 +68,31 @@ impl super::Protocol for Protocol {
     }
 
     #[instrument(skip(self, content))]
-    fn write_file(&self, relpath: &str, content: &[u8]) -> Result<()> {
+    fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         // TODO: Just write directly; remove if the write fails.
         let full_path = self.full_path(relpath);
-        let dir = full_path.parent().unwrap();
-        let context = |err| super::Error::io_error(&full_path, err);
-        let mut temp = tempfile::Builder::new()
-            .prefix(crate::TMP_PREFIX)
-            .tempfile_in(dir)
-            .map_err(context)?;
-        if let Err(err) = temp.write_all(content) {
-            let _ = temp.close();
-            warn!("Failed to write {:?}: {:?}", relpath, err);
-            return Err(context(err));
+        let oops = |err| super::Error::io_error(&full_path, err);
+        let mut options = File::options();
+        options.write(true);
+        match write_mode {
+            WriteMode::CreateNew => {
+                options.create_new(true);
+            }
+            WriteMode::Overwrite => {
+                options.create(true).truncate(true);
+            }
         }
-        if let Err(persist_error) = temp.persist(&full_path) {
-            warn!("Failed to persist {:?}: {:?}", full_path, persist_error);
-            persist_error.file.close().map_err(context)?;
-            Err(context(persist_error.error))
-        } else {
-            trace!("Wrote {} bytes", content.len());
-            Ok(())
+        let mut file = options.open(&full_path).map_err(oops)?;
+        if let Err(err) = file.write_all(content) {
+            error!("Failed to write {full_path:?}: {err:?}");
+            drop(file);
+            if let Err(err2) = remove_file(&full_path) {
+                error!("Failed to remove {full_path:?}: {err2:?}");
+            }
+            return Err(oops(err));
         }
+        trace!("Wrote {} bytes", content.len());
+        Ok(())
     }
 
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
@@ -130,9 +133,14 @@ impl super::Protocol for Protocol {
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
         let path = self.full_path(relpath);
         let fsmeta = path.metadata().map_err(|err| Error::io_error(&path, err))?;
+        let modified = fsmeta
+            .modified()
+            .map_err(|err| Error::io_error(&path, err))?
+            .into();
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),
+            modified,
         })
     }
 
@@ -161,9 +169,11 @@ impl super::Protocol for Protocol {
 #[cfg(test)]
 mod test {
     use std::error::Error;
+    use std::time::Duration;
 
     use assert_fs::prelude::*;
     use predicates::prelude::*;
+    use time::OffsetDateTime;
 
     use super::*;
     use crate::kind::Kind;
@@ -197,7 +207,12 @@ mod test {
         assert!(message.contains("Not found"));
         assert!(message.contains("nonexistent.json"));
 
-        assert!(err.path().expect("path").ends_with("nonexistent.json"));
+        assert!(err
+            .url
+            .as_ref()
+            .expect("url")
+            .path()
+            .ends_with("/nonexistent.json"));
         assert_eq!(err.kind(), transport::ErrorKind::NotFound);
         assert!(err.is_not_found());
 
@@ -215,13 +230,12 @@ mod test {
 
         let transport = Transport::local(temp.path());
 
-        assert_eq!(
-            transport.metadata(filename).unwrap(),
-            Metadata {
-                len: 24,
-                kind: Kind::File
-            }
-        );
+        let metadata = transport.metadata(filename).unwrap();
+        dbg!(&metadata);
+
+        assert_eq!(metadata.len, 24);
+        assert_eq!(metadata.kind, Kind::File);
+        assert!(metadata.modified + Duration::from_secs(60) > OffsetDateTime::now_utc());
         assert!(transport.metadata("nopoem").unwrap_err().is_not_found());
     }
 
@@ -257,7 +271,11 @@ mod test {
 
         transport.create_dir("subdir").unwrap();
         transport
-            .write_file("subdir/subfile", b"Must I paint you a picture?")
+            .write_file(
+                "subdir/subfile",
+                b"Must I paint you a picture?",
+                WriteMode::CreateNew,
+            )
             .unwrap();
 
         temp.child("subdir").assert(predicate::path::is_dir());
@@ -291,10 +309,10 @@ mod test {
         let transport = Transport::local(temp.path());
         let filename = "filename";
         transport
-            .write_file(filename, b"original content")
+            .write_file(filename, b"original content", WriteMode::Overwrite)
             .expect("first write succeeds");
         transport
-            .write_file(filename, b"new content")
+            .write_file(filename, b"new content", WriteMode::Overwrite)
             .expect("write over existing file succeeds");
         assert_eq!(
             transport.read_file(filename).unwrap().as_ref(),
