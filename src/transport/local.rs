@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Martin Pool.
+// Copyright 2020-2024 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::fs::{create_dir, remove_dir_all, remove_file, File};
+use std::fs::{create_dir, remove_file, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -25,7 +25,10 @@ use url::Url;
 use super::{Error, ListDir, Metadata, Result, WriteMode};
 
 pub(super) struct Protocol {
+    /// Directory addressed by this protocol.
     path: PathBuf,
+
+    /// URL corresponding to the directory.
     url: Url,
 }
 
@@ -42,6 +45,10 @@ impl Protocol {
         debug_assert!(!relpath.contains("/../"), "path must not contain /../");
         self.path.join(relpath)
     }
+
+    fn io_error(&self, relpath: &str, err: io::Error) -> Error {
+        Error::io_error(&self.path.join(relpath), err)
+    }
 }
 
 impl super::Protocol for Protocol {
@@ -49,29 +56,22 @@ impl super::Protocol for Protocol {
         &self.url
     }
 
+    #[instrument(skip(self))]
     fn read_file(&self, relpath: &str) -> Result<Bytes> {
         fn try_block(path: &Path) -> io::Result<Bytes> {
             let mut file = File::open(path)?;
-            let estimated_len: usize = file
-                .metadata()?
-                .len()
-                .try_into()
-                .expect("File size fits in usize");
-            let mut out_buf = Vec::with_capacity(estimated_len);
+            let mut out_buf = Vec::new();
             let actual_len = file.read_to_end(&mut out_buf)?;
             trace!("Read {actual_len} bytes");
-            out_buf.truncate(actual_len);
             Ok(out_buf.into())
         }
-        let path = &self.full_path(relpath);
-        try_block(path).map_err(|err| Error::io_error(path, err))
+        try_block(&self.full_path(relpath)).map_err(|err| self.io_error(relpath, err))
     }
 
     #[instrument(skip(self, content))]
     fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
-        // TODO: Just write directly; remove if the write fails.
         let full_path = self.full_path(relpath);
-        let oops = |err| super::Error::io_error(&full_path, err);
+        let oops = |err| self.io_error(relpath, err);
         let mut options = File::options();
         options.write(true);
         match write_mode {
@@ -100,7 +100,7 @@ impl super::Protocol for Protocol {
         // let's pass them back as lossy UTF-8 so they can be reported at a higher level, for
         // example during validation.
         let path = self.full_path(relpath);
-        let fail = |err| Error::io_error(&path, err);
+        let fail = |err| self.io_error(relpath, err);
         let mut names = ListDir::default();
         for dir_entry in path.read_dir().map_err(fail)? {
             let dir_entry = dir_entry.map_err(fail)?;
@@ -119,39 +119,39 @@ impl super::Protocol for Protocol {
         Ok(names)
     }
 
-    fn create_dir(&self, relpath: &str) -> Result<()> {
+    fn create_dir(&self, relpath: &str) -> super::Result<()> {
         let path = self.full_path(relpath);
         create_dir(&path).or_else(|err| {
             if err.kind() == io::ErrorKind::AlreadyExists {
                 Ok(())
             } else {
-                Err(super::Error::io_error(&path, err))
+                Err(self.io_error(relpath, err))
             }
         })
     }
 
+    fn remove_file(&self, relpath: &str) -> super::Result<()> {
+        std::fs::remove_file(self.full_path(relpath)).map_err(|err| self.io_error(relpath, err))
+    }
+
+    fn remove_dir_all(&self, relpath: &str) -> super::Result<()> {
+        std::fs::remove_dir_all(self.full_path(relpath)).map_err(|err| self.io_error(relpath, err))
+    }
+
     fn metadata(&self, relpath: &str) -> Result<Metadata> {
-        let path = self.full_path(relpath);
-        let fsmeta = path.metadata().map_err(|err| Error::io_error(&path, err))?;
+        let fsmeta = self
+            .full_path(relpath)
+            .metadata()
+            .map_err(|err| self.io_error(relpath, err))?;
         let modified = fsmeta
             .modified()
-            .map_err(|err| Error::io_error(&path, err))?
+            .map_err(|err| self.io_error(relpath, err))?
             .into();
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),
             modified,
         })
-    }
-
-    fn remove_file(&self, relpath: &str) -> Result<()> {
-        let path = self.full_path(relpath);
-        remove_file(&path).map_err(|err| super::Error::io_error(&path, err))
-    }
-
-    fn remove_dir_all(&self, relpath: &str) -> Result<()> {
-        let path = self.full_path(relpath);
-        remove_dir_all(&path).map_err(|err| super::Error::io_error(&path, err))
     }
 
     fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
@@ -207,12 +207,15 @@ mod test {
         assert!(message.contains("Not found"));
         assert!(message.contains("nonexistent.json"));
 
-        assert!(err
-            .url
-            .as_ref()
-            .expect("url")
-            .path()
-            .ends_with("/nonexistent.json"));
+        assert_eq!(
+            err.url()
+                .expect("url")
+                .path_segments()
+                .expect("path")
+                .last()
+                .expect("has a path segment"),
+            "nonexistent.json"
+        );
         assert_eq!(err.kind(), transport::ErrorKind::NotFound);
         assert!(err.is_not_found());
 

@@ -12,7 +12,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Stores the user and group names as strings in the archive.
+//! Tracks the file owner user/group.
 
 // TODO: There is potentially a more efficient way to do this, but this approach works
 // better than just saving the uid and gid, so that backups may potentially
