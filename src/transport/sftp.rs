@@ -1,4 +1,4 @@
-// Copyright 2022 Martin Pool
+// Copyright 2022-2025 Martin Pool
 
 //! Read/write archive over SFTP.
 
@@ -8,6 +8,7 @@ use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bytes::Bytes;
 use time::OffsetDateTime;
 use tracing::{error, info, instrument, trace, warn};
@@ -88,6 +89,7 @@ impl Protocol {
     }
 }
 
+#[async_trait]
 impl super::Protocol for Protocol {
     fn list_dir(&self, path: &str) -> Result<ListDir> {
         let full_path = &self.base_path.join(path);
@@ -126,6 +128,10 @@ impl super::Protocol for Protocol {
             }
         }
         Ok(ListDir { files, dirs })
+    }
+
+    async fn list_dir_async(&self, _path: &str) -> Result<ListDir> {
+        todo!("sftp list_dir_async");
     }
 
     fn read(&self, path: &str) -> Result<Bytes> {

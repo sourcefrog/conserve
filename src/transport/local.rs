@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Martin Pool.
+// Copyright 2020-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,12 +12,13 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::fs::{create_dir, remove_dir_all, remove_file, File};
+use std::fs::{self, create_dir, remove_dir_all, remove_file, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{io, path};
 
+use async_trait::async_trait;
 use bytes::Bytes;
 use tempfile::TempDir;
 use tracing::{error, instrument, trace, warn};
@@ -68,6 +69,7 @@ impl Protocol {
     }
 }
 
+#[async_trait]
 impl super::Protocol for Protocol {
     fn url(&self) -> &Url {
         &self.url
@@ -120,27 +122,24 @@ impl super::Protocol for Protocol {
     }
 
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
-        // Archives should never normally contain non-UTF-8 (or even non-ASCII) filenames, but
-        // let's pass them back as lossy UTF-8 so they can be reported at a higher level, for
-        // example during validation.
         let path = self.full_path(relpath);
-        let fail = |err| Error::io_error(&path, err);
-        let mut names = ListDir::default();
-        for dir_entry in path.read_dir().map_err(fail)? {
-            let dir_entry = dir_entry.map_err(fail)?;
-            if let Ok(name) = dir_entry.file_name().into_string() {
-                match dir_entry.file_type().map_err(fail)? {
-                    t if t.is_dir() => names.dirs.push(name),
-                    t if t.is_file() => names.files.push(name),
-                    _ => (),
-                }
-            } else {
-                // These should never normally exist in archive directories, so warn
-                // and continue.
-                warn!("Non-UTF-8 filename in archive {:?}", dir_entry.file_name());
-            }
+        let mut listing = ListDir::default();
+        for dir_entry in path.read_dir().map_err(|err| Error::io_error(&path, err))? {
+            collect_dir_entry(&mut listing, dir_entry)
+                .map_err(|err| Error::io_error(&path, err))?;
         }
-        Ok(names)
+        Ok(listing)
+    }
+
+    async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
+        let path = self.full_path(relpath);
+        let mut listing = ListDir::default();
+        let fail = |err| Error::io_error(&path, err);
+        let mut read_dir = tokio::fs::read_dir(&path).await.map_err(fail)?;
+        while let Some(dir_entry) = read_dir.next_entry().await.map_err(fail)? {
+            collect_tokio_dir_entry(&mut listing, dir_entry).await
+        }
+        Ok(listing)
     }
 
     fn create_dir(&self, relpath: &str) -> Result<()> {
@@ -191,6 +190,35 @@ impl super::Protocol for Protocol {
     }
 }
 
+async fn collect_tokio_dir_entry(list_dir: &mut ListDir, dir_entry: tokio::fs::DirEntry) {
+    if let Ok(name) = dir_entry.file_name().into_string() {
+        match dir_entry.file_type().await {
+            Ok(t) if t.is_dir() => list_dir.dirs.push(name),
+            Ok(t) if t.is_file() => list_dir.files.push(name),
+            other => warn!("Unexpected file type in archive: {name:?}: {other:?}"),
+        }
+    } else {
+        warn!("Non-UTF-8 filename in archive {:?}", dir_entry.file_name());
+    }
+}
+
+fn collect_dir_entry(
+    list_dir: &mut ListDir,
+    dir_entry: io::Result<fs::DirEntry>,
+) -> io::Result<()> {
+    let dir_entry = dir_entry?;
+    if let Ok(name) = dir_entry.file_name().into_string() {
+        match dir_entry.file_type()? {
+            t if t.is_dir() => list_dir.dirs.push(name),
+            t if t.is_file() => list_dir.files.push(name),
+            other => warn!("Unexpected file type in archive: {name:?}: {other:?}"),
+        }
+    } else {
+        warn!("Non-UTF-8 filename in archive {:?}", dir_entry.file_name());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use std::error::Error;
@@ -200,6 +228,7 @@ mod test {
     use predicates::prelude::*;
     use pretty_assertions::assert_eq;
     use time::OffsetDateTime;
+    use tokio;
 
     use super::*;
     use crate::kind::Kind;
@@ -426,5 +455,24 @@ mod test {
         // After dropping both references, the tempdir is removed
         drop(t2);
         assert!(!path.is_dir());
+    }
+
+    #[tokio::test]
+    async fn list_dir_async() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        temp.child("root file").touch().unwrap();
+        temp.child("subdir").create_dir_all().unwrap();
+        temp.child("subdir")
+            .child("subfile")
+            .write_str("Morning coffee")
+            .unwrap();
+
+        let transport = Transport::local(temp.path());
+        let list_dir = transport.list_dir_async(".").await.unwrap();
+        assert_eq!(list_dir.files, ["root file"]);
+        assert_eq!(list_dir.dirs, ["subdir"]);
+
+        let failure = transport.list_dir_async("nonexistent").await.unwrap_err();
+        assert!(failure.is_not_found());
     }
 }

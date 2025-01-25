@@ -183,6 +183,10 @@ impl Transport {
         self.protocol.list_dir(relpath)
     }
 
+    pub async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
+        self.protocol.list_dir_async(relpath).await
+    }
+
     /// Make a new transport addressing a subdirectory.
     pub fn chdir(&self, relpath: &str) -> Self {
         let mut sub_path = self.sub_path.clone();
@@ -260,6 +264,7 @@ pub enum WriteMode {
     /// Create the file if it does not exist, or fail if it does.
     CreateNew,
 }
+
 /// A directory entry read from a transport.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DirEntry {
@@ -295,6 +300,9 @@ type Result<T> = result::Result<T, Error>;
 mod test {
     use std::path::Path;
 
+    use assert_fs::{prelude::*, TempDir};
+    use pretty_assertions::assert_eq;
+
     use super::Transport;
 
     #[test]
@@ -316,5 +324,15 @@ mod test {
             let re = Regex::new(r#"Transport\(file:///[A-Za-z]:/tmp/\)"#).unwrap();
             assert!(re.is_match(&dbg));
         }
+    }
+
+    #[tokio::test]
+    async fn local_list_dir_async() {
+        let temp = TempDir::new().unwrap();
+        let transport = Transport::local(temp.path());
+        temp.child("a").touch().unwrap();
+        let list = transport.list_dir_async(".").await.unwrap();
+        assert_eq!(list.files, ["a"]);
+        assert!(list.dirs.is_empty());
     }
 }
