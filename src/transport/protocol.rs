@@ -7,11 +7,13 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bytes::Bytes;
 use url::Url;
 
 use super::{ListDir, Metadata, Result, WriteMode};
 
+#[async_trait]
 pub(super) trait Protocol: std::fmt::Debug + Send + Sync {
     fn read(&self, path: &str) -> Result<Bytes>;
 
@@ -23,6 +25,7 @@ pub(super) trait Protocol: std::fmt::Debug + Send + Sync {
     /// the complete content.
     fn write(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()>;
     fn list_dir(&self, relpath: &str) -> Result<ListDir>;
+    async fn list_dir_async(&self, relpath: &str) -> Result<ListDir>;
     fn create_dir(&self, relpath: &str) -> Result<()>;
 
     /// Get metadata about a file.

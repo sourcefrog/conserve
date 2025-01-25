@@ -1,4 +1,4 @@
-// Copyright 2023-2024 Martin Pool.
+// Copyright 2023-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use async_trait::async_trait;
 use aws_config::{AppName, BehaviorVersion};
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
@@ -202,6 +203,7 @@ fn join_paths(a: &str, b: &str) -> String {
     result
 }
 
+#[async_trait]
 impl super::Protocol for Protocol {
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         let _span = trace_span!("S3Transport::list_file", %relpath).entered();
@@ -253,6 +255,10 @@ impl super::Protocol for Protocol {
             "list_dir complete"
         );
         Ok(result)
+    }
+
+    async fn list_dir_async(&self, _path: &str) -> Result<ListDir> {
+        todo!("s3 list_dir_async");
     }
 
     fn read(&self, relpath: &str) -> Result<Bytes> {
