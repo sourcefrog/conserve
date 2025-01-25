@@ -8,7 +8,7 @@ license = "GPL-2.0"
 name = "conserve"
 readme = "README.md"
 repository = "https://github.com/sourcefrog/conserve/"
-version = "24.8.0"
+version = "23.11.0"
 rust-version = "1.79"
 
 [features]
@@ -80,6 +80,9 @@ whoami = "1.5.2"
 [target.'cfg(unix)'.dependencies]
 uzers = "0.11"
 nix = { version = "0.28", features = ["fs", "user"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-projfs = { version = "0.1.6", features = ["dynamic-import"] }
 
 [dependencies.clap]
 version = "4.3"

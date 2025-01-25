@@ -66,11 +66,19 @@ jobs:
           cargo --version
           rustc --version
       - name: Build
-        run: >
-          cargo build --all-targets --features fail/failpoints
-      - name: Test
-        run: >
-          cargo test --features fail/failpoints -- --include-ignored
+        run: cargo build --all-targets --features fail/failpoints
+      - name: Test (without mount)
+        run:
+          cargo test --features fail/failpoints -- --skip mount
+          --include-ignored
+      - name: Test (mount)
+        run:
+          cargo test --features fail/failpoints --test mount --
+          --include-ignored
+        env:
+          # Running multiple instances in parallel might cause a crash on low-end environments
+          # when executing the mounting tests on Windows due to projfs.
+          RUST_TEST_THREADS: 1
 
   # Run rustfmt separately so that it does not block test results
   rustfmt:

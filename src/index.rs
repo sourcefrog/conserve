@@ -277,11 +277,16 @@ fn hunk_relpath(hunk_number: u32) -> String {
     format!("{:05}/{:09}", hunk_number / HUNKS_PER_SUBDIR, hunk_number)
 }
 
-// TODO: Maybe this isn't adding much on top of the hunk iter?
-#[derive(Debug, Clone)]
+/// Utility to read the stored index
 pub struct IndexRead {
     /// Transport pointing to this index directory.
     transport: Transport,
+
+    /// Decompressor for the index to read
+    decompressor: Decompressor,
+
+    /// Current read statistics of this index
+    pub stats: IndexReadStats,
 }
 
 impl IndexRead {
@@ -292,41 +297,92 @@ impl IndexRead {
     }
 
     pub(crate) fn open(transport: Transport) -> IndexRead {
-        IndexRead { transport }
+        IndexRead {
+            transport,
+            decompressor: Decompressor::new(),
+            stats: IndexReadStats::default(),
+        }
     }
 
-    /// Make an iterator that will return all entries in this band.
-    pub fn iter_entries(self) -> IndexEntryIter<IndexHunkIter> {
-        // TODO: An option to pass in a subtree?
-        IndexEntryIter::new(self.iter_hunks(), Apath::root(), Exclude::nothing())
+    /// Clone the read index.
+    /// Note:
+    /// This has several side effects:
+    /// - Depending on the implementation of the decompressor, duplicate might not be a cheap option.
+    /// - Every read index has its own unique read stats, therefore the clone does not inherit the read stats.
+    pub(crate) fn duplicate(&self) -> Self {
+        Self::open(self.transport.clone())
     }
 
-    /// Make an iterator that returns hunks of entries from this index.
-    pub fn iter_hunks(&self) -> IndexHunkIter {
-        let _span = debug_span!("iter_hunks", ?self.transport).entered();
-        // All hunk numbers present in all directories.
-        let subdirs = self
-            .transport
-            .list_dir("")
-            .expect("list index dir") // TODO: Don't panic
-            .dirs
-            .into_iter()
-            .sorted()
-            .collect_vec();
-        debug!(?subdirs);
+    /// Read and parse a specific hunk
+    pub fn read_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
+        let path = hunk_relpath(hunk_number);
+        let compressed_bytes = match self.transport.read_file(&path) {
+            Ok(b) => b,
+            Err(err) if err.is_not_found() => {
+                // TODO: Cope with one hunk being missing, while there are still
+                // later-numbered hunks. This would require reading the whole
+                // list of hunks first.
+                return Ok(None);
+            }
+            Err(source) => return Err(Error::Transport { source }),
+        };
+        self.stats.index_hunks += 1;
+        self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
+        let index_bytes = self.decompressor.decompress(&compressed_bytes)?;
+        self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
+        let entries: Vec<IndexEntry> =
+            serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeJson {
+                path: path.clone(),
+                source,
+            })?;
+        if entries.is_empty() {
+            // It's legal, it's just weird - and it can be produced by some old Conserve versions.
+        }
+        Ok(Some(entries))
+    }
+
+    // All hunk numbers present in all directories.
+    pub fn hunks_available(&self) -> Result<Vec<u32>> {
+        let subdirs = self.transport.list_dir("")?.dirs.into_iter().sorted();
+
         let hunks = subdirs
-            .into_iter()
             .filter_map(|dir| self.transport.list_dir(&dir).ok())
             .flat_map(|list| list.files)
             .filter_map(|f| f.parse::<u32>().ok())
             .sorted()
             .collect_vec();
+
+        Ok(hunks)
+    }
+
+    /// Make an iterator that will return all entries in this band.
+    pub fn iter_entries(self) -> IndexEntryIter<IndexHunkIter> {
+        // TODO: An option to pass in a subtree?
+        IndexEntryIter::new(
+            self.iter_available_hunks(),
+            Apath::root(),
+            Exclude::nothing(),
+        )
+    }
+
+    /// Make an iterator that returns hunks of entries from this index.
+    pub fn iter_available_hunks(self) -> IndexHunkIter {
+        let _span = debug_span!("iter_hunks", ?self.transport).entered();
+        let hunks = self.hunks_available().expect("hunks available"); // TODO: Don't panic
         debug!(?hunks);
         IndexHunkIter {
             hunks: hunks.into_iter(),
-            transport: self.transport.clone(),
-            decompressor: Decompressor::new(),
-            stats: IndexReadStats::default(),
+            index: self,
+            after: None,
+        }
+    }
+
+    /// Make an iterator that returns hunks of entries for the specified hunks
+    pub fn iter_hunks(self, hunks: std::vec::IntoIter<u32>) -> IndexHunkIter {
+        let _span = debug_span!("iter_hunks", ?self.transport).entered();
+        IndexHunkIter {
+            hunks,
+            index: self,
             after: None,
         }
     }
@@ -337,10 +393,7 @@ impl IndexRead {
 /// Each returned item is a vec of (typically up to a thousand) index entries.
 pub struct IndexHunkIter {
     hunks: std::vec::IntoIter<u32>,
-    /// The `i` directory within the band where all files for this index are written.
-    transport: Transport,
-    decompressor: Decompressor,
-    pub stats: IndexReadStats,
+    pub index: IndexRead,
     /// If set, yield only entries ordered after this apath.
     after: Option<Apath>,
 }
@@ -351,11 +404,11 @@ impl Iterator for IndexHunkIter {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let hunk_number = self.hunks.next()?;
-            let entries = match self.read_next_hunk(hunk_number) {
+            let entries = match self.index.read_hunk(hunk_number) {
                 Ok(None) => return None,
                 Ok(Some(entries)) => entries,
                 Err(err) => {
-                    self.stats.errors += 1;
+                    self.index.stats.errors += 1;
                     error!("Error reading index hunk {hunk_number:?}: {err}");
                     continue;
                 }
@@ -393,33 +446,6 @@ impl IndexHunkIter {
             after: Some(apath.clone()),
             ..self
         }
-    }
-
-    fn read_next_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
-        let path = hunk_relpath(hunk_number);
-        let compressed_bytes = match self.transport.read_file(&path) {
-            Ok(b) => b,
-            Err(err) if err.is_not_found() => {
-                // TODO: Cope with one hunk being missing, while there are still
-                // later-numbered hunks. This would require reading the whole
-                // list of hunks first.
-                return Ok(None);
-            }
-            Err(source) => return Err(Error::Transport { source }),
-        };
-        self.stats.index_hunks += 1;
-        self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
-        let index_bytes = self.decompressor.decompress(&compressed_bytes)?;
-        self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
-        let entries: Vec<IndexEntry> =
-            serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeJson {
-                path: path.clone(),
-                source,
-            })?;
-        if entries.is_empty() {
-            // It's legal, it's just weird - and it can be produced by some old Conserve versions.
-        }
-        Ok(Some(entries))
     }
 }
 
@@ -654,8 +680,9 @@ mod tests {
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
 
         // Read it out as hunks.
-        let hunks: Vec<Vec<IndexEntry>> =
-            IndexRead::open_path(testdir.path()).iter_hunks().collect();
+        let hunks: Vec<Vec<IndexEntry>> = IndexRead::open_path(testdir.path())
+            .iter_available_hunks()
+            .collect();
         assert_eq!(hunks.len(), 2);
         assert_eq!(
             hunks[0]
@@ -681,73 +708,72 @@ mod tests {
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
         ib.finish_hunk(TestMonitor::arc()).unwrap();
 
-        let index_read = IndexRead::open_path(testdir.path());
-        let names: Vec<String> = index_read
-            .iter_hunks()
+        let names: Vec<String> = IndexRead::open_path(testdir.path())
+            .iter_available_hunks()
             .advance_to_after(&"/".into())
             .flatten()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/1.1", "/1.2", "/2.1", "/2.2"]);
 
-        let names: Vec<String> = index_read
-            .iter_hunks()
+        let names: Vec<String> = IndexRead::open_path(testdir.path())
+            .iter_available_hunks()
             .advance_to_after(&"/nonexistent".into())
             .flatten()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, [""; 0]);
 
-        let names: Vec<String> = index_read
-            .iter_hunks()
+        let names: Vec<String> = IndexRead::open_path(testdir.path())
+            .iter_available_hunks()
             .advance_to_after(&"/1.1".into())
             .flatten()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/1.2", "/2.1", "/2.2"]);
 
-        let names: Vec<String> = index_read
-            .iter_hunks()
+        let names: Vec<String> = IndexRead::open_path(testdir.path())
+            .iter_available_hunks()
             .advance_to_after(&"/1.1.1".into())
             .flatten()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/1.2", "/2.1", "/2.2"]);
 
-        let names: Vec<String> = index_read
-            .iter_hunks()
+        let names: Vec<String> = IndexRead::open_path(testdir.path())
+            .iter_available_hunks()
             .advance_to_after(&"/1.2".into())
             .flatten()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.1", "/2.2"]);
 
-        let names: Vec<String> = index_read
-            .iter_hunks()
+        let names: Vec<String> = IndexRead::open_path(testdir.path())
+            .iter_available_hunks()
             .advance_to_after(&"/1.3".into())
             .flatten()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.1", "/2.2"]);
 
-        let names: Vec<String> = index_read
-            .iter_hunks()
+        let names: Vec<String> = IndexRead::open_path(testdir.path())
+            .iter_available_hunks()
             .advance_to_after(&"/2.0".into())
             .flatten()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.1", "/2.2"]);
 
-        let names: Vec<String> = index_read
-            .iter_hunks()
+        let names: Vec<String> = IndexRead::open_path(testdir.path())
+            .iter_available_hunks()
             .advance_to_after(&"/2.1".into())
             .flatten()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.2"]);
 
-        let names: Vec<String> = index_read
-            .iter_hunks()
+        let names: Vec<String> = IndexRead::open_path(testdir.path())
+            .iter_available_hunks()
             .advance_to_after(&"/2.2".into())
             .flatten()
             .map(|entry| entry.apath.into())
@@ -806,7 +832,7 @@ mod tests {
         // Think about, but don't actually add some files
         ib.finish_hunk(TestMonitor::arc())?;
         let read_index = IndexRead::open_path(testdir.path());
-        assert_eq!(read_index.iter_hunks().count(), 1);
+        assert_eq!(read_index.iter_available_hunks().count(), 1);
         Ok(())
     }
 }

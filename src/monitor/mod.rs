@@ -4,6 +4,7 @@
 
 pub mod task;
 pub mod test;
+pub mod void;
 
 use self::task::Task;
 use crate::counters::Counter;
