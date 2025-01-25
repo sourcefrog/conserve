@@ -11,6 +11,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bytes::Bytes;
 use time::OffsetDateTime;
+use tokio::task::spawn_blocking;
 use tracing::{error, info, instrument, trace, warn};
 use url::Url;
 
@@ -80,58 +81,32 @@ impl Protocol {
             .map_err(|err| self.ssh_error(err, path))
     }
 
-    fn relative_url(&self, path: &str) -> Url {
+    fn join_url(&self, path: &str) -> Url {
         self.url.join(path).expect("join URL")
     }
 
     fn ssh_error(&self, source: ssh2::Error, path: &str) -> Error {
-        ssh_error(source, &self.relative_url(path))
+        ssh_error(source, &self.join_url(path))
     }
 }
 
 #[async_trait]
 impl super::Protocol for Protocol {
     fn list_dir(&self, path: &str) -> Result<ListDir> {
-        let full_path = &self.base_path.join(path);
-        trace!("iter_dir_entries {:?}", full_path);
-        let mut files = Vec::new();
-        let mut dirs = Vec::new();
-        let mut dir = self.sftp.opendir(full_path).map_err(|err| {
-            error!(?err, ?full_path, "Error opening directory");
-            self.ssh_error(err, path)
-        })?;
-        loop {
-            match dir.readdir() {
-                Ok((pathbuf, file_stat)) => {
-                    let name = pathbuf.to_string_lossy().into();
-                    if name == "." || name == ".." {
-                        continue;
-                    }
-                    trace!("read dir got name {}", name);
-                    match file_stat.file_type().into() {
-                        Kind::File => files.push(name),
-                        Kind::Dir => dirs.push(name),
-                        _ => (),
-                    }
-                }
-                Err(err) if err.code() == ssh2::ErrorCode::Session(-16) => {
-                    // Apparently there's no symbolic version for it, but this is the error
-                    // code.
-                    // <https://github.com/alexcrichton/ssh2-rs/issues/140>
-                    trace!("read dir end");
-                    break;
-                }
-                Err(err) => {
-                    info!("SFTP error {:?}", err);
-                    return Err(self.ssh_error(err, path));
-                }
-            }
-        }
-        Ok(ListDir { files, dirs })
+        list_dir(
+            self.sftp.clone(),
+            self.base_path.join(path),
+            self.join_url(path),
+        )
     }
 
-    async fn list_dir_async(&self, _path: &str) -> Result<ListDir> {
-        todo!("sftp list_dir_async");
+    async fn list_dir_async(&self, path: &str) -> Result<ListDir> {
+        let sftp = self.sftp.clone();
+        let url = self.join_url(path);
+        let full_path = self.base_path.join(path);
+        spawn_blocking(|| list_dir(sftp, full_path, url))
+            .await
+            .expect("spawn_blocking")
     }
 
     fn read(&self, path: &str) -> Result<Bytes> {
@@ -196,7 +171,7 @@ impl super::Protocol for Protocol {
                 );
             }
             return Err(super::Error {
-                url: Some(self.relative_url(relpath)),
+                url: Some(self.join_url(relpath)),
                 source: Some(Box::new(err)),
                 kind: ErrorKind::Other,
             });
@@ -213,7 +188,7 @@ impl super::Protocol for Protocol {
             super::Error {
                 kind: ErrorKind::Other,
                 source: None,
-                url: Some(self.relative_url(relpath)),
+                url: Some(self.join_url(relpath)),
             }
         })?;
         let modified = OffsetDateTime::from_unix_timestamp(modified as i64).map_err(|err| {
@@ -221,7 +196,7 @@ impl super::Protocol for Protocol {
             super::Error {
                 kind: ErrorKind::Other,
                 source: Some(Box::new(err)),
-                url: Some(self.relative_url(relpath)),
+                url: Some(self.join_url(relpath)),
             }
         })?;
         Ok(super::Metadata {
@@ -331,4 +306,42 @@ fn io_error(source: io::Error, url: &Url) -> Error {
         source: Some(Box::new(source)),
         url: Some(url.clone()),
     }
+}
+
+fn list_dir(sftp: Arc<ssh2::Sftp>, full_path: PathBuf, url: Url) -> Result<ListDir> {
+    trace!(?full_path, "list_dir");
+    let mut dir = sftp.opendir(&full_path).map_err(|err| {
+        error!(?err, ?full_path, "Error opening directory");
+        ssh_error(err, &url)
+    })?;
+    let mut files = Vec::new();
+    let mut dirs = Vec::new();
+    loop {
+        match dir.readdir() {
+            Ok((pathbuf, file_stat)) => {
+                let name = pathbuf.to_string_lossy().into();
+                if name == "." || name == ".." {
+                    continue;
+                }
+                trace!("read dir got name {}", name);
+                match file_stat.file_type().into() {
+                    Kind::File => files.push(name),
+                    Kind::Dir => dirs.push(name),
+                    _ => (),
+                }
+            }
+            Err(err) if err.code() == ssh2::ErrorCode::Session(-16) => {
+                // Apparently there's no symbolic version for it, but this is the error
+                // code.
+                // <https://github.com/alexcrichton/ssh2-rs/issues/140>
+                trace!("read dir end");
+                break;
+            }
+            Err(err) => {
+                info!("SFTP error {err:?}");
+                return Err(ssh_error(err, &url));
+            }
+        }
+    }
+    Ok(ListDir { files, dirs })
 }
