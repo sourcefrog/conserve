@@ -108,6 +108,8 @@ impl Transport {
     ///
     /// Any error during iteration causes overall failure.
     pub fn list_dir(&self, relpath: &str) -> Result<ListDir> {
+        // TODO: Perhaps it'd be better to include sizes (and maybe mtimes) as many transports
+        // might be able to provide this without extra work.
         self.protocol.list_dir(relpath)
     }
 

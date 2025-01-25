@@ -58,6 +58,7 @@ enum State {
     /// We have some index hunks from a band and can return them gradually.
     InBand {
         band_id: BandId,
+        /// Hunks not yet returned from this band.
         index_hunks: IndexHunkIter,
     },
 
