@@ -34,7 +34,7 @@ use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
-use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
+use aws_sdk_s3::operation::list_objects_v2::{ListObjectsV2Error, ListObjectsV2Output};
 use aws_sdk_s3::operation::put_object::PutObjectError;
 use aws_sdk_s3::primitives::ByteStreamError;
 use aws_sdk_s3::types::StorageClass;
@@ -206,7 +206,11 @@ fn join_paths(a: &str, b: &str) -> String {
 #[async_trait]
 impl super::Protocol for Protocol {
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
-        let _span = trace_span!("S3Transport::list_file", %relpath).entered();
+        self.runtime.block_on(self.list_dir_async(relpath))
+    }
+
+    async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
+        trace!(%relpath, "list_dir");
         let mut prefix = self.join_path(relpath);
         debug_assert!(!prefix.ends_with('/'), "{prefix:?} ends with /");
         if !prefix.is_empty() {
@@ -221,44 +225,17 @@ impl super::Protocol for Protocol {
             .into_paginator()
             .send();
         let mut result = ListDir::default();
-        loop {
-            match self.runtime.block_on(stream.next()) {
-                Some(Ok(response)) => {
-                    for common_prefix in response.common_prefixes.unwrap_or_default() {
-                        let name = common_prefix.prefix.expect("Common prefix has a name"); // needed for lifetime
-                        trace!(%name, "S3 common prefix");
-                        let name = name
-                            .strip_prefix(&prefix)
-                            .expect("Common prefix starts with prefix")
-                            .strip_suffix('/')
-                            .expect("Common prefix ends with /");
-                        debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
-                        result.dirs.push(name.to_owned());
-                    }
-                    for object in response.contents.unwrap_or_default() {
-                        let name = object.key.expect("Object has a key"); // needed
-                        trace!(%name, "S3 object");
-                        let name = name
-                            .strip_prefix(&prefix)
-                            .expect("Object name should start with prefix");
-                        debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
-                        result.files.push(name.to_owned());
-                    }
-                }
-                Some(Err(err)) => return Err(self.s3_error(&prefix, err)),
-                None => break,
-            }
+        while let Some(response) = stream.next().await {
+            let response = response.map_err(|err| self.s3_error(&prefix, err))?;
+            collect_listdir(&response, &prefix, &mut result);
         }
         trace!(
+            %relpath,
             n_dirs = result.dirs.len(),
             n_files = result.files.len(),
             "list_dir complete"
         );
         Ok(result)
-    }
-
-    async fn list_dir_async(&self, _path: &str) -> Result<ListDir> {
-        todo!("s3 list_dir_async");
     }
 
     fn read(&self, relpath: &str) -> Result<Bytes> {
@@ -458,5 +435,31 @@ impl From<&DeleteObjectError> for ErrorKind {
 impl From<&ByteStreamError> for ErrorKind {
     fn from(_source: &ByteStreamError) -> Self {
         ErrorKind::Other
+    }
+}
+
+fn collect_listdir(response: &ListObjectsV2Output, prefix: &str, list_dir: &mut ListDir) {
+    for common_prefix in response.common_prefixes() {
+        let name = common_prefix
+            .prefix
+            .as_ref()
+            .expect("Common prefix has a name"); // needed for lifetime
+        trace!(%name, "S3 common prefix");
+        let name = name
+            .strip_prefix(prefix)
+            .expect("Common prefix starts with prefix")
+            .strip_suffix('/')
+            .expect("Common prefix ends with /");
+        debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
+        list_dir.dirs.push(name.to_owned());
+    }
+    for object in response.contents() {
+        let name = object.key.as_ref().expect("Object has a key"); // needed
+        trace!(%name, "S3 object");
+        let name = name
+            .strip_prefix(prefix)
+            .expect("Object name should start with prefix");
+        debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
+        list_dir.files.push(name.to_owned());
     }
 }
