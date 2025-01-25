@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Martin Pool.
+// Copyright 2020-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{error, fmt, io, result};
 
+use async_trait::async_trait;
 use bytes::Bytes;
 use derive_more::Display;
 use time::OffsetDateTime;
@@ -113,6 +114,10 @@ impl Transport {
         self.protocol.list_dir(relpath)
     }
 
+    pub async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
+        self.protocol.list_dir_async(relpath).await
+    }
+
     /// Make a new transport addressing a subdirectory.
     pub fn chdir(&self, relpath: &str) -> Self {
         Transport {
@@ -176,6 +181,7 @@ pub enum WriteMode {
     CreateNew,
 }
 
+#[async_trait]
 trait Protocol: Send + Sync {
     fn read_file(&self, path: &str) -> Result<Bytes>;
 
@@ -187,6 +193,7 @@ trait Protocol: Send + Sync {
     /// the complete content.
     fn write_file(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()>;
     fn list_dir(&self, relpath: &str) -> Result<ListDir>;
+    async fn list_dir_async(&self, relpath: &str) -> Result<ListDir>;
     fn create_dir(&self, relpath: &str) -> Result<()>;
 
     /// Get metadata about a file.
@@ -340,6 +347,9 @@ type Result<T> = result::Result<T, Error>;
 mod test {
     use std::path::Path;
 
+    use assert_fs::{prelude::*, TempDir};
+    use pretty_assertions::assert_eq;
+
     use super::Transport;
 
     #[test]
@@ -362,4 +372,15 @@ mod test {
             assert!(re.is_match(&dbg));
         }
     }
+
+    #[tokio::test]
+    async fn local_list_dir_async()  {
+        let temp = TempDir::new().unwrap();
+        let transport = Transport::local(temp.path());
+        temp.child("a").touch().unwrap();
+        let list = transport.list_dir_async(".").await.unwrap();
+        assert_eq!(list.files, ["a"]);
+        assert!(list.dirs.is_empty());
+    }
+
 }
