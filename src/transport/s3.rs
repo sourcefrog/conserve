@@ -224,8 +224,10 @@ impl super::Protocol for Protocol {
             .delimiter("/")
             .into_paginator()
             .send();
+        trace!("list_dir paginator created");
         let mut result = ListDir::default();
         while let Some(response) = stream.next().await {
+            trace!(?response, "list_dir paginator next", );
             let response = response.map_err(|err| self.s3_error(&prefix, err))?;
             collect_listdir(&response, &prefix, &mut result);
         }

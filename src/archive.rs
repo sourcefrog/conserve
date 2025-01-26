@@ -329,7 +329,9 @@ impl Archive {
         options: &ValidateOptions,
         monitor: Arc<dyn Monitor>,
     ) -> Result<()> {
-        self.validate_archive_dir(monitor.clone())?;
+        // TODO: Checking the archive dir contents is a bit redundant with listing
+        // the bands: we could just collect unexpected files while listing bands.
+        // self.validate_archive_dir(monitor.clone()).await?;
 
         debug!("List bands...");
         let band_ids = self.list_band_ids_async().await?;
@@ -378,11 +380,11 @@ impl Archive {
         Ok(())
     }
 
-    fn validate_archive_dir(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
+    async fn validate_archive_dir(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
-        let list_dir = self.transport.list_dir("")?;
+        let list_dir = self.transport.list_dir_async("").await?;
         for dir_name in list_dir.dirs {
             if let Ok(band_id) = dir_name.parse::<BandId>() {
                 if !seen_bands.insert(band_id) {
