@@ -126,6 +126,10 @@ impl super::Protocol for Protocol {
         Ok(buf.into())
     }
 
+    async fn read_async(&self, _relpath: &str) -> Result<Bytes> {
+        todo!()
+    }
+
     fn create_dir(&self, relpath: &str) -> Result<()> {
         let full_path = self.base_path.join(relpath);
         trace!("create_dir {:?}", full_path);
