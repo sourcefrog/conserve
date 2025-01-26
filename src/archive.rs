@@ -335,8 +335,8 @@ impl Archive {
         } else {
             // 2. Check the hash of all blocks are correct, and remember how long
             //    the uncompressed data is.
-            let block_lengths: HashMap<BlockHash, usize> =
-                self.block_dir.validate(monitor.clone())?;
+            let block_lengths: HashMap<BlockHash, usize> = tokio::runtime::Runtime::new()?
+                .block_on(self.block_dir.validate(monitor.clone()))?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (hash, referenced_len) in referenced_lens {
                 if let Some(&actual_len) = block_lengths.get(&hash) {

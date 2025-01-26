@@ -259,7 +259,7 @@ impl super::Protocol for Protocol {
         Ok(body_bytes)
     }
 
-    async fn read_file_async(&self, relpath: &str) -> Result<Bytes> {
+    async fn read_file_async(&self, _relpath: &str) -> Result<Bytes> {
         todo!()
     }
 

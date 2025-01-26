@@ -380,7 +380,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn local_list_dir_async()  {
+    async fn local_list_dir_async() {
         let temp = TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
         temp.child("a").touch().unwrap();
@@ -388,5 +388,4 @@ mod test {
         assert_eq!(list.files, ["a"]);
         assert!(list.dirs.is_empty());
     }
-
 }
