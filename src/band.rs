@@ -179,44 +179,7 @@ impl Band {
     }
 
     /// Open the band with the given id.
-    pub fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
-        let transport = archive.transport().chdir(&band_id.to_string());
-        let head: Head =
-            read_json(&transport, BAND_HEAD_FILENAME)?.ok_or(Error::BandHeadMissing { band_id })?;
-        if let Some(version) = &head.band_format_version {
-            if !band_version_supported(version) {
-                return Err(Error::UnsupportedBandVersion {
-                    band_id,
-                    version: version.to_owned(),
-                });
-            }
-        } else {
-            debug!("Old(?) band {band_id} has no format version");
-            // Unmarked, old bands, are accepted for now. In the next archive
-            // version, band version markers ought to become mandatory.
-        }
-
-        let unsupported_flags = head
-            .format_flags
-            .iter()
-            .filter(|f| !flags::SUPPORTED.contains(&f.as_ref()))
-            .cloned()
-            .collect_vec();
-        if !unsupported_flags.is_empty() {
-            return Err(Error::UnsupportedBandFormatFlags {
-                band_id,
-                unsupported_flags,
-            });
-        }
-        Ok(Band {
-            band_id: band_id.to_owned(),
-            head,
-            transport,
-        })
-    }
-
-    /// Open the band with the given id.
-    pub async fn open_async(archive: &Archive, band_id: BandId) -> Result<Band> {
+    pub async fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
         let transport = archive.transport().chdir(&band_id.to_string());
         let head_bytes = match transport.read_file_async(BAND_HEAD_FILENAME).await {
             Err(err) if err.is_not_found() => return Err(Error::BandHeadMissing { band_id }),
@@ -386,8 +349,8 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn create_and_reopen_band() {
+    #[tokio::test]
+    async fn create_and_reopen_band() {
         let af = ScratchArchive::new();
         let band = Band::create(&af).unwrap();
 
@@ -405,7 +368,7 @@ mod tests {
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_str("b0000").unwrap();
-        let band2 = Band::open(&af, band_id).expect("failed to re-open band");
+        let band2 = Band::open(&af, band_id).await.expect("failed to re-open band");
         assert!(band2.is_closed().unwrap());
 
         // Try get_info
@@ -431,8 +394,8 @@ mod tests {
         assert!(!af.transport().is_file("b0000/BANDHEAD").unwrap());
     }
 
-    #[test]
-    fn unsupported_band_version() {
+    #[tokio::test]
+    async fn unsupported_band_version() {
         let af = ScratchArchive::new();
         fs::create_dir(af.path().join("b0000")).unwrap();
         let head = json!({
@@ -445,7 +408,7 @@ mod tests {
         )
         .unwrap();
 
-        let e = Band::open(&af, BandId::zero());
+        let e = Band::open(&af, BandId::zero()).await;
         let e_str = e.unwrap_err().to_string();
         assert!(
             e_str.contains("Unsupported band version \"8888.8.8\" in b0000"),

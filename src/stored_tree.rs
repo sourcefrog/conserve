@@ -44,9 +44,10 @@ impl StoredTree {
         }
     }
 
-    pub(crate) fn open(archive: &Archive, band_id: BandId) -> Result<StoredTree> {
+    // TODO: Maybe delete this and expect callers to have the band already?
+    pub(crate) async fn open(archive: &Archive, band_id: BandId) -> Result<StoredTree> {
         Ok(StoredTree {
-            band: Band::open(archive, band_id)?,
+            band: Band::open(archive, band_id).await?,
             block_dir: archive.block_dir.clone(),
             archive: archive.clone(),
         })
@@ -108,22 +109,23 @@ mod test {
     use super::super::test_fixtures::*;
     use super::super::*;
 
-    #[test]
+    #[tokio::test]
     pub fn open_stored_tree() {
         let af = ScratchArchive::new();
         af.store_two_versions();
 
         let last_band_id = af.last_band_id().unwrap().unwrap();
-        let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+        let st = af.open_stored_tree(BandSelectionPolicy::Latest).await.unwrap();
 
         assert_eq!(st.band().id(), last_band_id);
 
         let monitor = TestMonitor::arc();
-        let names: Vec<String> = st
-            .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
-            .unwrap()
-            .map(|e| e.apath.into())
-            .collect();
+        let entry_iter = st
+            .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone()).unwrap();
+        let names = Vec::new();
+        while let Some(entry) = entry_iter.next_async().await {
+            names.push(entry.apath.into());
+        }
         let expected = if SYMLINKS_SUPPORTED {
             vec![
                 "/",

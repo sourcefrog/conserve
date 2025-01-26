@@ -80,13 +80,13 @@ impl Archive {
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
-    pub fn open_path(path: &Path) -> Result<Archive> {
-        Archive::open(Transport::local(path))
+    pub async fn open_path(path: &Path) -> Result<Archive> {
+        Archive::open(Transport::local(path)).await
     }
 
-    pub fn open(transport: Transport) -> Result<Archive> {
+    pub async fn open(transport: Transport) -> Result<Archive> {
         let header: ArchiveHeader =
-            read_json(&transport, HEADER_FILENAME)?.ok_or(Error::NotAnArchive)?;
+            read_json(&transport, HEADER_FILENAME).await?.ok_or(Error::NotAnArchive)?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(Error::UnsupportedArchiveVersion {
                 version: header.conserve_archive_version,
@@ -117,7 +117,8 @@ impl Archive {
     }
 
     /// Return an iterator of entries in a selected version.
-    pub fn iter_entries(
+    // TODO: Maybe delete this; let callers open the tree and iterate it.
+    pub async fn iter_entries(
         &self,
         band_selection: BandSelectionPolicy,
         subtree: Apath,
@@ -125,6 +126,7 @@ impl Archive {
         monitor: Arc<dyn Monitor>,
     ) -> Result<impl Iterator<Item = IndexEntry>> {
         self.open_stored_tree(band_selection)?
+        .await
             .iter_entries(subtree, exclude, monitor)
     }
 
@@ -165,8 +167,8 @@ impl Archive {
     }
 
     // TODO: Maybe deprecate in favor of StoredTree constructors.
-    pub fn open_stored_tree(&self, band_selection: BandSelectionPolicy) -> Result<StoredTree> {
-        StoredTree::open(self, self.resolve_band_id(band_selection)?)
+    pub async fn open_stored_tree(&self, band_selection: BandSelectionPolicy) -> Result<StoredTree> {
+        StoredTree::open(self, self.resolve_band_id(band_selection)?).await
     }
 
     /// Return an iterator of valid band ids in this archive, in arbitrary order.

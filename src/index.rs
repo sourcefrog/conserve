@@ -314,6 +314,35 @@ impl IndexRead {
     }
 
     /// Read and parse a specific hunk
+    pub async fn read_hunk_async(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
+        let path = hunk_relpath(hunk_number);
+        let compressed_bytes = match self.transport.read_file_async(&path).await {
+            Ok(b) => b,
+            Err(err) if err.is_not_found() => {
+                // TODO: Cope with one hunk being missing, while there are still
+                // later-numbered hunks. This would require reading the whole
+                // list of hunks first.
+                return Ok(None);
+            }
+            Err(source) => return Err(Error::Transport { source }),
+        };
+        self.stats.index_hunks += 1;
+        self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
+        let index_bytes = self.decompressor.decompress(&compressed_bytes)?;
+        self.stats.uncompressed_index_bytes += index_bytes.len() as u64;
+        let entries: Vec<IndexEntry> =
+            serde_json::from_slice(&index_bytes).map_err(|source| Error::DeserializeJson {
+                path: path.clone(),
+                source,
+            })?;
+        if entries.is_empty() {
+            // It's legal, it's just weird - and it can be produced by some old Conserve versions.
+        }
+        Ok(Some(entries))
+    }
+
+    /// Read and parse a specific hunk
+    #[deprecated(note = "Use read_hunk_async instead")]
     pub fn read_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
         let path = hunk_relpath(hunk_number);
         let compressed_bytes = match self.transport.read_file(&path) {
@@ -445,6 +474,43 @@ impl IndexHunkIter {
         IndexHunkIter {
             after: Some(apath.clone()),
             ..self
+        }
+    }
+
+    // TODO: Replace `next`
+    async fn next_async(&mut self) -> Option<Vec<IndexEntry>> {
+        loop {
+            let hunk_number = self.hunks.next()?;
+            let entries = match self.index.read_hunk_async(hunk_number).await {
+                Ok(None) => return None,
+                Ok(Some(entries)) => entries,
+                Err(err) => {
+                    self.index.stats.errors += 1;
+                    error!("Error reading index hunk {hunk_number:?}: {err}");
+                    continue;
+                }
+            };
+            if let Some(ref after) = self.after {
+                if let Some(last) = entries.last() {
+                    if last.apath <= *after {
+                        continue;
+                    }
+                }
+                if let Some(first) = entries.first() {
+                    if first.apath > *after {
+                        self.after = None; // don't need to look again
+                        return Some(entries);
+                    }
+                }
+                let idx = match entries.binary_search_by_key(&after, |entry| &entry.apath) {
+                    Ok(idx) => idx + 1, // after the point it was found
+                    Err(idx) => idx,    // from the point it would have been
+                };
+                return Some(Vec::from(&entries[idx..]));
+            }
+            if !entries.is_empty() {
+                return Some(entries);
+            }
         }
     }
 }

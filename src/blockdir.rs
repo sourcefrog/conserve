@@ -197,8 +197,8 @@ impl BlockDir {
     }
 
     /// Read back some content addressed by an [Address] (a block hash, start and end).
-    pub fn read_address(&self, address: &Address, monitor: Arc<dyn Monitor>) -> Result<Bytes> {
-        let bytes = self.get_block_content(&address.hash, monitor)?;
+    pub async fn read_address(&self, address: &Address, monitor: Arc<dyn Monitor>) -> Result<Bytes> {
+        let bytes = self.get_async(&address.hash, monitor).await?;
         let len = address.len as usize;
         let start = address.start as usize;
         let end = start + len;
@@ -217,6 +217,7 @@ impl BlockDir {
     ///
     /// Checks that the hash is correct with the contents.
     #[instrument(skip(self, monitor))]
+    #[deprecated]
     pub fn get_block_content(&self, hash: &BlockHash, monitor: Arc<dyn Monitor>) -> Result<Bytes> {
         if let Some(hit) = self.cache.write().expect("Lock cache").get(hash) {
             monitor.count(Counter::BlockContentCacheHit, 1);
