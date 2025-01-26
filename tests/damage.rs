@@ -79,8 +79,8 @@ impl TreeChanges {
 
 #[rstest]
 #[traced_test]
-#[tokio::test] async
-fn backup_after_damage(
+#[tokio::test]
+async fn backup_after_damage(
     #[values(DamageAction::Delete, DamageAction::Truncate)] action: DamageAction,
     #[values(
         DamageLocation::BandHead(0),
@@ -201,6 +201,7 @@ fn backup_after_damage(
     // TODO: This should return problems that we can inspect.
     archive
         .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
+        .await
         .expect("validate");
 }
 

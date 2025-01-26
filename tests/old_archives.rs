@@ -83,6 +83,7 @@ fn validate_archive() {
 
         archive
             .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
+            .await
             .expect("validate archive");
         assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     }
