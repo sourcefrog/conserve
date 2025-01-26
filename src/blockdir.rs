@@ -21,7 +21,7 @@
 //!
 //! The structure is: archive > blockdir > subdir > file.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, RwLock};
@@ -413,36 +413,68 @@ impl BlockDir {
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub(crate) fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<HashMap<BlockHash, usize>> {
+    pub(crate) async fn validate(
+        &self,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
         // TODO: Warn on blocks in the wrong subdir.
         debug!("Start list blocks");
-        let blocks = self
-            .blocks(monitor.clone())?
-            .into_iter()
-            .collect::<HashSet<BlockHash>>();
+        let blocks = self.blocks_async(monitor.clone()).await?;
         debug!("Check {} blocks", blocks.len());
         let task = monitor.start_task("Validate blocks".to_string());
         task.set_total(blocks.len());
-        let block_lens = blocks
-            .into_par_iter()
-            .flat_map(
-                |hash| match self.get_block_content(&hash, monitor.clone()) {
-                    Ok(bytes) => {
-                        task.increment(1);
-                        Some((hash, bytes.len()))
-                    }
+        let mut taskset = JoinSet::new();
+        for hash in blocks {
+            let monitor = monitor.clone();
+            let task = task.clone();
+            let transport = self.transport.clone();
+            taskset.spawn(async move {
+                // get_async_uncached checks that the hash is correct
+                task.increment(1);
+                match get_async_uncached(&transport, hash.clone(), monitor.clone()).await {
+                    Ok(bytes) => Some((hash, bytes.len())),
                     Err(err) => {
                         monitor.error(err);
                         None
                     }
-                },
-            )
-            .collect();
+                }
+            });
+        }
+        let block_lens = taskset
+            .join_all()
+            .await
+            .into_iter()
+            .flatten()
+            .collect::<HashMap<_, _>>();
         Ok(block_lens)
     }
+}
+
+// This exists as a non-associated function to allow it to be used in the async
+// version of validate, without problems of holding a reference to the BlockDir.
+async fn get_async_uncached(
+    transport: &Transport,
+    hash: BlockHash,
+    monitor: Arc<dyn Monitor>,
+) -> Result<Bytes> {
+    let block_relpath = block_relpath(&hash);
+    let compressed_bytes = transport.read_async(&block_relpath).await?;
+    let decompressed_bytes = Decompressor::new().decompress(&compressed_bytes)?;
+    let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
+    if actual_hash != hash {
+        return Err(Error::BlockCorrupt { hash });
+    }
+    monitor.count(Counter::BlockReads, 1);
+    monitor.count(Counter::BlockReadCompressedBytes, compressed_bytes.len());
+    monitor.count(
+        Counter::BlockReadUncompressedBytes,
+        decompressed_bytes.len(),
+    );
+    trace!(?hash, len = decompressed_bytes.len(), "Read block complete");
+    Ok(decompressed_bytes)
 }
 
 #[derive(Debug, Default)]
