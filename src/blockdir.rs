@@ -30,6 +30,7 @@ use bytes::Bytes;
 use lru::LruCache;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use tokio::task::JoinSet;
 use tracing::{debug, warn};
 use tracing::{instrument, trace};
 use transport::WriteMode;
@@ -287,6 +288,22 @@ impl BlockDir {
         Ok(dirs)
     }
 
+    /// Return an iterator of block subdirectories, in arbitrary order.
+    ///
+    /// Errors, other than failure to open the directory at all, are logged and discarded.
+    async fn subdirs_async(&self) -> Result<Vec<String>> {
+        let ListDir { mut dirs, .. } = self.transport.list_dir_async("").await?;
+        dirs.retain(|dirname| {
+            if dirname.len() == SUBDIR_NAME_CHARS {
+                true
+            } else {
+                warn!("Unexpected subdirectory in blockdir: {dirname:?}");
+                false
+            }
+        });
+        Ok(dirs)
+    }
+
     /// Return all the blocknames in the blockdir, in arbitrary order.
     pub(crate) fn blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
         let transport = self.transport.clone();
@@ -312,6 +329,39 @@ impl BlockDir {
                 // TODO: Report errors on bad names?
                 name.parse().ok())
             .collect())
+    }
+
+    /// Return all the blocknames in the blockdir, in arbitrary order.
+    pub async fn blocks_async(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
+        let transport = self.transport.clone();
+        let task = monitor.start_task("List block subdir".to_string());
+        let subdirs = self.subdirs_async().await?;
+        task.set_total(subdirs.len());
+        let mut subdir_tasks = JoinSet::new();
+        for subdir_name in subdirs {
+            let transport = transport.clone();
+            let my_task = task.clone();
+            subdir_tasks.spawn(async move {
+                let r = transport.list_dir_async(&subdir_name).await;
+                my_task.increment(1);
+                r
+            });
+        }
+        let mut blocks = vec![];
+        while let Some(result) = subdir_tasks.join_next().await {
+            let result = result.expect("await listdir result");
+            match result {
+                Ok(ListDir { files, .. }) => {
+                    blocks.extend(files.into_iter().filter_map(|name|
+                        // just drop invalid names, for now
+                        name.parse().ok()));
+                }
+                Err(source) => {
+                    monitor.error(Error::ListBlocks { source });
+                }
+            }
+        }
+        Ok(blocks)
     }
 
     /// Check format invariants of the BlockDir.
@@ -362,6 +412,7 @@ pub struct BlockDirStats {
 mod test {
     use std::fs::{create_dir, write};
 
+    use pretty_assertions::assert_eq;
     use tempfile::TempDir;
 
     use crate::monitor::test::TestMonitor;
@@ -396,6 +447,24 @@ mod test {
         assert!(!blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
+    }
+
+    #[tokio::test]
+    async fn blocks_async() {
+        let tempdir = TempDir::new().unwrap();
+        let blockdir = BlockDir::open(Transport::local(tempdir.path()));
+        let mut stats = BackupStats::default();
+        let monitor = TestMonitor::arc();
+
+        let initial_blocks = blockdir.blocks_async(monitor.clone()).await.unwrap();
+        assert_eq!(initial_blocks, []);
+
+        let hash = blockdir
+            .store_or_deduplicate(Bytes::from("stuff"), &mut stats, monitor.clone())
+            .unwrap();
+
+        let blocks = blockdir.blocks_async(monitor.clone()).await.unwrap();
+        assert_eq!(blocks, [hash]);
     }
 
     #[test]
