@@ -336,6 +336,14 @@ impl std::process::Termination for ExitCode {
 impl Command {
     fn run(&self, monitor: Arc<TermUiMonitor>) -> Result<ExitCode> {
         let mut stdout = io::stdout();
+        // let runtime = tokio::runtime::Builder::new_multi_thread()
+        //     .enable_all()
+        //     .max_blocking_threads(10) //  avoid running out of FDs
+        //     .worker_threads(20)
+        //     .build()?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
         match self {
             Command::Backup {
                 archive,
@@ -368,10 +376,9 @@ impl Command {
             }
             Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open(Transport::new(archive)?)?
-                    .block_dir()
-                    .blocks(monitor)?
-                {
+                let archive = Archive::open(Transport::new(archive)?)?;
+                let blocks = runtime.block_on(archive.block_dir().blocks_async(monitor))?;
+                for hash in blocks {
                     writeln!(bw, "{hash}")?;
                 }
             }
