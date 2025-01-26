@@ -28,8 +28,8 @@ const HELLO_HASH: &str =
     "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
      896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7";
 
-#[test]
-pub fn simple_backup() {
+#[tokio::test]
+async fn simple_backup() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
@@ -48,7 +48,7 @@ pub fn simple_backup() {
     assert_eq!(backup_stats.written_blocks, 1);
     assert_eq!(backup_stats.uncompressed_bytes, 8);
     assert_eq!(backup_stats.compressed_bytes, 10);
-    check_backup(&af);
+    check_backup(&af).await;
 
     let restore_dir = TempDir::new().unwrap();
 
@@ -67,9 +67,9 @@ pub fn simple_backup() {
     monitor.assert_counter(Counter::FileBytes, 8);
 }
 
-#[test]
+#[tokio::test]
 #[traced_test]
-pub fn simple_backup_with_excludes() -> Result<()> {
+async fn simple_backup_with_excludes() -> Result<()> {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
@@ -85,7 +85,7 @@ pub fn simple_backup_with_excludes() -> Result<()> {
     let monitor = TestMonitor::arc();
     let stats = backup(&af, srcdir.path(), &options, monitor.clone()).expect("backup");
 
-    check_backup(&af);
+    check_backup(&af).await;
 
     let counters = monitor.counters();
     dbg!(counters);
@@ -154,7 +154,7 @@ pub fn backup_more_excludes() {
     assert_eq!(0, stats.unknown_kind);
 }
 
-fn check_backup(af: &ScratchArchive) {
+async fn check_backup(af: &ScratchArchive) {
     let band_ids = af.list_band_ids().unwrap();
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
@@ -193,6 +193,7 @@ fn check_backup(af: &ScratchArchive) {
     );
     assert_eq!(
         af.all_blocks(TestMonitor::arc())
+            .await
             .unwrap()
             .into_iter()
             .map(|h| h.to_string())
@@ -455,8 +456,8 @@ pub fn detect_minimal_mtime_change() {
     assert_eq!(stats.unmodified_files, 1);
 }
 
-#[test]
-fn small_files_combined_two_backups() {
+#[tokio::test]
+async fn small_files_combined_two_backups() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("file1");
@@ -492,7 +493,7 @@ fn small_files_combined_two_backups() {
     assert_eq!(stats2.written_blocks, 1);
     assert_eq!(stats2.combined_blocks, 1);
 
-    assert_eq!(af.all_blocks(TestMonitor::arc()).unwrap().len(), 2);
+    assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 2);
 }
 
 #[test]
