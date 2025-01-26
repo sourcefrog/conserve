@@ -59,13 +59,15 @@ impl Default for RestoreOptions {
 }
 
 /// Restore a selected version, or by default the latest, to a destination directory.
-pub fn restore(
+pub async fn restore(
     archive: &Archive,
     destination: &Path,
-    options: &RestoreOptions,
+    options: RestoreOptions,
     monitor: Arc<dyn Monitor>,
 ) -> Result<()> {
-    let st = archive.open_stored_tree(options.band_selection.clone())?;
+    let st = archive
+        .open_stored_tree(options.band_selection.clone())
+        .await?;
     ensure_dir_exists(destination)?;
     if !options.overwrite && !directory_is_empty(destination)? {
         return Err(Error::DestinationNotEmpty);

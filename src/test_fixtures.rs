@@ -52,11 +52,11 @@ impl ScratchArchive {
         &self.archive_path
     }
 
-    pub fn setup_incomplete_empty_band(&self) {
-        Band::create(&self.archive).unwrap();
+    pub async fn setup_incomplete_empty_band(&self) {
+        Band::create(&self.archive).await.unwrap();
     }
 
-    pub fn store_two_versions(&self) {
+    pub async fn store_two_versions(&self) {
         let srcdir = TreeFixture::new();
         srcdir.create_file("hello");
         srcdir.create_dir("subdir");
@@ -66,10 +66,14 @@ impl ScratchArchive {
         }
 
         let options = &BackupOptions::default();
-        backup(&self.archive, srcdir.path(), options, TestMonitor::arc()).unwrap();
+        backup(&self.archive, srcdir.path(), options, TestMonitor::arc())
+            .await
+            .unwrap();
 
         srcdir.create_file("hello2");
-        backup(&self.archive, srcdir.path(), options, TestMonitor::arc()).unwrap();
+        backup(&self.archive, srcdir.path(), options, TestMonitor::arc())
+            .await
+            .unwrap();
     }
 
     pub fn transport(&self) -> &Transport {

@@ -46,12 +46,12 @@ pub struct ShowVersionsOptions {
 }
 
 /// Print a list of versions, one per line, on stdout.
-pub fn show_versions(
+pub async fn show_versions(
     archive: &Archive,
     options: &ShowVersionsOptions,
     monitor: Arc<TermUiMonitor>,
 ) -> Result<()> {
-    let mut band_ids = archive.list_band_ids()?;
+    let mut band_ids = archive.list_band_ids().await?;
     if options.newest_first {
         band_ids.reverse();
     }
@@ -108,7 +108,8 @@ pub fn show_versions(
 
         if options.tree_size {
             let sizes = archive
-                .open_stored_tree(BandSelectionPolicy::Specified(band_id))?
+                .open_stored_tree(BandSelectionPolicy::Specified(band_id))
+                .await?
                 .size(Exclude::nothing(), monitor.clone())?;
             l.push(format!(
                 "{:>14}",

@@ -97,10 +97,10 @@ fn tree_sizes() {
             "});
 }
 
-#[test]
-fn short_newest_first() {
+#[tokio::test]
+async fn versions_short_newest_first() {
     let af = ScratchArchive::new();
-    af.store_two_versions();
+    af.store_two_versions().await;
 
     run_conserve()
         .args(["versions", "--short", "--newest"])

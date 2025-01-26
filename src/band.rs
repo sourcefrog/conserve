@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -130,11 +130,11 @@ impl Band {
     /// Make a new band (and its on-disk directory).
     ///
     /// The Band gets the next id after those that already exist.
-    pub fn create(archive: &Archive) -> Result<Band> {
-        Band::create_with_flags(archive, flags::DEFAULT)
+    pub(crate) async fn create(archive: &Archive) -> Result<Band> {
+        Band::create_with_flags(archive, flags::DEFAULT).await
     }
 
-    pub fn create_with_flags(
+    async fn create_with_flags(
         archive: &Archive,
         format_flags: &[Cow<'static, str>],
     ) -> Result<Band> {
@@ -142,7 +142,8 @@ impl Band {
             .iter()
             .for_each(|f| assert!(flags::SUPPORTED.contains(&f.as_ref()), "unknown flag {f:?}"));
         let band_id = archive
-            .last_band_id()?
+            .last_band_id()
+            .await?
             .map_or_else(BandId::zero, |b| b.next_sibling());
         let transport = archive.transport().chdir(&band_id.to_string());
         transport.create_dir("")?;
@@ -314,14 +315,15 @@ mod tests {
 
     use serde_json::json;
 
+    use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::ScratchArchive;
 
     use super::*;
 
-    #[test]
-    fn create_and_reopen_band() {
+    #[tokio::test]
+    async fn create_and_reopen_band() {
         let af = ScratchArchive::new();
-        let band = Band::create(&af).unwrap();
+        let band = Band::create(&af).await.unwrap();
 
         let band_dir = af.path().join("b0000");
         assert!(band_dir.is_dir());
@@ -351,10 +353,10 @@ mod tests {
         assert!(dur < Duration::from_secs(5));
     }
 
-    #[test]
-    fn delete_band() {
+    #[tokio::test]
+    async fn delete_band() {
         let af = ScratchArchive::new();
-        let _band = Band::create(&af).unwrap();
+        let _band = Band::create(&af).await.unwrap();
         assert!(af.transport().is_file("b0000/BANDHEAD").unwrap());
 
         Band::delete(&af, BandId::new(&[0])).expect("delete band");
@@ -363,8 +365,8 @@ mod tests {
         assert!(!af.transport().is_file("b0000/BANDHEAD").unwrap());
     }
 
-    #[test]
-    fn unsupported_band_version() {
+    #[tokio::test]
+    async fn unsupported_band_version() {
         let af = ScratchArchive::new();
         fs::create_dir(af.path().join("b0000")).unwrap();
         let head = json!({
@@ -383,5 +385,61 @@ mod tests {
             e_str.contains("Unsupported band version \"8888.8.8\" in b0000"),
             "bad band version: {e_str:#?}"
         );
+    }
+
+    #[tokio::test]
+    async fn create_bands() {
+        let af = ScratchArchive::new();
+        assert!(af.path().join("d").is_dir());
+
+        // Make one band
+        let _band1 = Band::create(&af).await.unwrap();
+        let band_path = af.path().join("b0000");
+        assert!(band_path.is_dir());
+        assert!(band_path.join("BANDHEAD").is_file());
+        assert!(band_path.join("i").is_dir());
+
+        assert_eq!(af.list_band_ids().await.unwrap(), vec![BandId::new(&[0])]);
+        assert_eq!(af.last_band_id().await.unwrap(), Some(BandId::new(&[0])));
+
+        // Try creating a second band.
+        let _band2 = Band::create(&af).await.unwrap();
+        assert_eq!(
+            af.list_band_ids().await.unwrap(),
+            vec![BandId::new(&[0]), BandId::new(&[1])]
+        );
+        assert_eq!(af.last_band_id().await.unwrap(), Some(BandId::new(&[1])));
+
+        assert_eq!(
+            af.referenced_blocks(&af.list_band_ids().await.unwrap(), TestMonitor::arc())
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "unknown flag \"wibble\"")]
+    async fn unknown_format_flag_panics_in_create() {
+        let af = ScratchArchive::new();
+        let _ = Band::create_with_flags(&af, &["wibble".into()]).await;
+        // This panics because there is no way to create a band with an unsupported flag from the CLI or API.
+    }
+
+    #[tokio::test]
+    async fn default_format_flags_are_empty() {
+        let af = ScratchArchive::new();
+
+        let orig_band = Band::create(&af).await.unwrap();
+        let flags = orig_band.format_flags();
+        assert!(flags.is_empty(), "{flags:?}");
+
+        let band = Band::open(&af, orig_band.id()).unwrap();
+        println!("{band:?}");
+        assert!(band.format_flags().is_empty());
+
+        assert_eq!(band.band_format_version(), Some("0.6.3"));
+        // TODO: When we do support some flags, check that the minimum version is 23.2.
     }
 }

@@ -39,8 +39,8 @@ fn open_old_archive(ver: &str, name: &str) -> Archive {
         .expect("Failed to open archive")
 }
 
-#[test]
-fn all_archive_versions_are_tested() {
+#[tokio::test]
+async fn all_archive_versions_are_tested() {
     let present_subdirs: HashSet<String> = read_dir("testdata/archive/minimal")
         .unwrap()
         .map(|direntry| direntry.unwrap().file_name().to_string_lossy().into_owned())
@@ -55,18 +55,22 @@ fn all_archive_versions_are_tested() {
     );
 }
 
-#[test]
-fn examine_archive() {
+#[tokio::test]
+async fn examine_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         println!("examine {ver}");
         let archive = open_old_archive(ver, "minimal");
 
-        let band_ids = archive.list_band_ids().expect("Failed to list band ids");
+        let band_ids = archive
+            .list_band_ids()
+            .await
+            .expect("Failed to list band ids");
         assert_eq!(band_ids, &[BandId::zero()]);
 
         assert_eq!(
             archive
                 .last_band_id()
+                .await
                 .expect("Get last_band_id")
                 .expect("Should have a last band id"),
             BandId::zero()
@@ -89,8 +93,8 @@ async fn validate_archive() {
     }
 }
 
-#[test]
-fn long_listing_old_archive() {
+#[tokio::test]
+async fn long_listing_old_archive() {
     let first_with_perms = semver::VersionReq::parse(">=0.6.17").unwrap();
 
     for ver in MINIMAL_ARCHIVE_VERSIONS {
@@ -105,6 +109,7 @@ fn long_listing_old_archive() {
         show::show_entry_names(
             archive
                 .open_stored_tree(BandSelectionPolicy::Latest)
+                .await
                 .unwrap()
                 .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
                 .unwrap(),
@@ -136,8 +141,8 @@ fn long_listing_old_archive() {
     }
 }
 
-#[test]
-fn restore_old_archive() {
+#[tokio::test]
+async fn restore_old_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         let dest = TempDir::new().unwrap();
         println!("restore {} to {:?}", ver, dest.path());
@@ -147,9 +152,10 @@ fn restore_old_archive() {
         restore(
             &archive,
             dest.path(),
-            &RestoreOptions::default(),
+            RestoreOptions::default(),
             monitor.clone(),
         )
+        .await
         .expect("restore");
 
         monitor.assert_counter(Counter::Symlinks, 0);
@@ -189,8 +195,8 @@ fn restore_old_archive() {
 
 /// Restore from the old archive, modify the tree, then make a backup into a copy
 /// of the old archive.
-#[test]
-fn restore_modify_backup() {
+#[tokio::test]
+async fn restore_modify_backup() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         let working_tree = TempDir::new().unwrap();
         println!("restore {} to {:?}", ver, working_tree.path());
@@ -200,9 +206,10 @@ fn restore_modify_backup() {
         restore(
             &archive,
             working_tree.path(),
-            &RestoreOptions::default(),
+            RestoreOptions::default(),
             TestMonitor::arc(),
         )
+        .await
         .expect("restore");
 
         // Write back into a new copy of the archive, without modifying the
@@ -237,6 +244,7 @@ fn restore_modify_backup() {
             },
             TestMonitor::arc(),
         )
+        .await
         .expect("Backup modified tree");
 
         // Check the visited files passed to the callbacks.

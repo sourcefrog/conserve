@@ -23,10 +23,10 @@ use conserve::test_fixtures::ScratchArchive;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;
 
-#[test]
-fn simple_restore() {
+#[tokio::test]
+async fn simple_restore() {
     let af = ScratchArchive::new();
-    af.store_two_versions();
+    af.store_two_versions().await;
     let destdir = TreeFixture::new();
     let restore_archive = Archive::open_path(af.path()).unwrap();
     let restored_names = Arc::new(Mutex::new(Vec::new()));
@@ -42,7 +42,9 @@ fn simple_restore() {
         ..Default::default()
     };
     let monitor = TestMonitor::arc();
-    restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
+    restore(&restore_archive, destdir.path(), options, monitor.clone())
+        .await
+        .expect("restore");
 
     monitor.assert_no_errors();
     monitor.assert_counter(Counter::Files, 3);
@@ -57,7 +59,6 @@ fn simple_restore() {
     if !SYMLINKS_SUPPORTED {
         expected_names.retain(|n| *n != "/link");
     }
-    drop(options);
     assert_eq!(restored_names.lock().unwrap().as_slice(), expected_names);
 
     let dest = &destdir.path();
@@ -73,10 +74,10 @@ fn simple_restore() {
     // TODO: Test file contents are as expected.
 }
 
-#[test]
-fn restore_specified_band() {
+#[tokio::test]
+async fn restore_specified_band() {
     let af = ScratchArchive::new();
-    af.store_two_versions();
+    af.store_two_versions().await;
     let destdir = TreeFixture::new();
     let archive = Archive::open_path(af.path()).unwrap();
     let band_id = BandId::new(&[0]);
@@ -85,7 +86,9 @@ fn restore_specified_band() {
         ..RestoreOptions::default()
     };
     let monitor = TestMonitor::arc();
-    restore(&archive, destdir.path(), &options, monitor.clone()).expect("restore");
+    restore(&archive, destdir.path(), options, monitor.clone())
+        .await
+        .expect("restore");
     monitor.assert_no_errors();
     // Does not have the 'hello2' file added in the second version.
     monitor.assert_counter(Counter::Files, 2);
@@ -94,8 +97,8 @@ fn restore_specified_band() {
 /// Restoring a subdirectory works, and restores the parent directories:
 ///
 /// <https://github.com/sourcefrog/conserve/issues/268>
-#[test]
-fn restore_only_subdir() {
+#[tokio::test]
+async fn restore_only_subdir() {
     // We need the selected directory to be more than one level down, because the bug was that
     // its parent was not created.
     let backup_monitor = TestMonitor::arc();
@@ -110,6 +113,7 @@ fn restore_only_subdir() {
         &BackupOptions::default(),
         backup_monitor.clone(),
     )
+    .await
     .unwrap();
     backup_monitor.assert_counter(Counter::Files, 1);
     backup_monitor.assert_no_errors();
@@ -121,7 +125,9 @@ fn restore_only_subdir() {
         only_subtree: Some(Apath::from("/parent/sub")),
         ..Default::default()
     };
-    restore(&archive, destdir.path(), &options, restore_monitor.clone()).expect("restore");
+    restore(&archive, destdir.path(), options, restore_monitor.clone())
+        .await
+        .expect("restore");
     restore_monitor.assert_no_errors();
     assert!(destdir.path().join("parent").is_dir());
     assert!(destdir.path().join("parent/sub/file").is_file());
@@ -129,17 +135,18 @@ fn restore_only_subdir() {
     restore_monitor.assert_counter(Counter::Files, 1);
 }
 
-#[test]
-pub fn decline_to_overwrite() {
+#[tokio::test]
+async fn decline_to_overwrite() {
     let af = ScratchArchive::new();
-    af.store_two_versions();
+    af.store_two_versions().await;
     let destdir = TreeFixture::new();
     destdir.create_file("existing");
     let options = RestoreOptions {
         ..RestoreOptions::default()
     };
     assert!(!options.overwrite, "overwrite is false by default");
-    let restore_err_str = restore(&af, destdir.path(), &options, TestMonitor::arc())
+    let restore_err_str = restore(&af, destdir.path(), options, TestMonitor::arc())
+        .await
         .expect_err("restore should fail if the destination exists")
         .to_string();
     assert!(
@@ -148,10 +155,10 @@ pub fn decline_to_overwrite() {
     );
 }
 
-#[test]
-pub fn forced_overwrite() {
+#[tokio::test]
+async fn forced_overwrite() {
     let af = ScratchArchive::new();
-    af.store_two_versions();
+    af.store_two_versions().await;
     let destdir = TreeFixture::new();
     destdir.create_file("existing");
 
@@ -161,7 +168,9 @@ pub fn forced_overwrite() {
         ..RestoreOptions::default()
     };
     let monitor = TestMonitor::arc();
-    restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
+    restore(&restore_archive, destdir.path(), options, monitor.clone())
+        .await
+        .expect("restore");
     monitor.assert_no_errors();
     monitor.assert_counter(Counter::Files, 3);
     let dest = destdir.path();
@@ -169,10 +178,10 @@ pub fn forced_overwrite() {
     assert!(dest.join("existing").is_file());
 }
 
-#[test]
-fn exclude_files() {
+#[tokio::test]
+async fn exclude_files() {
     let af = ScratchArchive::new();
-    af.store_two_versions();
+    af.store_two_versions().await;
     let destdir = TreeFixture::new();
     let restore_archive = Archive::open_path(af.path()).unwrap();
     let options = RestoreOptions {
@@ -181,7 +190,9 @@ fn exclude_files() {
         ..RestoreOptions::default()
     };
     let monitor = TestMonitor::arc();
-    restore(&restore_archive, destdir.path(), &options, monitor.clone()).expect("restore");
+    restore(&restore_archive, destdir.path(), options, monitor.clone())
+        .await
+        .expect("restore");
 
     let dest = destdir.path();
     assert!(dest.join("hello").is_file());
@@ -191,9 +202,9 @@ fn exclude_files() {
     monitor.assert_counter(Counter::Files, 2);
 }
 
-#[test]
+#[tokio::test]
 #[cfg(unix)]
-fn restore_symlink() {
+async fn restore_symlink() {
     use std::fs::{read_link, symlink_metadata};
     use std::path::PathBuf;
 
@@ -209,17 +220,15 @@ fn restore_symlink() {
     set_symlink_file_times(srcdir.path().join("symlink"), years_ago, years_ago).unwrap();
 
     let monitor = TestMonitor::arc();
-    backup(&af, srcdir.path(), &Default::default(), monitor.clone()).unwrap();
+    backup(&af, srcdir.path(), &Default::default(), monitor.clone())
+        .await
+        .unwrap();
 
     let restore_dir = TempDir::new().unwrap();
     let monitor = TestMonitor::arc();
-    restore(
-        &af,
-        restore_dir.path(),
-        &Default::default(),
-        monitor.clone(),
-    )
-    .unwrap();
+    restore(&af, restore_dir.path(), Default::default(), monitor.clone())
+        .await
+        .unwrap();
 
     let restored_symlink_path = restore_dir.path().join("symlink");
     let sym_meta = symlink_metadata(&restored_symlink_path).unwrap();
