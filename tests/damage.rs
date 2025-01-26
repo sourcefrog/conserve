@@ -79,7 +79,7 @@ impl TreeChanges {
 
 #[rstest]
 #[traced_test]
-#[test]
+#[tokio::test] async
 fn backup_after_damage(
     #[values(DamageAction::Delete, DamageAction::Truncate)] action: DamageAction,
     #[values(
@@ -110,7 +110,7 @@ fn backup_after_damage(
     .expect("initial backup");
 
     drop(archive);
-    action.damage(&location.to_path(&archive_dir));
+    action.damage(&location.to_path(&archive_dir).await);
 
     // Open the archive again to avoid cache effects.
     let archive = Archive::open(Transport::local(archive_dir.path())).expect("open archive");
@@ -254,7 +254,7 @@ pub enum DamageLocation {
 
 impl DamageLocation {
     /// Find the specific path for this location, within an archive.
-    pub fn to_path(&self, archive_dir: &Path) -> PathBuf {
+    async fn to_path(&self, archive_dir: &Path) -> PathBuf {
         match self {
             DamageLocation::BandHead(band_id) => archive_dir
                 .join(BandId::from(*band_id).to_string())
@@ -266,6 +266,7 @@ impl DamageLocation {
                 let archive = Archive::open(Transport::local(archive_dir)).expect("open archive");
                 let block_hash = archive
                     .all_blocks(TestMonitor::arc())
+                    .await
                     .expect("list blocks")
                     .into_iter()
                     .sorted()

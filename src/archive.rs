@@ -103,8 +103,8 @@ impl Archive {
     }
 
     /// Return an unsorted list of all blocks in the archive.
-    pub fn all_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
-        self.block_dir.blocks(monitor)
+    pub async fn all_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
+        self.block_dir.blocks_async(monitor).await
     }
 
     pub fn band_exists(&self, band_id: BandId) -> Result<bool> {
