@@ -97,6 +97,15 @@ impl super::Protocol for Protocol {
         try_block(path).map_err(|err| Error::io_error(path, err))
     }
 
+    async fn read_async(&self, relpath: &str) -> Result<Bytes> {
+        let full_path = &self.full_path(relpath);
+        trace!(?relpath, "Read file");
+        tokio::fs::read(full_path)
+            .await
+            .map(Bytes::from)
+            .map_err(|err| Error::io_error(full_path, err))
+    }
+
     #[instrument(skip(self, content))]
     fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         // TODO: Just write directly; remove if the write fails.
@@ -256,6 +265,24 @@ mod test {
         let calls = transport.recorded_calls();
         dbg!(&calls);
         assert_eq!(calls, [Call(Verb::Read, filename.into())]);
+
+        temp.close().unwrap();
+    }
+
+    #[tokio::test]
+    async fn read_file_async() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let content: &str = "the ribs of the disaster";
+        let filename = "poem.txt";
+
+        temp.child(filename).write_str(content).unwrap();
+
+        let transport = Transport::local(temp.path());
+        let bytes = transport.read_async(filename).await.unwrap();
+        assert_eq!(bytes, content.as_bytes());
+
+        let err = transport.read_async("nonexistent").await.unwrap_err();
+        assert!(err.is_not_found());
 
         temp.close().unwrap();
     }
