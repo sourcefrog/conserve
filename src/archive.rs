@@ -164,6 +164,7 @@ impl Archive {
         }
     }
 
+    // TODO: Maybe deprecate in favor of StoredTree constructors.
     pub fn open_stored_tree(&self, band_selection: BandSelectionPolicy) -> Result<StoredTree> {
         StoredTree::open(self, self.resolve_band_id(band_selection)?)
     }
@@ -339,7 +340,8 @@ impl Archive {
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
-        let referenced_lens = validate::validate_bands(self, &band_ids, monitor.clone())?;
+        let referenced_lens =
+            validate::validate_bands_async(self, &band_ids, monitor.clone()).await?;
 
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their

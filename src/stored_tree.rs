@@ -26,6 +26,8 @@ use crate::stitch::IterStitchedIndexHunks;
 use crate::*;
 
 /// Read index and file contents for a version stored in the archive.
+///
+// TODO: Perhaps this should be combined with `Band`, it may not be adding much.
 #[derive(Debug)]
 pub struct StoredTree {
     band: Band,
@@ -34,6 +36,14 @@ pub struct StoredTree {
 }
 
 impl StoredTree {
+    pub(crate) fn new(band: Band, archive: &Archive) -> Self {
+        StoredTree {
+            band,
+            archive: archive.clone(),
+            block_dir: archive.block_dir.clone(),
+        }
+    }
+
     pub(crate) fn open(archive: &Archive, band_id: BandId) -> Result<StoredTree> {
         Ok(StoredTree {
             band: Band::open(archive, band_id)?,

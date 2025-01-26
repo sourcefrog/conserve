@@ -19,6 +19,8 @@ use crate::monitor::Monitor;
 use crate::*;
 
 /// Abstract Tree that may be either on the real filesystem or stored in an archive.
+// TODO: Maybe delete this: abstracting over stored and live trees is not very useful
+// and the patterns to get the best performance are different.
 pub trait ReadTree {
     type Entry: EntryTrait + 'static;
     type IT: Iterator<Item = Self::Entry>;

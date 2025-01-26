@@ -104,6 +104,7 @@ pub enum Error {
 
     #[error("Failed to deserialize json from {path:?}: {source}")]
     DeserializeJson {
+        // TODO: Maybe a full URL from the transport instead?
         path: String,
         #[source]
         source: serde_json::Error,

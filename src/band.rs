@@ -215,6 +215,55 @@ impl Band {
         })
     }
 
+    /// Open the band with the given id.
+    pub async fn open_async(archive: &Archive, band_id: BandId) -> Result<Band> {
+        let transport = archive.transport().chdir(&band_id.to_string());
+        let head_bytes = match transport.read_file_async(BAND_HEAD_FILENAME).await {
+            Err(err) if err.is_not_found() => return Err(Error::BandHeadMissing { band_id }),
+            Err(err) => return Err(err.into()),
+            Ok(bytes) => bytes,
+        };
+        let head: Head = match serde_json::from_slice(&head_bytes) {
+            Ok(t) => t,
+            Err(err) => {
+                return Err(Error::DeserializeJson {
+                    source: err,
+                    path: BAND_HEAD_FILENAME.into(),
+                });
+            }
+        };
+        if let Some(version) = &head.band_format_version {
+            if !band_version_supported(version) {
+                return Err(Error::UnsupportedBandVersion {
+                    band_id,
+                    version: version.to_owned(),
+                });
+            }
+        } else {
+            debug!("Old(?) band {band_id} has no format version");
+            // Unmarked, old bands, are accepted for now. In the next archive
+            // version, band version markers ought to become mandatory.
+        }
+
+        let unsupported_flags = head
+            .format_flags
+            .iter()
+            .filter(|f| !flags::SUPPORTED.contains(&f.as_ref()))
+            .cloned()
+            .collect_vec();
+        if !unsupported_flags.is_empty() {
+            return Err(Error::UnsupportedBandFormatFlags {
+                band_id,
+                unsupported_flags,
+            });
+        }
+        Ok(Band {
+            band_id: band_id.to_owned(),
+            head,
+            transport,
+        })
+    }
+
     /// Delete a band.
     pub fn delete(archive: &Archive, band_id: BandId) -> Result<()> {
         // TODO: Count how many files were deleted, and the total size?
@@ -287,8 +336,27 @@ impl Band {
         })
     }
 
+    // TODO: switch to async
     pub fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
         let ListDir { mut files, dirs } = self.transport.list_dir("")?;
+        if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
+            monitor.error(Error::BandHeadMissing {
+                band_id: self.band_id,
+            });
+        }
+        remove_item(&mut files, &BAND_HEAD_FILENAME);
+        remove_item(&mut files, &BAND_TAIL_FILENAME);
+        for unexpected in files {
+            warn!(path = ?unexpected, "Unexpected file in band directory");
+        }
+        for unexpected in dirs.iter().filter(|n| n != &INDEX_DIR) {
+            warn!(path = ?unexpected, "Unexpected subdirectory in band directory");
+        }
+        Ok(())
+    }
+
+    pub async fn validate_async(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
+        let ListDir { mut files, dirs } = self.transport.list_dir_async("").await?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
             monitor.error(Error::BandHeadMissing {
                 band_id: self.band_id,

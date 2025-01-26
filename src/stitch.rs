@@ -105,6 +105,67 @@ impl IterStitchedIndexHunks {
     ) -> IndexEntryIter<IterStitchedIndexHunks> {
         IndexEntryIter::new(self, subtree, exclude)
     }
+
+    // TODO: Convert to a Stream?
+    pub async fn next_async(&mut self) -> Option<Self::Item> {
+        loop {
+            self.state = match &mut self.state {
+                State::Done => return None,
+                State::InBand {
+                    band_id,
+                    index_hunks,
+                } => {
+                    if let Some(hunk) = index_hunks.next() {
+                        if let Some(last_apath) = hunk.last().map(|entry| entry.apath.clone()) {
+                            trace!(%last_apath, "return hunk");
+                            self.last_apath = Some(last_apath);
+                        } else {
+                            trace!("return empty hunk");
+                        }
+                        return Some(hunk);
+                    } else {
+                        State::AfterBand(*band_id)
+                    }
+                }
+                State::BeforeBand(band_id) => {
+                    // Start reading this new index and skip forward until after last_apath
+                    match Band::open_async(&self.archive, *band_id).await {
+                        Ok(band) => {
+                            let mut index_hunks = band.index().iter_available_hunks();
+                            if let Some(last) = &self.last_apath {
+                                index_hunks = index_hunks.advance_to_after(last)
+                            }
+                            State::InBand {
+                                band_id: *band_id,
+                                index_hunks,
+                            }
+                        }
+                        Err(err) => {
+                            self.monitor.error(err);
+                            State::AfterBand(*band_id)
+                        }
+                    }
+                }
+                State::AfterBand(band_id) => {
+                    if self.archive.band_is_closed(*band_id).unwrap_or(false) {
+                        trace!(?band_id, "band is closed; stitched iteration complete");
+                        State::Done
+                    } else if let Some(prev_band_id) =
+                        previous_existing_band(&self.archive, *band_id)
+                    {
+                        trace!(?band_id, ?prev_band_id, "moving back to previous band");
+                        State::BeforeBand(prev_band_id)
+                    } else {
+                        trace!(
+                            ?band_id,
+                            "no previous band to stitch; stitched iteration is complete"
+                        );
+                        State::Done
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Iterator for IterStitchedIndexHunks {

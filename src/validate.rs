@@ -31,7 +31,7 @@ pub struct ValidateOptions {
 ///
 /// Returns the lengths of all blocks that were referenced, so that the caller can check
 /// that all blocks are present and long enough.
-pub(crate) fn validate_bands(
+pub(crate) async fn validate_bands_async(
     archive: &Archive,
     band_ids: &[BandId],
     monitor: Arc<dyn Monitor>,
@@ -41,24 +41,18 @@ pub(crate) fn validate_bands(
     task.set_total(band_ids.len());
     'band: for band_id in band_ids.iter() {
         task.increment(1);
-        let band = match Band::open(archive, *band_id) {
+        let band = match Band::open_async(archive, *band_id).await {
             Ok(band) => band,
             Err(err) => {
                 monitor.error(err);
                 continue 'band;
             }
         };
-        if let Err(err) = band.validate(monitor.clone()) {
+        if let Err(err) = band.validate_async(monitor.clone()).await {
             monitor.error(err);
             continue 'band;
         };
-        let st = match archive.open_stored_tree(BandSelectionPolicy::Specified(*band_id)) {
-            Err(err) => {
-                monitor.error(err);
-                continue 'band;
-            }
-            Ok(st) => st,
-        };
+        let st = StoredTree::new(band, archive);
         let band_block_lens = match validate_stored_tree(&st, monitor.clone()) {
             Err(err) => {
                 monitor.error(err);
