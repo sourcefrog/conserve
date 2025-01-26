@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,7 +17,6 @@ use std::sync::Arc;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use filetime::{set_file_mtime, FileTime};
-use rayon::prelude::ParallelIterator;
 use tracing_test::traced_test;
 
 use conserve::counters::Counter;
@@ -192,14 +191,12 @@ fn check_backup(af: &ScratchArchive) {
         af.block_dir()
             .blocks(TestMonitor::arc())
             .unwrap()
+            .into_iter()
             .map(|h| h.to_string())
             .collect::<Vec<String>>(),
         vec![HELLO_HASH]
     );
-    assert_eq!(
-        af.unreferenced_blocks(TestMonitor::arc()).unwrap().count(),
-        0
-    );
+    assert_eq!(af.unreferenced_blocks(TestMonitor::arc()).unwrap().len(), 0);
 }
 
 #[test]
@@ -488,10 +485,7 @@ fn small_files_combined_two_backups() {
     assert_eq!(stats2.written_blocks, 1);
     assert_eq!(stats2.combined_blocks, 1);
 
-    assert_eq!(
-        af.block_dir().blocks(TestMonitor::arc()).unwrap().count(),
-        2
-    );
+    assert_eq!(af.block_dir().blocks(TestMonitor::arc()).unwrap().len(), 2);
 }
 
 #[test]

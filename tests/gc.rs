@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,6 @@
 use conserve::monitor::test::TestMonitor;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 use conserve::*;
-use rayon::prelude::ParallelIterator;
 
 #[test]
 fn unreferenced_blocks() {
@@ -40,10 +39,7 @@ fn unreferenced_blocks() {
     std::fs::remove_dir_all(archive.path().join("b0000")).unwrap();
     let monitor = TestMonitor::arc();
 
-    let unreferenced: Vec<BlockHash> = archive
-        .unreferenced_blocks(monitor.clone())
-        .unwrap()
-        .collect();
+    let unreferenced: Vec<BlockHash> = archive.unreferenced_blocks(monitor.clone()).unwrap();
     assert_eq!(unreferenced, [content_hash]);
 
     // Delete dry run.

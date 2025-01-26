@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@ use conserve::monitor::test::TestMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::Band;
 use conserve::BandId;
-use rayon::prelude::ParallelIterator;
 
 #[test]
 fn create_then_open_archive() {
@@ -85,10 +84,7 @@ fn empty_archive() {
             .len(),
         0
     );
-    assert_eq!(
-        af.block_dir().blocks(TestMonitor::arc()).unwrap().count(),
-        0
-    );
+    assert_eq!(af.block_dir().blocks(TestMonitor::arc()).unwrap().len(), 0);
 }
 
 #[test]
@@ -120,8 +116,5 @@ fn create_bands() {
             .len(),
         0
     );
-    assert_eq!(
-        af.block_dir().blocks(TestMonitor::arc()).unwrap().count(),
-        0
-    );
+    assert_eq!(af.block_dir().blocks(TestMonitor::arc()).unwrap().len(), 0);
 }

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@ use std::time::Instant;
 use clap::builder::{styling, Styles};
 use clap::{Parser, Subcommand};
 use conserve::change::Change;
-use rayon::prelude::ParallelIterator;
 use time::UtcOffset;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn, Level};
@@ -372,8 +371,6 @@ impl Command {
                 for hash in Archive::open(Transport::new(archive)?)?
                     .block_dir()
                     .blocks(monitor)?
-                    .collect::<Vec<BlockHash>>()
-                    .into_iter()
                 {
                     writeln!(bw, "{hash}")?;
                 }
@@ -394,6 +391,7 @@ impl Command {
                     "{}",
                     Archive::open(Transport::new(archive)?)?
                         .unreferenced_blocks(monitor)?
+                        .into_iter()
                         .map(|hash| format!("{}\n", hash))
                         .collect::<Vec<String>>()
                         .join("")

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -209,15 +209,11 @@ impl Archive {
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
-    pub fn unreferenced_blocks(
-        &self,
-        monitor: Arc<dyn Monitor>,
-    ) -> Result<impl ParallelIterator<Item = BlockHash>> {
+    pub fn unreferenced_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
         let referenced = self.referenced_blocks(&self.list_band_ids()?, monitor.clone())?;
-        Ok(self
-            .block_dir()
-            .blocks(monitor)?
-            .filter(move |h| !referenced.contains(h)))
+        let mut blocks = self.block_dir().blocks(monitor)?;
+        blocks.retain(move |h| !referenced.contains(h));
+        Ok(blocks)
     }
 
     /// Delete bands, and the blocks that they reference.
@@ -251,7 +247,11 @@ impl Archive {
         debug!(referenced.len = referenced.len());
 
         debug!("Find present blocks...");
-        let present: HashSet<BlockHash> = self.block_dir.blocks(monitor.clone())?.collect();
+        let present: HashSet<BlockHash> = self
+            .block_dir
+            .blocks(monitor.clone())?
+            .into_iter()
+            .collect();
         debug!(present.len = present.len());
 
         debug!("Find unreferenced blocks...");
@@ -322,8 +322,11 @@ impl Archive {
             // content.
             debug!("List blocks...");
             // TODO: Check for unexpected files or directories in the blockdir.
-            let present_blocks: HashSet<BlockHash> =
-                self.block_dir.blocks(monitor.clone())?.collect();
+            let present_blocks: HashSet<BlockHash> = self
+                .block_dir
+                .blocks(monitor.clone())?
+                .into_iter()
+                .collect();
             for hash in referenced_lens.keys() {
                 if !present_blocks.contains(hash) {
                     monitor.error(Error::BlockMissing { hash: hash.clone() })

@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2020-2023 Martin Pool.
+// Copyright 2020-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -39,7 +39,6 @@ use assert_fs::TempDir;
 use dir_assert::assert_paths;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
-use rayon::prelude::ParallelIterator;
 use rstest::rstest;
 use tracing_test::traced_test;
 // use predicates::prelude::*;
@@ -48,8 +47,8 @@ use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
 use conserve::transport::Transport;
 use conserve::{
-    backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, BlockHash,
-    EntryTrait, Exclude, RestoreOptions, ValidateOptions,
+    backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait,
+    Exclude, RestoreOptions, ValidateOptions,
 };
 
 // TODO: Test restore from a partially damaged backup.
@@ -267,7 +266,6 @@ impl DamageLocation {
                 let block_hash = block_dir
                     .blocks(TestMonitor::arc())
                     .expect("list blocks")
-                    .collect::<Vec<BlockHash>>()
                     .into_iter()
                     .sorted()
                     .nth(*block_index)

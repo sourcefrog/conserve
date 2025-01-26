@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -278,10 +278,7 @@ impl BlockDir {
     }
 
     /// Return all the blocknames in the blockdir, in arbitrary order.
-    pub fn blocks(
-        &self,
-        monitor: Arc<dyn Monitor>,
-    ) -> Result<impl ParallelIterator<Item = BlockHash>> {
+    pub fn blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
         let transport = self.transport.clone();
         let task = monitor.start_task("List block subdir".to_string());
         let subdirs = self.subdirs()?;
@@ -303,7 +300,8 @@ impl BlockDir {
             .flatten()
             .filter_map(|name| // drop any invalid names, including temp files
                 // TODO: Report errors on bad names?
-                name.parse().ok()))
+                name.parse().ok())
+            .collect())
     }
 
     /// Check format invariants of the BlockDir.
@@ -318,6 +316,7 @@ impl BlockDir {
         debug!("Start list blocks");
         let blocks = self
             .blocks(monitor.clone())?
+            .into_iter()
             .collect::<HashSet<BlockHash>>();
         debug!("Check {} blocks", blocks.len());
         let task = monitor.start_task("Validate blocks".to_string());
@@ -401,10 +400,7 @@ mod test {
         create_dir(&subdir).unwrap();
         // Write a temp file as was created by earlier versions of the code.
         write(subdir.join("tmp123123123"), b"123").unwrap();
-        let blocks = blockdir
-            .blocks(monitor.clone())
-            .unwrap()
-            .collect::<Vec<_>>();
+        let blocks = blockdir.blocks(monitor.clone()).unwrap();
         assert_eq!(blocks, []);
     }
 
