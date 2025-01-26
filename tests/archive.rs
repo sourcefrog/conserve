@@ -56,8 +56,8 @@ fn fails_on_non_empty_directory() {
 
 /// A new archive contains just one header file.
 /// The header is readable json containing only a version number.
-#[test]
-fn empty_archive() {
+#[tokio::test]
+async fn empty_archive() {
     let af = ScratchArchive::new();
 
     assert!(af.path().is_dir());
@@ -84,11 +84,11 @@ fn empty_archive() {
             .len(),
         0
     );
-    assert_eq!(af.all_blocks(TestMonitor::arc()).unwrap().len(), 0);
+    assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 0);
 }
 
-#[test]
-fn create_bands() {
+#[tokio::test]
+async fn create_bands() {
     let af = ScratchArchive::new();
     assert!(af.path().join("d").is_dir());
 
@@ -116,5 +116,5 @@ fn create_bands() {
             .len(),
         0
     );
-    assert_eq!(af.all_blocks(TestMonitor::arc()).unwrap().len(), 0);
+    assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 0);
 }

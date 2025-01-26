@@ -332,7 +332,7 @@ impl BlockDir {
     }
 
     /// Return all the blocknames in the blockdir, in arbitrary order.
-    pub async fn blocks_async(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
+    pub(crate) async fn blocks_async(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
         let transport = self.transport.clone();
         let task = monitor.start_task("List block subdir".to_string());
         let subdirs = self.subdirs_async().await?;
