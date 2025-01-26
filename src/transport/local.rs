@@ -20,10 +20,14 @@ use std::{io, path};
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use tokio::sync::Semaphore;
 use tracing::{error, instrument, trace, warn};
 use url::Url;
 
 use super::{Error, ListDir, Metadata, Result, WriteMode};
+
+/// Avoid opening too many files at once.
+static FD_LIMIT: Semaphore = Semaphore::const_new(100);
 
 pub(super) struct Protocol {
     path: PathBuf,
@@ -108,7 +112,9 @@ impl super::Protocol for Protocol {
     }
 
     async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
+        let _permit = FD_LIMIT.acquire().await.expect("acquire permit");
         let path = self.full_path(relpath);
+        trace!("Listing {path:?}");
         let mut listing = ListDir::default();
         let fail = |err| Error::io_error(&path, err);
         let mut read_dir = tokio::fs::read_dir(&path).await.map_err(fail)?;
@@ -177,7 +183,10 @@ async fn collect_tokio_dir_entry(list_dir: &mut ListDir, dir_entry: tokio::fs::D
     }
 }
 
-fn collect_dir_entry(list_dir: &mut ListDir, dir_entry: io::Result<fs::DirEntry>) -> io::Result<()> {
+fn collect_dir_entry(
+    list_dir: &mut ListDir,
+    dir_entry: io::Result<fs::DirEntry>,
+) -> io::Result<()> {
     let dir_entry = dir_entry?;
     if let Ok(name) = dir_entry.file_name().into_string() {
         match dir_entry.file_type()? {
