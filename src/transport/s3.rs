@@ -259,6 +259,10 @@ impl super::Protocol for Protocol {
         Ok(body_bytes)
     }
 
+    async fn read_async(&self, _relpath: &str) -> Result<Bytes> {
+        todo!()
+    }
+
     #[mutants::skip] // does nothing so hard to observe!
     fn create_dir(&self, relpath: &str) -> Result<()> {
         // There are no directory objects, so there's nothing to create.
