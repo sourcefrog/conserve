@@ -93,13 +93,16 @@ mod test {
     use super::super::test_fixtures::*;
     use super::super::*;
 
-    #[test]
-    pub fn open_stored_tree() {
+    #[tokio::test]
+    async fn open_stored_tree() {
         let af = ScratchArchive::new();
-        af.store_two_versions();
+        af.store_two_versions().await;
 
-        let last_band_id = af.last_band_id().unwrap().unwrap();
-        let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+        let last_band_id = af.last_band_id().await.unwrap().unwrap();
+        let st = af
+            .open_stored_tree(BandSelectionPolicy::Latest)
+            .await
+            .unwrap();
 
         assert_eq!(st.band().id(), last_band_id);
 
@@ -124,22 +127,24 @@ mod test {
         assert_eq!(expected, names);
     }
 
-    #[test]
-    pub fn cant_open_no_versions() {
+    #[tokio::test]
+    async fn cant_open_no_versions() {
         let af = ScratchArchive::new();
         assert_eq!(
             af.open_stored_tree(BandSelectionPolicy::Latest)
+                .await
                 .unwrap_err()
                 .to_string(),
             "Archive is empty"
         );
     }
 
-    #[test]
-    fn iter_entries() {
+    #[tokio::test]
+    async fn iter_entries() {
         let archive = Archive::open_path(Path::new("testdata/archive/minimal/v0.6.3/")).unwrap();
         let st = archive
             .open_stored_tree(BandSelectionPolicy::Latest)
+            .await
             .unwrap();
 
         let monitor = TestMonitor::arc();

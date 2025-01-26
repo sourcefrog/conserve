@@ -107,6 +107,7 @@ async fn backup_after_damage(
         &backup_options,
         TestMonitor::arc(),
     )
+    .await
     .expect("initial backup");
 
     drop(archive);
@@ -123,6 +124,7 @@ async fn backup_after_damage(
         &backup_options,
         TestMonitor::arc(),
     )
+    .await
     .expect("write second backup after damage");
     dbg!(&backup_stats);
 
@@ -163,9 +165,10 @@ async fn backup_after_damage(
         restore(
             &archive,
             restore_dir.path(),
-            &RestoreOptions::default(),
+            RestoreOptions::default(),
             monitor.clone(),
         )
+        .await
         .expect("restore second backup");
         monitor.assert_counter(Counter::Files, 1);
         monitor.assert_no_errors();
@@ -176,7 +179,7 @@ async fn backup_after_damage(
     }
 
     // You can see both versions.
-    let versions = archive.list_band_ids().expect("list versions");
+    let versions = archive.list_band_ids().await.expect("list versions");
     assert_eq!(versions, [BandId::zero(), BandId::new(&[1])]);
 
     // Can list the contents of the second backup.
@@ -187,6 +190,7 @@ async fn backup_after_damage(
             Exclude::nothing(),
             TestMonitor::arc(),
         )
+        .await
         .expect("iter entries")
         .map(|e| e.apath().to_string())
         .collect_vec();

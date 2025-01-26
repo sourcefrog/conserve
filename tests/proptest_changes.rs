@@ -50,7 +50,7 @@ enum TreeChange {
     Restore(usize),
 }
 
-fn backup_sequential_changes(changes: &[TreeChange]) {
+async fn backup_sequential_changes(changes: &[TreeChange]) {
     use TreeChange::*;
     let tf = TreeFixture::new();
     let archive = ScratchArchive::new();
@@ -94,7 +94,9 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
                     max_entries_per_hunk: 3,
                     ..BackupOptions::default()
                 };
-                backup(&archive, tf.path(), &options, TestMonitor::arc()).unwrap();
+                backup(&archive, tf.path(), &options, TestMonitor::arc())
+                    .await
+                    .unwrap();
                 let snapshot = TempDir::new().unwrap();
                 cp_r::CopyOptions::default()
                     .copy_tree(tf.path(), snapshot.path())
@@ -108,25 +110,28 @@ fn backup_sequential_changes(changes: &[TreeChange]) {
                         &archive,
                         BandId::new(&[version as u32]),
                         backup_contents[version].path(),
-                    );
+                    )
+                    .await;
                 }
             }
         }
     }
     for (i, snapshot) in backup_contents.iter().enumerate() {
-        check_restore_against_snapshot(&archive, BandId::new(&[i as u32]), snapshot.path())
+        check_restore_against_snapshot(&archive, BandId::new(&[i as u32]), snapshot.path()).await
     }
     println!(">> done!");
 }
 
-fn check_restore_against_snapshot(archive: &Archive, band_id: BandId, snapshot: &Path) {
+async fn check_restore_against_snapshot(archive: &Archive, band_id: BandId, snapshot: &Path) {
     let restore_dir = tempfile::tempdir().unwrap();
     // TODO: Select the right band.
     let options = RestoreOptions {
         band_selection: BandSelectionPolicy::Specified(band_id),
         ..RestoreOptions::default()
     };
-    restore(archive, restore_dir.path(), &options, TestMonitor::arc()).unwrap();
+    restore(archive, restore_dir.path(), options, TestMonitor::arc())
+        .await
+        .unwrap();
     dir_assert::assert_paths(restore_dir.path(), snapshot).unwrap();
 }
 
@@ -137,6 +142,6 @@ proptest! {
     #[test]
     #[ignore] // making all these backups is expensive
     fn changes(changes: Vec<TreeChange>) {
-        backup_sequential_changes(&changes);
+        tokio::runtime::Runtime::new().unwrap().block_on(backup_sequential_changes(&changes));
     }
 }

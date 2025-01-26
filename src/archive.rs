@@ -120,41 +120,54 @@ impl Archive {
     }
 
     /// Return an iterator of entries in a selected version.
-    pub fn iter_entries(
+    // TODO: Maybe drop this and have callers walk the tree themselves?
+    pub async fn iter_entries(
         &self,
         band_selection: BandSelectionPolicy,
         subtree: Apath,
         exclude: Exclude,
         monitor: Arc<dyn Monitor>,
     ) -> Result<impl Iterator<Item = IndexEntry>> {
-        self.open_stored_tree(band_selection)?
+        self.open_stored_tree(band_selection)
+            .await?
             .iter_entries(subtree, exclude, monitor)
     }
 
     /// Returns a vector of band ids, in sorted order from first to last.
-    pub fn list_band_ids(&self) -> Result<Vec<BandId>> {
-        let mut band_ids: Vec<BandId> = self.iter_band_ids_unsorted()?.collect();
-        band_ids.sort_unstable();
-        Ok(band_ids)
+    pub async fn list_band_ids(&self) -> Result<Vec<BandId>> {
+        Ok(self
+            .transport
+            .list_dir_async("")
+            .await?
+            .dirs
+            .into_iter()
+            .filter(|dir_name| dir_name != BLOCK_DIR)
+            .filter_map(|dir_name| dir_name.parse().ok())
+            .sorted()
+            .collect())
     }
 
     pub(crate) fn transport(&self) -> &Transport {
         &self.transport
     }
 
-    pub fn resolve_band_id(&self, band_selection: BandSelectionPolicy) -> Result<BandId> {
+    pub async fn resolve_band_id(&self, band_selection: BandSelectionPolicy) -> Result<BandId> {
         match band_selection {
             BandSelectionPolicy::LatestClosed => self
-                .last_complete_band()?
+                .last_complete_band()
+                .await?
                 .map(|band| band.id())
                 .ok_or(Error::NoCompleteBands),
             BandSelectionPolicy::Specified(band_id) => Ok(band_id),
-            BandSelectionPolicy::Latest => self.last_band_id()?.ok_or(Error::ArchiveEmpty),
+            BandSelectionPolicy::Latest => self.last_band_id().await?.ok_or(Error::ArchiveEmpty),
         }
     }
 
-    pub fn open_stored_tree(&self, band_selection: BandSelectionPolicy) -> Result<StoredTree> {
-        StoredTree::open(self, self.resolve_band_id(band_selection)?)
+    pub async fn open_stored_tree(
+        &self,
+        band_selection: BandSelectionPolicy,
+    ) -> Result<StoredTree> {
+        StoredTree::open(self, self.resolve_band_id(band_selection).await?)
     }
 
     /// Return an iterator of valid band ids in this archive, in arbitrary order.
@@ -174,13 +187,13 @@ impl Archive {
 
     /// Return the `BandId` of the highest-numbered band, or Ok(None) if there
     /// are no bands, or an Err if any occurred reading the directory.
-    pub fn last_band_id(&self) -> Result<Option<BandId>> {
+    pub async fn last_band_id(&self) -> Result<Option<BandId>> {
         Ok(self.iter_band_ids_unsorted()?.max())
     }
 
     /// Return the last completely-written band id, if any.
-    pub fn last_complete_band(&self) -> Result<Option<Band>> {
-        for band_id in self.list_band_ids()?.into_iter().rev() {
+    pub async fn last_complete_band(&self) -> Result<Option<Band>> {
+        for band_id in self.list_band_ids().await?.into_iter().rev() {
             let b = Band::open(self, band_id)?;
             if b.is_closed()? {
                 return Ok(Some(b));
@@ -213,8 +226,8 @@ impl Archive {
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
-    pub fn unreferenced_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
-        let referenced = self.referenced_blocks(&self.list_band_ids()?, monitor.clone())?;
+    pub async fn unreferenced_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
+        let referenced = self.referenced_blocks(&self.list_band_ids().await?, monitor.clone())?;
         Ok(self
             .block_dir
             .blocks(monitor)?
@@ -227,7 +240,7 @@ impl Archive {
     ///
     /// If `delete_band_ids` is empty, this deletes no bands, but will delete any garbage
     /// blocks referenced by no existing bands.
-    pub fn delete_bands(
+    pub async fn delete_bands(
         &self,
         delete_band_ids: &[BandId],
         options: &DeleteOptions,
@@ -238,14 +251,14 @@ impl Archive {
 
         // TODO: No need to lock for dry_run.
         let delete_guard = if options.break_lock {
-            gc_lock::GarbageCollectionLock::break_lock(self)?
+            gc_lock::GarbageCollectionLock::break_lock(self).await?
         } else {
-            gc_lock::GarbageCollectionLock::new(self)?
+            gc_lock::GarbageCollectionLock::new(self).await?
         };
         debug!("Got gc lock");
 
         debug!("List band ids...");
-        let mut keep_band_ids = self.list_band_ids()?;
+        let mut keep_band_ids = self.list_band_ids().await?;
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
         debug!("List referenced blocks...");
@@ -281,7 +294,7 @@ impl Archive {
         stats.unreferenced_block_bytes = total_bytes;
 
         if !options.dry_run {
-            delete_guard.check()?;
+            delete_guard.check().await?;
             let task = monitor.start_task("Delete bands".to_string());
 
             for band_id in delete_band_ids.iter() {
@@ -320,12 +333,12 @@ impl Archive {
         self.validate_archive_dir(monitor.clone())?;
 
         debug!("List bands...");
-        let band_ids = self.list_band_ids()?;
+        let band_ids = self.list_band_ids().await?;
         debug!("Check {} bands...", band_ids.len());
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
         //    values referenced by all the indexes.
-        let referenced_lens = validate::validate_bands(self, &band_ids, monitor.clone())?;
+        let referenced_lens = validate::validate_bands(self, &band_ids, monitor.clone()).await?;
 
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
@@ -334,7 +347,8 @@ impl Archive {
             // TODO: Check for unexpected files or directories in the blockdir.
             let present_blocks: HashSet<BlockHash> = self
                 .block_dir
-                .blocks(monitor.clone())?
+                .blocks_async(monitor.clone())
+                .await?
                 .into_iter()
                 .collect();
             for hash in referenced_lens.keys() {
