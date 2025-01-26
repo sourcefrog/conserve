@@ -21,10 +21,14 @@ use std::{io, path};
 use async_trait::async_trait;
 use bytes::Bytes;
 use tempfile::TempDir;
+use tokio::sync::Semaphore;
 use tracing::{error, instrument, trace, warn};
 use url::Url;
 
 use super::{Error, ListDir, Metadata, Result, WriteMode};
+
+/// Avoid opening too many files at once.
+static FD_LIMIT: Semaphore = Semaphore::const_new(100);
 
 #[derive(Debug)]
 pub(super) struct Protocol {
@@ -132,7 +136,9 @@ impl super::Protocol for Protocol {
     }
 
     async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
+        let _permit = FD_LIMIT.acquire().await.expect("acquire permit");
         let path = self.full_path(relpath);
+        trace!("Listing {path:?}");
         let mut listing = ListDir::default();
         let fail = |err| Error::io_error(&path, err);
         let mut read_dir = tokio::fs::read_dir(&path).await.map_err(fail)?;
