@@ -135,6 +135,20 @@ impl Archive {
         Ok(band_ids)
     }
 
+    /// Returns a vector of band ids, in sorted order from first to last.
+    pub async fn list_band_ids_async(&self) -> Result<Vec<BandId>> {
+        Ok(self
+            .transport
+            .list_dir_async("")
+            .await?
+            .dirs
+            .into_iter()
+            .filter(|dir_name| dir_name != BLOCK_DIR)
+            .filter_map(|dir_name| dir_name.parse().ok())
+            .sorted()
+            .collect())
+    }
+
     pub(crate) fn transport(&self) -> &Transport {
         &self.transport
     }
@@ -307,10 +321,18 @@ impl Archive {
     /// tracing messages. This function only returns an error if validation
     /// stops due to a fatal error.
     pub fn validate(&self, options: &ValidateOptions, monitor: Arc<dyn Monitor>) -> Result<()> {
+        tokio::runtime::Runtime::new()?.block_on(self.validate_async(options, monitor))
+    }
+
+    pub async fn validate_async(
+        &self,
+        options: &ValidateOptions,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<()> {
         self.validate_archive_dir(monitor.clone())?;
 
         debug!("List bands...");
-        let band_ids = self.list_band_ids()?;
+        let band_ids = self.list_band_ids_async().await?;
         debug!("Check {} bands...", band_ids.len());
 
         // 1. Walk all indexes, collecting a list of (block_hash6, min_length)
@@ -324,7 +346,8 @@ impl Archive {
             // TODO: Check for unexpected files or directories in the blockdir.
             let present_blocks: HashSet<BlockHash> = self
                 .block_dir
-                .blocks(monitor.clone())?
+                .blocks_async(monitor.clone())
+                .await?
                 .into_iter()
                 .collect();
             for hash in referenced_lens.keys() {
@@ -335,8 +358,8 @@ impl Archive {
         } else {
             // 2. Check the hash of all blocks are correct, and remember how long
             //    the uncompressed data is.
-            let block_lengths: HashMap<BlockHash, usize> = tokio::runtime::Runtime::new()?
-                .block_on(self.block_dir.validate(monitor.clone()))?;
+            let block_lengths: HashMap<BlockHash, usize> =
+                self.block_dir.validate(monitor.clone()).await?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (hash, referenced_len) in referenced_lens {
                 if let Some(&actual_len) = block_lengths.get(&hash) {
