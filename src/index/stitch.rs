@@ -247,8 +247,8 @@ mod test {
         strs.join(" ")
     }
 
-    #[test]
-    fn stitch_index() -> Result<()> {
+    #[tokio::test]
+    async fn stitch_index() -> Result<()> {
         // This test uses private interfaces to create an index that breaks
         // across hunks in a certain way.
 
@@ -267,7 +267,7 @@ mod test {
         //   and 3 is carried over from b1.
 
         let monitor = TestMonitor::arc();
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id(), BandId::zero());
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b0"));
@@ -284,7 +284,7 @@ mod test {
         );
 
         let monitor = TestMonitor::arc();
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0001");
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b1"));
@@ -299,7 +299,7 @@ mod test {
 
         // b2
         let monitor = TestMonitor::arc();
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0002");
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b2"));
@@ -311,16 +311,16 @@ mod test {
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
 
         // b3
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0003");
 
         // b4
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0004");
 
         // b5
         let monitor = TestMonitor::arc();
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0005");
         let mut ib = band.index_builder();
         ib.push_entry(symlink("/0", "b5"));
@@ -355,8 +355,8 @@ mod test {
     /// Testing that the StitchedIndexHunks iterator does not loops forever on archives with at least one band
     /// but no completed bands.
     /// Reference: https://github.com/sourcefrog/conserve/pull/175
-    #[test]
-    fn issue_175() {
+    #[tokio::test]
+    async fn issue_175() {
         let tf = TreeFixture::new();
         tf.create_file("file_a");
 
@@ -367,10 +367,11 @@ mod test {
             &BackupOptions::default(),
             TestMonitor::arc(),
         )
+        .await
         .expect("backup should work");
 
         af.transport().remove_file("b0000/BANDTAIL").unwrap(); // band is now incomplete
-        let band_ids = af.list_band_ids().expect("should list bands");
+        let band_ids = af.list_band_ids().await.expect("should list bands");
 
         let band_id = band_ids.first().expect("expected at least one band");
 

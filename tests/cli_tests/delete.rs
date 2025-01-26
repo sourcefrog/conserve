@@ -27,7 +27,7 @@ use crate::run_conserve;
 #[tokio::test]
 async fn delete_both_bands() {
     let af = ScratchArchive::new();
-    af.store_two_versions();
+    af.store_two_versions().await;
 
     run_conserve()
         .args(["delete"])
@@ -37,14 +37,14 @@ async fn delete_both_bands() {
         .assert()
         .success();
 
-    assert_eq!(af.list_band_ids().unwrap().len(), 0);
+    assert_eq!(af.list_band_ids().await.unwrap().len(), 0);
     assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 0);
 }
 
 #[tokio::test]
 async fn delete_first_version() {
     let af = ScratchArchive::new();
-    af.store_two_versions();
+    af.store_two_versions().await;
 
     run_conserve()
         .args(["delete"])
@@ -53,7 +53,7 @@ async fn delete_first_version() {
         .assert()
         .success();
 
-    assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[1])]);
+    assert_eq!(af.list_band_ids().await.unwrap(), &[BandId::new(&[1])]);
     // b0 contains two small files packed into the same block, which is not deleted.
     // b1 (not deleted) adds one additional block, which is still referenced.
     assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 2);
@@ -82,7 +82,7 @@ async fn delete_first_version() {
 #[tokio::test]
 async fn delete_second_version() {
     let af = ScratchArchive::new();
-    af.store_two_versions();
+    af.store_two_versions().await;
 
     run_conserve()
         .args(["delete"])
@@ -91,7 +91,7 @@ async fn delete_second_version() {
         .assert()
         .success();
 
-    assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[0])]);
+    assert_eq!(af.list_band_ids().await.unwrap(), &[BandId::new(&[0])]);
     // b0 contains two small files packed into the same block.
     assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 1);
 

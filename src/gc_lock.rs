@@ -54,9 +54,9 @@ impl GarbageCollectionLock {
     ///
     /// Returns `Err(Error::DeleteWithIncompleteBackup)` if the last
     /// backup is incomplete.
-    pub fn new(archive: &Archive) -> Result<GarbageCollectionLock> {
+    pub async fn new(archive: &Archive) -> Result<GarbageCollectionLock> {
         let archive = archive.clone();
-        let band_id = archive.last_band_id()?;
+        let band_id = archive.last_band_id().await?;
         if let Some(band_id) = band_id {
             if !archive.band_is_closed(band_id)? {
                 return Err(Error::DeleteWithIncompleteBackup { band_id });
@@ -75,11 +75,11 @@ impl GarbageCollectionLock {
     ///
     /// Use this only if you're confident that the process owning the lock
     /// has terminated and the lock is stale.
-    pub fn break_lock(archive: &Archive) -> Result<GarbageCollectionLock> {
+    pub async fn break_lock(archive: &Archive) -> Result<GarbageCollectionLock> {
         if GarbageCollectionLock::is_locked(archive)? {
             archive.transport().remove_file(GC_LOCK)?;
         }
-        GarbageCollectionLock::new(archive)
+        GarbageCollectionLock::new(archive).await
     }
 
     /// Returns true if the archive is currently locked by a gc process.
@@ -89,8 +89,8 @@ impl GarbageCollectionLock {
 
     /// Check that no new versions have been created in this archive since
     /// the guard was created.
-    pub fn check(&self) -> Result<()> {
-        let current_last_band_id = self.archive.last_band_id()?;
+    pub async fn check(&self) -> Result<()> {
+        let current_last_band_id = self.archive.last_band_id().await?;
         if self.band_id == current_last_band_id {
             Ok(())
         } else {
@@ -115,20 +115,20 @@ mod test {
     use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::{ScratchArchive, TreeFixture};
 
-    #[test]
-    fn empty_archive_ok() {
+    #[tokio::test]
+    async fn empty_archive_ok() {
         let archive = ScratchArchive::new();
-        let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
+        let delete_guard = GarbageCollectionLock::new(&archive).await.unwrap();
         assert!(archive.transport().is_file("GC_LOCK").unwrap());
-        delete_guard.check().unwrap();
+        delete_guard.check().await.unwrap();
 
         // Released when dropped.
         drop(delete_guard);
         assert!(!archive.transport().is_file("GC_LOCK").unwrap());
     }
 
-    #[test]
-    fn completed_backup_ok() {
+    #[tokio::test]
+    async fn completed_backup_ok() {
         let archive = ScratchArchive::new();
         let source = TreeFixture::new();
         backup(
@@ -137,67 +137,68 @@ mod test {
             &BackupOptions::default(),
             TestMonitor::arc(),
         )
+        .await
         .unwrap();
-        let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
-        delete_guard.check().unwrap();
+        let delete_guard = GarbageCollectionLock::new(&archive).await.unwrap();
+        delete_guard.check().await.unwrap();
     }
 
-    #[test]
-    fn concurrent_complete_backup_denied() {
+    #[tokio::test]
+    async fn concurrent_complete_backup_denied() {
         let archive = ScratchArchive::new();
         let source = TreeFixture::new();
-        let _delete_guard = GarbageCollectionLock::new(&archive).unwrap();
+        let _delete_guard = GarbageCollectionLock::new(&archive).await.unwrap();
         let backup_result = backup(
             &archive,
             source.path(),
             &BackupOptions::default(),
             TestMonitor::arc(),
-        );
+        )
+        .await;
         assert_eq!(
             backup_result.expect_err("backup fails").to_string(),
             "Archive is locked for garbage collection"
         );
     }
 
-    #[test]
-    fn incomplete_backup_denied() {
+    #[tokio::test]
+    async fn incomplete_backup_denied() {
         let archive = ScratchArchive::new();
-        Band::create(&archive).unwrap();
-        let result = GarbageCollectionLock::new(&archive);
-        assert!(result.is_err());
+        Band::create(&archive).await.unwrap();
+        let err = GarbageCollectionLock::new(&archive).await.unwrap_err();
         assert_eq!(
-            result.err().unwrap().to_string(),
+            err.to_string(),
             "Can't delete blocks because the last band (b0000) is incomplete and may be in use"
         );
     }
 
-    #[test]
-    fn concurrent_gc_prevented() {
+    #[tokio::test]
+    async fn concurrent_gc_prevented() {
         let archive = ScratchArchive::new();
-        let _lock1 = GarbageCollectionLock::new(&archive).unwrap();
+        let _lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
         // Should not be able to create a second lock while one gc is running.
-        let lock2_result = GarbageCollectionLock::new(&archive);
+        let lock2_result = GarbageCollectionLock::new(&archive).await;
         assert_eq!(
             lock2_result.unwrap_err().to_string(),
             "Archive is locked for garbage collection"
         );
     }
 
-    #[test]
-    fn sequential_gc_allowed() {
+    #[tokio::test]
+    async fn sequential_gc_allowed() {
         let archive = ScratchArchive::new();
-        let _lock1 = GarbageCollectionLock::new(&archive).unwrap();
+        let _lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
         drop(_lock1);
-        let _lock2 = GarbageCollectionLock::new(&archive).unwrap();
+        let _lock2 = GarbageCollectionLock::new(&archive).await.unwrap();
         drop(_lock2);
     }
 
-    #[test]
-    fn break_lock() {
+    #[tokio::test]
+    async fn break_lock() {
         let archive = ScratchArchive::new();
-        let lock1 = GarbageCollectionLock::new(&archive).unwrap();
+        let lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
         // Pretend the process owning lock1 died, and get a new lock.
         std::mem::forget(lock1);
-        let _lock2 = GarbageCollectionLock::break_lock(&archive).unwrap();
+        let _lock2 = GarbageCollectionLock::break_lock(&archive).await.unwrap();
     }
 }

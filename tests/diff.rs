@@ -20,20 +20,25 @@ use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 use conserve::*;
 
 /// Make a tree with one file and an archive with one version.
-fn create_tree() -> (ScratchArchive, TreeFixture) {
+async fn create_tree() -> (ScratchArchive, TreeFixture) {
     let a = ScratchArchive::new();
     let tf = TreeFixture::new();
     tf.create_file_with_contents("thing", b"contents of thing");
-    let stats = backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc()).unwrap();
+    let stats = backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc())
+        .await
+        .unwrap();
     assert_eq!(stats.new_files, 1);
     (a, tf)
 }
 
-#[test]
-fn diff_unchanged() {
-    let (a, tf) = create_tree();
+#[tokio::test]
+async fn diff_unchanged() {
+    let (a, tf) = create_tree().await;
 
-    let st = a.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+    let st = a
+        .open_stored_tree(BandSelectionPolicy::Latest)
+        .await
+        .unwrap();
 
     let options = DiffOptions {
         include_unchanged: true,
@@ -64,11 +69,14 @@ fn diff_unchanged() {
     assert_eq!(changes.len(), 0);
 }
 
-#[test]
-fn mtime_only_change_reported_as_changed() {
-    let (a, tf) = create_tree();
+#[tokio::test]
+async fn mtime_only_change_reported_as_changed() {
+    let (a, tf) = create_tree().await;
 
-    let st = a.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+    let st = a
+        .open_stored_tree(BandSelectionPolicy::Latest)
+        .await
+        .unwrap();
     set_file_mtime(
         tf.path().join("thing"),
         FileTime::from_unix_time(1704135090, 0),
@@ -92,8 +100,8 @@ fn mtime_only_change_reported_as_changed() {
 // Test only on Linux, as macOS doesn't seem to have a way to get all groups
 // (see https://docs.rs/nix/latest/nix/unistd/fn.getgroups.html).
 #[cfg(target_os = "linux")]
-#[test]
-fn chgrp_reported_as_changed() {
+#[tokio::test]
+async fn chgrp_reported_as_changed() {
     use std::os::unix::fs::chown;
 
     use conserve::test_fixtures::arbitrary_secondary_group;
@@ -102,10 +110,13 @@ fn chgrp_reported_as_changed() {
         return;
     };
 
-    let (a, tf) = create_tree();
+    let (a, tf) = create_tree().await;
 
     chown(tf.path().join("thing"), None, Some(secondary_group)).unwrap();
-    let st = a.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+    let st = a
+        .open_stored_tree(BandSelectionPolicy::Latest)
+        .await
+        .unwrap();
 
     let options = DiffOptions {
         include_unchanged: false,
@@ -122,20 +133,25 @@ fn chgrp_reported_as_changed() {
 }
 
 #[cfg(unix)]
-#[test]
-fn symlink_target_change_reported_as_changed() {
+#[tokio::test]
+async fn symlink_target_change_reported_as_changed() {
     use std::fs::remove_file;
     use std::path::Path;
 
     let a = ScratchArchive::new();
     let tf = TreeFixture::new();
     tf.create_symlink("link", "target");
-    backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc()).unwrap();
+    backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc())
+        .await
+        .unwrap();
 
     let link_path = tf.path().join("link");
     remove_file(&link_path).unwrap();
     std::os::unix::fs::symlink("new-target", &link_path).unwrap();
-    let st = a.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+    let st = a
+        .open_stored_tree(BandSelectionPolicy::Latest)
+        .await
+        .unwrap();
     assert_eq!(
         std::fs::read_link(&link_path).unwrap(),
         Path::new("new-target")

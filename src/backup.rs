@@ -86,14 +86,14 @@ impl Default for BackupOptions {
 /// Backup a source directory into a new band in the archive.
 ///
 /// Returns statistics about what was copied.
-pub fn backup(
+pub async fn backup(
     archive: &Archive,
     source_path: &Path,
     options: &BackupOptions,
     monitor: Arc<dyn Monitor>,
 ) -> Result<BackupStats> {
     let start = Instant::now();
-    let mut writer = BackupWriter::begin(archive, options, monitor.clone())?;
+    let mut writer = BackupWriter::begin(archive, options, monitor.clone()).await?;
     let mut stats = BackupStats::default();
     let source_tree = SourceTree::open(source_path)?;
 
@@ -158,7 +158,7 @@ impl BackupWriter {
     /// Create a new BackupWriter.
     ///
     /// This currently makes a new top-level band.
-    pub fn begin(
+    async fn begin(
         archive: &Archive,
         options: &BackupOptions,
         monitor: Arc<dyn Monitor>,
@@ -166,7 +166,7 @@ impl BackupWriter {
         if gc_lock::GarbageCollectionLock::is_locked(archive)? {
             return Err(Error::GarbageCollectionLockHeld);
         }
-        let basis_index = if let Some(basis_band_id) = archive.last_band_id()? {
+        let basis_index = if let Some(basis_band_id) = archive.last_band_id().await? {
             Stitch::new(
                 archive,
                 basis_band_id,
@@ -180,7 +180,7 @@ impl BackupWriter {
         .peekable();
 
         // Create the new band only after finding the basis band!
-        let band = Band::create(archive)?;
+        let band = Band::create(archive).await?;
         let index_builder = band.index_builder();
         Ok(BackupWriter {
             band,

@@ -41,6 +41,7 @@ async fn simple_backup() {
         &BackupOptions::default(),
         monitor.clone(),
     )
+    .await
     .expect("backup");
     assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
     assert_eq!(backup_stats.files, 1);
@@ -59,9 +60,10 @@ async fn simple_backup() {
     restore(
         &archive,
         restore_dir.path(),
-        &RestoreOptions::default(),
+        RestoreOptions::default(),
         monitor.clone(),
     )
+    .await
     .expect("restore");
 
     monitor.assert_counter(Counter::FileBytes, 8);
@@ -83,7 +85,9 @@ async fn simple_backup_with_excludes() -> Result<()> {
         ..BackupOptions::default()
     };
     let monitor = TestMonitor::arc();
-    let stats = backup(&af, srcdir.path(), &options, monitor.clone()).expect("backup");
+    let stats = backup(&af, srcdir.path(), &options, monitor.clone())
+        .await
+        .expect("backup");
 
     check_backup(&af).await;
 
@@ -110,9 +114,10 @@ async fn simple_backup_with_excludes() -> Result<()> {
     restore(
         &archive,
         restore_dir.path(),
-        &RestoreOptions::default(),
+        RestoreOptions::default(),
         monitor.clone(),
     )
+    .await
     .expect("restore");
     monitor.assert_counter(Counter::FileBytes, 8);
     // TODO: Read back contents of that file.
@@ -126,8 +131,8 @@ async fn simple_backup_with_excludes() -> Result<()> {
     Ok(())
 }
 
-#[test]
-pub fn backup_more_excludes() {
+#[tokio::test]
+async fn backup_more_excludes() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
 
@@ -145,7 +150,9 @@ pub fn backup_more_excludes() {
         exclude,
         ..Default::default()
     };
-    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).expect("backup");
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        .await
+        .expect("backup");
 
     assert_eq!(1, stats.written_blocks);
     assert_eq!(1, stats.files);
@@ -156,11 +163,11 @@ pub fn backup_more_excludes() {
 }
 
 async fn check_backup(af: &ScratchArchive) {
-    let band_ids = af.list_band_ids().unwrap();
+    let band_ids = af.list_band_ids().await.unwrap();
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
     assert_eq!(
-        af.last_complete_band().unwrap().unwrap().id(),
+        af.last_complete_band().await.unwrap().unwrap().id(),
         BandId::new(&[0])
     );
 
@@ -185,7 +192,7 @@ async fn check_backup(af: &ScratchArchive) {
     assert!(file_entry.mtime > 0);
 
     assert_eq!(
-        af.referenced_blocks(&af.list_band_ids().unwrap(), TestMonitor::arc())
+        af.referenced_blocks(&af.list_band_ids().await.unwrap(), TestMonitor::arc())
             .unwrap()
             .into_iter()
             .map(|h| h.to_string())
@@ -201,11 +208,17 @@ async fn check_backup(af: &ScratchArchive) {
             .collect::<Vec<String>>(),
         vec![HELLO_HASH]
     );
-    assert_eq!(af.unreferenced_blocks(TestMonitor::arc()).unwrap().len(), 0);
+    assert_eq!(
+        af.unreferenced_blocks(TestMonitor::arc())
+            .await
+            .unwrap()
+            .len(),
+        0
+    );
 }
 
-#[test]
-fn large_file() {
+#[tokio::test]
+async fn large_file() {
     let af = ScratchArchive::new();
     let tf = TreeFixture::new();
 
@@ -223,6 +236,7 @@ fn large_file() {
         },
         monitor.clone(),
     )
+    .await
     .expect("backup");
     assert_eq!(backup_stats.new_files, 1);
     // First 1MB should be new; remainder should be deduplicated.
@@ -240,9 +254,10 @@ fn large_file() {
     restore(
         &restore_archive,
         rd.path(),
-        &RestoreOptions::default(),
+        RestoreOptions::default(),
         monitor.clone(),
     )
+    .await
     .expect("restore");
     monitor.assert_no_errors();
     monitor.assert_counter(Counter::Files, 1);
@@ -254,8 +269,8 @@ fn large_file() {
 
 /// If some files are unreadable, others are stored and the backup completes with warnings.
 #[cfg(unix)]
-#[test]
-fn source_unreadable() {
+#[tokio::test]
+async fn source_unreadable() {
     let af = ScratchArchive::new();
     let tf = TreeFixture::new();
 
@@ -271,6 +286,7 @@ fn source_unreadable() {
         &BackupOptions::default(),
         TestMonitor::arc(),
     )
+    .await
     .expect("backup");
     assert_eq!(stats.errors, 1);
     assert_eq!(stats.new_files, 3);
@@ -283,8 +299,8 @@ fn source_unreadable() {
 /// Files from before the Unix epoch can be backed up.
 ///
 /// Reproduction of <https://github.com/sourcefrog/conserve/issues/100>.
-#[test]
-fn mtime_before_epoch() {
+#[tokio::test]
+async fn mtime_before_epoch() {
     let tf = TreeFixture::new();
     let file_path = tf.create_file("old_file");
 
@@ -308,12 +324,13 @@ fn mtime_before_epoch() {
         &BackupOptions::default(),
         TestMonitor::arc(),
     )
+    .await
     .expect("backup shouldn't crash on before-epoch mtimes");
 }
 
 #[cfg(unix)]
-#[test]
-pub fn symlink() {
+#[tokio::test]
+async fn symlink() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_symlink("symlink", "/a/broken/destination");
@@ -324,13 +341,14 @@ pub fn symlink() {
         &BackupOptions::default(),
         TestMonitor::arc(),
     )
+    .await
     .expect("backup");
 
     assert_eq!(0, copy_stats.files);
     assert_eq!(1, copy_stats.symlinks);
     assert_eq!(0, copy_stats.unknown_kind);
 
-    let band_ids = af.list_band_ids().unwrap();
+    let band_ids = af.list_band_ids().await.unwrap();
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
 
@@ -350,8 +368,8 @@ pub fn symlink() {
     assert_eq!(e2.target.as_ref().unwrap(), "/a/broken/destination");
 }
 
-#[test]
-pub fn empty_file_uses_zero_blocks() {
+#[tokio::test]
+async fn empty_file_uses_zero_blocks() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file_with_contents("empty", &[]);
@@ -361,13 +379,17 @@ pub fn empty_file_uses_zero_blocks() {
         &BackupOptions::default(),
         TestMonitor::arc(),
     )
+    .await
     .unwrap();
 
     assert_eq!(1, stats.files);
     assert_eq!(stats.written_blocks, 0);
 
     // Read back the empty file
-    let st = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+    let st = af
+        .open_stored_tree(BandSelectionPolicy::Latest)
+        .await
+        .unwrap();
     let empty_entry = st
         .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
         .unwrap()
@@ -380,23 +402,26 @@ pub fn empty_file_uses_zero_blocks() {
     restore(
         &af,
         dest.path(),
-        &RestoreOptions::default(),
+        RestoreOptions::default(),
         TestMonitor::arc(),
     )
+    .await
     .expect("restore");
     // TODO: Check restore stats.
     dest.child("empty").assert("");
 }
 
-#[test]
-pub fn detect_unmodified() {
+#[tokio::test]
+async fn detect_unmodified() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("aaa");
     srcdir.create_file("bbb");
 
     let options = BackupOptions::default();
-    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).unwrap();
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        .await
+        .unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 2);
@@ -404,7 +429,9 @@ pub fn detect_unmodified() {
 
     // Make a second backup from the same tree, and we should see that
     // both files are unmodified.
-    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).unwrap();
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        .await
+        .unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 0);
@@ -414,7 +441,9 @@ pub fn detect_unmodified() {
     // as unmodified.
     srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
-    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).unwrap();
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        .await
+        .unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 0);
@@ -422,15 +451,17 @@ pub fn detect_unmodified() {
     assert_eq!(stats.modified_files, 1);
 }
 
-#[test]
-pub fn detect_minimal_mtime_change() {
+#[tokio::test]
+async fn detect_minimal_mtime_change() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("aaa");
     srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
     let options = BackupOptions::default();
-    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).unwrap();
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        .await
+        .unwrap();
 
     assert_eq!(stats.files, 2);
     assert_eq!(stats.new_files, 2);
@@ -452,7 +483,9 @@ pub fn detect_minimal_mtime_change() {
         }
     }
 
-    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc()).unwrap();
+    let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        .await
+        .unwrap();
     assert_eq!(stats.files, 2);
     assert_eq!(stats.unmodified_files, 1);
 }
@@ -470,6 +503,7 @@ async fn small_files_combined_two_backups() {
         &BackupOptions::default(),
         TestMonitor::arc(),
     )
+    .await
     .unwrap();
     // Although the two files have the same content, we do not yet dedupe them
     // within a combined block, so the block is different to when one identical
@@ -488,6 +522,7 @@ async fn small_files_combined_two_backups() {
         &BackupOptions::default(),
         TestMonitor::arc(),
     )
+    .await
     .unwrap();
     assert_eq!(stats2.new_files, 1);
     assert_eq!(stats2.unmodified_files, 2);
@@ -497,8 +532,8 @@ async fn small_files_combined_two_backups() {
     assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 2);
 }
 
-#[test]
-fn many_small_files_combined_to_one_block() {
+#[tokio::test]
+async fn many_small_files_combined_to_one_block() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     // The directory also counts as an entry, so we should be able to fit 1999
@@ -515,7 +550,9 @@ fn many_small_files_combined_to_one_block() {
         ..Default::default()
     };
     let monitor = TestMonitor::arc();
-    let stats = backup(&af, srcdir.path(), &backup_options, monitor.clone()).expect("backup");
+    let stats = backup(&af, srcdir.path(), &backup_options, monitor.clone())
+        .await
+        .expect("backup");
     assert_eq!(
         monitor.get_counter(Counter::IndexWrites),
         2,
@@ -532,7 +569,10 @@ fn many_small_files_combined_to_one_block() {
     assert_eq!(stats.written_blocks, 2);
     assert_eq!(stats.combined_blocks, 2);
 
-    let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+    let tree = af
+        .open_stored_tree(BandSelectionPolicy::Latest)
+        .await
+        .unwrap();
     let mut entry_iter = tree
         .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
         .unwrap();
@@ -548,8 +588,8 @@ fn many_small_files_combined_to_one_block() {
     );
 }
 
-#[test]
-pub fn mixed_medium_small_files_two_hunks() {
+#[tokio::test]
+async fn mixed_medium_small_files_two_hunks() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     const MEDIUM_LENGTH: u64 = 150_000;
@@ -568,7 +608,9 @@ pub fn mixed_medium_small_files_two_hunks() {
         ..Default::default()
     };
     let monitor = TestMonitor::arc();
-    let stats = backup(&af, srcdir.path(), &backup_options, monitor.clone()).expect("backup");
+    let stats = backup(&af, srcdir.path(), &backup_options, monitor.clone())
+        .await
+        .expect("backup");
     assert_eq!(
         monitor.get_counter(Counter::IndexWrites),
         2,
@@ -585,7 +627,10 @@ pub fn mixed_medium_small_files_two_hunks() {
     // There's one deduped block for all the large files, and then one per hunk for all the small combined files.
     assert_eq!(stats.written_blocks, 3);
 
-    let tree = af.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
+    let tree = af
+        .open_stored_tree(BandSelectionPolicy::Latest)
+        .await
+        .unwrap();
     let mut entry_iter = tree
         .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
         .unwrap();
@@ -601,8 +646,8 @@ pub fn mixed_medium_small_files_two_hunks() {
     );
 }
 
-#[test]
-fn detect_unchanged_from_stitched_index() {
+#[tokio::test]
+async fn detect_unchanged_from_stitched_index() {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("a");
@@ -618,6 +663,7 @@ fn detect_unchanged_from_stitched_index() {
         },
         monitor.clone(),
     )
+    .await
     .unwrap();
     assert_eq!(stats.new_files, 2);
     assert_eq!(stats.small_combined_files, 2);
@@ -635,6 +681,7 @@ fn detect_unchanged_from_stitched_index() {
         },
         monitor.clone(),
     )
+    .await
     .unwrap();
     assert_eq!(stats.unmodified_files, 1);
     assert_eq!(stats.modified_files, 1);
@@ -658,6 +705,7 @@ fn detect_unchanged_from_stitched_index() {
         },
         monitor.clone(),
     )
+    .await
     .unwrap();
     assert_eq!(stats.unmodified_files, 2, "both files are unmodified");
     assert_eq!(monitor.get_counter(Counter::IndexWrites), 3);

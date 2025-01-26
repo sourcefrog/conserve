@@ -370,7 +370,8 @@ impl Command {
                     source,
                     &options,
                     monitor,
-                )?;
+                )
+                .await?;
                 if !no_stats {
                     info!("Backup complete.\n{stats}");
                 }
@@ -384,13 +385,13 @@ impl Command {
                 }
             }
             Command::Debug(Debug::Index { archive, backup }) => {
-                let st = stored_tree_from_opt(archive, backup)?;
+                let st = stored_tree_from_opt(archive, backup).await?;
                 show::show_index_json(st.band(), &mut stdout)?;
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 let archive = Archive::open(Transport::new(archive)?)?;
-                for hash in archive.referenced_blocks(&archive.list_band_ids()?, monitor)? {
+                for hash in archive.referenced_blocks(&archive.list_band_ids().await?, monitor)? {
                     writeln!(bw, "{hash}")?;
                 }
             }
@@ -398,7 +399,8 @@ impl Command {
                 print!(
                     "{}",
                     Archive::open(Transport::new(archive)?)?
-                        .unreferenced_blocks(monitor)?
+                        .unreferenced_blocks(monitor)
+                        .await?
                         .into_iter()
                         .map(|hash| format!("{}\n", hash))
                         .collect::<Vec<String>>()
@@ -412,14 +414,16 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let stats = Archive::open(Transport::new(archive)?)?.delete_bands(
-                    backup,
-                    &DeleteOptions {
-                        dry_run: *dry_run,
-                        break_lock: *break_lock,
-                    },
-                    monitor.clone(),
-                )?;
+                let stats = Archive::open(Transport::new(archive)?)?
+                    .delete_bands(
+                        backup,
+                        &DeleteOptions {
+                            dry_run: *dry_run,
+                            break_lock: *break_lock,
+                        },
+                        monitor.clone(),
+                    )
+                    .await?;
                 if !no_stats {
                     monitor.clear_progress_bars();
                     println!("{stats}");
@@ -434,7 +438,7 @@ impl Command {
                 include_unchanged,
                 json,
             } => {
-                let st = stored_tree_from_opt(archive, backup)?;
+                let st = stored_tree_from_opt(archive, backup).await?;
                 let source = SourceTree::open(source)?;
                 let options = DiffOptions {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
@@ -456,14 +460,16 @@ impl Command {
                 no_stats,
             } => {
                 let archive = Archive::open(Transport::new(archive)?)?;
-                let stats = archive.delete_bands(
-                    &[],
-                    &DeleteOptions {
-                        dry_run: *dry_run,
-                        break_lock: *break_lock,
-                    },
-                    monitor,
-                )?;
+                let stats = archive
+                    .delete_bands(
+                        &[],
+                        &DeleteOptions {
+                            dry_run: *dry_run,
+                            break_lock: *break_lock,
+                        },
+                        monitor,
+                    )
+                    .await?;
                 if !no_stats {
                     info!(%stats);
                 }
@@ -484,7 +490,8 @@ impl Command {
                     if let Some(archive) = &stos.archive {
                         // TODO: Option for subtree.
                         Box::new(
-                            stored_tree_from_opt(archive, &stos.backup)?
+                            stored_tree_from_opt(archive, &stos.backup)
+                                .await?
                                 .iter_entries(Apath::root(), exclude, monitor.clone())?
                                 .map(|it| it.into()),
                         )
@@ -569,7 +576,7 @@ impl Command {
                         &changes_json.as_deref(),
                     )?,
                 };
-                restore(&archive, destination, &options, monitor)?;
+                restore(&archive, destination, options, monitor).await?;
                 debug!("Restore complete");
             }
             Command::Size {
@@ -580,7 +587,8 @@ impl Command {
             } => {
                 let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
                 let size = if let Some(archive) = &stos.archive {
-                    stored_tree_from_opt(archive, &stos.backup)?
+                    stored_tree_from_opt(archive, &stos.backup)
+                        .await?
                         .size(exclude, monitor.clone())?
                         .file_bytes
                 } else {
@@ -628,17 +636,20 @@ impl Command {
                     start_time: !*short,
                     backup_duration: !*short,
                 };
-                conserve::show_versions(&archive, &options, monitor)?;
+                conserve::show_versions(&archive, &options, monitor).await?;
             }
         }
         Ok(ExitCode::Success)
     }
 }
 
-fn stored_tree_from_opt(archive_location: &str, backup: &Option<BandId>) -> Result<StoredTree> {
+async fn stored_tree_from_opt(
+    archive_location: &str,
+    backup: &Option<BandId>,
+) -> Result<StoredTree> {
     let archive = Archive::open(Transport::new(archive_location)?)?;
     let policy = band_selection_policy_from_opt(backup);
-    archive.open_stored_tree(policy)
+    archive.open_stored_tree(policy).await
 }
 
 fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolicy {

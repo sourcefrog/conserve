@@ -16,10 +16,10 @@ use conserve::monitor::test::TestMonitor;
 use conserve::test_fixtures::ScratchArchive;
 use conserve::*;
 
-#[test]
-fn delete_all_bands() {
+#[tokio::test]
+async fn delete_all_bands() {
     let af = ScratchArchive::new();
-    af.store_two_versions();
+    af.store_two_versions().await;
 
     let stats = af
         .delete_bands(
@@ -27,6 +27,7 @@ fn delete_all_bands() {
             &Default::default(),
             TestMonitor::arc(),
         )
+        .await
         .expect("delete_bands");
 
     assert_eq!(stats.deleted_block_count, 2);
