@@ -50,12 +50,6 @@ use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, WriteMode};
 
 pub(super) struct Protocol {
     url: Url,
-    /// Tokio runtime specifically for S3 IO.
-    ///
-    /// S3 SDK is built on Tokio but the rest of Conserve uses threads.
-    /// Each call into the S3 transport blocks the calling thread
-    /// until the request is complete.
-    runtime: Arc<Runtime>,
 
     client: Arc<aws_sdk_s3::Client>,
 
@@ -70,20 +64,11 @@ impl Protocol {
     pub(super) fn new(url: &Url) -> Result<Self> {
         assert_eq!(url.scheme(), "s3");
 
-        // Like in <https://tokio.rs/tokio/topics/bridging>.
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|source| Error {
-                kind: ErrorKind::CreateTransport,
-                url: Some(url.to_owned()),
-                source: Some(Box::new(source)),
-            })?;
-
         let bucket = url.authority().to_owned();
         assert!(!bucket.is_empty(), "S3 bucket name is empty in {url:?}");
 
         // Find the bucket region.
+        let runtime = temp_runtime();
         let config = load_aws_config(&runtime, None);
         let client = aws_sdk_s3::Client::new(&config);
         let location_request = client
@@ -117,7 +102,6 @@ impl Protocol {
             bucket,
             base_path,
             client: Arc::new(client),
-            runtime: Arc::new(runtime),
             storage_class: StorageClass::IntelligentTiering,
             url: url.to_owned(),
         })
@@ -206,7 +190,7 @@ fn join_paths(a: &str, b: &str) -> String {
 #[async_trait]
 impl super::Protocol for Protocol {
     fn list_dir(&self, relpath: &str) -> Result<ListDir> {
-        self.runtime.block_on(self.list_dir_async(relpath))
+        temp_runtime().block_on(self.list_dir_async(relpath))
     }
 
     async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
@@ -227,7 +211,7 @@ impl super::Protocol for Protocol {
         trace!("list_dir paginator created");
         let mut result = ListDir::default();
         while let Some(response) = stream.next().await {
-            trace!(?response, "list_dir paginator next", );
+            trace!(?response, "list_dir paginator next",);
             let response = response.map_err(|err| self.s3_error(&prefix, err))?;
             collect_listdir(&response, &prefix, &mut result);
         }
@@ -241,16 +225,20 @@ impl super::Protocol for Protocol {
     }
 
     fn read_file(&self, relpath: &str) -> Result<Bytes> {
-        self.runtime.block_on(self.read_file_async(relpath))
+        temp_runtime().block_on(self.read_file_async(relpath))
     }
 
     async fn read_file_async(&self, relpath: &str) -> Result<Bytes> {
         let key = self.join_path(relpath);
         let request = self.client.get_object().bucket(&self.bucket).key(&key);
-        let response = request.send().await
+        let response = request
+            .send()
+            .await
             .map_err(|source| self.s3_error(&key, source))?;
-        let body_bytes =
-            response.body.collect().await
+        let body_bytes = response
+            .body
+            .collect()
+            .await
             .map_err(|source| Error {
                 kind: ErrorKind::Other,
                 url: self.url.join(relpath).ok(),
@@ -284,7 +272,7 @@ impl super::Protocol for Protocol {
         if write_mode == WriteMode::CreateNew {
             request = request.if_none_match("*");
         }
-        let response = self.runtime.block_on(request.send());
+        let response = temp_runtime().block_on(request.send());
         // trace!(?response);
         response.map_err(|err| self.s3_error(&key, err))?;
         trace!(body_len = content.len(), "wrote file");
@@ -295,7 +283,7 @@ impl super::Protocol for Protocol {
         let _span = trace_span!("S3Transport::remove_file", %relpath).entered();
         let key = self.join_path(relpath);
         let request = self.client.delete_object().bucket(&self.bucket).key(&key);
-        let response = self.runtime.block_on(request.send());
+        let response = temp_runtime().block_on(request.send());
         trace!(?response);
         response.map_err(|err| self.s3_error(&key, err))?;
         trace!("deleted file");
@@ -316,14 +304,15 @@ impl super::Protocol for Protocol {
             .into_paginator()
             .send();
         let mut n_files = 0;
-        while let Some(response) = self.runtime.block_on(stream.next()) {
+        let runtime = temp_runtime();
+        while let Some(response) = runtime.block_on(stream.next()) {
             for object in response
                 .map_err(|err| self.s3_error(&prefix, err))?
                 .contents
                 .expect("ListObjectsV2Response has contents")
             {
                 let key = object.key.expect("Object has a key");
-                self.runtime
+                runtime
                     .block_on(
                         self.client
                             .delete_object()
@@ -343,7 +332,7 @@ impl super::Protocol for Protocol {
         let _span = trace_span!("S3Transport::metadata", %relpath).entered();
         let key = self.join_path(relpath);
         let request = self.client.head_object().bucket(&self.bucket).key(&key);
-        let response = self.runtime.block_on(request.send());
+        let response = temp_runtime().block_on(request.send());
         // trace!(?response);
         match response {
             Ok(response) => {
@@ -381,7 +370,6 @@ impl super::Protocol for Protocol {
         Arc::new(Protocol {
             base_path: join_paths(&self.base_path, relpath),
             bucket: self.bucket.clone(),
-            runtime: self.runtime.clone(),
             client: self.client.clone(),
             storage_class: self.storage_class.clone(),
             url: self.url.join(relpath).expect("join URL"),
@@ -464,4 +452,14 @@ fn collect_listdir(response: &ListObjectsV2Output, prefix: &str, list_dir: &mut 
         debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
         list_dir.files.push(name.to_owned());
     }
+}
+
+/// Create a temporary runtime if we're called from sync code.
+///
+/// Eventually, if migration to async works out, this should be removed.
+fn temp_runtime() -> Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("Create temporary runtime")
 }
