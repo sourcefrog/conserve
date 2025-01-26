@@ -73,6 +73,15 @@ impl super::Protocol for Protocol {
         try_block(path).map_err(|err| Error::io_error(path, err))
     }
 
+    async fn read_file_async(&self, relpath: &str) -> Result<Bytes> {
+        let full_path = &self.full_path(relpath);
+        trace!(?relpath, "Read file");
+        tokio::fs::read(full_path)
+            .await
+            .map(Bytes::from)
+            .map_err(|err| Error::io_error(full_path, err))
+    }
+
     #[instrument(skip(self, content))]
     fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         // TODO: Just write directly; remove if the write fails.
@@ -207,6 +216,7 @@ mod test {
 
     use assert_fs::prelude::*;
     use predicates::prelude::*;
+    use pretty_assertions::assert_eq;
     use time::OffsetDateTime;
     use tokio;
 
@@ -225,6 +235,24 @@ mod test {
         let transport = Transport::local(temp.path());
         let buf = transport.read_file(filename).unwrap();
         assert_eq!(buf, content.as_bytes());
+
+        temp.close().unwrap();
+    }
+
+    #[tokio::test]
+    async fn read_file_async() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let content: &str = "the ribs of the disaster";
+        let filename = "poem.txt";
+
+        temp.child(filename).write_str(content).unwrap();
+
+        let transport = Transport::local(temp.path());
+        let bytes = transport.read_file_async(filename).await.unwrap();
+        assert_eq!(bytes, content.as_bytes());
+
+        let err = transport.read_file_async("nonexistent").await.unwrap_err();
+        assert!(err.is_not_found());
 
         temp.close().unwrap();
     }
