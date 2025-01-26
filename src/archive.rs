@@ -312,7 +312,11 @@ impl Archive {
     /// If problems are found, they are emitted as `warn` or `error` level
     /// tracing messages. This function only returns an error if validation
     /// stops due to a fatal error.
-    pub fn validate(&self, options: &ValidateOptions, monitor: Arc<dyn Monitor>) -> Result<()> {
+    pub async fn validate(
+        &self,
+        options: &ValidateOptions,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<()> {
         self.validate_archive_dir(monitor.clone())?;
 
         debug!("List bands...");
@@ -342,7 +346,7 @@ impl Archive {
             // 2. Check the hash of all blocks are correct, and remember how long
             //    the uncompressed data is.
             let block_lengths: HashMap<BlockHash, usize> =
-                self.block_dir.validate(monitor.clone())?;
+                self.block_dir.validate(monitor.clone()).await?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (hash, referenced_len) in referenced_lens {
                 if let Some(&actual_len) = block_lengths.get(&hash) {

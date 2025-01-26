@@ -21,12 +21,13 @@ use tracing_test::traced_test;
 use conserve::*;
 
 #[traced_test]
-#[test]
-fn missing_block_when_checking_hashes() -> Result<()> {
+#[tokio::test]
+async fn missing_block_when_checking_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
     let monitor = TestMonitor::arc();
     archive
         .validate(&ValidateOptions::default(), monitor.clone())
+        .await
         .unwrap();
     let errors = monitor.take_errors();
     dbg!(&errors);
@@ -36,16 +37,18 @@ fn missing_block_when_checking_hashes() -> Result<()> {
 }
 
 #[traced_test]
-#[test]
-fn missing_block_skip_block_hashes() -> Result<()> {
+#[tokio::test]
+async fn missing_block_skip_block_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
     let monitor = TestMonitor::arc();
-    archive.validate(
-        &ValidateOptions {
-            skip_block_hashes: true,
-        },
-        monitor.clone(),
-    )?;
+    archive
+        .validate(
+            &ValidateOptions {
+                skip_block_hashes: true,
+            },
+            monitor.clone(),
+        )
+        .await?;
     let errors = monitor.take_errors();
     dbg!(&errors);
     assert_eq!(errors.len(), 1);

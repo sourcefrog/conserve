@@ -120,6 +120,7 @@ async fn simple_backup_with_excludes() -> Result<()> {
     // TODO: Check what was restored.
 
     af.validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
+        .await
         .unwrap();
     assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     Ok(())

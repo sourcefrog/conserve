@@ -591,7 +591,9 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                Archive::open(Transport::new(archive)?)?.validate(&options, monitor.clone())?;
+                Archive::open(Transport::new(archive)?)?
+                    .validate(&options, monitor.clone())
+                    .await?;
                 if monitor.error_count() != 0 {
                     warn!("Archive has some problems.");
                 } else {
