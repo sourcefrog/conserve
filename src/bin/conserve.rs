@@ -685,7 +685,8 @@ fn make_change_callback<'a>(
     })))
 }
 
-fn main() -> Result<ExitCode> {
+#[tokio::main]
+async fn main() -> Result<ExitCode> {
     // Before anything else, get the local time offset, to avoid `time-rs`
     // problems with loading it when threads are running.
     *LOCAL_OFFSET.write().unwrap() =
