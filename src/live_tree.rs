@@ -26,6 +26,7 @@ use crate::counters::Counter;
 use crate::entry::KindMeta;
 use crate::monitor::Monitor;
 use crate::stats::LiveTreeIterStats;
+use crate::tree::TreeSize;
 use crate::*;
 
 /// A real tree on the filesystem, as a backup source.
@@ -73,18 +74,13 @@ impl LiveTree {
         }
         Ok(TreeSize { file_bytes })
     }
-}
 
-impl tree::ReadTree for LiveTree {
-    type Entry = EntryValue;
-    type IT = Iter;
-
-    fn iter_entries(
+   pub fn iter_entries(
         &self,
         subtree: Apath,
         exclude: Exclude,
         _monitor: Arc<dyn Monitor>,
-    ) -> Result<Self::IT> {
+    ) -> Result<Iter> {
         Iter::new(&self.path, subtree, exclude)
     }
 }

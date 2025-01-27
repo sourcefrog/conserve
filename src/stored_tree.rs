@@ -23,6 +23,7 @@ use std::sync::Arc;
 use crate::counters::Counter;
 use crate::monitor::Monitor;
 use crate::stitch::IterStitchedIndexHunks;
+use crate::tree::TreeSize;
 use crate::*;
 
 /// Read index and file contents for a version stored in the archive.
@@ -68,20 +69,16 @@ impl StoredTree {
         }
         Ok(TreeSize { file_bytes })
     }
-}
-
-impl ReadTree for StoredTree {
-    type Entry = IndexEntry;
-    type IT = index::IndexEntryIter<stitch::IterStitchedIndexHunks>;
 
     /// Return an iter of index entries in this stored tree.
-    // TODO: Should return an iter of Result<Entry> so that we can inspect them...
-    fn iter_entries(
+    // TODO: Should perhaps return a sequence of results so that the caller has the
+    // option to handle errors or continue.
+    pub fn iter_entries(
         &self,
         subtree: Apath,
         exclude: Exclude,
         monitor: Arc<dyn Monitor>,
-    ) -> Result<Self::IT> {
+    ) -> Result<index::IndexEntryIter<stitch::IterStitchedIndexHunks>> {
         Ok(
             IterStitchedIndexHunks::new(&self.archive, self.band.id(), monitor)
                 .iter_entries(subtree, exclude),

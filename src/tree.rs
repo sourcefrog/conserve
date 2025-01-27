@@ -11,31 +11,6 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Abstract Tree trait.
-
-use std::sync::Arc;
-
-use crate::monitor::Monitor;
-use crate::*;
-
-/// Abstract Tree that may be either on the real filesystem or stored in an archive.
-pub trait ReadTree {
-    type Entry: EntryTrait + 'static;
-    type IT: Iterator<Item = Self::Entry>;
-
-    /// Iterate, in apath order, all the entries in this tree.
-    ///
-    /// Errors reading individual paths or directories are sent to the UI and
-    /// counted, but are not treated as fatal, and don't appear as Results in the
-    /// iterator.
-    fn iter_entries(
-        &self,
-        subtree: Apath,
-        exclude: Exclude,
-        monitor: Arc<dyn Monitor>,
-    ) -> Result<Self::IT>;
-}
-
 /// The measured size of a tree.
 pub struct TreeSize {
     pub file_bytes: u64,
