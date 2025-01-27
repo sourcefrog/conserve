@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-use crate::counters::Counter;
 use crate::monitor::Monitor;
 use crate::*;
 
@@ -35,24 +34,6 @@ pub trait ReadTree {
         exclude: Exclude,
         monitor: Arc<dyn Monitor>,
     ) -> Result<Self::IT>;
-
-    /// Measure the tree size.
-    ///
-    /// This typically requires walking all entries, which may take a while.
-    fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
-        let mut file_bytes = 0u64;
-        let task = monitor.start_task("Measure tree".to_string());
-        for e in self.iter_entries(Apath::root(), exclude, monitor.clone())? {
-            // While just measuring size, ignore directories/files we can't stat.
-            if let Some(bytes) = e.size() {
-                monitor.count(Counter::Files, 1);
-                monitor.count(Counter::FileBytes, bytes as usize);
-                file_bytes += bytes;
-                task.increment(bytes as usize);
-            }
-        }
-        Ok(TreeSize { file_bytes })
-    }
 }
 
 /// The measured size of a tree.

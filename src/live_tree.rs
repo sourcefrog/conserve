@@ -22,12 +22,13 @@ use std::sync::Arc;
 
 use tracing::{error, warn};
 
+use crate::counters::Counter;
 use crate::entry::KindMeta;
 use crate::monitor::Monitor;
 use crate::stats::LiveTreeIterStats;
 use crate::*;
 
-/// A real tree on the filesystem, for use as a backup source or restore destination.
+/// A real tree on the filesystem, as a backup source.
 #[derive(Clone)]
 pub struct LiveTree {
     path: PathBuf,
@@ -56,6 +57,21 @@ impl LiveTree {
         assert_eq!(entry.kind(), Kind::File);
         let path = self.relative_path(&entry.apath);
         fs::File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
+    }
+
+    pub fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
+        let mut file_bytes = 0u64;
+        let task = monitor.start_task("Measure tree".to_string());
+        for e in self.iter_entries(Apath::from("/"), exclude, monitor.clone())? {
+            // While just measuring size, ignore directories/files we can't stat.
+            if let Some(bytes) = e.size() {
+                monitor.count(Counter::Files, 1);
+                monitor.count(Counter::FileBytes, bytes as usize);
+                file_bytes += bytes;
+                task.increment(bytes as usize);
+            }
+        }
+        Ok(TreeSize { file_bytes })
     }
 }
 
