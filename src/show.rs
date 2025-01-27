@@ -123,7 +123,7 @@ pub fn show_versions(
 pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
     // TODO: Maybe use https://docs.serde.rs/serde/ser/trait.Serializer.html#method.collect_seq.
     let bw = BufWriter::new(w);
-    let index_entries: Vec<IndexEntry> = band.index().iter_entries().collect();
+    let index_entries: Vec<Vec<IndexEntry>> = band.index().iter_available_hunks().collect();
     serde_json::ser::to_writer_pretty(bw, &index_entries)
         .map_err(|source| Error::SerializeJson { source })
 }

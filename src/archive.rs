@@ -199,7 +199,8 @@ impl Archive {
         Ok(band_ids
             .par_iter()
             .map(move |band_id| Band::open(&archive, *band_id).expect("Failed to open band"))
-            .flat_map_iter(|band| band.index().iter_entries())
+            .flat_map_iter(|band| band.index().iter_available_hunks())
+            .flatten()
             .flat_map_iter(|entry| entry.addrs)
             .map(|addr| addr.hash)
             .inspect(|_| {
