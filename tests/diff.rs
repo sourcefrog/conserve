@@ -97,13 +97,17 @@ fn chgrp_reported_as_changed() {
     use std::os::unix::fs::chown;
 
     use conserve::test_fixtures::arbitrary_secondary_group;
+    let Some(secondary_group) = arbitrary_secondary_group() else {
+        // maybe running on a machine where the user has only one group
+        return;
+    };
 
     let (a, tf) = create_tree();
 
     chown(
         tf.path().join("thing"),
         None,
-        Some(arbitrary_secondary_group()),
+        Some(secondary_group),
     )
     .unwrap();
     let st = a.open_stored_tree(BandSelectionPolicy::Latest).unwrap();

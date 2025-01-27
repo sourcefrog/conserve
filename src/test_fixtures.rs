@@ -205,17 +205,17 @@ where
 /// On Unix, return the gid of a group that the current user is a member of
 /// and that is not the primary group. This can be used to test chgrp operations.
 ///
-/// Panics if there is no such group, or if the list of groups can't be retrieved,
-/// which is always the case on macOS.
+/// Returns None if there is no such group: if the user is a member of only
+/// their primary group, or if the list of groups can't be retrieved, which is
+/// always the case on macOS.
 #[cfg(target_os = "linux")]
-pub fn arbitrary_secondary_group() -> u32 {
+pub fn arbitrary_secondary_group() -> Option<u32> {
     let groups = nix::unistd::getgroups().expect("getgroups");
     let primary_group = nix::unistd::getgid();
-    let secondary_group = groups
+    groups
         .iter()
         .find(|gid| **gid != primary_group)
-        .expect("secondary group");
-    secondary_group.as_raw()
+        .map(|gid| gid.as_raw())
 }
 
 #[cfg(test)]
@@ -224,6 +224,6 @@ mod test {
     #[test]
     fn arbitrary_secondary_group_is_found() {
         let gid = super::arbitrary_secondary_group();
-        assert!(gid > 0);
+        assert!(gid.is_none_or(|gid| gid>0));
     }
 }
