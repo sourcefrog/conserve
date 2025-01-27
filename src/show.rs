@@ -106,13 +106,13 @@ pub fn show_versions(
         }
 
         if options.tree_size {
-            let tree_mb_str = crate::misc::bytes_to_human_mb(
-                archive
-                    .open_stored_tree(BandSelectionPolicy::Specified(band_id))?
-                    .size(Exclude::nothing(), monitor.clone())?
-                    .file_bytes,
-            );
-            l.push(format!("{tree_mb_str:>14}",));
+            let sizes = archive
+                .open_stored_tree(BandSelectionPolicy::Specified(band_id))?
+                .size(Exclude::nothing(), monitor.clone())?;
+            l.push(format!(
+                "{:>14}",
+                crate::misc::bytes_to_human_mb(sizes.file_bytes)
+            ));
         }
         monitor.clear_progress_bars(); // to avoid fighting with stdout
         println!("{}", l.join(" "));

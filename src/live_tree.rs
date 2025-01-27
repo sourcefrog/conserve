@@ -22,12 +22,14 @@ use std::sync::Arc;
 
 use tracing::{error, warn};
 
+use crate::counters::Counter;
 use crate::entry::KindMeta;
 use crate::monitor::Monitor;
 use crate::stats::LiveTreeIterStats;
+use crate::tree::TreeSize;
 use crate::*;
 
-/// A real tree on the filesystem, for use as a backup source or restore destination.
+/// A real tree on the filesystem, as a backup source.
 #[derive(Clone)]
 pub struct LiveTree {
     path: PathBuf,
@@ -57,18 +59,28 @@ impl LiveTree {
         let path = self.relative_path(&entry.apath);
         fs::File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
     }
-}
 
-impl tree::ReadTree for LiveTree {
-    type Entry = EntryValue;
-    type IT = Iter;
+    pub fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
+        let mut file_bytes = 0u64;
+        let task = monitor.start_task("Measure tree".to_string());
+        for e in self.iter_entries(Apath::from("/"), exclude, monitor.clone())? {
+            // While just measuring size, ignore directories/files we can't stat.
+            if let Some(bytes) = e.size() {
+                monitor.count(Counter::Files, 1);
+                monitor.count(Counter::FileBytes, bytes as usize);
+                file_bytes += bytes;
+                task.increment(bytes as usize);
+            }
+        }
+        Ok(TreeSize { file_bytes })
+    }
 
-    fn iter_entries(
+   pub fn iter_entries(
         &self,
         subtree: Apath,
         exclude: Exclude,
         _monitor: Arc<dyn Monitor>,
-    ) -> Result<Self::IT> {
+    ) -> Result<Iter> {
         Iter::new(&self.path, subtree, exclude)
     }
 }

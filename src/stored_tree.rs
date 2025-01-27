@@ -20,8 +20,10 @@
 
 use std::sync::Arc;
 
+use crate::counters::Counter;
 use crate::monitor::Monitor;
 use crate::stitch::IterStitchedIndexHunks;
+use crate::tree::TreeSize;
 use crate::*;
 
 /// Read index and file contents for a version stored in the archive.
@@ -52,20 +54,31 @@ impl StoredTree {
     pub fn block_dir(&self) -> &BlockDir {
         &self.block_dir
     }
-}
 
-impl ReadTree for StoredTree {
-    type Entry = IndexEntry;
-    type IT = index::IndexEntryIter<stitch::IterStitchedIndexHunks>;
+    pub fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
+        let mut file_bytes = 0u64;
+        let task = monitor.start_task("Measure tree".to_string());
+        for e in self.iter_entries(Apath::from("/"), exclude, monitor.clone())? {
+            // While just measuring size, ignore directories/files we can't stat.
+            if let Some(bytes) = e.size() {
+                monitor.count(Counter::Files, 1);
+                monitor.count(Counter::FileBytes, bytes as usize);
+                file_bytes += bytes;
+                task.increment(bytes as usize);
+            }
+        }
+        Ok(TreeSize { file_bytes })
+    }
 
     /// Return an iter of index entries in this stored tree.
-    // TODO: Should return an iter of Result<Entry> so that we can inspect them...
-    fn iter_entries(
+    // TODO: Should perhaps return a sequence of results so that the caller has the
+    // option to handle errors or continue.
+    pub fn iter_entries(
         &self,
         subtree: Apath,
         exclude: Exclude,
         monitor: Arc<dyn Monitor>,
-    ) -> Result<Self::IT> {
+    ) -> Result<index::IndexEntryIter<stitch::IterStitchedIndexHunks>> {
         Ok(
             IterStitchedIndexHunks::new(&self.archive, self.band.id(), monitor)
                 .iter_entries(subtree, exclude),
