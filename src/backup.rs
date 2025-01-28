@@ -33,7 +33,7 @@ use crate::counters::Counter;
 use crate::io::read_with_retries;
 use crate::monitor::Monitor;
 use crate::stats::{write_compressed_size, write_count, write_duration, write_size};
-use crate::stitch::IterStitchedIndexHunks;
+use crate::index::stitch::IterStitchedIndexHunks;
 use crate::*;
 
 /// Configuration of how to make a backup.

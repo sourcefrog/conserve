@@ -23,7 +23,7 @@ use std::sync::Arc;
 use crate::counters::Counter;
 use crate::index::IndexEntryIter;
 use crate::monitor::Monitor;
-use crate::stitch::IterStitchedIndexHunks;
+use crate::index::stitch::IterStitchedIndexHunks;
 use crate::tree::TreeSize;
 use crate::*;
 
