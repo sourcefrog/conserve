@@ -164,11 +164,17 @@ impl BackupWriter {
             return Err(Error::GarbageCollectionLockHeld);
         }
         let basis_index = if let Some(basis_band_id) = archive.last_band_id()? {
-            Stitch::new(archive, basis_band_id, monitor)
+            Stitch::new(
+                archive,
+                basis_band_id,
+                Apath::root(),
+                Exclude::nothing(),
+                monitor,
+            )
+            .iter_entries()
         } else {
-            Stitch::empty(archive, monitor)
-        }
-        .iter_entries(Apath::root(), Exclude::nothing());
+            Stitch::empty(archive, monitor).iter_entries()
+        };
 
         // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;

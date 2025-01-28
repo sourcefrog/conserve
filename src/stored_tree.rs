@@ -80,7 +80,7 @@ impl StoredTree {
         exclude: Exclude,
         monitor: Arc<dyn Monitor>,
     ) -> Result<IndexEntryIter> {
-        Ok(Stitch::new(&self.archive, self.band.id(), monitor).iter_entries(subtree, exclude))
+        Ok(Stitch::new(&self.archive, self.band.id(), subtree, exclude, monitor).iter_entries())
     }
 }
 

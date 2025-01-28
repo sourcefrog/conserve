@@ -439,7 +439,7 @@ impl IndexHunkIter {
 /// them into individual entries, and returns only the entries within
 /// some subtree and satisfying some excludes.
 // TODO: Maybe fold this into stitch.rs; we'd rarely want them without stitching...
-pub struct IndexEntryIter {
+pub(crate) struct IndexEntryIter {
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,

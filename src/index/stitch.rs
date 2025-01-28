@@ -46,12 +46,19 @@ pub struct Stitch {
 
     state: State,
 
+    /// Filter entries according to these exclusions.
+    exclude: Exclude,
+
+    /// Only return entries within this directory.
+    subtree: Apath,
+
     monitor: Arc<dyn Monitor>,
 }
 
 /// What state is a stitch iter in, and what should happen next?
 enum State {
-    /// We've read to the end of a finished band, or to the earliest existing band, and there is no more content.
+    /// We've read to the end of a finished band, or to the earliest existing
+    /// band, and there is no more content.
     Done,
 
     /// We have know the band to read and have not yet read it at all.
@@ -61,6 +68,7 @@ enum State {
     InBand {
         band_id: BandId,
         /// Hunks not yet returned from this band.
+        // TODO: Maybe just hold a queue of hunk ids?
         index_hunks: IndexHunkIter,
     },
 
@@ -78,11 +86,19 @@ impl Stitch {
     /// the same point in the previous band, continuing backwards recursively
     /// until either there are no more previous indexes, or a complete index
     /// is found.
-    pub(crate) fn new(archive: &Archive, band_id: BandId, monitor: Arc<dyn Monitor>) -> Stitch {
+    pub(crate) fn new(
+        archive: &Archive,
+        band_id: BandId,
+        subtree: Apath,
+        exclude: Exclude,
+        monitor: Arc<dyn Monitor>,
+    ) -> Stitch {
         Stitch {
             archive: archive.clone(),
             last_apath: None,
             state: State::BeforeBand(band_id),
+            exclude,
+            subtree,
             monitor,
         }
     }
@@ -93,11 +109,15 @@ impl Stitch {
             archive: archive.clone(),
             last_apath: None,
             state: State::Done,
+            exclude: Exclude::nothing(),
+            subtree: Apath::root(),
             monitor,
         }
     }
 
-    pub fn iter_entries(self, subtree: Apath, exclude: Exclude) -> IndexEntryIter {
+    pub fn iter_entries(self) -> IndexEntryIter {
+        let subtree = self.subtree.clone();
+        let exclude = self.exclude.clone();
         IndexEntryIter::new(self, subtree, exclude)
     }
 }
@@ -168,8 +188,9 @@ impl Iterator for Stitch {
 
 fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<BandId> {
     loop {
-        // TODO: It might be faster to list the present bands and calculate
-        // from that, rather than walking backwards one at a time...
+        // TODO: It might be faster to list the present bands, maybe when
+        // constructing Stitch, and calculate from that, rather than walking
+        // backwards one at a time...
         if let Some(prev_band_id) = band_id.previous() {
             band_id = prev_band_id;
             if archive.band_exists(band_id).unwrap_or(false) {
@@ -202,10 +223,16 @@ mod test {
     }
 
     fn simple_ls(archive: &Archive, band_id: BandId) -> String {
-        let strs: Vec<String> = Stitch::new(archive, band_id, TestMonitor::arc())
-            .flatten()
-            .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
-            .collect();
+        let strs: Vec<String> = Stitch::new(
+            archive,
+            band_id,
+            Apath::root(),
+            Exclude::nothing(),
+            TestMonitor::arc(),
+        )
+        .flatten()
+        .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
+        .collect();
         strs.join(" ")
     }
 
@@ -337,7 +364,13 @@ mod test {
         let band_id = band_ids.first().expect("expected at least one band");
 
         let monitor = TestMonitor::arc();
-        let mut iter = Stitch::new(&af, *band_id, monitor.clone());
+        let mut iter = Stitch::new(
+            &af,
+            *band_id,
+            Apath::root(),
+            Exclude::nothing(),
+            monitor.clone(),
+        );
         // Get the first and only index entry.
         // `index_hunks` and `band_id` should be `Some`.
         assert!(iter.next().is_some());
