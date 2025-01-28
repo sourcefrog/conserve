@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -36,7 +36,9 @@ use crate::index::{IndexEntryIter, IndexHunkIter};
 use crate::monitor::Monitor;
 use crate::*;
 
-pub struct IterStitchedIndexHunks {
+/// Stitch together any number of incomplete indexes to form a more-complete
+/// index.
+pub struct Stitch {
     /// The latest (and highest-ordered) apath we have already yielded.
     last_apath: Option<Apath>,
 
@@ -66,7 +68,7 @@ enum State {
     AfterBand(BandId),
 }
 
-impl IterStitchedIndexHunks {
+impl Stitch {
     /// Return an iterator that reconstructs the most complete available index
     /// for a possibly-incomplete band.
     ///
@@ -76,12 +78,8 @@ impl IterStitchedIndexHunks {
     /// the same point in the previous band, continuing backwards recursively
     /// until either there are no more previous indexes, or a complete index
     /// is found.
-    pub(crate) fn new(
-        archive: &Archive,
-        band_id: BandId,
-        monitor: Arc<dyn Monitor>,
-    ) -> IterStitchedIndexHunks {
-        IterStitchedIndexHunks {
+    pub(crate) fn new(archive: &Archive, band_id: BandId, monitor: Arc<dyn Monitor>) -> Stitch {
+        Stitch {
             archive: archive.clone(),
             last_apath: None,
             state: State::BeforeBand(band_id),
@@ -89,8 +87,9 @@ impl IterStitchedIndexHunks {
         }
     }
 
-    pub(crate) fn empty(archive: &Archive, monitor: Arc<dyn Monitor>) -> IterStitchedIndexHunks {
-        IterStitchedIndexHunks {
+    /// Construct a stitcher that will just return nothing.
+    pub(crate) fn empty(archive: &Archive, monitor: Arc<dyn Monitor>) -> Stitch {
+        Stitch {
             archive: archive.clone(),
             last_apath: None,
             state: State::Done,
@@ -103,7 +102,7 @@ impl IterStitchedIndexHunks {
     }
 }
 
-impl Iterator for IterStitchedIndexHunks {
+impl Iterator for Stitch {
     type Item = Vec<IndexEntry>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -203,7 +202,7 @@ mod test {
     }
 
     fn simple_ls(archive: &Archive, band_id: BandId) -> String {
-        let strs: Vec<String> = IterStitchedIndexHunks::new(archive, band_id, TestMonitor::arc())
+        let strs: Vec<String> = Stitch::new(archive, band_id, TestMonitor::arc())
             .flatten()
             .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
             .collect();
@@ -338,7 +337,7 @@ mod test {
         let band_id = band_ids.first().expect("expected at least one band");
 
         let monitor = TestMonitor::arc();
-        let mut iter = IterStitchedIndexHunks::new(&af, *band_id, monitor.clone());
+        let mut iter = Stitch::new(&af, *band_id, monitor.clone());
         // Get the first and only index entry.
         // `index_hunks` and `band_id` should be `Some`.
         assert!(iter.next().is_some());
