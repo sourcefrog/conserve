@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,8 +14,10 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
+use std::cmp::Ordering;
 use std::fmt;
 use std::io::prelude::*;
+use std::iter::Peekable;
 use std::mem::take;
 use std::path::Path;
 use std::sync::atomic::Ordering::Relaxed;
@@ -144,9 +146,9 @@ struct BackupWriter {
     stats: BackupStats,
     block_dir: Arc<BlockDir>,
 
-    /// The index for the last stored band, used as hints for whether newly
-    /// stored files have changed.
-    basis_index: crate::index::IndexEntryIter,
+    /// The index for the last stored band (and any stitched predecessors), used
+    /// as hints for whether newly stored files have changed.
+    basis_index: Peekable<Stitch>,
 
     file_combiner: FileCombiner,
 }
@@ -164,11 +166,17 @@ impl BackupWriter {
             return Err(Error::GarbageCollectionLockHeld);
         }
         let basis_index = if let Some(basis_band_id) = archive.last_band_id()? {
-            Stitch::new(archive, basis_band_id, monitor)
+            Stitch::new(
+                archive,
+                basis_band_id,
+                Apath::root(),
+                Exclude::nothing(),
+                monitor,
+            )
         } else {
             Stitch::empty(archive, monitor)
         }
-        .iter_entries(Apath::root(), Exclude::nothing());
+        .peekable();
 
         // Create the new band only after finding the basis band!
         let band = Band::create(archive)?;
@@ -247,7 +255,7 @@ impl BackupWriter {
         self.stats.files += 1;
         monitor.count(Counter::Files, 1);
         let apath = source_entry.apath();
-        let result = if let Some(basis_entry) = self.basis_index.advance_to(apath) {
+        let result = if let Some(basis_entry) = advance_to(&mut self.basis_index, apath) {
             if content_heuristically_unchanged(source_entry, &basis_entry) {
                 if all_blocks_present(&basis_entry.addrs, &self.block_dir, &monitor) {
                     self.stats.unmodified_files += 1;
@@ -321,6 +329,32 @@ impl BackupWriter {
         // TODO: Emit the actual change.
         Ok(None)
     }
+}
+
+/// Return the entry for given apath, if it is present, otherwise None.
+/// It follows this will also return None at the end of the index.
+///
+/// After this is called, the iter has skipped forward to this apath,
+/// discarding entries for any earlier files. However, even if the apath
+/// is not present, other entries coming after it can still be read.
+// TODO: This could probably be dropped if we instead use Merge to
+// merge the basis index with the live tree...
+pub fn advance_to(iter: &mut Peekable<Stitch>, apath: &Apath) -> Option<IndexEntry> {
+    while let Some(cand) = iter.peek() {
+        match cand.apath.cmp(apath) {
+            Ordering::Less => {
+                let _ = iter.next();
+                continue;
+            }
+            Ordering::Equal => {
+                return Some(iter.next().unwrap());
+            }
+            Ordering::Greater => {
+                return None;
+            }
+        }
+    }
+    None
 }
 
 fn all_blocks_present(

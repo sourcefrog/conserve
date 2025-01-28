@@ -22,7 +22,6 @@ use std::sync::Arc;
 
 use crate::counters::Counter;
 use crate::index::stitch::Stitch;
-use crate::index::IndexEntryIter;
 use crate::monitor::Monitor;
 use crate::tree::TreeSize;
 use crate::*;
@@ -79,8 +78,15 @@ impl StoredTree {
         subtree: Apath,
         exclude: Exclude,
         monitor: Arc<dyn Monitor>,
-    ) -> Result<IndexEntryIter> {
-        Ok(Stitch::new(&self.archive, self.band.id(), monitor).iter_entries(subtree, exclude))
+    ) -> Result<Stitch> {
+        // TODO: Pass in this band so that we don't need to reopen it.
+        Ok(Stitch::new(
+            &self.archive,
+            self.band.id(),
+            subtree,
+            exclude,
+            monitor,
+        ))
     }
 }
 

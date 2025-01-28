@@ -15,17 +15,13 @@
 
 pub mod stitch;
 
-use std::cmp::Ordering;
-use std::iter::Peekable;
 use std::sync::Arc;
-use std::vec;
 
 use itertools::Itertools;
 use time::OffsetDateTime;
 use tracing::{debug, debug_span, error};
 use transport::WriteMode;
 
-use self::stitch::Stitch;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
 use crate::entry::KindMeta;
@@ -429,104 +425,6 @@ impl IndexHunkIter {
         IndexHunkIter {
             after: Some(apath.clone()),
             ..self
-        }
-    }
-}
-
-/// Read out all the entries from a stored index, in apath order.
-///
-/// This wraps an iterator that returns hunks of index data, flattens
-/// them into individual entries, and returns only the entries within
-/// some subtree and satisfying some excludes.
-// TODO: Maybe fold this into stitch.rs; we'd rarely want them without stitching...
-pub struct IndexEntryIter {
-    /// Temporarily buffered entries, read from the index files but not yet
-    /// returned to the client.
-    buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
-    hunk_iter: Stitch,
-    subtree: Apath,
-    exclude: Exclude,
-}
-
-impl IndexEntryIter {
-    pub(crate) fn new(hunk_iter: Stitch, subtree: Apath, exclude: Exclude) -> Self {
-        IndexEntryIter {
-            buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
-            hunk_iter,
-            subtree,
-            exclude,
-        }
-    }
-}
-
-impl Iterator for IndexEntryIter {
-    type Item = IndexEntry;
-
-    fn next(&mut self) -> Option<IndexEntry> {
-        loop {
-            if let Some(entry) = self.buffered_entries.next() {
-                // TODO: We could be smarter about skipping ahead if nothing
-                // in this page matches; or terminating early if we know
-                // nothing else in the index can be under this subtree.
-                if !self.subtree.is_prefix_of(&entry.apath) {
-                    continue;
-                }
-                if self.exclude.matches(&entry.apath) {
-                    continue;
-                }
-                return Some(entry);
-            }
-            if !self.refill_entry_buffer_or_warn() {
-                return None;
-            }
-        }
-    }
-}
-
-impl IndexEntryIter {
-    /// Return the entry for given apath, if it is present, otherwise None.
-    /// It follows this will also return None at the end of the index.
-    ///
-    /// After this is called, the iter has skipped forward to this apath,
-    /// discarding entries for any earlier files. However, even if the apath
-    /// is not present, other entries coming after it can still be read.
-    pub fn advance_to(&mut self, apath: &Apath) -> Option<IndexEntry> {
-        // This takes some care because we don't want to consume the entry
-        // that tells us we went too far.
-        loop {
-            if let Some(cand) = self.buffered_entries.peek() {
-                match cand.apath.cmp(apath) {
-                    Ordering::Less => {
-                        // Discard this and continue looking
-                        self.buffered_entries.next().unwrap();
-                    }
-                    Ordering::Equal => {
-                        return Some(self.buffered_entries.next().unwrap());
-                    }
-                    Ordering::Greater => {
-                        // We passed the point where this entry would have been:
-                        return None;
-                    }
-                }
-            } else if !self.refill_entry_buffer_or_warn() {
-                return None;
-            }
-        }
-    }
-
-    /// Read another hunk file and put it into buffered_entries.
-    ///
-    /// Returns true if another hunk could be found, otherwise false.
-    fn refill_entry_buffer_or_warn(&mut self) -> bool {
-        assert!(
-            self.buffered_entries.next().is_none(),
-            "refill_entry_buffer called with non-empty buffer"
-        );
-        if let Some(new_entries) = self.hunk_iter.next() {
-            self.buffered_entries = new_entries.into_iter().peekable();
-            true
-        } else {
-            false
         }
     }
 }

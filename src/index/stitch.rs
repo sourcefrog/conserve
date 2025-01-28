@@ -28,11 +28,12 @@
 //!   seen.
 //! * Bands might be deleted, so their numbers are not contiguous.
 
+use std::iter::Peekable;
 use std::sync::Arc;
 
 use tracing::trace;
 
-use crate::index::{IndexEntryIter, IndexHunkIter};
+use crate::index::IndexHunkIter;
 use crate::monitor::Monitor;
 use crate::*;
 
@@ -46,12 +47,20 @@ pub struct Stitch {
 
     state: State,
 
+    /// Filter entries according to these exclusions.
+    exclude: Exclude,
+
+    /// Only return entries within this directory.
+    subtree: Apath,
+
     monitor: Arc<dyn Monitor>,
 }
 
 /// What state is a stitch iter in, and what should happen next?
+#[allow(clippy::large_enum_variant)] // We only have typically one at any time
 enum State {
-    /// We've read to the end of a finished band, or to the earliest existing band, and there is no more content.
+    /// We've read to the end of a finished band, or to the earliest existing
+    /// band, and there is no more content.
     Done,
 
     /// We have know the band to read and have not yet read it at all.
@@ -60,7 +69,12 @@ enum State {
     /// We have some index hunks from a band and can return them gradually.
     InBand {
         band_id: BandId,
+        /// Temporarily buffered entries, read from the index files but not yet
+        /// returned to the client. If this is empty, it's time to read the next
+        /// hunk, or try the next band, or just the end.
+        buffered_entries: Peekable<std::vec::IntoIter<IndexEntry>>,
         /// Hunks not yet returned from this band.
+        // TODO: Maybe just hold a queue of hunk ids?
         index_hunks: IndexHunkIter,
     },
 
@@ -78,11 +92,19 @@ impl Stitch {
     /// the same point in the previous band, continuing backwards recursively
     /// until either there are no more previous indexes, or a complete index
     /// is found.
-    pub(crate) fn new(archive: &Archive, band_id: BandId, monitor: Arc<dyn Monitor>) -> Stitch {
+    pub(crate) fn new(
+        archive: &Archive,
+        band_id: BandId,
+        subtree: Apath,
+        exclude: Exclude,
+        monitor: Arc<dyn Monitor>,
+    ) -> Stitch {
         Stitch {
             archive: archive.clone(),
             last_apath: None,
             state: State::BeforeBand(band_id),
+            exclude,
+            subtree,
             monitor,
         }
     }
@@ -93,17 +115,15 @@ impl Stitch {
             archive: archive.clone(),
             last_apath: None,
             state: State::Done,
+            exclude: Exclude::nothing(),
+            subtree: Apath::root(),
             monitor,
         }
-    }
-
-    pub fn iter_entries(self, subtree: Apath, exclude: Exclude) -> IndexEntryIter {
-        IndexEntryIter::new(self, subtree, exclude)
     }
 }
 
 impl Iterator for Stitch {
-    type Item = Vec<IndexEntry>;
+    type Item = IndexEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -112,15 +132,25 @@ impl Iterator for Stitch {
                 State::InBand {
                     band_id,
                     index_hunks,
+                    buffered_entries,
                 } => {
-                    if let Some(hunk) = index_hunks.next() {
-                        if let Some(last_apath) = hunk.last().map(|entry| entry.apath.clone()) {
-                            trace!(%last_apath, "return hunk");
-                            self.last_apath = Some(last_apath);
+                    if let Some(entry) = buffered_entries.next() {
+                        // TODO: We could be smarter about skipping ahead if nothing
+                        // in this page matches; or terminating early if we know
+                        // nothing else in the index can be under this subtree.
+                        if !self.subtree.is_prefix_of(&entry.apath)
+                            || self.exclude.matches(&entry.apath)
+                        {
+                            continue;
                         } else {
-                            trace!("return empty hunk");
+                            return Some(entry);
                         }
-                        return Some(hunk);
+                    } else if let Some(hunk) = index_hunks.next() {
+                        if let Some(last_apath) = hunk.last().map(|entry| entry.apath.clone()) {
+                            self.last_apath = Some(last_apath);
+                        }
+                        *buffered_entries = hunk.into_iter().peekable();
+                        continue;
                     } else {
                         State::AfterBand(*band_id)
                     }
@@ -136,6 +166,7 @@ impl Iterator for Stitch {
                             State::InBand {
                                 band_id: *band_id,
                                 index_hunks,
+                                buffered_entries: Vec::new().into_iter().peekable(),
                             }
                         }
                         Err(err) => {
@@ -168,8 +199,9 @@ impl Iterator for Stitch {
 
 fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<BandId> {
     loop {
-        // TODO: It might be faster to list the present bands and calculate
-        // from that, rather than walking backwards one at a time...
+        // TODO: It might be faster to list the present bands, maybe when
+        // constructing Stitch, and calculate from that, rather than walking
+        // backwards one at a time...
         if let Some(prev_band_id) = band_id.previous() {
             band_id = prev_band_id;
             if archive.band_exists(band_id).unwrap_or(false) {
@@ -202,10 +234,15 @@ mod test {
     }
 
     fn simple_ls(archive: &Archive, band_id: BandId) -> String {
-        let strs: Vec<String> = Stitch::new(archive, band_id, TestMonitor::arc())
-            .flatten()
-            .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
-            .collect();
+        let strs: Vec<String> = Stitch::new(
+            archive,
+            band_id,
+            Apath::root(),
+            Exclude::nothing(),
+            TestMonitor::arc(),
+        )
+        .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
+        .collect();
         strs.join(" ")
     }
 
@@ -331,27 +368,34 @@ mod test {
         )
         .expect("backup should work");
 
-        af.transport().remove_file("b0000/BANDTAIL").unwrap();
+        af.transport().remove_file("b0000/BANDTAIL").unwrap(); // band is now incomplete
         let band_ids = af.list_band_ids().expect("should list bands");
 
         let band_id = band_ids.first().expect("expected at least one band");
 
         let monitor = TestMonitor::arc();
-        let mut iter = Stitch::new(&af, *band_id, monitor.clone());
-        // Get the first and only index entry.
-        // `index_hunks` and `band_id` should be `Some`.
-        assert!(iter.next().is_some());
-        monitor.assert_no_errors();
+        let mut entries = Stitch::new(
+            &af,
+            *band_id,
+            Apath::root(),
+            Exclude::nothing(),
+            monitor.clone(),
+        );
+        // It should have two entries.
+        assert_eq!(entries.next().unwrap().apath, "/");
+        assert_eq!(entries.next().unwrap().apath, "/file_a");
+        assert!(entries.next().is_none());
+        assert!(entries.next().is_none());
 
         // Remove the band head. This band can not be opened anymore.
         // If accessed this should fail the test.
         // Note: When refactoring `.expect("Failed to open band")` this might needs refactoring as well.
         af.transport().remove_file("b0000/BANDHEAD").unwrap();
 
-        // No more entries should follow.
-        for _ in 0..10 {
-            assert!(iter.next().is_none());
-        }
+        // You can keep polling the iterator but it will keep returning none,
+        // without trying to reopen the band.
+        assert!(entries.next().is_none());
+        assert!(entries.next().is_none());
 
         // It's not an error (at the moment) because a band with no head effectively doesn't exist.
         // (Maybe later the presence of a band directory with no head file should raise a warning.)
