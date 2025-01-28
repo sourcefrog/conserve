@@ -368,16 +368,6 @@ impl IndexRead {
             after: None,
         }
     }
-
-    /// Make an iterator that returns hunks of entries for the specified hunks
-    pub fn iter_hunks(self, hunks: std::vec::IntoIter<u32>) -> IndexHunkIter {
-        let _span = debug_span!("iter_hunks", ?self.transport).entered();
-        IndexHunkIter {
-            hunks,
-            index: self,
-            after: None,
-        }
-    }
 }
 
 /// Read hunks of entries from a stored index, in apath order.
