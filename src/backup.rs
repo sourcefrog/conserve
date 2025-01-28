@@ -146,7 +146,7 @@ struct BackupWriter {
 
     /// The index for the last stored band, used as hints for whether newly
     /// stored files have changed.
-    basis_index: crate::index::IndexEntryIter<crate::stitch::IterStitchedIndexHunks>,
+    basis_index: crate::index::IndexEntryIter,
 
     file_combiner: FileCombiner,
 }

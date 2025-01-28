@@ -98,11 +98,7 @@ impl IterStitchedIndexHunks {
         }
     }
 
-    pub fn iter_entries(
-        self,
-        subtree: Apath,
-        exclude: Exclude,
-    ) -> IndexEntryIter<IterStitchedIndexHunks> {
+    pub fn iter_entries(self, subtree: Apath, exclude: Exclude) -> IndexEntryIter {
         IndexEntryIter::new(self, subtree, exclude)
     }
 }

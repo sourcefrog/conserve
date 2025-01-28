@@ -570,7 +570,9 @@ impl Command {
             } => {
                 let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
                 let size = if let Some(archive) = &stos.archive {
-                    stored_tree_from_opt(archive, &stos.backup)?.size(exclude, monitor.clone())?.file_bytes
+                    stored_tree_from_opt(archive, &stos.backup)?
+                        .size(exclude, monitor.clone())?
+                        .file_bytes
                 } else {
                     LiveTree::open(stos.source.as_ref().unwrap())?
                         .size(exclude, monitor.clone())?
