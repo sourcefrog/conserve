@@ -30,10 +30,10 @@ use tracing::{trace, warn};
 use crate::blockdir::Address;
 use crate::change::Change;
 use crate::counters::Counter;
+use crate::index::stitch::Stitch;
 use crate::io::read_with_retries;
 use crate::monitor::Monitor;
 use crate::stats::{write_compressed_size, write_count, write_duration, write_size};
-use crate::index::stitch::IterStitchedIndexHunks;
 use crate::*;
 
 /// Configuration of how to make a backup.
@@ -164,9 +164,9 @@ impl BackupWriter {
             return Err(Error::GarbageCollectionLockHeld);
         }
         let basis_index = if let Some(basis_band_id) = archive.last_band_id()? {
-            IterStitchedIndexHunks::new(archive, basis_band_id, monitor)
+            Stitch::new(archive, basis_band_id, monitor)
         } else {
-            IterStitchedIndexHunks::empty(archive, monitor)
+            Stitch::empty(archive, monitor)
         }
         .iter_entries(Apath::root(), Exclude::nothing());
 

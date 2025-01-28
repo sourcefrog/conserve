@@ -26,13 +26,13 @@ use time::OffsetDateTime;
 use tracing::{debug, debug_span, error};
 use transport::WriteMode;
 
-use self::stitch::IterStitchedIndexHunks;
-use crate::transport::Transport;
+use self::stitch::Stitch;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
 use crate::entry::KindMeta;
 use crate::monitor::Monitor;
 use crate::stats::IndexReadStats;
+use crate::transport::Transport;
 use crate::unix_time::FromUnixAndNanos;
 use crate::*;
 
@@ -455,13 +455,13 @@ pub struct IndexEntryIter {
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
-    hunk_iter: IterStitchedIndexHunks,
+    hunk_iter: Stitch,
     subtree: Apath,
     exclude: Exclude,
 }
 
 impl IndexEntryIter {
-    pub(crate) fn new(hunk_iter: IterStitchedIndexHunks, subtree: Apath, exclude: Exclude) -> Self {
+    pub(crate) fn new(hunk_iter: Stitch, subtree: Apath, exclude: Exclude) -> Self {
         IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             hunk_iter,
