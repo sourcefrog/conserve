@@ -41,7 +41,6 @@ pub mod owner;
 pub mod restore;
 pub mod show;
 pub mod stats;
-mod stitch;
 mod stored_tree;
 pub mod termui;
 pub mod test_fixtures;

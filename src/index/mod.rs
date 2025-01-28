@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -11,7 +11,9 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Index lists the files in a band in the archive.
+//! The index lists all the files in a backup, sorted in apath order.
+
+pub mod stitch;
 
 use std::cmp::Ordering;
 use std::iter::Peekable;
@@ -19,13 +21,13 @@ use std::path::Path;
 use std::sync::Arc;
 use std::vec;
 
-use crate::stitch::IterStitchedIndexHunks;
-use crate::transport::Transport;
 use itertools::Itertools;
 use time::OffsetDateTime;
 use tracing::{debug, debug_span, error};
 use transport::WriteMode;
 
+use self::stitch::IterStitchedIndexHunks;
+use crate::transport::Transport;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
 use crate::entry::KindMeta;
