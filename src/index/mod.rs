@@ -17,7 +17,6 @@ pub mod stitch;
 
 use std::cmp::Ordering;
 use std::iter::Peekable;
-use std::path::Path;
 use std::sync::Arc;
 use std::vec;
 
@@ -293,9 +292,8 @@ pub struct IndexRead {
 }
 
 impl IndexRead {
-    #[allow(unused)]
-    // TODO: Deprecate, use Transport?
-    pub(crate) fn open_path(path: &Path) -> IndexRead {
+    #[cfg(test)]
+    pub(crate) fn open_path(path: &std::path::Path) -> IndexRead {
         IndexRead::open(Transport::local(path))
     }
 
