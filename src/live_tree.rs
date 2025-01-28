@@ -75,7 +75,7 @@ impl LiveTree {
         Ok(TreeSize { file_bytes })
     }
 
-   pub fn iter_entries(
+    pub fn iter_entries(
         &self,
         subtree: Apath,
         exclude: Exclude,

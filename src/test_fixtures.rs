@@ -224,6 +224,6 @@ mod test {
     #[test]
     fn arbitrary_secondary_group_is_found() {
         let gid = super::arbitrary_secondary_group();
-        assert!(gid.is_none_or(|gid| gid>0));
+        assert!(gid.is_none_or(|gid| gid > 0));
     }
 }

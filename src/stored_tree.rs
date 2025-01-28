@@ -21,6 +21,7 @@
 use std::sync::Arc;
 
 use crate::counters::Counter;
+use crate::index::IndexEntryIter;
 use crate::monitor::Monitor;
 use crate::stitch::IterStitchedIndexHunks;
 use crate::tree::TreeSize;
@@ -78,7 +79,7 @@ impl StoredTree {
         subtree: Apath,
         exclude: Exclude,
         monitor: Arc<dyn Monitor>,
-    ) -> Result<index::IndexEntryIter<stitch::IterStitchedIndexHunks>> {
+    ) -> Result<IndexEntryIter> {
         Ok(
             IterStitchedIndexHunks::new(&self.archive, self.band.id(), monitor)
                 .iter_entries(subtree, exclude),

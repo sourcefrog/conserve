@@ -104,12 +104,7 @@ fn chgrp_reported_as_changed() {
 
     let (a, tf) = create_tree();
 
-    chown(
-        tf.path().join("thing"),
-        None,
-        Some(secondary_group),
-    )
-    .unwrap();
+    chown(tf.path().join("thing"), None, Some(secondary_group)).unwrap();
     let st = a.open_stored_tree(BandSelectionPolicy::Latest).unwrap();
 
     let options = DiffOptions {

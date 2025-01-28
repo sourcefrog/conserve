@@ -19,6 +19,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::vec;
 
+use crate::stitch::IterStitchedIndexHunks;
 use crate::transport::Transport;
 use itertools::Itertools;
 use time::OffsetDateTime;
@@ -448,17 +449,17 @@ impl IndexHunkIter {
 /// them into individual entries, and returns only the entries within
 /// some subtree and satisfying some excludes.
 // TODO: Maybe fold this into stitch.rs; we'd rarely want them without stitching...
-pub struct IndexEntryIter<HI: Iterator<Item = Vec<IndexEntry>>> {
+pub struct IndexEntryIter {
     /// Temporarily buffered entries, read from the index files but not yet
     /// returned to the client.
     buffered_entries: Peekable<vec::IntoIter<IndexEntry>>,
-    hunk_iter: HI,
+    hunk_iter: IterStitchedIndexHunks,
     subtree: Apath,
     exclude: Exclude,
 }
 
-impl<HI: Iterator<Item = Vec<IndexEntry>>> IndexEntryIter<HI> {
-    pub(crate) fn new(hunk_iter: HI, subtree: Apath, exclude: Exclude) -> Self {
+impl IndexEntryIter {
+    pub(crate) fn new(hunk_iter: IterStitchedIndexHunks, subtree: Apath, exclude: Exclude) -> Self {
         IndexEntryIter {
             buffered_entries: Vec::<IndexEntry>::new().into_iter().peekable(),
             hunk_iter,
@@ -468,7 +469,7 @@ impl<HI: Iterator<Item = Vec<IndexEntry>>> IndexEntryIter<HI> {
     }
 }
 
-impl<HI: Iterator<Item = Vec<IndexEntry>>> Iterator for IndexEntryIter<HI> {
+impl Iterator for IndexEntryIter {
     type Item = IndexEntry;
 
     fn next(&mut self) -> Option<IndexEntry> {
@@ -492,7 +493,7 @@ impl<HI: Iterator<Item = Vec<IndexEntry>>> Iterator for IndexEntryIter<HI> {
     }
 }
 
-impl<HI: Iterator<Item = Vec<IndexEntry>>> IndexEntryIter<HI> {
+impl IndexEntryIter {
     /// Return the entry for given apath, if it is present, otherwise None.
     /// It follows this will also return None at the end of the index.
     ///
