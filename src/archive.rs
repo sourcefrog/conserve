@@ -212,9 +212,12 @@ impl Archive {
     /// Returns an iterator of blocks that are present and referenced by no index.
     pub fn unreferenced_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
         let referenced = self.referenced_blocks(&self.list_band_ids()?, monitor.clone())?;
-        let mut blocks = self.block_dir().blocks(monitor)?;
-        blocks.retain(move |h| !referenced.contains(h));
-        Ok(blocks)
+        Ok(self
+            .block_dir()
+            .blocks(monitor)?
+            .into_iter()
+            .filter(move |h| !referenced.contains(h))
+            .collect())
     }
 
     /// Delete bands, and the blocks that they reference.
