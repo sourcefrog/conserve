@@ -217,7 +217,8 @@ impl BackupWriter {
         options: &BackupOptions,
         monitor: Arc<dyn Monitor>,
     ) -> Result<Option<EntryChange>> {
-        // TODO: Emit deletions for entries in the basis not present in the source.
+        // TODO: Emit deletions for entries in the basis not present in the source,
+        // probably by using Merge to read both trees in parallel.
         match entry.kind() {
             Kind::Dir => self.copy_dir(entry, monitor.as_ref()),
             Kind::File => self.copy_file(entry, source, options, monitor.clone()),
@@ -569,8 +570,6 @@ fn content_heuristically_unchanged<E: EntryTrait, O: EntryTrait>(
 
 #[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
 pub struct BackupStats {
-    // TODO: Have separate more-specific stats for backup and restore, and then
-    // each can have a single Display method.
     // TODO: Include source file bytes, including unmodified files.
     pub files: usize,
     pub symlinks: usize,

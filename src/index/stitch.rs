@@ -74,7 +74,6 @@ enum State {
         /// hunk, or try the next band, or just the end.
         buffered_entries: Peekable<std::vec::IntoIter<IndexEntry>>,
         /// Hunks not yet returned from this band.
-        // TODO: Maybe just hold a queue of hunk ids?
         index_hunks: IndexHunkIter,
     },
 
