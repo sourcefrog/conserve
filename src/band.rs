@@ -71,7 +71,7 @@ fn band_version_supported(version: &str) -> bool {
 }
 
 /// Each backup makes a new `band` containing an index directory.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Band {
     band_id: BandId,
 
@@ -82,7 +82,7 @@ pub struct Band {
     head: Head,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Head {
     /// Seconds since the Unix epoch when writing of this band began.
     start_time: i64,
