@@ -40,6 +40,7 @@ use dir_assert::assert_paths;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use rstest::rstest;
+use tracing::info;
 use tracing_test::traced_test;
 // use predicates::prelude::*;
 
@@ -220,6 +221,7 @@ impl DamageAction {
     ///
     /// The file must already exist.
     pub fn damage(&self, path: &Path) {
+        info!(?self, ?path, "Apply damage!");
         assert!(path.exists(), "Path to be damaged does not exist: {path:?}");
         match self {
             DamageAction::Truncate => {
