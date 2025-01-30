@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Martin Pool.
+// Copyright 2020-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 //! Transport operations return std::io::Result to reflect their narrower focus.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::{error, fmt, io, result};
 
 use bytes::Bytes;
@@ -25,12 +25,16 @@ use url::Url;
 
 use crate::*;
 
+use self::record::{Call, Verb};
+
 pub mod local;
 #[cfg(feature = "sftp")]
 pub mod sftp;
 
 #[cfg(feature = "s3")]
 pub mod s3;
+
+pub mod record;
 
 /// Abstracted filesystem IO to access an archive.
 ///
@@ -48,6 +52,18 @@ pub mod s3;
 pub struct Transport {
     /// The concrete protocol implementation: local, S3, etc.
     protocol: Arc<dyn Protocol + 'static>,
+
+    /// The path relative to the origin.
+    ///
+    /// This is empty for protocols constructed with `new` etc, and non-empty
+    /// for protocols constructed from `chdir`.
+    sub_path: String,
+
+    /// If true, record operations into `calls` so that they can be inspected by tests.
+    record_calls: bool,
+
+    /// If recording is enabled, a list of all operations on all derived transports.
+    calls: Arc<Mutex<Vec<Call>>>,
 }
 
 impl Transport {
@@ -55,6 +71,9 @@ impl Transport {
     pub fn local(path: &Path) -> Self {
         Transport {
             protocol: Arc::new(local::Protocol::new(path)),
+            record_calls: false,
+            sub_path: String::new(),
+            calls: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -91,7 +110,40 @@ impl Transport {
                 })
             }
         };
-        Ok(Transport { protocol })
+        Ok(Transport {
+            protocol,
+            record_calls: false,
+            sub_path: String::new(),
+            calls: Arc::new(Mutex::new(Vec::new())),
+        })
+    }
+
+    /// Start recording operations from this and any derived transports.
+    #[cfg(test)]
+    pub(crate) fn enable_record(self) -> Transport {
+        Transport {
+            record_calls: true,
+            ..self
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn recorded_calls(&self) -> Vec<Call> {
+        self.calls.lock().unwrap().clone()
+    }
+
+    /// If recording is enabled, record an event.
+    fn record(&self, verb: Verb, path: &str) {
+        if cfg!(test) && self.record_calls {
+            let mut full_path = self.sub_path.clone();
+            if !path.is_empty() {
+                if !full_path.is_empty() {
+                    full_path += "/";
+                }
+                full_path += path;
+            }
+            self.calls.lock().unwrap().push(Call(verb, full_path));
+        }
     }
 
     /// Get one complete file into a caller-provided buffer.
@@ -99,6 +151,7 @@ impl Transport {
     /// Files in the archive are of bounded size, so it's OK to always read them entirely into
     /// memory, and this is simple to support on all implementations.
     pub fn read_file(&self, path: &str) -> Result<Bytes> {
+        self.record(Verb::Read, path);
         self.protocol.read_file(path)
     }
 
@@ -110,35 +163,51 @@ impl Transport {
     pub fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         // TODO: Perhaps it'd be better to include sizes (and maybe mtimes) as many transports
         // might be able to provide this without extra work.
+        self.record(Verb::ListDir, relpath);
         self.protocol.list_dir(relpath)
     }
 
     /// Make a new transport addressing a subdirectory.
     pub fn chdir(&self, relpath: &str) -> Self {
+        let mut sub_path = self.sub_path.clone();
+        if !relpath.is_empty() {
+            if !sub_path.is_empty() {
+                sub_path += "/";
+            }
+            sub_path += relpath;
+        }
         Transport {
             protocol: self.protocol.chdir(relpath),
+            sub_path,
+            record_calls: self.record_calls,
+            calls: Arc::clone(&self.calls),
         }
     }
 
     pub fn write_file(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()> {
+        self.record(Verb::Write, relpath);
         self.protocol.write_file(relpath, content, mode)
     }
 
     pub fn create_dir(&self, relpath: &str) -> Result<()> {
+        self.record(Verb::CreateDir, relpath);
         self.protocol.create_dir(relpath)
     }
 
     pub fn metadata(&self, relpath: &str) -> Result<Metadata> {
+        self.record(Verb::Metadata, relpath);
         self.protocol.metadata(relpath)
     }
 
     /// Delete a file.
     pub fn remove_file(&self, relpath: &str) -> Result<()> {
+        self.record(Verb::RemoveFile, relpath);
         self.protocol.remove_file(relpath)
     }
 
     /// Delete a directory and all its contents.
     pub fn remove_dir_all(&self, relpath: &str) -> Result<()> {
+        self.record(Verb::RemoveDirAll, relpath);
         self.protocol.remove_dir_all(relpath)
     }
 
@@ -176,7 +245,7 @@ pub enum WriteMode {
     CreateNew,
 }
 
-trait Protocol: Send + Sync {
+trait Protocol: std::fmt::Debug + Send + Sync {
     fn read_file(&self, path: &str) -> Result<Bytes>;
 
     /// Write a complete file.

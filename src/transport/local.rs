@@ -24,6 +24,7 @@ use url::Url;
 
 use super::{Error, ListDir, Metadata, Result, WriteMode};
 
+#[derive(Debug)]
 pub(super) struct Protocol {
     path: PathBuf,
     url: Url,
@@ -173,10 +174,12 @@ mod test {
 
     use assert_fs::prelude::*;
     use predicates::prelude::*;
+    use pretty_assertions::assert_eq;
     use time::OffsetDateTime;
 
     use super::*;
     use crate::kind::Kind;
+    use crate::transport::record::{Call, Verb};
     use crate::transport::{self, Transport};
 
     #[test]
@@ -187,9 +190,13 @@ mod test {
 
         temp.child(filename).write_str(content).unwrap();
 
-        let transport = Transport::local(temp.path());
+        let transport = Transport::local(temp.path()).enable_record();
         let buf = transport.read_file(filename).unwrap();
         assert_eq!(buf, content.as_bytes());
+
+        let calls = transport.recorded_calls();
+        dbg!(&calls);
+        assert_eq!(calls, [Call(Verb::Read, filename.into())]);
 
         temp.close().unwrap();
     }
@@ -335,7 +342,7 @@ mod test {
     #[test]
     fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::local(temp.path());
+        let transport = Transport::local(temp.path()).enable_record();
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();
@@ -346,18 +353,32 @@ mod test {
         assert_eq!(sub_list.dirs, ["bbb"]);
         assert_eq!(sub_list.files, [""; 0]);
 
+        assert_eq!(
+            transport.recorded_calls(),
+            [
+                Call(Verb::CreateDir, "aaa".into()),
+                Call(Verb::CreateDir, "aaa/bbb".into()),
+                Call(Verb::ListDir, "aaa".into())
+            ]
+        );
+
         temp.close().unwrap();
     }
 
     #[test]
     fn remove_dir_all() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::local(temp.path());
+        let transport = Transport::local(temp.path()).enable_record();
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa/bbb").unwrap();
         transport.create_dir("aaa/bbb/ccc").unwrap();
 
         transport.remove_dir_all("aaa").unwrap();
+
+        assert_eq!(
+            *transport.recorded_calls().last().unwrap(),
+            Call(Verb::RemoveDirAll, "aaa".into())
+        );
     }
 }

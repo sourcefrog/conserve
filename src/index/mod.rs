@@ -13,8 +13,8 @@
 
 //! The index lists all the files in a backup, sorted in apath order.
 
-pub mod stitch;
 pub(crate) mod entry;
+pub mod stitch;
 
 use std::sync::Arc;
 
