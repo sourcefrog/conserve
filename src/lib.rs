@@ -64,7 +64,7 @@ pub use crate::entry::{EntryTrait, EntryValue};
 pub use crate::errors::Error;
 pub use crate::excludes::Exclude;
 pub use crate::gc_lock::GarbageCollectionLock;
-pub use crate::index::{IndexEntry, IndexRead, IndexWriter};
+pub use crate::index::{IndexRead, entry::IndexEntry, IndexWriter};
 pub use crate::kind::Kind;
 pub use crate::live_tree::LiveTree;
 pub use crate::merge::MergeTrees;
@@ -101,6 +101,3 @@ static BAND_TAIL_FILENAME: &str = "BANDTAIL";
 
 /// Length of the binary content hash.
 pub(crate) const BLAKE_HASH_SIZE_BYTES: usize = 64;
-
-/// A callback when an entry is visited.
-pub type EntryCallback<'cb> = Box<dyn Fn(&IndexEntry) + 'cb>;

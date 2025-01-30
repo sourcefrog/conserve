@@ -32,6 +32,7 @@ use tracing::{trace, warn};
 use crate::blockdir::Address;
 use crate::change::Change;
 use crate::counters::Counter;
+use crate::index::entry::IndexEntry;
 use crate::index::stitch::Stitch;
 use crate::io::read_with_retries;
 use crate::monitor::Monitor;

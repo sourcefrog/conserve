@@ -24,6 +24,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
+use crate::index::entry::IndexEntry;
 use crate::jsonio::{read_json, write_json};
 use crate::monitor::Monitor;
 use crate::transport::Transport;

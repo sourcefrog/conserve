@@ -37,6 +37,8 @@ use crate::index::IndexHunkIter;
 use crate::monitor::Monitor;
 use crate::*;
 
+use super::entry::IndexEntry;
+
 /// Stitch together any number of incomplete indexes to form a more-complete
 /// index.
 pub struct Stitch {

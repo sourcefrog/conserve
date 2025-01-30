@@ -24,6 +24,7 @@ use time::format_description::well_known::Rfc3339;
 use time::UtcOffset;
 use tracing::error;
 
+use crate::index::entry::IndexEntry;
 use crate::misc::duration_to_hms;
 use crate::termui::TermUiMonitor;
 use crate::*;

@@ -25,6 +25,7 @@ use time::OffsetDateTime;
 use tracing::{instrument, trace, warn};
 
 use crate::counters::Counter;
+use crate::index::entry::IndexEntry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::monitor::Monitor;
 use crate::unix_time::ToFileTime;
