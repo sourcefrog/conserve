@@ -29,7 +29,7 @@ use derive_more::{Add, AddAssign};
 use itertools::Itertools;
 use tracing::{trace, warn};
 
-use crate::blockdir::Address;
+use crate::blockdir::{Address, BlockDir};
 use crate::change::Change;
 use crate::counters::Counter;
 use crate::index::entry::IndexEntry;

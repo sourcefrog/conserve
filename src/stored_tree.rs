@@ -31,14 +31,12 @@ use crate::*;
 pub struct StoredTree {
     band: Band,
     archive: Archive,
-    block_dir: Arc<BlockDir>,
 }
 
 impl StoredTree {
     pub(crate) fn open(archive: &Archive, band_id: BandId) -> Result<StoredTree> {
         Ok(StoredTree {
             band: Band::open(archive, band_id)?,
-            block_dir: archive.block_dir.clone(),
             archive: archive.clone(),
         })
     }
@@ -49,10 +47,6 @@ impl StoredTree {
 
     pub fn is_closed(&self) -> Result<bool> {
         self.band.is_closed()
-    }
-
-    pub fn block_dir(&self) -> &BlockDir {
-        &self.block_dir
     }
 
     pub fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {

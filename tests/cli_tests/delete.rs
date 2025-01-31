@@ -38,7 +38,7 @@ fn delete_both_bands() {
         .success();
 
     assert_eq!(af.list_band_ids().unwrap().len(), 0);
-    assert_eq!(af.block_dir().blocks(TestMonitor::arc()).unwrap().len(), 0);
+    assert_eq!(af.all_blocks(TestMonitor::arc()).unwrap().len(), 0);
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn delete_first_version() {
     assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[1])]);
     // b0 contains two small files packed into the same block, which is not deleted.
     // b1 (not deleted) adds one additional block, which is still referenced.
-    assert_eq!(af.block_dir().blocks(TestMonitor::arc()).unwrap().len(), 2);
+    assert_eq!(af.all_blocks(TestMonitor::arc()).unwrap().len(), 2);
 
     let rd = TempDir::new().unwrap();
     run_conserve()
@@ -92,7 +92,7 @@ fn delete_second_version() {
 
     assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[0])]);
     // b0 contains two small files packed into the same block.
-    assert_eq!(af.block_dir().blocks(TestMonitor::arc()).unwrap().len(), 1);
+    assert_eq!(af.all_blocks(TestMonitor::arc()).unwrap().len(), 1);
 
     let rd = TempDir::new().unwrap();
     run_conserve()

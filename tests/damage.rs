@@ -264,9 +264,8 @@ impl DamageLocation {
                 .join("BANDTAIL"),
             DamageLocation::Block(block_index) => {
                 let archive = Archive::open(Transport::local(archive_dir)).expect("open archive");
-                let block_dir = archive.block_dir();
-                let block_hash = block_dir
-                    .blocks(TestMonitor::arc())
+                let block_hash = archive
+                    .all_blocks(TestMonitor::arc())
                     .expect("list blocks")
                     .into_iter()
                     .sorted()

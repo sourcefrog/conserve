@@ -24,6 +24,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
+use crate::blockdir::BlockDir;
 use crate::index::entry::IndexEntry;
 use crate::jsonio::{read_json, write_json};
 use crate::monitor::Monitor;
@@ -101,8 +102,9 @@ impl Archive {
         })
     }
 
-    pub fn block_dir(&self) -> &BlockDir {
-        &self.block_dir
+    /// Return an unsorted list of all blocks in the archive.
+    pub fn all_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
+        self.block_dir.blocks(monitor)
     }
 
     pub fn band_exists(&self, band_id: BandId) -> Result<bool> {
@@ -214,7 +216,7 @@ impl Archive {
     pub fn unreferenced_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
         let referenced = self.referenced_blocks(&self.list_band_ids()?, monitor.clone())?;
         Ok(self
-            .block_dir()
+            .block_dir
             .blocks(monitor)?
             .into_iter()
             .filter(move |h| !referenced.contains(h))
@@ -242,7 +244,6 @@ impl Archive {
         };
         debug!("Got gc lock");
 
-        let block_dir = self.block_dir();
         debug!("List band ids...");
         let mut keep_band_ids = self.list_band_ids()?;
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
@@ -274,7 +275,7 @@ impl Archive {
             .inspect(|_| {
                 task.increment(1);
             })
-            .map(|(_i, block_id)| block_dir.compressed_size(block_id).unwrap_or_default())
+            .map(|(_i, block_id)| self.block_dir.compressed_size(block_id).unwrap_or_default())
             .sum();
         drop(task);
         stats.unreferenced_block_bytes = total_bytes;
@@ -295,7 +296,7 @@ impl Archive {
                 .par_iter()
                 .filter(|block_hash| {
                     task.increment(1);
-                    block_dir.delete_block(block_hash).is_err()
+                    self.block_dir.delete_block(block_hash).is_err()
                 })
                 .count();
             stats.deletion_errors += error_count;

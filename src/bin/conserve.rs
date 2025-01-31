@@ -368,10 +368,7 @@ impl Command {
             }
             Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open(Transport::new(archive)?)?
-                    .block_dir()
-                    .blocks(monitor)?
-                {
+                for hash in Archive::open(Transport::new(archive)?)?.all_blocks(monitor)? {
                     writeln!(bw, "{hash}")?;
                 }
             }

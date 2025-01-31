@@ -192,8 +192,7 @@ fn check_backup(af: &ScratchArchive) {
         vec![HELLO_HASH]
     );
     assert_eq!(
-        af.block_dir()
-            .blocks(TestMonitor::arc())
+        af.all_blocks(TestMonitor::arc())
             .unwrap()
             .into_iter()
             .map(|h| h.to_string())
@@ -493,7 +492,7 @@ fn small_files_combined_two_backups() {
     assert_eq!(stats2.written_blocks, 1);
     assert_eq!(stats2.combined_blocks, 1);
 
-    assert_eq!(af.block_dir().blocks(TestMonitor::arc()).unwrap().len(), 2);
+    assert_eq!(af.all_blocks(TestMonitor::arc()).unwrap().len(), 2);
 }
 
 #[test]

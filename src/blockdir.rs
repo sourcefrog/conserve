@@ -65,7 +65,7 @@ pub struct Address {
 
 /// A readable, writable directory within a band holding data blocks.
 #[derive(Debug)]
-pub struct BlockDir {
+pub(crate) struct BlockDir {
     transport: Transport,
     pub stats: BlockDirStats,
     // TODO: There are fancier caches and they might help, but this one works, and Stretto did not work for me.
@@ -80,13 +80,15 @@ fn subdir_relpath(block_hash: &str) -> &str {
 }
 
 /// Return the transport-relative file for a given hash.
+// This is exposed for testing, so that damage tests can determine
+// which files to damage.
 pub fn block_relpath(hash: &BlockHash) -> String {
     let hash_hex = hash.to_string();
     format!("{}/{}", subdir_relpath(&hash_hex), hash_hex)
 }
 
 impl BlockDir {
-    pub fn open(transport: Transport) -> BlockDir {
+    pub(crate) fn open(transport: Transport) -> BlockDir {
         /// Cache this many blocks in memory.
         // TODO: Change to a cache that tracks the size of stored blocks?
         // As a safe conservative value, 100 blocks of 20MB each would be 2GB.
@@ -103,7 +105,7 @@ impl BlockDir {
         }
     }
 
-    pub fn create(transport: Transport) -> Result<BlockDir> {
+    pub(crate) fn create(transport: Transport) -> Result<BlockDir> {
         transport.create_dir("")?;
         Ok(BlockDir::open(transport))
     }
@@ -167,7 +169,7 @@ impl BlockDir {
     /// an interrupted operation on a local filesystem to leave an empty file.
     /// So, these are specifically treated as missing, so there's a chance to heal
     /// them later.
-    pub fn contains(&self, hash: &BlockHash, monitor: Arc<dyn Monitor>) -> Result<bool> {
+    pub(crate) fn contains(&self, hash: &BlockHash, monitor: Arc<dyn Monitor>) -> Result<bool> {
         if self.cache.read().expect("Lock cache").contains(hash)
             || self.exists.read().unwrap().contains(hash)
         {
@@ -191,12 +193,16 @@ impl BlockDir {
     }
 
     /// Returns the compressed on-disk size of a block.
-    pub fn compressed_size(&self, hash: &BlockHash) -> Result<u64> {
+    pub(crate) fn compressed_size(&self, hash: &BlockHash) -> Result<u64> {
         Ok(self.transport.metadata(&block_relpath(hash))?.len)
     }
 
     /// Read back some content addressed by an [Address] (a block hash, start and end).
-    pub fn read_address(&self, address: &Address, monitor: Arc<dyn Monitor>) -> Result<Bytes> {
+    pub(crate) fn read_address(
+        &self,
+        address: &Address,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<Bytes> {
         let bytes = self.get_block_content(&address.hash, monitor)?;
         let len = address.len as usize;
         let start = address.start as usize;
@@ -216,7 +222,11 @@ impl BlockDir {
     ///
     /// Checks that the hash is correct with the contents.
     #[instrument(skip(self, monitor))]
-    pub fn get_block_content(&self, hash: &BlockHash, monitor: Arc<dyn Monitor>) -> Result<Bytes> {
+    pub(crate) fn get_block_content(
+        &self,
+        hash: &BlockHash,
+        monitor: Arc<dyn Monitor>,
+    ) -> Result<Bytes> {
         if let Some(hit) = self.cache.write().expect("Lock cache").get(hash) {
             monitor.count(Counter::BlockContentCacheHit, 1);
             self.stats.cache_hit.fetch_add(1, Relaxed);
@@ -253,7 +263,7 @@ impl BlockDir {
         Ok(decompressed_bytes)
     }
 
-    pub fn delete_block(&self, hash: &BlockHash) -> Result<()> {
+    pub(crate) fn delete_block(&self, hash: &BlockHash) -> Result<()> {
         self.cache.write().expect("Lock cache").pop(hash);
         self.exists.write().unwrap().pop(hash);
         self.transport
@@ -278,7 +288,7 @@ impl BlockDir {
     }
 
     /// Return all the blocknames in the blockdir, in arbitrary order.
-    pub fn blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
+    pub(crate) fn blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
         let transport = self.transport.clone();
         let task = monitor.start_task("List block subdir".to_string());
         let subdirs = self.subdirs()?;
@@ -308,7 +318,7 @@ impl BlockDir {
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<HashMap<BlockHash, usize>> {
+    pub(crate) fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.

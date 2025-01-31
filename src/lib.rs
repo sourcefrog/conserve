@@ -56,7 +56,6 @@ pub use crate::archive::DeleteOptions;
 pub use crate::backup::{backup, BackupOptions, BackupStats};
 pub use crate::band::{Band, BandSelectionPolicy};
 pub use crate::bandid::BandId;
-pub use crate::blockdir::BlockDir;
 pub use crate::blockhash::BlockHash;
 pub use crate::change::{ChangeCallback, EntryChange};
 pub use crate::diff::{diff, DiffOptions};

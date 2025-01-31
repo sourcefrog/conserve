@@ -24,6 +24,7 @@ use filetime::set_symlink_file_times;
 use time::OffsetDateTime;
 use tracing::{instrument, trace, warn};
 
+use crate::blockdir::BlockDir;
 use crate::counters::Counter;
 use crate::index::entry::IndexEntry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
@@ -70,7 +71,7 @@ pub fn restore(
         return Err(Error::DestinationNotEmpty);
     }
     let task = monitor.start_task("Restore".to_string());
-    let block_dir = archive.block_dir();
+    let block_dir = &archive.block_dir;
     // // This causes us to walk the source tree twice, which is probably an acceptable option
     // // since it's nice to see realistic overall progress. We could keep all the entries
     // // in memory, and maybe we should, but it might get unreasonably big.
