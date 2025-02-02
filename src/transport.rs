@@ -77,7 +77,7 @@ impl Transport {
     /// Open a new transport from a string that might be a URL or local path.
     pub fn new(s: &str) -> Result<Self> {
         if let Ok(url) = Url::parse(s) {
-            Transport::from_url(&url)
+            Transport::open_url(&url)
         } else {
             Ok(Transport::local(Path::new(s)))
         }
@@ -105,7 +105,7 @@ impl Transport {
         }
     }
 
-    pub fn from_url(url: &Url) -> Result<Self> {
+    pub fn open_url(url: &Url) -> Result<Self> {
         let protocol: Arc<dyn Protocol> = match url.scheme() {
             "file" => Arc::new(local::Protocol::new(
                 &url.to_file_path().expect("extract URL file path"),
