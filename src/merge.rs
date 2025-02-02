@@ -17,6 +17,7 @@
 
 use std::cmp::Ordering;
 
+use crate::index::stitch::Stitch;
 use crate::*;
 
 /// When merging entries from two trees a particular apath might
@@ -78,66 +79,48 @@ where
 ///
 /// Note that at present this only says whether files are absent from either
 /// side, not whether there is a content difference.
-pub struct MergeTrees<AE, BE, AIT, BIT>
-where
-    AE: EntryTrait,
-    BE: EntryTrait,
-    AIT: Iterator<Item = AE>,
-    BIT: Iterator<Item = BE>,
-{
-    ait: AIT,
-    bit: BIT,
-    /// Peeked next entry from [ait].
-    na: Option<AE>,
+///
+/// At present, this can only diff a source tree to a stored tree, but it could
+/// be genericized to diff any two trees, especially when there is a stable
+/// async iterator trait.
+pub struct MergeTrees {
+    a: Stitch,
+    b: source::Iter,
+    /// Peeked next entry from `a`.
+    next_a: Option<IndexEntry>,
     /// Peeked next entry from [bit].
-    nb: Option<BE>,
+    next_b: Option<EntryValue>,
 }
 
-impl<AE, BE, AIT, BIT> MergeTrees<AE, BE, AIT, BIT>
-where
-    AE: EntryTrait,
-    BE: EntryTrait,
-    AIT: Iterator<Item = AE>,
-    BIT: Iterator<Item = BE>,
-{
-    pub fn new(ait: AIT, bit: BIT) -> MergeTrees<AE, BE, AIT, BIT> {
+impl MergeTrees {
+    pub(crate) fn new(a: Stitch, b: source::Iter) -> MergeTrees {
         MergeTrees {
-            ait,
-            bit,
-            na: None,
-            nb: None,
+            a,
+            b,
+            next_a: None,
+            next_b: None,
         }
     }
-}
 
-impl<AE, BE, AIT, BIT> Iterator for MergeTrees<AE, BE, AIT, BIT>
-where
-    AE: EntryTrait,
-    BE: EntryTrait,
-    AIT: Iterator<Item = AE>,
-    BIT: Iterator<Item = BE>,
-{
-    type Item = MatchedEntries<AE, BE>;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    pub(crate) async fn next(&mut self) -> Option<MatchedEntries<IndexEntry, EntryValue>> {
         // Preload next-A and next-B, if they're not already loaded.
-        if self.na.is_none() {
-            self.na = self.ait.next();
+        if self.next_a.is_none() {
+            self.next_a = self.a.next().await;
         }
-        if self.nb.is_none() {
-            self.nb = self.bit.next();
+        if self.next_b.is_none() {
+            self.next_b = self.b.next();
         }
-        match (&self.na, &self.nb) {
+        match (&self.next_a, &self.next_b) {
             (None, None) => None,
-            (Some(_a), None) => Some(MatchedEntries::Left(self.na.take().unwrap())),
-            (None, Some(_b)) => Some(MatchedEntries::Right(self.nb.take().unwrap())),
+            (Some(_a), None) => Some(MatchedEntries::Left(self.next_a.take().unwrap())),
+            (None, Some(_b)) => Some(MatchedEntries::Right(self.next_b.take().unwrap())),
             (Some(a), Some(b)) => match a.apath().cmp(b.apath()) {
                 Ordering::Equal => Some(MatchedEntries::Both(
-                    self.na.take().unwrap(),
-                    self.nb.take().unwrap(),
+                    self.next_a.take().unwrap(),
+                    self.next_b.take().unwrap(),
                 )),
-                Ordering::Less => Some(MatchedEntries::Left(self.na.take().unwrap())),
-                Ordering::Greater => Some(MatchedEntries::Right(self.nb.take().unwrap())),
+                Ordering::Less => Some(MatchedEntries::Left(self.next_a.take().unwrap())),
+                Ordering::Greater => Some(MatchedEntries::Right(self.next_b.take().unwrap())),
             },
         }
     }
@@ -145,37 +128,39 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::monitor::test::TestMonitor;
-    use crate::test_fixtures::*;
-    use crate::*;
+    // use crate::monitor::test::TestMonitor;
+    // use crate::test_fixtures::*;
+    // use crate::*;
 
-    use super::MatchedEntries;
+    // use super::*;
 
-    #[test]
-    fn merge_entry_trees() {
-        let ta = TreeFixture::new();
-        let tb = TreeFixture::new();
-        let monitor = TestMonitor::arc();
-        let di = MergeTrees::new(
-            ta.live_tree()
-                .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
-                .unwrap(),
-            tb.live_tree()
-                .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
-                .unwrap(),
-        )
-        .collect::<Vec<_>>();
-        assert_eq!(di.len(), 1);
-        match &di[0] {
-            MatchedEntries::Both(ae, be) => {
-                assert_eq!(ae.kind(), Kind::Dir);
-                assert_eq!(be.kind(), Kind::Dir);
-                assert_eq!(ae.apath(), "/");
-                assert_eq!(be.apath(), "/");
-            }
-            other => panic!("unexpected {other:#?}"),
-        }
-    }
+    // TODO: Merge (maybe using proptest) some stored and live trees.
+
+    // #[test]
+    // fn merge_entry_trees() {
+    //     let ta = TreeFixture::new();
+    //     let tb = TreeFixture::new();
+    //     let monitor = TestMonitor::arc();
+    //     let di = MergeTrees::new(
+    //         ta.live_tree()
+    //             .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
+    //             .unwrap(),
+    //         tb.live_tree()
+    //             .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
+    //             .unwrap(),
+    //     )
+    //     .collect::<Vec<_>>();
+    //     assert_eq!(di.len(), 1);
+    //     match &di[0] {
+    //         MatchedEntries::Both(ae, be) => {
+    //             assert_eq!(ae.kind(), Kind::Dir);
+    //             assert_eq!(be.kind(), Kind::Dir);
+    //             assert_eq!(ae.apath(), "/");
+    //             assert_eq!(be.apath(), "/");
+    //         }
+    //         other => panic!("unexpected {other:#?}"),
+    //     }
+    // }
 
     // TODO: More tests of various diff situations.
 }

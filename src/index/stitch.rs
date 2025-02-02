@@ -121,12 +121,20 @@ impl Stitch {
             monitor,
         }
     }
-}
 
-impl Iterator for Stitch {
-    type Item = IndexEntry;
+    /// Collect all the entries from this stitcher into a vector for easier testing.
+    ///
+    /// This is not efficient for large indexes.
+    pub async fn collect_all(&mut self) -> Result<Vec<IndexEntry>> {
+        let mut entries = Vec::new();
+        while let Some(entry) = self.next().await {
+            entries.push(entry);
+        }
+        Ok(entries)
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
+    pub async fn next(&mut self) -> Option<IndexEntry> {
+        // This reports errors to the monitor but doesn't stop or return them: is that right? Probably?
         loop {
             self.state = match &mut self.state {
                 State::Done => return None,
@@ -235,16 +243,18 @@ mod test {
         }
     }
 
-    fn simple_ls(archive: &Archive, band_id: BandId) -> String {
-        let strs: Vec<String> = Stitch::new(
+    async fn simple_ls(archive: &Archive, band_id: BandId) -> String {
+        let mut strs = Vec::new();
+        let mut stitch = Stitch::new(
             archive,
             band_id,
             Apath::root(),
             Exclude::nothing(),
             TestMonitor::arc(),
-        )
-        .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
-        .collect();
+        );
+        while let Some(entry) = stitch.next().await {
+            strs.push(format!("{}:{}", &entry.apath, entry.target.unwrap()));
+        }
         strs.join(" ")
     }
 
@@ -334,19 +344,28 @@ mod test {
         std::fs::remove_dir_all(af.path().join("b0003"))?;
 
         let archive = Archive::open_path(af.path())?;
-        assert_eq!(simple_ls(&archive, BandId::new(&[0])), "/0:b0 /1:b0 /2:b0");
+        assert_eq!(
+            simple_ls(&archive, BandId::new(&[0])).await,
+            "/0:b0 /1:b0 /2:b0"
+        );
 
         assert_eq!(
-            simple_ls(&archive, BandId::new(&[1])),
+            simple_ls(&archive, BandId::new(&[1])).await,
             "/0:b1 /1:b1 /2:b1 /3:b1"
         );
 
-        assert_eq!(simple_ls(&archive, BandId::new(&[2])), "/0:b2 /2:b2 /3:b1");
-
-        assert_eq!(simple_ls(&archive, BandId::new(&[4])), "/0:b2 /2:b2 /3:b1");
+        assert_eq!(
+            simple_ls(&archive, BandId::new(&[2])).await,
+            "/0:b2 /2:b2 /3:b1"
+        );
 
         assert_eq!(
-            simple_ls(&archive, BandId::new(&[5])),
+            simple_ls(&archive, BandId::new(&[4])).await,
+            "/0:b2 /2:b2 /3:b1"
+        );
+
+        assert_eq!(
+            simple_ls(&archive, BandId::new(&[5])).await,
             "/0:b5 /00:b5 /2:b2 /3:b1"
         );
 
@@ -386,10 +405,10 @@ mod test {
             monitor.clone(),
         );
         // It should have two entries.
-        assert_eq!(entries.next().unwrap().apath, "/");
-        assert_eq!(entries.next().unwrap().apath, "/file_a");
-        assert!(entries.next().is_none());
-        assert!(entries.next().is_none());
+        assert_eq!(entries.next().await.unwrap().apath, "/");
+        assert_eq!(entries.next().await.unwrap().apath, "/file_a");
+        assert!(entries.next().await.is_none());
+        assert!(entries.next().await.is_none());
 
         // Remove the band head. This band can not be opened anymore.
         // If accessed this should fail the test.
@@ -398,8 +417,8 @@ mod test {
 
         // You can keep polling the iterator but it will keep returning none,
         // without trying to reopen the band.
-        assert!(entries.next().is_none());
-        assert!(entries.next().is_none());
+        assert!(entries.next().await.is_none());
+        assert!(entries.next().await.is_none());
 
         // It's not an error (at the moment) because a band with no head effectively doesn't exist.
         // (Maybe later the presence of a band directory with no head file should raise a warning.)

@@ -37,19 +37,52 @@ impl Default for DiffOptions {
     }
 }
 
+/// An async pseudo-iterator that yields a series of changes between two trees.
+// TODO: This is barely any different to Merge, maybe we should just merge them?
+// But, it does look a bit more at the contents of the entry, rather than just
+// aligning by apath.
+pub struct Diff {
+    merge: MergeTrees,
+    options: DiffOptions,
+    // monitor: Arc<dyn Monitor>,
+}
+
 /// Generate an iter of per-entry diffs between two trees.
-pub fn diff(
+pub async fn diff(
     st: &StoredTree,
     lt: &SourceTree,
-    options: &DiffOptions,
+    options: DiffOptions,
     monitor: Arc<dyn Monitor>,
-) -> Result<impl Iterator<Item = EntryChange>> {
-    let include_unchanged: bool = options.include_unchanged; // Copy out to avoid lifetime problems in the callback
-    let ait = st.iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?;
-    let bit = lt
-        .iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?
-        .filter(|le| le.kind() != Kind::Unknown);
-    Ok(MergeTrees::new(ait, bit)
-        .map(|me| me.to_entry_change())
-        .filter(move |c: &EntryChange| include_unchanged || !c.change.is_unchanged()))
+) -> Result<Diff> {
+    let a = st.iter_entries(Apath::root(), options.exclude.clone(), monitor.clone());
+    let b = lt.iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?;
+    let merge = MergeTrees::new(a, b);
+    Ok(Diff {
+        merge,
+        options,
+        // monitor,
+    })
+}
+
+impl Diff {
+    pub async fn next(&mut self) -> Option<EntryChange> {
+        while let Some(merge_entry) = self.merge.next().await {
+            let ec = merge_entry.to_entry_change();
+            if self.options.include_unchanged || !ec.change.is_unchanged() {
+                return Some(ec);
+            }
+        }
+        None
+    }
+
+    /// Collect all the diff entries.
+    ///
+    /// This is a convenience method for testing and small trees.
+    pub async fn collect(&mut self) -> Vec<EntryChange> {
+        let mut changes = Vec::new();
+        while let Some(change) = self.next().await {
+            changes.push(change);
+        }
+        changes
+    }
 }

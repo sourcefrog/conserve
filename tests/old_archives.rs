@@ -102,26 +102,23 @@ async fn long_listing_old_archive() {
         println!("restore {} to {:?}", ver, dest.path());
 
         let archive = open_old_archive(ver, "minimal");
-        let mut stdout = Vec::<u8>::new();
+        let mut output = String::new();
 
         // show archive contents
         let monitor = TestMonitor::arc();
-        show::show_entry_names(
-            archive
-                .open_stored_tree(BandSelectionPolicy::Latest)
-                .await
-                .unwrap()
-                .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
-                .unwrap(),
-            &mut stdout,
-            true,
-        )
-        .unwrap();
+        let mut entries = archive
+            .open_stored_tree(BandSelectionPolicy::Latest)
+            .await
+            .unwrap()
+            .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone());
+        while let Some(entry) = entries.next().await {
+            output.push_str(&format!("{}\n", entry.format_ls(true)));
+        }
         monitor.assert_no_errors();
 
         if first_with_perms.matches(&semver::Version::parse(ver).unwrap()) {
             assert_eq!(
-                String::from_utf8(stdout).unwrap(),
+                output,
                 "\
                     rwxrwxr-x mbp        mbp        /\n\
                     rw-rw-r-- mbp        mbp        /hello\n\
@@ -130,7 +127,7 @@ async fn long_listing_old_archive() {
             );
         } else {
             assert_eq!(
-                String::from_utf8(stdout).unwrap(),
+                output,
                 "\
                     none      none       none       /\n\
                     none      none       none       /hello\n\
