@@ -19,7 +19,7 @@ pub mod stitch;
 use std::sync::Arc;
 
 use itertools::Itertools;
-use tracing::{debug, debug_span, error};
+use tracing::{debug, debug_span, error, trace};
 use transport::WriteMode;
 
 use crate::compress::snappy::{Compressor, Decompressor};
@@ -81,6 +81,11 @@ impl IndexWriter {
         Ok(self.hunks_written)
     }
 
+    /// Return the number of queued up pending entries.
+    pub fn pending_entries(&self) -> usize {
+        self.entries.len()
+    }
+
     /// Write new index entries.
     ///
     /// Entries within one hunk may be added in arbitrary order, but they must all
@@ -103,8 +108,14 @@ impl IndexWriter {
     /// entries for the next hunk.
     pub fn finish_hunk(&mut self) -> Result<()> {
         if self.entries.is_empty() {
+            // TODO: Maybe assert that it's not empty?
             return Ok(());
         }
+        trace!(
+            hunk_index = self.sequence,
+            n_entries = self.entries.len(),
+            "Finish hunk"
+        );
         self.entries.sort_unstable_by(|a, b| {
             debug_assert!(a.apath != b.apath);
             a.apath.cmp(&b.apath)
