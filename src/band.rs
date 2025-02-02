@@ -251,8 +251,8 @@ impl Band {
         &self.head.format_flags
     }
 
-    pub fn index_builder(&self) -> IndexWriter {
-        IndexWriter::new(self.transport.chdir(INDEX_DIR))
+    pub fn index_writer(&self, monitor: Arc<dyn Monitor>) -> IndexWriter {
+        IndexWriter::new(self.transport.chdir(INDEX_DIR), monitor)
     }
 
     /// Get read-only access to the index of this band.

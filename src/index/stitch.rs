@@ -216,6 +216,7 @@ fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<Band
 
 #[cfg(test)]
 mod test {
+
     use super::*;
     use crate::counters::Counter;
     use crate::monitor::test::TestMonitor;
@@ -266,16 +267,18 @@ mod test {
         //   1 was deleted in b2, 2 is carried over from b2,
         //   and 3 is carried over from b1.
 
+        const MAX_ENTRIES: usize = 100;
+
         let monitor = TestMonitor::arc();
         let band = Band::create(&af).await?;
         assert_eq!(band.id(), BandId::zero());
-        let mut ib = band.index_builder();
+        let mut ib = band.index_writer(MAX_ENTRIES, monitor.clone());
         ib.push_entry(symlink("/0", "b0"));
         ib.push_entry(symlink("/1", "b0"));
-        ib.finish_hunk(monitor.clone())?;
+        ib.finish_hunk()?;
         ib.push_entry(symlink("/2", "b0"));
         // Flush this hunk but leave the band incomplete.
-        let hunks = ib.finish(monitor.clone())?;
+        let hunks = ib.finish()?;
         assert_eq!(hunks, 2);
         assert_eq!(
             monitor.get_counter(Counter::IndexWrites),
@@ -286,13 +289,13 @@ mod test {
         let monitor = TestMonitor::arc();
         let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0001");
-        let mut ib = band.index_builder();
+        let mut ib = band.index_writer(MAX_ENTRIES, monitor.clone());
         ib.push_entry(symlink("/0", "b1"));
         ib.push_entry(symlink("/1", "b1"));
-        ib.finish_hunk(monitor.clone())?;
+        ib.finish_hunk()?;
         ib.push_entry(symlink("/2", "b1"));
         ib.push_entry(symlink("/3", "b1"));
-        let hunks = ib.finish(monitor.clone())?;
+        let hunks = ib.finish()?;
         assert_eq!(hunks, 2);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
         band.close(2)?;
@@ -301,12 +304,12 @@ mod test {
         let monitor = TestMonitor::arc();
         let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0002");
-        let mut ib = band.index_builder();
+        let mut ib = band.index_writer(MAX_ENTRIES, monitor.clone());
         ib.push_entry(symlink("/0", "b2"));
-        ib.finish_hunk(monitor.clone())?;
+        ib.finish_hunk()?;
         ib.push_entry(symlink("/2", "b2"));
         // incomplete
-        let hunks = ib.finish(monitor.clone())?;
+        let hunks = ib.finish()?;
         assert_eq!(hunks, 2);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
 
@@ -322,10 +325,10 @@ mod test {
         let monitor = TestMonitor::arc();
         let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0005");
-        let mut ib = band.index_builder();
+        let mut ib = band.index_writer(MAX_ENTRIES, monitor.clone());
         ib.push_entry(symlink("/0", "b5"));
         ib.push_entry(symlink("/00", "b5"));
-        let hunks = ib.finish(monitor.clone())?;
+        let hunks = ib.finish()?;
         assert_eq!(hunks, 1);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
         // incomplete
