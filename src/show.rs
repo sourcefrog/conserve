@@ -110,7 +110,8 @@ pub async fn show_versions(
             let sizes = archive
                 .open_stored_tree(BandSelectionPolicy::Specified(band_id))
                 .await?
-                .size(Exclude::nothing(), monitor.clone())?;
+                .size(Exclude::nothing(), monitor.clone())
+                .await?;
             l.push(format!(
                 "{:>14}",
                 crate::misc::bytes_to_human_mb(sizes.file_bytes)
@@ -128,26 +129,4 @@ pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
     let index_entries: Vec<Vec<IndexEntry>> = band.index().iter_available_hunks().collect();
     serde_json::ser::to_writer_pretty(bw, &index_entries)
         .map_err(|source| Error::SerializeJson { source })
-}
-
-pub fn show_entry_names<E: EntryTrait, I: Iterator<Item = E>>(
-    it: I,
-    w: &mut dyn Write,
-    long_listing: bool,
-) -> Result<()> {
-    let mut bw = BufWriter::new(w);
-    for entry in it {
-        if long_listing {
-            writeln!(
-                bw,
-                "{} {} {}",
-                entry.unix_mode(),
-                entry.owner(),
-                entry.apath()
-            )?;
-        } else {
-            writeln!(bw, "{}", entry.apath())?;
-        }
-    }
-    Ok(())
 }

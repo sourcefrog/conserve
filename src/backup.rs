@@ -126,9 +126,9 @@ pub async fn backup(
         file_combiner: FileCombiner::new(archive.block_dir.clone(), options.max_block_size),
     };
 
-    while let Some(pair) = merge.next() {
-        trace!(?pair);
-        let (basis_entry, source_entry) = pair.into_options();
+    while let Some(merged_entries) = merge.next().await {
+        trace!(?merged_entries);
+        let (basis_entry, source_entry) = merged_entries.into_options();
         if let Some(source_entry) = source_entry {
             trace!(apath = %source_entry.apath(), has_basis = basis_entry.is_some(), "Copying");
             task.set_name(format!("Backup {}", source_entry.apath()));

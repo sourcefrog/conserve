@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
 use crate::blockdir::BlockDir;
-use crate::index::entry::IndexEntry;
+use crate::index::stitch::Stitch;
 use crate::jsonio::{read_json, write_json};
 use crate::monitor::Monitor;
 use crate::transport::Transport;
@@ -126,10 +126,11 @@ impl Archive {
         subtree: Apath,
         exclude: Exclude,
         monitor: Arc<dyn Monitor>,
-    ) -> Result<impl Iterator<Item = IndexEntry>> {
-        self.open_stored_tree(band_selection)
+    ) -> Result<Stitch> {
+        Ok(self
+            .open_stored_tree(band_selection)
             .await?
-            .iter_entries(subtree, exclude, monitor)
+            .iter_entries(subtree, exclude, monitor))
     }
 
     /// Returns a vector of band ids, in sorted order from first to last.

@@ -390,9 +390,13 @@ async fn empty_file_uses_zero_blocks() {
         .open_stored_tree(BandSelectionPolicy::Latest)
         .await
         .unwrap();
-    let empty_entry = st
+    let entries = st
         .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
-        .unwrap()
+        .collect_all()
+        .await
+        .unwrap();
+    let empty_entry = entries
+        .iter()
         .find(|i| &i.apath == "/empty")
         .expect("found one entry");
     assert_eq!(empty_entry.addrs, []);
@@ -574,19 +578,16 @@ async fn many_small_files_combined_to_one_block() {
         .open_stored_tree(BandSelectionPolicy::Latest)
         .await
         .unwrap();
-    let mut entry_iter = tree
+    let entries = tree
         .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+        .collect_all()
+        .await
         .unwrap();
-    assert_eq!(entry_iter.next().unwrap().apath(), "/");
-    for (i, entry) in entry_iter.enumerate() {
+    assert_eq!(entries[0].apath(), "/");
+    for (i, entry) in entries.iter().skip(1).enumerate() {
         assert_eq!(entry.apath().to_string(), format!("/file{i:04}"));
     }
-    assert_eq!(
-        tree.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
-            .unwrap()
-            .count(),
-        2000
-    );
+    assert_eq!(entries.len(), 2000);
 }
 
 #[tokio::test]
@@ -634,19 +635,16 @@ async fn mixed_medium_small_files_two_hunks() {
         .open_stored_tree(BandSelectionPolicy::Latest)
         .await
         .unwrap();
-    let mut entry_iter = tree
+    let entries = tree
         .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+        .collect_all()
+        .await
         .unwrap();
-    assert_eq!(entry_iter.next().unwrap().apath(), "/");
-    for (i, entry) in entry_iter.enumerate() {
+    assert_eq!(entries[0].apath(), "/");
+    for (i, entry) in entries.iter().skip(1).enumerate() {
         assert_eq!(entry.apath().to_string(), format!("/file{i:04}"));
     }
-    assert_eq!(
-        tree.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
-            .unwrap()
-            .count(),
-        2000
-    );
+    assert_eq!(entries.len(), 2000);
 }
 
 #[tokio::test]
