@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2022 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 //! Apaths in memory are simply strings.
 
 use std::cmp::{Ordering, PartialEq};
-use std::ffi::OsStr;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -108,17 +107,6 @@ impl FromStr for Apath {
         } else {
             Ok(Apath(s.to_owned()))
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct DecodeFilenameError<'name> {
-    name: &'name OsStr,
-}
-
-impl fmt::Display for DecodeFilenameError<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Couldn't decode filename {:?}", self.name)
     }
 }
 
