@@ -1,4 +1,4 @@
-// Copyright 2021-2024 Martin Pool.
+// Copyright 2021-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,7 +13,6 @@
 //! Tests for the diff API.
 
 use filetime::{set_file_mtime, FileTime};
-use itertools::Itertools;
 
 use conserve::monitor::test::TestMonitor;
 use conserve::test_fixtures::{ScratchArchive, TreeFixture};
@@ -45,9 +44,11 @@ async fn diff_unchanged() {
         ..DiffOptions::default()
     };
     let monitor = TestMonitor::arc();
-    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options, monitor.clone())
+    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, monitor.clone())
+        .await
         .unwrap()
-        .collect();
+        .collect()
+        .await;
     dbg!(&changes);
     assert_eq!(changes.len(), 2); // Root directory and the file "/thing".
     assert_eq!(changes[0].apath, "/");
@@ -62,9 +63,11 @@ async fn diff_unchanged() {
         include_unchanged: false,
         ..DiffOptions::default()
     };
-    let changes = diff(&st, &tf.live_tree(), &options, TestMonitor::arc())
+    let changes = diff(&st, &tf.live_tree(), options, TestMonitor::arc())
+        .await
         .unwrap()
-        .collect_vec();
+        .collect()
+        .await;
     println!("changes with include_unchanged=false:\n{changes:#?}");
     assert_eq!(changes.len(), 0);
 }
@@ -87,9 +90,11 @@ async fn mtime_only_change_reported_as_changed() {
         include_unchanged: false,
         ..DiffOptions::default()
     };
-    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options, TestMonitor::arc())
+    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, TestMonitor::arc())
+        .await
         .unwrap()
-        .collect();
+        .collect()
+        .await;
     dbg!(&changes);
     assert_eq!(changes.len(), 1);
     assert_eq!(changes[0].apath, "/thing");
@@ -122,9 +127,11 @@ async fn chgrp_reported_as_changed() {
         include_unchanged: false,
         ..DiffOptions::default()
     };
-    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options, TestMonitor::arc())
+    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, TestMonitor::arc())
+        .await
         .unwrap()
-        .collect();
+        .collect()
+        .await;
     dbg!(&changes);
     assert_eq!(changes.len(), 1);
     assert_eq!(changes[0].apath, "/thing");
@@ -161,9 +168,11 @@ async fn symlink_target_change_reported_as_changed() {
         include_unchanged: false,
         ..DiffOptions::default()
     };
-    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), &options, TestMonitor::arc())
+    let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, TestMonitor::arc())
+        .await
         .unwrap()
-        .collect();
+        .collect()
+        .await;
     dbg!(&changes);
     assert_eq!(changes.len(), 1);
     assert_eq!(changes[0].apath, "/link");

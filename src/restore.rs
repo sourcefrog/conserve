@@ -85,13 +85,13 @@ pub async fn restore(
     //     // deleted or changed while this is running.
     //     progress_bar.set_bytes_total(st.size(options.excludes.clone())?.file_bytes as u64);
     // }
-    let entry_iter = st.iter_entries(
+    let mut stitch = st.iter_entries(
         options.only_subtree.clone().unwrap_or_else(Apath::root),
         options.exclude.clone(),
         monitor.clone(),
-    )?;
+    );
     let mut deferrals = Vec::new();
-    for entry in entry_iter {
+    while let Some(entry) = stitch.next().await {
         task.set_name(format!("Restore {}", entry.apath));
         let path = destination.join(&entry.apath[1..]);
         match entry.kind() {

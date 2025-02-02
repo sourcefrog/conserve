@@ -49,12 +49,13 @@ impl StoredTree {
         self.band.is_closed()
     }
 
-    pub fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
+    pub async fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
         let mut file_bytes = 0u64;
         let task = monitor.start_task("Measure tree".to_string());
-        for e in self.iter_entries(Apath::from("/"), exclude, monitor.clone())? {
+        let mut stitch = self.iter_entries(Apath::from("/"), exclude, monitor.clone());
+        while let Some(entry) = stitch.next().await {
             // While just measuring size, ignore directories/files we can't stat.
-            if let Some(bytes) = e.size() {
+            if let Some(bytes) = entry.size() {
                 monitor.count(Counter::Files, 1);
                 monitor.count(Counter::FileBytes, bytes as usize);
                 file_bytes += bytes;
@@ -72,15 +73,9 @@ impl StoredTree {
         subtree: Apath,
         exclude: Exclude,
         monitor: Arc<dyn Monitor>,
-    ) -> Result<Stitch> {
+    ) -> Stitch {
         // TODO: Pass in this band so that we don't need to reopen it.
-        Ok(Stitch::new(
-            &self.archive,
-            self.band.id(),
-            subtree,
-            exclude,
-            monitor,
-        ))
+        Stitch::new(&self.archive, self.band.id(), subtree, exclude, monitor)
     }
 }
 
@@ -94,25 +89,24 @@ mod test {
     use super::super::*;
 
     #[tokio::test]
-    async fn open_stored_tree() {
+    async fn open_stored_tree() -> Result<()> {
         // tracing_subscriber::fmt::init();
 
         let af = ScratchArchive::new();
         af.store_two_versions().await;
 
         let last_band_id = af.last_band_id().await.unwrap().unwrap();
-        let st = af
-            .open_stored_tree(BandSelectionPolicy::Latest)
-            .await
-            .unwrap();
+        let st = af.open_stored_tree(BandSelectionPolicy::Latest).await?;
 
         assert_eq!(st.band().id(), last_band_id);
 
         let monitor = TestMonitor::arc();
         let names: Vec<String> = st
             .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
-            .unwrap()
-            .map(|e| e.apath.into())
+            .collect_all()
+            .await?
+            .into_iter()
+            .map(|e| e.apath.to_string())
             .collect();
         let expected = if SYMLINKS_SUPPORTED {
             vec![
@@ -127,6 +121,7 @@ mod test {
             vec!["/", "/hello", "/hello2", "/subdir", "/subdir/subfile"]
         };
         assert_eq!(names, expected);
+        Ok(())
     }
 
     #[tokio::test]
@@ -142,7 +137,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn iter_entries() {
+    async fn iter_entries() -> Result<()> {
         let archive = Archive::open_path(Path::new("testdata/archive/minimal/v0.6.3/")).unwrap();
         let st = archive
             .open_stored_tree(BandSelectionPolicy::Latest)
@@ -152,10 +147,13 @@ mod test {
         let monitor = TestMonitor::arc();
         let names: Vec<String> = st
             .iter_entries("/subdir".into(), Exclude::nothing(), monitor.clone())
-            .unwrap()
+            .collect_all()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
 
         assert_eq!(names.as_slice(), ["/subdir", "/subdir/subfile"]);
+        Ok(())
     }
 }

@@ -437,7 +437,8 @@ impl Command {
                     include_unchanged: *include_unchanged,
                 };
                 let mut bw = BufWriter::new(stdout);
-                for change in diff(&st, &source, &options, monitor.clone())? {
+                let mut diff = diff(&st, &source, options, monitor.clone()).await?;
+                while let Some(change) = diff.next().await {
                     if *json {
                         serde_json::to_writer(&mut bw, &change)?;
                     } else {
@@ -478,32 +479,36 @@ impl Command {
                 long_listing,
             } => {
                 let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
-                let entry_iter: Box<dyn Iterator<Item = EntryValue>> =
-                    if let Some(archive) = &stos.archive {
-                        // TODO: Option for subtree.
-                        Box::new(
-                            stored_tree_from_opt(archive, &stos.backup)
-                                .await?
-                                .iter_entries(Apath::root(), exclude, monitor.clone())?
-                                .map(|it| it.into()),
-                        )
-                    } else {
-                        Box::new(
-                            SourceTree::open(stos.source.clone().unwrap())?.iter_entries(
-                                Apath::root(),
-                                exclude,
-                                monitor.clone(),
-                            )?,
-                        )
-                    };
-                monitor.clear_progress_bars();
-                if *json {
-                    for entry in entry_iter {
-                        println!("{}", serde_json::ser::to_string(&entry)?);
+                if let Some(archive) = &stos.archive {
+                    // TODO: Option for subtree.
+                    let mut stitch = stored_tree_from_opt(archive, &stos.backup)
+                        .await?
+                        .iter_entries(Apath::root(), exclude, monitor.clone());
+                    while let Some(entry) = stitch.next().await {
+                        // Strip off index internals like addresses; this seems
+                        // like not quite the right way to do it, maybe the types should
+                        // be different, or these should be a specific method to produce
+                        // this json format...?
+                        let entry: EntryValue = entry.into();
+                        if *json {
+                            println!("{}", serde_json::ser::to_string(&entry)?);
+                        } else {
+                            println!("{}", entry.format_ls(*long_listing));
+                        }
                     }
                 } else {
-                    show::show_entry_names(entry_iter, &mut stdout, *long_listing)?;
-                }
+                    // TODO: Can maybe unify these more when the source tree iter is also async.
+                    let entry_iter = SourceTree::open(stos.source.clone().unwrap())?
+                        .iter_entries(Apath::root(), exclude, monitor.clone())?;
+                    for entry in entry_iter {
+                        if *json {
+                            println!("{}", serde_json::ser::to_string(&entry)?);
+                        } else {
+                            println!("{}", entry.format_ls(*long_listing));
+                        }
+                    }
+                };
+                monitor.clear_progress_bars();
             }
             #[cfg(windows)]
             Command::Mount {
@@ -581,7 +586,8 @@ impl Command {
                 let size = if let Some(archive) = &stos.archive {
                     stored_tree_from_opt(archive, &stos.backup)
                         .await?
-                        .size(exclude, monitor.clone())?
+                        .size(exclude, monitor.clone())
+                        .await?
                         .file_bytes
                 } else {
                     SourceTree::open(stos.source.as_ref().unwrap())?

@@ -192,6 +192,10 @@ async fn backup_after_damage(
         )
         .await
         .expect("iter entries")
+        .collect_all()
+        .await
+        .unwrap()
+        .into_iter()
         .map(|e| e.apath().to_string())
         .collect_vec();
 
