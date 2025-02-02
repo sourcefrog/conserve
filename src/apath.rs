@@ -291,6 +291,8 @@ impl DebugCheckOrder {
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
     use super::Apath;
 
     #[test]
@@ -376,6 +378,8 @@ mod test {
         ];
         for v in invalid_cases.iter() {
             assert!(!Apath::is_valid(v), "{v:?} incorrectly marked valid");
+            let err = Apath::from_str(v).unwrap_err();
+            assert_eq!(format!("{}", err), "Invalid apath: must have an initial slash and no ..");
         }
     }
 
