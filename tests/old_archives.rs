@@ -75,8 +75,8 @@ fn examine_archive() {
 }
 
 #[traced_test]
-#[test]
-fn validate_archive() {
+#[tokio::test]
+async fn validate_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         println!("validate {ver}");
         let archive = open_old_archive(ver, "minimal");
