@@ -71,12 +71,7 @@ pub struct Transport {
 impl Transport {
     /// Open a new local transport addressing a filesystem directory.
     pub fn local(path: &Path) -> Self {
-        Transport {
-            protocol: Arc::new(local::Protocol::new(path)),
-            record_calls: false,
-            sub_path: String::new(),
-            calls: Arc::new(Mutex::new(Vec::new())),
-        }
+        Transport::from_protocol(Arc::new(local::Protocol::new(path)))
     }
 
     /// Open a new transport from a string that might be a URL or local path.
@@ -85,6 +80,28 @@ impl Transport {
             Transport::from_url(&url)
         } else {
             Ok(Transport::local(Path::new(s)))
+        }
+    }
+
+    /// Make a new Transport addressing a new temporary directory.
+    ///
+    /// This is useful for tests that need a temporary directory.
+    ///
+    /// The directory will be deleted when all related Transports are dropped.
+    ///
+    /// # Panics
+    ///
+    /// If the temporary directory cannot be created.
+    pub fn temp() -> Self {
+        Transport::from_protocol(Arc::new(local::Protocol::temp()))
+    }
+
+    fn from_protocol(protocol: Arc<dyn Protocol>) -> Self {
+        Transport {
+            protocol,
+            record_calls: false,
+            sub_path: String::new(),
+            calls: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -112,12 +129,7 @@ impl Transport {
                 })
             }
         };
-        Ok(Transport {
-            protocol,
-            record_calls: false,
-            sub_path: String::new(),
-            calls: Arc::new(Mutex::new(Vec::new())),
-        })
+        Ok(Transport::from_protocol(protocol))
     }
 
     /// Start recording operations from this and any derived transports.

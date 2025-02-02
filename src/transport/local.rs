@@ -19,6 +19,7 @@ use std::sync::Arc;
 use std::{io, path};
 
 use bytes::Bytes;
+use tempfile::TempDir;
 use tracing::{error, instrument, trace, warn};
 use url::Url;
 
@@ -28,6 +29,7 @@ use super::{Error, ListDir, Metadata, Result, WriteMode};
 pub(super) struct Protocol {
     path: PathBuf,
     url: Url,
+    tempdir: Option<Arc<TempDir>>,
 }
 
 impl Protocol {
@@ -36,6 +38,27 @@ impl Protocol {
             path: path.to_owned(),
             url: Url::from_directory_path(path::absolute(path).expect("make path absolute"))
                 .expect("convert path to URL"),
+            tempdir: None,
+        }
+    }
+
+    /// Create a new temporary directory for testing.
+    ///
+    /// The tempdir will be removed when all derived Protocols (and Transports)
+    /// are dropped.
+    ///
+    /// # Panics
+    ///
+    /// If the directory can't be created.
+    pub(super) fn temp() -> Self {
+        let tempdir = TempDir::new().expect("Create tempdir");
+        let path = tempdir.path().to_owned();
+        let url = Url::from_directory_path(path::absolute(&path).expect("make path absolute"))
+            .expect("convert path to URL");
+        Protocol {
+            path,
+            url,
+            tempdir: Some(Arc::new(tempdir)),
         }
     }
 
@@ -159,6 +182,7 @@ impl super::Protocol for Protocol {
         Arc::new(Protocol {
             path: self.path.join(relpath),
             url: self.url.join(relpath).expect("join URL"),
+            tempdir: self.tempdir.clone(),
         })
     }
 
@@ -380,5 +404,30 @@ mod test {
             *transport.recorded_calls().last().unwrap(),
             Call(Verb::RemoveDirAll, "aaa".into())
         );
+    }
+
+    #[test]
+    fn temp() {
+        let transport = Transport::temp();
+        let path = transport.local_path().expect("local_path");
+        assert!(path.is_dir());
+
+        // Make some files and directories
+        transport
+            .write_file("hey", b"hi there", WriteMode::CreateNew)
+            .unwrap();
+        transport.create_dir("subdir").unwrap();
+        let t2 = transport.chdir("subdir");
+        t2.write_file("subfile", b"subcontent", WriteMode::CreateNew)
+            .unwrap();
+
+        // After dropping the first transport, the tempdir still exists
+        drop(transport);
+        assert!(path.is_dir());
+        assert!(t2.list_dir(".").is_ok());
+
+        // After dropping both references, the tempdir is removed
+        drop(t2);
+        assert!(!path.is_dir());
     }
 }
