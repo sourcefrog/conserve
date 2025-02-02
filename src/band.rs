@@ -28,7 +28,7 @@ use crate::transport::Transport;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
@@ -145,6 +145,7 @@ impl Band {
             .last_band_id()
             .await?
             .map_or_else(BandId::zero, |b| b.next_sibling());
+        trace!(?band_id, "Create band");
         let transport = archive.transport().chdir(&band_id.to_string());
         transport.create_dir("")?;
         transport.create_dir(INDEX_DIR)?;

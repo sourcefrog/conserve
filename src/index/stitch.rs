@@ -267,12 +267,10 @@ mod test {
         //   1 was deleted in b2, 2 is carried over from b2,
         //   and 3 is carried over from b1.
 
-        const MAX_ENTRIES: usize = 100;
-
         let monitor = TestMonitor::arc();
         let band = Band::create(&af).await?;
         assert_eq!(band.id(), BandId::zero());
-        let mut ib = band.index_writer(MAX_ENTRIES, monitor.clone());
+        let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b0"));
         ib.push_entry(symlink("/1", "b0"));
         ib.finish_hunk()?;
@@ -289,7 +287,7 @@ mod test {
         let monitor = TestMonitor::arc();
         let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0001");
-        let mut ib = band.index_writer(MAX_ENTRIES, monitor.clone());
+        let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b1"));
         ib.push_entry(symlink("/1", "b1"));
         ib.finish_hunk()?;
@@ -304,7 +302,7 @@ mod test {
         let monitor = TestMonitor::arc();
         let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0002");
-        let mut ib = band.index_writer(MAX_ENTRIES, monitor.clone());
+        let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b2"));
         ib.finish_hunk()?;
         ib.push_entry(symlink("/2", "b2"));
@@ -325,7 +323,7 @@ mod test {
         let monitor = TestMonitor::arc();
         let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0005");
-        let mut ib = band.index_writer(MAX_ENTRIES, monitor.clone());
+        let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b5"));
         ib.push_entry(symlink("/00", "b5"));
         let hunks = ib.finish()?;
@@ -355,8 +353,9 @@ mod test {
         Ok(())
     }
 
-    /// Testing that the StitchedIndexHunks iterator does not loops forever on archives with at least one band
-    /// but no completed bands.
+    /// Testing that the StitchedIndexHunks iterator does not loop forever on
+    /// archives with at least one band but no completed bands.
+    ///
     /// Reference: https://github.com/sourcefrog/conserve/pull/175
     #[tokio::test]
     async fn issue_175() {

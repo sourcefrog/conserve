@@ -534,6 +534,7 @@ async fn small_files_combined_two_backups() {
 
 #[tokio::test]
 async fn many_small_files_combined_to_one_block() {
+    // tracing_subscriber::fmt::init();
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     // The directory also counts as an entry, so we should be able to fit 1999
@@ -590,6 +591,8 @@ async fn many_small_files_combined_to_one_block() {
 
 #[tokio::test]
 async fn mixed_medium_small_files_two_hunks() {
+    // tracing_subscriber::fmt::init();
+
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     const MEDIUM_LENGTH: u64 = 150_000;
