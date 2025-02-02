@@ -20,7 +20,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use itertools::Itertools;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -213,11 +212,11 @@ impl Archive {
         let archive = self.clone();
         let task = monitor.start_task("Find referenced blocks".to_string());
         Ok(band_ids
-            .par_iter()
+            .iter()
             .map(move |band_id| Band::open(&archive, *band_id).expect("Failed to open band"))
-            .flat_map_iter(|band| band.index().iter_available_hunks())
+            .flat_map(|band| band.index().iter_available_hunks())
             .flatten()
-            .flat_map_iter(|entry| entry.addrs)
+            .flat_map(|entry| entry.addrs)
             .map(|addr| addr.hash)
             .inspect(|_| {
                 task.increment(1);
@@ -283,7 +282,7 @@ impl Archive {
         let task = monitor.start_task("Measure unreferenced blocks".to_string());
         task.set_total(unref_count);
         let total_bytes = unref
-            .par_iter()
+            .iter()
             .enumerate()
             .inspect(|_| {
                 task.increment(1);
@@ -306,7 +305,7 @@ impl Archive {
             let task = monitor.start_task("Delete blocks".to_string());
             task.set_total(unref_count);
             let error_count = unref
-                .par_iter()
+                .into_iter()
                 .filter(|block_hash| {
                     task.increment(1);
                     self.block_dir.delete_block(block_hash).is_err()

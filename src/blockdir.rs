@@ -28,7 +28,6 @@ use std::sync::{Arc, RwLock};
 
 use bytes::Bytes;
 use lru::LruCache;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
 use tracing::{debug, warn};
@@ -356,7 +355,7 @@ impl BlockDir {
         let subdirs = self.subdirs()?;
         task.set_total(subdirs.len());
         Ok(subdirs
-            .into_par_iter()
+            .into_iter()
             .map(move |subdir_name| {
                 let r = transport.list_dir(&subdir_name);
                 task.increment(1);
