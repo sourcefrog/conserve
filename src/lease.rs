@@ -229,12 +229,11 @@ pub struct LeaseContent {
 
 #[cfg(test)]
 mod test {
-    use std::fs::{write, File};
     use std::process;
     use std::time::Duration;
 
     use assert_matches::assert_matches;
-    use tempfile::TempDir;
+    use pretty_assertions::assert_eq;
 
     use super::*;
 
@@ -244,10 +243,9 @@ mod test {
             lease_expiry: Duration::from_secs(60),
             renewal_interval: Duration::from_secs(10),
         };
-        let tmp = TempDir::new().unwrap();
-        let transport = &Transport::local(tmp.path());
+        let transport = &Transport::temp();
         let lease = Lease::acquire(transport, &options).unwrap();
-        assert!(tmp.path().join("LEASE").exists());
+        assert!(transport.is_file(LEASE_FILENAME).unwrap());
         let orig_lease_taken = lease.content.acquired;
 
         let peeked = Lease::peek(transport).unwrap();
@@ -270,7 +268,7 @@ mod test {
         }
 
         lease.release().unwrap();
-        assert!(!tmp.path().join("LEASE").exists());
+        assert!(!transport.is_file("LEASE").unwrap());
     }
 
     #[test]
@@ -279,10 +277,9 @@ mod test {
             lease_expiry: Duration::from_secs(60),
             renewal_interval: Duration::from_secs(10),
         };
-        let tmp = TempDir::new().unwrap();
-        let transport = Transport::local(tmp.path());
+        let transport = Transport::temp();
         let lease = Lease::acquire(&transport, &options).unwrap();
-        assert!(tmp.path().join("LEASE").exists());
+        assert!(transport.is_file(LEASE_FILENAME).unwrap());
 
         transport.remove_file(LEASE_FILENAME).unwrap();
 
@@ -296,15 +293,14 @@ mod test {
             lease_expiry: Duration::from_secs(60),
             renewal_interval: Duration::from_secs(10),
         };
-        let tmp = TempDir::new().unwrap();
-        let transport = Transport::local(tmp.path());
+        let transport = Transport::temp();
         let lease1 = Lease::acquire(&transport, &options).unwrap();
-        assert!(tmp.path().join("LEASE").exists());
+        assert!(transport.is_file("LEASE").unwrap());
 
         // Delete the lease to make it easy to steal.
         transport.remove_file(LEASE_FILENAME).unwrap();
         let lease2 = Lease::acquire(&transport, &options).unwrap();
-        assert!(tmp.path().join("LEASE").exists());
+        assert!(transport.is_file("LEASE").unwrap());
 
         // Renewal through the first handle should now fail.
         let result = lease1.renew();
@@ -316,11 +312,11 @@ mod test {
 
     #[test]
     fn peek_fixed_lease_content() {
-        let tmp = TempDir::new().unwrap();
-        let transport = &Transport::local(tmp.path());
-        write(
-            tmp.path().join("LEASE"),
-            r#"
+        let transport = &Transport::temp();
+        transport
+            .write(
+                "LEASE",
+                br#"
         {
             "host": "somehost",
             "pid": 1234,
@@ -329,8 +325,9 @@ mod test {
             "expiry": "2021-01-01T12:35:56Z",
             "nonce": 12345
         }"#,
-        )
-        .unwrap();
+                WriteMode::CreateNew,
+            )
+            .unwrap();
         let state = Lease::peek(transport).unwrap();
         dbg!(&state);
         match state {
@@ -353,9 +350,8 @@ mod test {
     /// after it was last written.
     #[test]
     fn peek_corrupt_empty_lease() {
-        let tmp = TempDir::new().unwrap();
-        let transport = &Transport::local(tmp.path());
-        File::create(tmp.path().join("LEASE")).unwrap();
+        let transport = &Transport::temp();
+        transport.write("LEASE", b"", WriteMode::CreateNew).unwrap();
         let state = Lease::peek(transport).unwrap();
         match state {
             LeaseState::Corrupt(mtime) => {
