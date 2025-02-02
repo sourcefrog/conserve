@@ -9,8 +9,6 @@
 
 use std::cmp::Ordering;
 
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-
 use crate::{Apath, IndexRead, Result};
 
 #[derive(Debug)]
@@ -37,7 +35,7 @@ impl IndexHunkIndex {
     pub fn from_index(index: &IndexRead) -> Result<Self> {
         let mut hunk_info = index
             .hunks_available()?
-            .into_par_iter()
+            .into_iter()
             .map(move |hunk_index| {
                 let mut index = index.duplicate();
                 let entries = index.read_hunk(hunk_index)?;
