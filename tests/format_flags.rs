@@ -44,7 +44,7 @@ fn unknown_format_flag_fails_to_open() {
     });
     af.transport()
         .chdir("b0000")
-        .write_file(
+        .write(
             "BANDHEAD",
             &serde_json::to_vec(&head).unwrap(),
             WriteMode::CreateNew,

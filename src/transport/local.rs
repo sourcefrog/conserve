@@ -73,7 +73,7 @@ impl super::Protocol for Protocol {
         &self.url
     }
 
-    fn read_file(&self, relpath: &str) -> Result<Bytes> {
+    fn read(&self, relpath: &str) -> Result<Bytes> {
         fn try_block(path: &Path) -> io::Result<Bytes> {
             let mut file = File::open(path)?;
             let estimated_len: usize = file
@@ -92,7 +92,7 @@ impl super::Protocol for Protocol {
     }
 
     #[instrument(skip(self, content))]
-    fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
+    fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         // TODO: Just write directly; remove if the write fails.
         let full_path = self.full_path(relpath);
         let oops = |err| super::Error::io_error(&full_path, err);
@@ -215,7 +215,7 @@ mod test {
         temp.child(filename).write_str(content).unwrap();
 
         let transport = Transport::local(temp.path()).enable_record();
-        let buf = transport.read_file(filename).unwrap();
+        let buf = transport.read(filename).unwrap();
         assert_eq!(buf, content.as_bytes());
 
         let calls = transport.recorded_calls();
@@ -231,7 +231,7 @@ mod test {
         let transport = Transport::local(temp.path());
 
         let err = transport
-            .read_file("nonexistent.json")
+            .read("nonexistent.json")
             .expect_err("read_file should fail on nonexistent file");
 
         let message = err.to_string();
@@ -302,7 +302,7 @@ mod test {
 
         transport.create_dir("subdir").unwrap();
         transport
-            .write_file(
+            .write(
                 "subdir/subfile",
                 b"Must I paint you a picture?",
                 WriteMode::CreateNew,
@@ -329,7 +329,7 @@ mod test {
         fs::set_permissions(temp.child("file").path(), fs::Permissions::from_mode(0o000))
             .expect("set_permissions");
 
-        let err = transport.read_file("file").unwrap_err();
+        let err = transport.read("file").unwrap_err();
         assert!(!err.is_not_found());
         assert_eq!(err.kind(), transport::ErrorKind::PermissionDenied);
     }
@@ -340,15 +340,12 @@ mod test {
         let transport = Transport::local(temp.path());
         let filename = "filename";
         transport
-            .write_file(filename, b"original content", WriteMode::Overwrite)
+            .write(filename, b"original content", WriteMode::Overwrite)
             .expect("first write succeeds");
         transport
-            .write_file(filename, b"new content", WriteMode::Overwrite)
+            .write(filename, b"new content", WriteMode::Overwrite)
             .expect("write over existing file succeeds");
-        assert_eq!(
-            transport.read_file(filename).unwrap().as_ref(),
-            b"new content"
-        );
+        assert_eq!(transport.read(filename).unwrap().as_ref(), b"new content");
     }
 
     #[test]
@@ -414,11 +411,11 @@ mod test {
 
         // Make some files and directories
         transport
-            .write_file("hey", b"hi there", WriteMode::CreateNew)
+            .write("hey", b"hi there", WriteMode::CreateNew)
             .unwrap();
         transport.create_dir("subdir").unwrap();
         let t2 = transport.chdir("subdir");
-        t2.write_file("subfile", b"subcontent", WriteMode::CreateNew)
+        t2.write("subfile", b"subcontent", WriteMode::CreateNew)
             .unwrap();
 
         // After dropping the first transport, the tempdir still exists

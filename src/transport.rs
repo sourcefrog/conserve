@@ -164,9 +164,9 @@ impl Transport {
     ///
     /// Files in the archive are of bounded size, so it's OK to always read them entirely into
     /// memory, and this is simple to support on all implementations.
-    pub fn read_file(&self, path: &str) -> Result<Bytes> {
+    pub fn read(&self, path: &str) -> Result<Bytes> {
         self.record(Verb::Read, path);
-        self.protocol.read_file(path)
+        self.protocol.read(path)
     }
 
     /// List a directory, separating out file and subdirectory names.
@@ -198,9 +198,9 @@ impl Transport {
         }
     }
 
-    pub fn write_file(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()> {
+    pub fn write(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()> {
         self.record(Verb::Write, relpath);
-        self.protocol.write_file(relpath, content, mode)
+        self.protocol.write(relpath, content, mode)
     }
 
     pub fn create_dir(&self, relpath: &str) -> Result<()> {
@@ -260,7 +260,7 @@ pub enum WriteMode {
 }
 
 trait Protocol: std::fmt::Debug + Send + Sync {
-    fn read_file(&self, path: &str) -> Result<Bytes>;
+    fn read(&self, path: &str) -> Result<Bytes>;
 
     /// Write a complete file.
     ///
@@ -268,7 +268,7 @@ trait Protocol: std::fmt::Debug + Send + Sync {
     ///
     /// As much as possible, the file should be written atomically so that it is only visible with
     /// the complete content.
-    fn write_file(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()>;
+    fn write(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()>;
     fn list_dir(&self, relpath: &str) -> Result<ListDir>;
     fn create_dir(&self, relpath: &str) -> Result<()>;
 

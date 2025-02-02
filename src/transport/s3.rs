@@ -255,7 +255,7 @@ impl super::Protocol for Protocol {
         Ok(result)
     }
 
-    fn read_file(&self, relpath: &str) -> Result<Bytes> {
+    fn read(&self, relpath: &str) -> Result<Bytes> {
         let _span = trace_span!("S3Transport::read_file", %relpath).entered();
         let key = self.join_path(relpath);
         let request = self.client.get_object().bucket(&self.bucket).key(&key);
@@ -284,7 +284,7 @@ impl super::Protocol for Protocol {
     }
 
     #[instrument(skip(self, content))]
-    fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
+    fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let key = self.join_path(relpath);
         let crc32c =
             base64::engine::general_purpose::STANDARD.encode(crc32c::crc32c(content).to_be_bytes());

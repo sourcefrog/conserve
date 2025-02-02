@@ -54,7 +54,7 @@ where
     })?;
     s.push('\n');
     transport
-        .write_file(relpath, s.as_bytes(), WriteMode::CreateNew)
+        .write(relpath, s.as_bytes(), WriteMode::CreateNew)
         .map_err(Error::from)
 }
 
@@ -65,7 +65,7 @@ pub(crate) fn read_json<T>(transport: &Transport, path: &str) -> Result<Option<T
 where
     T: DeserializeOwned,
 {
-    let bytes = match transport.read_file(path) {
+    let bytes = match transport.read(path) {
         Ok(b) => b,
         Err(err) if err.is_not_found() => return Ok(None),
         Err(err) => return Err(err.into()),

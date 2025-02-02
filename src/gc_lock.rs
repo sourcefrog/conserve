@@ -67,7 +67,7 @@ impl GarbageCollectionLock {
         }
         archive
             .transport()
-            .write_file(GC_LOCK, b"{}\n", WriteMode::CreateNew)?;
+            .write(GC_LOCK, b"{}\n", WriteMode::CreateNew)?;
         Ok(GarbageCollectionLock { archive, band_id })
     }
 

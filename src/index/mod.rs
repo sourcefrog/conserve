@@ -116,7 +116,7 @@ impl IndexWriter {
         }
         let compressed_bytes = self.compressor.compress(&json)?;
         self.transport
-            .write_file(&relpath, &compressed_bytes, WriteMode::CreateNew)?;
+            .write(&relpath, &compressed_bytes, WriteMode::CreateNew)?;
         self.hunks_written += 1;
         monitor.count(Counter::IndexWrites, 1);
         monitor.count(Counter::IndexWriteCompressedBytes, compressed_bytes.len());
@@ -176,7 +176,7 @@ impl IndexRead {
     /// Read and parse a specific hunk
     pub fn read_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
         let path = hunk_relpath(hunk_number);
-        let compressed_bytes = match self.transport.read_file(&path) {
+        let compressed_bytes = match self.transport.read(&path) {
             Ok(b) => b,
             Err(err) if err.is_not_found() => {
                 // TODO: Cope with one hunk being missing, while there are still

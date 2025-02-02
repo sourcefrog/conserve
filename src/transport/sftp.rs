@@ -128,7 +128,7 @@ impl super::Protocol for Protocol {
         Ok(ListDir { files, dirs })
     }
 
-    fn read_file(&self, path: &str) -> Result<Bytes> {
+    fn read(&self, path: &str) -> Result<Bytes> {
         let full_path = self.base_path.join(path);
         let url = &self.url.join(path).expect("join URL");
         trace!("read {url}");
@@ -161,7 +161,7 @@ impl super::Protocol for Protocol {
         }
     }
 
-    fn write_file(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
+    fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let full_path = self.base_path.join(relpath);
         trace!(
             "write_file {len:>9} bytes to {full_path:?}",

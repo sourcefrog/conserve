@@ -136,7 +136,7 @@ impl BlockDir {
         self.transport.create_dir(subdir_relpath(&hex_hash))?;
         match self
             .transport
-            .write_file(&relpath, &compressed, WriteMode::CreateNew)
+            .write(&relpath, &compressed, WriteMode::CreateNew)
         {
             Ok(()) => {}
             Err(err) if err.kind() == transport::ErrorKind::AlreadyExists => {
@@ -236,7 +236,7 @@ impl BlockDir {
         monitor.count(Counter::BlockContentCacheMiss, 1);
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
-        let compressed_bytes = self.transport.read_file(&block_relpath)?;
+        let compressed_bytes = self.transport.read(&block_relpath)?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
         if actual_hash != *hash {
@@ -391,7 +391,7 @@ mod test {
         let blockdir = BlockDir::open(transport.clone());
         let monitor = TestMonitor::arc();
         transport
-            .write_file(&block_relpath(&hash), b"", WriteMode::Overwrite)
+            .write(&block_relpath(&hash), b"", WriteMode::Overwrite)
             .unwrap();
         assert!(!blockdir.contains(&hash, monitor.clone()).unwrap());
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);
