@@ -634,11 +634,11 @@ fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolic
     }
 }
 
-fn make_change_callback<'a>(
+fn make_change_callback(
     print_changes: bool,
     ls_long: bool,
     changes_json: &Option<&Path>,
-) -> Result<Option<ChangeCallback<'a>>> {
+) -> Result<Option<ChangeCallback>> {
     if !print_changes && !ls_long && changes_json.is_none() {
         return Ok(None);
     };

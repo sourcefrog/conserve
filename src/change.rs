@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -179,4 +179,4 @@ impl From<&dyn EntryTrait> for KindMetadata {
 }
 
 /// A callback when a changed entry is visited, e.g. during a backup.
-pub type ChangeCallback<'cb> = Box<dyn Fn(&EntryChange) -> Result<()> + 'cb>;
+pub type ChangeCallback = Box<dyn Fn(&EntryChange) -> Result<()> + 'static>;

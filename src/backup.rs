@@ -40,14 +40,14 @@ use crate::stats::{write_compressed_size, write_count, write_duration, write_siz
 use crate::*;
 
 /// Configuration of how to make a backup.
-pub struct BackupOptions<'cb> {
+pub struct BackupOptions {
     /// Exclude these globs from the backup.
     pub exclude: Exclude,
 
     pub max_entries_per_hunk: usize,
 
     /// Call this callback as each entry is successfully stored.
-    pub change_callback: Option<ChangeCallback<'cb>>,
+    pub change_callback: Option<ChangeCallback>,
 
     pub max_block_size: usize,
 
@@ -58,8 +58,8 @@ pub struct BackupOptions<'cb> {
     pub owner: bool,
 }
 
-impl Default for BackupOptions<'_> {
-    fn default() -> BackupOptions<'static> {
+impl Default for BackupOptions {
+    fn default() -> BackupOptions {
         BackupOptions {
             exclude: Exclude::nothing(),
             max_entries_per_hunk: 100_000,
