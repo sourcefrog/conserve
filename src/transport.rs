@@ -28,8 +28,10 @@ use self::record::{Call, Verb};
 
 mod error;
 pub mod local;
+mod protocol;
 #[cfg(feature = "sftp")]
 pub mod sftp;
+use protocol::Protocol;
 
 #[cfg(feature = "s3")]
 pub mod s3;
@@ -258,39 +260,6 @@ pub enum WriteMode {
     /// Create the file if it does not exist, or fail if it does.
     CreateNew,
 }
-
-trait Protocol: std::fmt::Debug + Send + Sync {
-    fn read(&self, path: &str) -> Result<Bytes>;
-
-    /// Write a complete file.
-    ///
-    /// Depending on the [WriteMode] this may either overwrite existing files, or error.
-    ///
-    /// As much as possible, the file should be written atomically so that it is only visible with
-    /// the complete content.
-    fn write(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()>;
-    fn list_dir(&self, relpath: &str) -> Result<ListDir>;
-    fn create_dir(&self, relpath: &str) -> Result<()>;
-
-    /// Get metadata about a file.
-    fn metadata(&self, relpath: &str) -> Result<Metadata>;
-
-    /// Delete a file.
-    fn remove_file(&self, relpath: &str) -> Result<()>;
-
-    /// Delete a directory and all its contents.
-    fn remove_dir_all(&self, relpath: &str) -> Result<()>;
-
-    /// Make a new transport addressing a subdirectory.
-    fn chdir(&self, relpath: &str) -> Arc<dyn Protocol>;
-
-    fn url(&self) -> &Url;
-
-    fn local_path(&self) -> Option<PathBuf> {
-        None
-    }
-}
-
 /// A directory entry read from a transport.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DirEntry {
