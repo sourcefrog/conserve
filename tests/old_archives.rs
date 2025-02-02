@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2020-2023 Martin Pool.
+// Copyright 2020-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,11 +13,10 @@
 
 //! Read archives written by older versions.
 
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fs::{self, metadata, read_dir};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
@@ -220,14 +219,16 @@ fn restore_modify_backup() {
         .expect("overwrite file");
 
         let new_archive = Archive::open_path(archive_temp.path()).expect("Open new archive");
-        let emitted = RefCell::new(Vec::new());
+        let emitted = Arc::new(Mutex::new(Vec::new()));
+        let emitted_clone = emitted.clone();
         let backup_stats = backup(
             &new_archive,
             working_tree.path(),
             &BackupOptions {
-                change_callback: Some(Box::new(|change| {
-                    emitted
-                        .borrow_mut()
+                change_callback: Some(Box::new(move |change| {
+                    emitted_clone
+                        .lock()
+                        .unwrap()
                         .push((change.change.sigil(), change.apath.to_string()));
                     Ok(())
                 })),
@@ -238,7 +239,7 @@ fn restore_modify_backup() {
         .expect("Backup modified tree");
 
         // Check the visited files passed to the callbacks.
-        let emitted = emitted.into_inner();
+        let emitted = emitted.lock().unwrap();
         dbg!(&emitted);
 
         // Expected results for files:

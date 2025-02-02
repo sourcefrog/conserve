@@ -1,4 +1,4 @@
-// Copyright 2015-2024 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,8 +12,8 @@
 
 //! Tests focused on restore.
 
-use std::cell::RefCell;
 use std::fs::{create_dir, write};
+use std::sync::{Arc, Mutex};
 
 use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
@@ -29,10 +29,14 @@ fn simple_restore() {
     af.store_two_versions();
     let destdir = TreeFixture::new();
     let restore_archive = Archive::open_path(af.path()).unwrap();
-    let restored_names = RefCell::new(Vec::new());
+    let restored_names = Arc::new(Mutex::new(Vec::new()));
+    let restored_names_clone = restored_names.clone();
     let options = RestoreOptions {
-        change_callback: Some(Box::new(|entry_change| {
-            restored_names.borrow_mut().push(entry_change.apath.clone());
+        change_callback: Some(Box::new(move |entry_change| {
+            restored_names_clone
+                .lock()
+                .unwrap()
+                .push(entry_change.apath.clone());
             Ok(())
         })),
         ..Default::default()
@@ -54,7 +58,7 @@ fn simple_restore() {
         expected_names.retain(|n| *n != "/link");
     }
     drop(options);
-    assert_eq!(restored_names.into_inner(), expected_names);
+    assert_eq!(restored_names.lock().unwrap().as_slice(), expected_names);
 
     let dest = &destdir.path();
     assert!(dest.join("hello").is_file());

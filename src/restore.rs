@@ -1,4 +1,4 @@
-// Copyright 2015-2024 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ use crate::*;
 
 /// Description of how to restore a tree.
 // #[derive(Debug)]
-pub struct RestoreOptions<'cb> {
+pub struct RestoreOptions {
     pub exclude: Exclude,
     /// Restore only this subdirectory.
     pub only_subtree: Option<Apath>,
@@ -43,10 +43,10 @@ pub struct RestoreOptions<'cb> {
     pub band_selection: BandSelectionPolicy,
 
     // Call this callback as each entry is successfully restored.
-    pub change_callback: Option<ChangeCallback<'cb>>,
+    pub change_callback: Option<ChangeCallback>,
 }
 
-impl Default for RestoreOptions<'_> {
+impl Default for RestoreOptions {
     fn default() -> Self {
         RestoreOptions {
             overwrite: false,
