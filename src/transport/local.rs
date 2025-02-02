@@ -12,7 +12,7 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::fs::{self, create_dir, remove_dir_all, remove_file, File};
+use std::fs::{self, create_dir, read, remove_dir_all, remove_file, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -80,21 +80,10 @@ impl super::Protocol for Protocol {
     }
 
     fn read(&self, relpath: &str) -> Result<Bytes> {
-        fn try_block(path: &Path) -> io::Result<Bytes> {
-            let mut file = File::open(path)?;
-            let estimated_len: usize = file
-                .metadata()?
-                .len()
-                .try_into()
-                .expect("File size fits in usize");
-            let mut out_buf = Vec::with_capacity(estimated_len);
-            let actual_len = file.read_to_end(&mut out_buf)?;
-            trace!("Read {actual_len} bytes");
-            out_buf.truncate(actual_len);
-            Ok(out_buf.into())
-        }
-        let path = &self.full_path(relpath);
-        try_block(path).map_err(|err| Error::io_error(path, err))
+        let full_path = &self.full_path(relpath);
+        read(full_path)
+            .map_err(|err| Error::io_error(full_path, err))
+            .map(Bytes::from)
     }
 
     async fn read_async(&self, relpath: &str) -> Result<Bytes> {
