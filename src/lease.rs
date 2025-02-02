@@ -236,12 +236,11 @@ pub struct LeaseContent {
 
 #[cfg(test)]
 mod test {
-    use std::fs::{write, File};
     use std::process;
     use std::time::Duration;
 
     use assert_matches::assert_matches;
-    use tempfile::TempDir;
+    use pretty_assertions::assert_eq;
 
     use super::*;
 
@@ -251,10 +250,9 @@ mod test {
             lease_expiry: Duration::from_secs(60),
             renewal_interval: Duration::from_secs(10),
         };
-        let tmp = TempDir::new().unwrap();
-        let transport = &Transport::local(tmp.path());
+        let transport = &Transport::temp();
         let lease = Lease::acquire(transport, &options).await.unwrap();
-        assert!(tmp.path().join("LEASE").exists());
+        assert!(transport.is_file("LEASE").await.unwrap());
         let orig_lease_taken = lease.content.acquired;
 
         let peeked = Lease::peek(transport).await.unwrap();
@@ -277,7 +275,7 @@ mod test {
         }
 
         lease.release().await.unwrap();
-        assert!(!tmp.path().join("LEASE").exists());
+        assert!(!transport.is_file("LEASE").await.unwrap());
     }
 
     #[tokio::test]
@@ -286,10 +284,9 @@ mod test {
             lease_expiry: Duration::from_secs(60),
             renewal_interval: Duration::from_secs(10),
         };
-        let tmp = TempDir::new().unwrap();
-        let transport = Transport::local(tmp.path());
+        let transport = Transport::temp();
         let lease = Lease::acquire(&transport, &options).await.unwrap();
-        assert!(tmp.path().join("LEASE").exists());
+        assert!(transport.is_file("LEASE").await.unwrap());
 
         transport.remove_file(LEASE_FILENAME).await.unwrap();
 
@@ -303,15 +300,14 @@ mod test {
             lease_expiry: Duration::from_secs(60),
             renewal_interval: Duration::from_secs(10),
         };
-        let tmp = TempDir::new().unwrap();
-        let transport = Transport::local(tmp.path());
+        let transport = Transport::temp();
         let lease1 = Lease::acquire(&transport, &options).await.unwrap();
-        assert!(tmp.path().join("LEASE").exists());
+        assert!(transport.is_file("LEASE").await.unwrap());
 
         // Delete the lease to make it easy to steal.
         transport.remove_file(LEASE_FILENAME).await.unwrap();
         let lease2 = Lease::acquire(&transport, &options).await.unwrap();
-        assert!(tmp.path().join("LEASE").exists());
+        assert!(transport.is_file("LEASE").await.unwrap());
 
         // Renewal through the first handle should now fail.
         let result = lease1.renew().await;
@@ -323,21 +319,23 @@ mod test {
 
     #[tokio::test]
     async fn peek_fixed_lease_content() {
-        let tmp = TempDir::new().unwrap();
-        let transport = &Transport::local(tmp.path());
-        write(
-            tmp.path().join("LEASE"),
-            r#"
-        {
-            "host": "somehost",
-            "pid": 1234,
-            "client_version": "0.1.2",
-            "acquired": "2021-01-01T12:34:56Z",
-            "expiry": "2021-01-01T12:35:56Z",
-            "nonce": 12345
-        }"#,
-        )
-        .unwrap();
+        let transport = &Transport::temp();
+        transport
+            .write(
+                "LEASE",
+                br#"
+                    {
+                        "host": "somehost",
+                        "pid": 1234,
+                        "client_version": "0.1.2",
+                        "acquired": "2021-01-01T12:34:56Z",
+                        "expiry": "2021-01-01T12:35:56Z",
+                        "nonce": 12345
+                    }"#,
+                WriteMode::CreateNew,
+            )
+            .await
+            .unwrap();
         let state = Lease::peek(transport).await.unwrap();
         dbg!(&state);
         match state {
@@ -360,9 +358,11 @@ mod test {
     /// after it was last written.
     #[tokio::test]
     async fn peek_corrupt_empty_lease() {
-        let tmp = TempDir::new().unwrap();
-        let transport = &Transport::local(tmp.path());
-        File::create(tmp.path().join("LEASE")).unwrap();
+        let transport = &Transport::temp();
+        transport
+            .write("LEASE", b"", WriteMode::CreateNew)
+            .await
+            .unwrap();
         let state = Lease::peek(transport).await.unwrap();
         match state {
             LeaseState::Corrupt(mtime) => {
