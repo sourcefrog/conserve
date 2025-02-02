@@ -130,7 +130,7 @@ pub async fn backup(
         }
         writer.flush_group(monitor.clone())?;
     }
-    stats += writer.finish(monitor.clone())?;
+    stats += writer.finish()?;
     stats.elapsed = start.elapsed();
     let block_stats = &archive.block_dir.stats;
     stats.read_blocks = block_stats.read_blocks.load(Relaxed);
@@ -143,7 +143,7 @@ pub async fn backup(
 /// Accepts files to write in the archive (in apath order.)
 struct BackupWriter {
     band: Band,
-    index_builder: IndexWriter,
+    index_writer: IndexWriter,
     stats: BackupStats,
     block_dir: Arc<BlockDir>,
 
@@ -172,19 +172,19 @@ impl BackupWriter {
                 basis_band_id,
                 Apath::root(),
                 Exclude::nothing(),
-                monitor,
+                monitor.clone(),
             )
         } else {
-            Stitch::empty(archive, monitor)
+            Stitch::empty(archive, monitor.clone())
         }
         .peekable();
 
         // Create the new band only after finding the basis band!
         let band = Band::create(archive).await?;
-        let index_builder = band.index_builder();
+        let index_writer = band.index_writer(options.max_entries_per_hunk, monitor.clone());
         Ok(BackupWriter {
             band,
-            index_builder,
+            index_writer,
             block_dir: archive.block_dir.clone(),
             stats: BackupStats::default(),
             basis_index,
@@ -192,8 +192,8 @@ impl BackupWriter {
         })
     }
 
-    fn finish(self, monitor: Arc<dyn Monitor>) -> Result<BackupStats> {
-        let hunks = self.index_builder.finish(monitor)?;
+    fn finish(self) -> Result<BackupStats> {
+        let hunks = self.index_writer.finish()?;
         self.band.close(hunks as u64)?;
         Ok(BackupStats { ..self.stats })
     }
@@ -202,8 +202,8 @@ impl BackupWriter {
     fn flush_group(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
         let (stats, mut entries) = self.file_combiner.drain(monitor.clone())?;
         self.stats += stats;
-        self.index_builder.append_entries(&mut entries);
-        self.index_builder.finish_hunk(monitor)
+        self.index_writer.append_entries(&mut entries);
+        self.index_writer.finish_hunk()
     }
 
     /// Add one entry to the backup.
@@ -241,7 +241,7 @@ impl BackupWriter {
     ) -> Result<Option<EntryChange>> {
         monitor.count(Counter::Dirs, 1);
         self.stats.directories += 1;
-        self.index_builder
+        self.index_writer
             .push_entry(IndexEntry::metadata_from(source_entry));
         Ok(None) // TODO: Emit the actual change.
     }
@@ -271,7 +271,7 @@ impl BackupWriter {
                         trace!(%apath, "Content same, metadata changed");
                         EntryChange::changed(&basis_entry, source_entry)
                     };
-                    self.index_builder.push_entry(new_entry);
+                    self.index_writer.push_entry(new_entry);
                     return Ok(Some(change));
                 } else {
                     warn!(%apath, "Some referenced blocks are missing or truncated; file will be stored again");
@@ -289,7 +289,7 @@ impl BackupWriter {
         };
         let size = source_entry.size().expect("source entry has a size");
         if size == 0 {
-            self.index_builder
+            self.index_writer
                 .push_entry(IndexEntry::metadata_from(source_entry));
             self.stats.empty_files += 1;
             monitor.count(Counter::EmptyFiles, 1);
@@ -308,7 +308,7 @@ impl BackupWriter {
                     options.max_block_size,
                     monitor.clone(),
                 )?;
-                self.index_builder.push_entry(IndexEntry {
+                self.index_writer.push_entry(IndexEntry {
                     addrs,
                     ..IndexEntry::metadata_from(source_entry)
                 });
@@ -326,7 +326,7 @@ impl BackupWriter {
         let target = source_entry.symlink_target();
         self.stats.symlinks += 1;
         assert!(target.is_some());
-        self.index_builder
+        self.index_writer
             .push_entry(IndexEntry::metadata_from(source_entry));
         // TODO: Emit the actual change.
         Ok(None)
