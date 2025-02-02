@@ -48,6 +48,30 @@ where
             MatchedEntries::Right(be) => EntryChange::added(be),
         }
     }
+
+    // pub(crate) fn right(&self) -> Option<&BE> {
+    //     match self {
+    //         MatchedEntries::Right(be) => Some(be),
+    //         MatchedEntries::Both(_, be) => Some(be),
+    //         MatchedEntries::Left(_) => None,
+    //     }
+    // }
+
+    // pub(crate) fn left(&self) -> Option<&AE> {
+    //     match self {
+    //         MatchedEntries::Left(ae) => Some(ae),
+    //         MatchedEntries::Both(ae, _) => Some(ae),
+    //         MatchedEntries::Right(_) => None,
+    //     }
+    // }
+
+    pub(crate) fn into_options(self) -> (Option<AE>, Option<BE>) {
+        match self {
+            MatchedEntries::Left(ae) => (Some(ae), None),
+            MatchedEntries::Right(be) => (None, Some(be)),
+            MatchedEntries::Both(ae, be) => (Some(ae), Some(be)),
+        }
+    }
 }
 
 /// Zip together entries from two trees, into an iterator of [MatchedEntries].

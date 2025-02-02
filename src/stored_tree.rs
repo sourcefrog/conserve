@@ -95,6 +95,8 @@ mod test {
 
     #[tokio::test]
     async fn open_stored_tree() {
+        // tracing_subscriber::fmt::init();
+
         let af = ScratchArchive::new();
         af.store_two_versions().await;
 
@@ -124,7 +126,7 @@ mod test {
         } else {
             vec!["/", "/hello", "/hello2", "/subdir", "/subdir/subfile"]
         };
-        assert_eq!(expected, names);
+        assert_eq!(names, expected);
     }
 
     #[tokio::test]
