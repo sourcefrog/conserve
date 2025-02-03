@@ -26,9 +26,22 @@ env:
 # TODO: Add -D warnings when that's clean on Windows.
 
 jobs:
+  # Check this file seems clean before launching anything else.
+  action-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check workflow files
+        shell: bash
+        run: |
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          # shellcheck disable=SC2046
+          ./actionlint -color $(find .github/workflows -name '*.yml' -type f ! -name release.yml -print)
+
   # Run tests just on Ubuntu to establish that things basically work,
   # before launching mutants etc
   quick-test:
+    needs: [action-lint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
