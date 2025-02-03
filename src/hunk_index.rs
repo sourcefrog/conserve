@@ -56,9 +56,8 @@ impl IndexHunkIndex {
 
                 Ok(meta_info)
             })
-            .map(Result::ok)
+            .filter_map(Result::ok)
             .flatten()
-            .filter_map(|entry| entry)
             .collect::<Vec<_>>();
 
         /* After parallel execution bring all hunks back into order */
