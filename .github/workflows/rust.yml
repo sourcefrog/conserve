@@ -52,7 +52,7 @@ jobs:
       fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
-        version: [stable, nightly, "1.79"]
+        version: [stable, nightly, "1.82"]
 
     steps:
       - uses: actions/checkout@v4
