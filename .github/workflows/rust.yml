@@ -65,6 +65,7 @@ jobs:
         run: cargo fmt --all -- --check
       - name: clippy
         run: cargo clippy --all-targets --all-features -- --deny clippy::all
+      - run: cargo check --no-default-features --all-targets
       - name: typos
         uses: crate-ci/typos@master
 
