@@ -165,9 +165,9 @@ impl TreeFixture {
     #[cfg(windows)]
     pub fn create_symlink(&self, _relative_path: &str, _target: &str) {}
 
-    pub fn live_tree(&self) -> LiveTree {
+    pub fn live_tree(&self) -> SourceTree {
         // TODO: Maybe allow deref TreeFixture to LiveTree.
-        LiveTree::open(self.path()).unwrap()
+        SourceTree::open(self.path()).unwrap()
     }
 
     #[cfg(unix)]

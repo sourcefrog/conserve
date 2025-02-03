@@ -289,7 +289,7 @@ fn mtime_before_epoch() {
     let t1969 = FileTime::from_unix_time(-36_000, 0);
     set_file_mtime(file_path, t1969).expect("Failed to set file times");
 
-    let lt = LiveTree::open(tf.path()).unwrap();
+    let lt = SourceTree::open(tf.path()).unwrap();
     let monitor = TestMonitor::arc();
     let entries = lt
         .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())

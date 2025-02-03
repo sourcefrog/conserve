@@ -42,7 +42,7 @@ impl Default for DiffOptions {
 /// Generate an iter of per-entry diffs between two trees.
 pub fn diff(
     st: &StoredTree,
-    lt: &LiveTree,
+    lt: &SourceTree,
     options: &DiffOptions,
     monitor: Arc<dyn Monitor>,
 ) -> Result<impl Iterator<Item = EntryChange>> {
