@@ -169,8 +169,13 @@ pub async fn backup(
             }
         } else {
             // This entry was in the basis but not in the source.
-            trace!(apath = %basis_entry.expect("Basis entry must exist if source entry is none").apath(), "Deleted");
+            let basis_entry = basis_entry.expect("Basis entry must exist if source entry is none");
+            trace!(apath = %basis_entry.apath(), "Deleted");
             monitor.count(Counter::EntriesDeleted, 1);
+            options
+                .change_callback
+                .as_ref()
+                .map(|cb| cb(&EntryChange::deleted(&basis_entry)));
         }
     }
     stats += writer.finish(monitor.clone())?;
@@ -643,5 +648,65 @@ impl fmt::Display for BackupStats {
         write_duration(w, "elapsed", self.elapsed)?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::sync::Mutex;
+
+    use assert_fs::prelude::*;
+    use assert_fs::TempDir;
+
+    use crate::monitor::test::TestMonitor;
+    use crate::transport::Transport;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn deleted_files_are_reported() {
+        // tracing_subscriber::fmt::init();
+
+        let transport = Transport::temp();
+        let archive = Archive::create(transport.clone()).unwrap();
+        let src = TempDir::new().unwrap();
+        let monitor = TestMonitor::arc();
+
+        src.child("a").touch().unwrap();
+
+        backup(
+            &archive,
+            src.path(),
+            &backup::BackupOptions::default(),
+            monitor.clone(),
+        )
+        .await
+        .unwrap();
+
+        // Use a sync Mutex here because this is a sync callback.
+        let changes = Arc::new(Mutex::new(Vec::new()));
+        let changes_clone = Arc::clone(&changes); // Clone to move into the closure below, which needs to be 'static
+        let options = BackupOptions {
+            change_callback: Some(Box::new(move |change| {
+                changes_clone.lock().unwrap().push(change.clone());
+                Ok(())
+            })),
+            ..BackupOptions::default()
+        };
+
+        std::fs::remove_file(src.child("a").path()).unwrap();
+        let stats2 = backup(&archive, src.path(), &options, monitor.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(stats2.files, 0);
+        assert_eq!(monitor.get_counter(Counter::EntriesDeleted), 1);
+        assert_eq!(
+            changes.lock().unwrap().len(),
+            1,
+            "should have seen a change for the deletion"
+        );
+        let change = &changes.lock().unwrap()[0];
+        assert_eq!(change.to_string(), "- /a");
     }
 }
