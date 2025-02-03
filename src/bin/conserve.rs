@@ -424,13 +424,13 @@ impl Command {
                 json,
             } => {
                 let st = stored_tree_from_opt(archive, backup)?;
-                let lt = LiveTree::open(source)?;
+                let source = SourceTree::open(source)?;
                 let options = DiffOptions {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     include_unchanged: *include_unchanged,
                 };
                 let mut bw = BufWriter::new(stdout);
-                for change in diff(&st, &lt, &options, monitor.clone())? {
+                for change in diff(&st, &source, &options, monitor.clone())? {
                     if *json {
                         serde_json::to_writer(&mut bw, &change)?;
                     } else {
@@ -478,11 +478,13 @@ impl Command {
                                 .map(|it| it.into()),
                         )
                     } else {
-                        Box::new(LiveTree::open(stos.source.clone().unwrap())?.iter_entries(
-                            Apath::root(),
-                            exclude,
-                            monitor.clone(),
-                        )?)
+                        Box::new(
+                            SourceTree::open(stos.source.clone().unwrap())?.iter_entries(
+                                Apath::root(),
+                                exclude,
+                                monitor.clone(),
+                            )?,
+                        )
                     };
                 monitor.clear_progress_bars();
                 if *json {
@@ -571,7 +573,7 @@ impl Command {
                         .size(exclude, monitor.clone())?
                         .file_bytes
                 } else {
-                    LiveTree::open(stos.source.as_ref().unwrap())?
+                    SourceTree::open(stos.source.as_ref().unwrap())?
                         .size(exclude, monitor.clone())?
                         .file_bytes
                 };

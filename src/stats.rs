@@ -84,7 +84,7 @@ pub struct IndexReadStats {
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct LiveTreeIterStats {
+pub struct SourceIterStats {
     pub directories_visited: usize,
     pub exclusions: usize,
     pub metadata_error: usize,

@@ -95,7 +95,7 @@ pub fn backup(
     let start = Instant::now();
     let mut writer = BackupWriter::begin(archive, options, monitor.clone())?;
     let mut stats = BackupStats::default();
-    let source_tree = LiveTree::open(source_path)?;
+    let source_tree = SourceTree::open(source_path)?;
 
     let task = monitor.start_task("Backup".to_string());
 
@@ -214,7 +214,7 @@ impl BackupWriter {
     fn copy_entry(
         &mut self,
         entry: &EntryValue,
-        source: &LiveTree,
+        source: &SourceTree,
         options: &BackupOptions,
         monitor: Arc<dyn Monitor>,
     ) -> Result<Option<EntryChange>> {
@@ -250,7 +250,7 @@ impl BackupWriter {
     fn copy_file(
         &mut self,
         source_entry: &EntryValue,
-        from_tree: &LiveTree,
+        from_tree: &SourceTree,
         options: &BackupOptions,
         monitor: Arc<dyn Monitor>,
     ) -> Result<Option<EntryChange>> {

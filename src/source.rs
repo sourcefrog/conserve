@@ -11,7 +11,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! Access a "live" on-disk tree as a source for backups, destination for restores, etc.
+//! A source tree on the filesystem.
 
 use std::collections::vec_deque::VecDeque;
 use std::fs;
@@ -25,21 +25,21 @@ use tracing::{error, warn};
 use crate::counters::Counter;
 use crate::entry::KindMeta;
 use crate::monitor::Monitor;
-use crate::stats::LiveTreeIterStats;
+use crate::stats::SourceIterStats;
 use crate::tree::TreeSize;
 use crate::*;
 
 /// A real tree on the filesystem, as a backup source.
 #[derive(Clone)]
-pub struct LiveTree {
+pub struct SourceTree {
     path: PathBuf,
 }
 
-impl LiveTree {
-    /// Open the live tree rooted at `path`.
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<LiveTree> {
+impl SourceTree {
+    /// Open the source tree rooted at `path`.
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<SourceTree> {
         // TODO: Maybe fail here if the root doesn't exist or isn't a directory?
-        Ok(LiveTree {
+        Ok(SourceTree {
             path: path.as_ref().to_path_buf(),
         })
     }
@@ -160,7 +160,7 @@ pub struct Iter {
     /// Patterns to exclude from iteration.
     exclude: Exclude,
 
-    stats: LiveTreeIterStats,
+    stats: SourceIterStats,
 }
 
 impl Iter {
@@ -185,7 +185,7 @@ impl Iter {
             dir_deque,
             check_order: apath::DebugCheckOrder::new(),
             exclude,
-            stats: LiveTreeIterStats::default(),
+            stats: SourceIterStats::default(),
         })
     }
 
@@ -340,7 +340,7 @@ mod test {
     #[test]
     fn open_tree() {
         let tf = TreeFixture::new();
-        let lt = LiveTree::open(tf.path()).unwrap();
+        let lt = SourceTree::open(tf.path()).unwrap();
         assert_eq!(lt.path(), tf.path());
     }
 
@@ -353,7 +353,7 @@ mod test {
         tf.create_file("jam/apricot");
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
-        let lt = LiveTree::open(tf.path()).unwrap();
+        let lt = SourceTree::open(tf.path()).unwrap();
         let result: Vec<EntryValue> = lt
             .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
             .unwrap()
@@ -396,7 +396,7 @@ mod test {
 
         let exclude = Exclude::from_strings(["/**/fooo*", "/**/??[rs]", "/**/*bas"]).unwrap();
 
-        let lt = LiveTree::open(tf.path()).unwrap();
+        let lt = SourceTree::open(tf.path()).unwrap();
         let names = entry_iter_to_apath_strings(
             lt.iter_entries(Apath::root(), exclude, TestMonitor::arc())
                 .unwrap(),
@@ -417,7 +417,7 @@ mod test {
         let tf = TreeFixture::new();
         tf.create_symlink("from", "to");
 
-        let lt = LiveTree::open(tf.path()).unwrap();
+        let lt = SourceTree::open(tf.path()).unwrap();
         let names = entry_iter_to_apath_strings(
             lt.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
                 .unwrap(),
@@ -435,7 +435,7 @@ mod test {
         tf.create_file("subdir/b");
         tf.create_file("zzz");
 
-        let lt = LiveTree::open(tf.path()).unwrap();
+        let lt = SourceTree::open(tf.path()).unwrap();
 
         let names = entry_iter_to_apath_strings(
             lt.iter_entries("/subdir".into(), Exclude::nothing(), TestMonitor::arc())
@@ -452,7 +452,7 @@ mod test {
         tf.create_dir("cache/1");
         cachedir::add_tag(cache_dir).unwrap();
 
-        let lt = LiveTree::open(tf.path()).unwrap();
+        let lt = SourceTree::open(tf.path()).unwrap();
         let names = entry_iter_to_apath_strings(
             lt.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
                 .unwrap(),
