@@ -17,8 +17,6 @@
 
 use std::sync::Arc;
 
-use readahead_iterator::IntoReadahead;
-
 use crate::monitor::Monitor;
 use crate::*;
 
@@ -46,15 +44,11 @@ pub fn diff(
     options: &DiffOptions,
     monitor: Arc<dyn Monitor>,
 ) -> Result<impl Iterator<Item = EntryChange>> {
-    let readahead = 1000;
     let include_unchanged: bool = options.include_unchanged; // Copy out to avoid lifetime problems in the callback
-    let ait = st
-        .iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?
-        .readahead(readahead);
+    let ait = st.iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?;
     let bit = lt
         .iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?
-        .filter(|le| le.kind() != Kind::Unknown)
-        .readahead(readahead);
+        .filter(|le| le.kind() != Kind::Unknown);
     Ok(MergeTrees::new(ait, bit)
         .map(|me| me.to_entry_change())
         .filter(move |c: &EntryChange| include_unchanged || !c.change.is_unchanged()))
