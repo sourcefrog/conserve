@@ -797,7 +797,6 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand",
- "readahead-iterator",
  "regex",
  "rstest",
  "semver",
@@ -2217,12 +2216,6 @@ checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
 dependencies = [
  "rand_core",
 ]
-
-[[package]]
-name = "readahead-iterator"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73ea134c32fe12df286020949d57d052a90c4001f2dbec4c1c074f39bcb7fc8c"
 
 [[package]]
 name = "redox_syscall"
