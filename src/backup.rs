@@ -225,7 +225,7 @@ impl BackupWriter {
     fn copy_entry(
         &mut self,
         basis_entry: &Option<IndexEntry>,
-        mut source_entry: EntryValue,
+        mut source_entry: source::Entry,
         source_tree: &SourceTree,
         options: &BackupOptions,
         monitor: Arc<dyn Monitor>,
@@ -257,7 +257,7 @@ impl BackupWriter {
 
     fn copy_dir(
         &mut self,
-        source_entry: &EntryValue,
+        source_entry: &source::Entry,
         monitor: &dyn Monitor,
     ) -> Result<Option<EntryChange>> {
         monitor.count(Counter::Dirs, 1);
@@ -270,7 +270,7 @@ impl BackupWriter {
     /// Copy in the contents of a file from another tree.
     fn copy_file(
         &mut self,
-        source_entry: &EntryValue,
+        source_entry: &source::Entry,
         source_tree: &SourceTree,
         basis_entry: &Option<IndexEntry>,
         options: &BackupOptions,
@@ -344,7 +344,7 @@ impl BackupWriter {
 
     fn copy_symlink(
         &mut self,
-        source_entry: &EntryValue,
+        source_entry: &source::Entry,
         monitor: &dyn Monitor,
     ) -> Result<Option<EntryChange>> {
         monitor.count(Counter::Symlinks, 1);
@@ -506,7 +506,7 @@ impl FileCombiner {
     /// `entry` should be an IndexEntry that's complete apart from the block addresses.
     fn push_file(
         &mut self,
-        entry: &EntryValue,
+        entry: &source::Entry,
         from_file: &mut dyn Read,
         monitor: Arc<dyn Monitor>,
     ) -> Result<()> {
