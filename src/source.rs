@@ -331,8 +331,10 @@ impl Iterator for Iter {
 
 #[cfg(test)]
 mod test {
+    use itertools::Itertools;
+
     use crate::monitor::test::TestMonitor;
-    use crate::test_fixtures::{entry_iter_to_apath_strings, TreeFixture};
+    use crate::test_fixtures::TreeFixture;
 
     use super::*;
 
@@ -357,7 +359,7 @@ mod test {
             .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
             .unwrap()
             .collect();
-        let names = entry_iter_to_apath_strings(&result);
+        let names: Vec<String> = result.iter().map(|e| e.apath().to_string()).collect();
         // First one is the root
         assert_eq!(
             names,
@@ -396,10 +398,11 @@ mod test {
         let exclude = Exclude::from_strings(["/**/fooo*", "/**/??[rs]", "/**/*bas"]).unwrap();
 
         let lt = SourceTree::open(tf.path()).unwrap();
-        let names = entry_iter_to_apath_strings(
-            lt.iter_entries(Apath::root(), exclude, TestMonitor::arc())
-                .unwrap(),
-        );
+        let names = lt
+            .iter_entries(Apath::root(), exclude, TestMonitor::arc())
+            .unwrap()
+            .map(|e| e.apath().to_string())
+            .collect_vec();
 
         // First one is the root
         assert_eq!(names, ["/", "/baz", "/baz/test"]);
@@ -417,10 +420,11 @@ mod test {
         tf.create_symlink("from", "to");
 
         let lt = SourceTree::open(tf.path()).unwrap();
-        let names = entry_iter_to_apath_strings(
-            lt.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
-                .unwrap(),
-        );
+        let names = lt
+            .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .unwrap()
+            .map(|e| e.apath().to_string())
+            .collect_vec();
 
         assert_eq!(names, ["/", "/from"]);
     }
@@ -436,10 +440,11 @@ mod test {
 
         let lt = SourceTree::open(tf.path()).unwrap();
 
-        let names = entry_iter_to_apath_strings(
-            lt.iter_entries("/subdir".into(), Exclude::nothing(), TestMonitor::arc())
-                .unwrap(),
-        );
+        let names = lt
+            .iter_entries("/subdir".into(), Exclude::nothing(), TestMonitor::arc())
+            .unwrap()
+            .map(|e| e.apath().to_string())
+            .collect_vec();
         assert_eq!(names, ["/subdir", "/subdir/a", "/subdir/b"]);
     }
 
@@ -452,10 +457,11 @@ mod test {
         cachedir::add_tag(cache_dir).unwrap();
 
         let lt = SourceTree::open(tf.path()).unwrap();
-        let names = entry_iter_to_apath_strings(
-            lt.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
-                .unwrap(),
-        );
+        let names = lt
+            .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .unwrap()
+            .map(|e| e.apath().to_string())
+            .collect_vec();
         assert_eq!(names, ["/", "/a"]);
     }
 }
