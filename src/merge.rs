@@ -89,7 +89,7 @@ pub struct MergeTrees {
     /// Peeked next entry from `a`.
     next_a: Option<IndexEntry>,
     /// Peeked next entry from [bit].
-    next_b: Option<EntryValue>,
+    next_b: Option<source::Entry>,
 }
 
 impl MergeTrees {
@@ -102,7 +102,7 @@ impl MergeTrees {
         }
     }
 
-    pub(crate) async fn next(&mut self) -> Option<MatchedEntries<IndexEntry, EntryValue>> {
+    pub(crate) async fn next(&mut self) -> Option<MatchedEntries<IndexEntry, source::Entry>> {
         // Preload next-A and next-B, if they're not already loaded.
         if self.next_a.is_none() {
             self.next_a = self.a.next().await;

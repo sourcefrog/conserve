@@ -489,9 +489,8 @@ impl Command {
                         // like not quite the right way to do it, maybe the types should
                         // be different, or these should be a specific method to produce
                         // this json format...?
-                        let entry: EntryValue = entry.into();
                         if *json {
-                            println!("{}", serde_json::ser::to_string(&entry)?);
+                            println!("{}", entry.listing_json());
                         } else {
                             println!("{}", entry.format_ls(*long_listing));
                         }
@@ -502,7 +501,7 @@ impl Command {
                         .iter_entries(Apath::root(), exclude, monitor.clone())?;
                     for entry in entry_iter {
                         if *json {
-                            println!("{}", serde_json::ser::to_string(&entry)?);
+                            println!("{}", entry.listing_json());
                         } else {
                             println!("{}", entry.format_ls(*long_listing));
                         }
