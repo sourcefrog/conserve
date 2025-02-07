@@ -59,7 +59,7 @@ pub use crate::bandid::BandId;
 pub use crate::blockhash::BlockHash;
 pub use crate::change::{ChangeCallback, EntryChange};
 pub use crate::diff::{diff, DiffOptions};
-pub use crate::entry::{EntryTrait, EntryValue};
+pub use crate::entry::EntryTrait;
 pub use crate::errors::Error;
 pub use crate::excludes::Exclude;
 pub use crate::gc_lock::GarbageCollectionLock;
