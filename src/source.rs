@@ -54,10 +54,9 @@ impl SourceTree {
     }
 
     /// Open a file inside the tree to read.
-    pub fn open_file(&self, entry: &EntryValue) -> Result<File> {
-        assert_eq!(entry.kind(), Kind::File);
-        let path = self.relative_path(&entry.apath);
-        fs::File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
+    pub fn open_file(&self, apath: &Apath) -> Result<File> {
+        let path = self.relative_path(apath);
+        File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
     }
 
     pub fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
