@@ -317,7 +317,7 @@ impl BackupWriter {
             self.stats.empty_files += 1;
             monitor.count(Counter::EmptyFiles, 1);
         } else {
-            let mut source_file = source_tree.open_file(source_entry)?;
+            let mut source_file = source_tree.open_file(&source_entry.apath)?;
             if size <= options.small_file_cap {
                 trace!(%apath, "Combining small file");
                 self.file_combiner
