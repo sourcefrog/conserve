@@ -82,13 +82,13 @@ pub struct EntryValue {
     pub(crate) owner: Owner,
 }
 
-impl<B: Borrow<EntryValue> + Debug> EntryTrait for B {
+impl EntryTrait for EntryValue {
     fn apath(&self) -> &Apath {
-        &self.borrow().apath
+        &self.apath
     }
 
     fn kind(&self) -> Kind {
-        Kind::from(&self.borrow().kind_meta)
+        Kind::from(&self.kind_meta)
     }
 
     fn mtime(&self) -> OffsetDateTime {
