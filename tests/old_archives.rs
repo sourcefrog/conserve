@@ -34,8 +34,9 @@ use util::{copy_testdata_archive, testdata_archive_path};
 
 const MINIMAL_ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.10", "0.6.2", "0.6.3", "0.6.9", "0.6.17"];
 
-fn open_old_archive(ver: &str, name: &str) -> Archive {
+async fn open_old_archive(ver: &str, name: &str) -> Archive {
     Archive::open_path(Path::new(&testdata_archive_path(name, ver)))
+        .await
         .expect("Failed to open archive")
 }
 
@@ -59,7 +60,7 @@ async fn all_archive_versions_are_tested() {
 async fn examine_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         println!("examine {ver}");
-        let archive = open_old_archive(ver, "minimal");
+        let archive = open_old_archive(ver, "minimal").await;
 
         let band_ids = archive
             .list_band_ids()
@@ -83,7 +84,7 @@ async fn examine_archive() {
 async fn validate_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         println!("validate {ver}");
-        let archive = open_old_archive(ver, "minimal");
+        let archive = open_old_archive(ver, "minimal").await;
 
         archive
             .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
@@ -101,7 +102,7 @@ async fn long_listing_old_archive() {
         let dest = TempDir::new().unwrap();
         println!("restore {} to {:?}", ver, dest.path());
 
-        let archive = open_old_archive(ver, "minimal");
+        let archive = open_old_archive(ver, "minimal").await;
         let mut output = String::new();
 
         // show archive contents
@@ -144,7 +145,7 @@ async fn restore_old_archive() {
         let dest = TempDir::new().unwrap();
         println!("restore {} to {:?}", ver, dest.path());
 
-        let archive = open_old_archive(ver, "minimal");
+        let archive = open_old_archive(ver, "minimal").await;
         let monitor = TestMonitor::arc();
         restore(
             &archive,
@@ -198,7 +199,7 @@ async fn restore_modify_backup() {
         let working_tree = TempDir::new().unwrap();
         println!("restore {} to {:?}", ver, working_tree.path());
 
-        let archive = open_old_archive(ver, "minimal");
+        let archive = open_old_archive(ver, "minimal").await;
 
         restore(
             &archive,
@@ -223,7 +224,9 @@ async fn restore_modify_backup() {
         )
         .expect("overwrite file");
 
-        let new_archive = Archive::open_path(archive_temp.path()).expect("Open new archive");
+        let new_archive = Archive::open_path(archive_temp.path())
+            .await
+            .expect("Open new archive");
         let emitted = Arc::new(Mutex::new(Vec::new()));
         let emitted_clone = emitted.clone();
         let backup_stats = backup(

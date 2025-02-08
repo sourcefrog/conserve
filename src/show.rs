@@ -62,14 +62,14 @@ pub async fn show_versions(
         }
         let mut l: Vec<String> = Vec::new();
         l.push(format!("{band_id:<20}"));
-        let band = match Band::open(archive, band_id) {
+        let band = match Band::open(archive, band_id).await {
             Ok(band) => band,
             Err(err) => {
                 error!("Failed to open band {band_id:?}: {err}");
                 continue;
             }
         };
-        let info = match band.get_info() {
+        let info = match band.get_info().await {
             Ok(info) => info,
             Err(err) => {
                 error!("Failed to read band tail {band_id:?}: {err}");

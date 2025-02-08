@@ -53,7 +53,7 @@ async fn simple_backup() {
 
     let restore_dir = TempDir::new().unwrap();
 
-    let archive = Archive::open_path(af.path()).unwrap();
+    let archive = Archive::open_path(af.path()).await.unwrap();
     assert!(archive.band_exists(BandId::zero()).unwrap());
     assert!(archive.band_is_closed(BandId::zero()).unwrap());
     assert!(!archive.band_exists(BandId::new(&[1])).unwrap());
@@ -101,10 +101,10 @@ async fn simple_backup_with_excludes() -> Result<()> {
 
     let restore_dir = TempDir::new().unwrap();
 
-    let archive = Archive::open_path(af.path()).unwrap();
+    let archive = Archive::open_path(af.path()).await.unwrap();
 
-    let band = Band::open(&archive, BandId::zero()).unwrap();
-    let band_info = band.get_info()?;
+    let band = Band::open(&archive, BandId::zero()).await.unwrap();
+    let band_info = band.get_info().await?;
     assert_eq!(band_info.index_hunk_count, Some(1));
     assert_eq!(band_info.id, BandId::zero());
     assert!(band_info.is_closed);
@@ -171,7 +171,7 @@ async fn check_backup(af: &ScratchArchive) {
         BandId::new(&[0])
     );
 
-    let band = Band::open(af, band_ids[0]).unwrap();
+    let band = Band::open(af, band_ids[0]).await.unwrap();
     assert!(band.is_closed().unwrap());
 
     let index_entries = band
@@ -193,6 +193,7 @@ async fn check_backup(af: &ScratchArchive) {
 
     assert_eq!(
         af.referenced_blocks(&af.list_band_ids().await.unwrap(), TestMonitor::arc())
+            .await
             .unwrap()
             .into_iter()
             .map(|h| h.to_string())
@@ -249,7 +250,7 @@ async fn large_file() {
 
     // Try to restore it
     let rd = TempDir::new().unwrap();
-    let restore_archive = Archive::open_path(af.path()).unwrap();
+    let restore_archive = Archive::open_path(af.path()).await.unwrap();
     let monitor = TestMonitor::arc();
     restore(
         &restore_archive,
@@ -352,7 +353,7 @@ async fn symlink() {
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
 
-    let band = Band::open(&af, band_ids[0]).unwrap();
+    let band = Band::open(&af, band_ids[0]).await.unwrap();
     assert!(band.is_closed().unwrap());
 
     let index_entries = band

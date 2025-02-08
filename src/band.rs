@@ -181,10 +181,11 @@ impl Band {
     }
 
     /// Open the band with the given id.
-    pub fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
+    pub async fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
         let transport = archive.transport().chdir(&band_id.to_string());
-        let head: Head =
-            read_json(&transport, BAND_HEAD_FILENAME)?.ok_or(Error::BandHeadMissing { band_id })?;
+        let head: Head = read_json(&transport, BAND_HEAD_FILENAME)
+            .await?
+            .ok_or(Error::BandHeadMissing { band_id })?;
         if let Some(version) = &head.band_format_version {
             if !band_version_supported(version) {
                 return Err(Error::UnsupportedBandVersion {
@@ -262,8 +263,8 @@ impl Band {
     }
 
     /// Return info about the state of this band.
-    pub fn get_info(&self) -> Result<Info> {
-        let tail_option: Option<Tail> = read_json(&self.transport, BAND_TAIL_FILENAME)?;
+    pub async fn get_info(&self) -> Result<Info> {
+        let tail_option: Option<Tail> = read_json(&self.transport, BAND_TAIL_FILENAME).await?;
         let start_time =
             OffsetDateTime::from_unix_timestamp(self.head.start_time).map_err(|_| {
                 Error::InvalidMetadata {
@@ -340,11 +341,13 @@ mod tests {
         assert!(band.is_closed().unwrap());
 
         let band_id = BandId::from_str("b0000").unwrap();
-        let band2 = Band::open(&af, band_id).expect("failed to re-open band");
+        let band2 = Band::open(&af, band_id)
+            .await
+            .expect("failed to re-open band");
         assert!(band2.is_closed().unwrap());
 
         // Try get_info
-        let info = band2.get_info().expect("get_info failed");
+        let info = band2.get_info().await.expect("get_info failed");
         assert_eq!(info.id.to_string(), "b0000");
         assert!(info.is_closed);
         assert_eq!(info.index_hunk_count, Some(0));
@@ -380,7 +383,7 @@ mod tests {
         )
         .unwrap();
 
-        let e = Band::open(&af, BandId::zero());
+        let e = Band::open(&af, BandId::zero()).await;
         let e_str = e.unwrap_err().to_string();
         assert!(
             e_str.contains("Unsupported band version \"8888.8.8\" in b0000"),
@@ -413,6 +416,7 @@ mod tests {
 
         assert_eq!(
             af.referenced_blocks(&af.list_band_ids().await.unwrap(), TestMonitor::arc())
+                .await
                 .unwrap()
                 .len(),
             0
@@ -436,7 +440,7 @@ mod tests {
         let flags = orig_band.format_flags();
         assert!(flags.is_empty(), "{flags:?}");
 
-        let band = Band::open(&af, orig_band.id()).unwrap();
+        let band = Band::open(&af, orig_band.id()).await.unwrap();
         println!("{band:?}");
         assert!(band.format_flags().is_empty());
 

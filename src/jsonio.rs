@@ -61,11 +61,11 @@ where
 /// Read and deserialize uncompressed json from a file on a Transport.
 ///
 /// Returns None if the file does not exist.
-pub(crate) fn read_json<T>(transport: &Transport, path: &str) -> Result<Option<T>>
+pub(crate) async fn read_json<T>(transport: &Transport, path: &str) -> Result<Option<T>>
 where
     T: DeserializeOwned,
 {
-    let bytes = match transport.read(path) {
+    let bytes = match transport.read_async(path).await {
         Ok(b) => b,
         Err(err) if err.is_not_found() => return Ok(None),
         Err(err) => return Err(err.into()),
@@ -110,8 +110,8 @@ mod tests {
         temp.close().unwrap();
     }
 
-    #[test]
-    fn read_json_from_transport() {
+    #[tokio::test]
+    async fn read_json_from_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
         temp.child("test.json")
             .write_str(r#"{"id": 42, "weather": "cold"}"#)
@@ -119,6 +119,7 @@ mod tests {
 
         let transport = Transport::local(temp.path());
         let content: TestContents = read_json(&transport, "test.json")
+            .await
             .expect("no error")
             .expect("file exists");
 

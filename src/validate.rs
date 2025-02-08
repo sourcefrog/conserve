@@ -41,7 +41,7 @@ pub(crate) async fn validate_bands(
     task.set_total(band_ids.len());
     'band: for band_id in band_ids.iter() {
         task.increment(1);
-        let band = match Band::open(archive, *band_id) {
+        let band = match Band::open(archive, *band_id).await {
             Ok(band) => band,
             Err(err) => {
                 monitor.error(err);
