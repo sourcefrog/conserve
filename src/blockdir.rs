@@ -236,7 +236,7 @@ impl BlockDir {
         monitor.count(Counter::BlockContentCacheMiss, 1);
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
-        let compressed_bytes = self.transport.read_async(&block_relpath).await?;
+        let compressed_bytes = self.transport.read(&block_relpath).await?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
         if actual_hash != *hash {
@@ -278,7 +278,7 @@ impl BlockDir {
         monitor.count(Counter::BlockContentCacheMiss, 1);
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
-        let compressed_bytes = self.transport.read_async(&block_relpath).await?;
+        let compressed_bytes = self.transport.read(&block_relpath).await?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
         if actual_hash != *hash {
@@ -460,7 +460,7 @@ async fn get_async_uncached(
     monitor: Arc<dyn Monitor>,
 ) -> Result<Bytes> {
     let block_relpath = block_relpath(&hash);
-    let compressed_bytes = transport.read_async(&block_relpath).await?;
+    let compressed_bytes = transport.read(&block_relpath).await?;
     let decompressed_bytes = Decompressor::new().decompress(&compressed_bytes)?;
     let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
     if actual_hash != hash {

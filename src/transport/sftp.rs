@@ -21,6 +21,8 @@ use super::{Error, ErrorKind, ListDir, Result, WriteMode};
 
 pub(super) struct Protocol {
     url: Url,
+    // TODO: Maybe use a Tokio Mutex here, so that threads don't get hung up on the mutex inside
+    // the C library.
     sftp: Arc<ssh2::Sftp>,
     base_path: PathBuf,
 }
@@ -109,7 +111,7 @@ impl super::Protocol for Protocol {
             .expect("spawn_blocking")
     }
 
-    fn read(&self, path: &str) -> Result<Bytes> {
+    async fn read(&self, path: &str) -> Result<Bytes> {
         let full_path = self.base_path.join(path);
         let url = &self.url.join(path).expect("join URL");
         trace!("read {url}");
@@ -124,10 +126,6 @@ impl super::Protocol for Protocol {
         assert_eq!(len, buf.len());
         trace!("read {} bytes from {}", len, full_path.display());
         Ok(buf.into())
-    }
-
-    async fn read_async(&self, _relpath: &str) -> Result<Bytes> {
-        todo!()
     }
 
     fn create_dir(&self, relpath: &str) -> Result<()> {
