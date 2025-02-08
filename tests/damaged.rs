@@ -23,7 +23,7 @@ use conserve::*;
 #[traced_test]
 #[tokio::test]
 async fn missing_block_when_checking_hashes() -> Result<()> {
-    let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
+    let archive = Archive::open_path(Path::new("testdata/damaged/missing-block")).await?;
     let monitor = TestMonitor::arc();
     archive
         .validate(&ValidateOptions::default(), monitor.clone())
@@ -39,7 +39,7 @@ async fn missing_block_when_checking_hashes() -> Result<()> {
 #[traced_test]
 #[tokio::test]
 async fn missing_block_skip_block_hashes() -> Result<()> {
-    let archive = Archive::open_path(Path::new("testdata/damaged/missing-block"))?;
+    let archive = Archive::open_path(Path::new("testdata/damaged/missing-block")).await?;
     let monitor = TestMonitor::arc();
     archive
         .validate(

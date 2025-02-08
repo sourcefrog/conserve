@@ -166,7 +166,7 @@ impl Stitch {
                 }
                 State::BeforeBand(band_id) => {
                     // Start reading this new index and skip forward until after last_apath
-                    match Band::open(&self.archive, *band_id) {
+                    match Band::open(&self.archive, *band_id).await {
                         Ok(band) => {
                             let mut index_hunks = band.index().iter_available_hunks();
                             if let Some(last) = &self.last_apath {
@@ -343,7 +343,7 @@ mod test {
 
         std::fs::remove_dir_all(af.path().join("b0003"))?;
 
-        let archive = Archive::open_path(af.path())?;
+        let archive = Archive::open_path(af.path()).await?;
         assert_eq!(
             simple_ls(&archive, BandId::new(&[0])).await,
             "/0:b0 /1:b0 /2:b0"

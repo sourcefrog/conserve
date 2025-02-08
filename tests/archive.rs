@@ -32,7 +32,7 @@ async fn create_then_open_archive() {
     assert!(arch.list_band_ids().await.unwrap().is_empty());
 
     // We can re-open it.
-    Archive::open_path(&arch_path).unwrap();
+    Archive::open_path(&arch_path).await.unwrap();
     assert!(arch.list_band_ids().await.unwrap().is_empty());
     assert!(arch.last_complete_band().await.unwrap().is_none());
 }
@@ -78,6 +78,7 @@ async fn empty_archive() {
     );
     assert_eq!(
         af.referenced_blocks(&af.list_band_ids().await.unwrap(), TestMonitor::arc())
+            .await
             .unwrap()
             .len(),
         0

@@ -34,9 +34,9 @@ pub struct StoredTree {
 }
 
 impl StoredTree {
-    pub(crate) fn open(archive: &Archive, band_id: BandId) -> Result<StoredTree> {
+    pub(crate) async fn open(archive: &Archive, band_id: BandId) -> Result<StoredTree> {
         Ok(StoredTree {
-            band: Band::open(archive, band_id)?,
+            band: Band::open(archive, band_id).await?,
             archive: archive.clone(),
         })
     }
@@ -138,7 +138,9 @@ mod test {
 
     #[tokio::test]
     async fn iter_entries() -> Result<()> {
-        let archive = Archive::open_path(Path::new("testdata/archive/minimal/v0.6.3/")).unwrap();
+        let archive = Archive::open_path(Path::new("testdata/archive/minimal/v0.6.3/"))
+            .await
+            .unwrap();
         let st = archive
             .open_stored_tree(BandSelectionPolicy::Latest)
             .await
