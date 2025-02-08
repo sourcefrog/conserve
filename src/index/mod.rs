@@ -78,9 +78,9 @@ impl IndexRead {
     }
 
     /// Read and parse a specific hunk
-    pub fn read_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
+    pub async fn read_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
         let path = hunk_relpath(hunk_number);
-        let compressed_bytes = match self.transport.read(&path) {
+        let compressed_bytes = match self.transport.read_async(&path).await {
             Ok(b) => b,
             Err(err) if err.is_not_found() => {
                 // TODO: Cope with one hunk being missing, while there are still
@@ -147,15 +147,14 @@ pub struct IndexHunkIter {
     after: Option<Apath>,
 }
 
-impl Iterator for IndexHunkIter {
+impl IndexHunkIter {
     // TODO: Maybe this should return Results so that errors can be
     // more easily observed.
-    type Item = Vec<IndexEntry>;
 
-    fn next(&mut self) -> Option<Self::Item> {
+    pub async fn next(&mut self) -> Option<Vec<IndexEntry>> {
         loop {
             let hunk_number = self.hunks.next()?;
-            let entries = match self.index.read_hunk(hunk_number) {
+            let entries = match self.index.read_hunk(hunk_number).await {
                 Ok(None) => return None,
                 Ok(Some(entries)) => entries,
                 Err(_err) => {
@@ -185,9 +184,32 @@ impl Iterator for IndexHunkIter {
             }
         }
     }
-}
 
-impl IndexHunkIter {
+    /// Collect the contents of the iterator into a vector of hunks, each of which
+    /// contains vector of entries.
+    ///
+    /// This reads the whole index into memory so is not recommended for large trees.
+    pub async fn collect_hunk_vec(&mut self) -> Result<Vec<Vec<IndexEntry>>> {
+        let mut hunks = Vec::new();
+        while let Some(hunk) = self.next().await {
+            hunks.push(hunk);
+        }
+        Ok(hunks)
+    }
+
+    /// Collect the contents of the index into a vec of entries.
+    ///
+    /// This is the flattened version of `collect_hunk_vec`.
+    ///
+    /// This reads the whole index into memory so is not recommended for large trees.
+    pub async fn collect_entry_vec(&mut self) -> Result<Vec<IndexEntry>> {
+        let mut entries = Vec::new();
+        while let Some(hunk) = self.next().await {
+            entries.extend(hunk);
+        }
+        Ok(entries)
+    }
+
     /// Advance self so that it returns only entries with apaths ordered after `apath`.
     #[must_use]
     pub fn advance_to_after(self, apath: &Apath) -> Self {
@@ -290,8 +312,8 @@ mod tests {
         assert_eq!(super::hunk_relpath(0), "00000/000000000");
     }
 
-    #[test]
-    fn basic() {
+    #[tokio::test]
+    async fn basic() -> Result<()> {
         let transport = Transport::temp();
         let monitor = TestMonitor::arc();
         let mut index_writer = IndexWriter::new(transport.clone(), monitor.clone());
@@ -314,16 +336,18 @@ mod tests {
 
         let hunks = IndexRead::open(transport.clone())
             .iter_available_hunks()
-            .collect_vec();
+            .collect_hunk_vec()
+            .await?;
         assert_eq!(hunks.len(), 1);
         let entries = &hunks[0];
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].apath, "/apple");
         assert_eq!(entries[1].apath, "/banana");
+        Ok(())
     }
 
-    #[test]
-    fn multiple_hunks() {
+    #[tokio::test]
+    async fn multiple_hunks() -> Result<()> {
         let (testdir, mut ib) = setup();
         ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
         ib.finish_hunk().unwrap();
@@ -331,14 +355,20 @@ mod tests {
         ib.finish_hunk().unwrap();
 
         let index_read = IndexRead::open_path(testdir.path());
-        let it = index_read.iter_available_hunks().flatten();
-        let names: Vec<String> = it.map(|x| x.apath.into()).collect();
+        let names = index_read
+            .iter_available_hunks()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
+            .map(|e| e.apath.to_string())
+            .collect_vec();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
 
         // Read it out as hunks.
         let hunks: Vec<Vec<IndexEntry>> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
-            .collect();
+            .collect_hunk_vec()
+            .await?;
         assert_eq!(hunks.len(), 2);
         assert_eq!(
             hunks[0]
@@ -354,10 +384,11 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["/2.1", "/2.2"]
         );
+        Ok(())
     }
 
-    #[test]
-    fn iter_hunks_advance_to_after() {
+    #[tokio::test]
+    async fn iter_hunks_advance_to_after() -> Result<()> {
         let (testdir, mut ib) = setup();
         ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
         ib.finish_hunk().unwrap();
@@ -367,7 +398,9 @@ mod tests {
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
             .advance_to_after(&"/".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/1.1", "/1.2", "/2.1", "/2.2"]);
@@ -375,7 +408,9 @@ mod tests {
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
             .advance_to_after(&"/nonexistent".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, [""; 0]);
@@ -383,7 +418,9 @@ mod tests {
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
             .advance_to_after(&"/1.1".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/1.2", "/2.1", "/2.2"]);
@@ -391,7 +428,9 @@ mod tests {
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
             .advance_to_after(&"/1.1.1".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/1.2", "/2.1", "/2.2"]);
@@ -399,7 +438,9 @@ mod tests {
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
             .advance_to_after(&"/1.2".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.1", "/2.2"]);
@@ -407,7 +448,9 @@ mod tests {
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
             .advance_to_after(&"/1.3".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.1", "/2.2"]);
@@ -415,7 +458,9 @@ mod tests {
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
             .advance_to_after(&"/2.0".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.1", "/2.2"]);
@@ -423,7 +468,9 @@ mod tests {
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
             .advance_to_after(&"/2.1".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.2"]);
@@ -431,17 +478,20 @@ mod tests {
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
             .advance_to_after(&"/2.2".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, [] as [&str; 0]);
+        Ok(())
     }
 
     /// Exactly fill the first hunk: there shouldn't be an empty second hunk.
     ///
     /// https://github.com/sourcefrog/conserve/issues/95
-    #[test]
-    fn no_final_empty_hunk() -> Result<()> {
+    #[tokio::test]
+    async fn no_final_empty_hunk() -> Result<()> {
         let (testdir, mut ib) = setup();
         for i in 0..1000 {
             ib.push_entry(sample_entry(&format!("/{i:0>10}")));
@@ -451,7 +501,8 @@ mod tests {
         ib.finish_hunk()?;
         dbg!(ib.hunks_written);
         let read_index = IndexRead::open_path(testdir.path());
-        assert_eq!(read_index.iter_available_hunks().count(), 1);
+        let hunks = read_index.iter_available_hunks().collect_hunk_vec().await?;
+        assert_eq!(hunks.len(), 1);
         Ok(())
     }
 }

@@ -216,8 +216,9 @@ impl Archive {
         let mut blocks = HashSet::new();
         for band_id in band_ids {
             let band = Band::open(&archive, *band_id).await?;
-            for entry in band.index().iter_available_hunks().flatten() {
-                for addr in entry.addrs {
+            let mut iter = band.index().iter_available_hunks();
+            while let Some(hunk) = iter.next().await {
+                for addr in hunk.into_iter().flat_map(|entry| entry.addrs) {
                     blocks.insert(addr.hash);
                     task.increment(1);
                 }
