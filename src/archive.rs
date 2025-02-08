@@ -81,13 +81,14 @@ impl Archive {
     /// Open an existing archive.
     ///
     /// Checks that the header is correct.
-    pub fn open_path(path: &Path) -> Result<Archive> {
-        Archive::open(Transport::local(path))
+    pub async fn open_path(path: &Path) -> Result<Archive> {
+        Archive::open(Transport::local(path)).await
     }
 
-    pub fn open(transport: Transport) -> Result<Archive> {
-        let header: ArchiveHeader =
-            read_json(&transport, HEADER_FILENAME)?.ok_or(Error::NotAnArchive)?;
+    pub async fn open(transport: Transport) -> Result<Archive> {
+        let header: ArchiveHeader = read_json(&transport, HEADER_FILENAME)
+            .await?
+            .ok_or(Error::NotAnArchive)?;
         if header.conserve_archive_version != ARCHIVE_VERSION {
             return Err(Error::UnsupportedArchiveVersion {
                 version: header.conserve_archive_version,
@@ -167,7 +168,7 @@ impl Archive {
         &self,
         band_selection: BandSelectionPolicy,
     ) -> Result<StoredTree> {
-        StoredTree::open(self, self.resolve_band_id(band_selection).await?)
+        StoredTree::open(self, self.resolve_band_id(band_selection).await?).await
     }
 
     /// Return an iterator of valid band ids in this archive, in arbitrary order.
@@ -194,7 +195,7 @@ impl Archive {
     /// Return the last completely-written band id, if any.
     pub async fn last_complete_band(&self) -> Result<Option<Band>> {
         for band_id in self.list_band_ids().await?.into_iter().rev() {
-            let b = Band::open(self, band_id)?;
+            let b = Band::open(self, band_id).await?;
             if b.is_closed()? {
                 return Ok(Some(b));
             }
@@ -205,29 +206,31 @@ impl Archive {
     /// Returns all blocks referenced by all bands.
     ///
     /// Shows a progress bar as they're collected.
-    pub fn referenced_blocks(
+    pub async fn referenced_blocks(
         &self,
         band_ids: &[BandId],
         monitor: Arc<dyn Monitor>,
     ) -> Result<HashSet<BlockHash>> {
         let archive = self.clone();
         let task = monitor.start_task("Find referenced blocks".to_string());
-        Ok(band_ids
-            .iter()
-            .map(move |band_id| Band::open(&archive, *band_id).expect("Failed to open band"))
-            .flat_map(|band| band.index().iter_available_hunks())
-            .flatten()
-            .flat_map(|entry| entry.addrs)
-            .map(|addr| addr.hash)
-            .inspect(|_| {
-                task.increment(1);
-            })
-            .collect())
+        let mut blocks = HashSet::new();
+        for band_id in band_ids {
+            let band = Band::open(&archive, *band_id).await?;
+            for entry in band.index().iter_available_hunks().flatten() {
+                for addr in entry.addrs {
+                    blocks.insert(addr.hash);
+                    task.increment(1);
+                }
+            }
+        }
+        Ok(blocks)
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
     pub async fn unreferenced_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
-        let referenced = self.referenced_blocks(&self.list_band_ids().await?, monitor.clone())?;
+        let referenced = self
+            .referenced_blocks(&self.list_band_ids().await?, monitor.clone())
+            .await?;
         Ok(self
             .block_dir
             .blocks(monitor)?
@@ -262,7 +265,9 @@ impl Archive {
         keep_band_ids.retain(|b| !delete_band_ids.contains(b));
 
         debug!("List referenced blocks...");
-        let referenced = self.referenced_blocks(&keep_band_ids, monitor.clone())?;
+        let referenced = self
+            .referenced_blocks(&keep_band_ids, monitor.clone())
+            .await?;
         debug!(referenced.len = referenced.len());
 
         debug!("Find present blocks...");

@@ -6,8 +6,8 @@
 use conserve::test_fixtures::ScratchArchive;
 use conserve::*;
 use transport::WriteMode;
-#[test]
-fn unknown_format_flag_fails_to_open() {
+#[tokio::test]
+async fn unknown_format_flag_fails_to_open() {
     let af = ScratchArchive::new();
 
     // Make the bandhead by hand because the library prevents writing invalid flags.
@@ -26,7 +26,7 @@ fn unknown_format_flag_fails_to_open() {
         )
         .unwrap();
 
-    let err = Band::open(&af, BandId::zero()).unwrap_err();
+    let err = Band::open(&af, BandId::zero()).await.unwrap_err();
     assert_eq!(
         err.to_string(),
         "Unsupported band format flags [\"wibble\"] in b0000"

@@ -114,7 +114,9 @@ async fn backup_after_damage(
     action.damage(&location.to_path(&archive_dir).await);
 
     // Open the archive again to avoid cache effects.
-    let archive = Archive::open(Transport::local(archive_dir.path())).expect("open archive");
+    let archive = Archive::open(Transport::local(archive_dir.path()))
+        .await
+        .expect("open archive");
 
     // A second backup should succeed.
     changes.apply(&source_dir);
@@ -272,7 +274,9 @@ impl DamageLocation {
                 .join(BandId::from(*band_id).to_string())
                 .join("BANDTAIL"),
             DamageLocation::Block(block_index) => {
-                let archive = Archive::open(Transport::local(archive_dir)).expect("open archive");
+                let archive = Archive::open(Transport::local(archive_dir))
+                    .await
+                    .expect("open archive");
                 let block_hash = archive
                     .all_blocks(TestMonitor::arc())
                     .await

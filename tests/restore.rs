@@ -28,7 +28,7 @@ async fn simple_restore() {
     let af = ScratchArchive::new();
     af.store_two_versions().await;
     let destdir = TreeFixture::new();
-    let restore_archive = Archive::open_path(af.path()).unwrap();
+    let restore_archive = Archive::open_path(af.path()).await.unwrap();
     let restored_names = Arc::new(Mutex::new(Vec::new()));
     let restored_names_clone = restored_names.clone();
     let options = RestoreOptions {
@@ -79,7 +79,7 @@ async fn restore_specified_band() {
     let af = ScratchArchive::new();
     af.store_two_versions().await;
     let destdir = TreeFixture::new();
-    let archive = Archive::open_path(af.path()).unwrap();
+    let archive = Archive::open_path(af.path()).await.unwrap();
     let band_id = BandId::new(&[0]);
     let options = RestoreOptions {
         band_selection: BandSelectionPolicy::Specified(band_id),
@@ -120,7 +120,7 @@ async fn restore_only_subdir() {
 
     let destdir = TreeFixture::new();
     let restore_monitor = TestMonitor::arc();
-    let archive = Archive::open_path(af.path()).unwrap();
+    let archive = Archive::open_path(af.path()).await.unwrap();
     let options = RestoreOptions {
         only_subtree: Some(Apath::from("/parent/sub")),
         ..Default::default()
@@ -162,7 +162,7 @@ async fn forced_overwrite() {
     let destdir = TreeFixture::new();
     destdir.create_file("existing");
 
-    let restore_archive = Archive::open_path(af.path()).unwrap();
+    let restore_archive = Archive::open_path(af.path()).await.unwrap();
     let options = RestoreOptions {
         overwrite: true,
         ..RestoreOptions::default()
@@ -183,7 +183,7 @@ async fn exclude_files() {
     let af = ScratchArchive::new();
     af.store_two_versions().await;
     let destdir = TreeFixture::new();
-    let restore_archive = Archive::open_path(af.path()).unwrap();
+    let restore_archive = Archive::open_path(af.path()).await.unwrap();
     let options = RestoreOptions {
         overwrite: true,
         exclude: Exclude::from_strings(["/**/subfile"]).unwrap(),
