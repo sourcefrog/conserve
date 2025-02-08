@@ -215,9 +215,10 @@ impl Transport {
         self.protocol.create_dir(relpath)
     }
 
-    pub fn metadata(&self, relpath: &str) -> Result<Metadata> {
+    /// Return mtime, size, and other metadata about a file.
+    pub async fn metadata(&self, relpath: &str) -> Result<Metadata> {
         self.record(Verb::Metadata, relpath);
-        self.protocol.metadata(relpath)
+        self.protocol.metadata(relpath).await
     }
 
     /// Delete a file.
@@ -233,8 +234,8 @@ impl Transport {
     }
 
     /// Check if a regular file exists.
-    pub fn is_file(&self, path: &str) -> Result<bool> {
-        match self.metadata(path) {
+    pub async fn is_file(&self, path: &str) -> Result<bool> {
+        match self.metadata(path).await {
             Ok(metadata) => Ok(metadata.kind == Kind::File),
             Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
             Err(err) => Err(err),

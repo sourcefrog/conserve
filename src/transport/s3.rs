@@ -338,11 +338,11 @@ impl super::Protocol for Protocol {
         Ok(())
     }
 
-    fn metadata(&self, relpath: &str) -> Result<Metadata> {
-        let _span = trace_span!("S3Transport::metadata", %relpath).entered();
+    async fn metadata(&self, relpath: &str) -> Result<Metadata> {
         let key = self.join_path(relpath);
+        trace!(?key, "s3::metadata");
         let request = self.client.head_object().bucket(&self.bucket).key(&key);
-        let response = self.runtime.block_on(request.send());
+        let response = request.send().await;
         // trace!(?response);
         match response {
             Ok(response) => {

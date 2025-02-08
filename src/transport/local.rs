@@ -150,9 +150,11 @@ impl super::Protocol for Protocol {
         })
     }
 
-    fn metadata(&self, relpath: &str) -> Result<Metadata> {
+    async fn metadata(&self, relpath: &str) -> Result<Metadata> {
         let path = self.full_path(relpath);
-        let fsmeta = path.metadata().map_err(|err| Error::io_error(&path, err))?;
+        let fsmeta = tokio::fs::metadata(&path)
+            .await
+            .map_err(|err| Error::io_error(&path, err))?;
         let modified = fsmeta
             .modified()
             .map_err(|err| Error::io_error(&path, err))?
@@ -293,26 +295,37 @@ mod test {
         );
     }
 
-    #[test]
-    fn read_metadata() {
+    #[tokio::test]
+    async fn read_metadata() {
         let temp = assert_fs::TempDir::new().unwrap();
         let content: &str = "the ribs of the disaster";
         let filename = "poem.txt";
         temp.child(filename).write_str(content).unwrap();
 
-        let transport = Transport::local(temp.path());
+        let transport = Transport::local(temp.path()).enable_record();
 
-        let metadata = transport.metadata(filename).unwrap();
+        let metadata = transport.metadata(filename).await.unwrap();
         dbg!(&metadata);
 
         assert_eq!(metadata.len, 24);
         assert_eq!(metadata.kind, Kind::File);
         assert!(metadata.modified + Duration::from_secs(60) > OffsetDateTime::now_utc());
-        assert!(transport.metadata("nopoem").unwrap_err().is_not_found());
+        assert!(transport
+            .metadata("nopoem")
+            .await
+            .unwrap_err()
+            .is_not_found());
+        assert_eq!(
+            transport.recorded_calls(),
+            [
+                Call(Verb::Metadata, filename.into()),
+                Call(Verb::Metadata, "nopoem".into())
+            ]
+        );
     }
 
-    #[test]
-    fn list_directory() {
+    #[tokio::test]
+    async fn list_directory() {
         let temp = assert_fs::TempDir::new().unwrap();
         temp.child("root file").touch().unwrap();
         temp.child("subdir").create_dir_all().unwrap();
@@ -326,8 +339,8 @@ mod test {
         assert_eq!(root_list.files, ["root file"]);
         assert_eq!(root_list.dirs, ["subdir"]);
 
-        assert!(transport.is_file("root file").unwrap());
-        assert!(!transport.is_file("nuh-uh").unwrap());
+        assert!(transport.is_file("root file").await.unwrap());
+        assert!(!transport.is_file("nuh-uh").await.unwrap());
 
         let subdir_list = transport.list_dir("subdir").unwrap();
         assert_eq!(subdir_list.files, ["subfile"]);

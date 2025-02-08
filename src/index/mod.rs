@@ -330,7 +330,7 @@ mod tests {
         assert!(counters.get(Counter::IndexWriteUncompressedBytes) < 250);
 
         assert!(
-            transport.is_file("00000/000000000").unwrap(),
+            transport.is_file("00000/000000000").await.unwrap(),
             "Index hunk file not found"
         );
 

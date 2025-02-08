@@ -181,7 +181,7 @@ impl super::Protocol for Protocol {
         Ok(())
     }
 
-    fn metadata(&self, relpath: &str) -> Result<super::Metadata> {
+    async fn metadata(&self, relpath: &str) -> Result<super::Metadata> {
         let full_path = self.base_path.join(relpath);
         let stat = self.lstat(relpath)?;
         trace!("metadata {full_path:?}");

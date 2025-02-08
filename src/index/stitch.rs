@@ -185,11 +185,11 @@ impl Stitch {
                     }
                 }
                 State::AfterBand(band_id) => {
-                    if self.archive.band_is_closed(*band_id).unwrap_or(false) {
+                    if self.archive.band_is_closed(*band_id).await.unwrap_or(false) {
                         trace!(?band_id, "band is closed; stitched iteration complete");
                         State::Done
                     } else if let Some(prev_band_id) =
-                        previous_existing_band(&self.archive, *band_id)
+                        previous_existing_band(&self.archive, *band_id).await
                     {
                         trace!(?band_id, ?prev_band_id, "moving back to previous band");
                         State::BeforeBand(prev_band_id)
@@ -206,14 +206,14 @@ impl Stitch {
     }
 }
 
-fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<BandId> {
+async fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<BandId> {
     loop {
         // TODO: It might be faster to list the present bands, maybe when
         // constructing Stitch, and calculate from that, rather than walking
         // backwards one at a time...
         if let Some(prev_band_id) = band_id.previous() {
             band_id = prev_band_id;
-            if archive.band_exists(band_id).unwrap_or(false) {
+            if archive.band_exists(band_id).await.unwrap_or(false) {
                 return Some(band_id);
             }
         } else {
