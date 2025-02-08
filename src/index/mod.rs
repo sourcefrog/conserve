@@ -88,7 +88,11 @@ impl IndexRead {
                 // list of hunks first.
                 return Ok(None);
             }
-            Err(source) => return Err(Error::Transport { source }),
+            Err(source) => {
+                self.stats.errors += 1;
+                error!("Error reading index hunk {hunk_number:?}: {source}");
+                return Err(Error::Transport { source });
+            }
         };
         self.stats.index_hunks += 1;
         self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
@@ -154,9 +158,7 @@ impl Iterator for IndexHunkIter {
             let entries = match self.index.read_hunk(hunk_number) {
                 Ok(None) => return None,
                 Ok(Some(entries)) => entries,
-                Err(err) => {
-                    self.index.stats.errors += 1;
-                    error!("Error reading index hunk {hunk_number:?}: {err}");
+                Err(_err) => {
                     continue;
                 }
             };
