@@ -378,7 +378,7 @@ impl Command {
             }
             Command::Debug(Debug::Index { archive, backup }) => {
                 let st = stored_tree_from_opt(archive, backup).await?;
-                show::show_index_json(st.band(), &mut stdout)?;
+                show::show_index_json(st.band(), &mut stdout).await?;
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);

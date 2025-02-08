@@ -29,7 +29,7 @@ const HELLO_HASH: &str =
      896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7";
 
 #[tokio::test]
-async fn simple_backup() {
+async fn simple_backup() -> Result<()> {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
@@ -49,7 +49,7 @@ async fn simple_backup() {
     assert_eq!(backup_stats.written_blocks, 1);
     assert_eq!(backup_stats.uncompressed_bytes, 8);
     assert_eq!(backup_stats.compressed_bytes, 10);
-    check_backup(&af).await;
+    check_backup(&af).await?;
 
     let restore_dir = TempDir::new().unwrap();
 
@@ -67,6 +67,7 @@ async fn simple_backup() {
     .expect("restore");
 
     monitor.assert_counter(Counter::FileBytes, 8);
+    Ok(())
 }
 
 #[tokio::test]
@@ -89,7 +90,7 @@ async fn simple_backup_with_excludes() -> Result<()> {
         .await
         .expect("backup");
 
-    check_backup(&af).await;
+    check_backup(&af).await?;
 
     let counters = monitor.counters();
     dbg!(counters);
@@ -162,7 +163,7 @@ async fn backup_more_excludes() {
     assert_eq!(0, stats.unknown_kind);
 }
 
-async fn check_backup(af: &ScratchArchive) {
+async fn check_backup(af: &ScratchArchive) -> Result<()> {
     let band_ids = af.list_band_ids().await.unwrap();
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
@@ -177,8 +178,8 @@ async fn check_backup(af: &ScratchArchive) {
     let index_entries = band
         .index()
         .iter_available_hunks()
-        .flatten()
-        .collect::<Vec<IndexEntry>>();
+        .collect_entry_vec()
+        .await?;
     assert_eq!(2, index_entries.len());
 
     let root_entry = &index_entries[0];
@@ -216,6 +217,7 @@ async fn check_backup(af: &ScratchArchive) {
             .len(),
         0
     );
+    Ok(())
 }
 
 #[tokio::test]
@@ -331,7 +333,7 @@ async fn mtime_before_epoch() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn symlink() {
+async fn symlink() -> Result<()> {
     let af = ScratchArchive::new();
     let srcdir = TreeFixture::new();
     srcdir.create_symlink("symlink", "/a/broken/destination");
@@ -359,14 +361,15 @@ async fn symlink() {
     let index_entries = band
         .index()
         .iter_available_hunks()
-        .flatten()
-        .collect::<Vec<IndexEntry>>();
+        .collect_entry_vec()
+        .await?;
     assert_eq!(2, index_entries.len());
 
     let e2 = &index_entries[1];
     assert_eq!(e2.kind(), Kind::Symlink);
     assert_eq!(&e2.apath, "/symlink");
     assert_eq!(e2.target.as_ref().unwrap(), "/a/broken/destination");
+    Ok(())
 }
 
 #[tokio::test]

@@ -32,36 +32,34 @@ impl IndexHunkIndex {
     /// Note:
     /// Depending on the index size this might not be a cheap operation
     /// as we loop through every hunk and read its contents.
-    pub fn from_index(index: &IndexRead) -> Result<Self> {
-        let mut hunk_info = index
-            .hunks_available()?
-            .into_iter()
-            .map(move |hunk_index| {
-                let mut index = index.duplicate();
-                let entries = index.read_hunk(hunk_index)?;
-                let meta_info = if let Some(entries) = entries {
-                    if let (Some(first), Some(last)) = (entries.first(), entries.last()) {
-                        Some(HunkIndexMeta {
-                            index: hunk_index,
-
-                            start_path: first.apath.clone(),
-                            end_path: last.apath.clone(),
-                        })
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-
-                Ok(meta_info)
-            })
-            .filter_map(Result::ok)
-            .flatten()
-            .collect::<Vec<_>>();
-
-        /* After parallel execution bring all hunks back into order */
-        hunk_info.sort_by_key(|info| info.index);
+    pub async fn from_index(index: &IndexRead) -> Result<Self> {
+        let mut hunk_info = Vec::new();
+        for hunk_index in index.hunks_available()? {
+            let mut index = index.duplicate();
+            let entries = index.read_hunk(hunk_index).await?;
+            if let Some(entries) = entries {
+                if let (Some(first), Some(last)) = (entries.first(), entries.last()) {
+                    hunk_info.push(HunkIndexMeta {
+                        index: hunk_index,
+                        start_path: first.apath.clone(),
+                        end_path: last.apath.clone(),
+                    });
+                }
+            }
+        }
+        #[cfg(debug_assertions)]
+        for window in hunk_info.windows(2) {
+            let [a, b] = window else { unreachable!() };
+            debug_assert!(
+                a.start_path < b.start_path,
+                "start paths out of order: {a:?}, {b:?}"
+            );
+            debug_assert!(a.index < b.index, "indexes out of order: {a:?}, {b:?}");
+            debug_assert!(
+                a.end_path < b.start_path,
+                "end path not less than start path: {a:?}, {b:?}"
+            )
+        }
         Ok(Self { hunks: hunk_info })
     }
 
