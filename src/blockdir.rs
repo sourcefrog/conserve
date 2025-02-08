@@ -198,12 +198,12 @@ impl BlockDir {
     }
 
     /// Read back some content addressed by an [Address] (a block hash, start and end).
-    pub(crate) fn read_address(
+    pub(crate) async fn read_address(
         &self,
         address: &Address,
         monitor: Arc<dyn Monitor>,
     ) -> Result<Bytes> {
-        let bytes = self.get_block_content(&address.hash, monitor)?;
+        let bytes = self.get_block_content(&address.hash, monitor).await?;
         let len = address.len as usize;
         let start = address.start as usize;
         let end = start + len;
@@ -222,7 +222,7 @@ impl BlockDir {
     ///
     /// Checks that the hash is correct with the contents.
     #[instrument(skip(self, monitor))]
-    pub(crate) fn get_block_content(
+    pub(crate) async fn get_block_content(
         &self,
         hash: &BlockHash,
         monitor: Arc<dyn Monitor>,
@@ -236,7 +236,7 @@ impl BlockDir {
         monitor.count(Counter::BlockContentCacheMiss, 1);
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
-        let compressed_bytes = self.transport.read(&block_relpath)?;
+        let compressed_bytes = self.transport.read_async(&block_relpath).await?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
         if actual_hash != *hash {
@@ -556,8 +556,8 @@ mod test {
         assert_eq!(blocks, []);
     }
 
-    #[test]
-    fn cache_hit() {
+    #[tokio::test]
+    async fn cache_hit() {
         let blockdir = BlockDir::open(Transport::temp());
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
@@ -572,21 +572,27 @@ mod test {
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1);
 
         let monitor = TestMonitor::arc();
-        let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
+        let retrieved = blockdir
+            .get_block_content(&hash, monitor.clone())
+            .await
+            .unwrap();
         assert_eq!(content, retrieved);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 1);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 0);
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit against the value written
 
-        let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
+        let retrieved = blockdir
+            .get_block_content(&hash, monitor.clone())
+            .await
+            .unwrap();
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 2);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 0);
         assert_eq!(content, retrieved);
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 3); // hit again
     }
 
-    #[test]
-    fn existence_cache_hit() {
+    #[tokio::test]
+    async fn existence_cache_hit() {
         let transport = Transport::temp();
         let blockdir = BlockDir::open(transport.clone());
         let mut stats = BackupStats::default();
@@ -612,7 +618,10 @@ mod test {
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 2);
 
         // actually reading the content is a miss
-        let retrieved = blockdir.get_block_content(&hash, monitor.clone()).unwrap();
+        let retrieved = blockdir
+            .get_block_content(&hash, monitor.clone())
+            .await
+            .unwrap();
         assert_eq!(content, retrieved);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 1);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 0);

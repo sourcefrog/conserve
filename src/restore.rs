@@ -22,7 +22,7 @@ use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
 use time::OffsetDateTime;
-use tracing::{instrument, trace, warn};
+use tracing::{instrument, trace};
 
 use crate::blockdir::BlockDir;
 use crate::counters::Counter;
@@ -117,7 +117,9 @@ pub async fn restore(
             }
             Kind::File => {
                 monitor.count(Counter::Files, 1);
-                if let Err(err) = restore_file(path.clone(), &entry, block_dir, monitor.clone()) {
+                if let Err(err) =
+                    restore_file(path.clone(), &entry, block_dir, monitor.clone()).await
+                {
                     monitor.error(err);
                     continue;
                 }
@@ -199,7 +201,7 @@ fn apply_deferrals(deferrals: &[DirDeferral], monitor: Arc<dyn Monitor>) -> Resu
 
 /// Copy in the contents of a file from another tree.
 #[instrument(skip(source_entry, block_dir, monitor))]
-fn restore_file(
+async fn restore_file(
     path: PathBuf,
     source_entry: &IndexEntry,
     block_dir: &BlockDir,
@@ -217,6 +219,7 @@ fn restore_file(
         // probably a waste.
         let bytes = block_dir
             .read_address(addr, monitor.clone())
+            .await
             .map_err(|source| Error::RestoreFileBlock {
                 apath: source_entry.apath.clone(),
                 hash: addr.hash.clone(),
