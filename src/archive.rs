@@ -288,14 +288,12 @@ impl Archive {
         debug!("Measure unreferenced blocks...");
         let task = monitor.start_task("Measure unreferenced blocks".to_string());
         task.set_total(unref_count);
-        let total_bytes = unref
-            .iter()
-            .enumerate()
-            .inspect(|_| {
-                task.increment(1);
-            })
-            .map(|(_i, block_id)| self.block_dir.compressed_size(block_id).unwrap_or_default())
-            .sum();
+        // TODO: Parallelize
+        let mut total_bytes = 0;
+        for block_id in &unref {
+            total_bytes += self.block_dir.compressed_size(block_id).await?;
+            task.increment(1);
+        }
         drop(task);
         stats.unreferenced_block_bytes = total_bytes;
 
