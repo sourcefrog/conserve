@@ -154,7 +154,7 @@ impl Stitch {
                         } else {
                             return Some(entry);
                         }
-                    } else if let Some(hunk) = index_hunks.next() {
+                    } else if let Some(hunk) = index_hunks.next().await {
                         if let Some(last_apath) = hunk.last().map(|entry| entry.apath.clone()) {
                             self.last_apath = Some(last_apath);
                         }

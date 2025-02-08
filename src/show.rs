@@ -123,10 +123,14 @@ pub async fn show_versions(
     Ok(())
 }
 
-pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
+pub async fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
     // TODO: Maybe use https://docs.serde.rs/serde/ser/trait.Serializer.html#method.collect_seq.
     let bw = BufWriter::new(w);
-    let index_entries: Vec<Vec<IndexEntry>> = band.index().iter_available_hunks().collect();
+    let index_entries: Vec<Vec<IndexEntry>> = band
+        .index()
+        .iter_available_hunks()
+        .collect_hunk_vec()
+        .await?;
     serde_json::ser::to_writer_pretty(bw, &index_entries)
         .map_err(|source| Error::SerializeJson { source })
 }
