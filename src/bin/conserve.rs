@@ -502,8 +502,11 @@ impl Command {
                     }
                 } else {
                     // TODO: Can maybe unify these more when the source tree iter is also async.
-                    let entry_iter = SourceTree::open(stos.source.clone().unwrap())?
-                        .iter_entries(Apath::root(), exclude, monitor.clone())?;
+                    let entry_iter = SourceTree::open(stos.source.clone().unwrap())?.iter_entries(
+                        Apath::root(),
+                        exclude,
+                        monitor.clone(),
+                    )?;
                     for entry in entry_iter {
                         if *json {
                             println!("{}", entry.listing_json());
