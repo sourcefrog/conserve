@@ -80,7 +80,7 @@ impl IndexRead {
     /// Read and parse a specific hunk
     pub async fn read_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
         let path = hunk_relpath(hunk_number);
-        let compressed_bytes = match self.transport.read_async(&path).await {
+        let compressed_bytes = match self.transport.read(&path).await {
             Ok(b) => b,
             Err(err) if err.is_not_found() => {
                 // TODO: Cope with one hunk being missing, while there are still
