@@ -65,7 +65,7 @@ pub(crate) async fn read_json<T>(transport: &Transport, path: &str) -> Result<Op
 where
     T: DeserializeOwned,
 {
-    let bytes = match transport.read_async(path).await {
+    let bytes = match transport.read(path).await {
         Ok(b) => b,
         Err(err) if err.is_not_found() => return Ok(None),
         Err(err) => return Err(err.into()),

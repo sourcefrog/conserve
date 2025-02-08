@@ -238,17 +238,18 @@ impl super::Protocol for Protocol {
         Ok(result)
     }
 
-    fn read(&self, relpath: &str) -> Result<Bytes> {
-        let _span = trace_span!("S3Transport::read_file", %relpath).entered();
+    async fn read(&self, relpath: &str) -> Result<Bytes> {
+        trace!(?relpath, "s3::read");
         let key = self.join_path(relpath);
         let request = self.client.get_object().bucket(&self.bucket).key(&key);
-        let response = self
-            .runtime
-            .block_on(request.send())
+        let response = request
+            .send()
+            .await
             .map_err(|source| self.s3_error(&key, source))?;
-        let body_bytes = self
-            .runtime
-            .block_on(response.body.collect())
+        let body_bytes = response
+            .body
+            .collect()
+            .await
             .map_err(|source| Error {
                 kind: ErrorKind::Other,
                 url: self.url.join(relpath).ok(),
@@ -257,10 +258,6 @@ impl super::Protocol for Protocol {
             .into_bytes();
         trace!(body_len = body_bytes.len(), "read file");
         Ok(body_bytes)
-    }
-
-    async fn read_async(&self, _relpath: &str) -> Result<Bytes> {
-        todo!()
     }
 
     #[mutants::skip] // does nothing so hard to observe!

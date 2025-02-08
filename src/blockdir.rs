@@ -237,7 +237,7 @@ impl BlockDir {
         monitor.count(Counter::BlockContentCacheMiss, 1);
         let mut decompressor = Decompressor::new();
         let block_relpath = block_relpath(hash);
-        let compressed_bytes = self.transport.read_async(&block_relpath).await?;
+        let compressed_bytes = self.transport.read(&block_relpath).await?;
         let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
         let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
         if actual_hash != *hash {
@@ -248,6 +248,51 @@ impl BlockDir {
             .expect("Lock cache")
             .put(hash.clone(), decompressed_bytes.clone());
         self.exists.write().unwrap().put(hash.clone(), ());
+        self.stats.read_blocks.fetch_add(1, Relaxed);
+        monitor.count(Counter::BlockReads, 1);
+        self.stats
+            .read_block_compressed_bytes
+            .fetch_add(compressed_bytes.len(), Relaxed);
+        monitor.count(Counter::BlockReadCompressedBytes, compressed_bytes.len());
+        self.stats
+            .read_block_uncompressed_bytes
+            .fetch_add(decompressed_bytes.len(), Relaxed);
+        monitor.count(
+            Counter::BlockReadUncompressedBytes,
+            decompressed_bytes.len(),
+        );
+        Ok(decompressed_bytes)
+    }
+
+    /// Return the entire contents of the block.
+    ///
+    /// Checks that the hash is correct with the contents.
+    #[instrument(skip(self, monitor))]
+    pub async fn get_async(&self, hash: &BlockHash, monitor: Arc<dyn Monitor>) -> Result<Bytes> {
+        // TODO: Tokio locks on caches
+        if let Some(hit) = self.cache.write().expect("Lock cache").get(hash) {
+            monitor.count(Counter::BlockContentCacheHit, 1);
+            self.stats.cache_hit.fetch_add(1, Relaxed);
+            trace!("Block cache hit");
+            return Ok(hit.clone());
+        }
+        monitor.count(Counter::BlockContentCacheMiss, 1);
+        let mut decompressor = Decompressor::new();
+        let block_relpath = block_relpath(hash);
+        let compressed_bytes = self.transport.read(&block_relpath).await?;
+        let decompressed_bytes = decompressor.decompress(&compressed_bytes)?;
+        let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
+        if actual_hash != *hash {
+            return Err(Error::BlockCorrupt { hash: hash.clone() });
+        }
+        self.cache
+            .write()
+            .expect("Lock cache")
+            .put(hash.clone(), decompressed_bytes.clone());
+        self.exists
+            .write()
+            .expect("Lock existence cache")
+            .put(hash.clone(), ());
         self.stats.read_blocks.fetch_add(1, Relaxed);
         monitor.count(Counter::BlockReads, 1);
         self.stats
@@ -416,7 +461,7 @@ async fn get_async_uncached(
     monitor: Arc<dyn Monitor>,
 ) -> Result<Bytes> {
     let block_relpath = block_relpath(&hash);
-    let compressed_bytes = transport.read_async(&block_relpath).await?;
+    let compressed_bytes = transport.read(&block_relpath).await?;
     let decompressed_bytes = Decompressor::new().decompress(&compressed_bytes)?;
     let actual_hash = BlockHash::hash_bytes(&decompressed_bytes);
     if actual_hash != hash {

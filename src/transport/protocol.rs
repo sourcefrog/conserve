@@ -15,8 +15,7 @@ use super::{ListDir, Metadata, Result, WriteMode};
 
 #[async_trait]
 pub(super) trait Protocol: std::fmt::Debug + Send + Sync {
-    fn read(&self, path: &str) -> Result<Bytes>;
-    async fn read_async(&self, path: &str) -> Result<Bytes>;
+    async fn read(&self, path: &str) -> Result<Bytes>;
 
     /// Write a complete file.
     ///

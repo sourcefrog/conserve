@@ -12,7 +12,7 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::fs::{self, create_dir, read, remove_dir_all, remove_file, File};
+use std::fs::{self, create_dir, remove_dir_all, remove_file, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -79,14 +79,7 @@ impl super::Protocol for Protocol {
         &self.url
     }
 
-    fn read(&self, relpath: &str) -> Result<Bytes> {
-        let full_path = &self.full_path(relpath);
-        read(full_path)
-            .map_err(|err| Error::io_error(full_path, err))
-            .map(Bytes::from)
-    }
-
-    async fn read_async(&self, relpath: &str) -> Result<Bytes> {
+    async fn read(&self, relpath: &str) -> Result<Bytes> {
         let full_path = &self.full_path(relpath);
         trace!(?relpath, "Read file");
         tokio::fs::read(full_path)
@@ -239,8 +232,8 @@ mod test {
     use crate::transport::record::{Call, Verb};
     use crate::transport::{self, Transport};
 
-    #[test]
-    fn read_file() {
+    #[tokio::test]
+    async fn read_async() {
         let temp = assert_fs::TempDir::new().unwrap();
         let content: &str = "the ribs of the disaster";
         let filename = "poem.txt";
@@ -248,41 +241,33 @@ mod test {
         temp.child(filename).write_str(content).unwrap();
 
         let transport = Transport::local(temp.path()).enable_record();
-        let buf = transport.read(filename).unwrap();
-        assert_eq!(buf, content.as_bytes());
+
+        let bytes = transport.read(filename).await.unwrap();
+        assert_eq!(bytes, content.as_bytes());
+
+        let err = transport.read("nonexistent").await.unwrap_err();
+        assert!(err.is_not_found());
 
         let calls = transport.recorded_calls();
         dbg!(&calls);
-        assert_eq!(calls, [Call(Verb::Read, filename.into())]);
+        assert_eq!(
+            calls,
+            [
+                Call(Verb::Read, filename.into()),
+                Call(Verb::Read, "nonexistent".into())
+            ]
+        );
 
         temp.close().unwrap();
     }
 
     #[tokio::test]
-    async fn read_file_async() {
-        let temp = assert_fs::TempDir::new().unwrap();
-        let content: &str = "the ribs of the disaster";
-        let filename = "poem.txt";
-
-        temp.child(filename).write_str(content).unwrap();
-
-        let transport = Transport::local(temp.path());
-        let bytes = transport.read_async(filename).await.unwrap();
-        assert_eq!(bytes, content.as_bytes());
-
-        let err = transport.read_async("nonexistent").await.unwrap_err();
-        assert!(err.is_not_found());
-
-        temp.close().unwrap();
-    }
-
-    #[test]
-    fn read_file_not_found() {
-        let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::local(temp.path());
+    async fn read_file_not_found() {
+        let transport = Transport::temp().enable_record();
 
         let err = transport
             .read("nonexistent.json")
+            .await
             .expect_err("read_file should fail on nonexistent file");
 
         let message = err.to_string();
@@ -301,6 +286,11 @@ mod test {
         let source = err.source().expect("source");
         let io_source: &io::Error = source.downcast_ref().expect("io::Error");
         assert_eq!(io_source.kind(), io::ErrorKind::NotFound);
+
+        assert_eq!(
+            transport.recorded_calls(),
+            [Call(Verb::Read, "nonexistent.json".into())]
+        );
     }
 
     #[test]
@@ -383,8 +373,8 @@ mod test {
     }
 
     #[cfg(unix)]
-    #[test]
-    fn write_file_permission_denied() {
+    #[tokio::test]
+    async fn write_file_permission_denied() {
         use std::fs;
         use std::os::unix::prelude::PermissionsExt;
 
@@ -394,15 +384,14 @@ mod test {
         fs::set_permissions(temp.child("file").path(), fs::Permissions::from_mode(0o000))
             .expect("set_permissions");
 
-        let err = transport.read("file").unwrap_err();
+        let err = transport.read("file").await.unwrap_err();
         assert!(!err.is_not_found());
         assert_eq!(err.kind(), transport::ErrorKind::PermissionDenied);
     }
 
-    #[test]
-    fn write_file_can_overwrite() {
-        let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::local(temp.path());
+    #[tokio::test]
+    async fn write_file_can_overwrite() {
+        let transport = Transport::temp().enable_record();
         let filename = "filename";
         transport
             .write(filename, b"original content", WriteMode::Overwrite)
@@ -410,7 +399,18 @@ mod test {
         transport
             .write(filename, b"new content", WriteMode::Overwrite)
             .expect("write over existing file succeeds");
-        assert_eq!(transport.read(filename).unwrap().as_ref(), b"new content");
+        assert_eq!(
+            transport.read(filename).await.unwrap().as_ref(),
+            b"new content"
+        );
+        assert_eq!(
+            transport.recorded_calls(),
+            [
+                Call(Verb::Write, filename.into()),
+                Call(Verb::Write, filename.into()),
+                Call(Verb::Read, filename.into())
+            ]
+        );
     }
 
     #[test]

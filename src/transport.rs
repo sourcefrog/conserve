@@ -167,13 +167,9 @@ impl Transport {
     /// Files in the archive are of bounded size, so it's OK to always read them
     /// entirely into memory, and this is simple to support on all
     /// implementations.
-    pub fn read(&self, path: &str) -> Result<Bytes> {
+    pub async fn read(&self, path: &str) -> Result<Bytes> {
         self.record(Verb::Read, path);
-        self.protocol.read(path)
-    }
-
-    pub async fn read_async(&self, path: &str) -> Result<Bytes> {
-        self.protocol.read_async(path).await
+        self.protocol.read(path).await
     }
 
     /// List a directory, separating out file and subdirectory names.
