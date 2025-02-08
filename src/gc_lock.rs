@@ -58,11 +58,11 @@ impl GarbageCollectionLock {
         let archive = archive.clone();
         let band_id = archive.last_band_id().await?;
         if let Some(band_id) = band_id {
-            if !archive.band_is_closed(band_id)? {
+            if !archive.band_is_closed(band_id).await? {
                 return Err(Error::DeleteWithIncompleteBackup { band_id });
             }
         }
-        if archive.transport().is_file(GC_LOCK).unwrap_or(true) {
+        if archive.transport().is_file(GC_LOCK).await.unwrap_or(true) {
             return Err(Error::GarbageCollectionLockHeld);
         }
         archive
@@ -76,15 +76,19 @@ impl GarbageCollectionLock {
     /// Use this only if you're confident that the process owning the lock
     /// has terminated and the lock is stale.
     pub async fn break_lock(archive: &Archive) -> Result<GarbageCollectionLock> {
-        if GarbageCollectionLock::is_locked(archive)? {
+        if GarbageCollectionLock::is_locked(archive).await? {
             archive.transport().remove_file(GC_LOCK)?;
         }
         GarbageCollectionLock::new(archive).await
     }
 
     /// Returns true if the archive is currently locked by a gc process.
-    pub fn is_locked(archive: &Archive) -> Result<bool> {
-        archive.transport().is_file(GC_LOCK).map_err(Error::from)
+    pub async fn is_locked(archive: &Archive) -> Result<bool> {
+        archive
+            .transport()
+            .is_file(GC_LOCK)
+            .await
+            .map_err(Error::from)
     }
 
     /// Check that no new versions have been created in this archive since
@@ -119,12 +123,12 @@ mod test {
     async fn empty_archive_ok() {
         let archive = ScratchArchive::new();
         let delete_guard = GarbageCollectionLock::new(&archive).await.unwrap();
-        assert!(archive.transport().is_file("GC_LOCK").unwrap());
+        assert!(archive.transport().is_file("GC_LOCK").await.unwrap());
         delete_guard.check().await.unwrap();
 
         // Released when dropped.
         drop(delete_guard);
-        assert!(!archive.transport().is_file("GC_LOCK").unwrap());
+        assert!(!archive.transport().is_file("GC_LOCK").await.unwrap());
     }
 
     #[tokio::test]

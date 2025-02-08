@@ -45,8 +45,8 @@ impl StoredTree {
         &self.band
     }
 
-    pub fn is_closed(&self) -> Result<bool> {
-        self.band.is_closed()
+    pub async fn is_closed(&self) -> Result<bool> {
+        self.band.is_closed().await
     }
 
     pub async fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {

@@ -92,7 +92,7 @@ pub async fn backup(
     monitor: Arc<dyn Monitor>,
 ) -> Result<BackupStats> {
     let start = Instant::now();
-    if gc_lock::GarbageCollectionLock::is_locked(archive)? {
+    if gc_lock::GarbageCollectionLock::is_locked(archive).await? {
         return Err(Error::GarbageCollectionLockHeld);
     }
     let source_tree = SourceTree::open(source_path)?;

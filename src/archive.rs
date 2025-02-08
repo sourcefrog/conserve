@@ -107,15 +107,17 @@ impl Archive {
         self.block_dir.blocks_async(monitor).await
     }
 
-    pub fn band_exists(&self, band_id: BandId) -> Result<bool> {
+    pub async fn band_exists(&self, band_id: BandId) -> Result<bool> {
         self.transport()
             .is_file(&format!("{}/{}", band_id, crate::BAND_HEAD_FILENAME))
+            .await
             .map_err(Error::from)
     }
 
-    pub fn band_is_closed(&self, band_id: BandId) -> Result<bool> {
+    pub async fn band_is_closed(&self, band_id: BandId) -> Result<bool> {
         self.transport
             .is_file(&format!("{}/{}", band_id, crate::BAND_TAIL_FILENAME))
+            .await
             .map_err(Error::from)
     }
 
@@ -196,7 +198,7 @@ impl Archive {
     pub async fn last_complete_band(&self) -> Result<Option<Band>> {
         for band_id in self.list_band_ids().await?.into_iter().rev() {
             let b = Band::open(self, band_id).await?;
-            if b.is_closed()? {
+            if b.is_closed().await? {
                 return Ok(Some(b));
             }
         }
