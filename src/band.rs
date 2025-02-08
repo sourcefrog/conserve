@@ -233,9 +233,10 @@ impl Band {
             })
     }
 
-    pub fn is_closed(&self) -> Result<bool> {
+    pub async fn is_closed(&self) -> Result<bool> {
         self.transport
             .is_file(BAND_TAIL_FILENAME)
+            .await
             .map_err(Error::from)
     }
 
@@ -334,17 +335,17 @@ mod tests {
         assert!(!band_dir.join("BANDTAIL").exists());
         assert!(band_dir.join("i").is_dir());
 
-        assert!(!band.is_closed().unwrap());
+        assert!(!band.is_closed().await.unwrap());
 
         band.close(0).unwrap();
         assert!(band_dir.join("BANDTAIL").is_file());
-        assert!(band.is_closed().unwrap());
+        assert!(band.is_closed().await.unwrap());
 
         let band_id = BandId::from_str("b0000").unwrap();
         let band2 = Band::open(&af, band_id)
             .await
             .expect("failed to re-open band");
-        assert!(band2.is_closed().unwrap());
+        assert!(band2.is_closed().await.unwrap());
 
         // Try get_info
         let info = band2.get_info().await.expect("get_info failed");
@@ -361,12 +362,12 @@ mod tests {
     async fn delete_band() {
         let af = ScratchArchive::new();
         let _band = Band::create(&af).await.unwrap();
-        assert!(af.transport().is_file("b0000/BANDHEAD").unwrap());
+        assert!(af.transport().is_file("b0000/BANDHEAD").await.unwrap());
 
         Band::delete(&af, BandId::new(&[0])).expect("delete band");
 
-        assert!(!af.transport().is_file("b0000").unwrap());
-        assert!(!af.transport().is_file("b0000/BANDHEAD").unwrap());
+        assert!(!af.transport().is_file("b0000").await.unwrap());
+        assert!(!af.transport().is_file("b0000/BANDHEAD").await.unwrap());
     }
 
     #[tokio::test]

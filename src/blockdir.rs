@@ -182,7 +182,7 @@ impl BlockDir {
             return Ok(true);
         }
         monitor.count(Counter::BlockExistenceCacheMiss, 1);
-        match self.transport.metadata(&block_relpath(hash)) {
+        match self.transport.metadata(&block_relpath(hash)).await {
             Err(err) if err.is_not_found() => Ok(false),
             Err(err) => {
                 warn!(?err, ?hash, "Error checking presence of block");
@@ -198,7 +198,7 @@ impl BlockDir {
 
     /// Returns the compressed on-disk size of a block.
     pub(crate) async fn compressed_size(&self, hash: &BlockHash) -> Result<u64> {
-        Ok(self.transport.metadata(&block_relpath(hash))?.len)
+        Ok(self.transport.metadata(&block_relpath(hash)).await?.len)
     }
 
     /// Read back some content addressed by an [Address] (a block hash, start and end).

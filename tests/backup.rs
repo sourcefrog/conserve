@@ -54,9 +54,9 @@ async fn simple_backup() -> Result<()> {
     let restore_dir = TempDir::new().unwrap();
 
     let archive = Archive::open_path(af.path()).await.unwrap();
-    assert!(archive.band_exists(BandId::zero()).unwrap());
-    assert!(archive.band_is_closed(BandId::zero()).unwrap());
-    assert!(!archive.band_exists(BandId::new(&[1])).unwrap());
+    assert!(archive.band_exists(BandId::zero()).await.unwrap());
+    assert!(archive.band_is_closed(BandId::zero()).await.unwrap());
+    assert!(!archive.band_exists(BandId::new(&[1])).await.unwrap());
     restore(
         &archive,
         restore_dir.path(),
@@ -173,7 +173,7 @@ async fn check_backup(af: &ScratchArchive) -> Result<()> {
     );
 
     let band = Band::open(af, band_ids[0]).await.unwrap();
-    assert!(band.is_closed().unwrap());
+    assert!(band.is_closed().await.unwrap());
 
     let index_entries = band
         .index()
@@ -356,7 +356,7 @@ async fn symlink() -> Result<()> {
     assert_eq!("b0000", band_ids[0].to_string());
 
     let band = Band::open(&af, band_ids[0]).await.unwrap();
-    assert!(band.is_closed().unwrap());
+    assert!(band.is_closed().await.unwrap());
 
     let index_entries = band
         .index()
