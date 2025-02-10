@@ -672,7 +672,6 @@ mod test {
     use assert_fs::TempDir;
 
     use crate::monitor::test::TestMonitor;
-    use crate::transport::Transport;
 
     use super::*;
 
@@ -680,8 +679,7 @@ mod test {
     async fn deleted_files_are_reported() {
         // tracing_subscriber::fmt::init();
 
-        let transport = Transport::temp();
-        let archive = Archive::create(transport.clone()).unwrap();
+        let archive = Archive::create_temp().await;
         let src = TempDir::new().unwrap();
         let monitor = TestMonitor::arc();
 
