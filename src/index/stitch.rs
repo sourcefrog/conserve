@@ -168,7 +168,7 @@ impl Stitch {
                     // Start reading this new index and skip forward until after last_apath
                     match Band::open(&self.archive, *band_id).await {
                         Ok(band) => {
-                            let mut index_hunks = band.index().iter_available_hunks();
+                            let mut index_hunks = band.index().iter_available_hunks().await;
                             if let Some(last) = &self.last_apath {
                                 index_hunks = index_hunks.advance_to_after(last)
                             }
