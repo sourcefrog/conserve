@@ -129,6 +129,7 @@ pub async fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
     let index_entries: Vec<Vec<IndexEntry>> = band
         .index()
         .iter_available_hunks()
+        .await
         .collect_hunk_vec()
         .await?;
     serde_json::ser::to_writer_pretty(bw, &index_entries)

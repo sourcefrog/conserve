@@ -178,6 +178,7 @@ async fn check_backup(af: &ScratchArchive) -> Result<()> {
     let index_entries = band
         .index()
         .iter_available_hunks()
+        .await
         .collect_entry_vec()
         .await?;
     assert_eq!(2, index_entries.len());
@@ -361,6 +362,7 @@ async fn symlink() -> Result<()> {
     let index_entries = band
         .index()
         .iter_available_hunks()
+        .await
         .collect_entry_vec()
         .await?;
     assert_eq!(2, index_entries.len());

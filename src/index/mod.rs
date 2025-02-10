@@ -110,7 +110,7 @@ impl IndexRead {
     }
 
     // All hunk numbers present in all directories.
-    pub fn hunks_available(&self) -> Result<Vec<u32>> {
+    pub async fn hunks_available(&self) -> Result<Vec<u32>> {
         let subdirs = self.transport.list_dir("")?.dirs.into_iter().sorted();
 
         let hunks = subdirs
@@ -125,9 +125,9 @@ impl IndexRead {
 
     /// Make an iterator that returns hunks of entries from this index,
     /// skipping any that are not present.
-    pub fn iter_available_hunks(self) -> IndexHunkIter {
+    pub async fn iter_available_hunks(self) -> IndexHunkIter {
         let _span = debug_span!("iter_hunks", ?self.transport).entered();
-        let hunks = self.hunks_available().expect("hunks available"); // TODO: Don't panic
+        let hunks = self.hunks_available().await.expect("hunks available"); // TODO: Don't panic
         debug!(?hunks);
         IndexHunkIter {
             hunks: hunks.into_iter(),
@@ -336,6 +336,7 @@ mod tests {
 
         let hunks = IndexRead::open(transport.clone())
             .iter_available_hunks()
+            .await
             .collect_hunk_vec()
             .await?;
         assert_eq!(hunks.len(), 1);
@@ -357,6 +358,7 @@ mod tests {
         let index_read = IndexRead::open_path(testdir.path());
         let names = index_read
             .iter_available_hunks()
+            .await
             .collect_entry_vec()
             .await?
             .into_iter()
@@ -367,6 +369,7 @@ mod tests {
         // Read it out as hunks.
         let hunks: Vec<Vec<IndexEntry>> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .collect_hunk_vec()
             .await?;
         assert_eq!(hunks.len(), 2);
@@ -397,6 +400,7 @@ mod tests {
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/".into())
             .collect_entry_vec()
             .await?
@@ -407,6 +411,7 @@ mod tests {
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/nonexistent".into())
             .collect_entry_vec()
             .await?
@@ -417,6 +422,7 @@ mod tests {
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/1.1".into())
             .collect_entry_vec()
             .await?
@@ -427,6 +433,7 @@ mod tests {
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/1.1.1".into())
             .collect_entry_vec()
             .await?
@@ -437,6 +444,7 @@ mod tests {
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/1.2".into())
             .collect_entry_vec()
             .await?
@@ -447,6 +455,7 @@ mod tests {
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/1.3".into())
             .collect_entry_vec()
             .await?
@@ -457,6 +466,7 @@ mod tests {
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/2.0".into())
             .collect_entry_vec()
             .await?
@@ -467,6 +477,7 @@ mod tests {
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/2.1".into())
             .collect_entry_vec()
             .await?
@@ -477,6 +488,7 @@ mod tests {
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/2.2".into())
             .collect_entry_vec()
             .await?
@@ -501,7 +513,11 @@ mod tests {
         ib.finish_hunk()?;
         dbg!(ib.hunks_written);
         let read_index = IndexRead::open_path(testdir.path());
-        let hunks = read_index.iter_available_hunks().collect_hunk_vec().await?;
+        let hunks = read_index
+            .iter_available_hunks()
+            .await
+            .collect_hunk_vec()
+            .await?;
         assert_eq!(hunks.len(), 1);
         Ok(())
     }
