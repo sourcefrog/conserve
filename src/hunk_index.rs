@@ -34,7 +34,7 @@ impl IndexHunkIndex {
     /// as we loop through every hunk and read its contents.
     pub async fn from_index(index: &IndexRead) -> Result<Self> {
         let mut hunk_info = Vec::new();
-        for hunk_index in index.hunks_available()? {
+        for hunk_index in index.hunks_available().await? {
             let mut index = index.duplicate();
             let entries = index.read_hunk(hunk_index).await?;
             if let Some(entries) = entries {
