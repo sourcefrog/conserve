@@ -60,6 +60,13 @@ impl Archive {
         Archive::create(Transport::local(path))
     }
 
+    /// Make a new archive in a temp directory.
+    ///
+    /// Panic if the tempdir can't be created.
+    pub async fn create_temp() -> Archive {
+        Archive::create(Transport::temp()).unwrap()
+    }
+
     /// Make a new archive in a new directory accessed by a Transport.
     pub fn create(transport: Transport) -> Result<Archive> {
         transport.create_dir("")?;
