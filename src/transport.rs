@@ -289,6 +289,12 @@ pub struct Metadata {
     pub modified: OffsetDateTime,
 }
 
+impl Metadata {
+    pub fn kind(&self) -> Kind {
+        self.kind
+    }
+}
+
 /// A list of all the files and directories in a directory.
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct ListDir {
