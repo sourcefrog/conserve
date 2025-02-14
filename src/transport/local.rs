@@ -349,8 +349,8 @@ mod test {
         temp.close().unwrap();
     }
 
-    #[test]
-    fn write_file() {
+    #[tokio::test]
+    async fn write_file() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
 
@@ -367,6 +367,14 @@ mod test {
         temp.child("subdir")
             .child("subfile")
             .assert("Must I paint you a picture?");
+        let dir_meta = transport.metadata("subdir").await.unwrap();
+        assert!(dir_meta.kind().is_dir());
+        assert!(!dir_meta.kind().is_file());
+        assert!(!dir_meta.kind().is_symlink());
+        let file_meta = transport.metadata("subdir/subfile").await.unwrap();
+        assert!(file_meta.kind().is_file());
+        assert!(!file_meta.kind().is_dir());
+        assert!(!file_meta.kind().is_symlink());
 
         temp.close().unwrap();
     }
@@ -412,14 +420,15 @@ mod test {
         );
     }
 
-    #[test]
-    fn create_existing_dir() {
+    #[tokio::test]
+    async fn create_existing_dir() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
+        assert!(transport.metadata("aaa").await.unwrap().kind().is_dir());
 
         temp.close().unwrap();
     }
