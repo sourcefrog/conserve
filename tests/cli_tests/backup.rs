@@ -18,13 +18,13 @@ use assert_fs::NamedTempFile;
 use indoc::indoc;
 use serde_json::Deserializer;
 
-use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::{test_fixtures::TreeFixture, Archive};
 
 use crate::run_conserve;
 
-#[test]
-fn backup_verbose() {
-    let af = ScratchArchive::new();
+#[tokio::test]
+async fn backup_verbose() {
+    let af = Archive::create_temp().await;
     let src = TreeFixture::new();
     src.create_dir("subdir");
     src.create_file("subdir/a");
@@ -34,7 +34,7 @@ fn backup_verbose() {
 
     run_conserve()
         .args(["backup", "--no-stats", "-v"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(src.path())
         .arg("--changes-json")
         .arg(changes_json.path())
@@ -69,16 +69,16 @@ fn backup_verbose() {
     assert_eq!(counters.get("Dirs").unwrap(), 2);
 }
 
-#[test]
-fn verbose_backup_does_not_print_unchanged_files() {
-    let af = ScratchArchive::new();
+#[tokio::test]
+async fn verbose_backup_does_not_print_unchanged_files() {
+    let af = Archive::create_temp().await;
     let src = TreeFixture::new();
     src.create_file("a");
     src.create_file("b");
 
     run_conserve()
         .args(["backup", "--no-stats", "-v"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(src.path())
         .assert()
         .success()
@@ -91,7 +91,7 @@ fn verbose_backup_does_not_print_unchanged_files() {
 
     run_conserve()
         .args(["backup", "--no-stats", "-v"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(src.path())
         .assert()
         .success()

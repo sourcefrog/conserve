@@ -14,7 +14,7 @@
 //! Tests of the `conserve versions` command.
 
 use assert_cmd::prelude::*;
-use conserve::test_fixtures::ScratchArchive;
+use conserve::Archive;
 use indoc::indoc;
 use predicates::function::function;
 use predicates::prelude::*;
@@ -99,12 +99,12 @@ fn tree_sizes() {
 
 #[tokio::test]
 async fn versions_short_newest_first() {
-    let af = ScratchArchive::new();
-    af.store_two_versions().await;
+    let af = Archive::create_temp().await;
+    conserve::test_fixtures::store_two_versions(&af).await;
 
     run_conserve()
         .args(["versions", "--short", "--newest"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success()
         .stderr(predicate::str::is_empty())

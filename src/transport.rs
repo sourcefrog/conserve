@@ -246,8 +246,8 @@ impl Transport {
         self.protocol.url()
     }
 
-    #[allow(unused)]
-    fn local_path(&self) -> Option<PathBuf> {
+    /// If this is a local transport, return the path.
+    pub fn local_path(&self) -> Option<PathBuf> {
         self.protocol.local_path()
     }
 }

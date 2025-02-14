@@ -17,89 +17,35 @@
 /// is deleted.
 use std::fs;
 use std::io::Write;
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use tempfile::TempDir;
 
 use crate::monitor::test::TestMonitor;
-use crate::transport::Transport;
 use crate::*;
 
-/// A temporary archive, deleted when it goes out of scope.
-///
-/// The ScratchArchive can be treated as an Archive.
-pub struct ScratchArchive {
-    #[allow(dead_code)]
-    tempdir: TempDir, // held only for cleanup
-    archive: Archive,
-    archive_path: PathBuf,
+pub async fn setup_incomplete_empty_band(archive: &Archive) {
+    Band::create(archive).await.unwrap();
 }
 
-impl ScratchArchive {
-    pub fn new() -> ScratchArchive {
-        let tempdir = TempDir::new().unwrap();
-        let archive_path = tempdir.path().join("archive");
-        let archive = Archive::create_path(&archive_path).unwrap();
-        ScratchArchive {
-            tempdir,
-            archive,
-            archive_path,
-        }
+pub async fn store_two_versions(archive: &Archive) {
+    let srcdir = TreeFixture::new();
+    srcdir.create_file("hello");
+    srcdir.create_dir("subdir");
+    srcdir.create_file("subdir/subfile");
+    if SYMLINKS_SUPPORTED {
+        srcdir.create_symlink("link", "target");
     }
 
-    pub fn path(&self) -> &Path {
-        &self.archive_path
-    }
+    let options = &BackupOptions::default();
+    backup(archive, srcdir.path(), options, TestMonitor::arc())
+        .await
+        .unwrap();
 
-    pub async fn setup_incomplete_empty_band(&self) {
-        Band::create(&self.archive).await.unwrap();
-    }
-
-    pub async fn store_two_versions(&self) {
-        let srcdir = TreeFixture::new();
-        srcdir.create_file("hello");
-        srcdir.create_dir("subdir");
-        srcdir.create_file("subdir/subfile");
-        if SYMLINKS_SUPPORTED {
-            srcdir.create_symlink("link", "target");
-        }
-
-        let options = &BackupOptions::default();
-        backup(&self.archive, srcdir.path(), options, TestMonitor::arc())
-            .await
-            .unwrap();
-
-        srcdir.create_file("hello2");
-        backup(&self.archive, srcdir.path(), options, TestMonitor::arc())
-            .await
-            .unwrap();
-    }
-
-    pub fn transport(&self) -> &Transport {
-        self.archive.transport()
-    }
-}
-
-impl Deref for ScratchArchive {
-    type Target = Archive;
-
-    /// ScratchArchive can be directly used as an archive.
-    fn deref(&self) -> &Archive {
-        &self.archive
-    }
-}
-
-impl AsRef<Archive> for ScratchArchive {
-    fn as_ref(&self) -> &Archive {
-        &self.archive
-    }
-}
-
-impl Default for ScratchArchive {
-    fn default() -> Self {
-        Self::new()
-    }
+    srcdir.create_file("hello2");
+    backup(archive, srcdir.path(), options, TestMonitor::arc())
+        .await
+        .unwrap();
 }
 
 /// A temporary tree for running a test.

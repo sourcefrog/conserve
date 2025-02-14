@@ -15,12 +15,12 @@
 use filetime::{set_file_mtime, FileTime};
 
 use conserve::monitor::test::TestMonitor;
-use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::test_fixtures::TreeFixture;
 use conserve::*;
 
 /// Make a tree with one file and an archive with one version.
-async fn create_tree() -> (ScratchArchive, TreeFixture) {
-    let a = ScratchArchive::new();
+async fn create_tree() -> (Archive, TreeFixture) {
+    let a = Archive::create_temp().await;
     let tf = TreeFixture::new();
     tf.create_file_with_contents("thing", b"contents of thing");
     let stats = backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc())
@@ -145,7 +145,7 @@ async fn symlink_target_change_reported_as_changed() {
     use std::fs::remove_file;
     use std::path::Path;
 
-    let a = ScratchArchive::new();
+    let a = Archive::create_temp().await;
     let tf = TreeFixture::new();
     tf.create_symlink("link", "target");
     backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc())

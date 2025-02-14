@@ -3,12 +3,11 @@
 
 //! Tests for per-band format flags.
 
-use conserve::test_fixtures::ScratchArchive;
 use conserve::*;
 use transport::WriteMode;
 #[tokio::test]
 async fn unknown_format_flag_fails_to_open() {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
 
     // Make the bandhead by hand because the library prevents writing invalid flags.
     af.transport().create_dir("b0000").unwrap();

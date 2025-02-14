@@ -17,23 +17,24 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use conserve::monitor::test::TestMonitor;
+use conserve::test_fixtures::store_two_versions;
+use conserve::Archive;
 use predicates::prelude::*;
 
-use conserve::test_fixtures::ScratchArchive;
 use conserve::BandId;
 
 use crate::run_conserve;
 
 #[tokio::test]
 async fn delete_both_bands() {
-    let af = ScratchArchive::new();
-    af.store_two_versions().await;
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b0000"])
         .args(["-b", "b0001"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success();
 
@@ -43,13 +44,13 @@ async fn delete_both_bands() {
 
 #[tokio::test]
 async fn delete_first_version() {
-    let af = ScratchArchive::new();
-    af.store_two_versions().await;
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b0"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success();
 
@@ -61,7 +62,7 @@ async fn delete_first_version() {
     let rd = TempDir::new().unwrap();
     run_conserve()
         .arg("restore")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(rd.path())
         .assert()
         .success();
@@ -74,20 +75,20 @@ async fn delete_first_version() {
 
     run_conserve()
         .arg("validate")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success();
 }
 
 #[tokio::test]
 async fn delete_second_version() {
-    let af = ScratchArchive::new();
-    af.store_two_versions().await;
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b1"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success();
 
@@ -98,7 +99,7 @@ async fn delete_second_version() {
     let rd = TempDir::new().unwrap();
     run_conserve()
         .arg("restore")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(rd.path())
         .assert()
         .success();
@@ -111,19 +112,19 @@ async fn delete_second_version() {
 
     run_conserve()
         .arg("validate")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success();
 }
 
-#[test]
-fn delete_nonexistent_band() {
-    let af = ScratchArchive::new();
+#[tokio::test]
+async fn delete_nonexistent_band() {
+    let af = Archive::create_temp().await;
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b0000"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .stderr(predicate::str::contains(
             "ERROR conserve: Band not found: b0000",

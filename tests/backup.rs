@@ -21,7 +21,7 @@ use tracing_test::traced_test;
 
 use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
-use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::test_fixtures::TreeFixture;
 use conserve::*;
 
 const HELLO_HASH: &str =
@@ -30,7 +30,7 @@ const HELLO_HASH: &str =
 
 #[tokio::test]
 async fn simple_backup() -> Result<()> {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
 
@@ -53,7 +53,7 @@ async fn simple_backup() -> Result<()> {
 
     let restore_dir = TempDir::new().unwrap();
 
-    let archive = Archive::open_path(af.path()).await.unwrap();
+    let archive = Archive::open(af.transport().clone()).await.unwrap();
     assert!(archive.band_exists(BandId::zero()).await.unwrap());
     assert!(archive.band_is_closed(BandId::zero()).await.unwrap());
     assert!(!archive.band_exists(BandId::new(&[1])).await.unwrap());
@@ -73,7 +73,7 @@ async fn simple_backup() -> Result<()> {
 #[tokio::test]
 #[traced_test]
 async fn simple_backup_with_excludes() -> Result<()> {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
     srcdir.create_file("hello");
     srcdir.create_file("foooo");
@@ -102,7 +102,7 @@ async fn simple_backup_with_excludes() -> Result<()> {
 
     let restore_dir = TempDir::new().unwrap();
 
-    let archive = Archive::open_path(af.path()).await.unwrap();
+    let archive = Archive::open(af.transport().clone()).await.unwrap();
 
     let band = Band::open(&archive, BandId::zero()).await.unwrap();
     let band_info = band.get_info().await?;
@@ -134,7 +134,7 @@ async fn simple_backup_with_excludes() -> Result<()> {
 
 #[tokio::test]
 async fn backup_more_excludes() {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
 
     srcdir.create_dir("test");
@@ -163,16 +163,16 @@ async fn backup_more_excludes() {
     assert_eq!(0, stats.unknown_kind);
 }
 
-async fn check_backup(af: &ScratchArchive) -> Result<()> {
-    let band_ids = af.list_band_ids().await.unwrap();
+async fn check_backup(archive: &Archive) -> Result<()> {
+    let band_ids = archive.list_band_ids().await.unwrap();
     assert_eq!(1, band_ids.len());
     assert_eq!("b0000", band_ids[0].to_string());
     assert_eq!(
-        af.last_complete_band().await.unwrap().unwrap().id(),
+        archive.last_complete_band().await.unwrap().unwrap().id(),
         BandId::new(&[0])
     );
 
-    let band = Band::open(af, band_ids[0]).await.unwrap();
+    let band = Band::open(archive, band_ids[0]).await.unwrap();
     assert!(band.is_closed().await.unwrap());
 
     let index_entries = band
@@ -194,7 +194,8 @@ async fn check_backup(af: &ScratchArchive) -> Result<()> {
     assert!(file_entry.mtime > 0);
 
     assert_eq!(
-        af.referenced_blocks(&af.list_band_ids().await.unwrap(), TestMonitor::arc())
+        archive
+            .referenced_blocks(&archive.list_band_ids().await.unwrap(), TestMonitor::arc())
             .await
             .unwrap()
             .into_iter()
@@ -203,7 +204,8 @@ async fn check_backup(af: &ScratchArchive) -> Result<()> {
         vec![HELLO_HASH]
     );
     assert_eq!(
-        af.all_blocks(TestMonitor::arc())
+        archive
+            .all_blocks(TestMonitor::arc())
             .await
             .unwrap()
             .into_iter()
@@ -212,7 +214,8 @@ async fn check_backup(af: &ScratchArchive) -> Result<()> {
         vec![HELLO_HASH]
     );
     assert_eq!(
-        af.unreferenced_blocks(TestMonitor::arc())
+        archive
+            .unreferenced_blocks(TestMonitor::arc())
             .await
             .unwrap()
             .len(),
@@ -223,7 +226,7 @@ async fn check_backup(af: &ScratchArchive) -> Result<()> {
 
 #[tokio::test]
 async fn large_file() {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let tf = TreeFixture::new();
 
     let file_size = 4 << 20;
@@ -253,7 +256,7 @@ async fn large_file() {
 
     // Try to restore it
     let rd = TempDir::new().unwrap();
-    let restore_archive = Archive::open_path(af.path()).await.unwrap();
+    let restore_archive = Archive::open(af.transport().clone()).await.unwrap();
     let monitor = TestMonitor::arc();
     restore(
         &restore_archive,
@@ -275,7 +278,7 @@ async fn large_file() {
 #[cfg(unix)]
 #[tokio::test]
 async fn source_unreadable() {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let tf = TreeFixture::new();
 
     tf.create_file("a");
@@ -321,7 +324,7 @@ async fn mtime_before_epoch() {
     assert_eq!(entries[0].apath(), "/");
     assert_eq!(entries[1].apath(), "/old_file");
 
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     backup(
         &af,
         tf.path(),
@@ -335,7 +338,7 @@ async fn mtime_before_epoch() {
 #[cfg(unix)]
 #[tokio::test]
 async fn symlink() -> Result<()> {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
     srcdir.create_symlink("symlink", "/a/broken/destination");
 
@@ -376,7 +379,7 @@ async fn symlink() -> Result<()> {
 
 #[tokio::test]
 async fn empty_file_uses_zero_blocks() {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
     srcdir.create_file_with_contents("empty", &[]);
     let stats = backup(
@@ -423,7 +426,7 @@ async fn empty_file_uses_zero_blocks() {
 
 #[tokio::test]
 async fn detect_unmodified() {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
     srcdir.create_file("aaa");
     srcdir.create_file("bbb");
@@ -463,7 +466,7 @@ async fn detect_unmodified() {
 
 #[tokio::test]
 async fn detect_minimal_mtime_change() {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
     srcdir.create_file("aaa");
     srcdir.create_file_with_contents("bbb", b"longer content for bbb");
@@ -502,7 +505,7 @@ async fn detect_minimal_mtime_change() {
 
 #[tokio::test]
 async fn small_files_combined_two_backups() {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
     srcdir.create_file("file1");
     srcdir.create_file("file2");
@@ -545,7 +548,7 @@ async fn small_files_combined_two_backups() {
 #[tokio::test]
 async fn many_small_files_combined_to_one_block() {
     // tracing_subscriber::fmt::init();
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
     // The directory also counts as an entry, so we should be able to fit 1999
     // files in 2 hunks of 1000 entries.
@@ -600,7 +603,7 @@ async fn many_small_files_combined_to_one_block() {
 async fn mixed_medium_small_files_two_hunks() {
     // tracing_subscriber::fmt::init();
 
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
     const MEDIUM_LENGTH: u64 = 150_000;
     // Make some files large enough not to be grouped together as small files.
@@ -655,7 +658,7 @@ async fn mixed_medium_small_files_two_hunks() {
 
 #[tokio::test]
 async fn detect_unchanged_from_stitched_index() {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
     srcdir.create_file("a");
     srcdir.create_file("b");

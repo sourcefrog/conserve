@@ -228,7 +228,7 @@ mod test {
     use super::*;
     use crate::counters::Counter;
     use crate::monitor::test::TestMonitor;
-    use crate::test_fixtures::{ScratchArchive, TreeFixture};
+    use crate::test_fixtures::TreeFixture;
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
         IndexEntry {
@@ -263,7 +263,7 @@ mod test {
         // This test uses private interfaces to create an index that breaks
         // across hunks in a certain way.
 
-        let af = ScratchArchive::new();
+        let af = Archive::create_temp().await;
 
         // Construct a history with four versions:
         //
@@ -341,9 +341,9 @@ mod test {
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
         // incomplete
 
-        std::fs::remove_dir_all(af.path().join("b0003"))?;
+        std::fs::remove_dir_all(af.transport().local_path().unwrap().join("b0003"))?;
 
-        let archive = Archive::open_path(af.path()).await?;
+        let archive = Archive::open(af.transport().clone()).await?;
         assert_eq!(
             simple_ls(&archive, BandId::new(&[0])).await,
             "/0:b0 /1:b0 /2:b0"
@@ -381,7 +381,7 @@ mod test {
         let tf = TreeFixture::new();
         tf.create_file("file_a");
 
-        let af = ScratchArchive::new();
+        let af = Archive::create_temp().await;
         backup(
             &af,
             tf.path(),

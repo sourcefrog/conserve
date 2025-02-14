@@ -53,7 +53,7 @@ enum TreeChange {
 async fn backup_sequential_changes(changes: &[TreeChange]) {
     use TreeChange::*;
     let tf = TreeFixture::new();
-    let archive = ScratchArchive::new();
+    let archive = Archive::create_temp().await;
     let mut live_files: Vec<String> = Vec::new();
     let mut live_contents: BTreeMap<String, Vec<u8>> = BTreeMap::new();
     let mut next_file = 0;

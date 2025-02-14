@@ -21,7 +21,6 @@ use assert_fs::TempDir;
 
 use conserve::archive::Archive;
 use conserve::monitor::test::TestMonitor;
-use conserve::test_fixtures::ScratchArchive;
 
 #[tokio::test]
 async fn create_then_open_archive() {
@@ -56,13 +55,18 @@ fn fails_on_non_empty_directory() {
 /// The header is readable json containing only a version number.
 #[tokio::test]
 async fn empty_archive() {
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
 
-    assert!(af.path().is_dir());
-    assert!(af.path().join("CONSERVE").is_file());
-    assert!(af.path().join("d").is_dir());
+    assert!(af.transport().local_path().unwrap().is_dir());
+    assert!(af
+        .transport()
+        .local_path()
+        .unwrap()
+        .join("CONSERVE")
+        .is_file());
+    assert!(af.transport().local_path().unwrap().join("d").is_dir());
 
-    let header_path = af.path().join("CONSERVE");
+    let header_path = af.transport().local_path().unwrap().join("CONSERVE");
     let mut header_file = fs::File::open(header_path).unwrap();
     let mut contents = String::new();
     header_file.read_to_string(&mut contents).unwrap();

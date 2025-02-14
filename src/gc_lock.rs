@@ -117,11 +117,11 @@ impl Drop for GarbageCollectionLock {
 mod test {
     use super::*;
     use crate::monitor::test::TestMonitor;
-    use crate::test_fixtures::{ScratchArchive, TreeFixture};
+    use crate::test_fixtures::TreeFixture;
 
     #[tokio::test]
     async fn empty_archive_ok() {
-        let archive = ScratchArchive::new();
+        let archive = Archive::create_temp().await;
         let delete_guard = GarbageCollectionLock::new(&archive).await.unwrap();
         assert!(archive.transport().is_file("GC_LOCK").await.unwrap());
         delete_guard.check().await.unwrap();
@@ -133,7 +133,7 @@ mod test {
 
     #[tokio::test]
     async fn completed_backup_ok() {
-        let archive = ScratchArchive::new();
+        let archive = Archive::create_temp().await;
         let source = TreeFixture::new();
         backup(
             &archive,
@@ -149,7 +149,7 @@ mod test {
 
     #[tokio::test]
     async fn concurrent_complete_backup_denied() {
-        let archive = ScratchArchive::new();
+        let archive = Archive::create_temp().await;
         let source = TreeFixture::new();
         let _delete_guard = GarbageCollectionLock::new(&archive).await.unwrap();
         let backup_result = backup(
@@ -167,7 +167,7 @@ mod test {
 
     #[tokio::test]
     async fn incomplete_backup_denied() {
-        let archive = ScratchArchive::new();
+        let archive = Archive::create_temp().await;
         Band::create(&archive).await.unwrap();
         let err = GarbageCollectionLock::new(&archive).await.unwrap_err();
         assert_eq!(
@@ -178,7 +178,7 @@ mod test {
 
     #[tokio::test]
     async fn concurrent_gc_prevented() {
-        let archive = ScratchArchive::new();
+        let archive = Archive::create_temp().await;
         let _lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
         // Should not be able to create a second lock while one gc is running.
         let lock2_result = GarbageCollectionLock::new(&archive).await;
@@ -190,7 +190,7 @@ mod test {
 
     #[tokio::test]
     async fn sequential_gc_allowed() {
-        let archive = ScratchArchive::new();
+        let archive = Archive::create_temp().await;
         let _lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
         drop(_lock1);
         let _lock2 = GarbageCollectionLock::new(&archive).await.unwrap();
@@ -199,7 +199,7 @@ mod test {
 
     #[tokio::test]
     async fn break_lock() {
-        let archive = ScratchArchive::new();
+        let archive = Archive::create_temp().await;
         let lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
         // Pretend the process owning lock1 died, and get a new lock.
         std::mem::forget(lock1);

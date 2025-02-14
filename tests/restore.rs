@@ -19,16 +19,16 @@ use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
 use tempfile::TempDir;
 
-use conserve::test_fixtures::ScratchArchive;
+use conserve::test_fixtures::store_two_versions;
 use conserve::test_fixtures::TreeFixture;
 use conserve::*;
 
 #[tokio::test]
 async fn simple_restore() {
-    let af = ScratchArchive::new();
-    af.store_two_versions().await;
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
     let destdir = TreeFixture::new();
-    let restore_archive = Archive::open_path(af.path()).await.unwrap();
+    let restore_archive = Archive::open(af.transport().clone()).await.unwrap();
     let restored_names = Arc::new(Mutex::new(Vec::new()));
     let restored_names_clone = restored_names.clone();
     let options = RestoreOptions {
@@ -76,10 +76,10 @@ async fn simple_restore() {
 
 #[tokio::test]
 async fn restore_specified_band() {
-    let af = ScratchArchive::new();
-    af.store_two_versions().await;
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
     let destdir = TreeFixture::new();
-    let archive = Archive::open_path(af.path()).await.unwrap();
+    let archive = Archive::open(af.transport().clone()).await.unwrap();
     let band_id = BandId::new(&[0]);
     let options = RestoreOptions {
         band_selection: BandSelectionPolicy::Specified(band_id),
@@ -106,7 +106,7 @@ async fn restore_only_subdir() {
     create_dir(src.path().join("parent")).unwrap();
     create_dir(src.path().join("parent/sub")).unwrap();
     write(src.path().join("parent/sub/file"), b"hello").unwrap();
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     backup(
         &af,
         src.path(),
@@ -120,7 +120,7 @@ async fn restore_only_subdir() {
 
     let destdir = TreeFixture::new();
     let restore_monitor = TestMonitor::arc();
-    let archive = Archive::open_path(af.path()).await.unwrap();
+    let archive = Archive::open(af.transport().clone()).await.unwrap();
     let options = RestoreOptions {
         only_subtree: Some(Apath::from("/parent/sub")),
         ..Default::default()
@@ -137,8 +137,8 @@ async fn restore_only_subdir() {
 
 #[tokio::test]
 async fn decline_to_overwrite() {
-    let af = ScratchArchive::new();
-    af.store_two_versions().await;
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
     let destdir = TreeFixture::new();
     destdir.create_file("existing");
     let options = RestoreOptions {
@@ -157,12 +157,12 @@ async fn decline_to_overwrite() {
 
 #[tokio::test]
 async fn forced_overwrite() {
-    let af = ScratchArchive::new();
-    af.store_two_versions().await;
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
     let destdir = TreeFixture::new();
     destdir.create_file("existing");
 
-    let restore_archive = Archive::open_path(af.path()).await.unwrap();
+    let restore_archive = Archive::open(af.transport().clone()).await.unwrap();
     let options = RestoreOptions {
         overwrite: true,
         ..RestoreOptions::default()
@@ -180,10 +180,10 @@ async fn forced_overwrite() {
 
 #[tokio::test]
 async fn exclude_files() {
-    let af = ScratchArchive::new();
-    af.store_two_versions().await;
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
     let destdir = TreeFixture::new();
-    let restore_archive = Archive::open_path(af.path()).await.unwrap();
+    let restore_archive = Archive::open(af.transport().clone()).await.unwrap();
     let options = RestoreOptions {
         overwrite: true,
         exclude: Exclude::from_strings(["/**/subfile"]).unwrap(),
@@ -212,7 +212,7 @@ async fn restore_symlink() {
 
     use conserve::monitor::test::TestMonitor;
 
-    let af = ScratchArchive::new();
+    let af = Archive::create_temp().await;
     let srcdir = TreeFixture::new();
 
     srcdir.create_symlink("symlink", "target");

@@ -13,12 +13,12 @@
 //! Test garbage collection.
 
 use conserve::monitor::test::TestMonitor;
-use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::test_fixtures::TreeFixture;
 use conserve::*;
 
 #[tokio::test]
 async fn unreferenced_blocks() {
-    let archive = ScratchArchive::new();
+    let archive = Archive::create_temp().await;
     let tf = TreeFixture::new();
     tf.create_file("hello");
     let content_hash: BlockHash =
@@ -37,7 +37,7 @@ async fn unreferenced_blocks() {
     .expect("backup");
 
     // Delete the band and index
-    std::fs::remove_dir_all(archive.path().join("b0000")).unwrap();
+    std::fs::remove_dir_all(archive.transport().local_path().unwrap().join("b0000")).unwrap();
     let monitor = TestMonitor::arc();
 
     let unreferenced: Vec<BlockHash> = archive.unreferenced_blocks(monitor.clone()).await.unwrap();
@@ -108,7 +108,7 @@ async fn unreferenced_blocks() {
 
 #[tokio::test]
 async fn backup_prevented_by_gc_lock() -> Result<()> {
-    let archive = ScratchArchive::new();
+    let archive = Archive::create_temp().await;
     let tf = TreeFixture::new();
     tf.create_file("hello");
 
