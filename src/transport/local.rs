@@ -170,12 +170,12 @@ impl super::Protocol for Protocol {
 
     fn remove_file(&self, relpath: &str) -> Result<()> {
         let path = self.full_path(relpath);
-        remove_file(&path).map_err(|err| super::Error::io_error(&path, err))
+        remove_file(&path).map_err(|err| Error::io_error(&path, err))
     }
 
     fn remove_dir_all(&self, relpath: &str) -> Result<()> {
         let path = self.full_path(relpath);
-        remove_dir_all(&path).map_err(|err| super::Error::io_error(&path, err))
+        remove_dir_all(&path).map_err(|err| Error::io_error(&path, err))
     }
 
     fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {

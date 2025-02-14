@@ -171,6 +171,14 @@ impl Transport {
         self.protocol.read(path)
     }
 
+    /// Get the URL for a file relative to this transport.
+    pub fn relative_file_url(&self, path: &str) -> Url {
+        self.protocol
+            .url()
+            .join(path)
+            .expect("join relative file URL")
+    }
+
     /// List a directory, separating out file and subdirectory names.
     ///
     /// Names are in the arbitrary order that they're returned from the transport.
