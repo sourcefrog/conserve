@@ -350,21 +350,21 @@ mod test {
     }
 
     #[cfg(unix)]
-    #[test]
-    fn list_dir_skips_symlinks() {
+    #[tokio::test]
+    async fn list_dir_skips_symlinks() {
         // Archives aren't expected to contain symlinks and so list_dir just skips them.
 
         let transport = Transport::temp();
         let dir = transport.local_path().unwrap();
         std::os::unix::fs::symlink("foo", dir.join("alink")).unwrap();
 
-        let list_dir = transport.list_dir(".").unwrap();
+        let list_dir = transport.list_dir_async(".").await.unwrap();
         assert_eq!(list_dir.files, [""; 0]);
         assert_eq!(list_dir.dirs, [""; 0]);
     }
 
-    #[test]
-    fn write_file() {
+    #[tokio::test]
+    async fn write_file() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
 
@@ -381,6 +381,14 @@ mod test {
         temp.child("subdir")
             .child("subfile")
             .assert("Must I paint you a picture?");
+        let dir_meta = transport.metadata("subdir").await.unwrap();
+        assert!(dir_meta.kind().is_dir());
+        assert!(!dir_meta.kind().is_file());
+        assert!(!dir_meta.kind().is_symlink());
+        let file_meta = transport.metadata("subdir/subfile").await.unwrap();
+        assert!(file_meta.kind().is_file());
+        assert!(!file_meta.kind().is_dir());
+        assert!(!file_meta.kind().is_symlink());
 
         temp.close().unwrap();
     }
@@ -426,14 +434,15 @@ mod test {
         );
     }
 
-    #[test]
-    fn create_existing_dir() {
+    #[tokio::test]
+    async fn create_existing_dir() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
 
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
         transport.create_dir("aaa").unwrap();
+        assert!(transport.metadata("aaa").await.unwrap().kind().is_dir());
 
         temp.close().unwrap();
     }
