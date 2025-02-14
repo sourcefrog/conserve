@@ -16,33 +16,34 @@
 use assert_cmd::prelude::*;
 use indoc::indoc;
 use predicates::prelude::*;
-
-use conserve::test_fixtures::{ScratchArchive, TreeFixture};
 use serde_json::Value;
+
+use conserve::test_fixtures::TreeFixture;
+use conserve::Archive;
 
 use crate::run_conserve;
 
-fn setup() -> (ScratchArchive, TreeFixture) {
-    let af = ScratchArchive::new();
+async fn setup() -> (Archive, TreeFixture) {
+    let af = Archive::create_temp().await;
     let tf = TreeFixture::new();
     tf.create_file_with_contents("hello.c", b"void main() {}");
     tf.create_dir("subdir");
     run_conserve()
         .arg("backup")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success();
     (af, tf)
 }
 
-#[test]
-fn no_changes() {
-    let (af, tf) = setup();
+#[tokio::test]
+async fn no_changes() {
+    let (af, tf) = setup().await;
 
     run_conserve()
         .arg("diff")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -52,7 +53,7 @@ fn no_changes() {
     run_conserve()
         .arg("diff")
         .arg("--include-unchanged")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -60,16 +61,16 @@ fn no_changes() {
         .stderr(predicate::str::is_empty());
 }
 
-#[test]
-fn add_entries() {
-    let (af, tf) = setup();
+#[tokio::test]
+async fn add_entries() {
+    let (af, tf) = setup().await;
     tf.create_dir("src");
     let new_rs_content = b"pub fn main() {}";
     tf.create_file_with_contents("src/new.rs", new_rs_content);
 
     run_conserve()
         .arg("diff")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -82,7 +83,7 @@ fn add_entries() {
     // Inspect json diff
     let command = run_conserve()
         .args(["diff", "-j"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -108,14 +109,14 @@ fn add_entries() {
     assert!(diff[1]["added"]["mtime"].is_string());
 }
 
-#[test]
-fn remove_file() {
-    let (af, tf) = setup();
+#[tokio::test]
+async fn remove_file() {
+    let (af, tf) = setup().await;
     std::fs::remove_file(tf.path().join("hello.c")).unwrap();
 
     run_conserve()
         .arg("diff")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -125,7 +126,7 @@ fn remove_file() {
     run_conserve()
         .arg("diff")
         .arg("--include-unchanged")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -133,15 +134,15 @@ fn remove_file() {
         .stderr(predicate::str::is_empty());
 }
 
-#[test]
-fn change_kind() {
-    let (af, tf) = setup();
+#[tokio::test]
+async fn change_kind() {
+    let (af, tf) = setup().await;
     std::fs::remove_dir(tf.path().join("subdir")).unwrap();
     tf.create_file_with_contents("subdir", b"used to be a directory, no longer");
 
     run_conserve()
         .arg("diff")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -153,7 +154,7 @@ fn change_kind() {
     run_conserve()
         .arg("diff")
         .arg("--include-unchanged")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -165,15 +166,15 @@ fn change_kind() {
         .stderr(predicate::str::is_empty());
 }
 
-#[test]
-fn change_file_content() {
+#[tokio::test]
+async fn change_file_content() {
     // This actually detects that the file size/mtime changed, and does not thoroughly read the file.
-    let (af, tf) = setup();
+    let (af, tf) = setup().await;
     tf.create_file_with_contents("hello.c", b"int main() { abort(); }");
 
     run_conserve()
         .arg("diff")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -185,7 +186,7 @@ fn change_file_content() {
     run_conserve()
         .arg("diff")
         .arg("--include-unchanged")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()

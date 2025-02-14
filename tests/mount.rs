@@ -7,10 +7,7 @@ use std::{
 };
 
 use conserve::{
-    backup,
-    monitor::test::TestMonitor,
-    test_fixtures::{ScratchArchive, TreeFixture},
-    BackupOptions, MountOptions,
+    backup, monitor::test::TestMonitor, test_fixtures::TreeFixture, BackupOptions, MountOptions,
 };
 use tempfile::TempDir;
 
@@ -28,13 +25,13 @@ fn read_dir(path: &Path) -> Vec<(bool, String)> {
         .collect::<Vec<_>>()
 }
 
-#[test]
+#[tokio::test]
 #[cfg(unix)]
-fn mount_unix_not_implemented() {
+async fn mount_unix_not_implemented() {
     use assert_matches::assert_matches;
-    use conserve::Error;
+    use conserve::{Archive, Error};
 
-    let archive = ScratchArchive::new();
+    let archive = Archive::create_temp().await;
     let mountdir = TempDir::new().unwrap();
 
     let result = conserve::mount(
@@ -45,10 +42,10 @@ fn mount_unix_not_implemented() {
     assert_matches!(result.err(), Some(Error::NotImplemented));
 }
 
-#[test]
+#[tokio::test]
 #[cfg(not(unix))]
-fn mount_empty() {
-    let archive = ScratchArchive::new();
+async fn mount_empty() {
+    let archive = Archive::create_temp().await;
     let mountdir = TempDir::new().unwrap();
     let _projection = conserve::mount(
         archive.clone(),
@@ -63,10 +60,10 @@ fn mount_empty() {
     assert_eq!(read_dir(mountdir.path()), [(true, "all".into())]);
 }
 
-#[test]
+#[tokio::test]
 #[cfg(not(unix))]
-fn mount_sub_dirs() {
-    let archive = ScratchArchive::new();
+async fn mount_sub_dirs() {
+    let archive = Archive::create_temp().await;
     {
         let srcdir = TreeFixture::new();
 
@@ -122,10 +119,10 @@ fn mount_sub_dirs() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[cfg(not(unix))]
-fn mount_file_versions() {
-    let archive = ScratchArchive::new();
+async fn mount_file_versions() {
+    let archive = Archive::create_temp().await;
     {
         let srcdir = TreeFixture::new();
 
@@ -212,10 +209,10 @@ fn mount_file_versions() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[cfg(not(unix))]
-fn mount_cleanup() {
-    let archive = ScratchArchive::new();
+async fn mount_cleanup() {
+    let archive = Archive::create_temp().await;
     {
         let srcdir = TreeFixture::new();
         srcdir.create_file("file.txt");

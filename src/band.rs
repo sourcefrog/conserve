@@ -319,16 +319,16 @@ mod tests {
     use serde_json::json;
 
     use crate::monitor::test::TestMonitor;
-    use crate::test_fixtures::ScratchArchive;
 
     use super::*;
 
     #[tokio::test]
     async fn create_and_reopen_band() {
-        let af = ScratchArchive::new();
-        let band = Band::create(&af).await.unwrap();
+        let archive = Archive::create_temp().await;
+        let band = Band::create(&archive).await.unwrap();
+        let archive_path = archive.transport().local_path().unwrap();
 
-        let band_dir = af.path().join("b0000");
+        let band_dir = archive_path.join("b0000");
         assert!(band_dir.is_dir());
 
         assert!(band_dir.join("BANDHEAD").is_file());
@@ -342,7 +342,7 @@ mod tests {
         assert!(band.is_closed().await.unwrap());
 
         let band_id = BandId::from_str("b0000").unwrap();
-        let band2 = Band::open(&af, band_id)
+        let band2 = Band::open(&archive, band_id)
             .await
             .expect("failed to re-open band");
         assert!(band2.is_closed().await.unwrap());
@@ -360,31 +360,32 @@ mod tests {
 
     #[tokio::test]
     async fn delete_band() {
-        let af = ScratchArchive::new();
-        let _band = Band::create(&af).await.unwrap();
-        assert!(af.transport().is_file("b0000/BANDHEAD").await.unwrap());
+        let archive = Archive::create_temp().await;
+        let _band = Band::create(&archive).await.unwrap();
+        assert!(archive.transport().is_file("b0000/BANDHEAD").await.unwrap());
 
-        Band::delete(&af, BandId::new(&[0])).expect("delete band");
+        Band::delete(&archive, BandId::new(&[0])).expect("delete band");
 
-        assert!(!af.transport().is_file("b0000").await.unwrap());
-        assert!(!af.transport().is_file("b0000/BANDHEAD").await.unwrap());
+        assert!(!archive.transport().is_file("b0000").await.unwrap());
+        assert!(!archive.transport().is_file("b0000/BANDHEAD").await.unwrap());
     }
 
     #[tokio::test]
     async fn unsupported_band_version() {
-        let af = ScratchArchive::new();
-        fs::create_dir(af.path().join("b0000")).unwrap();
+        let archive = Archive::create_temp().await;
+        let path = archive.transport().local_path().unwrap();
+        fs::create_dir(path.join("b0000")).unwrap();
         let head = json!({
             "start_time": 0,
             "band_format_version": "8888.8.8",
         });
         fs::write(
-            af.path().join("b0000").join(BAND_HEAD_FILENAME),
+            path.join("b0000").join(BAND_HEAD_FILENAME),
             head.to_string(),
         )
         .unwrap();
 
-        let e = Band::open(&af, BandId::zero()).await;
+        let e = Band::open(&archive, BandId::zero()).await;
         let e_str = e.unwrap_err().to_string();
         assert!(
             e_str.contains("Unsupported band version \"8888.8.8\" in b0000"),
@@ -394,54 +395,67 @@ mod tests {
 
     #[tokio::test]
     async fn create_bands() {
-        let af = ScratchArchive::new();
-        assert!(af.path().join("d").is_dir());
+        let archive = Archive::create_temp().await;
+        assert!(archive.transport().local_path().unwrap().join("d").is_dir());
 
         // Make one band
-        let _band1 = Band::create(&af).await.unwrap();
-        let band_path = af.path().join("b0000");
+        let _band1 = Band::create(&archive).await.unwrap();
+        let band_path = archive.transport().local_path().unwrap().join("b0000");
         assert!(band_path.is_dir());
         assert!(band_path.join("BANDHEAD").is_file());
         assert!(band_path.join("i").is_dir());
 
-        assert_eq!(af.list_band_ids().await.unwrap(), vec![BandId::new(&[0])]);
-        assert_eq!(af.last_band_id().await.unwrap(), Some(BandId::new(&[0])));
+        assert_eq!(
+            archive.list_band_ids().await.unwrap(),
+            vec![BandId::new(&[0])]
+        );
+        assert_eq!(
+            archive.last_band_id().await.unwrap(),
+            Some(BandId::new(&[0]))
+        );
 
         // Try creating a second band.
-        let _band2 = Band::create(&af).await.unwrap();
+        let _band2 = Band::create(&archive).await.unwrap();
         assert_eq!(
-            af.list_band_ids().await.unwrap(),
+            archive.list_band_ids().await.unwrap(),
             vec![BandId::new(&[0]), BandId::new(&[1])]
         );
-        assert_eq!(af.last_band_id().await.unwrap(), Some(BandId::new(&[1])));
+        assert_eq!(
+            archive.last_band_id().await.unwrap(),
+            Some(BandId::new(&[1]))
+        );
 
         assert_eq!(
-            af.referenced_blocks(&af.list_band_ids().await.unwrap(), TestMonitor::arc())
+            archive
+                .referenced_blocks(&archive.list_band_ids().await.unwrap(), TestMonitor::arc())
                 .await
                 .unwrap()
                 .len(),
             0
         );
-        assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 0);
+        assert_eq!(
+            archive.all_blocks(TestMonitor::arc()).await.unwrap().len(),
+            0
+        );
     }
 
     #[tokio::test]
     #[should_panic(expected = "unknown flag \"wibble\"")]
     async fn unknown_format_flag_panics_in_create() {
-        let af = ScratchArchive::new();
-        let _ = Band::create_with_flags(&af, &["wibble".into()]).await;
+        let archive = Archive::create_temp().await;
+        let _ = Band::create_with_flags(&archive, &["wibble".into()]).await;
         // This panics because there is no way to create a band with an unsupported flag from the CLI or API.
     }
 
     #[tokio::test]
     async fn default_format_flags_are_empty() {
-        let af = ScratchArchive::new();
+        let archive = Archive::create_temp().await;
 
-        let orig_band = Band::create(&af).await.unwrap();
+        let orig_band = Band::create(&archive).await.unwrap();
         let flags = orig_band.format_flags();
         assert!(flags.is_empty(), "{flags:?}");
 
-        let band = Band::open(&af, orig_band.id()).await.unwrap();
+        let band = Band::open(&archive, orig_band.id()).await.unwrap();
         println!("{band:?}");
         assert!(band.format_flags().is_empty());
 

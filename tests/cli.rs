@@ -23,12 +23,14 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::NamedTempFile;
 use assert_fs::TempDir;
+use conserve::test_fixtures::setup_incomplete_empty_band;
+use conserve::Archive;
 use indoc::indoc;
 use predicates::prelude::*;
 use serde_json::Deserializer;
 use url::Url;
 
-use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::test_fixtures::TreeFixture;
 
 fn run_conserve() -> Command {
     let mut command = Command::cargo_bin("conserve").expect("locate conserve binary");
@@ -335,12 +337,12 @@ async fn empty_archive() {
 /// The `--incomplete` option is no longer needed.
 #[tokio::test]
 async fn incomplete_version() {
-    let af = ScratchArchive::new();
-    af.setup_incomplete_empty_band().await;
+    let af = Archive::create_temp().await;
+    setup_incomplete_empty_band(&af).await;
 
     run_conserve()
         .arg("versions")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
@@ -348,12 +350,16 @@ async fn incomplete_version() {
         .stdout(predicate::str::contains("incomplete"));
 
     // ls succeeds on an incomplete band
-    run_conserve().arg("ls").arg(af.path()).assert().success();
+    run_conserve()
+        .arg("ls")
+        .arg(af.transport().local_path().unwrap())
+        .assert()
+        .success();
 
     // Cannot gc with an empty band.
     run_conserve()
         .arg("gc")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .failure()
         .stderr(predicate::str::contains("incomplete and may be in use"));

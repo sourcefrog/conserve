@@ -92,8 +92,8 @@ mod test {
     async fn open_stored_tree() -> Result<()> {
         // tracing_subscriber::fmt::init();
 
-        let af = ScratchArchive::new();
-        af.store_two_versions().await;
+        let af = Archive::create_temp().await;
+        store_two_versions(&af).await;
 
         let last_band_id = af.last_band_id().await.unwrap().unwrap();
         let st = af.open_stored_tree(BandSelectionPolicy::Latest).await?;
@@ -126,7 +126,7 @@ mod test {
 
     #[tokio::test]
     async fn cant_open_no_versions() {
-        let af = ScratchArchive::new();
+        let af = Archive::create_temp().await;
         assert_eq!(
             af.open_stored_tree(BandSelectionPolicy::Latest)
                 .await

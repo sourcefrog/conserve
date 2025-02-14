@@ -13,13 +13,13 @@
 //! Test deletion.
 
 use conserve::monitor::test::TestMonitor;
-use conserve::test_fixtures::ScratchArchive;
+use conserve::test_fixtures::store_two_versions;
 use conserve::*;
 
 #[tokio::test]
 async fn delete_all_bands() {
-    let af = ScratchArchive::new();
-    af.store_two_versions().await;
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
 
     let stats = af
         .delete_bands(

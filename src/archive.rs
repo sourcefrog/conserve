@@ -157,7 +157,7 @@ impl Archive {
             .collect())
     }
 
-    pub(crate) fn transport(&self) -> &Transport {
+    pub fn transport(&self) -> &Transport {
         &self.transport
     }
 
