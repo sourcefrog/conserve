@@ -26,7 +26,7 @@ use conserve::monitor::test::TestMonitor;
 async fn create_then_open_archive() {
     let testdir = TempDir::new().unwrap();
     let arch_path = testdir.path().join("arch");
-    let arch = Archive::create_path(&arch_path).unwrap();
+    let arch = Archive::create_path(&arch_path).await.unwrap();
 
     assert!(arch.list_band_ids().await.unwrap().is_empty());
 
@@ -36,13 +36,13 @@ async fn create_then_open_archive() {
     assert!(arch.last_complete_band().await.unwrap().is_none());
 }
 
-#[test]
-fn fails_on_non_empty_directory() {
+#[tokio::test]
+async fn fails_on_non_empty_directory() {
     let temp = TempDir::new().unwrap();
 
     temp.child("i am already here").touch().unwrap();
 
-    let result = Archive::create_path(temp.path());
+    let result = Archive::create_path(temp.path()).await;
     assert_eq!(
         result.as_ref().unwrap_err().to_string(),
         "Directory for new archive is not empty",

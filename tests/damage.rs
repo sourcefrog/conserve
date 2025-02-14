@@ -94,7 +94,9 @@ async fn backup_after_damage(
     let archive_dir = TempDir::new().unwrap();
     let source_dir = TempDir::new().unwrap();
 
-    let archive = Archive::create_path(archive_dir.path()).expect("create archive");
+    let archive = Archive::create_path(archive_dir.path())
+        .await
+        .expect("create archive");
     source_dir
         .child("file")
         .write_str("content in first backup")

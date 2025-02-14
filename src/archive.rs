@@ -56,21 +56,21 @@ pub struct DeleteOptions {
 
 impl Archive {
     /// Make a new archive in a local directory.
-    pub fn create_path(path: &Path) -> Result<Archive> {
-        Archive::create(Transport::local(path))
+    pub async fn create_path(path: &Path) -> Result<Archive> {
+        Archive::create(Transport::local(path)).await
     }
 
     /// Make a new archive in a temp directory.
     ///
     /// Panic if the tempdir can't be created.
     pub async fn create_temp() -> Archive {
-        Archive::create(Transport::temp()).unwrap()
+        Archive::create(Transport::temp()).await.unwrap()
     }
 
     /// Make a new archive in a new directory accessed by a Transport.
-    pub fn create(transport: Transport) -> Result<Archive> {
+    pub async fn create(transport: Transport) -> Result<Archive> {
         transport.create_dir("")?;
-        let names = transport.list_dir("")?;
+        let names = transport.list_dir_async("").await?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
             return Err(Error::NewArchiveDirectoryNotEmpty);
         }
