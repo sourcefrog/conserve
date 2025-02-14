@@ -29,8 +29,8 @@ use crate::*;
 /// Read index and file contents for a version stored in the archive.
 #[derive(Debug)]
 pub struct StoredTree {
-    band: Band,
-    archive: Archive,
+    pub(crate) band: Band,
+    pub(crate) archive: Archive,
 }
 
 impl StoredTree {

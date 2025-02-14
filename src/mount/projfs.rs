@@ -57,7 +57,8 @@ impl StoredFileReader {
             })
             .map::<Result<Bytes>, _>(move |entry| {
                 let content = stored_tree
-                    .block_dir()
+                    .archive
+                    .block_dir
                     .get_block_content(&entry.hash, monitor.clone())?;
 
                 Ok(content.slice((entry.start as usize)..(entry.start + entry.len) as usize))
