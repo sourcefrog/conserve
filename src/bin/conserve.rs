@@ -483,7 +483,7 @@ impl Command {
                 }
             }
             Command::Init { archive } => {
-                Archive::create(Transport::new(archive)?)?;
+                Archive::create(Transport::new(archive)?).await?;
                 debug!("Created new archive in {archive:?}");
             }
             Command::Ls {
