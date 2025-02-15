@@ -172,19 +172,10 @@ impl Transport {
         self.protocol.read(path).await
     }
 
-    /// List a directory, separating out file and subdirectory names.
-    ///
-    /// Names are in the arbitrary order that they're returned from the transport.
-    ///
-    /// Any error during iteration causes overall failure.
-    pub fn list_dir(&self, relpath: &str) -> Result<ListDir> {
+    pub async fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         // TODO: Perhaps it'd be better to include sizes (and maybe mtimes) as many transports
         // might be able to provide this without extra work.
         self.record(Verb::ListDir, relpath);
-        self.protocol.list_dir(relpath)
-    }
-
-    pub async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
         self.protocol.list_dir_async(relpath).await
     }
 
@@ -339,7 +330,7 @@ mod test {
         let temp = TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
         temp.child("a").touch().unwrap();
-        let list = transport.list_dir_async(".").await.unwrap();
+        let list = transport.list_dir(".").await.unwrap();
         assert_eq!(list.files, ["a"]);
         assert!(list.dirs.is_empty());
     }

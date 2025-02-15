@@ -70,7 +70,7 @@ impl Archive {
     /// Make a new archive in a new directory accessed by a Transport.
     pub async fn create(transport: Transport) -> Result<Archive> {
         transport.create_dir("")?;
-        let names = transport.list_dir_async("").await?;
+        let names = transport.list_dir("").await?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
             return Err(Error::NewArchiveDirectoryNotEmpty);
         }
@@ -147,7 +147,7 @@ impl Archive {
     pub async fn list_band_ids(&self) -> Result<Vec<BandId>> {
         Ok(self
             .transport
-            .list_dir_async("")
+            .list_dir("")
             .await?
             .dirs
             .into_iter()
@@ -228,7 +228,8 @@ impl Archive {
             .await?;
         Ok(self
             .block_dir
-            .blocks(monitor)?
+            .blocks(monitor)
+            .await?
             .into_iter()
             .filter(move |h| !referenced.contains(h))
             .collect())
@@ -268,7 +269,8 @@ impl Archive {
         debug!("Find present blocks...");
         let present: HashSet<BlockHash> = self
             .block_dir
-            .blocks(monitor.clone())?
+            .blocks(monitor.clone())
+            .await?
             .into_iter()
             .collect();
         debug!(present.len = present.len());
@@ -328,7 +330,7 @@ impl Archive {
         options: &ValidateOptions,
         monitor: Arc<dyn Monitor>,
     ) -> Result<()> {
-        self.validate_archive_dir(monitor.clone())?;
+        self.validate_archive_dir(monitor.clone()).await?;
 
         debug!("List bands...");
         let band_ids = self.list_band_ids().await?;
@@ -377,11 +379,11 @@ impl Archive {
         Ok(())
     }
 
-    fn validate_archive_dir(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
+    async fn validate_archive_dir(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
-        let list_dir = self.transport.list_dir("")?;
+        let list_dir = self.transport.list_dir("").await?;
         for dir_name in list_dir.dirs {
             if let Ok(band_id) = dir_name.parse::<BandId>() {
                 if !seen_bands.insert(band_id) {

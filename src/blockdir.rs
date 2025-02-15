@@ -323,8 +323,8 @@ impl BlockDir {
     /// Return an iterator of block subdirectories, in arbitrary order.
     ///
     /// Errors, other than failure to open the directory at all, are logged and discarded.
-    fn subdirs(&self) -> Result<Vec<String>> {
-        let ListDir { mut dirs, .. } = self.transport.list_dir("")?;
+    async fn subdirs(&self) -> Result<Vec<String>> {
+        let ListDir { mut dirs, .. } = self.transport.list_dir("").await?;
         dirs.retain(|dirname| {
             if dirname.len() == SUBDIR_NAME_CHARS {
                 true
@@ -340,7 +340,7 @@ impl BlockDir {
     ///
     /// Errors, other than failure to open the directory at all, are logged and discarded.
     async fn subdirs_async(&self) -> Result<Vec<String>> {
-        let ListDir { mut dirs, .. } = self.transport.list_dir_async("").await?;
+        let ListDir { mut dirs, .. } = self.transport.list_dir("").await?;
         dirs.retain(|dirname| {
             if dirname.len() == SUBDIR_NAME_CHARS {
                 true
@@ -353,30 +353,24 @@ impl BlockDir {
     }
 
     /// Return all the blocknames in the blockdir, in arbitrary order.
-    pub(crate) fn blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
+    pub(crate) async fn blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
         let transport = self.transport.clone();
         let task = monitor.start_task("List block subdir".to_string());
-        let subdirs = self.subdirs()?;
+        let subdirs = self.subdirs().await?;
         task.set_total(subdirs.len());
-        Ok(subdirs
-            .into_iter()
-            .map(move |subdir_name| {
-                let r = transport.list_dir(&subdir_name);
-                task.increment(1);
-                r
-            })
-            .filter_map(move |iter_or| match iter_or {
-                Err(source) => {
-                    monitor.error(Error::ListBlocks { source });
-                    None
+        let mut blocks = Vec::new();
+        for dir in subdirs {
+            match transport.list_dir(&dir).await {
+                Ok(list) => {
+                    task.increment(1);
+                    blocks.extend(list.files.into_iter().filter_map(|name| name.parse().ok()));
                 }
-                Ok(ListDir { files, .. }) => Some(files),
-            })
-            .flatten()
-            .filter_map(|name| // drop any invalid names, including temp files
-                // TODO: Report errors on bad names?
-                name.parse().ok())
-            .collect())
+                Err(err) => {
+                    monitor.error(Error::ListBlocks { source: err });
+                }
+            }
+        }
+        Ok(blocks)
     }
 
     /// Return all the blocknames in the blockdir, in arbitrary order.
@@ -390,7 +384,7 @@ impl BlockDir {
             let transport = transport.clone();
             let my_task = task.clone();
             subdir_tasks.spawn(async move {
-                let r = transport.list_dir_async(&subdir_name).await;
+                let r = transport.list_dir(&subdir_name).await;
                 my_task.increment(1);
                 r
             });
@@ -549,8 +543,8 @@ mod test {
         assert_eq!(blocks, [hash]);
     }
 
-    #[test]
-    fn temp_files_are_not_returned_as_blocks() {
+    #[tokio::test]
+    async fn temp_files_are_not_returned_as_blocks() {
         let tempdir = TempDir::new().unwrap();
         let blockdir = BlockDir::open(Transport::local(tempdir.path()));
         let monitor = TestMonitor::arc();
@@ -558,7 +552,7 @@ mod test {
         create_dir(&subdir).unwrap();
         // Write a temp file as was created by earlier versions of the code.
         write(subdir.join("tmp123123123"), b"123").unwrap();
-        let blocks = blockdir.blocks(monitor.clone()).unwrap();
+        let blocks = blockdir.blocks_async(monitor.clone()).await.unwrap();
         assert_eq!(blocks, []);
     }
 

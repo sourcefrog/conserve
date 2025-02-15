@@ -291,8 +291,8 @@ impl Band {
         })
     }
 
-    pub fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
-        let ListDir { mut files, dirs } = self.transport.list_dir("")?;
+    pub async fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
+        let ListDir { mut files, dirs } = self.transport.list_dir("").await?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
             monitor.error(Error::BandHeadMissing {
                 band_id: self.band_id,
