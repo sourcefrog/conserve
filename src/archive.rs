@@ -180,25 +180,10 @@ impl Archive {
         StoredTree::open(self, self.resolve_band_id(band_selection).await?).await
     }
 
-    /// Return an iterator of valid band ids in this archive, in arbitrary order.
-    ///
-    /// Errors reading the archive directory are logged and discarded.
-    fn iter_band_ids_unsorted(&self) -> Result<impl Iterator<Item = BandId>> {
-        // This doesn't check for extraneous files or directories, which should be a weird rare
-        // problem. Validate does.
-        Ok(self
-            .transport
-            .list_dir("")?
-            .dirs
-            .into_iter()
-            .filter(|dir_name| dir_name != BLOCK_DIR)
-            .filter_map(|dir_name| dir_name.parse().ok()))
-    }
-
     /// Return the `BandId` of the highest-numbered band, or Ok(None) if there
     /// are no bands, or an Err if any occurred reading the directory.
     pub async fn last_band_id(&self) -> Result<Option<BandId>> {
-        Ok(self.iter_band_ids_unsorted()?.max())
+        Ok(self.list_band_ids().await?.into_iter().max())
     }
 
     /// Return the last completely-written band id, if any.
