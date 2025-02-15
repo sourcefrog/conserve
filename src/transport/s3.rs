@@ -205,10 +205,6 @@ fn join_paths(a: &str, b: &str) -> String {
 
 #[async_trait]
 impl super::Protocol for Protocol {
-    fn list_dir(&self, relpath: &str) -> Result<ListDir> {
-        self.runtime.block_on(self.list_dir_async(relpath))
-    }
-
     async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
         trace!(%relpath, "list_dir");
         let mut prefix = self.join_path(relpath);

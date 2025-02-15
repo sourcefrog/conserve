@@ -22,8 +22,8 @@ fn open_local() {
     Transport::local(Path::new("/backup"));
 }
 
-#[test]
-fn list_dir_names() {
+#[tokio::test]
+async fn list_dir_names() {
     let temp = assert_fs::TempDir::new().unwrap();
     temp.child("a dir").create_dir_all().unwrap();
     temp.child("a file").touch().unwrap();
@@ -34,7 +34,7 @@ fn list_dir_names() {
     let transport = Transport::new(url.as_str()).unwrap();
     dbg!(&transport);
 
-    let ListDir { mut files, dirs } = transport.list_dir("").unwrap();
+    let ListDir { mut files, dirs } = transport.list_dir("").await.unwrap();
     assert_eq!(dirs, ["a dir"]);
     files.sort();
     assert_eq!(files, ["a file", "another file"]);

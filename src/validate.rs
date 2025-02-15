@@ -48,7 +48,7 @@ pub(crate) async fn validate_bands(
                 continue 'band;
             }
         };
-        if let Err(err) = band.validate(monitor.clone()) {
+        if let Err(err) = band.validate(monitor.clone()).await {
             monitor.error(err);
             continue 'band;
         };

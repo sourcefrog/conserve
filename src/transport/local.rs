@@ -12,7 +12,7 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::fs::{self, create_dir, remove_dir_all, remove_file, File};
+use std::fs::{create_dir, remove_dir_all, remove_file, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -116,16 +116,6 @@ impl super::Protocol for Protocol {
         Ok(())
     }
 
-    fn list_dir(&self, relpath: &str) -> Result<ListDir> {
-        let path = self.full_path(relpath);
-        let mut listing = ListDir::default();
-        for dir_entry in path.read_dir().map_err(|err| Error::io_error(&path, err))? {
-            collect_dir_entry(&mut listing, dir_entry)
-                .map_err(|err| Error::io_error(&path, err))?;
-        }
-        Ok(listing)
-    }
-
     async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
         let _permit = FD_LIMIT.acquire().await.expect("acquire permit");
         let path = self.full_path(relpath);
@@ -199,23 +189,6 @@ async fn collect_tokio_dir_entry(list_dir: &mut ListDir, dir_entry: tokio::fs::D
     } else {
         warn!("Non-UTF-8 filename in archive {:?}", dir_entry.file_name());
     }
-}
-
-fn collect_dir_entry(
-    list_dir: &mut ListDir,
-    dir_entry: io::Result<fs::DirEntry>,
-) -> io::Result<()> {
-    let dir_entry = dir_entry?;
-    if let Ok(name) = dir_entry.file_name().into_string() {
-        match dir_entry.file_type()? {
-            t if t.is_dir() => list_dir.dirs.push(name),
-            t if t.is_file() => list_dir.files.push(name),
-            other => warn!("Unexpected file type in archive: {name:?}: {other:?}"),
-        }
-    } else {
-        warn!("Non-UTF-8 filename in archive {:?}", dir_entry.file_name());
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -335,14 +308,14 @@ mod test {
             .unwrap();
 
         let transport = Transport::local(temp.path());
-        let root_list = transport.list_dir(".").unwrap();
+        let root_list = transport.list_dir(".").await.unwrap();
         assert_eq!(root_list.files, ["root file"]);
         assert_eq!(root_list.dirs, ["subdir"]);
 
         assert!(transport.is_file("root file").await.unwrap());
         assert!(!transport.is_file("nuh-uh").await.unwrap());
 
-        let subdir_list = transport.list_dir("subdir").unwrap();
+        let subdir_list = transport.list_dir("subdir").await.unwrap();
         assert_eq!(subdir_list.files, ["subfile"]);
         assert_eq!(subdir_list.dirs, [""; 0]);
 
@@ -358,7 +331,7 @@ mod test {
         let dir = transport.local_path().unwrap();
         std::os::unix::fs::symlink("foo", dir.join("alink")).unwrap();
 
-        let list_dir = transport.list_dir_async(".").await.unwrap();
+        let list_dir = transport.list_dir(".").await.unwrap();
         assert_eq!(list_dir.files, [""; 0]);
         assert_eq!(list_dir.dirs, [""; 0]);
     }
@@ -447,8 +420,8 @@ mod test {
         temp.close().unwrap();
     }
 
-    #[test]
-    fn sub_transport() {
+    #[tokio::test]
+    async fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path()).enable_record();
 
@@ -456,7 +429,7 @@ mod test {
         transport.create_dir("aaa/bbb").unwrap();
 
         let sub_transport = transport.chdir("aaa");
-        let sub_list = sub_transport.list_dir("").unwrap();
+        let sub_list = sub_transport.list_dir("").await.unwrap();
 
         assert_eq!(sub_list.dirs, ["bbb"]);
         assert_eq!(sub_list.files, [""; 0]);
@@ -490,8 +463,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn temp() {
+    #[tokio::test]
+    async fn temp() {
         let transport = Transport::temp();
         let path = transport.local_path().expect("local_path");
         assert!(path.is_dir());
@@ -508,7 +481,7 @@ mod test {
         // After dropping the first transport, the tempdir still exists
         drop(transport);
         assert!(path.is_dir());
-        assert!(t2.list_dir(".").is_ok());
+        assert!(t2.list_dir(".").await.is_ok());
 
         // After dropping both references, the tempdir is removed
         drop(t2);
@@ -526,11 +499,11 @@ mod test {
             .unwrap();
 
         let transport = Transport::local(temp.path());
-        let list_dir = transport.list_dir_async(".").await.unwrap();
+        let list_dir = transport.list_dir(".").await.unwrap();
         assert_eq!(list_dir.files, ["root file"]);
         assert_eq!(list_dir.dirs, ["subdir"]);
 
-        let failure = transport.list_dir_async("nonexistent").await.unwrap_err();
+        let failure = transport.list_dir("nonexistent").await.unwrap_err();
         assert!(failure.is_not_found());
     }
 }

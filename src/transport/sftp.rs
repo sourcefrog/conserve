@@ -94,14 +94,6 @@ impl Protocol {
 
 #[async_trait]
 impl super::Protocol for Protocol {
-    fn list_dir(&self, path: &str) -> Result<ListDir> {
-        list_dir(
-            self.sftp.clone(),
-            self.base_path.join(path),
-            self.join_url(path),
-        )
-    }
-
     async fn list_dir_async(&self, path: &str) -> Result<ListDir> {
         let sftp = self.sftp.clone();
         let url = self.join_url(path);
@@ -222,7 +214,11 @@ impl super::Protocol for Protocol {
         let mut dirs_to_delete = vec![path.to_owned()];
         while let Some(dir) = dirs_to_walk.pop() {
             trace!(?dir, "Walk down dir");
-            let list = self.list_dir(&dir)?;
+            let list = list_dir(
+                self.sftp.clone(),
+                self.base_path.join(path),
+                self.join_url(path),
+            )?;
             for file in list.files {
                 self.remove_file(&format!("{dir}/{file}"))?;
             }

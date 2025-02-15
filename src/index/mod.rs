@@ -111,15 +111,18 @@ impl IndexRead {
 
     // All hunk numbers present in all directories.
     pub async fn hunks_available(&self) -> Result<Vec<u32>> {
-        let subdirs = self.transport.list_dir("")?.dirs.into_iter().sorted();
-
-        let hunks = subdirs
-            .filter_map(|dir| self.transport.list_dir(&dir).ok())
-            .flat_map(|list| list.files)
-            .filter_map(|f| f.parse::<u32>().ok())
-            .sorted()
-            .collect_vec();
-
+        let subdirs = self.transport.list_dir("").await?.dirs.into_iter().sorted();
+        let mut hunks = Vec::new();
+        for dir in subdirs {
+            if let Ok(list) = self.transport.list_dir(&dir).await {
+                hunks.extend(
+                    list.files
+                        .iter()
+                        .filter_map(|f| f.parse::<u32>().ok())
+                        .sorted(),
+                )
+            }
+        }
         Ok(hunks)
     }
 
