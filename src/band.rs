@@ -147,8 +147,8 @@ impl Band {
             .map_or_else(BandId::zero, |b| b.next_sibling());
         trace!(?band_id, "Create band");
         let transport = archive.transport().chdir(&band_id.to_string());
-        transport.create_dir("")?;
-        transport.create_dir(INDEX_DIR)?;
+        transport.create_dir("").await?;
+        transport.create_dir(INDEX_DIR).await?;
         let band_format_version = if format_flags.is_empty() {
             Some("0.6.3".to_owned())
         } else {

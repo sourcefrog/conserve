@@ -69,12 +69,12 @@ impl Archive {
 
     /// Make a new archive in a new directory accessed by a Transport.
     pub async fn create(transport: Transport) -> Result<Archive> {
-        transport.create_dir("")?;
+        transport.create_dir("").await?;
         let names = transport.list_dir("").await?;
         if !names.files.is_empty() || !names.dirs.is_empty() {
             return Err(Error::NewArchiveDirectoryNotEmpty);
         }
-        let block_dir = Arc::new(BlockDir::create(transport.chdir(BLOCK_DIR))?);
+        let block_dir = Arc::new(BlockDir::create(transport.chdir(BLOCK_DIR)).await?);
         let header = ArchiveHeader {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };

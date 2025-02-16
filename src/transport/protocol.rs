@@ -25,7 +25,7 @@ pub(super) trait Protocol: std::fmt::Debug + Send + Sync {
     /// the complete content.
     fn write(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()>;
     async fn list_dir_async(&self, relpath: &str) -> Result<ListDir>;
-    fn create_dir(&self, relpath: &str) -> Result<()>;
+    async fn create_dir(&self, relpath: &str) -> Result<()>;
 
     /// Get metadata about a file.
     async fn metadata(&self, relpath: &str) -> Result<Metadata>;

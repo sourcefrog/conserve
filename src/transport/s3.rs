@@ -257,7 +257,7 @@ impl super::Protocol for Protocol {
     }
 
     #[mutants::skip] // does nothing so hard to observe!
-    fn create_dir(&self, relpath: &str) -> Result<()> {
+    async fn create_dir(&self, relpath: &str) -> Result<()> {
         // There are no directory objects, so there's nothing to create.
         let _ = relpath;
         Ok(())

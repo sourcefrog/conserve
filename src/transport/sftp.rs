@@ -122,10 +122,14 @@ impl super::Protocol for Protocol {
         Ok(buf.into())
     }
 
-    fn create_dir(&self, relpath: &str) -> Result<()> {
+    async fn create_dir(&self, relpath: &str) -> Result<()> {
         let full_path = self.base_path.join(relpath);
         trace!("create_dir {:?}", full_path);
-        match self.sftp.mkdir(&full_path, 0o700) {
+        let sftp = Arc::clone(&self.sftp);
+        match spawn_blocking(move || sftp.mkdir(&full_path, 0o700))
+            .await
+            .expect("spawn_blocking")
+        {
             Ok(()) => Ok(()),
             Err(err) if err.code() == ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_FAILURE) => {
                 // openssh seems to say failure for "directory exists" :/

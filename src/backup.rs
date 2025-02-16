@@ -204,7 +204,7 @@ struct BackupWriter {
 impl BackupWriter {
     async fn finish(mut self, monitor: Arc<dyn Monitor>) -> Result<BackupStats> {
         self.flush_group(monitor.clone()).await?;
-        let hunks = self.index_writer.finish()?;
+        let hunks = self.index_writer.finish().await?;
         trace!(?hunks, "Closing band");
         self.band.close(hunks as u64)?;
         Ok(BackupStats { ..self.stats })
@@ -216,7 +216,8 @@ impl BackupWriter {
         trace!("Got {} entries to write from file combiner", entries.len());
         self.stats += stats;
         self.index_writer.append_entries(&mut entries);
-        self.index_writer.finish_hunk()
+        self.index_writer.finish_hunk().await?;
+        Ok(())
     }
 
     /// Add one entry to the backup.
