@@ -10,7 +10,7 @@ async fn unknown_format_flag_fails_to_open() {
     let af = Archive::create_temp().await;
 
     // Make the bandhead by hand because the library prevents writing invalid flags.
-    af.transport().create_dir("b0000").unwrap();
+    af.transport().create_dir("b0000").await.unwrap();
     let head = serde_json::json! ({
         "start_time": 1676651990,
         "band_format_version": "23.2.0",

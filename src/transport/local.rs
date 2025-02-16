@@ -12,7 +12,7 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::fs::{create_dir, remove_dir_all, remove_file, File};
+use std::fs::{remove_dir_all, remove_file, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -129,9 +129,9 @@ impl super::Protocol for Protocol {
         Ok(listing)
     }
 
-    fn create_dir(&self, relpath: &str) -> Result<()> {
+    async fn create_dir(&self, relpath: &str) -> Result<()> {
         let path = self.full_path(relpath);
-        create_dir(&path).or_else(|err| {
+        tokio::fs::create_dir(&path).await.or_else(|err| {
             if err.kind() == io::ErrorKind::AlreadyExists {
                 Ok(())
             } else {
@@ -341,7 +341,7 @@ mod test {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
 
-        transport.create_dir("subdir").unwrap();
+        transport.create_dir("subdir").await.unwrap();
         transport
             .write(
                 "subdir/subfile",
@@ -412,9 +412,9 @@ mod test {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
 
-        transport.create_dir("aaa").unwrap();
-        transport.create_dir("aaa").unwrap();
-        transport.create_dir("aaa").unwrap();
+        transport.create_dir("aaa").await.unwrap();
+        transport.create_dir("aaa").await.unwrap();
+        transport.create_dir("aaa").await.unwrap();
         assert!(transport.metadata("aaa").await.unwrap().kind().is_dir());
 
         temp.close().unwrap();
@@ -425,8 +425,8 @@ mod test {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path()).enable_record();
 
-        transport.create_dir("aaa").unwrap();
-        transport.create_dir("aaa/bbb").unwrap();
+        transport.create_dir("aaa").await.unwrap();
+        transport.create_dir("aaa/bbb").await.unwrap();
 
         let sub_transport = transport.chdir("aaa");
         let sub_list = sub_transport.list_dir("").await.unwrap();
@@ -446,14 +446,14 @@ mod test {
         temp.close().unwrap();
     }
 
-    #[test]
-    fn remove_dir_all() {
+    #[tokio::test]
+    async fn remove_dir_all() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path()).enable_record();
 
-        transport.create_dir("aaa").unwrap();
-        transport.create_dir("aaa/bbb").unwrap();
-        transport.create_dir("aaa/bbb/ccc").unwrap();
+        transport.create_dir("aaa").await.unwrap();
+        transport.create_dir("aaa/bbb").await.unwrap();
+        transport.create_dir("aaa/bbb/ccc").await.unwrap();
 
         transport.remove_dir_all("aaa").unwrap();
 
@@ -473,7 +473,7 @@ mod test {
         transport
             .write("hey", b"hi there", WriteMode::CreateNew)
             .unwrap();
-        transport.create_dir("subdir").unwrap();
+        transport.create_dir("subdir").await.unwrap();
         let t2 = transport.chdir("subdir");
         t2.write("subfile", b"subcontent", WriteMode::CreateNew)
             .unwrap();

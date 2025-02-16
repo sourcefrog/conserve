@@ -283,10 +283,10 @@ mod test {
         let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b0"));
         ib.push_entry(symlink("/1", "b0"));
-        ib.finish_hunk()?;
+        ib.finish_hunk().await?;
         ib.push_entry(symlink("/2", "b0"));
         // Flush this hunk but leave the band incomplete.
-        let hunks = ib.finish()?;
+        let hunks = ib.finish().await?;
         assert_eq!(hunks, 2);
         assert_eq!(
             monitor.get_counter(Counter::IndexWrites),
@@ -300,10 +300,10 @@ mod test {
         let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b1"));
         ib.push_entry(symlink("/1", "b1"));
-        ib.finish_hunk()?;
+        ib.finish_hunk().await?;
         ib.push_entry(symlink("/2", "b1"));
         ib.push_entry(symlink("/3", "b1"));
-        let hunks = ib.finish()?;
+        let hunks = ib.finish().await?;
         assert_eq!(hunks, 2);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
         band.close(2)?;
@@ -314,10 +314,10 @@ mod test {
         assert_eq!(band.id().to_string(), "b0002");
         let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b2"));
-        ib.finish_hunk()?;
+        ib.finish_hunk().await?;
         ib.push_entry(symlink("/2", "b2"));
         // incomplete
-        let hunks = ib.finish()?;
+        let hunks = ib.finish().await?;
         assert_eq!(hunks, 2);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
 
@@ -336,7 +336,7 @@ mod test {
         let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b5"));
         ib.push_entry(symlink("/00", "b5"));
-        let hunks = ib.finish()?;
+        let hunks = ib.finish().await?;
         assert_eq!(hunks, 1);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
         // incomplete

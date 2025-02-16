@@ -105,8 +105,8 @@ impl BlockDir {
         }
     }
 
-    pub(crate) fn create(transport: Transport) -> Result<BlockDir> {
-        transport.create_dir("")?;
+    pub(crate) async fn create(transport: Transport) -> Result<BlockDir> {
+        transport.create_dir("").await?;
         Ok(BlockDir::open(transport))
     }
 
@@ -133,7 +133,7 @@ impl BlockDir {
         let comp_len: u64 = compressed.len().try_into().unwrap();
         let hex_hash = hash.to_string();
         let relpath = block_relpath(&hash);
-        self.transport.create_dir(subdir_relpath(&hex_hash))?;
+        self.transport.create_dir(subdir_relpath(&hex_hash)).await?;
         match self
             .transport
             .write(&relpath, &compressed, WriteMode::CreateNew)

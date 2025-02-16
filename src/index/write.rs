@@ -68,8 +68,8 @@ impl IndexWriter {
     }
 
     /// Finish the last hunk of this index, and return the stats.
-    pub fn finish(mut self) -> Result<usize> {
-        self.finish_hunk()?;
+    pub async fn finish(mut self) -> Result<usize> {
+        self.finish_hunk().await?;
         Ok(self.hunks_written)
     }
 
@@ -98,7 +98,7 @@ impl IndexWriter {
     /// This writes all the currently queued entries into a new index file
     /// in the band directory, and then clears the buffer to start receiving
     /// entries for the next hunk.
-    pub fn finish_hunk(&mut self) -> Result<()> {
+    pub async fn finish_hunk(&mut self) -> Result<()> {
         if self.entries.is_empty() {
             // TODO: Maybe assert that it's not empty?
             return Ok(());
@@ -119,7 +119,9 @@ impl IndexWriter {
         let relpath = hunk_relpath(self.sequence);
         let json = serde_json::to_vec(&self.entries)?;
         if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
-            self.transport.create_dir(&subdir_relpath(self.sequence))?;
+            self.transport
+                .create_dir(&subdir_relpath(self.sequence))
+                .await?;
         }
         let compressed_bytes = self.compressor.compress(&json)?;
         self.transport

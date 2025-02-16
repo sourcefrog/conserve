@@ -250,8 +250,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn serialize_index() {
+    #[tokio::test]
+    async fn serialize_index() {
         let entries = [IndexEntry {
             apath: "/a/b".into(),
             mtime: 1_461_736_377,
@@ -273,45 +273,45 @@ mod tests {
         );
     }
 
-    #[test]
-    fn index_builder_sorts_entries() {
+    #[tokio::test]
+    async fn index_builder_sorts_entries() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/zzz"));
         ib.push_entry(sample_entry("/aaa"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk().await.unwrap();
     }
 
-    #[test]
+    #[tokio::test]
     #[should_panic]
-    fn index_builder_checks_names() {
+    async fn index_builder_checks_names() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("../escapecat"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk().await.unwrap();
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(debug_assertions)]
     #[should_panic]
-    fn no_duplicate_paths() {
+    async fn no_duplicate_paths() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/again"));
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk().await.unwrap();
     }
 
-    #[test]
     #[cfg(debug_assertions)]
+    #[tokio::test]
     #[should_panic]
-    fn no_duplicate_paths_across_hunks() {
+    async fn no_duplicate_paths_across_hunks() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk().await.unwrap();
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk().await.unwrap();
     }
 
-    #[test]
-    fn path_for_hunk() {
+    #[tokio::test]
+    async fn path_for_hunk() {
         assert_eq!(super::hunk_relpath(0), "00000/000000000");
     }
 
@@ -321,7 +321,7 @@ mod tests {
         let monitor = TestMonitor::arc();
         let mut index_writer = IndexWriter::new(transport.clone(), monitor.clone());
         index_writer.append_entries(&mut vec![sample_entry("/apple"), sample_entry("/banana")]);
-        let hunks = index_writer.finish().unwrap();
+        let hunks = index_writer.finish().await.unwrap();
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
 
         assert_eq!(hunks, 1);
@@ -354,9 +354,9 @@ mod tests {
     async fn multiple_hunks() -> Result<()> {
         let (testdir, mut ib) = setup();
         ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk().await.unwrap();
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk().await.unwrap();
 
         let index_read = IndexRead::open_path(testdir.path());
         let names = index_read
@@ -397,9 +397,9 @@ mod tests {
     async fn iter_hunks_advance_to_after() -> Result<()> {
         let (testdir, mut ib) = setup();
         ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk().await.unwrap();
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
-        ib.finish_hunk().unwrap();
+        ib.finish_hunk().await.unwrap();
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
@@ -511,9 +511,9 @@ mod tests {
         for i in 0..1000 {
             ib.push_entry(sample_entry(&format!("/{i:0>10}")));
         }
-        ib.finish_hunk()?;
+        ib.finish_hunk().await?;
         // Think about, but don't actually add some files
-        ib.finish_hunk()?;
+        ib.finish_hunk().await?;
         dbg!(ib.hunks_written);
         let read_index = IndexRead::open_path(testdir.path());
         let hunks = read_index

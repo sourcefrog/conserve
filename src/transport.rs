@@ -208,9 +208,9 @@ impl Transport {
         self.protocol.write(relpath, content, mode)
     }
 
-    pub fn create_dir(&self, relpath: &str) -> Result<()> {
+    pub async fn create_dir(&self, relpath: &str) -> Result<()> {
         self.record(Verb::CreateDir, relpath);
-        self.protocol.create_dir(relpath)
+        self.protocol.create_dir(relpath).await
     }
 
     /// Return mtime, size, and other metadata about a file.
