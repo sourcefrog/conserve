@@ -305,13 +305,11 @@ impl Archive {
 
             let task = monitor.start_task("Delete blocks".to_string());
             task.set_total(unref_count);
-            let error_count = unref
-                .into_iter()
-                .filter(|block_hash| {
-                    task.increment(1);
-                    self.block_dir.delete_block(block_hash).is_err()
-                })
-                .count();
+            let mut error_count = 0;
+            for block_hash in unref {
+                task.increment(1);
+                error_count += self.block_dir.delete_block(block_hash).await.is_err() as usize;
+            }
             stats.deletion_errors += error_count;
             stats.deleted_block_count += unref_count - error_count;
         }

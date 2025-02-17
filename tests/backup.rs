@@ -698,9 +698,10 @@ async fn detect_unchanged_from_stitched_index() {
     assert_eq!(monitor.get_counter(Counter::IndexWrites), 3,);
 
     // Delete the last hunk and reopen the last band.
-    af.transport().remove_file("b0001/BANDTAIL").unwrap();
+    af.transport().remove_file("b0001/BANDTAIL").await.unwrap();
     af.transport()
         .remove_file("b0001/i/00000/000000002")
+        .await
         .unwrap();
 
     // The third backup should see nothing changed, by looking at the stitched

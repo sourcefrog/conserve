@@ -31,7 +31,7 @@ pub(super) trait Protocol: std::fmt::Debug + Send + Sync {
     async fn metadata(&self, relpath: &str) -> Result<Metadata>;
 
     /// Delete a file.
-    fn remove_file(&self, relpath: &str) -> Result<()>;
+    async fn remove_file(&self, relpath: &str) -> Result<()>;
 
     /// Delete a directory and all its contents.
     async fn remove_dir_all(&self, relpath: &str) -> Result<()>;

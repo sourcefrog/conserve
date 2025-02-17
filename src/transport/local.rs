@@ -156,9 +156,11 @@ impl super::Protocol for Protocol {
         })
     }
 
-    fn remove_file(&self, relpath: &str) -> Result<()> {
+    async fn remove_file(&self, relpath: &str) -> Result<()> {
         let path = self.full_path(relpath);
-        remove_file(&path).map_err(|err| super::Error::io_error(&path, err))
+        tokio::fs::remove_file(&path)
+            .await
+            .map_err(|err| super::Error::io_error(&path, err))
     }
 
     async fn remove_dir_all(&self, relpath: &str) -> Result<()> {

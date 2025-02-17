@@ -220,9 +220,9 @@ impl Transport {
     }
 
     /// Delete a file.
-    pub fn remove_file(&self, relpath: &str) -> Result<()> {
+    pub async fn remove_file(&self, relpath: &str) -> Result<()> {
         self.record(Verb::RemoveFile, relpath);
-        self.protocol.remove_file(relpath)
+        self.protocol.remove_file(relpath).await
     }
 
     /// Delete a directory and all its contents.

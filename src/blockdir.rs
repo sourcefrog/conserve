@@ -313,11 +313,12 @@ impl BlockDir {
         Ok(decompressed_bytes)
     }
 
-    pub(crate) fn delete_block(&self, hash: &BlockHash) -> Result<()> {
+    pub(crate) async fn delete_block(&self, hash: &BlockHash) -> Result<()> {
         self.cache.write().expect("Lock cache").pop(hash);
         self.exists.write().unwrap().pop(hash);
         self.transport
             .remove_file(&block_relpath(hash))
+            .await
             .map_err(Error::from)
     }
 

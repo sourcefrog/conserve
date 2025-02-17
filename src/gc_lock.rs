@@ -78,7 +78,7 @@ impl GarbageCollectionLock {
     /// has terminated and the lock is stale.
     pub async fn break_lock(archive: &Archive) -> Result<GarbageCollectionLock> {
         if GarbageCollectionLock::is_locked(archive).await? {
-            archive.transport().remove_file(GC_LOCK)?;
+            archive.transport().remove_file(GC_LOCK).await?;
         }
         GarbageCollectionLock::new(archive).await
     }
@@ -111,6 +111,7 @@ impl GarbageCollectionLock {
         self.archive
             .transport()
             .remove_file(GC_LOCK)
+            .await
             .map_err(|err| {
                 error!(?err, "Failed to delete GC lock");
                 Error::from(err)
@@ -124,7 +125,7 @@ impl Drop for GarbageCollectionLock {
         // and before the process exits.
         let transport = self.archive.transport().clone();
         tokio::task::spawn(async move {
-            transport.remove_file(GC_LOCK).inspect_err(|err| {
+            transport.remove_file(GC_LOCK).await.inspect_err(|err| {
                 // Print directly to stderr, in case the UI structure is in a
                 // bad state during unwind.
                 eprintln!("Failed to delete GC_LOCK from Drop: {err:?}");
