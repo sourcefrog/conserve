@@ -205,7 +205,7 @@ impl BackupWriter {
         self.flush_group(monitor.clone()).await?;
         let hunks = self.index_writer.finish().await?;
         trace!(?hunks, "Closing band");
-        self.band.close(hunks as u64)?;
+        self.band.close(hunks as u64).await?;
         Ok(BackupStats { ..self.stats })
     }
 

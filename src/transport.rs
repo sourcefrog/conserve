@@ -203,9 +203,9 @@ impl Transport {
         }
     }
 
-    pub fn write(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()> {
+    pub async fn write(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()> {
         self.record(Verb::Write, relpath);
-        self.protocol.write(relpath, content, mode)
+        self.protocol.write(relpath, content, mode).await
     }
 
     pub async fn create_dir(&self, relpath: &str) -> Result<()> {

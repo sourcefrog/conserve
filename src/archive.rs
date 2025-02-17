@@ -78,7 +78,7 @@ impl Archive {
         let header = ArchiveHeader {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
-        write_json(&transport, HEADER_FILENAME, &header)?;
+        write_json(&transport, HEADER_FILENAME, &header).await?;
         Ok(Archive {
             block_dir,
             transport,

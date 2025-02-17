@@ -125,7 +125,8 @@ impl IndexWriter {
         }
         let compressed_bytes = self.compressor.compress(&json)?;
         self.transport
-            .write(&relpath, &compressed_bytes, WriteMode::CreateNew)?;
+            .write(&relpath, &compressed_bytes, WriteMode::CreateNew)
+            .await?;
         self.hunks_written += 1;
         self.monitor.count(Counter::IndexWrites, 1);
         self.monitor
