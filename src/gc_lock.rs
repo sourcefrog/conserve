@@ -105,11 +105,16 @@ impl GarbageCollectionLock {
 
 impl Drop for GarbageCollectionLock {
     fn drop(&mut self) {
-        if let Err(err) = self.archive.transport().remove_file(GC_LOCK) {
-            // Print directly to stderr, in case the UI structure is in a
-            // bad state during unwind.
-            eprintln!("Failed to delete GC_LOCK: {err:?}")
-        }
+        // The lock will, hopefully, be deleted soon after the lock is dropped,
+        // and before the process exits.
+        let transport = self.archive.transport().clone();
+        tokio::task::spawn_blocking(move || {
+            if let Err(err) = transport.remove_file(GC_LOCK) {
+                // Print directly to stderr, in case the UI structure is in a
+                // bad state during unwind.
+                eprintln!("Failed to delete GC_LOCK: {err:?}")
+            }
+        });
     }
 }
 
