@@ -298,7 +298,7 @@ impl Archive {
             let task = monitor.start_task("Delete bands".to_string());
 
             for band_id in delete_band_ids.iter() {
-                Band::delete(self, *band_id)?;
+                Band::delete(self, *band_id).await?;
                 stats.deleted_band_count += 1;
                 task.increment(1);
             }

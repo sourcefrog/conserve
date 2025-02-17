@@ -226,9 +226,9 @@ impl Transport {
     }
 
     /// Delete a directory and all its contents.
-    pub fn remove_dir_all(&self, relpath: &str) -> Result<()> {
+    pub async fn remove_dir_all(&self, relpath: &str) -> Result<()> {
         self.record(Verb::RemoveDirAll, relpath);
-        self.protocol.remove_dir_all(relpath)
+        self.protocol.remove_dir_all(relpath).await
     }
 
     /// Check if a regular file exists.

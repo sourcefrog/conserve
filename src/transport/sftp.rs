@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use time::OffsetDateTime;
 use tokio::task::spawn_blocking;
-use tracing::{error, info, instrument, trace, warn};
+use tracing::{error, info, trace, warn};
 use url::Url;
 
 use crate::Kind;
@@ -100,9 +100,7 @@ impl super::Protocol for Protocol {
         let sftp = self.sftp.clone();
         let url = self.join_url(path);
         let full_path = self.base_path.join(path);
-        spawn_blocking(|| list_dir(sftp, full_path, url))
-            .await
-            .expect("spawn_blocking")
+        list_dir_async(sftp, full_path, url).await
     }
 
     async fn read(&self, path: &str) -> Result<Bytes> {
@@ -214,17 +212,12 @@ impl super::Protocol for Protocol {
             .map_err(|err| self.ssh_error(err, relpath))
     }
 
-    #[instrument]
-    fn remove_dir_all(&self, path: &str) -> Result<()> {
+    async fn remove_dir_all(&self, path: &str) -> Result<()> {
         let mut dirs_to_walk = vec![path.to_owned()];
         let mut dirs_to_delete = vec![path.to_owned()];
         while let Some(dir) = dirs_to_walk.pop() {
             trace!(?dir, "Walk down dir");
-            let list = list_dir(
-                self.sftp.clone(),
-                self.base_path.join(path),
-                self.join_url(path),
-            )?;
+            let list = self.list_dir_async(path).await?;
             for file in list.files {
                 self.remove_file(&format!("{dir}/{file}"))?;
             }
@@ -239,9 +232,11 @@ impl super::Protocol for Protocol {
         // Consume them in the reverse order discovered, so bottom up
         for dir in dirs_to_delete.iter().rev() {
             let full_path = self.base_path.join(dir);
+            let sftp = Arc::clone(&self.sftp);
             trace!(?dir, "rmdir");
-            self.sftp
-                .rmdir(&full_path)
+            spawn_blocking(move || sftp.rmdir(&full_path))
+                .await
+                .unwrap()
                 .map_err(|err| self.ssh_error(err, dir))?;
         }
         Ok(())
@@ -310,6 +305,12 @@ fn io_error(source: io::Error, url: &Url) -> Error {
         source: Some(Box::new(source)),
         url: Some(url.clone()),
     }
+}
+
+async fn list_dir_async(sftp: Arc<ssh2::Sftp>, full_path: PathBuf, url: Url) -> Result<ListDir> {
+    spawn_blocking(|| list_dir(sftp, full_path, url))
+        .await
+        .unwrap()
 }
 
 fn list_dir(sftp: Arc<ssh2::Sftp>, full_path: PathBuf, url: Url) -> Result<ListDir> {

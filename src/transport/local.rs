@@ -12,7 +12,7 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::fs::{remove_dir_all, remove_file, File};
+use std::fs::{remove_file, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -161,9 +161,11 @@ impl super::Protocol for Protocol {
         remove_file(&path).map_err(|err| super::Error::io_error(&path, err))
     }
 
-    fn remove_dir_all(&self, relpath: &str) -> Result<()> {
+    async fn remove_dir_all(&self, relpath: &str) -> Result<()> {
         let path = self.full_path(relpath);
-        remove_dir_all(&path).map_err(|err| super::Error::io_error(&path, err))
+        tokio::fs::remove_dir_all(&path)
+            .await
+            .map_err(|err| super::Error::io_error(&path, err))
     }
 
     fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
@@ -455,7 +457,7 @@ mod test {
         transport.create_dir("aaa/bbb").await.unwrap();
         transport.create_dir("aaa/bbb/ccc").await.unwrap();
 
-        transport.remove_dir_all("aaa").unwrap();
+        transport.remove_dir_all("aaa").await.unwrap();
 
         assert_eq!(
             *transport.recorded_calls().last().unwrap(),

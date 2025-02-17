@@ -297,11 +297,11 @@ impl super::Protocol for Protocol {
         Ok(())
     }
 
-    fn remove_dir_all(&self, relpath: &str) -> Result<()> {
+    async fn remove_dir_all(&self, relpath: &str) -> Result<()> {
         // Walk the prefix and delete every object within it.
         // This could be locally parallelized, but it's only used during `conserve delete`
         // which isn't the most important thing to optimize.
-        let _span = trace_span!("S3Transport::remove_dir_all", %relpath).entered();
+        trace!(%relpath, "S3Transport::remove_dir_all");
         let prefix = self.join_path(relpath);
         let mut stream = self
             .client
@@ -311,21 +311,19 @@ impl super::Protocol for Protocol {
             .into_paginator()
             .send();
         let mut n_files = 0;
-        while let Some(response) = self.runtime.block_on(stream.next()) {
+        while let Some(response) = stream.next().await {
             for object in response
                 .map_err(|err| self.s3_error(&prefix, err))?
                 .contents
                 .expect("ListObjectsV2Response has contents")
             {
                 let key = object.key.expect("Object has a key");
-                self.runtime
-                    .block_on(
-                        self.client
-                            .delete_object()
-                            .bucket(&self.bucket)
-                            .key(&key)
-                            .send(),
-                    )
+                self.client
+                    .delete_object()
+                    .bucket(&self.bucket)
+                    .key(&key)
+                    .send()
+                    .await
                     .map_err(|err| self.s3_error(&key, err))?;
                 n_files += 1;
             }
