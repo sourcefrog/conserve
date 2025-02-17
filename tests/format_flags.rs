@@ -23,6 +23,7 @@ async fn unknown_format_flag_fails_to_open() {
             &serde_json::to_vec(&head).unwrap(),
             WriteMode::CreateNew,
         )
+        .await
         .unwrap();
 
     let err = Band::open(&af, BandId::zero()).await.unwrap_err();

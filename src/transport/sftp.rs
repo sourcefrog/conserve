@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use ssh2::Sftp;
 use time::OffsetDateTime;
 use tokio::task::spawn_blocking;
 use tracing::{error, info, trace, warn};
@@ -25,7 +26,7 @@ pub(super) struct Protocol {
     // the C library.
     //
     // TODO: In fact perhaps have a pool of connections to get more parallelism?
-    sftp: Arc<ssh2::Sftp>,
+    sftp: Arc<Sftp>,
     base_path: PathBuf,
 }
 
@@ -140,41 +141,14 @@ impl super::Protocol for Protocol {
         }
     }
 
-    fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
-        let full_path = self.base_path.join(relpath);
-        trace!(
-            "write_file {len:>9} bytes to {full_path:?}",
-            len = content.len()
-        );
-        let flags = ssh2::OpenFlags::WRITE
-            | ssh2::OpenFlags::CREATE
-            | match write_mode {
-                WriteMode::CreateNew => ssh2::OpenFlags::EXCLUSIVE,
-                WriteMode::Overwrite => ssh2::OpenFlags::TRUNCATE,
-            };
-        let mut file = self
-            .sftp
-            .open_mode(&full_path, flags, 0o644, ssh2::OpenType::File)
-            .map_err(|err| {
-                warn!(?err, ?relpath, "sftp error creating file");
-                self.ssh_error(err, relpath)
-            })?;
-        if let Err(err) = file.write_all(content) {
-            warn!(?err, ?full_path, "sftp error writing file");
-            if let Err(err2) = self.sftp.unlink(&full_path) {
-                warn!(
-                    ?err2,
-                    ?full_path,
-                    "sftp error unlinking file after write error"
-                );
-            }
-            return Err(super::Error {
-                url: Some(self.join_url(relpath)),
-                source: Some(Box::new(err)),
-                kind: ErrorKind::Other,
-            });
-        }
-        Ok(())
+    async fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
+        let fullpath = self.base_path.join(relpath);
+        let url = self.url.join(relpath).unwrap();
+        let content = Bytes::from(content.to_vec()); // TODO: Take Bytes as an arg.
+        let sftp = Arc::clone(&self.sftp);
+        spawn_blocking(move || sync_write(sftp, fullpath, url, content, write_mode))
+            .await
+            .unwrap()
     }
 
     async fn metadata(&self, relpath: &str) -> Result<super::Metadata> {
@@ -351,4 +325,45 @@ fn list_dir(sftp: Arc<ssh2::Sftp>, full_path: PathBuf, url: Url) -> Result<ListD
         }
     }
     Ok(ListDir { files, dirs })
+}
+
+fn sync_write(
+    sftp: Arc<Sftp>,
+    full_path: PathBuf,
+    url: Url,
+    content: Bytes,
+    write_mode: WriteMode,
+) -> Result<()> {
+    trace!(
+        "write_file {len:>9} bytes to {full_path:?}",
+        len = content.len()
+    );
+    let flags = ssh2::OpenFlags::WRITE
+        | ssh2::OpenFlags::CREATE
+        | match write_mode {
+            WriteMode::CreateNew => ssh2::OpenFlags::EXCLUSIVE,
+            WriteMode::Overwrite => ssh2::OpenFlags::TRUNCATE,
+        };
+    let mut file = sftp
+        .open_mode(&full_path, flags, 0o644, ssh2::OpenType::File)
+        .map_err(|err| {
+            warn!(?err, ?full_path, "sftp error creating file");
+            ssh_error(err, &url)
+        })?;
+    if let Err(err) = file.write_all(&content) {
+        warn!(?err, ?full_path, "sftp error writing file");
+        if let Err(err2) = sftp.unlink(&full_path) {
+            warn!(
+                ?err2,
+                ?full_path,
+                "sftp error unlinking file after write error"
+            );
+        }
+        return Err(super::Error {
+            url: Some(url),
+            source: Some(Box::new(err)),
+            kind: ErrorKind::Other,
+        });
+    }
+    Ok(())
 }

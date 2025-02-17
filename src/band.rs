@@ -159,7 +159,7 @@ impl Band {
             band_format_version,
             format_flags: format_flags.into(),
         };
-        write_json(&transport, BAND_HEAD_FILENAME, &head)?;
+        write_json(&transport, BAND_HEAD_FILENAME, &head).await?;
         Ok(Band {
             band_id,
             head,
@@ -168,7 +168,7 @@ impl Band {
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(&self, index_hunk_count: u64) -> Result<()> {
+    pub async fn close(&self, index_hunk_count: u64) -> Result<()> {
         write_json(
             &self.transport,
             BAND_TAIL_FILENAME,
@@ -177,6 +177,7 @@ impl Band {
                 index_hunk_count: Some(index_hunk_count),
             },
         )
+        .await
         .map_err(Error::from)
     }
 
@@ -338,7 +339,7 @@ mod tests {
 
         assert!(!band.is_closed().await.unwrap());
 
-        band.close(0).unwrap();
+        band.close(0).await.unwrap();
         assert!(band_dir.join("BANDTAIL").is_file());
         assert!(band.is_closed().await.unwrap());
 

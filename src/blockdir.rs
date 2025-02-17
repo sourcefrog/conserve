@@ -137,6 +137,7 @@ impl BlockDir {
         match self
             .transport
             .write(&relpath, &compressed, WriteMode::CreateNew)
+            .await
         {
             Ok(()) => {}
             Err(err) if err.kind() == transport::ErrorKind::AlreadyExists => {
@@ -519,6 +520,7 @@ mod test {
         let monitor = TestMonitor::arc();
         transport
             .write(&block_relpath(&hash), b"", WriteMode::Overwrite)
+            .await
             .unwrap();
         assert!(!blockdir.contains(&hash, monitor.clone()).await.unwrap());
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);

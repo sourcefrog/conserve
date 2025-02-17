@@ -44,7 +44,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Write uncompressed json to a file on a Transport.
-pub(crate) fn write_json<T>(transport: &Transport, relpath: &str, obj: &T) -> Result<()>
+pub(crate) async fn write_json<T>(transport: &Transport, relpath: &str, obj: &T) -> Result<()>
 where
     T: serde::Serialize,
 {
@@ -55,6 +55,7 @@ where
     s.push('\n');
     transport
         .write(relpath, s.as_bytes(), WriteMode::CreateNew)
+        .await
         .map_err(Error::from)
 }
 
@@ -92,8 +93,8 @@ mod tests {
         pub weather: String,
     }
 
-    #[test]
-    fn write_json_to_transport() {
+    #[tokio::test]
+    async fn write_json_to_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
         let entry = TestContents {
             id: 42,
@@ -102,7 +103,9 @@ mod tests {
         let filename = "test.json";
 
         let transport = Transport::local(temp.path());
-        super::write_json(&transport, filename, &entry).unwrap();
+        super::write_json(&transport, filename, &entry)
+            .await
+            .unwrap();
 
         let json_child = temp.child("test.json");
         json_child.assert(concat!(r#"{"id":42,"weather":"cold"}"#, "\n"));

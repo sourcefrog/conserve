@@ -12,8 +12,6 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::fs::{remove_file, File};
-use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{io, path};
@@ -22,7 +20,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use tempfile::TempDir;
 use tokio::sync::Semaphore;
-use tracing::{error, instrument, trace, warn};
+use tracing::{error, trace, warn};
 use url::Url;
 
 use super::{Error, ListDir, Metadata, Result, WriteMode};
@@ -88,12 +86,9 @@ impl super::Protocol for Protocol {
             .map_err(|err| Error::io_error(full_path, err))
     }
 
-    #[instrument(skip(self, content))]
-    fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
-        // TODO: Just write directly; remove if the write fails.
+    async fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let full_path = self.full_path(relpath);
-        let oops = |err| super::Error::io_error(&full_path, err);
-        let mut options = File::options();
+        let mut options = tokio::fs::OpenOptions::new();
         options.write(true);
         match write_mode {
             WriteMode::CreateNew => {
@@ -103,17 +98,16 @@ impl super::Protocol for Protocol {
                 options.create(true).truncate(true);
             }
         }
-        let mut file = options.open(&full_path).map_err(oops)?;
-        if let Err(err) = file.write_all(content) {
+        if let Err(err) = tokio::fs::write(&full_path, content).await {
             error!("Failed to write {full_path:?}: {err:?}");
-            drop(file);
-            if let Err(err2) = remove_file(&full_path) {
+            if let Err(err2) = tokio::fs::remove_file(&full_path).await {
                 error!("Failed to remove {full_path:?}: {err2:?}");
             }
-            return Err(oops(err));
+            Err(super::Error::io_error(&full_path, err))
+        } else {
+            trace!("Wrote {} bytes", content.len());
+            Ok(())
         }
-        trace!("Wrote {} bytes", content.len());
-        Ok(())
     }
 
     async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
@@ -338,6 +332,7 @@ mod test {
                 b"Must I paint you a picture?",
                 WriteMode::CreateNew,
             )
+            .await
             .unwrap();
 
         temp.child("subdir").assert(predicate::path::is_dir());
@@ -379,9 +374,11 @@ mod test {
         let filename = "filename";
         transport
             .write(filename, b"original content", WriteMode::Overwrite)
+            .await
             .expect("first write succeeds");
         transport
             .write(filename, b"new content", WriteMode::Overwrite)
+            .await
             .expect("write over existing file succeeds");
         assert_eq!(
             transport.read(filename).await.unwrap().as_ref(),
@@ -462,10 +459,12 @@ mod test {
         // Make some files and directories
         transport
             .write("hey", b"hi there", WriteMode::CreateNew)
+            .await
             .unwrap();
         transport.create_dir("subdir").await.unwrap();
         let t2 = transport.chdir("subdir");
         t2.write("subfile", b"subcontent", WriteMode::CreateNew)
+            .await
             .unwrap();
 
         // After dropping the first transport, the tempdir still exists

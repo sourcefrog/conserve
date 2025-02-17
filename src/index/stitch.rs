@@ -306,7 +306,7 @@ mod test {
         let hunks = ib.finish().await?;
         assert_eq!(hunks, 2);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
-        band.close(2)?;
+        band.close(2).await?;
 
         // b2
         let monitor = TestMonitor::arc();
