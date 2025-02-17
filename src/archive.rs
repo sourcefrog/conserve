@@ -249,7 +249,7 @@ impl Archive {
         let start = Instant::now();
 
         // TODO: No need to lock for dry_run.
-        let delete_guard = if options.break_lock {
+        let gc_lock = if options.break_lock {
             gc_lock::GarbageCollectionLock::break_lock(self).await?
         } else {
             gc_lock::GarbageCollectionLock::new(self).await?
@@ -294,7 +294,7 @@ impl Archive {
         stats.unreferenced_block_bytes = total_bytes;
 
         if !options.dry_run {
-            delete_guard.check().await?;
+            gc_lock.check().await?;
             let task = monitor.start_task("Delete bands".to_string());
 
             for band_id in delete_band_ids.iter() {
@@ -315,6 +315,7 @@ impl Archive {
             stats.deletion_errors += error_count;
             stats.deleted_block_count += unref_count - error_count;
         }
+        gc_lock.release().await?;
 
         stats.elapsed = start.elapsed();
         Ok(stats)
