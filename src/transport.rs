@@ -77,6 +77,9 @@ impl Transport {
     }
 
     /// Open a new transport from a string that might be a URL or local path.
+    // TODO: Should this be async and open a connection, or should it be lazy?
+    // Lazy would be easier for tests that expect local dirs to open immediately.
+    // Async might be better for SFTP where we can authenticate the connection...
     pub fn new(s: &str) -> Result<Self> {
         if let Ok(url) = Url::parse(s) {
             Transport::open_url(&url)
@@ -107,6 +110,8 @@ impl Transport {
         }
     }
 
+    /// Open a Transport from a URL.
+    // TODO: Like ::new, should this be lazy or prompt?
     pub fn open_url(url: &Url) -> Result<Self> {
         let protocol: Arc<dyn Protocol> = match url.scheme() {
             "file" => Arc::new(local::Protocol::new(
@@ -180,6 +185,8 @@ impl Transport {
     }
 
     /// Make a new transport addressing a subdirectory.
+    ///
+    /// This can succeed even if the subdirectory does not exist yet.
     pub fn chdir(&self, relpath: &str) -> Self {
         let mut sub_path = self.sub_path.clone();
         if !relpath.is_empty() {

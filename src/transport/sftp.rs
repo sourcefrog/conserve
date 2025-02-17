@@ -23,6 +23,8 @@ pub(super) struct Protocol {
     url: Url,
     // TODO: Maybe use a Tokio Mutex here, so that threads don't get hung up on the mutex inside
     // the C library.
+    //
+    // TODO: In fact perhaps have a pool of connections to get more parallelism?
     sftp: Arc<ssh2::Sftp>,
     base_path: PathBuf,
 }
