@@ -43,7 +43,7 @@ use aws_types::SdkConfig;
 use base64::Engine;
 use bytes::Bytes;
 use tokio::runtime::Runtime;
-use tracing::{debug, instrument, trace, trace_span};
+use tracing::{debug, instrument, trace};
 use url::Url;
 
 use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, WriteMode};
@@ -286,15 +286,17 @@ impl super::Protocol for Protocol {
         Ok(())
     }
 
-    fn remove_file(&self, relpath: &str) -> Result<()> {
-        let _span = trace_span!("S3Transport::remove_file", %relpath).entered();
+    async fn remove_file(&self, relpath: &str) -> Result<()> {
+        trace!(%relpath, "S3Transport::remove_file");
         let key = self.join_path(relpath);
-        let request = self.client.delete_object().bucket(&self.bucket).key(&key);
-        let response = self.runtime.block_on(request.send());
-        trace!(?response);
-        response.map_err(|err| self.s3_error(&key, err))?;
-        trace!("deleted file");
-        Ok(())
+        self.client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .send()
+            .await
+            .map(|response| trace!(?response))
+            .map_err(|err| self.s3_error(&key, err))
     }
 
     async fn remove_dir_all(&self, relpath: &str) -> Result<()> {

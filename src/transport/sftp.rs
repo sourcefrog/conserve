@@ -204,11 +204,13 @@ impl super::Protocol for Protocol {
         })
     }
 
-    fn remove_file(&self, relpath: &str) -> Result<()> {
+    async fn remove_file(&self, relpath: &str) -> Result<()> {
         let full_path = self.base_path.join(relpath);
         trace!("remove_file {full_path:?}");
-        self.sftp
-            .unlink(&full_path)
+        let sftp = Arc::clone(&self.sftp);
+        spawn_blocking(move || sftp.unlink(&full_path))
+            .await
+            .unwrap()
             .map_err(|err| self.ssh_error(err, relpath))
     }
 
@@ -219,7 +221,7 @@ impl super::Protocol for Protocol {
             trace!(?dir, "Walk down dir");
             let list = self.list_dir_async(path).await?;
             for file in list.files {
-                self.remove_file(&format!("{dir}/{file}"))?;
+                self.remove_file(&format!("{dir}/{file}")).await?;
             }
             list.dirs
                 .iter()

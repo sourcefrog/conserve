@@ -391,7 +391,7 @@ mod test {
         .await
         .expect("backup should work");
 
-        af.transport().remove_file("b0000/BANDTAIL").unwrap(); // band is now incomplete
+        af.transport().remove_file("b0000/BANDTAIL").await.unwrap(); // band is now incomplete
         let band_ids = af.list_band_ids().await.expect("should list bands");
 
         let band_id = band_ids.first().expect("expected at least one band");
@@ -413,7 +413,7 @@ mod test {
         // Remove the band head. This band can not be opened anymore.
         // If accessed this should fail the test.
         // Note: When refactoring `.expect("Failed to open band")` this might needs refactoring as well.
-        af.transport().remove_file("b0000/BANDHEAD").unwrap();
+        af.transport().remove_file("b0000/BANDHEAD").await.unwrap();
 
         // You can keep polling the iterator but it will keep returning none,
         // without trying to reopen the band.

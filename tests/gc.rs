@@ -148,8 +148,9 @@ async fn backup_prevented_by_gc_lock() -> Result<()> {
         &BackupOptions::default(),
         monitor.clone(),
     )
-    .await;
-    assert!(backup_result.is_ok());
+    .await
+    .unwrap();
+    dbg!(&backup_result);
 
     Ok(())
 }
