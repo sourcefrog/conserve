@@ -19,6 +19,8 @@ pub static LEASE_FILENAME: &str = "LEASE";
 #[derive(Debug)]
 pub struct Lease {
     transport: Transport,
+    /// URL of the lease file.
+    url: Url,
     lease_taken: OffsetDateTime,
     /// The next refresh after this time must rewrite the lease.
     next_renewal: OffsetDateTime,
@@ -90,6 +92,7 @@ impl Lease {
         let next_renewal = lease_taken + Duration::from_secs(60);
         Ok(Lease {
             transport: transport.clone(),
+            url,
             lease_taken,
             next_renewal,
         })
