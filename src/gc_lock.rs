@@ -31,6 +31,7 @@
 //! delete but before starting to actually delete them, we check that no
 //! new bands have been created.
 
+use tracing::{error, trace};
 use transport::WriteMode;
 
 use crate::*;
@@ -101,6 +102,20 @@ impl GarbageCollectionLock {
             Err(Error::GarbageCollectionLockHeldDuringBackup)
         }
     }
+
+    /// Explicitly release the lock.
+    ///
+    /// Awaiting the future will ensure that the lock is released.
+    pub async fn release(self) -> Result<()> {
+        trace!("Releasing GC lock");
+        self.archive
+            .transport()
+            .remove_file(GC_LOCK)
+            .map_err(|err| {
+                error!(?err, "Failed to delete GC lock");
+                Error::from(err)
+            })
+    }
 }
 
 impl Drop for GarbageCollectionLock {
@@ -108,18 +123,20 @@ impl Drop for GarbageCollectionLock {
         // The lock will, hopefully, be deleted soon after the lock is dropped,
         // and before the process exits.
         let transport = self.archive.transport().clone();
-        tokio::task::spawn_blocking(move || {
-            if let Err(err) = transport.remove_file(GC_LOCK) {
+        tokio::task::spawn(async move {
+            transport.remove_file(GC_LOCK).inspect_err(|err| {
                 // Print directly to stderr, in case the UI structure is in a
                 // bad state during unwind.
-                eprintln!("Failed to delete GC_LOCK: {err:?}")
-            }
+                eprintln!("Failed to delete GC_LOCK from Drop: {err:?}");
+            })
         });
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
+
     use super::*;
     use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::TreeFixture;
@@ -133,6 +150,9 @@ mod test {
 
         // Released when dropped.
         drop(delete_guard);
+        // Cleanup is async: hard to know exactly when it will complete, but this should be
+        // sufficient?
+        tokio::time::sleep(Duration::from_millis(100)).await;
         assert!(!archive.transport().is_file("GC_LOCK").await.unwrap());
     }
 
@@ -196,10 +216,10 @@ mod test {
     #[tokio::test]
     async fn sequential_gc_allowed() {
         let archive = Archive::create_temp().await;
-        let _lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
-        drop(_lock1);
-        let _lock2 = GarbageCollectionLock::new(&archive).await.unwrap();
-        drop(_lock2);
+        let lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
+        lock1.release().await.unwrap();
+        let lock2 = GarbageCollectionLock::new(&archive).await.unwrap();
+        lock2.release().await.unwrap();
     }
 
     #[tokio::test]
