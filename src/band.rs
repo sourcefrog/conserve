@@ -219,11 +219,12 @@ impl Band {
     }
 
     /// Delete a band.
-    pub fn delete(archive: &Archive, band_id: BandId) -> Result<()> {
+    pub async fn delete(archive: &Archive, band_id: BandId) -> Result<()> {
         // TODO: Count how many files were deleted, and the total size?
         archive
             .transport()
             .remove_dir_all(&band_id.to_string())
+            .await
             .map_err(|err| {
                 if err.is_not_found() {
                     Error::BandNotFound { band_id }
@@ -364,7 +365,9 @@ mod tests {
         let _band = Band::create(&archive).await.unwrap();
         assert!(archive.transport().is_file("b0000/BANDHEAD").await.unwrap());
 
-        Band::delete(&archive, BandId::new(&[0])).expect("delete band");
+        Band::delete(&archive, BandId::new(&[0]))
+            .await
+            .expect("delete band");
 
         assert!(!archive.transport().is_file("b0000").await.unwrap());
         assert!(!archive.transport().is_file("b0000/BANDHEAD").await.unwrap());

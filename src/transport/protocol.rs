@@ -34,7 +34,7 @@ pub(super) trait Protocol: std::fmt::Debug + Send + Sync {
     fn remove_file(&self, relpath: &str) -> Result<()>;
 
     /// Delete a directory and all its contents.
-    fn remove_dir_all(&self, relpath: &str) -> Result<()>;
+    async fn remove_dir_all(&self, relpath: &str) -> Result<()>;
 
     /// Make a new transport addressing a subdirectory.
     fn chdir(&self, relpath: &str) -> Arc<dyn Protocol>;
