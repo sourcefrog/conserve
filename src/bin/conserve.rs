@@ -368,7 +368,7 @@ impl Command {
                     ..Default::default()
                 };
                 let stats = backup(
-                    &Archive::open(Transport::new(archive)?).await?,
+                    &Archive::open(Transport::new(archive).await?).await?,
                     source,
                     &options,
                     monitor,
@@ -380,7 +380,7 @@ impl Command {
             }
             Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                let archive = Archive::open(Transport::new(archive)?).await?;
+                let archive = Archive::open(Transport::new(archive).await?).await?;
                 let blocks = archive.all_blocks(monitor).await?;
                 for hash in blocks {
                     writeln!(bw, "{hash}")?;
@@ -392,7 +392,7 @@ impl Command {
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                let archive = Archive::open(Transport::new(archive)?).await?;
+                let archive = Archive::open(Transport::new(archive).await?).await?;
                 for hash in archive
                     .referenced_blocks(&archive.list_band_ids().await?, monitor)
                     .await?
@@ -403,7 +403,7 @@ impl Command {
             Command::Debug(Debug::Unreferenced { archive }) => {
                 print!(
                     "{}",
-                    Archive::open(Transport::new(archive)?)
+                    Archive::open(Transport::new(archive).await?)
                         .await?
                         .unreferenced_blocks(monitor)
                         .await?
@@ -420,7 +420,7 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let stats = Archive::open(Transport::new(archive)?)
+                let stats = Archive::open(Transport::new(archive).await?)
                     .await?
                     .delete_bands(
                         backup,
@@ -467,7 +467,7 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let archive = Archive::open(Transport::new(archive)?).await?;
+                let archive = Archive::open(Transport::new(archive).await?).await?;
                 let stats = archive
                     .delete_bands(
                         &[],
@@ -483,7 +483,7 @@ impl Command {
                 }
             }
             Command::Init { archive } => {
-                Archive::create(Transport::new(archive)?).await?;
+                Archive::create(Transport::new(archive).await?).await?;
                 debug!("Created new archive in {archive:?}");
             }
             Command::Ls {
@@ -574,7 +574,7 @@ impl Command {
                 no_stats,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
-                let archive = Archive::open(Transport::new(archive)?).await?;
+                let archive = Archive::open(Transport::new(archive).await?).await?;
                 let _ = no_stats; // accepted but ignored; we never currently print stats
                 let options = RestoreOptions {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
@@ -619,7 +619,7 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                Archive::open(Transport::new(archive)?)
+                Archive::open(Transport::new(archive).await?)
                     .await?
                     .validate(&options, monitor.clone())
                     .await?;
@@ -641,7 +641,7 @@ impl Command {
                 } else {
                     Some(*LOCAL_OFFSET.read().unwrap())
                 };
-                let archive = Archive::open(Transport::new(archive)?).await?;
+                let archive = Archive::open(Transport::new(archive).await?).await?;
                 let options = ShowVersionsOptions {
                     newest_first: *newest,
                     tree_size: *sizes,
@@ -660,7 +660,7 @@ async fn stored_tree_from_opt(
     archive_location: &str,
     backup: &Option<BandId>,
 ) -> Result<StoredTree> {
-    let archive = Archive::open(Transport::new(archive_location)?).await?;
+    let archive = Archive::open(Transport::new(archive_location).await?).await?;
     let policy = band_selection_policy_from_opt(backup);
     archive.open_stored_tree(policy).await
 }

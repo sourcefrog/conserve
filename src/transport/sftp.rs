@@ -31,7 +31,14 @@ pub(super) struct Protocol {
 }
 
 impl Protocol {
-    pub fn new(url: &Url) -> Result<Self> {
+    pub async fn new(url: &Url) -> Result<Self> {
+        let url = url.to_owned();
+        spawn_blocking(|| Protocol::blocking_new(url))
+            .await
+            .unwrap()
+    }
+
+    fn blocking_new(url: Url) -> Result<Self> {
         assert_eq!(url.scheme(), "sftp");
         let addr = format!(
             "{}:{}",
@@ -40,17 +47,17 @@ impl Protocol {
         );
         let tcp_stream = TcpStream::connect(addr).map_err(|err| {
             error!(?err, ?url, "Error opening SSH TCP connection");
-            io_error(err, url)
+            io_error(err, &url)
         })?;
         trace!("got tcp connection");
         let mut session = ssh2::Session::new().map_err(|err| {
             error!(?err, "Error opening SSH session");
-            ssh_error(err, url)
+            ssh_error(err, &url)
         })?;
         session.set_tcp_stream(tcp_stream);
         session.handshake().map_err(|err| {
             error!(?err, "Error in SSH handshake");
-            ssh_error(err, url)
+            ssh_error(err, &url)
         })?;
         trace!(
             "SSH hands shaken, banner: {}",
@@ -65,12 +72,12 @@ impl Protocol {
         };
         session.userauth_agent(&username).map_err(|err| {
             error!(?err, username, "Error in SSH user auth with agent");
-            ssh_error(err, url)
+            ssh_error(err, &url)
         })?;
         trace!("Authenticated!");
         let sftp = session.sftp().map_err(|err| {
             error!(?err, "Error opening SFTP session");
-            ssh_error(err, url)
+            ssh_error(err, &url)
         })?;
         Ok(Protocol {
             url: url.to_owned(),

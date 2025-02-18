@@ -77,12 +77,9 @@ impl Transport {
     }
 
     /// Open a new transport from a string that might be a URL or local path.
-    // TODO: Should this be async and open a connection, or should it be lazy?
-    // Lazy would be easier for tests that expect local dirs to open immediately.
-    // Async might be better for SFTP where we can authenticate the connection...
-    pub fn new(s: &str) -> Result<Self> {
+    pub async fn new(s: &str) -> Result<Self> {
         if let Ok(url) = Url::parse(s) {
-            Transport::open_url(&url)
+            Transport::open_url(&url).await
         } else {
             Ok(Transport::local(Path::new(s)))
         }
@@ -111,8 +108,7 @@ impl Transport {
     }
 
     /// Open a Transport from a URL.
-    // TODO: Like ::new, should this be lazy or prompt?
-    pub fn open_url(url: &Url) -> Result<Self> {
+    pub async fn open_url(url: &Url) -> Result<Self> {
         let protocol: Arc<dyn Protocol> = match url.scheme() {
             "file" => Arc::new(local::Protocol::new(
                 &url.to_file_path().expect("extract URL file path"),
@@ -123,10 +119,10 @@ impl Transport {
             }
 
             #[cfg(feature = "s3")]
-            "s3" => Arc::new(s3::Protocol::new(url)?),
+            "s3" => Arc::new(s3::Protocol::new(url).await?),
 
             #[cfg(feature = "sftp")]
-            "sftp" => Arc::new(sftp::Protocol::new(url)?),
+            "sftp" => Arc::new(sftp::Protocol::new(url).await?),
 
             _other => {
                 return Err(Error {
