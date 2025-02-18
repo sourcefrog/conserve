@@ -24,13 +24,14 @@
 //
 //    cargo mutants -f s3.rs --no-config -C --features=s3,s3-integration-test
 
+use std::error::Error as StdError;
 use std::fmt;
 use std::sync::Arc;
 use std::time::SystemTime;
 
 use async_trait::async_trait;
 use aws_config::{AppName, BehaviorVersion};
-use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::error::{DisplayErrorContext, SdkError};
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
@@ -42,20 +43,13 @@ use aws_types::region::Region;
 use aws_types::SdkConfig;
 use base64::Engine;
 use bytes::Bytes;
-use tokio::runtime::Runtime;
-use tracing::{debug, trace};
+use tracing::{debug, error, trace};
 use url::Url;
 
 use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, WriteMode};
 
 pub(super) struct Protocol {
     url: Url,
-    /// Tokio runtime specifically for S3 IO.
-    ///
-    /// S3 SDK is built on Tokio but the rest of Conserve uses threads.
-    /// Each call into the S3 transport blocks the calling thread
-    /// until the request is complete.
-    runtime: Arc<Runtime>,
 
     client: Arc<aws_sdk_s3::Client>,
 
@@ -67,31 +61,22 @@ pub(super) struct Protocol {
 }
 
 impl Protocol {
-    pub(super) fn new(url: &Url) -> Result<Self> {
+    pub(super) async fn new(url: &Url) -> Result<Self> {
         assert_eq!(url.scheme(), "s3");
-
-        // Like in <https://tokio.rs/tokio/topics/bridging>.
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|source| Error {
-                kind: ErrorKind::CreateTransport,
-                url: Some(url.to_owned()),
-                source: Some(Box::new(source)),
-            })?;
+        let url = url.to_owned();
 
         let bucket = url.authority().to_owned();
         assert!(!bucket.is_empty(), "S3 bucket name is empty in {url:?}");
 
         // Find the bucket region.
-        let config = load_aws_config(&runtime, None);
+        let config = load_aws_config(None).await;
         let client = aws_sdk_s3::Client::new(&config);
-        let location_request = client
+        let location_response = client
             .get_bucket_location()
-            .set_bucket(Some(bucket.clone()));
-        let location_response = runtime
-            .block_on(location_request.send())
-            .expect("Send GetBucketLocation");
+            .set_bucket(Some(bucket.clone()))
+            .send()
+            .await
+            .map_err(|err| s3_error(err, &url))?;
         debug!(?location_response);
 
         let region = location_response
@@ -100,7 +85,7 @@ impl Protocol {
         debug!(?region, "S3 bucket region");
 
         // Make a new client in the right region.
-        let config = load_aws_config(&runtime, region);
+        let config = load_aws_config(region).await;
         let client = aws_sdk_s3::Client::new(&config);
 
         let mut base_path = url.path().to_owned();
@@ -117,9 +102,8 @@ impl Protocol {
             bucket,
             base_path,
             client: Arc::new(client),
-            runtime: Arc::new(runtime),
             storage_class: StorageClass::IntelligentTiering,
-            url: url.to_owned(),
+            url,
         })
     }
 
@@ -156,7 +140,7 @@ impl fmt::Debug for Protocol {
     }
 }
 
-fn load_aws_config(runtime: &Runtime, region: Option<String>) -> SdkConfig {
+async fn load_aws_config(region: Option<String>) -> SdkConfig {
     // Use us-east-1 at least for looking up the bucket's region, if
     // none is known yet.
     let loader = aws_config::defaults(BehaviorVersion::latest())
@@ -164,7 +148,7 @@ fn load_aws_config(runtime: &Runtime, region: Option<String>) -> SdkConfig {
         .region(Region::new(
             region.unwrap_or_else(|| "us-east-1".to_owned()),
         ));
-    runtime.block_on(loader.load())
+    loader.load().await
 }
 
 /// Join paths in a way that works for S3 keys.
@@ -376,7 +360,6 @@ impl super::Protocol for Protocol {
         Arc::new(Protocol {
             base_path: join_paths(&self.base_path, relpath),
             bucket: self.bucket.clone(),
-            runtime: self.runtime.clone(),
             client: self.client.clone(),
             storage_class: self.storage_class.clone(),
             url: self.url.join(relpath).expect("join URL"),
@@ -458,5 +441,18 @@ fn collect_listdir(response: &ListObjectsV2Output, prefix: &str, list_dir: &mut 
             .expect("Object name should start with prefix");
         debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
         list_dir.files.push(name.to_owned());
+    }
+}
+
+fn s3_error<E: StdError + Sync + Send + 'static>(err: SdkError<E>, url: &Url) -> Error {
+    // TODO: Break out more specific errors?
+    //
+    // For example:
+    // ERROR conserve::transport::s3: S3 error: DisplayErrorContext(DispatchFailure(DispatchFailure { source: ConnectorError { kind: Other(None), source: CredentialsNotLoaded(CredentialsNotLoaded { source: Some("no providers in chain provided credentials") }), connection: Unknown } }))
+    error!("S3 error: {:?}", DisplayErrorContext(&err));
+    Error {
+        source: Some(Box::new(err)),
+        url: Some(url.to_owned()),
+        kind: ErrorKind::Connect,
     }
 }
