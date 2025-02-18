@@ -1,4 +1,4 @@
-// Copyright 2023-2024 Martin Pool.
+// Copyright 2023-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -24,16 +24,18 @@
 //
 //    cargo mutants -f s3.rs --no-config -C --features=s3,s3-integration-test
 
+use std::error::Error as StdError;
 use std::fmt;
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use async_trait::async_trait;
 use aws_config::{AppName, BehaviorVersion};
-use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::error::{DisplayErrorContext, ProvideErrorMetadata, SdkError};
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
-use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
+use aws_sdk_s3::operation::list_objects_v2::{ListObjectsV2Error, ListObjectsV2Output};
 use aws_sdk_s3::operation::put_object::PutObjectError;
 use aws_sdk_s3::primitives::ByteStreamError;
 use aws_sdk_s3::types::StorageClass;
@@ -41,20 +43,13 @@ use aws_types::region::Region;
 use aws_types::SdkConfig;
 use base64::Engine;
 use bytes::Bytes;
-use tokio::runtime::Runtime;
-use tracing::{debug, instrument, trace, trace_span};
+use tracing::{debug, error, trace};
 use url::Url;
 
 use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, WriteMode};
 
 pub(super) struct Protocol {
     url: Url,
-    /// Tokio runtime specifically for S3 IO.
-    ///
-    /// S3 SDK is built on Tokio but the rest of Conserve uses threads.
-    /// Each call into the S3 transport blocks the calling thread
-    /// until the request is complete.
-    runtime: Arc<Runtime>,
 
     client: Arc<aws_sdk_s3::Client>,
 
@@ -66,31 +61,22 @@ pub(super) struct Protocol {
 }
 
 impl Protocol {
-    pub(super) fn new(url: &Url) -> Result<Self> {
+    pub(super) async fn new(url: &Url) -> Result<Self> {
         assert_eq!(url.scheme(), "s3");
-
-        // Like in <https://tokio.rs/tokio/topics/bridging>.
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|source| Error {
-                kind: ErrorKind::CreateTransport,
-                url: Some(url.to_owned()),
-                source: Some(Box::new(source)),
-            })?;
+        let url = url.to_owned();
 
         let bucket = url.authority().to_owned();
         assert!(!bucket.is_empty(), "S3 bucket name is empty in {url:?}");
 
         // Find the bucket region.
-        let config = load_aws_config(&runtime, None);
+        let config = load_aws_config(None).await;
         let client = aws_sdk_s3::Client::new(&config);
-        let location_request = client
+        let location_response = client
             .get_bucket_location()
-            .set_bucket(Some(bucket.clone()));
-        let location_response = runtime
-            .block_on(location_request.send())
-            .expect("Send GetBucketLocation");
+            .set_bucket(Some(bucket.clone()))
+            .send()
+            .await
+            .map_err(|err| s3_error(err, &url))?;
         debug!(?location_response);
 
         let region = location_response
@@ -99,7 +85,7 @@ impl Protocol {
         debug!(?region, "S3 bucket region");
 
         // Make a new client in the right region.
-        let config = load_aws_config(&runtime, region);
+        let config = load_aws_config(region).await;
         let client = aws_sdk_s3::Client::new(&config);
 
         let mut base_path = url.path().to_owned();
@@ -116,9 +102,8 @@ impl Protocol {
             bucket,
             base_path,
             client: Arc::new(client),
-            runtime: Arc::new(runtime),
             storage_class: StorageClass::IntelligentTiering,
-            url: url.to_owned(),
+            url,
         })
     }
 
@@ -155,7 +140,7 @@ impl fmt::Debug for Protocol {
     }
 }
 
-fn load_aws_config(runtime: &Runtime, region: Option<String>) -> SdkConfig {
+async fn load_aws_config(region: Option<String>) -> SdkConfig {
     // Use us-east-1 at least for looking up the bucket's region, if
     // none is known yet.
     let loader = aws_config::defaults(BehaviorVersion::latest())
@@ -163,7 +148,7 @@ fn load_aws_config(runtime: &Runtime, region: Option<String>) -> SdkConfig {
         .region(Region::new(
             region.unwrap_or_else(|| "us-east-1".to_owned()),
         ));
-    runtime.block_on(loader.load())
+    loader.load().await
 }
 
 /// Join paths in a way that works for S3 keys.
@@ -202,9 +187,10 @@ fn join_paths(a: &str, b: &str) -> String {
     result
 }
 
+#[async_trait]
 impl super::Protocol for Protocol {
-    fn list_dir(&self, relpath: &str) -> Result<ListDir> {
-        let _span = trace_span!("S3Transport::list_file", %relpath).entered();
+    async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
+        trace!(%relpath, "list_dir");
         let mut prefix = self.join_path(relpath);
         debug_assert!(!prefix.ends_with('/'), "{prefix:?} ends with /");
         if !prefix.is_empty() {
@@ -219,35 +205,12 @@ impl super::Protocol for Protocol {
             .into_paginator()
             .send();
         let mut result = ListDir::default();
-        loop {
-            match self.runtime.block_on(stream.next()) {
-                Some(Ok(response)) => {
-                    for common_prefix in response.common_prefixes.unwrap_or_default() {
-                        let name = common_prefix.prefix.expect("Common prefix has a name"); // needed for lifetime
-                        trace!(%name, "S3 common prefix");
-                        let name = name
-                            .strip_prefix(&prefix)
-                            .expect("Common prefix starts with prefix")
-                            .strip_suffix('/')
-                            .expect("Common prefix ends with /");
-                        debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
-                        result.dirs.push(name.to_owned());
-                    }
-                    for object in response.contents.unwrap_or_default() {
-                        let name = object.key.expect("Object has a key"); // needed
-                        trace!(%name, "S3 object");
-                        let name = name
-                            .strip_prefix(&prefix)
-                            .expect("Object name should start with prefix");
-                        debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
-                        result.files.push(name.to_owned());
-                    }
-                }
-                Some(Err(err)) => return Err(self.s3_error(&prefix, err)),
-                None => break,
-            }
+        while let Some(response) = stream.next().await {
+            let response = response.map_err(|err| self.s3_error(&prefix, err))?;
+            collect_listdir(&response, &prefix, &mut result);
         }
         trace!(
+            %relpath,
             n_dirs = result.dirs.len(),
             n_files = result.files.len(),
             "list_dir complete"
@@ -255,17 +218,18 @@ impl super::Protocol for Protocol {
         Ok(result)
     }
 
-    fn read(&self, relpath: &str) -> Result<Bytes> {
-        let _span = trace_span!("S3Transport::read_file", %relpath).entered();
+    async fn read(&self, relpath: &str) -> Result<Bytes> {
+        trace!(?relpath, "s3::read");
         let key = self.join_path(relpath);
         let request = self.client.get_object().bucket(&self.bucket).key(&key);
-        let response = self
-            .runtime
-            .block_on(request.send())
+        let response = request
+            .send()
+            .await
             .map_err(|source| self.s3_error(&key, source))?;
-        let body_bytes = self
-            .runtime
-            .block_on(response.body.collect())
+        let body_bytes = response
+            .body
+            .collect()
+            .await
             .map_err(|source| Error {
                 kind: ErrorKind::Other,
                 url: self.url.join(relpath).ok(),
@@ -277,14 +241,13 @@ impl super::Protocol for Protocol {
     }
 
     #[mutants::skip] // does nothing so hard to observe!
-    fn create_dir(&self, relpath: &str) -> Result<()> {
+    async fn create_dir(&self, relpath: &str) -> Result<()> {
         // There are no directory objects, so there's nothing to create.
         let _ = relpath;
         Ok(())
     }
 
-    #[instrument(skip(self, content))]
-    fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
+    async fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let key = self.join_path(relpath);
         let crc32c =
             base64::engine::general_purpose::STANDARD.encode(crc32c::crc32c(content).to_be_bytes());
@@ -299,29 +262,32 @@ impl super::Protocol for Protocol {
         if write_mode == WriteMode::CreateNew {
             request = request.if_none_match("*");
         }
-        let response = self.runtime.block_on(request.send());
-        // trace!(?response);
-        response.map_err(|err| self.s3_error(&key, err))?;
+        request
+            .send()
+            .await
+            .map_err(|err| self.s3_error(&key, err))?;
         trace!(body_len = content.len(), "wrote file");
         Ok(())
     }
 
-    fn remove_file(&self, relpath: &str) -> Result<()> {
-        let _span = trace_span!("S3Transport::remove_file", %relpath).entered();
+    async fn remove_file(&self, relpath: &str) -> Result<()> {
+        trace!(%relpath, "S3Transport::remove_file");
         let key = self.join_path(relpath);
-        let request = self.client.delete_object().bucket(&self.bucket).key(&key);
-        let response = self.runtime.block_on(request.send());
-        trace!(?response);
-        response.map_err(|err| self.s3_error(&key, err))?;
-        trace!("deleted file");
-        Ok(())
+        self.client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .send()
+            .await
+            .map(|response| trace!(?response))
+            .map_err(|err| self.s3_error(&key, err))
     }
 
-    fn remove_dir_all(&self, relpath: &str) -> Result<()> {
+    async fn remove_dir_all(&self, relpath: &str) -> Result<()> {
         // Walk the prefix and delete every object within it.
         // This could be locally parallelized, but it's only used during `conserve delete`
         // which isn't the most important thing to optimize.
-        let _span = trace_span!("S3Transport::remove_dir_all", %relpath).entered();
+        trace!(%relpath, "S3Transport::remove_dir_all");
         let prefix = self.join_path(relpath);
         let mut stream = self
             .client
@@ -331,21 +297,19 @@ impl super::Protocol for Protocol {
             .into_paginator()
             .send();
         let mut n_files = 0;
-        while let Some(response) = self.runtime.block_on(stream.next()) {
+        while let Some(response) = stream.next().await {
             for object in response
                 .map_err(|err| self.s3_error(&prefix, err))?
                 .contents
                 .expect("ListObjectsV2Response has contents")
             {
                 let key = object.key.expect("Object has a key");
-                self.runtime
-                    .block_on(
-                        self.client
-                            .delete_object()
-                            .bucket(&self.bucket)
-                            .key(&key)
-                            .send(),
-                    )
+                self.client
+                    .delete_object()
+                    .bucket(&self.bucket)
+                    .key(&key)
+                    .send()
+                    .await
                     .map_err(|err| self.s3_error(&key, err))?;
                 n_files += 1;
             }
@@ -354,11 +318,11 @@ impl super::Protocol for Protocol {
         Ok(())
     }
 
-    fn metadata(&self, relpath: &str) -> Result<Metadata> {
-        let _span = trace_span!("S3Transport::metadata", %relpath).entered();
+    async fn metadata(&self, relpath: &str) -> Result<Metadata> {
         let key = self.join_path(relpath);
+        trace!(?key, "s3::metadata");
         let request = self.client.head_object().bucket(&self.bucket).key(&key);
-        let response = self.runtime.block_on(request.send());
+        let response = request.send().await;
         // trace!(?response);
         match response {
             Ok(response) => {
@@ -396,7 +360,6 @@ impl super::Protocol for Protocol {
         Arc::new(Protocol {
             base_path: join_paths(&self.base_path, relpath),
             bucket: self.bucket.clone(),
-            runtime: self.runtime.clone(),
             client: self.client.clone(),
             storage_class: self.storage_class.clone(),
             url: self.url.join(relpath).expect("join URL"),
@@ -452,5 +415,44 @@ impl From<&DeleteObjectError> for ErrorKind {
 impl From<&ByteStreamError> for ErrorKind {
     fn from(_source: &ByteStreamError) -> Self {
         ErrorKind::Other
+    }
+}
+
+fn collect_listdir(response: &ListObjectsV2Output, prefix: &str, list_dir: &mut ListDir) {
+    for common_prefix in response.common_prefixes() {
+        let name = common_prefix
+            .prefix
+            .as_ref()
+            .expect("Common prefix has a name"); // needed for lifetime
+        trace!(%name, "S3 common prefix");
+        let name = name
+            .strip_prefix(prefix)
+            .expect("Common prefix starts with prefix")
+            .strip_suffix('/')
+            .expect("Common prefix ends with /");
+        debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
+        list_dir.dirs.push(name.to_owned());
+    }
+    for object in response.contents() {
+        let name = object.key.as_ref().expect("Object has a key"); // needed
+        trace!(%name, "S3 object");
+        let name = name
+            .strip_prefix(prefix)
+            .expect("Object name should start with prefix");
+        debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
+        list_dir.files.push(name.to_owned());
+    }
+}
+
+fn s3_error<E: StdError + Sync + Send + 'static>(err: SdkError<E>, url: &Url) -> Error {
+    // TODO: Break out more specific errors?
+    //
+    // For example:
+    // ERROR conserve::transport::s3: S3 error: DisplayErrorContext(DispatchFailure(DispatchFailure { source: ConnectorError { kind: Other(None), source: CredentialsNotLoaded(CredentialsNotLoaded { source: Some("no providers in chain provided credentials") }), connection: Unknown } }))
+    error!("S3 error: {:?}", DisplayErrorContext(&err));
+    Error {
+        source: Some(Box::new(err)),
+        url: Some(url.to_owned()),
+        kind: ErrorKind::Connect,
     }
 }

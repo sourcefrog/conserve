@@ -14,10 +14,8 @@
 //! Make a backup by walking a source directory and copying the contents
 //! into an archive.
 
-use std::cmp::Ordering;
 use std::fmt;
 use std::io::prelude::*;
-use std::iter::Peekable;
 use std::mem::take;
 use std::path::Path;
 use std::sync::atomic::Ordering::Relaxed;
@@ -26,7 +24,6 @@ use std::time::{Duration, Instant};
 
 use bytes::BytesMut;
 use derive_more::{Add, AddAssign};
-use itertools::Itertools;
 use tracing::{trace, warn};
 
 use crate::blockdir::{Address, BlockDir};
@@ -44,6 +41,7 @@ pub struct BackupOptions {
     /// Exclude these globs from the backup.
     pub exclude: Exclude,
 
+    /// Maximum number of index entries per index hunk.
     pub max_entries_per_hunk: usize,
 
     /// Call this callback as each entry is successfully stored.
@@ -86,27 +84,63 @@ impl Default for BackupOptions {
 /// Backup a source directory into a new band in the archive.
 ///
 /// Returns statistics about what was copied.
-pub fn backup(
+#[allow(clippy::while_let_on_iterator)] // will later be async
+pub async fn backup(
     archive: &Archive,
     source_path: &Path,
     options: &BackupOptions,
     monitor: Arc<dyn Monitor>,
 ) -> Result<BackupStats> {
     let start = Instant::now();
-    let mut writer = BackupWriter::begin(archive, options, monitor.clone())?;
-    let mut stats = BackupStats::default();
+    if gc_lock::GarbageCollectionLock::is_locked(archive).await? {
+        return Err(Error::GarbageCollectionLockHeld);
+    }
     let source_tree = SourceTree::open(source_path)?;
-
+    let mut stats = BackupStats::default();
     let task = monitor.start_task("Backup".to_string());
+    let basis_index = if let Some(basis_band_id) = archive.last_band_id().await? {
+        Stitch::new(
+            archive,
+            basis_band_id,
+            Apath::root(),
+            Exclude::nothing(),
+            monitor.clone(),
+        )
+    } else {
+        Stitch::empty(archive, monitor.clone())
+    };
 
-    let entry_iter =
+    let source_entries =
         source_tree.iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?;
-    for entry_group in entry_iter.chunks(options.max_entries_per_hunk).into_iter() {
-        for mut entry in entry_group {
-            if !options.owner {
-                entry.owner.clear();
-            }
-            match writer.copy_entry(&entry, &source_tree, options, monitor.clone()) {
+    let mut merge = MergeTrees::new(basis_index, source_entries);
+
+    // Create the new band only after finding the basis band!
+    let band = Band::create(archive).await?;
+    let index_writer = band.index_writer(monitor.clone());
+    let mut writer = BackupWriter {
+        band,
+        index_writer,
+        block_dir: archive.block_dir.clone(),
+        stats: BackupStats::default(),
+        file_combiner: FileCombiner::new(archive.block_dir.clone(), options.max_block_size),
+    };
+
+    while let Some(merged_entries) = merge.next().await {
+        trace!(?merged_entries);
+        let (basis_entry, source_entry) = merged_entries.into_options();
+        if let Some(source_entry) = source_entry {
+            trace!(apath = %source_entry.apath(), has_basis = basis_entry.is_some(), "Copying");
+            task.set_name(format!("Backup {}", source_entry.apath()));
+            match writer
+                .copy_entry(
+                    &basis_entry,
+                    source_entry,
+                    &source_tree,
+                    options,
+                    monitor.clone(),
+                )
+                .await
+            {
                 Err(err) => {
                     monitor.error(err);
                     stats.errors += 1;
@@ -117,8 +151,7 @@ pub fn backup(
                         Change::Changed { .. } => monitor.count(Counter::EntriesChanged, 1),
                         Change::Added { .. } => monitor.count(Counter::EntriesAdded, 1),
                         Change::Unchanged { .. } => monitor.count(Counter::EntriesUnchanged, 1),
-                        // Deletions are not produced at the moment.
-                        Change::Deleted { .. } => monitor.count(Counter::EntriesDeleted, 1),
+                        Change::Deleted { .. } => panic!("Deleted should not be returned here"),
                     }
                     if let Some(cb) = &options.change_callback {
                         cb(&entry_change)?;
@@ -126,11 +159,29 @@ pub fn backup(
                 }
                 Ok(_) => {}
             }
-            task.set_name(format!("Backup {}", entry.apath()));
+            trace!(
+                index_queue = writer.index_writer.pending_entries(),
+                combiner_queue = writer.file_combiner.queue.len(),
+                "After copy"
+            );
+            if writer.index_writer.pending_entries() + writer.file_combiner.queue.len()
+                >= options.max_entries_per_hunk
+            {
+                writer.flush_group(monitor.clone()).await?;
+                assert_eq!(writer.index_writer.pending_entries(), 0);
+            }
+        } else {
+            // This entry was in the basis but not in the source.
+            let basis_entry = basis_entry.expect("Basis entry must exist if source entry is none");
+            trace!(apath = %basis_entry.apath(), "Deleted");
+            monitor.count(Counter::EntriesDeleted, 1);
+            options
+                .change_callback
+                .as_ref()
+                .map(|cb| cb(&EntryChange::deleted(&basis_entry)));
         }
-        writer.flush_group(monitor.clone())?;
     }
-    stats += writer.finish(monitor.clone())?;
+    stats += writer.finish(monitor.clone()).await?;
     stats.elapsed = start.elapsed();
     let block_stats = &archive.block_dir.stats;
     stats.read_blocks = block_stats.read_blocks.load(Relaxed);
@@ -143,67 +194,30 @@ pub fn backup(
 /// Accepts files to write in the archive (in apath order.)
 struct BackupWriter {
     band: Band,
-    index_builder: IndexWriter,
+    index_writer: IndexWriter,
     stats: BackupStats,
     block_dir: Arc<BlockDir>,
-
-    /// The index for the last stored band (and any stitched predecessors), used
-    /// as hints for whether newly stored files have changed.
-    basis_index: Peekable<Stitch>,
 
     file_combiner: FileCombiner,
 }
 
 impl BackupWriter {
-    /// Create a new BackupWriter.
-    ///
-    /// This currently makes a new top-level band.
-    pub fn begin(
-        archive: &Archive,
-        options: &BackupOptions,
-        monitor: Arc<dyn Monitor>,
-    ) -> Result<Self> {
-        if gc_lock::GarbageCollectionLock::is_locked(archive)? {
-            return Err(Error::GarbageCollectionLockHeld);
-        }
-        let basis_index = if let Some(basis_band_id) = archive.last_band_id()? {
-            Stitch::new(
-                archive,
-                basis_band_id,
-                Apath::root(),
-                Exclude::nothing(),
-                monitor,
-            )
-        } else {
-            Stitch::empty(archive, monitor)
-        }
-        .peekable();
-
-        // Create the new band only after finding the basis band!
-        let band = Band::create(archive)?;
-        let index_builder = band.index_builder();
-        Ok(BackupWriter {
-            band,
-            index_builder,
-            block_dir: archive.block_dir.clone(),
-            stats: BackupStats::default(),
-            basis_index,
-            file_combiner: FileCombiner::new(archive.block_dir.clone(), options.max_block_size),
-        })
-    }
-
-    fn finish(self, monitor: Arc<dyn Monitor>) -> Result<BackupStats> {
-        let hunks = self.index_builder.finish(monitor)?;
-        self.band.close(hunks as u64)?;
+    async fn finish(mut self, monitor: Arc<dyn Monitor>) -> Result<BackupStats> {
+        self.flush_group(monitor.clone()).await?;
+        let hunks = self.index_writer.finish().await?;
+        trace!(?hunks, "Closing band");
+        self.band.close(hunks as u64).await?;
         Ok(BackupStats { ..self.stats })
     }
 
     /// Write out any pending data blocks, and then the pending index entries.
-    fn flush_group(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
-        let (stats, mut entries) = self.file_combiner.drain(monitor.clone())?;
+    async fn flush_group(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
+        let (stats, mut entries) = self.file_combiner.drain(monitor.clone()).await?;
+        trace!("Got {} entries to write from file combiner", entries.len());
         self.stats += stats;
-        self.index_builder.append_entries(&mut entries);
-        self.index_builder.finish_hunk(monitor)
+        self.index_writer.append_entries(&mut entries);
+        self.index_writer.finish_hunk().await?;
+        Ok(())
     }
 
     /// Add one entry to the backup.
@@ -211,19 +225,32 @@ impl BackupWriter {
     /// Return an indication of whether it changed (if it's a file), or
     /// None for non-plain-file types where that information is not currently
     /// calculated.
-    fn copy_entry(
+    async fn copy_entry(
         &mut self,
-        entry: &EntryValue,
-        source: &SourceTree,
+        basis_entry: &Option<IndexEntry>,
+        mut source_entry: source::Entry,
+        source_tree: &SourceTree,
         options: &BackupOptions,
         monitor: Arc<dyn Monitor>,
     ) -> Result<Option<EntryChange>> {
+        if !options.owner {
+            source_entry.owner.clear();
+        }
         // TODO: Emit deletions for entries in the basis not present in the source,
         // probably by using Merge to read both trees in parallel.
-        match entry.kind() {
-            Kind::Dir => self.copy_dir(entry, monitor.as_ref()),
-            Kind::File => self.copy_file(entry, source, options, monitor.clone()),
-            Kind::Symlink => self.copy_symlink(entry, monitor.as_ref()),
+        match source_entry.kind() {
+            Kind::Dir => self.copy_dir(&source_entry, monitor.as_ref()),
+            Kind::File => {
+                self.copy_file(
+                    &source_entry,
+                    source_tree,
+                    basis_entry,
+                    options,
+                    monitor.clone(),
+                )
+                .await
+            }
+            Kind::Symlink => self.copy_symlink(&source_entry, monitor.as_ref()),
             Kind::Unknown => {
                 self.stats.unknown_kind += 1;
                 // TODO: Perhaps eventually we could backup and restore pipes,
@@ -236,68 +263,73 @@ impl BackupWriter {
 
     fn copy_dir(
         &mut self,
-        source_entry: &EntryValue,
+        source_entry: &source::Entry,
         monitor: &dyn Monitor,
     ) -> Result<Option<EntryChange>> {
         monitor.count(Counter::Dirs, 1);
         self.stats.directories += 1;
-        self.index_builder
+        self.index_writer
             .push_entry(IndexEntry::metadata_from(source_entry));
         Ok(None) // TODO: Emit the actual change.
     }
 
     /// Copy in the contents of a file from another tree.
-    fn copy_file(
+    async fn copy_file(
         &mut self,
-        source_entry: &EntryValue,
-        from_tree: &SourceTree,
+        source_entry: &source::Entry,
+        source_tree: &SourceTree,
+        basis_entry: &Option<IndexEntry>,
         options: &BackupOptions,
         monitor: Arc<dyn Monitor>,
     ) -> Result<Option<EntryChange>> {
         self.stats.files += 1;
         monitor.count(Counter::Files, 1);
         let apath = source_entry.apath();
-        let result = if let Some(basis_entry) = advance_to(&mut self.basis_index, apath) {
-            if content_heuristically_unchanged(source_entry, &basis_entry) {
-                if all_blocks_present(&basis_entry.addrs, &self.block_dir, &monitor) {
+        trace!(?apath, "Copying file");
+        let result = if let Some(basis_entry) = basis_entry {
+            if content_heuristically_unchanged(source_entry, basis_entry) {
+                if all_blocks_present(&basis_entry.addrs, &self.block_dir, &monitor).await {
                     self.stats.unmodified_files += 1;
                     let new_entry = IndexEntry {
                         addrs: basis_entry.addrs.clone(),
                         ..IndexEntry::metadata_from(source_entry)
                     };
-                    let change = if new_entry == basis_entry {
-                        EntryChange::unchanged(&basis_entry)
+                    let change = if new_entry == *basis_entry {
+                        EntryChange::unchanged(basis_entry)
                     } else {
                         trace!(%apath, "Content same, metadata changed");
-                        EntryChange::changed(&basis_entry, source_entry)
+                        EntryChange::changed(basis_entry, source_entry)
                     };
-                    self.index_builder.push_entry(new_entry);
+                    self.index_writer.push_entry(new_entry);
                     return Ok(Some(change));
                 } else {
                     warn!(%apath, "Some referenced blocks are missing or truncated; file will be stored again");
                     self.stats.modified_files += 1;
                     self.stats.replaced_damaged_blocks += 1;
-                    Some(EntryChange::changed(&basis_entry, source_entry))
+                    Some(EntryChange::changed(basis_entry, source_entry))
                 }
             } else {
                 self.stats.modified_files += 1;
-                Some(EntryChange::changed(&basis_entry, source_entry))
+                Some(EntryChange::changed(basis_entry, source_entry))
             }
         } else {
             self.stats.new_files += 1;
+            trace!("New file");
             Some(EntryChange::added(source_entry))
         };
         let size = source_entry.size().expect("source entry has a size");
         if size == 0 {
-            self.index_builder
+            self.index_writer
                 .push_entry(IndexEntry::metadata_from(source_entry));
             self.stats.empty_files += 1;
             monitor.count(Counter::EmptyFiles, 1);
         } else {
-            let mut source_file = from_tree.open_file(source_entry)?;
+            let mut source_file = source_tree.open_file(&source_entry.apath)?;
             if size <= options.small_file_cap {
+                trace!(%apath, "Combining small file");
                 self.file_combiner
-                    .push_file(source_entry, &mut source_file, monitor.clone())?;
+                    .push_file(source_entry, &mut source_file, monitor.clone())
+                    .await?;
                 monitor.count(Counter::SmallFiles, 1);
             } else {
                 let addrs = store_file_content(
@@ -307,8 +339,9 @@ impl BackupWriter {
                     &mut self.stats,
                     options.max_block_size,
                     monitor.clone(),
-                )?;
-                self.index_builder.push_entry(IndexEntry {
+                )
+                .await?;
+                self.index_writer.push_entry(IndexEntry {
                     addrs,
                     ..IndexEntry::metadata_from(source_entry)
                 });
@@ -319,59 +352,38 @@ impl BackupWriter {
 
     fn copy_symlink(
         &mut self,
-        source_entry: &EntryValue,
+        source_entry: &source::Entry,
         monitor: &dyn Monitor,
     ) -> Result<Option<EntryChange>> {
         monitor.count(Counter::Symlinks, 1);
         let target = source_entry.symlink_target();
         self.stats.symlinks += 1;
         assert!(target.is_some());
-        self.index_builder
+        self.index_writer
             .push_entry(IndexEntry::metadata_from(source_entry));
         // TODO: Emit the actual change.
         Ok(None)
     }
 }
 
-/// Return the entry for given apath, if it is present, otherwise None.
-/// It follows this will also return None at the end of the index.
-///
-/// After this is called, the iter has skipped forward to this apath,
-/// discarding entries for any earlier files. However, even if the apath
-/// is not present, other entries coming after it can still be read.
-// TODO: This could probably be dropped if we instead use Merge to
-// merge the basis index with the live tree...
-pub fn advance_to(iter: &mut Peekable<Stitch>, apath: &Apath) -> Option<IndexEntry> {
-    while let Some(cand) = iter.peek() {
-        match cand.apath.cmp(apath) {
-            Ordering::Less => {
-                let _ = iter.next();
-                continue;
-            }
-            Ordering::Equal => {
-                return Some(iter.next().unwrap());
-            }
-            Ordering::Greater => {
-                return None;
-            }
-        }
-    }
-    None
-}
-
-fn all_blocks_present(
+async fn all_blocks_present(
     addresses: &[Address],
     block_dir: &BlockDir,
     monitor: &Arc<dyn Monitor>,
 ) -> bool {
-    addresses
-        .iter()
-        .map(|addr| &addr.hash)
-        .unique()
-        .all(|hash| block_dir.contains(hash, monitor.clone()).unwrap_or(false))
+    for addr in addresses {
+        if !block_dir
+            .contains(&addr.hash, monitor.clone())
+            .await
+            .unwrap_or(false)
+        {
+            return false;
+        }
+    }
+    true
 }
 
-fn store_file_content(
+async fn store_file_content(
     apath: &Apath,
     from_file: &mut dyn Read,
     block_dir: &BlockDir,
@@ -393,7 +405,9 @@ fn store_file_content(
         let buffer = buffer.freeze();
         monitor.count(Counter::FileBytes, buffer.len());
         let len = buffer.len() as u64;
-        let hash = block_dir.store_or_deduplicate(buffer, stats, monitor.clone())?;
+        let hash = block_dir
+            .store_or_deduplicate(buffer, stats, monitor.clone())
+            .await?;
         addresses.push(Address {
             hash,
             start: 0,
@@ -463,8 +477,8 @@ impl FileCombiner {
 
     /// Flush any pending files, and return accumulated file entries and stats.
     /// The FileCombiner is then empty and ready for reuse.
-    fn drain(&mut self, monitor: Arc<dyn Monitor>) -> Result<(BackupStats, Vec<IndexEntry>)> {
-        self.flush(monitor)?;
+    async fn drain(&mut self, monitor: Arc<dyn Monitor>) -> Result<(BackupStats, Vec<IndexEntry>)> {
+        self.flush(monitor).await?;
         debug_assert!(self.queue.is_empty());
         debug_assert!(self.buf.is_empty());
         Ok((
@@ -479,16 +493,15 @@ impl FileCombiner {
     ///
     /// After this call the FileCombiner is empty and can be reused for more files into a new
     /// block.
-    fn flush(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
+    async fn flush(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
         if self.queue.is_empty() {
             debug_assert!(self.buf.is_empty());
             return Ok(());
         }
-        let hash = self.block_dir.store_or_deduplicate(
-            take(&mut self.buf).freeze(),
-            &mut self.stats,
-            monitor,
-        )?;
+        let hash = self
+            .block_dir
+            .store_or_deduplicate(take(&mut self.buf).freeze(), &mut self.stats, monitor)
+            .await?;
         self.stats.combined_blocks += 1;
         self.finished
             .extend(self.queue.drain(..).map(|qf| IndexEntry {
@@ -505,9 +518,9 @@ impl FileCombiner {
     /// Add the contents of a small file into this combiner.
     ///
     /// `entry` should be an IndexEntry that's complete apart from the block addresses.
-    fn push_file(
+    async fn push_file(
         &mut self,
-        entry: &EntryValue,
+        entry: &source::Entry,
         from_file: &mut dyn Read,
         monitor: Arc<dyn Monitor>,
     ) -> Result<()> {
@@ -549,7 +562,7 @@ impl FileCombiner {
         // TODO: This can overrun by one small file; it would be better to check
         // in advance and perhaps start a new combined block that it will fit inside.
         if self.buf.len() >= self.max_block_size {
-            self.flush(monitor)
+            self.flush(monitor).await
         } else {
             Ok(())
         }
@@ -650,5 +663,62 @@ impl fmt::Display for BackupStats {
         write_duration(w, "elapsed", self.elapsed)?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::sync::Mutex;
+
+    use assert_fs::prelude::*;
+    use assert_fs::TempDir;
+
+    use crate::monitor::test::TestMonitor;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn deleted_files_are_reported() {
+        // tracing_subscriber::fmt::init();
+
+        let archive = Archive::create_temp().await;
+        let src = TempDir::new().unwrap();
+        let monitor = TestMonitor::arc();
+
+        src.child("a").touch().unwrap();
+
+        backup(
+            &archive,
+            src.path(),
+            &backup::BackupOptions::default(),
+            monitor.clone(),
+        )
+        .await
+        .unwrap();
+
+        let changes = Arc::new(Mutex::new(Vec::new()));
+        let changes_clone = Arc::clone(&changes); // Clone to move into the closure below, which needs to be 'static
+        let options = BackupOptions {
+            change_callback: Some(Box::new(move |change| {
+                changes_clone.lock().unwrap().push(change.clone());
+                Ok(())
+            })),
+            ..BackupOptions::default()
+        };
+
+        std::fs::remove_file(src.child("a").path()).unwrap();
+        let stats2 = backup(&archive, src.path(), &options, monitor.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(stats2.files, 0);
+        assert_eq!(monitor.get_counter(Counter::EntriesDeleted), 1);
+        assert_eq!(
+            changes.lock().unwrap().len(),
+            1,
+            "should have seen a change for the deletion"
+        );
+        let change = &changes.lock().unwrap()[0];
+        assert_eq!(change.to_string(), "- /a");
     }
 }

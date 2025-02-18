@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -29,6 +29,20 @@ pub enum Kind {
     Unknown,
 }
 
+impl Kind {
+    pub fn is_file(&self) -> bool {
+        matches!(self, Kind::File)
+    }
+
+    pub fn is_dir(&self) -> bool {
+        matches!(self, Kind::Dir)
+    }
+
+    pub fn is_symlink(&self) -> bool {
+        matches!(self, Kind::Symlink)
+    }
+}
+
 impl From<FileType> for Kind {
     fn from(ft: FileType) -> Kind {
         if ft.is_file() {
@@ -40,5 +54,29 @@ impl From<FileType> for Kind {
         } else {
             Kind::Unknown
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn predicates() {
+        assert!(Kind::File.is_file());
+        assert!(!Kind::File.is_dir());
+        assert!(!Kind::File.is_symlink());
+
+        assert!(!Kind::Dir.is_file());
+        assert!(Kind::Dir.is_dir());
+        assert!(!Kind::Dir.is_symlink());
+
+        assert!(!Kind::Symlink.is_file());
+        assert!(!Kind::Symlink.is_dir());
+        assert!(Kind::Symlink.is_symlink());
+
+        assert!(!Kind::Unknown.is_file());
+        assert!(!Kind::Unknown.is_dir());
+        assert!(!Kind::Unknown.is_symlink());
     }
 }

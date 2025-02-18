@@ -23,12 +23,14 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::NamedTempFile;
 use assert_fs::TempDir;
+use conserve::test_fixtures::setup_incomplete_empty_band;
+use conserve::Archive;
 use indoc::indoc;
 use predicates::prelude::*;
 use serde_json::Deserializer;
 use url::Url;
 
-use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::test_fixtures::TreeFixture;
 
 fn run_conserve() -> Command {
     let mut command = Command::cargo_bin("conserve").expect("locate conserve binary");
@@ -36,8 +38,8 @@ fn run_conserve() -> Command {
     command
 }
 
-#[test]
-fn no_args() {
+#[tokio::test]
+async fn no_args() {
     // Run with no arguments, should fail with a usage message to stderr.
     run_conserve()
         .assert()
@@ -46,8 +48,8 @@ fn no_args() {
         .stderr(predicate::str::contains("Usage:"));
 }
 
-#[test]
-fn help() {
+#[tokio::test]
+async fn help() {
     run_conserve()
         .arg("--help")
         .assert()
@@ -59,8 +61,8 @@ fn help() {
         .stderr(predicate::str::is_empty());
 }
 
-#[test]
-fn clean_error_on_non_archive() {
+#[tokio::test]
+async fn clean_error_on_non_archive() {
     // Try to backup into a directory that is not an archive.
     let testdir = TempDir::new().unwrap();
     // TODO: Errors really should go to stderr not stdout.
@@ -75,8 +77,8 @@ fn clean_error_on_non_archive() {
         ));
 }
 
-#[test]
-fn basic_backup() {
+#[tokio::test]
+async fn basic_backup() {
     let testdir = TempDir::new().unwrap();
     let arch_dir = testdir.path().join("a");
 
@@ -296,8 +298,8 @@ fn basic_backup() {
     // TODO: Compare vs source tree.
 }
 
-#[test]
-fn empty_archive() {
+#[tokio::test]
+async fn empty_archive() {
     let tempdir = TempDir::new().unwrap();
     let adir = tempdir.path().join("archive");
     let restore_dir = TempDir::new().unwrap();
@@ -333,14 +335,14 @@ fn empty_archive() {
 /// Check behavior on an incomplete version.
 ///
 /// The `--incomplete` option is no longer needed.
-#[test]
-fn incomplete_version() {
-    let af = ScratchArchive::new();
-    af.setup_incomplete_empty_band();
+#[tokio::test]
+async fn incomplete_version() {
+    let af = Archive::create_temp().await;
+    setup_incomplete_empty_band(&af).await;
 
     run_conserve()
         .arg("versions")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success()
         .stderr(predicate::str::is_empty())
@@ -348,19 +350,23 @@ fn incomplete_version() {
         .stdout(predicate::str::contains("incomplete"));
 
     // ls succeeds on an incomplete band
-    run_conserve().arg("ls").arg(af.path()).assert().success();
+    run_conserve()
+        .arg("ls")
+        .arg(af.transport().local_path().unwrap())
+        .assert()
+        .success();
 
     // Cannot gc with an empty band.
     run_conserve()
         .arg("gc")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .failure()
         .stderr(predicate::str::contains("incomplete and may be in use"));
 }
 
-#[test]
-fn restore_only_subtree() {
+#[tokio::test]
+async fn restore_only_subtree() {
     let dest = TempDir::new().unwrap();
     run_conserve()
         .args([
@@ -382,8 +388,8 @@ fn restore_only_subtree() {
     dest.close().unwrap();
 }
 
-#[test]
-fn size_exclude() {
+#[tokio::test]
+async fn size_exclude() {
     let source = TreeFixture::new();
     source.create_file_with_contents("small", b"0123456789");
     source.create_file_with_contents("junk", b"01234567890123456789");

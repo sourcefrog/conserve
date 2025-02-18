@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Martin Pool.
+// Copyright 2020-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,18 +12,21 @@
 
 //! Access to an archive on the local filesystem.
 
-use std::fs::{create_dir, remove_dir_all, remove_file, File};
-use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{io, path};
 
+use async_trait::async_trait;
 use bytes::Bytes;
 use tempfile::TempDir;
-use tracing::{error, instrument, trace, warn};
+use tokio::sync::Semaphore;
+use tracing::{error, trace, warn};
 use url::Url;
 
 use super::{Error, ListDir, Metadata, Result, WriteMode};
+
+/// Avoid opening too many files at once.
+static FD_LIMIT: Semaphore = Semaphore::const_new(100);
 
 #[derive(Debug)]
 pub(super) struct Protocol {
@@ -68,35 +71,24 @@ impl Protocol {
     }
 }
 
+#[async_trait]
 impl super::Protocol for Protocol {
     fn url(&self) -> &Url {
         &self.url
     }
 
-    fn read(&self, relpath: &str) -> Result<Bytes> {
-        fn try_block(path: &Path) -> io::Result<Bytes> {
-            let mut file = File::open(path)?;
-            let estimated_len: usize = file
-                .metadata()?
-                .len()
-                .try_into()
-                .expect("File size fits in usize");
-            let mut out_buf = Vec::with_capacity(estimated_len);
-            let actual_len = file.read_to_end(&mut out_buf)?;
-            trace!("Read {actual_len} bytes");
-            out_buf.truncate(actual_len);
-            Ok(out_buf.into())
-        }
-        let path = &self.full_path(relpath);
-        try_block(path).map_err(|err| Error::io_error(path, err))
+    async fn read(&self, relpath: &str) -> Result<Bytes> {
+        let full_path = &self.full_path(relpath);
+        trace!(?relpath, "Read file");
+        tokio::fs::read(full_path)
+            .await
+            .map(Bytes::from)
+            .map_err(|err| Error::io_error(full_path, err))
     }
 
-    #[instrument(skip(self, content))]
-    fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
-        // TODO: Just write directly; remove if the write fails.
+    async fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
         let full_path = self.full_path(relpath);
-        let oops = |err| super::Error::io_error(&full_path, err);
-        let mut options = File::options();
+        let mut options = tokio::fs::OpenOptions::new();
         options.write(true);
         match write_mode {
             WriteMode::CreateNew => {
@@ -106,46 +98,34 @@ impl super::Protocol for Protocol {
                 options.create(true).truncate(true);
             }
         }
-        let mut file = options.open(&full_path).map_err(oops)?;
-        if let Err(err) = file.write_all(content) {
+        if let Err(err) = tokio::fs::write(&full_path, content).await {
             error!("Failed to write {full_path:?}: {err:?}");
-            drop(file);
-            if let Err(err2) = remove_file(&full_path) {
+            if let Err(err2) = tokio::fs::remove_file(&full_path).await {
                 error!("Failed to remove {full_path:?}: {err2:?}");
             }
-            return Err(oops(err));
+            Err(super::Error::io_error(&full_path, err))
+        } else {
+            trace!("Wrote {} bytes", content.len());
+            Ok(())
         }
-        trace!("Wrote {} bytes", content.len());
-        Ok(())
     }
 
-    fn list_dir(&self, relpath: &str) -> Result<ListDir> {
-        // Archives should never normally contain non-UTF-8 (or even non-ASCII) filenames, but
-        // let's pass them back as lossy UTF-8 so they can be reported at a higher level, for
-        // example during validation.
+    async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
+        let _permit = FD_LIMIT.acquire().await.expect("acquire permit");
         let path = self.full_path(relpath);
+        trace!("Listing {path:?}");
+        let mut listing = ListDir::default();
         let fail = |err| Error::io_error(&path, err);
-        let mut names = ListDir::default();
-        for dir_entry in path.read_dir().map_err(fail)? {
-            let dir_entry = dir_entry.map_err(fail)?;
-            if let Ok(name) = dir_entry.file_name().into_string() {
-                match dir_entry.file_type().map_err(fail)? {
-                    t if t.is_dir() => names.dirs.push(name),
-                    t if t.is_file() => names.files.push(name),
-                    _ => (),
-                }
-            } else {
-                // These should never normally exist in archive directories, so warn
-                // and continue.
-                warn!("Non-UTF-8 filename in archive {:?}", dir_entry.file_name());
-            }
+        let mut read_dir = tokio::fs::read_dir(&path).await.map_err(fail)?;
+        while let Some(dir_entry) = read_dir.next_entry().await.map_err(fail)? {
+            collect_tokio_dir_entry(&mut listing, dir_entry).await
         }
-        Ok(names)
+        Ok(listing)
     }
 
-    fn create_dir(&self, relpath: &str) -> Result<()> {
+    async fn create_dir(&self, relpath: &str) -> Result<()> {
         let path = self.full_path(relpath);
-        create_dir(&path).or_else(|err| {
+        tokio::fs::create_dir(&path).await.or_else(|err| {
             if err.kind() == io::ErrorKind::AlreadyExists {
                 Ok(())
             } else {
@@ -154,9 +134,11 @@ impl super::Protocol for Protocol {
         })
     }
 
-    fn metadata(&self, relpath: &str) -> Result<Metadata> {
+    async fn metadata(&self, relpath: &str) -> Result<Metadata> {
         let path = self.full_path(relpath);
-        let fsmeta = path.metadata().map_err(|err| Error::io_error(&path, err))?;
+        let fsmeta = tokio::fs::metadata(&path)
+            .await
+            .map_err(|err| Error::io_error(&path, err))?;
         let modified = fsmeta
             .modified()
             .map_err(|err| Error::io_error(&path, err))?
@@ -168,14 +150,18 @@ impl super::Protocol for Protocol {
         })
     }
 
-    fn remove_file(&self, relpath: &str) -> Result<()> {
+    async fn remove_file(&self, relpath: &str) -> Result<()> {
         let path = self.full_path(relpath);
-        remove_file(&path).map_err(|err| super::Error::io_error(&path, err))
+        tokio::fs::remove_file(&path)
+            .await
+            .map_err(|err| Error::io_error(&path, err))
     }
 
-    fn remove_dir_all(&self, relpath: &str) -> Result<()> {
+    async fn remove_dir_all(&self, relpath: &str) -> Result<()> {
         let path = self.full_path(relpath);
-        remove_dir_all(&path).map_err(|err| super::Error::io_error(&path, err))
+        tokio::fs::remove_dir_all(&path)
+            .await
+            .map_err(|err| Error::io_error(&path, err))
     }
 
     fn chdir(&self, relpath: &str) -> Arc<dyn super::Protocol> {
@@ -191,6 +177,18 @@ impl super::Protocol for Protocol {
     }
 }
 
+async fn collect_tokio_dir_entry(list_dir: &mut ListDir, dir_entry: tokio::fs::DirEntry) {
+    if let Ok(name) = dir_entry.file_name().into_string() {
+        match dir_entry.file_type().await {
+            Ok(t) if t.is_dir() => list_dir.dirs.push(name),
+            Ok(t) if t.is_file() => list_dir.files.push(name),
+            other => warn!("Unexpected file type in archive: {name:?}: {other:?}"),
+        }
+    } else {
+        warn!("Non-UTF-8 filename in archive {:?}", dir_entry.file_name());
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::error::Error;
@@ -200,14 +198,15 @@ mod test {
     use predicates::prelude::*;
     use pretty_assertions::assert_eq;
     use time::OffsetDateTime;
+    use tokio;
 
     use super::*;
     use crate::kind::Kind;
     use crate::transport::record::{Call, Verb};
     use crate::transport::{self, Transport};
 
-    #[test]
-    fn read_file() {
+    #[tokio::test]
+    async fn read_async() {
         let temp = assert_fs::TempDir::new().unwrap();
         let content: &str = "the ribs of the disaster";
         let filename = "poem.txt";
@@ -215,23 +214,33 @@ mod test {
         temp.child(filename).write_str(content).unwrap();
 
         let transport = Transport::local(temp.path()).enable_record();
-        let buf = transport.read(filename).unwrap();
-        assert_eq!(buf, content.as_bytes());
+
+        let bytes = transport.read(filename).await.unwrap();
+        assert_eq!(bytes, content.as_bytes());
+
+        let err = transport.read("nonexistent").await.unwrap_err();
+        assert!(err.is_not_found());
 
         let calls = transport.recorded_calls();
         dbg!(&calls);
-        assert_eq!(calls, [Call(Verb::Read, filename.into())]);
+        assert_eq!(
+            calls,
+            [
+                Call(Verb::Read, filename.into()),
+                Call(Verb::Read, "nonexistent".into())
+            ]
+        );
 
         temp.close().unwrap();
     }
 
-    #[test]
-    fn read_file_not_found() {
-        let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::local(temp.path());
+    #[tokio::test]
+    async fn read_file_not_found() {
+        let transport = Transport::temp().enable_record();
 
         let err = transport
             .read("nonexistent.json")
+            .await
             .expect_err("read_file should fail on nonexistent file");
 
         let message = err.to_string();
@@ -250,28 +259,44 @@ mod test {
         let source = err.source().expect("source");
         let io_source: &io::Error = source.downcast_ref().expect("io::Error");
         assert_eq!(io_source.kind(), io::ErrorKind::NotFound);
+
+        assert_eq!(
+            transport.recorded_calls(),
+            [Call(Verb::Read, "nonexistent.json".into())]
+        );
     }
 
-    #[test]
-    fn read_metadata() {
+    #[tokio::test]
+    async fn read_metadata() {
         let temp = assert_fs::TempDir::new().unwrap();
         let content: &str = "the ribs of the disaster";
         let filename = "poem.txt";
         temp.child(filename).write_str(content).unwrap();
 
-        let transport = Transport::local(temp.path());
+        let transport = Transport::local(temp.path()).enable_record();
 
-        let metadata = transport.metadata(filename).unwrap();
+        let metadata = transport.metadata(filename).await.unwrap();
         dbg!(&metadata);
 
         assert_eq!(metadata.len, 24);
         assert_eq!(metadata.kind, Kind::File);
         assert!(metadata.modified + Duration::from_secs(60) > OffsetDateTime::now_utc());
-        assert!(transport.metadata("nopoem").unwrap_err().is_not_found());
+        assert!(transport
+            .metadata("nopoem")
+            .await
+            .unwrap_err()
+            .is_not_found());
+        assert_eq!(
+            transport.recorded_calls(),
+            [
+                Call(Verb::Metadata, filename.into()),
+                Call(Verb::Metadata, "nopoem".into())
+            ]
+        );
     }
 
-    #[test]
-    fn list_directory() {
+    #[tokio::test]
+    async fn list_directory() {
         let temp = assert_fs::TempDir::new().unwrap();
         temp.child("root file").touch().unwrap();
         temp.child("subdir").create_dir_all().unwrap();
@@ -281,45 +306,54 @@ mod test {
             .unwrap();
 
         let transport = Transport::local(temp.path());
-        let root_list = transport.list_dir(".").unwrap();
+        let root_list = transport.list_dir(".").await.unwrap();
         assert_eq!(root_list.files, ["root file"]);
         assert_eq!(root_list.dirs, ["subdir"]);
 
-        assert!(transport.is_file("root file").unwrap());
-        assert!(!transport.is_file("nuh-uh").unwrap());
+        assert!(transport.is_file("root file").await.unwrap());
+        assert!(!transport.is_file("nuh-uh").await.unwrap());
 
-        let subdir_list = transport.list_dir("subdir").unwrap();
+        let subdir_list = transport.list_dir("subdir").await.unwrap();
         assert_eq!(subdir_list.files, ["subfile"]);
         assert_eq!(subdir_list.dirs, [""; 0]);
 
         temp.close().unwrap();
     }
 
-    #[test]
-    fn write_file() {
+    #[tokio::test]
+    async fn write_file() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
 
-        transport.create_dir("subdir").unwrap();
+        transport.create_dir("subdir").await.unwrap();
         transport
             .write(
                 "subdir/subfile",
                 b"Must I paint you a picture?",
                 WriteMode::CreateNew,
             )
+            .await
             .unwrap();
 
         temp.child("subdir").assert(predicate::path::is_dir());
         temp.child("subdir")
             .child("subfile")
             .assert("Must I paint you a picture?");
+        let dir_meta = transport.metadata("subdir").await.unwrap();
+        assert!(dir_meta.kind().is_dir());
+        assert!(!dir_meta.kind().is_file());
+        assert!(!dir_meta.kind().is_symlink());
+        let file_meta = transport.metadata("subdir/subfile").await.unwrap();
+        assert!(file_meta.kind().is_file());
+        assert!(!file_meta.kind().is_dir());
+        assert!(!file_meta.kind().is_symlink());
 
         temp.close().unwrap();
     }
 
     #[cfg(unix)]
-    #[test]
-    fn write_file_permission_denied() {
+    #[tokio::test]
+    async fn write_file_permission_denied() {
         use std::fs;
         use std::os::unix::prelude::PermissionsExt;
 
@@ -329,47 +363,60 @@ mod test {
         fs::set_permissions(temp.child("file").path(), fs::Permissions::from_mode(0o000))
             .expect("set_permissions");
 
-        let err = transport.read("file").unwrap_err();
+        let err = transport.read("file").await.unwrap_err();
         assert!(!err.is_not_found());
         assert_eq!(err.kind(), transport::ErrorKind::PermissionDenied);
     }
 
-    #[test]
-    fn write_file_can_overwrite() {
-        let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::local(temp.path());
+    #[tokio::test]
+    async fn write_file_can_overwrite() {
+        let transport = Transport::temp().enable_record();
         let filename = "filename";
         transport
             .write(filename, b"original content", WriteMode::Overwrite)
+            .await
             .expect("first write succeeds");
         transport
             .write(filename, b"new content", WriteMode::Overwrite)
+            .await
             .expect("write over existing file succeeds");
-        assert_eq!(transport.read(filename).unwrap().as_ref(), b"new content");
+        assert_eq!(
+            transport.read(filename).await.unwrap().as_ref(),
+            b"new content"
+        );
+        assert_eq!(
+            transport.recorded_calls(),
+            [
+                Call(Verb::Write, filename.into()),
+                Call(Verb::Write, filename.into()),
+                Call(Verb::Read, filename.into())
+            ]
+        );
     }
 
-    #[test]
-    fn create_existing_dir() {
+    #[tokio::test]
+    async fn create_existing_dir() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
 
-        transport.create_dir("aaa").unwrap();
-        transport.create_dir("aaa").unwrap();
-        transport.create_dir("aaa").unwrap();
+        transport.create_dir("aaa").await.unwrap();
+        transport.create_dir("aaa").await.unwrap();
+        transport.create_dir("aaa").await.unwrap();
+        assert!(transport.metadata("aaa").await.unwrap().kind().is_dir());
 
         temp.close().unwrap();
     }
 
-    #[test]
-    fn sub_transport() {
+    #[tokio::test]
+    async fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path()).enable_record();
 
-        transport.create_dir("aaa").unwrap();
-        transport.create_dir("aaa/bbb").unwrap();
+        transport.create_dir("aaa").await.unwrap();
+        transport.create_dir("aaa/bbb").await.unwrap();
 
         let sub_transport = transport.chdir("aaa");
-        let sub_list = sub_transport.list_dir("").unwrap();
+        let sub_list = sub_transport.list_dir("").await.unwrap();
 
         assert_eq!(sub_list.dirs, ["bbb"]);
         assert_eq!(sub_list.files, [""; 0]);
@@ -386,16 +433,16 @@ mod test {
         temp.close().unwrap();
     }
 
-    #[test]
-    fn remove_dir_all() {
+    #[tokio::test]
+    async fn remove_dir_all() {
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path()).enable_record();
 
-        transport.create_dir("aaa").unwrap();
-        transport.create_dir("aaa/bbb").unwrap();
-        transport.create_dir("aaa/bbb/ccc").unwrap();
+        transport.create_dir("aaa").await.unwrap();
+        transport.create_dir("aaa/bbb").await.unwrap();
+        transport.create_dir("aaa/bbb/ccc").await.unwrap();
 
-        transport.remove_dir_all("aaa").unwrap();
+        transport.remove_dir_all("aaa").await.unwrap();
 
         assert_eq!(
             *transport.recorded_calls().last().unwrap(),
@@ -403,8 +450,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn temp() {
+    #[tokio::test]
+    async fn temp() {
         let transport = Transport::temp();
         let path = transport.local_path().expect("local_path");
         assert!(path.is_dir());
@@ -412,19 +459,40 @@ mod test {
         // Make some files and directories
         transport
             .write("hey", b"hi there", WriteMode::CreateNew)
+            .await
             .unwrap();
-        transport.create_dir("subdir").unwrap();
+        transport.create_dir("subdir").await.unwrap();
         let t2 = transport.chdir("subdir");
         t2.write("subfile", b"subcontent", WriteMode::CreateNew)
+            .await
             .unwrap();
 
         // After dropping the first transport, the tempdir still exists
         drop(transport);
         assert!(path.is_dir());
-        assert!(t2.list_dir(".").is_ok());
+        assert!(t2.list_dir(".").await.is_ok());
 
         // After dropping both references, the tempdir is removed
         drop(t2);
         assert!(!path.is_dir());
+    }
+
+    #[tokio::test]
+    async fn list_dir_async() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        temp.child("root file").touch().unwrap();
+        temp.child("subdir").create_dir_all().unwrap();
+        temp.child("subdir")
+            .child("subfile")
+            .write_str("Morning coffee")
+            .unwrap();
+
+        let transport = Transport::local(temp.path());
+        let list_dir = transport.list_dir(".").await.unwrap();
+        assert_eq!(list_dir.files, ["root file"]);
+        assert_eq!(list_dir.dirs, ["subdir"]);
+
+        let failure = transport.list_dir("nonexistent").await.unwrap_err();
+        assert!(failure.is_not_found());
     }
 }

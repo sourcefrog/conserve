@@ -77,9 +77,9 @@ impl Transport {
     }
 
     /// Open a new transport from a string that might be a URL or local path.
-    pub fn new(s: &str) -> Result<Self> {
+    pub async fn new(s: &str) -> Result<Self> {
         if let Ok(url) = Url::parse(s) {
-            Transport::open_url(&url)
+            Transport::open_url(&url).await
         } else {
             Ok(Transport::local(Path::new(s)))
         }
@@ -107,7 +107,8 @@ impl Transport {
         }
     }
 
-    pub fn open_url(url: &Url) -> Result<Self> {
+    /// Open a Transport from a URL.
+    pub async fn open_url(url: &Url) -> Result<Self> {
         let protocol: Arc<dyn Protocol> = match url.scheme() {
             "file" => Arc::new(local::Protocol::new(
                 &url.to_file_path().expect("extract URL file path"),
@@ -118,10 +119,10 @@ impl Transport {
             }
 
             #[cfg(feature = "s3")]
-            "s3" => Arc::new(s3::Protocol::new(url)?),
+            "s3" => Arc::new(s3::Protocol::new(url).await?),
 
             #[cfg(feature = "sftp")]
-            "sftp" => Arc::new(sftp::Protocol::new(url)?),
+            "sftp" => Arc::new(sftp::Protocol::new(url).await?),
 
             _other => {
                 return Err(Error {
@@ -162,13 +163,14 @@ impl Transport {
         }
     }
 
-    /// Get one complete file into a caller-provided buffer.
+    /// Get one complete file.
     ///
-    /// Files in the archive are of bounded size, so it's OK to always read them entirely into
-    /// memory, and this is simple to support on all implementations.
-    pub fn read(&self, path: &str) -> Result<Bytes> {
+    /// Files in the archive are of bounded size, so it's OK to always read them
+    /// entirely into memory, and this is simple to support on all
+    /// implementations.
+    pub async fn read(&self, path: &str) -> Result<Bytes> {
         self.record(Verb::Read, path);
-        self.protocol.read(path)
+        self.protocol.read(path).await
     }
 
     /// List a directory, separating out file and subdirectory names.
@@ -176,14 +178,16 @@ impl Transport {
     /// Names are in the arbitrary order that they're returned from the transport.
     ///
     /// Any error during iteration causes overall failure.
-    pub fn list_dir(&self, relpath: &str) -> Result<ListDir> {
+    pub async fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         // TODO: Perhaps it'd be better to include sizes (and maybe mtimes) as many transports
         // might be able to provide this without extra work.
         self.record(Verb::ListDir, relpath);
-        self.protocol.list_dir(relpath)
+        self.protocol.list_dir_async(relpath).await
     }
 
     /// Make a new transport addressing a subdirectory.
+    ///
+    /// This can succeed even if the subdirectory does not exist yet.
     pub fn chdir(&self, relpath: &str) -> Self {
         let mut sub_path = self.sub_path.clone();
         if !relpath.is_empty() {
@@ -200,36 +204,37 @@ impl Transport {
         }
     }
 
-    pub fn write(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()> {
+    pub async fn write(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()> {
         self.record(Verb::Write, relpath);
-        self.protocol.write(relpath, content, mode)
+        self.protocol.write(relpath, content, mode).await
     }
 
-    pub fn create_dir(&self, relpath: &str) -> Result<()> {
+    pub async fn create_dir(&self, relpath: &str) -> Result<()> {
         self.record(Verb::CreateDir, relpath);
-        self.protocol.create_dir(relpath)
+        self.protocol.create_dir(relpath).await
     }
 
-    pub fn metadata(&self, relpath: &str) -> Result<Metadata> {
+    /// Return mtime, size, and other metadata about a file.
+    pub async fn metadata(&self, relpath: &str) -> Result<Metadata> {
         self.record(Verb::Metadata, relpath);
-        self.protocol.metadata(relpath)
+        self.protocol.metadata(relpath).await
     }
 
     /// Delete a file.
-    pub fn remove_file(&self, relpath: &str) -> Result<()> {
+    pub async fn remove_file(&self, relpath: &str) -> Result<()> {
         self.record(Verb::RemoveFile, relpath);
-        self.protocol.remove_file(relpath)
+        self.protocol.remove_file(relpath).await
     }
 
     /// Delete a directory and all its contents.
-    pub fn remove_dir_all(&self, relpath: &str) -> Result<()> {
+    pub async fn remove_dir_all(&self, relpath: &str) -> Result<()> {
         self.record(Verb::RemoveDirAll, relpath);
-        self.protocol.remove_dir_all(relpath)
+        self.protocol.remove_dir_all(relpath).await
     }
 
     /// Check if a regular file exists.
-    pub fn is_file(&self, path: &str) -> Result<bool> {
-        match self.metadata(path) {
+    pub async fn is_file(&self, path: &str) -> Result<bool> {
+        match self.metadata(path).await {
             Ok(metadata) => Ok(metadata.kind == Kind::File),
             Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
             Err(err) => Err(err),
@@ -240,8 +245,8 @@ impl Transport {
         self.protocol.url()
     }
 
-    #[allow(unused)]
-    fn local_path(&self) -> Option<PathBuf> {
+    /// If this is a local transport, return the path.
+    pub fn local_path(&self) -> Option<PathBuf> {
         self.protocol.local_path()
     }
 }
@@ -260,6 +265,7 @@ pub enum WriteMode {
     /// Create the file if it does not exist, or fail if it does.
     CreateNew,
 }
+
 /// A directory entry read from a transport.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DirEntry {
@@ -282,6 +288,12 @@ pub struct Metadata {
     pub modified: OffsetDateTime,
 }
 
+impl Metadata {
+    pub fn kind(&self) -> Kind {
+        self.kind
+    }
+}
+
 /// A list of all the files and directories in a directory.
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct ListDir {
@@ -294,6 +306,9 @@ type Result<T> = result::Result<T, Error>;
 #[cfg(test)]
 mod test {
     use std::path::Path;
+
+    use assert_fs::{prelude::*, TempDir};
+    use pretty_assertions::assert_eq;
 
     use super::Transport;
 
@@ -316,5 +331,15 @@ mod test {
             let re = Regex::new(r#"Transport\(file:///[A-Za-z]:/tmp/\)"#).unwrap();
             assert!(re.is_match(&dbg));
         }
+    }
+
+    #[tokio::test]
+    async fn local_list_dir_async() {
+        let temp = TempDir::new().unwrap();
+        let transport = Transport::local(temp.path());
+        temp.child("a").touch().unwrap();
+        let list = transport.list_dir(".").await.unwrap();
+        assert_eq!(list.files, ["a"]);
+        assert!(list.dirs.is_empty());
     }
 }

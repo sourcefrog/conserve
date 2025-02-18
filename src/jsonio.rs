@@ -13,7 +13,6 @@
 
 //! Read and write JSON files.
 
-use std::io;
 use std::path::PathBuf;
 
 use serde::de::DeserializeOwned;
@@ -22,12 +21,6 @@ use crate::transport::{self, Transport, WriteMode};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("IO error")]
-    Io {
-        #[from]
-        source: io::Error,
-    },
-
     #[error("JSON serialization error")]
     Json {
         source: serde_json::Error,
@@ -44,7 +37,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Write uncompressed json to a file on a Transport.
-pub(crate) fn write_json<T>(transport: &Transport, relpath: &str, obj: &T) -> Result<()>
+pub(crate) async fn write_json<T>(transport: &Transport, relpath: &str, obj: &T) -> Result<()>
 where
     T: serde::Serialize,
 {
@@ -55,17 +48,18 @@ where
     s.push('\n');
     transport
         .write(relpath, s.as_bytes(), WriteMode::CreateNew)
+        .await
         .map_err(Error::from)
 }
 
 /// Read and deserialize uncompressed json from a file on a Transport.
 ///
 /// Returns None if the file does not exist.
-pub(crate) fn read_json<T>(transport: &Transport, path: &str) -> Result<Option<T>>
+pub(crate) async fn read_json<T>(transport: &Transport, path: &str) -> Result<Option<T>>
 where
     T: DeserializeOwned,
 {
-    let bytes = match transport.read(path) {
+    let bytes = match transport.read(path).await {
         Ok(b) => b,
         Err(err) if err.is_not_found() => return Ok(None),
         Err(err) => return Err(err.into()),
@@ -92,8 +86,8 @@ mod tests {
         pub weather: String,
     }
 
-    #[test]
-    fn write_json_to_transport() {
+    #[tokio::test]
+    async fn write_json_to_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
         let entry = TestContents {
             id: 42,
@@ -102,7 +96,9 @@ mod tests {
         let filename = "test.json";
 
         let transport = Transport::local(temp.path());
-        super::write_json(&transport, filename, &entry).unwrap();
+        super::write_json(&transport, filename, &entry)
+            .await
+            .unwrap();
 
         let json_child = temp.child("test.json");
         json_child.assert(concat!(r#"{"id":42,"weather":"cold"}"#, "\n"));
@@ -110,8 +106,8 @@ mod tests {
         temp.close().unwrap();
     }
 
-    #[test]
-    fn read_json_from_transport() {
+    #[tokio::test]
+    async fn read_json_from_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
         temp.child("test.json")
             .write_str(r#"{"id": 42, "weather": "cold"}"#)
@@ -119,6 +115,7 @@ mod tests {
 
         let transport = Transport::local(temp.path());
         let content: TestContents = read_json(&transport, "test.json")
+            .await
             .expect("no error")
             .expect("file exists");
 

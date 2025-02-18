@@ -13,6 +13,9 @@
 
 //! A source tree on the filesystem.
 
+mod entry;
+pub use entry::Entry;
+
 use std::collections::vec_deque::VecDeque;
 use std::fs;
 use std::fs::File;
@@ -54,10 +57,9 @@ impl SourceTree {
     }
 
     /// Open a file inside the tree to read.
-    pub fn open_file(&self, entry: &EntryValue) -> Result<File> {
-        assert_eq!(entry.kind(), Kind::File);
-        let path = self.relative_path(&entry.apath);
-        fs::File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
+    pub fn open_file(&self, apath: &Apath) -> Result<File> {
+        let path = self.relative_path(apath);
+        File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
     }
 
     pub fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
@@ -89,7 +91,7 @@ fn entry_from_fs_metadata(
     apath: Apath,
     source_path: &Path,
     metadata: &fs::Metadata,
-) -> Result<EntryValue> {
+) -> Result<Entry> {
     let mtime = metadata
         .modified()
         .expect("Failed to get file mtime")
@@ -125,7 +127,7 @@ fn entry_from_fs_metadata(
     };
     let owner = Owner::from(metadata);
     let unix_mode = UnixMode::from(metadata.permissions());
-    Ok(EntryValue {
+    Ok(Entry {
         apath,
         mtime,
         kind_meta,
@@ -152,7 +154,7 @@ pub struct Iter {
 
     /// All entries that have been seen but not yet returned by the iterator, in the order they
     /// should be returned.
-    entry_deque: VecDeque<EntryValue>,
+    entry_deque: VecDeque<Entry>,
 
     /// Check that emitted paths are in the right order.
     check_order: apath::DebugCheckOrder,
@@ -170,7 +172,7 @@ impl Iter {
         let start_path = subtree.below(root_path);
         let start_metadata = fs::symlink_metadata(&start_path)?;
         // Preload iter to return the root and then recurse into it.
-        let entry_deque: VecDeque<EntryValue> = [entry_from_fs_metadata(
+        let entry_deque: VecDeque<Entry> = [entry_from_fs_metadata(
             subtree.clone(),
             &start_path,
             &start_metadata,
@@ -196,7 +198,7 @@ impl Iter {
     fn visit_next_directory(&mut self, parent_apath: &Apath) {
         self.stats.directories_visited += 1;
         // Tuples of (name, entry) so that we can sort children by name.
-        let mut children = Vec::<(String, EntryValue)>::new();
+        let mut children = Vec::<(String, Entry)>::new();
         let dir_path = parent_apath.below(&self.root_path);
         let dir_iter = match fs::read_dir(&dir_path) {
             Ok(i) => i,
@@ -309,9 +311,9 @@ impl Iter {
 // subdirectories are then visited, also in sorted order, before returning to
 // any higher-level directories.
 impl Iterator for Iter {
-    type Item = EntryValue;
+    type Item = Entry;
 
-    fn next(&mut self) -> Option<EntryValue> {
+    fn next(&mut self) -> Option<Entry> {
         loop {
             if let Some(entry) = self.entry_deque.pop_front() {
                 // Have already found some entries, so just return the first.
@@ -332,8 +334,10 @@ impl Iterator for Iter {
 
 #[cfg(test)]
 mod test {
+    use itertools::Itertools;
+
     use crate::monitor::test::TestMonitor;
-    use crate::test_fixtures::{entry_iter_to_apath_strings, TreeFixture};
+    use crate::test_fixtures::TreeFixture;
 
     use super::*;
 
@@ -354,11 +358,11 @@ mod test {
         tf.create_dir("jelly");
         tf.create_dir("jam/.etc");
         let lt = SourceTree::open(tf.path()).unwrap();
-        let result: Vec<EntryValue> = lt
+        let result: Vec<Entry> = lt
             .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
             .unwrap()
             .collect();
-        let names = entry_iter_to_apath_strings(&result);
+        let names: Vec<String> = result.iter().map(|e| e.apath().to_string()).collect();
         // First one is the root
         assert_eq!(
             names,
@@ -375,7 +379,7 @@ mod test {
 
         let repr = format!("{:?}", &result[6]);
         println!("{repr}");
-        assert!(repr.starts_with("EntryValue {"));
+        assert!(repr.starts_with("Entry {"));
         assert!(repr.contains("Apath(\"/jam/apricot\")"));
 
         // TODO: Somehow get the stats out of the iterator.
@@ -397,10 +401,11 @@ mod test {
         let exclude = Exclude::from_strings(["/**/fooo*", "/**/??[rs]", "/**/*bas"]).unwrap();
 
         let lt = SourceTree::open(tf.path()).unwrap();
-        let names = entry_iter_to_apath_strings(
-            lt.iter_entries(Apath::root(), exclude, TestMonitor::arc())
-                .unwrap(),
-        );
+        let names = lt
+            .iter_entries(Apath::root(), exclude, TestMonitor::arc())
+            .unwrap()
+            .map(|e| e.apath().to_string())
+            .collect_vec();
 
         // First one is the root
         assert_eq!(names, ["/", "/baz", "/baz/test"]);
@@ -418,10 +423,11 @@ mod test {
         tf.create_symlink("from", "to");
 
         let lt = SourceTree::open(tf.path()).unwrap();
-        let names = entry_iter_to_apath_strings(
-            lt.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
-                .unwrap(),
-        );
+        let names = lt
+            .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .unwrap()
+            .map(|e| e.apath().to_string())
+            .collect_vec();
 
         assert_eq!(names, ["/", "/from"]);
     }
@@ -437,10 +443,11 @@ mod test {
 
         let lt = SourceTree::open(tf.path()).unwrap();
 
-        let names = entry_iter_to_apath_strings(
-            lt.iter_entries("/subdir".into(), Exclude::nothing(), TestMonitor::arc())
-                .unwrap(),
-        );
+        let names = lt
+            .iter_entries("/subdir".into(), Exclude::nothing(), TestMonitor::arc())
+            .unwrap()
+            .map(|e| e.apath().to_string())
+            .collect_vec();
         assert_eq!(names, ["/subdir", "/subdir/a", "/subdir/b"]);
     }
 
@@ -453,10 +460,11 @@ mod test {
         cachedir::add_tag(cache_dir).unwrap();
 
         let lt = SourceTree::open(tf.path()).unwrap();
-        let names = entry_iter_to_apath_strings(
-            lt.iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
-                .unwrap(),
-        );
+        let names = lt
+            .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .unwrap()
+            .map(|e| e.apath().to_string())
+            .collect_vec();
         assert_eq!(names, ["/", "/a"]);
     }
 }

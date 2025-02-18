@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ use crate::transport::Transport;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
 use crate::jsonio::{read_json, write_json};
 use crate::misc::remove_item;
@@ -130,11 +130,11 @@ impl Band {
     /// Make a new band (and its on-disk directory).
     ///
     /// The Band gets the next id after those that already exist.
-    pub fn create(archive: &Archive) -> Result<Band> {
-        Band::create_with_flags(archive, flags::DEFAULT)
+    pub(crate) async fn create(archive: &Archive) -> Result<Band> {
+        Band::create_with_flags(archive, flags::DEFAULT).await
     }
 
-    pub fn create_with_flags(
+    async fn create_with_flags(
         archive: &Archive,
         format_flags: &[Cow<'static, str>],
     ) -> Result<Band> {
@@ -142,11 +142,13 @@ impl Band {
             .iter()
             .for_each(|f| assert!(flags::SUPPORTED.contains(&f.as_ref()), "unknown flag {f:?}"));
         let band_id = archive
-            .last_band_id()?
+            .last_band_id()
+            .await?
             .map_or_else(BandId::zero, |b| b.next_sibling());
+        trace!(?band_id, "Create band");
         let transport = archive.transport().chdir(&band_id.to_string());
-        transport.create_dir("")?;
-        transport.create_dir(INDEX_DIR)?;
+        transport.create_dir("").await?;
+        transport.create_dir(INDEX_DIR).await?;
         let band_format_version = if format_flags.is_empty() {
             Some("0.6.3".to_owned())
         } else {
@@ -157,7 +159,7 @@ impl Band {
             band_format_version,
             format_flags: format_flags.into(),
         };
-        write_json(&transport, BAND_HEAD_FILENAME, &head)?;
+        write_json(&transport, BAND_HEAD_FILENAME, &head).await?;
         Ok(Band {
             band_id,
             head,
@@ -166,7 +168,7 @@ impl Band {
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub fn close(&self, index_hunk_count: u64) -> Result<()> {
+    pub async fn close(&self, index_hunk_count: u64) -> Result<()> {
         write_json(
             &self.transport,
             BAND_TAIL_FILENAME,
@@ -175,14 +177,16 @@ impl Band {
                 index_hunk_count: Some(index_hunk_count),
             },
         )
+        .await
         .map_err(Error::from)
     }
 
     /// Open the band with the given id.
-    pub fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
+    pub async fn open(archive: &Archive, band_id: BandId) -> Result<Band> {
         let transport = archive.transport().chdir(&band_id.to_string());
-        let head: Head =
-            read_json(&transport, BAND_HEAD_FILENAME)?.ok_or(Error::BandHeadMissing { band_id })?;
+        let head: Head = read_json(&transport, BAND_HEAD_FILENAME)
+            .await?
+            .ok_or(Error::BandHeadMissing { band_id })?;
         if let Some(version) = &head.band_format_version {
             if !band_version_supported(version) {
                 return Err(Error::UnsupportedBandVersion {
@@ -216,11 +220,12 @@ impl Band {
     }
 
     /// Delete a band.
-    pub fn delete(archive: &Archive, band_id: BandId) -> Result<()> {
+    pub async fn delete(archive: &Archive, band_id: BandId) -> Result<()> {
         // TODO: Count how many files were deleted, and the total size?
         archive
             .transport()
             .remove_dir_all(&band_id.to_string())
+            .await
             .map_err(|err| {
                 if err.is_not_found() {
                     Error::BandNotFound { band_id }
@@ -230,9 +235,10 @@ impl Band {
             })
     }
 
-    pub fn is_closed(&self) -> Result<bool> {
+    pub async fn is_closed(&self) -> Result<bool> {
         self.transport
             .is_file(BAND_TAIL_FILENAME)
+            .await
             .map_err(Error::from)
     }
 
@@ -250,8 +256,8 @@ impl Band {
         &self.head.format_flags
     }
 
-    pub fn index_builder(&self) -> IndexWriter {
-        IndexWriter::new(self.transport.chdir(INDEX_DIR))
+    pub fn index_writer(&self, monitor: Arc<dyn Monitor>) -> IndexWriter {
+        IndexWriter::new(self.transport.chdir(INDEX_DIR), monitor)
     }
 
     /// Get read-only access to the index of this band.
@@ -260,8 +266,8 @@ impl Band {
     }
 
     /// Return info about the state of this band.
-    pub fn get_info(&self) -> Result<Info> {
-        let tail_option: Option<Tail> = read_json(&self.transport, BAND_TAIL_FILENAME)?;
+    pub async fn get_info(&self) -> Result<Info> {
+        let tail_option: Option<Tail> = read_json(&self.transport, BAND_TAIL_FILENAME).await?;
         let start_time =
             OffsetDateTime::from_unix_timestamp(self.head.start_time).map_err(|_| {
                 Error::InvalidMetadata {
@@ -287,8 +293,8 @@ impl Band {
         })
     }
 
-    pub fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
-        let ListDir { mut files, dirs } = self.transport.list_dir("")?;
+    pub async fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
+        let ListDir { mut files, dirs } = self.transport.list_dir("").await?;
         if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
             monitor.error(Error::BandHeadMissing {
                 band_id: self.band_id,
@@ -314,34 +320,37 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::test_fixtures::ScratchArchive;
+    use crate::monitor::test::TestMonitor;
 
     use super::*;
 
-    #[test]
-    fn create_and_reopen_band() {
-        let af = ScratchArchive::new();
-        let band = Band::create(&af).unwrap();
+    #[tokio::test]
+    async fn create_and_reopen_band() {
+        let archive = Archive::create_temp().await;
+        let band = Band::create(&archive).await.unwrap();
+        let archive_path = archive.transport().local_path().unwrap();
 
-        let band_dir = af.path().join("b0000");
+        let band_dir = archive_path.join("b0000");
         assert!(band_dir.is_dir());
 
         assert!(band_dir.join("BANDHEAD").is_file());
         assert!(!band_dir.join("BANDTAIL").exists());
         assert!(band_dir.join("i").is_dir());
 
-        assert!(!band.is_closed().unwrap());
+        assert!(!band.is_closed().await.unwrap());
 
-        band.close(0).unwrap();
+        band.close(0).await.unwrap();
         assert!(band_dir.join("BANDTAIL").is_file());
-        assert!(band.is_closed().unwrap());
+        assert!(band.is_closed().await.unwrap());
 
         let band_id = BandId::from_str("b0000").unwrap();
-        let band2 = Band::open(&af, band_id).expect("failed to re-open band");
-        assert!(band2.is_closed().unwrap());
+        let band2 = Band::open(&archive, band_id)
+            .await
+            .expect("failed to re-open band");
+        assert!(band2.is_closed().await.unwrap());
 
         // Try get_info
-        let info = band2.get_info().expect("get_info failed");
+        let info = band2.get_info().await.expect("get_info failed");
         assert_eq!(info.id.to_string(), "b0000");
         assert!(info.is_closed);
         assert_eq!(info.index_hunk_count, Some(0));
@@ -351,37 +360,110 @@ mod tests {
         assert!(dur < Duration::from_secs(5));
     }
 
-    #[test]
-    fn delete_band() {
-        let af = ScratchArchive::new();
-        let _band = Band::create(&af).unwrap();
-        assert!(af.transport().is_file("b0000/BANDHEAD").unwrap());
+    #[tokio::test]
+    async fn delete_band() {
+        let archive = Archive::create_temp().await;
+        let _band = Band::create(&archive).await.unwrap();
+        assert!(archive.transport().is_file("b0000/BANDHEAD").await.unwrap());
 
-        Band::delete(&af, BandId::new(&[0])).expect("delete band");
+        Band::delete(&archive, BandId::new(&[0]))
+            .await
+            .expect("delete band");
 
-        assert!(!af.transport().is_file("b0000").unwrap());
-        assert!(!af.transport().is_file("b0000/BANDHEAD").unwrap());
+        assert!(!archive.transport().is_file("b0000").await.unwrap());
+        assert!(!archive.transport().is_file("b0000/BANDHEAD").await.unwrap());
     }
 
-    #[test]
-    fn unsupported_band_version() {
-        let af = ScratchArchive::new();
-        fs::create_dir(af.path().join("b0000")).unwrap();
+    #[tokio::test]
+    async fn unsupported_band_version() {
+        let archive = Archive::create_temp().await;
+        let path = archive.transport().local_path().unwrap();
+        fs::create_dir(path.join("b0000")).unwrap();
         let head = json!({
             "start_time": 0,
             "band_format_version": "8888.8.8",
         });
         fs::write(
-            af.path().join("b0000").join(BAND_HEAD_FILENAME),
+            path.join("b0000").join(BAND_HEAD_FILENAME),
             head.to_string(),
         )
         .unwrap();
 
-        let e = Band::open(&af, BandId::zero());
+        let e = Band::open(&archive, BandId::zero()).await;
         let e_str = e.unwrap_err().to_string();
         assert!(
             e_str.contains("Unsupported band version \"8888.8.8\" in b0000"),
             "bad band version: {e_str:#?}"
         );
+    }
+
+    #[tokio::test]
+    async fn create_bands() {
+        let archive = Archive::create_temp().await;
+        assert!(archive.transport().local_path().unwrap().join("d").is_dir());
+
+        // Make one band
+        let _band1 = Band::create(&archive).await.unwrap();
+        let band_path = archive.transport().local_path().unwrap().join("b0000");
+        assert!(band_path.is_dir());
+        assert!(band_path.join("BANDHEAD").is_file());
+        assert!(band_path.join("i").is_dir());
+
+        assert_eq!(
+            archive.list_band_ids().await.unwrap(),
+            vec![BandId::new(&[0])]
+        );
+        assert_eq!(
+            archive.last_band_id().await.unwrap(),
+            Some(BandId::new(&[0]))
+        );
+
+        // Try creating a second band.
+        let _band2 = Band::create(&archive).await.unwrap();
+        assert_eq!(
+            archive.list_band_ids().await.unwrap(),
+            vec![BandId::new(&[0]), BandId::new(&[1])]
+        );
+        assert_eq!(
+            archive.last_band_id().await.unwrap(),
+            Some(BandId::new(&[1]))
+        );
+
+        assert_eq!(
+            archive
+                .referenced_blocks(&archive.list_band_ids().await.unwrap(), TestMonitor::arc())
+                .await
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(
+            archive.all_blocks(TestMonitor::arc()).await.unwrap().len(),
+            0
+        );
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "unknown flag \"wibble\"")]
+    async fn unknown_format_flag_panics_in_create() {
+        let archive = Archive::create_temp().await;
+        let _ = Band::create_with_flags(&archive, &["wibble".into()]).await;
+        // This panics because there is no way to create a band with an unsupported flag from the CLI or API.
+    }
+
+    #[tokio::test]
+    async fn default_format_flags_are_empty() {
+        let archive = Archive::create_temp().await;
+
+        let orig_band = Band::create(&archive).await.unwrap();
+        let flags = orig_band.format_flags();
+        assert!(flags.is_empty(), "{flags:?}");
+
+        let band = Band::open(&archive, orig_band.id()).await.unwrap();
+        println!("{band:?}");
+        assert!(band.format_flags().is_empty());
+
+        assert_eq!(band.band_format_version(), Some("0.6.3"));
+        // TODO: When we do support some flags, check that the minimum version is 23.2.
     }
 }
