@@ -24,7 +24,7 @@ pub(super) trait Protocol: std::fmt::Debug + Send + Sync {
     /// As much as possible, the file should be written atomically so that it is only visible with
     /// the complete content.
     async fn write(&self, relpath: &str, content: &[u8], mode: WriteMode) -> Result<()>;
-    async fn list_dir_async(&self, relpath: &str) -> Result<ListDir>;
+    async fn list_dir(&self, relpath: &str) -> Result<ListDir>;
     async fn create_dir(&self, relpath: &str) -> Result<()>;
 
     /// Get metadata about a file.

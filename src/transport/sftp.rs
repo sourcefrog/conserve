@@ -5,7 +5,7 @@
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -19,6 +19,8 @@ use url::Url;
 use crate::Kind;
 
 use super::{Error, ErrorKind, ListDir, Result, WriteMode};
+
+type SftpResult<T> = std::result::Result<T, ssh2::Error>;
 
 pub(super) struct Protocol {
     url: Url,
@@ -86,82 +88,112 @@ impl Protocol {
         })
     }
 
-    fn lstat(&self, path: &str) -> Result<ssh2::FileStat> {
-        trace!("lstat {path}");
-        self.sftp
-            .lstat(&self.base_path.join(path))
-            .map_err(|err| self.ssh_error(err, path))
+    /// Call a blocking function, providing the Sftp object.
+    async fn call_sftp<F, R>(&self, func: F, relpath: &str) -> Result<R>
+    where
+        F: FnOnce(&ssh2::Sftp, &Path) -> SftpResult<R> + Send + Sync + 'static,
+        R: Send + Sync + 'static,
+    {
+        let url = self.url.join(relpath).unwrap();
+        self.call_blocking(
+            move |sftp, path| func(sftp, path).map_err(|err| ssh_error(err, &url)),
+            relpath,
+        )
+        .await
+    }
+
+    /// Call a blocking function, providing the Sftp object.
+    ///
+    /// Similar but returning a Transport error.
+    async fn call_blocking<F, R>(&self, func: F, relpath: &str) -> Result<R>
+    where
+        F: FnOnce(&ssh2::Sftp, &Path) -> Result<R> + Send + Sync + 'static,
+        R: Send + Sync + 'static,
+    {
+        // TODO: Lock a mutex
+        let sftp = Arc::clone(&self.sftp);
+        let full_path = self.base_path.join(relpath);
+        spawn_blocking(move || func(&sftp, &full_path)).await?
+    }
+
+    async fn lstat(&self, path: &str) -> Result<ssh2::FileStat> {
+        trace!(?path, "lstat");
+        self.call_sftp(|sftp, path| sftp.lstat(path), path).await
     }
 
     fn join_url(&self, path: &str) -> Url {
         self.url.join(path).expect("join URL")
     }
-
-    fn ssh_error(&self, source: ssh2::Error, path: &str) -> Error {
-        ssh_error(source, &self.join_url(path))
-    }
 }
 
 #[async_trait]
 impl super::Protocol for Protocol {
-    async fn list_dir_async(&self, path: &str) -> Result<ListDir> {
-        let sftp = self.sftp.clone();
-        let url = self.join_url(path);
-        let full_path = self.base_path.join(path);
-        list_dir_async(sftp, full_path, url).await
+    async fn list_dir(&self, path: &str) -> Result<ListDir> {
+        trace!(?path, "list_dir");
+        self.call_sftp(list_dir, path).await
     }
 
     async fn read(&self, path: &str) -> Result<Bytes> {
-        let full_path = self.base_path.join(path);
-        let url = &self.url.join(path).expect("join URL");
-        trace!("read {url}");
-        let mut buf = Vec::with_capacity(2 << 20);
-        let mut file = self
-            .sftp
-            .open(&full_path)
-            .map_err(|err| self.ssh_error(err, path))?;
-        let len = file
-            .read_to_end(&mut buf)
-            .map_err(|err| io_error(err, url))?;
-        assert_eq!(len, buf.len());
-        trace!("read {} bytes from {}", len, full_path.display());
-        Ok(buf.into())
+        trace!(?path, "read");
+        let url = self.url.join(path).expect("join URL");
+        self.call_blocking(
+            move |sftp, full_path| -> Result<Bytes> {
+                let mut file = sftp.open(full_path).map_err(|err| Error {
+                    kind: err.code().into(),
+                    url: Some(url.clone()),
+                    source: Some(err.into()),
+                })?;
+                let mut buf = Vec::new();
+                let len = file
+                    .read_to_end(&mut buf)
+                    .map_err(|err| io_error(err, &url))?;
+                debug_assert_eq!(len, buf.len());
+                trace!("read {} bytes from {}", len, full_path.display());
+                Ok(buf.into())
+            },
+            path,
+        )
+        .await
     }
 
     async fn create_dir(&self, relpath: &str) -> Result<()> {
         let full_path = self.base_path.join(relpath);
-        trace!("create_dir {:?}", full_path);
-        let sftp = Arc::clone(&self.sftp);
-        match spawn_blocking(move || sftp.mkdir(&full_path, 0o700))
-            .await
-            .expect("spawn_blocking")
-        {
-            Ok(()) => Ok(()),
-            Err(err) if err.code() == ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_FAILURE) => {
-                // openssh seems to say failure for "directory exists" :/
-                Ok(())
-            }
-            Err(err) => {
-                warn!(?err, ?relpath);
-                Err(self.ssh_error(err, relpath))
-            }
-        }
+        trace!(?full_path, "create_dir");
+        self.call_sftp(
+            |sftp, full_path| {
+                match sftp.mkdir(full_path, 0o700) {
+                    Err(err)
+                        if err.code() == ssh2::ErrorCode::SFTP(libssh2_sys::LIBSSH2_FX_FAILURE) =>
+                    {
+                        // openssh seems to say failure for "directory exists" :/
+                        Ok(())
+                    }
+                    Ok(()) => Ok(()),
+                    Err(err) => {
+                        warn!(?err, ?full_path, "mkdir failed");
+                        Err(err)
+                    }
+                }
+            },
+            relpath,
+        )
+        .await
     }
 
     async fn write(&self, relpath: &str, content: &[u8], write_mode: WriteMode) -> Result<()> {
-        let fullpath = self.base_path.join(relpath);
-        let url = self.url.join(relpath).unwrap();
         let content = Bytes::from(content.to_vec()); // TODO: Take Bytes as an arg.
-        let sftp = Arc::clone(&self.sftp);
-        spawn_blocking(move || sync_write(sftp, fullpath, url, content, write_mode))
-            .await
-            .unwrap()
+        let url = self.join_url(relpath);
+        self.call_blocking(
+            move |sftp, full_path| sync_write(sftp, full_path, url, content, write_mode),
+            relpath,
+        )
+        .await
     }
 
     async fn metadata(&self, relpath: &str) -> Result<super::Metadata> {
         let full_path = self.base_path.join(relpath);
-        let stat = self.lstat(relpath)?;
         trace!("metadata {full_path:?}");
+        let stat = self.lstat(relpath).await?;
         let modified = stat.mtime.ok_or_else(|| {
             warn!("No mtime for {full_path:?}");
             super::Error {
@@ -188,11 +220,8 @@ impl super::Protocol for Protocol {
     async fn remove_file(&self, relpath: &str) -> Result<()> {
         let full_path = self.base_path.join(relpath);
         trace!("remove_file {full_path:?}");
-        let sftp = Arc::clone(&self.sftp);
-        spawn_blocking(move || sftp.unlink(&full_path))
+        self.call_sftp(move |sftp, full_path| sftp.unlink(full_path), relpath)
             .await
-            .unwrap()
-            .map_err(|err| self.ssh_error(err, relpath))
     }
 
     async fn remove_dir_all(&self, path: &str) -> Result<()> {
@@ -200,7 +229,7 @@ impl super::Protocol for Protocol {
         let mut dirs_to_delete = vec![path.to_owned()];
         while let Some(dir) = dirs_to_walk.pop() {
             trace!(?dir, "Walk down dir");
-            let list = self.list_dir_async(path).await?;
+            let list = self.list_dir(path).await?;
             for file in list.files {
                 self.remove_file(&format!("{dir}/{file}")).await?;
             }
@@ -214,13 +243,9 @@ impl super::Protocol for Protocol {
         }
         // Consume them in the reverse order discovered, so bottom up
         for dir in dirs_to_delete.iter().rev() {
-            let full_path = self.base_path.join(dir);
-            let sftp = Arc::clone(&self.sftp);
             trace!(?dir, "rmdir");
-            spawn_blocking(move || sftp.rmdir(&full_path))
-                .await
-                .unwrap()
-                .map_err(|err| self.ssh_error(err, dir))?;
+            self.call_sftp(|sftp, full_path| sftp.rmdir(full_path), dir)
+                .await?;
         }
         Ok(())
     }
@@ -290,17 +315,10 @@ fn io_error(source: io::Error, url: &Url) -> Error {
     }
 }
 
-async fn list_dir_async(sftp: Arc<ssh2::Sftp>, full_path: PathBuf, url: Url) -> Result<ListDir> {
-    spawn_blocking(|| list_dir(sftp, full_path, url))
-        .await
-        .unwrap()
-}
-
-fn list_dir(sftp: Arc<ssh2::Sftp>, full_path: PathBuf, url: Url) -> Result<ListDir> {
+fn list_dir(sftp: &Sftp, full_path: &Path) -> SftpResult<ListDir> {
     trace!(?full_path, "list_dir");
-    let mut dir = sftp.opendir(&full_path).map_err(|err| {
+    let mut dir = sftp.opendir(full_path).inspect_err(|err| {
         error!(?err, ?full_path, "Error opening directory");
-        ssh_error(err, &url)
     })?;
     let mut files = Vec::new();
     let mut dirs = Vec::new();
@@ -327,7 +345,7 @@ fn list_dir(sftp: Arc<ssh2::Sftp>, full_path: PathBuf, url: Url) -> Result<ListD
             }
             Err(err) => {
                 info!("SFTP error {err:?}");
-                return Err(ssh_error(err, &url));
+                return Err(err);
             }
         }
     }
@@ -335,8 +353,8 @@ fn list_dir(sftp: Arc<ssh2::Sftp>, full_path: PathBuf, url: Url) -> Result<ListD
 }
 
 fn sync_write(
-    sftp: Arc<Sftp>,
-    full_path: PathBuf,
+    sftp: &Sftp,
+    full_path: &Path,
     url: Url,
     content: Bytes,
     write_mode: WriteMode,

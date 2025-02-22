@@ -177,7 +177,7 @@ impl Transport {
         // TODO: Perhaps it'd be better to include sizes (and maybe mtimes) as many transports
         // might be able to provide this without extra work.
         self.record(Verb::ListDir, relpath);
-        self.protocol.list_dir_async(relpath).await
+        self.protocol.list_dir(relpath).await
     }
 
     /// Make a new transport addressing a subdirectory.

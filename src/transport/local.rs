@@ -110,7 +110,7 @@ impl super::Protocol for Protocol {
         }
     }
 
-    async fn list_dir_async(&self, relpath: &str) -> Result<ListDir> {
+    async fn list_dir(&self, relpath: &str) -> Result<ListDir> {
         let _permit = FD_LIMIT.acquire().await.expect("acquire permit");
         let path = self.full_path(relpath);
         trace!("Listing {path:?}");
