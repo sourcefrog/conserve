@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2017-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -45,6 +45,11 @@ pub struct GarbageCollectionLock {
     /// Last band id present when the guard was created. May be None if
     /// there are no bands.
     band_id: Option<BandId>,
+
+    /// Is the lock actually held?
+    ///
+    /// Present so that we can avoid dropping it a second time from Drop.
+    held: bool,
 }
 
 /// Lock on an archive for gc, that excludes backups and gc by other processes.
@@ -70,7 +75,11 @@ impl GarbageCollectionLock {
             .transport()
             .write(GC_LOCK, b"{}\n", WriteMode::CreateNew)
             .await?;
-        Ok(GarbageCollectionLock { archive, band_id })
+        Ok(GarbageCollectionLock {
+            archive,
+            band_id,
+            held: true,
+        })
     }
 
     /// Take a lock on an archive, breaking any existing gc lock.
@@ -107,7 +116,7 @@ impl GarbageCollectionLock {
     /// Explicitly release the lock.
     ///
     /// Awaiting the future will ensure that the lock is released.
-    pub async fn release(self) -> Result<()> {
+    pub async fn release(mut self) -> Result<()> {
         trace!("Releasing GC lock");
         self.archive
             .transport()
@@ -116,7 +125,9 @@ impl GarbageCollectionLock {
             .map_err(|err| {
                 error!(?err, "Failed to delete GC lock");
                 Error::from(err)
-            })
+            })?;
+        self.held = false;
+        Ok(())
     }
 }
 
@@ -124,6 +135,10 @@ impl Drop for GarbageCollectionLock {
     fn drop(&mut self) {
         // The lock will, hopefully, be deleted soon after the lock is dropped,
         // and before the process exits.
+        if !self.held {
+            return;
+        }
+        trace!("Releasing GC lock from Drop");
         let transport = self.archive.transport().clone();
         tokio::task::spawn(async move {
             transport.remove_file(GC_LOCK).await.inspect_err(|err| {
