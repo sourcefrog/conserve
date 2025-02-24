@@ -22,12 +22,18 @@ use super::{Error, ErrorKind, ListDir, Result, WriteMode};
 
 type SftpResult<T> = std::result::Result<T, ssh2::Error>;
 
+// This object wraps the Rust wrapper for the C SFTP client.
+//
+// Calls into libssh2 are wrapped in blocking tasks. Calls can block for either of
+// two reasons:
+//
+// 1. They're blocking network calls, waiting for data to or from the server.
+// 2. They're waiting for the mutex that allows only one call to be in flight at a time.
+
 pub(super) struct Protocol {
     url: Url,
-    // TODO: Maybe use a Tokio Mutex here, so that threads don't get hung up on the mutex inside
-    // the C library.
-    //
-    // TODO: In fact perhaps have a pool of connections to get more parallelism?
+    // TODO: Perhaps have a pool of lazily-opened connections to get more parallelism?
+    /// The wrapped C SFTP client.
     sftp: Arc<Sftp>,
     base_path: PathBuf,
 }
@@ -88,7 +94,7 @@ impl Protocol {
         })
     }
 
-    /// Call a blocking function, providing the Sftp object.
+    /// Call a blocking function, providing the Sftp object, and mapping errors to Transport errors.
     async fn call_sftp<F, R>(&self, func: F, relpath: &str) -> Result<R>
     where
         F: FnOnce(&ssh2::Sftp, &Path) -> SftpResult<R> + Send + Sync + 'static,
@@ -104,13 +110,13 @@ impl Protocol {
 
     /// Call a blocking function, providing the Sftp object.
     ///
-    /// Similar but returning a Transport error.
+    /// This is similar to `call_sftp`, but takes a closure returning a
+    /// Transport error.
     async fn call_blocking<F, R>(&self, func: F, relpath: &str) -> Result<R>
     where
         F: FnOnce(&ssh2::Sftp, &Path) -> Result<R> + Send + Sync + 'static,
         R: Send + Sync + 'static,
     {
-        // TODO: Lock a mutex
         let sftp = Arc::clone(&self.sftp);
         let full_path = self.base_path.join(relpath);
         spawn_blocking(move || func(&sftp, &full_path)).await?
