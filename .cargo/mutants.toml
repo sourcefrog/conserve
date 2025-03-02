@@ -5,6 +5,8 @@ exclude_re = [
     "<impl Display",
     # spins forever returning empty vecs
     "replace <impl Iterator for IterStitchedIndexHunks>::next -> Option<Self::Item> with Some\\(Default::default\\(\\)\\)",
+    # finds some real lacking coverage of error handling: https://github.com/sourcefrog/conserve/issues/286
+    "src/blockdir.rs:.*: replace match guard"
 ]
 
 # Include only files that are currently well-tested; most of the others should

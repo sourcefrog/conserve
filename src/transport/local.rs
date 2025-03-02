@@ -294,7 +294,7 @@ mod test {
 
         temp.close().unwrap();
     }
-    
+
     #[cfg(unix)]
     #[test]
     fn list_dir_skips_symlinks() {
@@ -303,7 +303,7 @@ mod test {
         let transport = Transport::temp();
         let dir = transport.local_path().unwrap();
         std::os::unix::fs::symlink("foo", dir.join("alink")).unwrap();
-        
+
         let list_dir = transport.list_dir(".").unwrap();
         assert_eq!(list_dir.files, [""; 0]);
         assert_eq!(list_dir.dirs, [""; 0]);
