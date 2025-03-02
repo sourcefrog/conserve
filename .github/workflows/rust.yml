@@ -63,8 +63,9 @@ jobs:
         run: cargo build --all-targets --all-features
       - name: rustfmt check
         run: cargo fmt --all -- --check
-      - name: clippy
-        run: cargo clippy --all-targets --all-features -- --deny clippy::all
+      # Don't run clippy because it's too prone to breaking when new lints are introduced.
+      # - name: clippy
+      #   run: cargo clippy --all-targets --all-features -- --deny clippy::all
       - run: cargo check --no-default-features --all-targets
       - name: typos
         uses: crate-ci/typos@master
@@ -92,12 +93,10 @@ jobs:
       - name: Build
         run: cargo build --all-targets --features fail/failpoints
       - name: Test (without mount)
-        run:
-          cargo test --features fail/failpoints -- --skip mount
+        run: cargo test --features fail/failpoints -- --skip mount
           --include-ignored
       - name: Test (mount)
-        run:
-          cargo test --features fail/failpoints --test mount --
+        run: cargo test --features fail/failpoints --test mount --
           --include-ignored
         env:
           # Running multiple instances in parallel might cause a crash on low-end environments
