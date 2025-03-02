@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Martin Pool.
+// Copyright 2020-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -293,6 +293,20 @@ mod test {
         assert_eq!(subdir_list.dirs, [""; 0]);
 
         temp.close().unwrap();
+    }
+    
+    #[cfg(unix)]
+    #[test]
+    fn list_dir_skips_symlinks() {
+        // Archives aren't expected to contain symlinks and so list_dir just skips them.
+
+        let transport = Transport::temp();
+        let dir = transport.local_path().unwrap();
+        std::os::unix::fs::symlink("foo", dir.join("alink")).unwrap();
+        
+        let list_dir = transport.list_dir(".").unwrap();
+        assert_eq!(list_dir.files, [""; 0]);
+        assert_eq!(list_dir.dirs, [""; 0]);
     }
 
     #[test]
