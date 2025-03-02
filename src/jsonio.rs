@@ -132,4 +132,12 @@ mod tests {
 
         temp.close().unwrap();
     }
+
+    #[test]
+    fn read_json_is_none_for_nonexistent_files() {
+        let transport = Transport::temp();
+        assert!(read_json::<TestContents>(&transport, "nonexistent.json")
+            .expect("No error for nonexistent file")
+            .is_none());
+    }
 }
