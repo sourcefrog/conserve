@@ -240,8 +240,8 @@ impl Transport {
         self.protocol.url()
     }
 
-    #[allow(unused)]
-    fn local_path(&self) -> Option<PathBuf> {
+    #[allow(unused)] // exposed for testing
+    pub fn local_path(&self) -> Option<PathBuf> {
         self.protocol.local_path()
     }
 }

@@ -133,6 +133,20 @@ mod tests {
         temp.close().unwrap();
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn read_json_error_when_permission_denied() -> Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+        let transport = Transport::temp();
+        let f = std::fs::File::create(transport.local_path().unwrap().join("file"))?;
+        let metadata = f.metadata()?;
+        let mut perms = metadata.permissions();
+        perms.set_mode(0);
+        f.set_permissions(perms)?;
+        read_json::<TestContents>(&transport, "file").expect_err("Read file with access denied");
+        Ok(())
+    }
+
     #[test]
     fn read_json_is_none_for_nonexistent_files() {
         let transport = Transport::temp();
