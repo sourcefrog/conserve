@@ -145,7 +145,7 @@ mod tests {
         let f = std::fs::File::create(transport.local_path().unwrap().join("file"))?;
         let metadata = f.metadata()?;
         let mut perms = metadata.permissions();
-        perms.set_mode(0);
+        perms.set_mode(0o0);
         f.set_permissions(perms)?;
         read_json::<TestContents>(&transport, "file")
             .await
