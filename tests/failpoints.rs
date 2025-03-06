@@ -22,20 +22,29 @@ use fail::FailScenario;
 use crate::transport::Transport;
 use conserve::*;
 
-#[test]
-fn create_dir_permission_denied() {
+#[tokio::test]
+async fn create_dir_permission_denied() {
     let scenario = FailScenario::setup();
     fail::cfg("restore::create-dir", "return").unwrap();
     let archive = Archive::open(Transport::local(Path::new(
         "testdata/archive/simple/v0.6.10",
     )))
+    .await
     .unwrap();
-    let options = RestoreOptions {
+
+    let restore_options = RestoreOptions {
         ..RestoreOptions::default()
     };
     let restore_tmp = TempDir::new().unwrap();
     let monitor = TestMonitor::arc();
-    let stats = restore(&archive, restore_tmp.path(), &options, monitor.clone()).expect("Restore");
+    let stats = restore(
+        &archive,
+        restore_tmp.path(),
+        restore_options,
+        monitor.clone(),
+    )
+    .await
+    .expect("Restore");
     dbg!(&stats);
     let errors = monitor.take_errors();
     dbg!(&errors);
