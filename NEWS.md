@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-- Changed: S3 is no longer built by default, because it adds many dependencies. It can be turned on again with `--features s3`.
-
 - New: `conserve mount ARCHIVE` gives readonly access to all the history in the archive as a virtual filesystem, currently only on Windows.
 
 ## 24.8.0
