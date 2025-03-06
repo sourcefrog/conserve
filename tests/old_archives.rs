@@ -34,13 +34,14 @@ use util::{copy_testdata_archive, testdata_archive_path};
 
 const MINIMAL_ARCHIVE_VERSIONS: &[&str] = &["0.6.0", "0.6.10", "0.6.2", "0.6.3", "0.6.9", "0.6.17"];
 
-fn open_old_archive(ver: &str, name: &str) -> Archive {
+async fn open_old_archive(ver: &str, name: &str) -> Archive {
     Archive::open_path(Path::new(&testdata_archive_path(name, ver)))
+        .await
         .expect("Failed to open archive")
 }
 
-#[test]
-fn all_archive_versions_are_tested() {
+#[tokio::test]
+async fn all_archive_versions_are_tested() {
     let present_subdirs: HashSet<String> = read_dir("testdata/archive/minimal")
         .unwrap()
         .map(|direntry| direntry.unwrap().file_name().to_string_lossy().into_owned())
@@ -55,18 +56,22 @@ fn all_archive_versions_are_tested() {
     );
 }
 
-#[test]
-fn examine_archive() {
+#[tokio::test]
+async fn examine_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         println!("examine {ver}");
-        let archive = open_old_archive(ver, "minimal");
+        let archive = open_old_archive(ver, "minimal").await;
 
-        let band_ids = archive.list_band_ids().expect("Failed to list band ids");
+        let band_ids = archive
+            .list_band_ids()
+            .await
+            .expect("Failed to list band ids");
         assert_eq!(band_ids, &[BandId::zero()]);
 
         assert_eq!(
             archive
                 .last_band_id()
+                .await
                 .expect("Get last_band_id")
                 .expect("Should have a last band id"),
             BandId::zero()
@@ -75,47 +80,46 @@ fn examine_archive() {
 }
 
 #[traced_test]
-#[test]
-fn validate_archive() {
+#[tokio::test]
+async fn validate_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         println!("validate {ver}");
-        let archive = open_old_archive(ver, "minimal");
+        let archive = open_old_archive(ver, "minimal").await;
 
         archive
             .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
+            .await
             .expect("validate archive");
         assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
     }
 }
 
-#[test]
-fn long_listing_old_archive() {
+#[tokio::test]
+async fn long_listing_old_archive() {
     let first_with_perms = semver::VersionReq::parse(">=0.6.17").unwrap();
 
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         let dest = TempDir::new().unwrap();
         println!("restore {} to {:?}", ver, dest.path());
 
-        let archive = open_old_archive(ver, "minimal");
-        let mut stdout = Vec::<u8>::new();
+        let archive = open_old_archive(ver, "minimal").await;
+        let mut output = String::new();
 
         // show archive contents
         let monitor = TestMonitor::arc();
-        show::show_entry_names(
-            archive
-                .open_stored_tree(BandSelectionPolicy::Latest)
-                .unwrap()
-                .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
-                .unwrap(),
-            &mut stdout,
-            true,
-        )
-        .unwrap();
+        let mut entries = archive
+            .open_stored_tree(BandSelectionPolicy::Latest)
+            .await
+            .unwrap()
+            .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone());
+        while let Some(entry) = entries.next().await {
+            output.push_str(&format!("{}\n", entry.format_ls(true)));
+        }
         monitor.assert_no_errors();
 
         if first_with_perms.matches(&semver::Version::parse(ver).unwrap()) {
             assert_eq!(
-                String::from_utf8(stdout).unwrap(),
+                output,
                 "\
                     rwxrwxr-x mbp        mbp        /\n\
                     rw-rw-r-- mbp        mbp        /hello\n\
@@ -124,7 +128,7 @@ fn long_listing_old_archive() {
             );
         } else {
             assert_eq!(
-                String::from_utf8(stdout).unwrap(),
+                output,
                 "\
                     none      none       none       /\n\
                     none      none       none       /hello\n\
@@ -135,20 +139,21 @@ fn long_listing_old_archive() {
     }
 }
 
-#[test]
-fn restore_old_archive() {
+#[tokio::test]
+async fn restore_old_archive() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         let dest = TempDir::new().unwrap();
         println!("restore {} to {:?}", ver, dest.path());
 
-        let archive = open_old_archive(ver, "minimal");
+        let archive = open_old_archive(ver, "minimal").await;
         let monitor = TestMonitor::arc();
         restore(
             &archive,
             dest.path(),
-            &RestoreOptions::default(),
+            RestoreOptions::default(),
             monitor.clone(),
         )
+        .await
         .expect("restore");
 
         monitor.assert_counter(Counter::Symlinks, 0);
@@ -188,20 +193,21 @@ fn restore_old_archive() {
 
 /// Restore from the old archive, modify the tree, then make a backup into a copy
 /// of the old archive.
-#[test]
-fn restore_modify_backup() {
+#[tokio::test]
+async fn restore_modify_backup() {
     for ver in MINIMAL_ARCHIVE_VERSIONS {
         let working_tree = TempDir::new().unwrap();
         println!("restore {} to {:?}", ver, working_tree.path());
 
-        let archive = open_old_archive(ver, "minimal");
+        let archive = open_old_archive(ver, "minimal").await;
 
         restore(
             &archive,
             working_tree.path(),
-            &RestoreOptions::default(),
+            RestoreOptions::default(),
             TestMonitor::arc(),
         )
+        .await
         .expect("restore");
 
         // Write back into a new copy of the archive, without modifying the
@@ -218,7 +224,9 @@ fn restore_modify_backup() {
         )
         .expect("overwrite file");
 
-        let new_archive = Archive::open_path(archive_temp.path()).expect("Open new archive");
+        let new_archive = Archive::open_path(archive_temp.path())
+            .await
+            .expect("Open new archive");
         let emitted = Arc::new(Mutex::new(Vec::new()));
         let emitted_clone = emitted.clone();
         let backup_stats = backup(
@@ -236,6 +244,7 @@ fn restore_modify_backup() {
             },
             TestMonitor::arc(),
         )
+        .await
         .expect("Backup modified tree");
 
         // Check the visited files passed to the callbacks.

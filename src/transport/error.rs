@@ -87,6 +87,16 @@ impl Error {
     }
 }
 
+impl From<tokio::task::JoinError> for Error {
+    fn from(err: tokio::task::JoinError) -> Self {
+        Error {
+            source: Some(Box::new(err)),
+            url: None,
+            kind: ErrorKind::Other,
+        }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind)?;

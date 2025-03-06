@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2023 Martin Pool.
+// Copyright 2023-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,8 +14,8 @@
 //! Test `conserve ls`.
 
 use assert_cmd::prelude::*;
-use indoc::indoc;
 use pretty_assertions::assert_eq;
+use serde_json::{json, Value};
 
 use crate::run_conserve;
 
@@ -25,13 +25,21 @@ fn ls_json() {
         .args(["ls", "--json", "./testdata/archive/minimal/v0.6.17"])
         .assert()
         .success();
+    let json_lines: Vec<Value> = String::from_utf8_lossy(&cmd.get_output().stdout)
+        .lines()
+        .map(|s| s.parse().unwrap())
+        .collect();
+    let json_list: Value = json_lines.into();
     assert_eq!(
-        String::from_utf8_lossy(&cmd.get_output().stdout),
-        indoc! { r#"
-            {"apath":"/","kind":"Dir","mtime":"2020-06-16 00:15:23.0 +00:00:00","unix_mode":509,"user":"mbp","group":"mbp"}
-            {"apath":"/hello","kind":"File","size":12,"mtime":"2020-06-16 00:15:23.0 +00:00:00","unix_mode":436,"user":"mbp","group":"mbp"}
-            {"apath":"/subdir","kind":"Dir","mtime":"2020-06-16 00:15:23.0 +00:00:00","unix_mode":509,"user":"mbp","group":"mbp"}
-            {"apath":"/subdir/subfile","kind":"File","size":12,"mtime":"2020-06-16 00:15:23.0 +00:00:00","unix_mode":436,"user":"mbp","group":"mbp"}
-        "# }
+        json_list,
+        json!([
+            {"apath":"/","kind":"Dir",
+                "mtime":1592266523, "mtime_nanos": 0,
+                "unix_mode":509,"user":"mbp","group":"mbp"},
+            {"apath":"/hello","kind":"File","size":12,
+                "mtime":1592266523, "mtime_nanos": 0,"unix_mode":436,"user":"mbp","group":"mbp"},
+            {"apath":"/subdir","kind":"Dir","mtime":1592266523, "mtime_nanos": 0,"unix_mode":509,"user":"mbp","group":"mbp"},
+            {"apath":"/subdir/subfile","kind":"File","size":12,"mtime":1592266523, "mtime_nanos": 0,"unix_mode":436,"user":"mbp","group":"mbp"}
+        ])
     );
 }

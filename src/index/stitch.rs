@@ -121,12 +121,20 @@ impl Stitch {
             monitor,
         }
     }
-}
 
-impl Iterator for Stitch {
-    type Item = IndexEntry;
+    /// Collect all the entries from this stitcher into a vector for easier testing.
+    ///
+    /// This is not efficient for large indexes.
+    pub async fn collect_all(&mut self) -> Result<Vec<IndexEntry>> {
+        let mut entries = Vec::new();
+        while let Some(entry) = self.next().await {
+            entries.push(entry);
+        }
+        Ok(entries)
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
+    pub async fn next(&mut self) -> Option<IndexEntry> {
+        // This reports errors to the monitor but doesn't stop or return them: is that right? Probably?
         loop {
             self.state = match &mut self.state {
                 State::Done => return None,
@@ -146,7 +154,7 @@ impl Iterator for Stitch {
                         } else {
                             return Some(entry);
                         }
-                    } else if let Some(hunk) = index_hunks.next() {
+                    } else if let Some(hunk) = index_hunks.next().await {
                         if let Some(last_apath) = hunk.last().map(|entry| entry.apath.clone()) {
                             self.last_apath = Some(last_apath);
                         }
@@ -158,9 +166,9 @@ impl Iterator for Stitch {
                 }
                 State::BeforeBand(band_id) => {
                     // Start reading this new index and skip forward until after last_apath
-                    match Band::open(&self.archive, *band_id) {
+                    match Band::open(&self.archive, *band_id).await {
                         Ok(band) => {
-                            let mut index_hunks = band.index().iter_available_hunks();
+                            let mut index_hunks = band.index().iter_available_hunks().await;
                             if let Some(last) = &self.last_apath {
                                 index_hunks = index_hunks.advance_to_after(last)
                             }
@@ -177,11 +185,11 @@ impl Iterator for Stitch {
                     }
                 }
                 State::AfterBand(band_id) => {
-                    if self.archive.band_is_closed(*band_id).unwrap_or(false) {
+                    if self.archive.band_is_closed(*band_id).await.unwrap_or(false) {
                         trace!(?band_id, "band is closed; stitched iteration complete");
                         State::Done
                     } else if let Some(prev_band_id) =
-                        previous_existing_band(&self.archive, *band_id)
+                        previous_existing_band(&self.archive, *band_id).await
                     {
                         trace!(?band_id, ?prev_band_id, "moving back to previous band");
                         State::BeforeBand(prev_band_id)
@@ -198,14 +206,14 @@ impl Iterator for Stitch {
     }
 }
 
-fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<BandId> {
+async fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<BandId> {
     loop {
         // TODO: It might be faster to list the present bands, maybe when
         // constructing Stitch, and calculate from that, rather than walking
         // backwards one at a time...
         if let Some(prev_band_id) = band_id.previous() {
             band_id = prev_band_id;
-            if archive.band_exists(band_id).unwrap_or(false) {
+            if archive.band_exists(band_id).await.unwrap_or(false) {
                 return Some(band_id);
             }
         } else {
@@ -216,10 +224,11 @@ fn previous_existing_band(archive: &Archive, mut band_id: BandId) -> Option<Band
 
 #[cfg(test)]
 mod test {
+
     use super::*;
     use crate::counters::Counter;
     use crate::monitor::test::TestMonitor;
-    use crate::test_fixtures::{ScratchArchive, TreeFixture};
+    use crate::test_fixtures::TreeFixture;
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
         IndexEntry {
@@ -234,25 +243,27 @@ mod test {
         }
     }
 
-    fn simple_ls(archive: &Archive, band_id: BandId) -> String {
-        let strs: Vec<String> = Stitch::new(
+    async fn simple_ls(archive: &Archive, band_id: BandId) -> String {
+        let mut strs = Vec::new();
+        let mut stitch = Stitch::new(
             archive,
             band_id,
             Apath::root(),
             Exclude::nothing(),
             TestMonitor::arc(),
-        )
-        .map(|entry| format!("{}:{}", &entry.apath, entry.target.unwrap()))
-        .collect();
+        );
+        while let Some(entry) = stitch.next().await {
+            strs.push(format!("{}:{}", &entry.apath, entry.target.unwrap()));
+        }
         strs.join(" ")
     }
 
-    #[test]
-    fn stitch_index() -> Result<()> {
+    #[tokio::test]
+    async fn stitch_index() -> Result<()> {
         // This test uses private interfaces to create an index that breaks
         // across hunks in a certain way.
 
-        let af = ScratchArchive::new();
+        let af = Archive::create_temp().await;
 
         // Construct a history with four versions:
         //
@@ -267,15 +278,15 @@ mod test {
         //   and 3 is carried over from b1.
 
         let monitor = TestMonitor::arc();
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id(), BandId::zero());
-        let mut ib = band.index_builder();
+        let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b0"));
         ib.push_entry(symlink("/1", "b0"));
-        ib.finish_hunk(monitor.clone())?;
+        ib.finish_hunk().await?;
         ib.push_entry(symlink("/2", "b0"));
         // Flush this hunk but leave the band incomplete.
-        let hunks = ib.finish(monitor.clone())?;
+        let hunks = ib.finish().await?;
         assert_eq!(hunks, 2);
         assert_eq!(
             monitor.get_counter(Counter::IndexWrites),
@@ -284,93 +295,104 @@ mod test {
         );
 
         let monitor = TestMonitor::arc();
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0001");
-        let mut ib = band.index_builder();
+        let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b1"));
         ib.push_entry(symlink("/1", "b1"));
-        ib.finish_hunk(monitor.clone())?;
+        ib.finish_hunk().await?;
         ib.push_entry(symlink("/2", "b1"));
         ib.push_entry(symlink("/3", "b1"));
-        let hunks = ib.finish(monitor.clone())?;
+        let hunks = ib.finish().await?;
         assert_eq!(hunks, 2);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
-        band.close(2)?;
+        band.close(2).await?;
 
         // b2
         let monitor = TestMonitor::arc();
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0002");
-        let mut ib = band.index_builder();
+        let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b2"));
-        ib.finish_hunk(monitor.clone())?;
+        ib.finish_hunk().await?;
         ib.push_entry(symlink("/2", "b2"));
         // incomplete
-        let hunks = ib.finish(monitor.clone())?;
+        let hunks = ib.finish().await?;
         assert_eq!(hunks, 2);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
 
         // b3
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0003");
 
         // b4
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0004");
 
         // b5
         let monitor = TestMonitor::arc();
-        let band = Band::create(&af)?;
+        let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0005");
-        let mut ib = band.index_builder();
+        let mut ib = band.index_writer(monitor.clone());
         ib.push_entry(symlink("/0", "b5"));
         ib.push_entry(symlink("/00", "b5"));
-        let hunks = ib.finish(monitor.clone())?;
+        let hunks = ib.finish().await?;
         assert_eq!(hunks, 1);
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
         // incomplete
 
-        std::fs::remove_dir_all(af.path().join("b0003"))?;
+        std::fs::remove_dir_all(af.transport().local_path().unwrap().join("b0003"))?;
 
-        let archive = Archive::open_path(af.path())?;
-        assert_eq!(simple_ls(&archive, BandId::new(&[0])), "/0:b0 /1:b0 /2:b0");
+        let archive = Archive::open(af.transport().clone()).await?;
+        assert_eq!(
+            simple_ls(&archive, BandId::new(&[0])).await,
+            "/0:b0 /1:b0 /2:b0"
+        );
 
         assert_eq!(
-            simple_ls(&archive, BandId::new(&[1])),
+            simple_ls(&archive, BandId::new(&[1])).await,
             "/0:b1 /1:b1 /2:b1 /3:b1"
         );
 
-        assert_eq!(simple_ls(&archive, BandId::new(&[2])), "/0:b2 /2:b2 /3:b1");
-
-        assert_eq!(simple_ls(&archive, BandId::new(&[4])), "/0:b2 /2:b2 /3:b1");
+        assert_eq!(
+            simple_ls(&archive, BandId::new(&[2])).await,
+            "/0:b2 /2:b2 /3:b1"
+        );
 
         assert_eq!(
-            simple_ls(&archive, BandId::new(&[5])),
+            simple_ls(&archive, BandId::new(&[4])).await,
+            "/0:b2 /2:b2 /3:b1"
+        );
+
+        assert_eq!(
+            simple_ls(&archive, BandId::new(&[5])).await,
             "/0:b5 /00:b5 /2:b2 /3:b1"
         );
 
         Ok(())
     }
 
-    /// Testing that the StitchedIndexHunks iterator does not loops forever on archives with at least one band
-    /// but no completed bands.
+    /// Testing that the StitchedIndexHunks iterator does not loop forever on
+    /// archives with at least one band but no completed bands.
+    ///
     /// Reference: https://github.com/sourcefrog/conserve/pull/175
-    #[test]
-    fn issue_175() {
+    #[tokio::test]
+    async fn issue_175() {
         let tf = TreeFixture::new();
         tf.create_file("file_a");
 
-        let af = ScratchArchive::new();
+        let af = Archive::create_temp().await;
         backup(
             &af,
             tf.path(),
             &BackupOptions::default(),
             TestMonitor::arc(),
         )
+        .await
         .expect("backup should work");
 
-        af.transport().remove_file("b0000/BANDTAIL").unwrap(); // band is now incomplete
-        let band_ids = af.list_band_ids().expect("should list bands");
+        af.transport().remove_file("b0000/BANDTAIL").await.unwrap(); // band is now incomplete
+        let band_ids = af.list_band_ids().await.expect("should list bands");
 
         let band_id = band_ids.first().expect("expected at least one band");
 
@@ -383,20 +405,20 @@ mod test {
             monitor.clone(),
         );
         // It should have two entries.
-        assert_eq!(entries.next().unwrap().apath, "/");
-        assert_eq!(entries.next().unwrap().apath, "/file_a");
-        assert!(entries.next().is_none());
-        assert!(entries.next().is_none());
+        assert_eq!(entries.next().await.unwrap().apath, "/");
+        assert_eq!(entries.next().await.unwrap().apath, "/file_a");
+        assert!(entries.next().await.is_none());
+        assert!(entries.next().await.is_none());
 
         // Remove the band head. This band can not be opened anymore.
         // If accessed this should fail the test.
         // Note: When refactoring `.expect("Failed to open band")` this might needs refactoring as well.
-        af.transport().remove_file("b0000/BANDHEAD").unwrap();
+        af.transport().remove_file("b0000/BANDHEAD").await.unwrap();
 
         // You can keep polling the iterator but it will keep returning none,
         // without trying to reopen the band.
-        assert!(entries.next().is_none());
-        assert!(entries.next().is_none());
+        assert!(entries.next().await.is_none());
+        assert!(entries.next().await.is_none());
 
         // It's not an error (at the moment) because a band with no head effectively doesn't exist.
         // (Maybe later the presence of a band directory with no head file should raise a warning.)

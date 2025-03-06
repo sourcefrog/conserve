@@ -46,12 +46,12 @@ pub struct ShowVersionsOptions {
 }
 
 /// Print a list of versions, one per line, on stdout.
-pub fn show_versions(
+pub async fn show_versions(
     archive: &Archive,
     options: &ShowVersionsOptions,
     monitor: Arc<TermUiMonitor>,
 ) -> Result<()> {
-    let mut band_ids = archive.list_band_ids()?;
+    let mut band_ids = archive.list_band_ids().await?;
     if options.newest_first {
         band_ids.reverse();
     }
@@ -62,14 +62,14 @@ pub fn show_versions(
         }
         let mut l: Vec<String> = Vec::new();
         l.push(format!("{band_id:<20}"));
-        let band = match Band::open(archive, band_id) {
+        let band = match Band::open(archive, band_id).await {
             Ok(band) => band,
             Err(err) => {
                 error!("Failed to open band {band_id:?}: {err}");
                 continue;
             }
         };
-        let info = match band.get_info() {
+        let info = match band.get_info().await {
             Ok(info) => info,
             Err(err) => {
                 error!("Failed to read band tail {band_id:?}: {err}");
@@ -108,8 +108,10 @@ pub fn show_versions(
 
         if options.tree_size {
             let sizes = archive
-                .open_stored_tree(BandSelectionPolicy::Specified(band_id))?
-                .size(Exclude::nothing(), monitor.clone())?;
+                .open_stored_tree(BandSelectionPolicy::Specified(band_id))
+                .await?
+                .size(Exclude::nothing(), monitor.clone())
+                .await?;
             l.push(format!(
                 "{:>14}",
                 crate::misc::bytes_to_human_mb(sizes.file_bytes)
@@ -121,32 +123,15 @@ pub fn show_versions(
     Ok(())
 }
 
-pub fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
+pub async fn show_index_json(band: &Band, w: &mut dyn Write) -> Result<()> {
     // TODO: Maybe use https://docs.serde.rs/serde/ser/trait.Serializer.html#method.collect_seq.
     let bw = BufWriter::new(w);
-    let index_entries: Vec<Vec<IndexEntry>> = band.index().iter_available_hunks().collect();
+    let index_entries: Vec<Vec<IndexEntry>> = band
+        .index()
+        .iter_available_hunks()
+        .await
+        .collect_hunk_vec()
+        .await?;
     serde_json::ser::to_writer_pretty(bw, &index_entries)
         .map_err(|source| Error::SerializeJson { source })
-}
-
-pub fn show_entry_names<E: EntryTrait, I: Iterator<Item = E>>(
-    it: I,
-    w: &mut dyn Write,
-    long_listing: bool,
-) -> Result<()> {
-    let mut bw = BufWriter::new(w);
-    for entry in it {
-        if long_listing {
-            writeln!(
-                bw,
-                "{} {} {}",
-                entry.unix_mode(),
-                entry.owner(),
-                entry.apath()
-            )?;
-        } else {
-            writeln!(bw, "{}", entry.apath())?;
-        }
-    }
-    Ok(())
 }

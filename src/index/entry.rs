@@ -11,15 +11,16 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+use serde_json::json;
 use time::OffsetDateTime;
 
 use crate::apath::Apath;
-use crate::blockdir;
-use crate::entry::{EntryTrait, EntryValue, KindMeta};
+use crate::entry::EntryTrait;
 use crate::kind::Kind;
 use crate::owner::Owner;
 use crate::unix_mode::UnixMode;
 use crate::unix_time::FromUnixAndNanos;
+use crate::{blockdir, source};
 
 /// Description of one archived file.
 ///
@@ -70,34 +71,6 @@ pub struct IndexEntry {
 }
 // GRCOV_EXCLUDE_STOP
 
-impl From<IndexEntry> for EntryValue {
-    fn from(index_entry: IndexEntry) -> EntryValue {
-        let kind_meta = match index_entry.kind {
-            Kind::File => KindMeta::File {
-                size: index_entry.addrs.iter().map(|a| a.len).sum(),
-            },
-            Kind::Symlink => KindMeta::Symlink {
-                // TODO: Should not be fatal
-                target: index_entry
-                    .target
-                    .expect("symlink entry should have a target"),
-            },
-            Kind::Dir => KindMeta::Dir,
-            Kind::Unknown => KindMeta::Unknown,
-        };
-        EntryValue {
-            apath: index_entry.apath,
-            kind_meta,
-            mtime: OffsetDateTime::from_unix_seconds_and_nanos(
-                index_entry.mtime,
-                index_entry.mtime_nanos,
-            ),
-            unix_mode: index_entry.unix_mode,
-            owner: index_entry.owner,
-        }
-    }
-}
-
 impl EntryTrait for IndexEntry {
     /// Return apath relative to the top of the tree.
     fn apath(&self) -> &Apath {
@@ -132,13 +105,33 @@ impl EntryTrait for IndexEntry {
     fn owner(&self) -> &Owner {
         &self.owner
     }
+
+    fn listing_json(&self) -> serde_json::Value {
+        let mut val = json!({
+            "apath": self.apath.to_string(),
+            "kind": self.kind,
+            "mtime": self.mtime,
+            "mtime_nanos": self.mtime_nanos,
+            "unix_mode": self.unix_mode,
+            "user": self.owner.user,
+            "group": self.owner.group,
+            // omit addrs
+        });
+        if let Some(target) = &self.target {
+            val["target"] = json!(target);
+        }
+        if self.kind == Kind::File {
+            val["size"] = json!(self.size());
+        }
+        val
+    }
 }
 
 impl IndexEntry {
     /// Copy the metadata, but not the body content, from another entry.
     ///
     /// The result has no blocks.
-    pub(crate) fn metadata_from(source: &EntryValue) -> IndexEntry {
+    pub(crate) fn metadata_from(source: &source::Entry) -> IndexEntry {
         let mtime = source.mtime();
         assert_eq!(
             source.symlink_target().is_some(),

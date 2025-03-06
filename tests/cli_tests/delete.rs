@@ -17,51 +17,52 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use conserve::monitor::test::TestMonitor;
+use conserve::test_fixtures::store_two_versions;
+use conserve::Archive;
 use predicates::prelude::*;
 
-use conserve::test_fixtures::ScratchArchive;
 use conserve::BandId;
 
 use crate::run_conserve;
 
-#[test]
-fn delete_both_bands() {
-    let af = ScratchArchive::new();
-    af.store_two_versions();
+#[tokio::test]
+async fn delete_both_bands() {
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b0000"])
         .args(["-b", "b0001"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success();
 
-    assert_eq!(af.list_band_ids().unwrap().len(), 0);
-    assert_eq!(af.all_blocks(TestMonitor::arc()).unwrap().len(), 0);
+    assert_eq!(af.list_band_ids().await.unwrap().len(), 0);
+    assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 0);
 }
 
-#[test]
-fn delete_first_version() {
-    let af = ScratchArchive::new();
-    af.store_two_versions();
+#[tokio::test]
+async fn delete_first_version() {
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b0"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success();
 
-    assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[1])]);
+    assert_eq!(af.list_band_ids().await.unwrap(), &[BandId::new(&[1])]);
     // b0 contains two small files packed into the same block, which is not deleted.
     // b1 (not deleted) adds one additional block, which is still referenced.
-    assert_eq!(af.all_blocks(TestMonitor::arc()).unwrap().len(), 2);
+    assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 2);
 
     let rd = TempDir::new().unwrap();
     run_conserve()
         .arg("restore")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(rd.path())
         .assert()
         .success();
@@ -74,30 +75,31 @@ fn delete_first_version() {
 
     run_conserve()
         .arg("validate")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success();
 }
-#[test]
-fn delete_second_version() {
-    let af = ScratchArchive::new();
-    af.store_two_versions();
+
+#[tokio::test]
+async fn delete_second_version() {
+    let af = Archive::create_temp().await;
+    store_two_versions(&af).await;
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b1"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success();
 
-    assert_eq!(af.list_band_ids().unwrap(), &[BandId::new(&[0])]);
+    assert_eq!(af.list_band_ids().await.unwrap(), &[BandId::new(&[0])]);
     // b0 contains two small files packed into the same block.
-    assert_eq!(af.all_blocks(TestMonitor::arc()).unwrap().len(), 1);
+    assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 1);
 
     let rd = TempDir::new().unwrap();
     run_conserve()
         .arg("restore")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(rd.path())
         .assert()
         .success();
@@ -110,19 +112,19 @@ fn delete_second_version() {
 
     run_conserve()
         .arg("validate")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .success();
 }
 
-#[test]
-fn delete_nonexistent_band() {
-    let af = ScratchArchive::new();
+#[tokio::test]
+async fn delete_nonexistent_band() {
+    let af = Archive::create_temp().await;
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b0000"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .stderr(predicate::str::contains(
             "ERROR conserve: Band not found: b0000",

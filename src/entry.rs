@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,7 +14,6 @@
 //! An entry representing a file, directory, etc, in either a
 //! stored tree or local tree.
 
-use std::borrow::Borrow;
 use std::fmt::Debug;
 
 use serde::Serialize;
@@ -35,6 +34,16 @@ pub trait EntryTrait: Debug {
     fn symlink_target(&self) -> Option<&str>;
     fn unix_mode(&self) -> UnixMode;
     fn owner(&self) -> &Owner;
+
+    fn format_ls(&self, long_listing: bool) -> String {
+        if long_listing {
+            format!("{} {} {}", self.unix_mode(), self.owner(), self.apath())
+        } else {
+            self.apath().to_string()
+        }
+    }
+
+    fn listing_json(&self) -> serde_json::Value;
 }
 
 /// Per-kind metadata.
@@ -55,58 +64,5 @@ impl From<&KindMeta> for Kind {
             KindMeta::Symlink { .. } => Kind::Symlink,
             KindMeta::Unknown => Kind::Unknown,
         }
-    }
-}
-
-/// An in-memory [Entry] describing a file/dir/symlink, with no addresses.
-#[derive(Debug, Serialize, Clone, Eq, PartialEq)]
-pub struct EntryValue {
-    pub(crate) apath: Apath,
-
-    /// Is it a file, dir, or symlink, and for files the size and for symlinks the target.
-    #[serde(flatten)]
-    pub(crate) kind_meta: KindMeta,
-
-    /// Modification time.
-    pub(crate) mtime: OffsetDateTime,
-    pub(crate) unix_mode: UnixMode,
-    #[serde(flatten)]
-    pub(crate) owner: Owner,
-}
-
-impl<B: Borrow<EntryValue> + Debug> EntryTrait for B {
-    fn apath(&self) -> &Apath {
-        &self.borrow().apath
-    }
-
-    fn kind(&self) -> Kind {
-        Kind::from(&self.borrow().kind_meta)
-    }
-
-    fn mtime(&self) -> OffsetDateTime {
-        self.borrow().mtime
-    }
-
-    fn size(&self) -> Option<u64> {
-        if let KindMeta::File { size } = self.borrow().kind_meta {
-            Some(size)
-        } else {
-            None
-        }
-    }
-
-    fn symlink_target(&self) -> Option<&str> {
-        match &self.borrow().kind_meta {
-            KindMeta::Symlink { target } => Some(target),
-            _ => None,
-        }
-    }
-
-    fn unix_mode(&self) -> UnixMode {
-        self.borrow().unix_mode
-    }
-
-    fn owner(&self) -> &Owner {
-        &self.borrow().owner
     }
 }

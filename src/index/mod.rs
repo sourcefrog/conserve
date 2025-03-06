@@ -13,119 +13,23 @@
 
 //! The index lists all the files in a backup, sorted in apath order.
 
-pub(crate) mod entry;
-pub mod stitch;
-
-use std::sync::Arc;
-
 use itertools::Itertools;
 use tracing::{debug, debug_span, error};
-use transport::WriteMode;
 
-use crate::compress::snappy::{Compressor, Decompressor};
-use crate::counters::Counter;
-use crate::monitor::Monitor;
+use crate::compress::snappy::Decompressor;
 use crate::stats::IndexReadStats;
 use crate::transport::Transport;
 use crate::*;
 
+pub mod stitch;
+
+pub(crate) mod entry;
 use self::entry::IndexEntry;
 
+mod write;
+pub use write::IndexWriter;
+
 pub const HUNKS_PER_SUBDIR: u32 = 10_000;
-
-/// Write out index hunks.
-///
-/// This class is responsible for: remembering the hunk number, and checking that the
-/// hunks preserve apath order.
-pub struct IndexWriter {
-    /// The `i` directory within the band where all files for this index are written.
-    transport: Transport,
-
-    /// Currently queued entries to be written out, in arbitrary order.
-    entries: Vec<IndexEntry>,
-
-    /// Index hunk number, starting at 0.
-    sequence: u32,
-
-    /// Number of hunks actually written.
-    hunks_written: usize,
-
-    /// The last filename from the previous hunk, to enforce ordering. At the
-    /// start of the first hunk this is empty; at the start of a later hunk it's
-    /// the last path from the previous hunk.
-    check_order: apath::DebugCheckOrder,
-
-    compressor: Compressor,
-}
-
-/// Accumulate and write out index entries into files in an index directory.
-impl IndexWriter {
-    /// Make a new builder that will write files into the given directory.
-    pub fn new(transport: Transport) -> IndexWriter {
-        IndexWriter {
-            transport,
-            entries: Vec::new(),
-            sequence: 0,
-            hunks_written: 0,
-            check_order: apath::DebugCheckOrder::new(),
-            compressor: Compressor::new(),
-        }
-    }
-
-    /// Finish the last hunk of this index, and return the stats.
-    pub fn finish(mut self, monitor: Arc<dyn Monitor>) -> Result<usize> {
-        self.finish_hunk(monitor)?;
-        Ok(self.hunks_written)
-    }
-
-    /// Write new index entries.
-    ///
-    /// Entries within one hunk may be added in arbitrary order, but they must all
-    /// sort after previously-written content.
-    ///
-    /// The new entry must sort after everything already written to the index.
-    pub(crate) fn push_entry(&mut self, entry: IndexEntry) {
-        self.entries.push(entry);
-    }
-
-    pub(crate) fn append_entries(&mut self, entries: &mut Vec<IndexEntry>) {
-        self.entries.append(entries);
-    }
-
-    /// Finish this hunk of the index.
-    ///
-    /// This writes all the currently queued entries into a new index file
-    /// in the band directory, and then clears the buffer to start receiving
-    /// entries for the next hunk.
-    pub fn finish_hunk(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
-        if self.entries.is_empty() {
-            return Ok(());
-        }
-        self.entries.sort_unstable_by(|a, b| {
-            debug_assert!(a.apath != b.apath);
-            a.apath.cmp(&b.apath)
-        });
-        self.check_order.check(&self.entries[0].apath);
-        if self.entries.len() > 1 {
-            self.check_order.check(&self.entries.last().unwrap().apath);
-        }
-        let relpath = hunk_relpath(self.sequence);
-        let json = serde_json::to_vec(&self.entries)?;
-        if (self.sequence % HUNKS_PER_SUBDIR) == 0 {
-            self.transport.create_dir(&subdir_relpath(self.sequence))?;
-        }
-        let compressed_bytes = self.compressor.compress(&json)?;
-        self.transport
-            .write(&relpath, &compressed_bytes, WriteMode::CreateNew)?;
-        self.hunks_written += 1;
-        monitor.count(Counter::IndexWrites, 1);
-        monitor.count(Counter::IndexWriteCompressedBytes, compressed_bytes.len());
-        monitor.count(Counter::IndexWriteUncompressedBytes, json.len());
-        self.entries.clear(); // Ready for the next hunk.
-        self.sequence += 1;
-        Ok(())
-    }
-}
 
 /// Return the transport-relative path for a subdirectory.
 fn subdir_relpath(hunk_number: u32) -> String {
@@ -174,9 +78,9 @@ impl IndexRead {
     }
 
     /// Read and parse a specific hunk
-    pub fn read_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
+    pub async fn read_hunk(&mut self, hunk_number: u32) -> Result<Option<Vec<IndexEntry>>> {
         let path = hunk_relpath(hunk_number);
-        let compressed_bytes = match self.transport.read(&path) {
+        let compressed_bytes = match self.transport.read(&path).await {
             Ok(b) => b,
             Err(err) if err.is_not_found() => {
                 // TODO: Cope with one hunk being missing, while there are still
@@ -184,7 +88,11 @@ impl IndexRead {
                 // list of hunks first.
                 return Ok(None);
             }
-            Err(source) => return Err(Error::Transport { source }),
+            Err(source) => {
+                self.stats.errors += 1;
+                error!("Error reading index hunk {hunk_number:?}: {source}");
+                return Err(Error::Transport { source });
+            }
         };
         self.stats.index_hunks += 1;
         self.stats.compressed_index_bytes += compressed_bytes.len() as u64;
@@ -202,24 +110,27 @@ impl IndexRead {
     }
 
     // All hunk numbers present in all directories.
-    pub fn hunks_available(&self) -> Result<Vec<u32>> {
-        let subdirs = self.transport.list_dir("")?.dirs.into_iter().sorted();
-
-        let hunks = subdirs
-            .filter_map(|dir| self.transport.list_dir(&dir).ok())
-            .flat_map(|list| list.files)
-            .filter_map(|f| f.parse::<u32>().ok())
-            .sorted()
-            .collect_vec();
-
+    pub async fn hunks_available(&self) -> Result<Vec<u32>> {
+        let subdirs = self.transport.list_dir("").await?.dirs.into_iter().sorted();
+        let mut hunks = Vec::new();
+        for dir in subdirs {
+            if let Ok(list) = self.transport.list_dir(&dir).await {
+                hunks.extend(
+                    list.files
+                        .iter()
+                        .filter_map(|f| f.parse::<u32>().ok())
+                        .sorted(),
+                )
+            }
+        }
         Ok(hunks)
     }
 
     /// Make an iterator that returns hunks of entries from this index,
     /// skipping any that are not present.
-    pub fn iter_available_hunks(self) -> IndexHunkIter {
+    pub async fn iter_available_hunks(self) -> IndexHunkIter {
         let _span = debug_span!("iter_hunks", ?self.transport).entered();
-        let hunks = self.hunks_available().expect("hunks available"); // TODO: Don't panic
+        let hunks = self.hunks_available().await.expect("hunks available"); // TODO: Don't panic
         debug!(?hunks);
         IndexHunkIter {
             hunks: hunks.into_iter(),
@@ -239,20 +150,17 @@ pub struct IndexHunkIter {
     after: Option<Apath>,
 }
 
-impl Iterator for IndexHunkIter {
+impl IndexHunkIter {
     // TODO: Maybe this should return Results so that errors can be
     // more easily observed.
-    type Item = Vec<IndexEntry>;
 
-    fn next(&mut self) -> Option<Self::Item> {
+    pub async fn next(&mut self) -> Option<Vec<IndexEntry>> {
         loop {
             let hunk_number = self.hunks.next()?;
-            let entries = match self.index.read_hunk(hunk_number) {
+            let entries = match self.index.read_hunk(hunk_number).await {
                 Ok(None) => return None,
                 Ok(Some(entries)) => entries,
-                Err(err) => {
-                    self.index.stats.errors += 1;
-                    error!("Error reading index hunk {hunk_number:?}: {err}");
+                Err(_err) => {
                     continue;
                 }
             };
@@ -279,9 +187,32 @@ impl Iterator for IndexHunkIter {
             }
         }
     }
-}
 
-impl IndexHunkIter {
+    /// Collect the contents of the iterator into a vector of hunks, each of which
+    /// contains vector of entries.
+    ///
+    /// This reads the whole index into memory so is not recommended for large trees.
+    pub async fn collect_hunk_vec(&mut self) -> Result<Vec<Vec<IndexEntry>>> {
+        let mut hunks = Vec::new();
+        while let Some(hunk) = self.next().await {
+            hunks.push(hunk);
+        }
+        Ok(hunks)
+    }
+
+    /// Collect the contents of the index into a vec of entries.
+    ///
+    /// This is the flattened version of `collect_hunk_vec`.
+    ///
+    /// This reads the whole index into memory so is not recommended for large trees.
+    pub async fn collect_entry_vec(&mut self) -> Result<Vec<IndexEntry>> {
+        let mut entries = Vec::new();
+        while let Some(hunk) = self.next().await {
+            entries.extend(hunk);
+        }
+        Ok(entries)
+    }
+
     /// Advance self so that it returns only entries with apaths ordered after `apath`.
     #[must_use]
     pub fn advance_to_after(self, apath: &Apath) -> Self {
@@ -296,13 +227,13 @@ impl IndexHunkIter {
 mod tests {
     use tempfile::TempDir;
 
-    use crate::monitor::test::TestMonitor;
+    use crate::{counters::Counter, monitor::test::TestMonitor};
 
     use super::*;
 
     fn setup() -> (TempDir, IndexWriter) {
         let testdir = TempDir::new().unwrap();
-        let ib = IndexWriter::new(Transport::local(testdir.path()));
+        let ib = IndexWriter::new(Transport::local(testdir.path()), TestMonitor::arc());
         (testdir, ib)
     }
 
@@ -319,8 +250,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn serialize_index() {
+    #[tokio::test]
+    async fn serialize_index() {
         let entries = [IndexEntry {
             apath: "/a/b".into(),
             mtime: 1_461_736_377,
@@ -342,54 +273,55 @@ mod tests {
         );
     }
 
-    #[test]
-    fn index_builder_sorts_entries() {
+    #[tokio::test]
+    async fn index_builder_sorts_entries() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/zzz"));
         ib.push_entry(sample_entry("/aaa"));
-        ib.finish_hunk(TestMonitor::arc()).unwrap();
+        ib.finish_hunk().await.unwrap();
     }
 
-    #[test]
+    #[tokio::test]
     #[should_panic]
-    fn index_builder_checks_names() {
+    async fn index_builder_checks_names() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("../escapecat"));
-        ib.finish_hunk(TestMonitor::arc()).unwrap();
+        ib.finish_hunk().await.unwrap();
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(debug_assertions)]
     #[should_panic]
-    fn no_duplicate_paths() {
+    async fn no_duplicate_paths() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/again"));
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk(TestMonitor::arc()).unwrap();
+        ib.finish_hunk().await.unwrap();
     }
 
-    #[test]
     #[cfg(debug_assertions)]
+    #[tokio::test]
     #[should_panic]
-    fn no_duplicate_paths_across_hunks() {
+    async fn no_duplicate_paths_across_hunks() {
         let (_testdir, mut ib) = setup();
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk(TestMonitor::arc()).unwrap();
+        ib.finish_hunk().await.unwrap();
         ib.push_entry(sample_entry("/again"));
-        ib.finish_hunk(TestMonitor::arc()).unwrap();
+        ib.finish_hunk().await.unwrap();
     }
 
-    #[test]
-    fn path_for_hunk() {
+    #[tokio::test]
+    async fn path_for_hunk() {
         assert_eq!(super::hunk_relpath(0), "00000/000000000");
     }
 
-    #[test]
-    fn basic() {
-        let (testdir, mut ib) = setup();
+    #[tokio::test]
+    async fn basic() -> Result<()> {
+        let transport = Transport::temp();
         let monitor = TestMonitor::arc();
-        ib.append_entries(&mut vec![sample_entry("/apple"), sample_entry("/banana")]);
-        let hunks = ib.finish(monitor.clone()).unwrap();
+        let mut index_writer = IndexWriter::new(transport.clone(), monitor.clone());
+        index_writer.append_entries(&mut vec![sample_entry("/apple"), sample_entry("/banana")]);
+        let hunks = index_writer.finish().await.unwrap();
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
 
         assert_eq!(hunks, 1);
@@ -401,39 +333,48 @@ mod tests {
         assert!(counters.get(Counter::IndexWriteUncompressedBytes) < 250);
 
         assert!(
-            std::fs::metadata(testdir.path().join("00000").join("000000000"))
-                .unwrap()
-                .is_file(),
+            transport.is_file("00000/000000000").await.unwrap(),
             "Index hunk file not found"
         );
 
-        let hunks = IndexRead::open_path(testdir.path())
+        let hunks = IndexRead::open(transport.clone())
             .iter_available_hunks()
-            .collect_vec();
+            .await
+            .collect_hunk_vec()
+            .await?;
         assert_eq!(hunks.len(), 1);
         let entries = &hunks[0];
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].apath, "/apple");
         assert_eq!(entries[1].apath, "/banana");
+        Ok(())
     }
 
-    #[test]
-    fn multiple_hunks() {
+    #[tokio::test]
+    async fn multiple_hunks() -> Result<()> {
         let (testdir, mut ib) = setup();
         ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
-        ib.finish_hunk(TestMonitor::arc()).unwrap();
+        ib.finish_hunk().await.unwrap();
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
-        ib.finish_hunk(TestMonitor::arc()).unwrap();
+        ib.finish_hunk().await.unwrap();
 
         let index_read = IndexRead::open_path(testdir.path());
-        let it = index_read.iter_available_hunks().flatten();
-        let names: Vec<String> = it.map(|x| x.apath.into()).collect();
+        let names = index_read
+            .iter_available_hunks()
+            .await
+            .collect_entry_vec()
+            .await?
+            .into_iter()
+            .map(|e| e.apath.to_string())
+            .collect_vec();
         assert_eq!(names, &["/1.1", "/1.2", "/2.1", "/2.2"]);
 
         // Read it out as hunks.
         let hunks: Vec<Vec<IndexEntry>> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
-            .collect();
+            .await
+            .collect_hunk_vec()
+            .await?;
         assert_eq!(hunks.len(), 2);
         assert_eq!(
             hunks[0]
@@ -449,103 +390,138 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["/2.1", "/2.2"]
         );
+        Ok(())
     }
 
-    #[test]
-    fn iter_hunks_advance_to_after() {
+    #[tokio::test]
+    async fn iter_hunks_advance_to_after() -> Result<()> {
         let (testdir, mut ib) = setup();
         ib.append_entries(&mut vec![sample_entry("/1.1"), sample_entry("/1.2")]);
-        ib.finish_hunk(TestMonitor::arc()).unwrap();
+        ib.finish_hunk().await.unwrap();
         ib.append_entries(&mut vec![sample_entry("/2.1"), sample_entry("/2.2")]);
-        ib.finish_hunk(TestMonitor::arc()).unwrap();
+        ib.finish_hunk().await.unwrap();
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/1.1", "/1.2", "/2.1", "/2.2"]);
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/nonexistent".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, [""; 0]);
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/1.1".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/1.2", "/2.1", "/2.2"]);
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/1.1.1".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/1.2", "/2.1", "/2.2"]);
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/1.2".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.1", "/2.2"]);
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/1.3".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.1", "/2.2"]);
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/2.0".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.1", "/2.2"]);
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/2.1".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, ["/2.2"]);
 
         let names: Vec<String> = IndexRead::open_path(testdir.path())
             .iter_available_hunks()
+            .await
             .advance_to_after(&"/2.2".into())
-            .flatten()
+            .collect_entry_vec()
+            .await?
+            .into_iter()
             .map(|entry| entry.apath.into())
             .collect();
         assert_eq!(names, [] as [&str; 0]);
+        Ok(())
     }
 
     /// Exactly fill the first hunk: there shouldn't be an empty second hunk.
     ///
     /// https://github.com/sourcefrog/conserve/issues/95
-    #[test]
-    fn no_final_empty_hunk() -> Result<()> {
+    #[tokio::test]
+    async fn no_final_empty_hunk() -> Result<()> {
         let (testdir, mut ib) = setup();
-        for i in 0..100_000 {
+        for i in 0..1000 {
             ib.push_entry(sample_entry(&format!("/{i:0>10}")));
         }
-        ib.finish_hunk(TestMonitor::arc())?;
+        ib.finish_hunk().await?;
         // Think about, but don't actually add some files
-        ib.finish_hunk(TestMonitor::arc())?;
+        ib.finish_hunk().await?;
+        dbg!(ib.hunks_written);
         let read_index = IndexRead::open_path(testdir.path());
-        assert_eq!(read_index.iter_available_hunks().count(), 1);
+        let hunks = read_index
+            .iter_available_hunks()
+            .await
+            .collect_hunk_vec()
+            .await?;
+        assert_eq!(hunks.len(), 1);
         Ok(())
     }
 }

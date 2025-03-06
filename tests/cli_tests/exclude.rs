@@ -14,15 +14,16 @@
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use conserve::Archive;
 use indoc::indoc;
 use predicates::prelude::*;
 
-use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::test_fixtures::TreeFixture;
 
 use crate::run_conserve;
 
-#[test]
-fn exclude_option_ordering() {
+#[tokio::test]
+async fn exclude_option_ordering() {
     // Regression caused by the move to structopt(?) in 7ddb02d0cf47467f1cccc2dcdedb005e8c4e3f25.
     // See https://github.com/TeXitoi/structopt/issues/396.
     let testdir = TempDir::new().unwrap();
@@ -43,9 +44,9 @@ fn exclude_option_ordering() {
         .success();
 }
 
-#[test]
-fn exclude_simple_glob() {
-    let af = ScratchArchive::new();
+#[tokio::test]
+async fn exclude_simple_glob() {
+    let af = Archive::create_temp().await;
     let src = TreeFixture::new();
 
     src.create_dir("src");
@@ -54,7 +55,7 @@ fn exclude_simple_glob() {
 
     run_conserve()
         .args(["backup", "-v", "--exclude", "*.o", "--no-stats"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(src.path())
         .assert()
         .stdout("+ /src/hello.c\n")
@@ -62,16 +63,16 @@ fn exclude_simple_glob() {
 
     run_conserve()
         .args(["ls"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .stdout("/\n/src\n/src/hello.c\n")
         .success();
 }
 
 /// `--exclude /*.o` should match only in the root directory.
-#[test]
-fn exclude_glob_only_in_root() {
-    let af = ScratchArchive::new();
+#[tokio::test]
+async fn exclude_glob_only_in_root() {
+    let af = Archive::create_temp().await;
     let src = TreeFixture::new();
 
     src.create_dir("src");
@@ -80,7 +81,7 @@ fn exclude_glob_only_in_root() {
 
     run_conserve()
         .args(["backup", "-v", "--exclude", "/*.o", "--no-stats"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(src.path())
         .assert()
         .stdout("+ /src/hello.c\n+ /src/hello.o\n")
@@ -88,15 +89,15 @@ fn exclude_glob_only_in_root() {
 
     run_conserve()
         .args(["ls"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .stdout("/\n/src\n/src/hello.c\n/src/hello.o\n")
         .success();
 }
 
-#[test]
-fn exclude_suffix_pattern() {
-    let af = ScratchArchive::new();
+#[tokio::test]
+async fn exclude_suffix_pattern() {
+    let af = Archive::create_temp().await;
     let src = TreeFixture::new();
 
     src.create_dir("src");
@@ -111,22 +112,22 @@ fn exclude_suffix_pattern() {
 
     run_conserve()
         .args(["backup", "-v", "--exclude", "target/{release,debug}"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(src.path())
         .assert()
         .success();
 
     run_conserve()
         .args(["ls"])
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .assert()
         .stdout("/\n/release\n/src\n/subproj\n/target\n/src/hello.rs\n/subproj/target\n")
         .success();
 }
 
-#[test]
-fn exclude_from_file() {
-    let af = ScratchArchive::new();
+#[tokio::test]
+async fn exclude_from_file() {
+    let af = Archive::create_temp().await;
     let src = TreeFixture::new();
 
     src.create_dir("src");
@@ -142,7 +143,7 @@ fn exclude_from_file() {
     run_conserve()
         .args(["backup", "-v", "--exclude-from"])
         .arg(src.path().join("exclude"))
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .args(["--exclude=*~"])
         .arg(src.path())
         .assert()
@@ -152,8 +153,8 @@ fn exclude_from_file() {
 /// `--exclude /subtree` should also exclude everything under it.
 ///
 /// <https://github.com/sourcefrog/conserve/issues/160>
-#[test]
-fn ls_exclude_excludes_subtrees() {
+#[tokio::test]
+async fn ls_exclude_excludes_subtrees() {
     run_conserve()
         .args([
             "ls",
@@ -173,8 +174,8 @@ fn ls_exclude_excludes_subtrees() {
 /// `--exclude /subtree` should also exclude everything under it.
 ///
 /// <https://github.com/sourcefrog/conserve/issues/160>
-#[test]
-fn restore_exclude_excludes_subtrees() {
+#[tokio::test]
+async fn restore_exclude_excludes_subtrees() {
     let dest = TempDir::new().unwrap();
     run_conserve()
         .args([
