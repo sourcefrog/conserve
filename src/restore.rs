@@ -295,6 +295,6 @@ fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<()> {
 fn restore_symlink(_restore_path: &Path, entry: &IndexEntry) -> Result<()> {
     // TODO: Add a test with a canned index containing a symlink, and expect
     // it cannot be restored on Windows and can be on Unix.
-    warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
+    tracing::warn!("Can't restore symlinks on non-Unix: {}", entry.apath());
     Ok(())
 }
