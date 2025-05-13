@@ -4,6 +4,8 @@
 
 - New: `conserve mount ARCHIVE` gives readonly access to all the history in the archive as a virtual filesystem, currently only on Windows.
 
+- New: Support for reading and writing archives over SFTP. Credentials currently must come from an sftp-agent.
+
 ## 24.8.0
 
 - Fixed: `restore --only` specifying a subdirectory no longer fails due to parent directories missing from the destination.
