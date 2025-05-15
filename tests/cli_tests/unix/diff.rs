@@ -18,31 +18,31 @@ use std::fs;
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 
-use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::{test_fixtures::TreeFixture, Archive};
 
 use crate::run_conserve;
 
-fn setup_symlink() -> (ScratchArchive, TreeFixture) {
-    let af = ScratchArchive::new();
+async fn setup_symlink() -> (Archive, TreeFixture) {
+    let af = Archive::create_temp().await;
     let tf = TreeFixture::new();
     tf.create_dir("subdir");
     tf.create_symlink("subdir/link", "target");
     run_conserve()
         .arg("backup")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success();
     (af, tf)
 }
 
-#[test]
-pub fn symlink_unchanged() {
-    let (af, tf) = setup_symlink();
+#[tokio::test]
+async fn symlink_unchanged() {
+    let (af, tf) = setup_symlink().await;
 
     run_conserve()
         .arg("diff")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -52,7 +52,7 @@ pub fn symlink_unchanged() {
     run_conserve()
         .arg("diff")
         .arg("--include-unchanged")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -60,15 +60,15 @@ pub fn symlink_unchanged() {
         .stderr(predicate::str::is_empty());
 }
 
-#[test]
-pub fn symlink_changed() {
-    let (af, tf) = setup_symlink();
+#[tokio::test]
+async fn symlink_changed() {
+    let (af, tf) = setup_symlink().await;
     fs::remove_file(tf.path().join("subdir/link")).unwrap();
     tf.create_symlink("subdir/link", "newtarget");
 
     run_conserve()
         .arg("diff")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()
@@ -78,7 +78,7 @@ pub fn symlink_changed() {
     run_conserve()
         .arg("diff")
         .arg("--include-unchanged")
-        .arg(af.path())
+        .arg(af.transport().local_path().unwrap())
         .arg(tf.path())
         .assert()
         .success()

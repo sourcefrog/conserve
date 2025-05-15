@@ -22,8 +22,8 @@ fn open_local() {
     Transport::local(Path::new("/backup"));
 }
 
-#[test]
-fn list_dir_names() {
+#[tokio::test]
+async fn list_dir_names() {
     let temp = assert_fs::TempDir::new().unwrap();
     temp.child("a dir").create_dir_all().unwrap();
     temp.child("a file").touch().unwrap();
@@ -31,10 +31,10 @@ fn list_dir_names() {
 
     let url = Url::from_directory_path(temp.path()).unwrap();
     dbg!(&url);
-    let transport = Transport::new(url.as_str()).unwrap();
+    let transport = Transport::new(url.as_str()).await.unwrap();
     dbg!(&transport);
 
-    let ListDir { mut files, dirs } = transport.list_dir("").unwrap();
+    let ListDir { mut files, dirs } = transport.list_dir("").await.unwrap();
     assert_eq!(dirs, ["a dir"]);
     files.sort();
     assert_eq!(files, ["a file", "another file"]);
@@ -42,8 +42,8 @@ fn list_dir_names() {
     temp.close().unwrap();
 }
 
-#[test]
-fn parse_location_urls() {
+#[tokio::test]
+async fn parse_location_urls() {
     for n in [
         "./relative",
         "/backup/repo.c6",
@@ -51,20 +51,22 @@ fn parse_location_urls() {
         "c:/backup/repo",
         r"c:\backup\repo\",
     ] {
-        assert!(Transport::new(n).is_ok(), "Failed to parse {n:?}");
+        assert!(Transport::new(n).await.is_ok(), "Failed to parse {n:?}");
     }
 }
 
-#[test]
-fn unsupported_location_urls() {
+#[tokio::test]
+async fn unsupported_location_urls() {
     assert_eq!(
         Transport::new("http://conserve.example/repo")
+            .await
             .unwrap_err()
             .to_string(),
         "Unsupported URL scheme: http://conserve.example/repo"
     );
     assert_eq!(
         Transport::new("ftp://user@conserve.example/repo")
+            .await
             .unwrap_err()
             .to_string(),
         "Unsupported URL scheme: ftp://user@conserve.example/repo"

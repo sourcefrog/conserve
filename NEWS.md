@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Changed: Conserve now internally uses Tokio rather than raw threads and Rayon for parallelism. This is a step towards better overlapping both local and network archive operations.
+
 - New: `conserve mount ARCHIVE` gives readonly access to all the history in the archive as a virtual filesystem, currently only on Windows.
 
 - New: Support for reading and writing archives over SFTP. Credentials currently must come from an sftp-agent.

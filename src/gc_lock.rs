@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2017-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@
 //! delete but before starting to actually delete them, we check that no
 //! new bands have been created.
 
+use tracing::{error, trace};
 use transport::WriteMode;
 
 use crate::*;
@@ -44,6 +45,11 @@ pub struct GarbageCollectionLock {
     /// Last band id present when the guard was created. May be None if
     /// there are no bands.
     band_id: Option<BandId>,
+
+    /// Is the lock actually held?
+    ///
+    /// Present so that we can avoid dropping it a second time from Drop.
+    held: bool,
 }
 
 /// Lock on an archive for gc, that excludes backups and gc by other processes.
@@ -54,82 +60,122 @@ impl GarbageCollectionLock {
     ///
     /// Returns `Err(Error::DeleteWithIncompleteBackup)` if the last
     /// backup is incomplete.
-    pub fn new(archive: &Archive) -> Result<GarbageCollectionLock> {
+    pub async fn new(archive: &Archive) -> Result<GarbageCollectionLock> {
         let archive = archive.clone();
-        let band_id = archive.last_band_id()?;
+        let band_id = archive.last_band_id().await?;
         if let Some(band_id) = band_id {
-            if !archive.band_is_closed(band_id)? {
+            if !archive.band_is_closed(band_id).await? {
                 return Err(Error::DeleteWithIncompleteBackup { band_id });
             }
         }
-        if archive.transport().is_file(GC_LOCK).unwrap_or(true) {
+        if archive.transport().is_file(GC_LOCK).await.unwrap_or(true) {
             return Err(Error::GarbageCollectionLockHeld);
         }
         archive
             .transport()
-            .write(GC_LOCK, b"{}\n", WriteMode::CreateNew)?;
-        Ok(GarbageCollectionLock { archive, band_id })
+            .write(GC_LOCK, b"{}\n", WriteMode::CreateNew)
+            .await?;
+        Ok(GarbageCollectionLock {
+            archive,
+            band_id,
+            held: true,
+        })
     }
 
     /// Take a lock on an archive, breaking any existing gc lock.
     ///
     /// Use this only if you're confident that the process owning the lock
     /// has terminated and the lock is stale.
-    pub fn break_lock(archive: &Archive) -> Result<GarbageCollectionLock> {
-        if GarbageCollectionLock::is_locked(archive)? {
-            archive.transport().remove_file(GC_LOCK)?;
+    pub async fn break_lock(archive: &Archive) -> Result<GarbageCollectionLock> {
+        if GarbageCollectionLock::is_locked(archive).await? {
+            archive.transport().remove_file(GC_LOCK).await?;
         }
-        GarbageCollectionLock::new(archive)
+        GarbageCollectionLock::new(archive).await
     }
 
     /// Returns true if the archive is currently locked by a gc process.
-    pub fn is_locked(archive: &Archive) -> Result<bool> {
-        archive.transport().is_file(GC_LOCK).map_err(Error::from)
+    pub async fn is_locked(archive: &Archive) -> Result<bool> {
+        archive
+            .transport()
+            .is_file(GC_LOCK)
+            .await
+            .map_err(Error::from)
     }
 
     /// Check that no new versions have been created in this archive since
     /// the guard was created.
-    pub fn check(&self) -> Result<()> {
-        let current_last_band_id = self.archive.last_band_id()?;
+    pub async fn check(&self) -> Result<()> {
+        let current_last_band_id = self.archive.last_band_id().await?;
         if self.band_id == current_last_band_id {
             Ok(())
         } else {
             Err(Error::GarbageCollectionLockHeldDuringBackup)
         }
     }
+
+    /// Explicitly release the lock.
+    ///
+    /// Awaiting the future will ensure that the lock is released.
+    pub async fn release(mut self) -> Result<()> {
+        trace!("Releasing GC lock");
+        self.archive
+            .transport()
+            .remove_file(GC_LOCK)
+            .await
+            .map_err(|err| {
+                error!(?err, "Failed to delete GC lock");
+                Error::from(err)
+            })?;
+        self.held = false;
+        Ok(())
+    }
 }
 
 impl Drop for GarbageCollectionLock {
     fn drop(&mut self) {
-        if let Err(err) = self.archive.transport().remove_file(GC_LOCK) {
-            // Print directly to stderr, in case the UI structure is in a
-            // bad state during unwind.
-            eprintln!("Failed to delete GC_LOCK: {err:?}")
+        // The lock will, hopefully, be deleted soon after the lock is dropped,
+        // and before the process exits.
+        if !self.held {
+            return;
         }
+        trace!("Releasing GC lock from Drop");
+        let transport = self.archive.transport().clone();
+        tokio::task::spawn(async move {
+            transport.remove_file(GC_LOCK).await.inspect_err(|err| {
+                // Print directly to stderr, in case the UI structure is in a
+                // bad state during unwind.
+                eprintln!("Failed to delete GC_LOCK from Drop: {err:?}");
+            })
+        });
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
+
     use super::*;
     use crate::monitor::test::TestMonitor;
-    use crate::test_fixtures::{ScratchArchive, TreeFixture};
+    use crate::test_fixtures::TreeFixture;
 
-    #[test]
-    fn empty_archive_ok() {
-        let archive = ScratchArchive::new();
-        let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
-        assert!(archive.transport().is_file("GC_LOCK").unwrap());
-        delete_guard.check().unwrap();
+    #[tokio::test]
+    async fn empty_archive_ok() {
+        let archive = Archive::create_temp().await;
+        let delete_guard = GarbageCollectionLock::new(&archive).await.unwrap();
+        assert!(archive.transport().is_file("GC_LOCK").await.unwrap());
+        delete_guard.check().await.unwrap();
 
         // Released when dropped.
         drop(delete_guard);
-        assert!(!archive.transport().is_file("GC_LOCK").unwrap());
+        // Cleanup is async: hard to know exactly when it will complete, but this should be
+        // sufficient?
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(!archive.transport().is_file("GC_LOCK").await.unwrap());
     }
 
-    #[test]
-    fn completed_backup_ok() {
-        let archive = ScratchArchive::new();
+    #[tokio::test]
+    async fn completed_backup_ok() {
+        let archive = Archive::create_temp().await;
         let source = TreeFixture::new();
         backup(
             &archive,
@@ -137,67 +183,68 @@ mod test {
             &BackupOptions::default(),
             TestMonitor::arc(),
         )
+        .await
         .unwrap();
-        let delete_guard = GarbageCollectionLock::new(&archive).unwrap();
-        delete_guard.check().unwrap();
+        let delete_guard = GarbageCollectionLock::new(&archive).await.unwrap();
+        delete_guard.check().await.unwrap();
     }
 
-    #[test]
-    fn concurrent_complete_backup_denied() {
-        let archive = ScratchArchive::new();
+    #[tokio::test]
+    async fn concurrent_complete_backup_denied() {
+        let archive = Archive::create_temp().await;
         let source = TreeFixture::new();
-        let _delete_guard = GarbageCollectionLock::new(&archive).unwrap();
+        let _delete_guard = GarbageCollectionLock::new(&archive).await.unwrap();
         let backup_result = backup(
             &archive,
             source.path(),
             &BackupOptions::default(),
             TestMonitor::arc(),
-        );
+        )
+        .await;
         assert_eq!(
             backup_result.expect_err("backup fails").to_string(),
             "Archive is locked for garbage collection"
         );
     }
 
-    #[test]
-    fn incomplete_backup_denied() {
-        let archive = ScratchArchive::new();
-        Band::create(&archive).unwrap();
-        let result = GarbageCollectionLock::new(&archive);
-        assert!(result.is_err());
+    #[tokio::test]
+    async fn incomplete_backup_denied() {
+        let archive = Archive::create_temp().await;
+        Band::create(&archive).await.unwrap();
+        let err = GarbageCollectionLock::new(&archive).await.unwrap_err();
         assert_eq!(
-            result.err().unwrap().to_string(),
+            err.to_string(),
             "Can't delete blocks because the last band (b0000) is incomplete and may be in use"
         );
     }
 
-    #[test]
-    fn concurrent_gc_prevented() {
-        let archive = ScratchArchive::new();
-        let _lock1 = GarbageCollectionLock::new(&archive).unwrap();
+    #[tokio::test]
+    async fn concurrent_gc_prevented() {
+        let archive = Archive::create_temp().await;
+        let _lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
         // Should not be able to create a second lock while one gc is running.
-        let lock2_result = GarbageCollectionLock::new(&archive);
+        let lock2_result = GarbageCollectionLock::new(&archive).await;
         assert_eq!(
             lock2_result.unwrap_err().to_string(),
             "Archive is locked for garbage collection"
         );
     }
 
-    #[test]
-    fn sequential_gc_allowed() {
-        let archive = ScratchArchive::new();
-        let _lock1 = GarbageCollectionLock::new(&archive).unwrap();
-        drop(_lock1);
-        let _lock2 = GarbageCollectionLock::new(&archive).unwrap();
-        drop(_lock2);
+    #[tokio::test]
+    async fn sequential_gc_allowed() {
+        let archive = Archive::create_temp().await;
+        let lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
+        lock1.release().await.unwrap();
+        let lock2 = GarbageCollectionLock::new(&archive).await.unwrap();
+        lock2.release().await.unwrap();
     }
 
-    #[test]
-    fn break_lock() {
-        let archive = ScratchArchive::new();
-        let lock1 = GarbageCollectionLock::new(&archive).unwrap();
+    #[tokio::test]
+    async fn break_lock() {
+        let archive = Archive::create_temp().await;
+        let lock1 = GarbageCollectionLock::new(&archive).await.unwrap();
         // Pretend the process owning lock1 died, and get a new lock.
         std::mem::forget(lock1);
-        let _lock2 = GarbageCollectionLock::break_lock(&archive).unwrap();
+        let _lock2 = GarbageCollectionLock::break_lock(&archive).await.unwrap();
     }
 }

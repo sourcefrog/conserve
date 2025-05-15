@@ -79,8 +79,8 @@ impl TreeChanges {
 
 #[rstest]
 #[traced_test]
-#[test]
-fn backup_after_damage(
+#[tokio::test]
+async fn backup_after_damage(
     #[values(DamageAction::Delete, DamageAction::Truncate)] action: DamageAction,
     #[values(
         DamageLocation::BandHead(0),
@@ -94,7 +94,9 @@ fn backup_after_damage(
     let archive_dir = TempDir::new().unwrap();
     let source_dir = TempDir::new().unwrap();
 
-    let archive = Archive::create_path(archive_dir.path()).expect("create archive");
+    let archive = Archive::create_path(archive_dir.path())
+        .await
+        .expect("create archive");
     source_dir
         .child("file")
         .write_str("content in first backup")
@@ -107,13 +109,16 @@ fn backup_after_damage(
         &backup_options,
         TestMonitor::arc(),
     )
+    .await
     .expect("initial backup");
 
     drop(archive);
-    action.damage(&location.to_path(&archive_dir));
+    action.damage(&location.to_path(&archive_dir).await);
 
     // Open the archive again to avoid cache effects.
-    let archive = Archive::open(Transport::local(archive_dir.path())).expect("open archive");
+    let archive = Archive::open(Transport::local(archive_dir.path()))
+        .await
+        .expect("open archive");
 
     // A second backup should succeed.
     changes.apply(&source_dir);
@@ -123,6 +128,7 @@ fn backup_after_damage(
         &backup_options,
         TestMonitor::arc(),
     )
+    .await
     .expect("write second backup after damage");
     dbg!(&backup_stats);
 
@@ -163,9 +169,10 @@ fn backup_after_damage(
         restore(
             &archive,
             restore_dir.path(),
-            &RestoreOptions::default(),
+            RestoreOptions::default(),
             monitor.clone(),
         )
+        .await
         .expect("restore second backup");
         monitor.assert_counter(Counter::Files, 1);
         monitor.assert_no_errors();
@@ -176,7 +183,7 @@ fn backup_after_damage(
     }
 
     // You can see both versions.
-    let versions = archive.list_band_ids().expect("list versions");
+    let versions = archive.list_band_ids().await.expect("list versions");
     assert_eq!(versions, [BandId::zero(), BandId::new(&[1])]);
 
     // Can list the contents of the second backup.
@@ -187,7 +194,12 @@ fn backup_after_damage(
             Exclude::nothing(),
             TestMonitor::arc(),
         )
+        .await
         .expect("iter entries")
+        .collect_all()
+        .await
+        .unwrap()
+        .into_iter()
         .map(|e| e.apath().to_string())
         .collect_vec();
 
@@ -201,6 +213,7 @@ fn backup_after_damage(
     // TODO: This should return problems that we can inspect.
     archive
         .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
+        .await
         .expect("validate");
 }
 
@@ -254,7 +267,7 @@ pub enum DamageLocation {
 
 impl DamageLocation {
     /// Find the specific path for this location, within an archive.
-    pub fn to_path(&self, archive_dir: &Path) -> PathBuf {
+    async fn to_path(&self, archive_dir: &Path) -> PathBuf {
         match self {
             DamageLocation::BandHead(band_id) => archive_dir
                 .join(BandId::from(*band_id).to_string())
@@ -263,9 +276,12 @@ impl DamageLocation {
                 .join(BandId::from(*band_id).to_string())
                 .join("BANDTAIL"),
             DamageLocation::Block(block_index) => {
-                let archive = Archive::open(Transport::local(archive_dir)).expect("open archive");
+                let archive = Archive::open(Transport::local(archive_dir))
+                    .await
+                    .expect("open archive");
                 let block_hash = archive
                     .all_blocks(TestMonitor::arc())
+                    .await
                     .expect("list blocks")
                     .into_iter()
                     .sorted()

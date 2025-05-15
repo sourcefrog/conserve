@@ -13,12 +13,12 @@
 //! Test garbage collection.
 
 use conserve::monitor::test::TestMonitor;
-use conserve::test_fixtures::{ScratchArchive, TreeFixture};
+use conserve::test_fixtures::TreeFixture;
 use conserve::*;
 
-#[test]
-fn unreferenced_blocks() {
-    let archive = ScratchArchive::new();
+#[tokio::test]
+async fn unreferenced_blocks() {
+    let archive = Archive::create_temp().await;
     let tf = TreeFixture::new();
     tf.create_file("hello");
     let content_hash: BlockHash =
@@ -33,13 +33,14 @@ fn unreferenced_blocks() {
         &BackupOptions::default(),
         TestMonitor::arc(),
     )
+    .await
     .expect("backup");
 
     // Delete the band and index
-    std::fs::remove_dir_all(archive.path().join("b0000")).unwrap();
+    std::fs::remove_dir_all(archive.transport().local_path().unwrap().join("b0000")).unwrap();
     let monitor = TestMonitor::arc();
 
-    let unreferenced: Vec<BlockHash> = archive.unreferenced_blocks(monitor.clone()).unwrap();
+    let unreferenced: Vec<BlockHash> = archive.unreferenced_blocks(monitor.clone()).await.unwrap();
     assert_eq!(unreferenced, [content_hash]);
 
     // Delete dry run.
@@ -52,6 +53,7 @@ fn unreferenced_blocks() {
             },
             monitor.clone(),
         )
+        .await
         .unwrap();
     assert_eq!(
         delete_stats,
@@ -72,6 +74,7 @@ fn unreferenced_blocks() {
     };
     let delete_stats = archive
         .delete_bands(&[], &options, monitor.clone())
+        .await
         .unwrap();
     assert_eq!(
         delete_stats,
@@ -88,6 +91,7 @@ fn unreferenced_blocks() {
     // Try again to delete: should find no garbage.
     let delete_stats = archive
         .delete_bands(&[], &options, monitor.clone())
+        .await
         .unwrap();
     assert_eq!(
         delete_stats,
@@ -102,13 +106,13 @@ fn unreferenced_blocks() {
     );
 }
 
-#[test]
-fn backup_prevented_by_gc_lock() -> Result<()> {
-    let archive = ScratchArchive::new();
+#[tokio::test]
+async fn backup_prevented_by_gc_lock() -> Result<()> {
+    let archive = Archive::create_temp().await;
     let tf = TreeFixture::new();
     tf.create_file("hello");
 
-    let lock1 = GarbageCollectionLock::new(&archive)?;
+    let lock1 = GarbageCollectionLock::new(&archive).await?;
 
     // Backup should fail while gc lock is held.
     let monitor = TestMonitor::arc();
@@ -117,7 +121,8 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
         tf.path(),
         &BackupOptions::default(),
         monitor.clone(),
-    );
+    )
+    .await;
     assert_eq!(
         backup_result.unwrap_err().to_string(),
         "Archive is locked for garbage collection"
@@ -125,14 +130,16 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
 
     // Leak the lock, then gc breaking the lock.
     std::mem::forget(lock1);
-    archive.delete_bands(
-        &[],
-        &DeleteOptions {
-            break_lock: true,
-            ..Default::default()
-        },
-        monitor.clone(),
-    )?;
+    archive
+        .delete_bands(
+            &[],
+            &DeleteOptions {
+                break_lock: true,
+                ..Default::default()
+            },
+            monitor.clone(),
+        )
+        .await?;
 
     // Backup should now succeed.
     let backup_result = backup(
@@ -140,8 +147,10 @@ fn backup_prevented_by_gc_lock() -> Result<()> {
         tf.path(),
         &BackupOptions::default(),
         monitor.clone(),
-    );
-    assert!(backup_result.is_ok());
+    )
+    .await
+    .unwrap();
+    dbg!(&backup_result);
 
     Ok(())
 }

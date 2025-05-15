@@ -334,7 +334,8 @@ impl std::process::Termination for ExitCode {
 }
 
 impl Command {
-    fn run(&self, monitor: Arc<TermUiMonitor>) -> Result<ExitCode> {
+    #[tokio::main]
+    async fn run(&self, monitor: Arc<TermUiMonitor>) -> Result<ExitCode> {
         let mut stdout = io::stdout();
         match self {
             Command::Backup {
@@ -357,37 +358,45 @@ impl Command {
                     ..Default::default()
                 };
                 let stats = backup(
-                    &Archive::open(Transport::new(archive)?)?,
+                    &Archive::open(Transport::new(archive).await?).await?,
                     source,
                     &options,
                     monitor,
-                )?;
+                )
+                .await?;
                 if !no_stats {
                     info!("Backup complete.\n{stats}");
                 }
             }
             Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                for hash in Archive::open(Transport::new(archive)?)?.all_blocks(monitor)? {
+                let archive = Archive::open(Transport::new(archive).await?).await?;
+                let blocks = archive.all_blocks(monitor).await?;
+                for hash in blocks {
                     writeln!(bw, "{hash}")?;
                 }
             }
             Command::Debug(Debug::Index { archive, backup }) => {
-                let st = stored_tree_from_opt(archive, backup)?;
-                show::show_index_json(st.band(), &mut stdout)?;
+                let st = stored_tree_from_opt(archive, backup).await?;
+                show::show_index_json(st.band(), &mut stdout).await?;
             }
             Command::Debug(Debug::Referenced { archive }) => {
                 let mut bw = BufWriter::new(stdout);
-                let archive = Archive::open(Transport::new(archive)?)?;
-                for hash in archive.referenced_blocks(&archive.list_band_ids()?, monitor)? {
+                let archive = Archive::open(Transport::new(archive).await?).await?;
+                for hash in archive
+                    .referenced_blocks(&archive.list_band_ids().await?, monitor)
+                    .await?
+                {
                     writeln!(bw, "{hash}")?;
                 }
             }
             Command::Debug(Debug::Unreferenced { archive }) => {
                 print!(
                     "{}",
-                    Archive::open(Transport::new(archive)?)?
-                        .unreferenced_blocks(monitor)?
+                    Archive::open(Transport::new(archive).await?)
+                        .await?
+                        .unreferenced_blocks(monitor)
+                        .await?
                         .into_iter()
                         .map(|hash| format!("{}\n", hash))
                         .collect::<Vec<String>>()
@@ -401,14 +410,17 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let stats = Archive::open(Transport::new(archive)?)?.delete_bands(
-                    backup,
-                    &DeleteOptions {
-                        dry_run: *dry_run,
-                        break_lock: *break_lock,
-                    },
-                    monitor.clone(),
-                )?;
+                let stats = Archive::open(Transport::new(archive).await?)
+                    .await?
+                    .delete_bands(
+                        backup,
+                        &DeleteOptions {
+                            dry_run: *dry_run,
+                            break_lock: *break_lock,
+                        },
+                        monitor.clone(),
+                    )
+                    .await?;
                 if !no_stats {
                     monitor.clear_progress_bars();
                     println!("{stats}");
@@ -423,14 +435,15 @@ impl Command {
                 include_unchanged,
                 json,
             } => {
-                let st = stored_tree_from_opt(archive, backup)?;
+                let st = stored_tree_from_opt(archive, backup).await?;
                 let source = SourceTree::open(source)?;
                 let options = DiffOptions {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
                     include_unchanged: *include_unchanged,
                 };
                 let mut bw = BufWriter::new(stdout);
-                for change in diff(&st, &source, &options, monitor.clone())? {
+                let mut diff = diff(&st, &source, options, monitor.clone()).await?;
+                while let Some(change) = diff.next().await {
                     if *json {
                         serde_json::to_writer(&mut bw, &change)?;
                     } else {
@@ -444,21 +457,23 @@ impl Command {
                 break_lock,
                 no_stats,
             } => {
-                let archive = Archive::open(Transport::new(archive)?)?;
-                let stats = archive.delete_bands(
-                    &[],
-                    &DeleteOptions {
-                        dry_run: *dry_run,
-                        break_lock: *break_lock,
-                    },
-                    monitor,
-                )?;
+                let archive = Archive::open(Transport::new(archive).await?).await?;
+                let stats = archive
+                    .delete_bands(
+                        &[],
+                        &DeleteOptions {
+                            dry_run: *dry_run,
+                            break_lock: *break_lock,
+                        },
+                        monitor,
+                    )
+                    .await?;
                 if !no_stats {
                     info!(%stats);
                 }
             }
             Command::Init { archive } => {
-                Archive::create(Transport::new(archive)?)?;
+                Archive::create(Transport::new(archive).await?).await?;
                 debug!("Created new archive in {archive:?}");
             }
             Command::Ls {
@@ -469,31 +484,38 @@ impl Command {
                 long_listing,
             } => {
                 let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
-                let entry_iter: Box<dyn Iterator<Item = EntryValue>> =
-                    if let Some(archive) = &stos.archive {
-                        // TODO: Option for subtree.
-                        Box::new(
-                            stored_tree_from_opt(archive, &stos.backup)?
-                                .iter_entries(Apath::root(), exclude, monitor.clone())?
-                                .map(|it| it.into()),
-                        )
-                    } else {
-                        Box::new(
-                            SourceTree::open(stos.source.clone().unwrap())?.iter_entries(
-                                Apath::root(),
-                                exclude,
-                                monitor.clone(),
-                            )?,
-                        )
-                    };
-                monitor.clear_progress_bars();
-                if *json {
-                    for entry in entry_iter {
-                        println!("{}", serde_json::ser::to_string(&entry)?);
+                if let Some(archive) = &stos.archive {
+                    // TODO: Option for subtree.
+                    let mut stitch = stored_tree_from_opt(archive, &stos.backup)
+                        .await?
+                        .iter_entries(Apath::root(), exclude, monitor.clone());
+                    while let Some(entry) = stitch.next().await {
+                        // Strip off index internals like addresses; this seems
+                        // like not quite the right way to do it, maybe the types should
+                        // be different, or these should be a specific method to produce
+                        // this json format...?
+                        if *json {
+                            println!("{}", entry.listing_json());
+                        } else {
+                            println!("{}", entry.format_ls(*long_listing));
+                        }
                     }
                 } else {
-                    show::show_entry_names(entry_iter, &mut stdout, *long_listing)?;
-                }
+                    // TODO: Can maybe unify these more when the source tree iter is also async.
+                    let entry_iter = SourceTree::open(stos.source.clone().unwrap())?.iter_entries(
+                        Apath::root(),
+                        exclude,
+                        monitor.clone(),
+                    )?;
+                    for entry in entry_iter {
+                        if *json {
+                            println!("{}", entry.listing_json());
+                        } else {
+                            println!("{}", entry.format_ls(*long_listing));
+                        }
+                    }
+                };
+                monitor.clear_progress_bars();
             }
             #[cfg(windows)]
             Command::Mount {
@@ -545,7 +567,7 @@ impl Command {
                 no_stats,
             } => {
                 let band_selection = band_selection_policy_from_opt(backup);
-                let archive = Archive::open(Transport::new(archive)?)?;
+                let archive = Archive::open(Transport::new(archive).await?).await?;
                 let _ = no_stats; // accepted but ignored; we never currently print stats
                 let options = RestoreOptions {
                     exclude: Exclude::from_patterns_and_files(exclude, exclude_from)?,
@@ -558,7 +580,7 @@ impl Command {
                         &changes_json.as_deref(),
                     )?,
                 };
-                restore(&archive, destination, &options, monitor)?;
+                restore(&archive, destination, options, monitor).await?;
                 debug!("Restore complete");
             }
             Command::Size {
@@ -569,8 +591,10 @@ impl Command {
             } => {
                 let exclude = Exclude::from_patterns_and_files(exclude, exclude_from)?;
                 let size = if let Some(archive) = &stos.archive {
-                    stored_tree_from_opt(archive, &stos.backup)?
-                        .size(exclude, monitor.clone())?
+                    stored_tree_from_opt(archive, &stos.backup)
+                        .await?
+                        .size(exclude, monitor.clone())
+                        .await?
                         .file_bytes
                 } else {
                     SourceTree::open(stos.source.as_ref().unwrap())?
@@ -588,7 +612,10 @@ impl Command {
                 let options = ValidateOptions {
                     skip_block_hashes: *quick,
                 };
-                Archive::open(Transport::new(archive)?)?.validate(&options, monitor.clone())?;
+                Archive::open(Transport::new(archive).await?)
+                    .await?
+                    .validate(&options, monitor.clone())
+                    .await?;
                 if monitor.error_count() != 0 {
                     warn!("Archive has some problems.");
                 } else {
@@ -607,7 +634,7 @@ impl Command {
                 } else {
                     Some(*LOCAL_OFFSET.read().unwrap())
                 };
-                let archive = Archive::open(Transport::new(archive)?)?;
+                let archive = Archive::open(Transport::new(archive).await?).await?;
                 let options = ShowVersionsOptions {
                     newest_first: *newest,
                     tree_size: *sizes,
@@ -615,17 +642,20 @@ impl Command {
                     start_time: !*short,
                     backup_duration: !*short,
                 };
-                conserve::show_versions(&archive, &options, monitor)?;
+                conserve::show_versions(&archive, &options, monitor).await?;
             }
         }
         Ok(ExitCode::Success)
     }
 }
 
-fn stored_tree_from_opt(archive_location: &str, backup: &Option<BandId>) -> Result<StoredTree> {
-    let archive = Archive::open(Transport::new(archive_location)?)?;
+async fn stored_tree_from_opt(
+    archive_location: &str,
+    backup: &Option<BandId>,
+) -> Result<StoredTree> {
+    let archive = Archive::open(Transport::new(archive_location).await?).await?;
     let policy = band_selection_policy_from_opt(backup);
-    archive.open_stored_tree(policy)
+    archive.open_stored_tree(policy).await
 }
 
 fn band_selection_policy_from_opt(backup: &Option<BandId>) -> BandSelectionPolicy {

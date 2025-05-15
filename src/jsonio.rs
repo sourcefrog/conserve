@@ -44,7 +44,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Write uncompressed json to a file on a Transport.
-pub(crate) fn write_json<T>(transport: &Transport, relpath: &str, obj: &T) -> Result<()>
+pub(crate) async fn write_json<T>(transport: &Transport, relpath: &str, obj: &T) -> Result<()>
 where
     T: serde::Serialize,
 {
@@ -55,17 +55,18 @@ where
     s.push('\n');
     transport
         .write(relpath, s.as_bytes(), WriteMode::CreateNew)
+        .await
         .map_err(Error::from)
 }
 
 /// Read and deserialize uncompressed json from a file on a Transport.
 ///
 /// Returns None if the file does not exist.
-pub(crate) fn read_json<T>(transport: &Transport, path: &str) -> Result<Option<T>>
+pub(crate) async fn read_json<T>(transport: &Transport, path: &str) -> Result<Option<T>>
 where
     T: DeserializeOwned,
 {
-    let bytes = match transport.read(path) {
+    let bytes = match transport.read(path).await {
         Ok(b) => b,
         Err(err) if err.is_not_found() => return Ok(None),
         Err(err) => return Err(err.into()),
@@ -92,8 +93,8 @@ mod tests {
         pub weather: String,
     }
 
-    #[test]
-    fn write_json_to_transport() {
+    #[tokio::test]
+    async fn write_json_to_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
         let entry = TestContents {
             id: 42,
@@ -102,7 +103,9 @@ mod tests {
         let filename = "test.json";
 
         let transport = Transport::local(temp.path());
-        super::write_json(&transport, filename, &entry).unwrap();
+        super::write_json(&transport, filename, &entry)
+            .await
+            .unwrap();
 
         let json_child = temp.child("test.json");
         json_child.assert(concat!(r#"{"id":42,"weather":"cold"}"#, "\n"));
@@ -110,8 +113,8 @@ mod tests {
         temp.close().unwrap();
     }
 
-    #[test]
-    fn read_json_from_transport() {
+    #[tokio::test]
+    async fn read_json_from_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
         temp.child("test.json")
             .write_str(r#"{"id": 42, "weather": "cold"}"#)
@@ -119,6 +122,7 @@ mod tests {
 
         let transport = Transport::local(temp.path());
         let content: TestContents = read_json(&transport, "test.json")
+            .await
             .expect("no error")
             .expect("file exists");
 
@@ -134,23 +138,26 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[test]
-    fn read_json_error_when_permission_denied() -> Result<()> {
+    #[tokio::test]
+    async fn read_json_error_when_permission_denied() -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
         let transport = Transport::temp();
         let f = std::fs::File::create(transport.local_path().unwrap().join("file"))?;
         let metadata = f.metadata()?;
         let mut perms = metadata.permissions();
-        perms.set_mode(0);
+        perms.set_mode(0o0);
         f.set_permissions(perms)?;
-        read_json::<TestContents>(&transport, "file").expect_err("Read file with access denied");
+        read_json::<TestContents>(&transport, "file")
+            .await
+            .expect_err("Read file with access denied");
         Ok(())
     }
 
-    #[test]
-    fn read_json_is_none_for_nonexistent_files() {
+    #[tokio::test]
+    async fn read_json_is_none_for_nonexistent_files() {
         let transport = Transport::temp();
         assert!(read_json::<TestContents>(&transport, "nonexistent.json")
+            .await
             .expect("No error for nonexistent file")
             .is_none());
     }
