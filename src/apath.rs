@@ -332,7 +332,7 @@ mod test {
     #[test]
     fn display_apath() {
         let apath: Apath = "/something".parse().unwrap();
-        assert_eq!(format!("{}", apath), "/something");
+        assert_eq!(format!("{apath}"), "/something");
     }
 
     #[test]
@@ -380,7 +380,7 @@ mod test {
             assert!(!Apath::is_valid(v), "{v:?} incorrectly marked valid");
             let err = Apath::from_str(v).unwrap_err();
             assert_eq!(
-                format!("{}", err),
+                format!("{err}"),
                 "Invalid apath: must have an initial slash and no .."
             );
         }

@@ -112,7 +112,7 @@ impl Debug for Counters {
         let mut s = f.debug_struct("Counters");
         for i in Counter::iter() {
             s.field(
-                &format!("{:?}", i),
+                &format!("{i:?}"),
                 &self.counters[i as usize].load(Relaxed),
             );
         }
@@ -168,7 +168,7 @@ mod test {
         let counters = Counters::default();
         counters.count(Counter::Files, 2);
         let d = format!("{counters:#?}");
-        println!("{}", d);
+        println!("{d}");
         assert!(d.contains("Files: 2"));
         assert!(d.contains("Dirs: 0"));
     }

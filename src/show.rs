@@ -57,7 +57,7 @@ pub async fn show_versions(
     }
     for band_id in band_ids {
         if !(options.tree_size || options.start_time || options.backup_duration) {
-            println!("{}", band_id);
+            println!("{band_id}");
             continue;
         }
         let mut l: Vec<String> = Vec::new();

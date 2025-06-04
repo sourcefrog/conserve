@@ -180,7 +180,7 @@ mod test {
             BlockHash::hash_bytes(b"conserve"),
             BlockHash::hash_bytes(b"backup"),
         ];
-        println!("{:#?}", hs);
+        println!("{hs:#?}");
         assert_ne!(hs[0], hs[1]);
         // it just happens that they come out in this order.
         assert!(hs[0] < hs[1]);

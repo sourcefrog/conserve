@@ -80,7 +80,7 @@ fn backup_unix_permissions() {
         user = user,
         group = group
     );
-    println!("expected: {}", expected);
+    println!("expected: {expected}");
     run_conserve()
         .args(["backup", "-v", "-l"])
         .arg(&arch_dir)

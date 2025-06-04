@@ -104,9 +104,9 @@ impl Display for TaskState {
         let done = self.done.load(Relaxed);
         let name = self.name.read().unwrap();
         if total == 0 && done == 0 {
-            write!(f, "{}", name)
+            write!(f, "{name}")
         } else if total == 0 {
-            write!(f, "{}: {}", name, done)
+            write!(f, "{name}: {done}")
         } else {
             write!(
                 f,

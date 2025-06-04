@@ -398,7 +398,7 @@ impl Command {
                         .unreferenced_blocks(monitor)
                         .await?
                         .into_iter()
-                        .map(|hash| format!("{}\n", hash))
+                        .map(|hash| format!("{hash}\n"))
                         .collect::<Vec<String>>()
                         .join("")
                 );

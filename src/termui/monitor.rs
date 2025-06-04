@@ -138,7 +138,7 @@ impl nutmeg::Model for Model {
             }
         }
         for task in self.tasks.lock().unwrap().active_tasks() {
-            s += &format!("{}\n", task);
+            s += &format!("{task}\n");
         }
         s
     }

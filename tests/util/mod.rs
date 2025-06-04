@@ -8,7 +8,7 @@ use tempfile::TempDir;
 
 /// Make a copy of a archive testdata.
 pub fn copy_testdata_archive(name: &str, version: &str) -> TempDir {
-    let temp = TempDir::with_prefix(format!("conserve-api-test-{}-{}", name, version))
+    let temp = TempDir::with_prefix(format!("conserve-api-test-{name}-{version}"))
         .expect("create temp dir");
     let stored_archive_path = testdata_archive_path(name, version);
     cp_r::CopyOptions::default()
