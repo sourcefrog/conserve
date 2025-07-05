@@ -111,10 +111,7 @@ impl Debug for Counters {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("Counters");
         for i in Counter::iter() {
-            s.field(
-                &format!("{i:?}"),
-                &self.counters[i as usize].load(Relaxed),
-            );
+            s.field(&format!("{i:?}"), &self.counters[i as usize].load(Relaxed));
         }
         s.finish()
     }
