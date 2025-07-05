@@ -105,15 +105,28 @@ enum Command {
     Delete {
         /// Archive to delete from.
         archive: String,
+
         /// Backup to delete, as an id like 'b1'. May be repeated with commas.
-        #[arg(long, short, value_delimiter = ',', required(true))]
+        #[arg(
+            long,
+            short,
+            value_delimiter = ',',
+            required_unless_present = "expiry_days"
+        )]
         backup: Vec<BandId>,
+
+        /// Delete backups that are older than the specified number of days.
+        #[arg(long, required_unless_present = "backup")]
+        expiry_days: Option<u32>,
+
         /// Don't actually delete, just check what could be deleted.
         #[arg(long)]
         dry_run: bool,
+
         /// Break a lock left behind by a previous interrupted gc operation, and then gc.
         #[arg(long)]
         break_lock: bool,
+
         #[arg(long)]
         no_stats: bool,
     },
@@ -407,6 +420,7 @@ impl Command {
                 archive,
                 backup,
                 dry_run,
+                expiry_days,
                 break_lock,
                 no_stats,
             } => {
@@ -417,6 +431,7 @@ impl Command {
                         &DeleteOptions {
                             dry_run: *dry_run,
                             break_lock: *break_lock,
+                            expiry_days: *expiry_days,
                         },
                         monitor.clone(),
                     )
@@ -464,6 +479,7 @@ impl Command {
                         &DeleteOptions {
                             dry_run: *dry_run,
                             break_lock: *break_lock,
+                            expiry_days: None,
                         },
                         monitor,
                     )

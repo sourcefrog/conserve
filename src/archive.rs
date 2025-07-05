@@ -21,7 +21,8 @@ use std::time::Instant;
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, warn};
+use time::OffsetDateTime;
+use tracing::{debug, info, warn};
 
 use crate::blockdir::BlockDir;
 use crate::index::stitch::Stitch;
@@ -52,6 +53,8 @@ struct ArchiveHeader {
 pub struct DeleteOptions {
     pub dry_run: bool,
     pub break_lock: bool,
+    /// Delete backups that are older than the specified number of days.
+    pub expiry_days: Option<u32>,
 }
 
 impl Archive {
@@ -237,7 +240,7 @@ impl Archive {
 
     /// Delete bands, and the blocks that they reference.
     ///
-    /// If `delete_band_ids` is empty, this deletes no bands, but will delete any garbage
+    /// If `delete_band_ids` is empty and `expiry_days` is None, this deletes no bands, but will delete any garbage
     /// blocks referenced by no existing bands.
     pub async fn delete_bands(
         &self,
@@ -247,6 +250,7 @@ impl Archive {
     ) -> Result<DeleteStats> {
         let mut stats = DeleteStats::default();
         let start = Instant::now();
+        let mut delete_band_ids = delete_band_ids.to_vec();
 
         // TODO: No need to lock for dry_run.
         let gc_lock = if options.break_lock {
@@ -257,8 +261,28 @@ impl Archive {
         debug!("Got gc lock");
 
         debug!("List band ids...");
-        let mut keep_band_ids = self.list_band_ids().await?;
-        keep_band_ids.retain(|b| !delete_band_ids.contains(b));
+        let all_band_ids = self.list_band_ids().await?;
+        if let Some(expiry_days) = options.expiry_days {
+            let now = OffsetDateTime::now_utc();
+            for band_id in &all_band_ids {
+                if delete_band_ids.contains(band_id) {
+                    continue;
+                }
+                let band = Band::open(self, *band_id).await?;
+                let info = band.get_info().await?;
+                let t = info.end_time.unwrap_or(info.start_time);
+                let age = now - t;
+                if age.whole_seconds() > (expiry_days as i64) * 24 * 60 * 60 {
+                    info!("Band {band_id} from {t} expired");
+                    delete_band_ids.push(*band_id);
+                }
+            }
+        }
+        let keep_band_ids: Vec<BandId> = all_band_ids
+            .iter()
+            .cloned()
+            .filter(|b| !delete_band_ids.contains(b))
+            .collect();
 
         debug!("List referenced blocks...");
         let referenced = self

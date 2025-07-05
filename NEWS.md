@@ -8,6 +8,8 @@
 
 - New: Support for reading and writing archives over SFTP. Credentials currently must come from an sftp-agent.
 
+- New: `delete --expiry-days DAYS` deletes all backups older than DAYS days.
+
 ## 24.8.0
 
 - Fixed: `restore --only` specifying a subdirectory no longer fails due to parent directories missing from the destination.

@@ -50,6 +50,7 @@ async fn unreferenced_blocks() {
             &DeleteOptions {
                 dry_run: true,
                 break_lock: false,
+                expiry_days: None,
             },
             monitor.clone(),
         )
@@ -71,6 +72,7 @@ async fn unreferenced_blocks() {
     let options = DeleteOptions {
         dry_run: false,
         break_lock: false,
+        expiry_days: None,
     };
     let delete_stats = archive
         .delete_bands(&[], &options, monitor.clone())
