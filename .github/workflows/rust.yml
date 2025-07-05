@@ -76,7 +76,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        # windows-latest: currently broken and too hard for me to maintain -- mbp 2025-07
+        os: [ubuntu-latest, macOS-latest]
         version: [stable, nightly, "1.82"]
 
     steps:

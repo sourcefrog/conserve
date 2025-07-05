@@ -38,8 +38,6 @@ Conserve's [guiding principles](doc/manifesto.md):
   multiple cores and IO bandwidth. (In the current release there's still room to
   add more concurrency.)
 
-- **Portable**: Conserve is tested on Windows, Linux (x86 and ARM), and OS X.
-
 ## Quick start guide
 
 Conserve storage is within an _archive_ directory created by `conserve init`:
@@ -178,7 +176,9 @@ There is still room for several performance improvements and features.
 
 The current data format (called "0.6") will be readable by future releases for at least two years.
 
-Be aware Conserve is developed as a part-time non-commercial project and there's no guarantee of support or reliability. Bug reports are welcome but I cannot promise they will receive a resolution within any particular time frame.
+**Be aware Conserve is developed as a part-time non-commercial project and there's no guarantee of support or reliability. Bug reports are welcome but I cannot promise they will receive a resolution within any particular time frame.**
+
+Windows is currently not supported: Microsoft no longer provide free development VM images, my hardware machine can't update to Windows 11, and I can't find an easy place to get a cloud VM without paying enterprise licence fees. Let me know if you have a suggestion!
 
 ## Licence and non-warranty
 
