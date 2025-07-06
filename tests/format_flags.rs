@@ -29,6 +29,6 @@ async fn unknown_format_flag_fails_to_open() {
     let err = Band::open(&af, BandId::zero()).await.unwrap_err();
     assert_eq!(
         err.to_string(),
-        "Unsupported band format flags [\"wibble\"] in b0000"
+        "Failed to deserialize json from \"BANDHEAD\": invalid value: string \"wibble\", expected registered format flag name at line 1 column 56"
     )
 }

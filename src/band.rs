@@ -21,11 +21,10 @@
 //! To read a consistent tree possibly composed from several incremental backups, use
 //! StoredTree rather than the Band itself.
 
-use std::borrow::Cow;
 use std::sync::Arc;
 
+use crate::flags::FormatFlags;
 use crate::transport::Transport;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tracing::{debug, trace, warn};
@@ -82,8 +81,8 @@ struct Head {
 
     /// Format flags that must be understood to read this band and the
     /// referenced data correctly.
-    #[serde(default)]
-    format_flags: Vec<Cow<'static, str>>,
+    #[serde(default = "FormatFlags::empty")]
+    format_flags: FormatFlags,
 }
 
 /// Format of the on-disk tail file.
@@ -120,16 +119,10 @@ impl Band {
     ///
     /// The Band gets the next id after those that already exist.
     pub(crate) async fn create(archive: &Archive) -> Result<Band> {
-        Band::create_with_flags(archive, flags::DEFAULT).await
+        Band::create_with_flags(archive, FormatFlags::current_default()).await
     }
 
-    async fn create_with_flags(
-        archive: &Archive,
-        format_flags: &[Cow<'static, str>],
-    ) -> Result<Band> {
-        format_flags
-            .iter()
-            .for_each(|f| assert!(flags::SUPPORTED.contains(&f.as_ref()), "unknown flag {f:?}"));
+    async fn create_with_flags(archive: &Archive, format_flags: FormatFlags) -> Result<Band> {
         let band_id = archive
             .last_band_id()
             .await?
@@ -146,7 +139,7 @@ impl Band {
         let head = Head {
             start_time: OffsetDateTime::now_utc().unix_timestamp(),
             band_format_version,
-            format_flags: format_flags.into(),
+            format_flags,
         };
         write_json(&transport, BAND_HEAD_FILENAME, &head).await?;
         Ok(Band {
@@ -189,18 +182,6 @@ impl Band {
             // version, band version markers ought to become mandatory.
         }
 
-        let unsupported_flags = head
-            .format_flags
-            .iter()
-            .filter(|f| !flags::SUPPORTED.contains(&f.as_ref()))
-            .cloned()
-            .collect_vec();
-        if !unsupported_flags.is_empty() {
-            return Err(Error::UnsupportedBandFormatFlags {
-                band_id,
-                unsupported_flags,
-            });
-        }
         Ok(Band {
             band_id: band_id.to_owned(),
             head,
@@ -241,7 +222,7 @@ impl Band {
     }
 
     /// Get the format flags in this band, from [flags].
-    pub fn format_flags(&self) -> &[Cow<'static, str>] {
+    pub fn format_flags(&self) -> &FormatFlags {
         &self.head.format_flags
     }
 
@@ -430,14 +411,6 @@ mod tests {
             archive.all_blocks(TestMonitor::arc()).await.unwrap().len(),
             0
         );
-    }
-
-    #[tokio::test]
-    #[should_panic(expected = "unknown flag \"wibble\"")]
-    async fn unknown_format_flag_panics_in_create() {
-        let archive = Archive::create_temp().await;
-        let _ = Band::create_with_flags(&archive, &["wibble".into()]).await;
-        // This panics because there is no way to create a band with an unsupported flag from the CLI or API.
     }
 
     #[tokio::test]
