@@ -38,17 +38,6 @@ use crate::*;
 
 static INDEX_DIR: &str = "i";
 
-/// Per-band format flags.
-pub mod flags {
-    use std::borrow::Cow;
-
-    /// Default flags for newly created bands.
-    pub static DEFAULT: &[Cow<'static, str>] = &[];
-
-    /// All the flags understood by this version of Conserve.
-    pub static SUPPORTED: &[&str] = &[];
-}
-
 /// Describes how to select a band from an archive.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BandSelectionPolicy {

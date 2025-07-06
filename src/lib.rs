@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Martin Pool.
+// Copyright 2015-2025 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ mod diff;
 pub mod entry;
 pub mod errors;
 pub mod excludes;
+pub mod flags;
 mod gc_lock;
 mod hunk_index;
 pub mod index;
