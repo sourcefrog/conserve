@@ -263,6 +263,7 @@ impl Archive {
         debug!("List band ids...");
         let all_band_ids = self.list_band_ids().await?;
         if let Some(expiry_days) = options.expiry_days {
+            // TODO: Parallelize the loop over all bands to read their head/tail.
             let now = OffsetDateTime::now_utc();
             for band_id in &all_band_ids {
                 if delete_band_ids.contains(band_id) {

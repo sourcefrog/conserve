@@ -73,6 +73,7 @@ pub struct Band {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Head {
     /// Seconds since the Unix epoch when writing of this band began.
+    // TODO: Maybe an OffsetDateTime with custom serialization.
     start_time: i64,
 
     /// Semver string for the minimum Conserve version to read this band
@@ -89,6 +90,7 @@ struct Head {
 #[derive(Debug, Serialize, Deserialize)]
 struct Tail {
     /// Seconds since the Unix epoch when the band was closed.
+    // TODO: Maybe an OffsetDateTime with custom serialization.
     end_time: i64,
 
     /// Number of index hunks in this band, to enable validation that none are missing.
