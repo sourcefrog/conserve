@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 
 use bytes::BytesMut;
 use derive_more::{Add, AddAssign};
+use time::OffsetDateTime;
 use tracing::{trace, warn};
 
 use crate::blockdir::{Address, BlockDir};
@@ -58,6 +59,9 @@ pub struct BackupOptions {
 
     /// Flags for newly created bands.
     pub format_flags: FormatFlags,
+
+    /// Override the start and end time, rather than using the real clock.
+    pub override_start_time: Option<OffsetDateTime>,
 }
 
 impl Default for BackupOptions {
@@ -70,6 +74,7 @@ impl Default for BackupOptions {
             max_block_size: 20 << 20,
             small_file_cap: 1 << 20,
             owner: true,
+            override_start_time: None,
         }
     }
 }
@@ -92,7 +97,7 @@ impl Default for BackupOptions {
 pub async fn backup(
     archive: &Archive,
     source_path: &Path,
-    options: &BackupOptions,
+    backup_options: &BackupOptions,
     monitor: Arc<dyn Monitor>,
 ) -> Result<BackupStats> {
     let start = Instant::now();
@@ -114,19 +119,22 @@ pub async fn backup(
         Stitch::empty(archive, monitor.clone())
     };
 
-    let source_entries =
-        source_tree.iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?;
+    let source_entries = source_tree.iter_entries(
+        Apath::root(),
+        backup_options.exclude.clone(),
+        monitor.clone(),
+    )?;
     let mut merge = MergeTrees::new(basis_index, source_entries);
 
     // Create the new band only after finding the basis band!
-    let band = Band::create_ext(archive, options).await?;
+    let band = Band::create_ext(archive, backup_options).await?;
     let index_writer = band.index_writer(monitor.clone());
     let mut writer = BackupWriter {
         band,
         index_writer,
         block_dir: archive.block_dir.clone(),
         stats: BackupStats::default(),
-        file_combiner: FileCombiner::new(archive.block_dir.clone(), options.max_block_size),
+        file_combiner: FileCombiner::new(archive.block_dir.clone(), backup_options.max_block_size),
     };
 
     while let Some(merged_entries) = merge.next().await {
@@ -140,7 +148,7 @@ pub async fn backup(
                     &basis_entry,
                     source_entry,
                     &source_tree,
-                    options,
+                    backup_options,
                     monitor.clone(),
                 )
                 .await
@@ -157,7 +165,7 @@ pub async fn backup(
                         Change::Unchanged { .. } => monitor.count(Counter::EntriesUnchanged, 1),
                         Change::Deleted { .. } => panic!("Deleted should not be returned here"),
                     }
-                    if let Some(cb) = &options.change_callback {
+                    if let Some(cb) = &backup_options.change_callback {
                         cb(&entry_change)?;
                     }
                 }
@@ -169,7 +177,7 @@ pub async fn backup(
                 "After copy"
             );
             if writer.index_writer.pending_entries() + writer.file_combiner.queue.len()
-                >= options.max_entries_per_hunk
+                >= backup_options.max_entries_per_hunk
             {
                 writer.flush_group(monitor.clone()).await?;
                 assert_eq!(writer.index_writer.pending_entries(), 0);
@@ -179,13 +187,13 @@ pub async fn backup(
             let basis_entry = basis_entry.expect("Basis entry must exist if source entry is none");
             trace!(apath = %basis_entry.apath(), "Deleted");
             monitor.count(Counter::EntriesDeleted, 1);
-            options
+            backup_options
                 .change_callback
                 .as_ref()
                 .map(|cb| cb(&EntryChange::deleted(&basis_entry)));
         }
     }
-    stats += writer.finish(monitor.clone()).await?;
+    stats += writer.finish(monitor.clone(), backup_options).await?;
     stats.elapsed = start.elapsed();
     let block_stats = &archive.block_dir.stats;
     stats.read_blocks = block_stats.read_blocks.load(Relaxed);
@@ -201,16 +209,19 @@ struct BackupWriter {
     index_writer: IndexWriter,
     stats: BackupStats,
     block_dir: Arc<BlockDir>,
-
     file_combiner: FileCombiner,
 }
 
 impl BackupWriter {
-    async fn finish(mut self, monitor: Arc<dyn Monitor>) -> Result<BackupStats> {
+    async fn finish(
+        mut self,
+        monitor: Arc<dyn Monitor>,
+        backup_options: &BackupOptions,
+    ) -> Result<BackupStats> {
         self.flush_group(monitor.clone()).await?;
         let hunks = self.index_writer.finish().await?;
         trace!(?hunks, "Closing band");
-        self.band.close(hunks as u64).await?;
+        self.band.close(hunks as u64, backup_options).await?;
         Ok(BackupStats { ..self.stats })
     }
 

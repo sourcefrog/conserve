@@ -17,6 +17,8 @@ use std::sync::Arc;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use filetime::{set_file_mtime, FileTime};
+use time::macros::{date, time};
+use time::OffsetDateTime;
 use tracing_test::traced_test;
 
 use conserve::counters::Counter;
@@ -720,4 +722,24 @@ async fn detect_unchanged_from_stitched_index() {
     .unwrap();
     assert_eq!(stats.unmodified_files, 2, "both files are unmodified");
     assert_eq!(monitor.get_counter(Counter::IndexWrites), 3);
+}
+
+#[tokio::test]
+async fn override_backup_time() -> Result<()> {
+    let af = Archive::create_temp().await;
+    let srcdir = TreeFixture::new();
+    let monitor = TestMonitor::arc();
+    let fake_time = OffsetDateTime::new_utc(date!(2010 - 12 - 31), time!(12:01:02));
+    let backup_options = BackupOptions {
+        override_start_time: Some(fake_time),
+        ..Default::default()
+    };
+    let _stats = backup(&af, srcdir.path(), &backup_options, monitor.clone()).await?;
+
+    let band = Band::open(&af, BandId::zero()).await?;
+    let info = band.get_info().await?;
+
+    assert_eq!(info.start_time, fake_time);
+    assert_eq!(info.end_time, Some(fake_time));
+    Ok(())
 }

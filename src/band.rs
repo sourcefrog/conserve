@@ -140,7 +140,10 @@ impl Band {
         } else {
             Some("23.2.0".to_owned())
         };
-        let start_time = OffsetDateTime::now_utc().unix_timestamp();
+        let start_time = backup_options
+            .override_start_time
+            .unwrap_or_else(OffsetDateTime::now_utc)
+            .unix_timestamp();
         let head = Head {
             start_time,
             band_format_version,
@@ -155,12 +158,17 @@ impl Band {
     }
 
     /// Mark this band closed: no more blocks should be written after this.
-    pub async fn close(&self, index_hunk_count: u64) -> Result<()> {
+    pub async fn close(&self, index_hunk_count: u64, backup_options: &BackupOptions) -> Result<()> {
+        // TODO: This should perhaps be on a specific band writer object, and allow it to only be closed once?
+        let end_time = backup_options
+            .override_start_time
+            .unwrap_or_else(OffsetDateTime::now_utc)
+            .unix_timestamp();
         write_json(
             &self.transport,
             BAND_TAIL_FILENAME,
             &Tail {
-                end_time: OffsetDateTime::now_utc().unix_timestamp(),
+                end_time,
                 index_hunk_count: Some(index_hunk_count),
             },
         )
@@ -301,6 +309,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_and_reopen_band() {
+        let backup_options = BackupOptions::default();
         let archive = Archive::create_temp().await;
         let band = Band::create(&archive).await.unwrap();
         let archive_path = archive.transport().local_path().unwrap();
@@ -314,7 +323,7 @@ mod tests {
 
         assert!(!band.is_closed().await.unwrap());
 
-        band.close(0).await.unwrap();
+        band.close(0, &backup_options).await.unwrap();
         assert!(band_dir.join("BANDTAIL").is_file());
         assert!(band.is_closed().await.unwrap());
 
