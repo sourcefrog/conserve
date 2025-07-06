@@ -113,7 +113,7 @@ impl Ord for BlockHash {
 
 impl PartialOrd for BlockHash {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.bin.cmp(&other.bin))
+        Some(self.cmp(other))
     }
 }
 
