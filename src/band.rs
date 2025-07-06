@@ -119,10 +119,13 @@ impl Band {
     ///
     /// The Band gets the next id after those that already exist.
     pub(crate) async fn create(archive: &Archive) -> Result<Band> {
-        Band::create_with_flags(archive, FormatFlags::current_default()).await
+        Band::create_ext(archive, &BackupOptions::default()).await
     }
 
-    async fn create_with_flags(archive: &Archive, format_flags: FormatFlags) -> Result<Band> {
+    pub(crate) async fn create_ext(
+        archive: &Archive,
+        backup_options: &BackupOptions,
+    ) -> Result<Band> {
         let band_id = archive
             .last_band_id()
             .await?
@@ -131,15 +134,17 @@ impl Band {
         let transport = archive.transport().chdir(&band_id.to_string());
         transport.create_dir("").await?;
         transport.create_dir(INDEX_DIR).await?;
+        let format_flags = &backup_options.format_flags;
         let band_format_version = if format_flags.is_empty() {
             Some("0.6.3".to_owned())
         } else {
             Some("23.2.0".to_owned())
         };
+        let start_time = OffsetDateTime::now_utc().unix_timestamp();
         let head = Head {
-            start_time: OffsetDateTime::now_utc().unix_timestamp(),
+            start_time,
             band_format_version,
-            format_flags,
+            format_flags: format_flags.clone(),
         };
         write_json(&transport, BAND_HEAD_FILENAME, &head).await?;
         Ok(Band {

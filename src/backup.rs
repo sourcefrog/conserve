@@ -29,6 +29,7 @@ use tracing::{trace, warn};
 use crate::blockdir::{Address, BlockDir};
 use crate::change::Change;
 use crate::counters::Counter;
+use crate::flags::FormatFlags;
 use crate::index::entry::IndexEntry;
 use crate::index::stitch::Stitch;
 use crate::io::read_with_retries;
@@ -54,6 +55,9 @@ pub struct BackupOptions {
 
     /// Record the user/group owners on Unix.
     pub owner: bool,
+
+    /// Flags for newly created bands.
+    pub format_flags: FormatFlags,
 }
 
 impl Default for BackupOptions {
@@ -62,6 +66,7 @@ impl Default for BackupOptions {
             exclude: Exclude::nothing(),
             max_entries_per_hunk: 100_000,
             change_callback: None,
+            format_flags: FormatFlags::current_default(),
             max_block_size: 20 << 20,
             small_file_cap: 1 << 20,
             owner: true,
@@ -114,7 +119,7 @@ pub async fn backup(
     let mut merge = MergeTrees::new(basis_index, source_entries);
 
     // Create the new band only after finding the basis band!
-    let band = Band::create(archive).await?;
+    let band = Band::create_ext(archive, options).await?;
     let index_writer = band.index_writer(monitor.clone());
     let mut writer = BackupWriter {
         band,
