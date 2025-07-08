@@ -196,6 +196,7 @@ impl Band {
             // Unmarked, old bands, are accepted for now. In the next archive
             // version, band version markers ought to become mandatory.
         }
+        head.format_flags.check_supported(band_id)?;
 
         Ok(Band {
             band_id: band_id.to_owned(),

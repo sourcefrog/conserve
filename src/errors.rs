@@ -13,7 +13,6 @@
 
 //! Conserve error types.
 
-use std::borrow::Cow;
 use std::io;
 use std::path::PathBuf;
 
@@ -66,7 +65,7 @@ pub enum Error {
     #[error("Unsupported band format flags {unsupported_flags:?} in {band_id}")]
     UnsupportedBandFormatFlags {
         band_id: BandId,
-        unsupported_flags: Vec<Cow<'static, str>>,
+        unsupported_flags: Vec<String>,
     },
 
     #[error("Destination directory is not empty")]
