@@ -371,6 +371,11 @@ mod test {
         use std::fs;
         use std::os::unix::prelude::PermissionsExt;
 
+        if nix::unistd::Uid::effective().is_root() {
+            println!("Skipping permissions test when running as root");
+            return;
+        }
+
         let temp = assert_fs::TempDir::new().unwrap();
         let transport = Transport::local(temp.path());
         temp.child("file").touch().unwrap();
