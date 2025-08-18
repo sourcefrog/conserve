@@ -13,7 +13,6 @@
 
 //! Block hash address type.
 
-use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
@@ -28,7 +27,7 @@ use crate::*;
 ///
 /// Stored in memory as compact bytes, but translatable to and from
 /// hex strings.
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, PartialOrd, Ord)]
 #[serde(into = "String")]
 #[serde(try_from = "&str")]
 pub struct BlockHash {
@@ -102,18 +101,6 @@ impl From<Blake2bResult> for BlockHash {
         let mut bin = [0; BLAKE_HASH_SIZE_BYTES];
         bin.copy_from_slice(hash.as_bytes());
         BlockHash { bin }
-    }
-}
-
-impl Ord for BlockHash {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.bin.cmp(&other.bin)
-    }
-}
-
-impl PartialOrd for BlockHash {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.bin.cmp(&other.bin))
     }
 }
 
