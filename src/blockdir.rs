@@ -96,6 +96,10 @@ impl BlockDir {
 
         /// Remember the existence of this many blocks, even if we don't have their content.
         const EXISTENCE_CACHE_SIZE: usize = (64 << 20) / BLAKE_HASH_SIZE_BYTES;
+        const {
+            // Protect against excessive memory usage introduced by mutants.
+            assert!(EXISTENCE_CACHE_SIZE < 1_000_000_000, "Cache size too large");
+        }
 
         BlockDir {
             transport,
