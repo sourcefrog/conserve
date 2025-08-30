@@ -140,10 +140,11 @@ impl BlockDir {
             .await
         {
             Ok(()) => {}
-            Err(err) if err.kind() == transport::ErrorKind::AlreadyExists => {
-                // let's assume the contents are correct
-            }
             Err(err) => {
+                // We previously checked that the block was not already present. If there is another
+                // backup concurrently writing, we might race with it and find here that the block's
+                // already been written. However, I'm going to move towards holding a lock for all
+                // writes, and then that will never happen.
                 warn!(?err, ?hash, "Error writing block");
                 return Err(err.into());
             }
@@ -480,6 +481,36 @@ mod test {
             .unwrap();
         assert!(!blockdir.contains(&hash, monitor.clone()).await.unwrap());
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
+    }
+
+    #[tokio::test]
+    async fn store_existing_block_is_not_an_error() {
+        let transport = Transport::temp();
+        let blockdir = BlockDir::open(transport.clone());
+        let mut stats = BackupStats::default();
+        let monitor = TestMonitor::arc();
+        let content = Bytes::from("stuff");
+        let hash = blockdir
+            .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
+            .await
+            .unwrap();
+        assert_eq!(monitor.get_counter(Counter::BlockWrites), 1);
+        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 0);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
+        assert!(blockdir.contains(&hash, monitor.clone()).await.unwrap());
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
+        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1); // Since we just wrote it, we know it's there.
+
+        // Open again to get a fresh cache
+        let blockdir = BlockDir::open(transport.clone());
+        let monitor = TestMonitor::arc();
+        let _hash = blockdir
+            .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
+            .await
+            .unwrap();
+        assert_eq!(monitor.get_counter(Counter::BlockWrites), 0);
+        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 1);
         assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
     }
 
