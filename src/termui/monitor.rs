@@ -47,7 +47,7 @@ impl TermUiMonitor {
         let tasks = Arc::new(Mutex::new(TaskList::default()));
         // We'll update from a polling thread at regular intervals, so we don't need Nutmeg to rate limit updates.
         let options = nutmeg::Options::default()
-            .update_interval(Duration::ZERO)
+            .update_interval(Duration::from_millis(500))
             .progress_enabled(show_progress)
             .destination(Destination::Stderr);
         let view = Arc::new(View::new(
