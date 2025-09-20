@@ -87,7 +87,7 @@ version = "4.3"
 features = ["derive", "deprecated", "wrap_help"]
 
 [dependencies.nutmeg]
-version = "0.1.4"
+version = "0.1.5"
 # git = "https://github.com/sourcefrog/nutmeg"
 # branch = "const-new"
 # path = "../nutmeg"
@@ -109,9 +109,6 @@ proptest-derive = "0.5"
 rand = "0.8"
 rstest = { version = "0.19", default-features = false }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
-
-[lib]
-doctest = false
 
 [profile.release]
 debug = true

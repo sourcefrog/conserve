@@ -1933,12 +1933,11 @@ dependencies = [
 
 [[package]]
 name = "nutmeg"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "210b363fa6901c372f264fa32ef3710c0e86328901deaed31294fecfd51e848b"
+checksum = "2d739ff27e8a6012737151871baad943516705b9ad100ab9e452dbe70ebf0e7b"
 dependencies = [
  "atty",
- "parking_lot 0.12.1",
  "terminal_size 0.2.6",
  "yansi",
 ]
