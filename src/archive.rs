@@ -111,7 +111,7 @@ impl Archive {
 
     /// Return an unsorted list of all blocks in the archive.
     pub async fn all_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
-        self.block_dir.blocks_async(monitor).await
+        self.block_dir.blocks(monitor).await
     }
 
     pub async fn band_exists(&self, band_id: BandId) -> Result<bool> {
@@ -346,7 +346,7 @@ impl Archive {
             // TODO: Check for unexpected files or directories in the blockdir.
             let present_blocks: HashSet<BlockHash> = self
                 .block_dir
-                .blocks_async(monitor.clone())
+                .blocks(monitor.clone())
                 .await?
                 .into_iter()
                 .collect();

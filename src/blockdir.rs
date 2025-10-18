@@ -299,48 +299,11 @@ impl BlockDir {
         Ok(dirs)
     }
 
-    /// Return an iterator of block subdirectories, in arbitrary order.
-    ///
-    /// Errors, other than failure to open the directory at all, are logged and discarded.
-    async fn subdirs_async(&self) -> Result<Vec<String>> {
-        let ListDir { mut dirs, .. } = self.transport.list_dir("").await?;
-        dirs.retain(|dirname| {
-            if dirname.len() == SUBDIR_NAME_CHARS {
-                true
-            } else {
-                warn!("Unexpected subdirectory in blockdir: {dirname:?}");
-                false
-            }
-        });
-        Ok(dirs)
-    }
-
     /// Return all the blocknames in the blockdir, in arbitrary order.
     pub(crate) async fn blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
         let transport = self.transport.clone();
         let task = monitor.start_task("List block subdir".to_string());
         let subdirs = self.subdirs().await?;
-        task.set_total(subdirs.len());
-        let mut blocks = Vec::new();
-        for dir in subdirs {
-            match transport.list_dir(&dir).await {
-                Ok(list) => {
-                    task.increment(1);
-                    blocks.extend(list.files.into_iter().filter_map(|name| name.parse().ok()));
-                }
-                Err(err) => {
-                    monitor.error(Error::ListBlocks { source: err });
-                }
-            }
-        }
-        Ok(blocks)
-    }
-
-    /// Return all the blocknames in the blockdir, in arbitrary order.
-    pub(crate) async fn blocks_async(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
-        let transport = self.transport.clone();
-        let task = monitor.start_task("List block subdir".to_string());
-        let subdirs = self.subdirs_async().await?;
         task.set_total(subdirs.len());
         let mut subdir_tasks = JoinSet::new();
         for subdir_name in subdirs {
@@ -382,7 +345,7 @@ impl BlockDir {
         // TODO: Test having a block with the right compression but the wrong contents.
         // TODO: Warn on blocks in the wrong subdir.
         debug!("Start list blocks");
-        let blocks = self.blocks_async(monitor.clone()).await?;
+        let blocks = self.blocks(monitor.clone()).await?;
         debug!("Check {} blocks", blocks.len());
         let task = monitor.start_task("Validate blocks".to_string());
         task.set_total(blocks.len());
@@ -525,7 +488,7 @@ mod test {
         let mut stats = BackupStats::default();
         let monitor = TestMonitor::arc();
 
-        let initial_blocks = blockdir.blocks_async(monitor.clone()).await.unwrap();
+        let initial_blocks = blockdir.blocks(monitor.clone()).await.unwrap();
         assert_eq!(initial_blocks, []);
 
         let hash = blockdir
@@ -533,7 +496,7 @@ mod test {
             .await
             .unwrap();
 
-        let blocks = blockdir.blocks_async(monitor.clone()).await.unwrap();
+        let blocks = blockdir.blocks(monitor.clone()).await.unwrap();
         assert_eq!(blocks, [hash]);
     }
 
@@ -546,7 +509,7 @@ mod test {
         create_dir(&subdir).unwrap();
         // Write a temp file as was created by earlier versions of the code.
         write(subdir.join("tmp123123123"), b"123").unwrap();
-        let blocks = blockdir.blocks_async(monitor.clone()).await.unwrap();
+        let blocks = blockdir.blocks(monitor.clone()).await.unwrap();
         assert_eq!(blocks, []);
     }
 
