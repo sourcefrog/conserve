@@ -678,6 +678,8 @@ mod test {
     use crate::counters::Counter;
     use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::TreeFixture;
+    use crate::transport::record::Verb;
+    use crate::transport::Transport;
     use crate::*;
 
     use super::*;
@@ -1424,5 +1426,93 @@ mod test {
         .unwrap();
         assert_eq!(stats.unmodified_files, 2, "both files are unmodified");
         assert_eq!(monitor.get_counter(Counter::IndexWrites), 3);
+    }
+
+    #[tokio::test]
+    async fn unmodified_file_blocks_are_not_written_or_individually_checked() {
+        let transport = Transport::temp().enable_record_calls();
+        let archive = Archive::create(transport.clone()).await.unwrap();
+        let srcdir = TreeFixture::new();
+        srcdir.create_file("aaa");
+        srcdir.create_file("bbb");
+
+        let options = BackupOptions::default();
+        let stats = backup(&archive, srcdir.path(), &options, TestMonitor::arc())
+            .await
+            .unwrap();
+
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.new_files, 2);
+        assert_eq!(stats.unmodified_files, 0);
+        let recording = transport.take_recording();
+        println!("calls for first backup: {recording:#?}");
+
+        // Reopen the archive to avoid cache effects.
+        let archive = Archive::open(transport.clone()).await.unwrap();
+        // Make a second backup from the same tree, and we should see that both files are unmodified.
+        let stats = backup(&archive, srcdir.path(), &options, TestMonitor::arc())
+            .await
+            .unwrap();
+
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.new_files, 0);
+        assert_eq!(stats.unmodified_files, 2);
+        let recording = transport.take_recording();
+        println!("calls for second backup without modification: {recording:#?}");
+        let writes = recording.verb_paths(Verb::Write);
+        println!("writes for second backup without modification: {writes:#?}");
+        assert_eq!(
+            writes,
+            vec![
+                "b0001/BANDHEAD",
+                "b0001/i/00000/000000000",
+                "b0001/BANDTAIL"
+            ],
+            "with no modification, backup should only write head, tail, and index"
+        );
+        let metadata_calls = recording.verb_paths(Verb::Metadata);
+        println!("metadata calls for second backup without modification: {metadata_calls:#?}");
+        // TODO: Really we should not get metadata for data blocks, we should just read the directory up front.
+        assert_eq!(
+            metadata_calls.len(),
+            3,
+            "with no modification, backup is expected to get metadata for data blocks"
+        );
+        assert!(metadata_calls
+            .iter()
+            .all(|c| c.ends_with("BANDTAIL") || c.ends_with("GC_LOCK") || c.starts_with("d/")));
+
+        // Change one of the files, and in a new backup it should be recognized
+        // as unmodified.
+        let archive = Archive::open(transport.clone()).await.unwrap();
+        srcdir.create_file_with_contents("bbb", b"longer content for bbb");
+        let stats = backup(&archive, srcdir.path(), &options, TestMonitor::arc())
+            .await
+            .unwrap();
+
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.new_files, 0);
+        assert_eq!(stats.unmodified_files, 1);
+        assert_eq!(stats.modified_files, 1);
+
+        let recording = transport.take_recording();
+        println!("calls for third backup after modification: {recording:#?}");
+        let writes = recording.verb_paths(Verb::Write);
+        println!("writes for third backup after modification: {writes:#?}");
+        assert_eq!(
+            writes.len(),
+            4,
+            "write should be head, tail, index, and one data block: {writes:#?}"
+        );
+        let metadata_calls = recording.verb_paths(Verb::Metadata);
+        println!("metadata calls for third backup after modification: {metadata_calls:#?}");
+        assert_eq!(
+            metadata_calls.len(),
+            4,
+            "with modification to one file, backup is expected to get metadata for head, tail, one new data block, and one unchanged data block: {metadata_calls:#?}"
+        );
+        assert!(metadata_calls
+            .iter()
+            .all(|c| c.ends_with("BANDTAIL") || c.ends_with("GC_LOCK") || c.starts_with("d/")));
     }
 }
