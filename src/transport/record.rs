@@ -13,12 +13,21 @@
 //! A log of operations on a transport, for testing.
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Call(
+pub(crate) struct Call {
     /// What operation?
-    pub Verb,
+    pub verb: Verb,
     /// Path relative to the originally opened transport.
-    pub String,
-);
+    pub path: String,
+}
+
+impl Call {
+    pub(crate) fn new<P: ToString>(verb: Verb, path: P) -> Self {
+        Self {
+            verb,
+            path: path.to_string(),
+        }
+    }
+}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Verb {

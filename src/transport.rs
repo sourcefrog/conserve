@@ -167,7 +167,7 @@ impl Transport {
                 }
                 full_path += path;
             }
-            self.calls.lock().unwrap().push(Call(verb, full_path));
+            self.calls.lock().unwrap().push(Call::new(verb, full_path));
         }
     }
 

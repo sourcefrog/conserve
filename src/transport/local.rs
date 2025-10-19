@@ -246,8 +246,8 @@ mod test {
         assert_eq!(
             calls,
             [
-                Call(Verb::Read, filename.into()),
-                Call(Verb::Read, "nonexistent".into())
+                Call::new(Verb::Read, filename),
+                Call::new(Verb::Read, "nonexistent")
             ]
         );
 
@@ -282,7 +282,7 @@ mod test {
 
         assert_eq!(
             transport.recorded_calls(),
-            [Call(Verb::Read, "nonexistent.json".into())]
+            [Call::new(Verb::Read, "nonexistent.json")]
         );
     }
 
@@ -309,8 +309,8 @@ mod test {
         assert_eq!(
             transport.recorded_calls(),
             [
-                Call(Verb::Metadata, filename.into()),
-                Call(Verb::Metadata, "nopoem".into())
+                Call::new(Verb::Metadata, filename),
+                Call::new(Verb::Metadata, "nopoem")
             ]
         );
     }
@@ -436,9 +436,9 @@ mod test {
         assert_eq!(
             transport.recorded_calls(),
             [
-                Call(Verb::Write, filename.into()),
-                Call(Verb::Write, filename.into()),
-                Call(Verb::Read, filename.into())
+                Call::new(Verb::Write, filename),
+                Call::new(Verb::Write, filename),
+                Call::new(Verb::Read, filename)
             ]
         );
     }
@@ -474,9 +474,9 @@ mod test {
         assert_eq!(
             transport.recorded_calls(),
             [
-                Call(Verb::CreateDir, "aaa".into()),
-                Call(Verb::CreateDir, "aaa/bbb".into()),
-                Call(Verb::ListDir, "aaa".into())
+                Call::new(Verb::CreateDir, "aaa"),
+                Call::new(Verb::CreateDir, "aaa/bbb"),
+                Call::new(Verb::ListDir, "aaa")
             ]
         );
 
@@ -496,7 +496,7 @@ mod test {
 
         assert_eq!(
             *transport.recorded_calls().last().unwrap(),
-            Call(Verb::RemoveDirAll, "aaa".into())
+            Call::new(Verb::RemoveDirAll, "aaa")
         );
     }
 
