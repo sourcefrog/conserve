@@ -24,7 +24,7 @@ use url::Url;
 
 use crate::*;
 
-use self::record::{Call, Verb};
+pub mod record;
 
 mod error;
 pub mod local;
@@ -36,9 +36,8 @@ use protocol::Protocol;
 #[cfg(feature = "s3")]
 pub mod s3;
 
-pub mod record;
-
 pub use self::error::{Error, ErrorKind};
+use self::record::{Call, Recording, Verb};
 
 /// Abstracted filesystem IO to access an archive.
 ///
@@ -67,7 +66,7 @@ pub struct Transport {
     record_calls: bool,
 
     /// If recording is enabled, a list of all operations on all derived transports.
-    calls: Arc<Mutex<Vec<Call>>>,
+    recording: Arc<Mutex<Recording>>,
 }
 
 impl Transport {
@@ -103,7 +102,7 @@ impl Transport {
             protocol,
             record_calls: false,
             sub_path: String::new(),
-            calls: Arc::new(Mutex::new(Vec::new())),
+            recording: Arc::new(Mutex::new(Recording::new())),
         }
     }
 
@@ -147,14 +146,15 @@ impl Transport {
 
     /// Take out all the recorded calls, clearing the record.
     #[cfg(test)]
-    pub(crate) fn take_recorded_calls(&self) -> Vec<Call> {
-        std::mem::take(&mut self.calls.lock().unwrap().as_mut())
+    pub(crate) fn take_recording(&self) -> Recording {
+        std::mem::take(&mut self.recording.lock().unwrap())
     }
 
     /// Return a copy of the recorded calls.
     #[cfg(test)]
+    // TODO: Maybe replace with `take_recording`?
     pub(crate) fn recorded_calls(&self) -> Vec<Call> {
-        self.calls.lock().unwrap().clone()
+        self.recording.lock().unwrap().calls.clone()
     }
 
     /// If recording is enabled, record an event.
@@ -167,7 +167,10 @@ impl Transport {
                 }
                 full_path += path;
             }
-            self.calls.lock().unwrap().push(Call::new(verb, full_path));
+            self.recording
+                .lock()
+                .unwrap()
+                .push(Call::new(verb, full_path));
         }
     }
 
@@ -201,7 +204,7 @@ impl Transport {
             protocol: self.protocol.chdir(relpath),
             sub_path,
             record_calls: self.record_calls,
-            calls: Arc::clone(&self.calls),
+            recording: Arc::clone(&self.recording),
         }
     }
 
@@ -317,6 +320,7 @@ mod test {
     use url::Url;
 
     use super::{Kind, Transport};
+    use crate::transport::record::{Call, Verb};
 
     #[test]
     fn get_path_from_local_transport() {
@@ -342,7 +346,7 @@ mod test {
     #[tokio::test]
     async fn local_list_dir_async() {
         let temp = TempDir::new().unwrap();
-        let transport = Transport::local(temp.path());
+        let transport = Transport::local(temp.path()).enable_record_calls();
         temp.child("a").touch().unwrap();
         let list = transport.list_dir(".").await.unwrap();
         assert_eq!(list.len(), 1);
@@ -354,6 +358,13 @@ mod test {
                 len: Some(0),
             }]
         );
+        assert_eq!(
+            transport.recorded_calls(),
+            vec![Call::new(Verb::ListDir, ".")]
+        );
+        let recording = transport.take_recording();
+        assert_eq!(recording.calls, vec![Call::new(Verb::ListDir, ".")]);
+        assert_eq!(recording.verb_paths(Verb::ListDir), vec!["."]);
     }
 
     #[test]

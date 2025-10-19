@@ -10,7 +10,12 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-//! A log of operations on a transport, for testing.
+//! A log of operations on a transport.
+//!
+//! This is used so that tests can observe which operations are performed on a transport,
+//! to make reproducible assertions that should correlate to runtime performance.
+//!
+//! This module is only available in test builds.
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Call {
@@ -38,4 +43,30 @@ pub enum Verb {
     RemoveDirAll,
     CreateDir,
     Metadata,
+}
+
+/// A log of operations on a transport.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct Recording {
+    /// The operations performed on the transport.
+    pub calls: Vec<Call>,
+}
+
+impl Recording {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(super) fn push(&mut self, call: Call) {
+        self.calls.push(call);
+    }
+
+    #[cfg(test)]
+    pub fn verb_paths(&self, verb: Verb) -> Vec<&str> {
+        self.calls
+            .iter()
+            .filter(|call| call.verb == verb)
+            .map(|call| call.path.as_str())
+            .collect()
+    }
 }
