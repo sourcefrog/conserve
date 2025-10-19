@@ -23,7 +23,9 @@ use tokio::sync::Semaphore;
 use tracing::{error, trace, warn};
 use url::Url;
 
-use super::{Error, ListDir, Metadata, Result, WriteMode};
+use crate::Kind;
+
+use super::{DirEntry, Error, Metadata, Result, WriteMode};
 
 /// Avoid opening too many files at once.
 static FD_LIMIT: Semaphore = Semaphore::const_new(100);
@@ -110,17 +112,19 @@ impl super::Protocol for Protocol {
         }
     }
 
-    async fn list_dir(&self, relpath: &str) -> Result<ListDir> {
+    async fn list_dir(&self, relpath: &str) -> Result<Vec<DirEntry>> {
         let _permit = FD_LIMIT.acquire().await.expect("acquire permit");
         let path = self.full_path(relpath);
         trace!("Listing {path:?}");
-        let mut listing = ListDir::default();
         let fail = |err| Error::io_error(&path, err);
         let mut read_dir = tokio::fs::read_dir(&path).await.map_err(fail)?;
+        let mut entries = Vec::new();
         while let Some(dir_entry) = read_dir.next_entry().await.map_err(fail)? {
-            collect_tokio_dir_entry(&mut listing, dir_entry).await
+            if let Some(dir_entry) = collect_tokio_dir_entry(dir_entry).await {
+                entries.push(dir_entry);
+            }
         }
-        Ok(listing)
+        Ok(entries)
     }
 
     async fn create_dir(&self, relpath: &str) -> Result<()> {
@@ -177,15 +181,31 @@ impl super::Protocol for Protocol {
     }
 }
 
-async fn collect_tokio_dir_entry(list_dir: &mut ListDir, dir_entry: tokio::fs::DirEntry) {
+async fn collect_tokio_dir_entry(dir_entry: tokio::fs::DirEntry) -> Option<DirEntry> {
     if let Ok(name) = dir_entry.file_name().into_string() {
         match dir_entry.file_type().await {
-            Ok(t) if t.is_dir() => list_dir.dirs.push(name),
-            Ok(t) if t.is_file() => list_dir.files.push(name),
-            other => warn!("Unexpected file type in archive: {name:?}: {other:?}"),
+            Ok(t) if t.is_dir() => Some(DirEntry {
+                name,
+                kind: Kind::Dir,
+                len: None,
+            }),
+            Ok(t) if t.is_file() => Some(DirEntry {
+                name,
+                kind: Kind::File,
+                len: Some(dir_entry.metadata().await.ok()?.len()),
+            }),
+            Ok(other) => {
+                warn!("Unexpected file type in archive: {name:?}: {other:?}");
+                None
+            }
+            Err(err) => {
+                warn!("Failed to get file type for {name:?}: {err:?}");
+                None
+            }
         }
     } else {
         warn!("Non-UTF-8 filename in archive {:?}", dir_entry.file_name());
+        None
     }
 }
 
@@ -306,16 +326,27 @@ mod test {
             .unwrap();
 
         let transport = Transport::local(temp.path());
-        let root_list = transport.list_dir(".").await.unwrap();
-        assert_eq!(root_list.files, ["root file"]);
-        assert_eq!(root_list.dirs, ["subdir"]);
+        let mut root_list = transport.list_dir(".").await.unwrap();
+        root_list.sort_by_key(|entry| entry.name.clone());
+        assert_eq!(root_list.len(), 2);
+        assert_eq!(root_list[0].name, "root file");
+        assert_eq!(root_list[0].kind, Kind::File);
+        assert_eq!(root_list[0].len, Some(0));
+
+        assert_eq!(root_list[1].name, "subdir");
+        assert_eq!(root_list[1].kind, Kind::Dir);
+        assert_eq!(root_list[1].len, None);
 
         assert!(transport.is_file("root file").await.unwrap());
         assert!(!transport.is_file("nuh-uh").await.unwrap());
 
-        let subdir_list = transport.list_dir("subdir").await.unwrap();
-        assert_eq!(subdir_list.files, ["subfile"]);
-        assert_eq!(subdir_list.dirs, [""; 0]);
+        let mut subdir_list = transport.list_dir("subdir").await.unwrap();
+        subdir_list.sort();
+
+        assert_eq!(subdir_list.len(), 1);
+        assert_eq!(subdir_list[0].name, "subfile");
+        assert_eq!(subdir_list[0].kind, Kind::File);
+        assert_eq!(subdir_list[0].len, Some(14));
 
         temp.close().unwrap();
     }
@@ -330,8 +361,7 @@ mod test {
         std::os::unix::fs::symlink("foo", dir.join("alink")).unwrap();
 
         let list_dir = transport.list_dir(".").await.unwrap();
-        assert_eq!(list_dir.files, [""; 0]);
-        assert_eq!(list_dir.dirs, [""; 0]);
+        assert_eq!(list_dir.len(), 0);
     }
 
     #[tokio::test]
@@ -436,9 +466,10 @@ mod test {
 
         let sub_transport = transport.chdir("aaa");
         let sub_list = sub_transport.list_dir("").await.unwrap();
-
-        assert_eq!(sub_list.dirs, ["bbb"]);
-        assert_eq!(sub_list.files, [""; 0]);
+        assert_eq!(sub_list.len(), 1);
+        assert_eq!(sub_list[0].name, "bbb");
+        assert_eq!(sub_list[0].kind, Kind::Dir);
+        assert_eq!(sub_list[0].len, None);
 
         assert_eq!(
             transport.recorded_calls(),
@@ -507,9 +538,15 @@ mod test {
             .unwrap();
 
         let transport = Transport::local(temp.path());
-        let list_dir = transport.list_dir(".").await.unwrap();
-        assert_eq!(list_dir.files, ["root file"]);
-        assert_eq!(list_dir.dirs, ["subdir"]);
+        let mut entries = transport.list_dir(".").await.unwrap();
+        entries.sort();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].name, "root file");
+        assert_eq!(entries[0].kind, Kind::File);
+        assert_eq!(entries[0].len, Some(0));
+        assert_eq!(entries[1].name, "subdir");
+        assert_eq!(entries[1].kind, Kind::Dir);
+        assert_eq!(entries[1].len, None);
 
         let failure = transport.list_dir("nonexistent").await.unwrap_err();
         assert!(failure.is_not_found());

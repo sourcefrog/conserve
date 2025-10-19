@@ -173,9 +173,7 @@ impl Transport {
         self.protocol.read(path).await
     }
 
-    pub async fn list_dir(&self, relpath: &str) -> Result<ListDir> {
-        // TODO: Perhaps it'd be better to include sizes (and maybe mtimes) as many transports
-        // might be able to provide this without extra work.
+    pub async fn list_dir(&self, relpath: &str) -> Result<Vec<DirEntry>> {
         self.record(Verb::ListDir, relpath);
         self.protocol.list_dir(relpath).await
     }
@@ -265,11 +263,22 @@ pub enum WriteMode {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DirEntry {
     /// Name of the file within the directory being listed.
-    pub name: String,
+    pub name: String, // NB: Must be first for Ord
     /// Kind of file.
     pub kind: Kind,
+    /// Length of the file, if it is a file.
+    pub len: Option<u64>,
 }
 
+impl DirEntry {
+    pub fn is_file(&self) -> bool {
+        self.kind == Kind::File
+    }
+
+    pub fn is_dir(&self) -> bool {
+        self.kind == Kind::Dir
+    }
+}
 /// Stat metadata about a file in a transport.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Metadata {
@@ -289,13 +298,6 @@ impl Metadata {
     }
 }
 
-/// A list of all the files and directories in a directory.
-#[derive(Debug, Default, Eq, PartialEq)]
-pub struct ListDir {
-    pub files: Vec<String>,
-    pub dirs: Vec<String>,
-}
-
 type Result<T> = result::Result<T, Error>;
 
 #[cfg(test)]
@@ -306,9 +308,7 @@ mod test {
     use pretty_assertions::assert_eq;
     use url::Url;
 
-    use crate::transport::ListDir;
-
-    use super::Transport;
+    use super::{Kind, Transport};
 
     #[test]
     fn get_path_from_local_transport() {
@@ -337,8 +337,15 @@ mod test {
         let transport = Transport::local(temp.path());
         temp.child("a").touch().unwrap();
         let list = transport.list_dir(".").await.unwrap();
-        assert_eq!(list.files, ["a"]);
-        assert!(list.dirs.is_empty());
+        assert_eq!(list.len(), 1);
+        assert_eq!(
+            list,
+            vec![crate::transport::DirEntry {
+                name: "a".to_string(),
+                kind: Kind::File,
+                len: Some(0),
+            }]
+        );
     }
 
     #[test]
@@ -358,10 +365,18 @@ mod test {
         let transport = Transport::new(url.as_str()).await.unwrap();
         dbg!(&transport);
 
-        let ListDir { mut files, dirs } = transport.list_dir("").await.unwrap();
-        assert_eq!(dirs, ["a dir"]);
-        files.sort();
-        assert_eq!(files, ["a file", "another file"]);
+        let mut entries = transport.list_dir("").await.unwrap();
+        entries.sort();
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].name, "a dir");
+        assert_eq!(entries[0].kind, Kind::Dir);
+        assert_eq!(entries[0].len, None);
+        assert_eq!(entries[1].name, "a file");
+        assert_eq!(entries[1].kind, Kind::File);
+        assert_eq!(entries[1].len, Some(0));
+        assert_eq!(entries[2].name, "another file");
+        assert_eq!(entries[2].kind, Kind::File);
+        assert_eq!(entries[2].len, Some(0));
 
         temp.close().unwrap();
     }

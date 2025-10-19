@@ -18,7 +18,7 @@ use url::Url;
 
 use crate::Kind;
 
-use super::{Error, ErrorKind, ListDir, Result, WriteMode};
+use super::{DirEntry, Error, ErrorKind, Result, WriteMode};
 
 type SftpResult<T> = std::result::Result<T, ssh2::Error>;
 
@@ -134,7 +134,7 @@ impl Protocol {
 
 #[async_trait]
 impl super::Protocol for Protocol {
-    async fn list_dir(&self, path: &str) -> Result<ListDir> {
+    async fn list_dir(&self, path: &str) -> Result<Vec<DirEntry>> {
         trace!(?path, "list_dir");
         self.call_sftp(list_dir, path).await
     }
@@ -235,17 +235,16 @@ impl super::Protocol for Protocol {
         let mut dirs_to_delete = vec![path.to_owned()];
         while let Some(dir) = dirs_to_walk.pop() {
             trace!(?dir, "Walk down dir");
-            let list = self.list_dir(path).await?;
-            for file in list.files {
-                self.remove_file(&format!("{dir}/{file}")).await?;
+            let entries = self.list_dir(path).await?;
+            for entry in entries {
+                let entry_path = format!("{dir}/{}", entry.name);
+                if entry.is_file() {
+                    self.remove_file(&entry_path).await?;
+                } else if entry.is_dir() {
+                    dirs_to_delete.push(entry_path.clone());
+                    dirs_to_walk.push(entry_path);
+                }
             }
-            list.dirs
-                .iter()
-                .map(|subdir| format!("{dir}/{subdir}"))
-                .for_each(|p| {
-                    dirs_to_delete.push(p.clone());
-                    dirs_to_walk.push(p)
-                });
         }
         // Consume them in the reverse order discovered, so bottom up
         for dir in dirs_to_delete.iter().rev() {
@@ -321,13 +320,12 @@ fn io_error(source: io::Error, url: &Url) -> Error {
     }
 }
 
-fn list_dir(sftp: &Sftp, full_path: &Path) -> SftpResult<ListDir> {
+fn list_dir(sftp: &Sftp, full_path: &Path) -> SftpResult<Vec<DirEntry>> {
     trace!(?full_path, "list_dir");
     let mut dir = sftp.opendir(full_path).inspect_err(|err| {
         error!(?err, ?full_path, "Error opening directory");
     })?;
-    let mut files = Vec::new();
-    let mut dirs = Vec::new();
+    let mut entries = Vec::new();
     loop {
         match dir.readdir() {
             Ok((pathbuf, file_stat)) => {
@@ -337,8 +335,16 @@ fn list_dir(sftp: &Sftp, full_path: &Path) -> SftpResult<ListDir> {
                 }
                 trace!("read dir got name {}", name);
                 match file_stat.file_type().into() {
-                    Kind::File => files.push(name),
-                    Kind::Dir => dirs.push(name),
+                    Kind::File => entries.push(DirEntry {
+                        name,
+                        kind: Kind::File,
+                        len: Some(file_stat.size.unwrap_or_default()),
+                    }),
+                    Kind::Dir => entries.push(DirEntry {
+                        name,
+                        kind: Kind::Dir,
+                        len: None,
+                    }),
                     _ => (),
                 }
             }
@@ -355,7 +361,7 @@ fn list_dir(sftp: &Sftp, full_path: &Path) -> SftpResult<ListDir> {
             }
         }
     }
-    Ok(ListDir { files, dirs })
+    Ok(entries)
 }
 
 fn sync_write(

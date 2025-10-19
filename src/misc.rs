@@ -17,15 +17,6 @@ use std::time::Duration;
 
 use crate::stats::Sizes;
 
-/// Remove and return an item from a vec, if it's present.
-pub(crate) fn remove_item<T, U: PartialEq<T>>(v: &mut Vec<T>, item: &U) {
-    // Remove this when it's stabilized in std:
-    // https://github.com/rust-lang/rust/issues/40062
-    if let Some(pos) = v.iter().position(|x| *item == *x) {
-        v.remove(pos);
-    }
-}
-
 pub fn bytes_to_human_mb(s: u64) -> String {
     use thousands::Separable;
     let mut s = (s / 1_000_000).separate_with_commas();

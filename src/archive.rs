@@ -70,8 +70,8 @@ impl Archive {
     /// Make a new archive in a new directory accessed by a Transport.
     pub async fn create(transport: Transport) -> Result<Archive> {
         transport.create_dir("").await?;
-        let names = transport.list_dir("").await?;
-        if !names.files.is_empty() || !names.dirs.is_empty() {
+        let entries = transport.list_dir("").await?;
+        if !entries.is_empty() {
             return Err(Error::NewArchiveDirectoryNotEmpty);
         }
         let block_dir = Arc::new(BlockDir::create(transport.chdir(BLOCK_DIR)).await?);
@@ -149,10 +149,9 @@ impl Archive {
             .transport
             .list_dir("")
             .await?
-            .dirs
             .into_iter()
-            .filter(|dir_name| dir_name != BLOCK_DIR)
-            .filter_map(|dir_name| dir_name.parse().ok())
+            .filter(|entry| entry.name != BLOCK_DIR && entry.kind == Kind::Dir)
+            .filter_map(|entry| entry.name.parse().ok())
             .sorted()
             .collect())
     }
@@ -382,30 +381,30 @@ impl Archive {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
-        let list_dir = self.transport.list_dir("").await?;
-        for dir_name in list_dir.dirs {
-            if let Ok(band_id) = dir_name.parse::<BandId>() {
-                if !seen_bands.insert(band_id) {
-                    // TODO: Test this
-                    monitor.error(Error::InvalidMetadata {
-                        details: format!("Duplicated band directory for {band_id:?}"),
-                    });
+        let entries = self.transport.list_dir("").await?;
+        for entry in entries {
+            if entry.kind == Kind::Dir {
+                if let Ok(band_id) = entry.name.parse::<BandId>() {
+                    if !seen_bands.insert(band_id) {
+                        // TODO: Test this
+                        monitor.error(Error::InvalidMetadata {
+                            details: format!("Duplicated band directory for {band_id:?}"),
+                        });
+                    }
+                } else if !entry.name.eq_ignore_ascii_case(BLOCK_DIR) {
+                    // TODO: The whole path not just the filename
+                    warn!(
+                        name = entry.name,
+                        "Unexpected subdirectory in archive directory"
+                    );
                 }
-            } else if !dir_name.eq_ignore_ascii_case(BLOCK_DIR) {
-                // TODO: The whole path not just the filename
-                warn!(
-                    path = dir_name,
-                    "Unexpected subdirectory in archive directory"
-                );
-            }
-        }
-        for name in list_dir.files {
-            if !name.eq_ignore_ascii_case(HEADER_FILENAME)
-                && !name.eq_ignore_ascii_case(crate::gc_lock::GC_LOCK)
-                && !name.eq_ignore_ascii_case(".DS_Store")
+            } else if entry.kind == Kind::File
+                && !entry.name.eq_ignore_ascii_case(HEADER_FILENAME)
+                && !entry.name.eq_ignore_ascii_case(crate::gc_lock::GC_LOCK)
+                && !entry.name.eq_ignore_ascii_case(".DS_Store")
             {
                 // TODO: The whole path not just the filename
-                warn!(path = name, "Unexpected file in archive directory");
+                warn!(path = entry.name, "Unexpected file in archive directory");
             }
         }
         Ok(())

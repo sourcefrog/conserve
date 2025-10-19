@@ -31,9 +31,7 @@ use time::OffsetDateTime;
 use tracing::{debug, trace, warn};
 
 use crate::jsonio::{read_json, write_json};
-use crate::misc::remove_item;
 use crate::monitor::Monitor;
-use crate::transport::ListDir;
 use crate::*;
 
 static INDEX_DIR: &str = "i";
@@ -294,19 +292,17 @@ impl Band {
     }
 
     pub async fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
-        let ListDir { mut files, dirs } = self.transport.list_dir("").await?;
-        if !files.contains(&BAND_HEAD_FILENAME.to_string()) {
+        let entries = self.transport.list_dir("").await?;
+        if !entries.iter().any(|entry| entry.name == BAND_HEAD_FILENAME) {
             monitor.error(Error::BandHeadMissing {
                 band_id: self.band_id,
             });
         }
-        remove_item(&mut files, &BAND_HEAD_FILENAME);
-        remove_item(&mut files, &BAND_TAIL_FILENAME);
-        for unexpected in files {
-            warn!(path = ?unexpected, "Unexpected file in band directory");
-        }
-        for unexpected in dirs.iter().filter(|n| n != &INDEX_DIR) {
-            warn!(path = ?unexpected, "Unexpected subdirectory in band directory");
+        for entry in entries {
+            let name = entry.name;
+            if name != BAND_HEAD_FILENAME && name != BAND_TAIL_FILENAME && name != INDEX_DIR {
+                warn!(name = ?name, "Unexpected entry in band directory");
+            }
         }
         Ok(())
     }

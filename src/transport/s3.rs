@@ -46,7 +46,7 @@ use bytes::Bytes;
 use tracing::{debug, error, trace};
 use url::Url;
 
-use super::{Error, ErrorKind, Kind, ListDir, Metadata, Result, WriteMode};
+use super::{DirEntry, Error, ErrorKind, Kind, Metadata, Result, WriteMode};
 
 pub(super) struct Protocol {
     url: Url,
@@ -189,7 +189,7 @@ fn join_paths(a: &str, b: &str) -> String {
 
 #[async_trait]
 impl super::Protocol for Protocol {
-    async fn list_dir(&self, relpath: &str) -> Result<ListDir> {
+    async fn list_dir(&self, relpath: &str) -> Result<Vec<DirEntry>> {
         trace!(%relpath, "list_dir");
         let mut prefix = self.join_path(relpath);
         debug_assert!(!prefix.ends_with('/'), "{prefix:?} ends with /");
@@ -204,18 +204,18 @@ impl super::Protocol for Protocol {
             .delimiter("/")
             .into_paginator()
             .send();
-        let mut result = ListDir::default();
+        let mut entries = Vec::new();
         while let Some(response) = stream.next().await {
             let response = response.map_err(|err| self.s3_error(&prefix, err))?;
-            collect_listdir(&response, &prefix, &mut result);
+            entries.extend(collect_listdir(&response, &prefix)?);
         }
         trace!(
             %relpath,
-            n_dirs = result.dirs.len(),
-            n_files = result.files.len(),
+            n_dirs = entries.iter().filter(|entry| entry.is_dir()).count(),
+            n_files = entries.iter().filter(|entry| entry.is_file()).count(),
             "list_dir complete"
         );
-        Ok(result)
+        Ok(entries)
     }
 
     async fn read(&self, relpath: &str) -> Result<Bytes> {
@@ -418,7 +418,8 @@ impl From<&ByteStreamError> for ErrorKind {
     }
 }
 
-fn collect_listdir(response: &ListObjectsV2Output, prefix: &str, list_dir: &mut ListDir) {
+fn collect_listdir(response: &ListObjectsV2Output, prefix: &str) -> Result<Vec<DirEntry>> {
+    let mut entries = Vec::new();
     for common_prefix in response.common_prefixes() {
         let name = common_prefix
             .prefix
@@ -431,7 +432,11 @@ fn collect_listdir(response: &ListObjectsV2Output, prefix: &str, list_dir: &mut 
             .strip_suffix('/')
             .expect("Common prefix ends with /");
         debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
-        list_dir.dirs.push(name.to_owned());
+        entries.push(DirEntry {
+            name: name.to_owned(),
+            kind: Kind::Dir,
+            len: None,
+        });
     }
     for object in response.contents() {
         let name = object.key.as_ref().expect("Object has a key"); // needed
@@ -440,8 +445,19 @@ fn collect_listdir(response: &ListObjectsV2Output, prefix: &str, list_dir: &mut 
             .strip_prefix(prefix)
             .expect("Object name should start with prefix");
         debug_assert!(!name.contains('/'), "{name:?} contains / but shouldn't");
-        list_dir.files.push(name.to_owned());
+        entries.push(DirEntry {
+            name: name.to_owned(),
+            kind: Kind::File,
+            len: Some(
+                object
+                    .size
+                    .expect("Object has a size")
+                    .try_into()
+                    .expect("Object size non-negative"),
+            ),
+        });
     }
+    Ok(entries)
 }
 
 fn s3_error<E: StdError + Sync + Send + 'static>(err: SdkError<E>, url: &Url) -> Error {

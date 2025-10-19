@@ -37,7 +37,7 @@ use transport::WriteMode;
 use crate::compress::snappy::{Compressor, Decompressor};
 use crate::counters::Counter;
 use crate::monitor::Monitor;
-use crate::transport::{ListDir, Transport};
+use crate::transport::Transport;
 use crate::*;
 
 // const BLOCKDIR_FILE_NAME_LEN: usize = crate::BLAKE_HASH_SIZE_BYTES * 2;
@@ -287,15 +287,21 @@ impl BlockDir {
     ///
     /// Errors, other than failure to open the directory at all, are logged and discarded.
     async fn subdirs(&self) -> Result<Vec<String>> {
-        let ListDir { mut dirs, .. } = self.transport.list_dir("").await?;
-        dirs.retain(|dirname| {
-            if dirname.len() == SUBDIR_NAME_CHARS {
-                true
-            } else {
-                warn!("Unexpected subdirectory in blockdir: {dirname:?}");
-                false
-            }
-        });
+        let dirs = self
+            .transport
+            .list_dir("")
+            .await?
+            .into_iter()
+            .filter(|entry| entry.kind == Kind::Dir)
+            .map(|entry| entry.name)
+            .filter(|dirname| {
+                let t = dirname.len() == SUBDIR_NAME_CHARS;
+                if !t {
+                    warn!("Unexpected subdirectory in blockdir: {dirname:?}");
+                }
+                t
+            })
+            .collect();
         Ok(dirs)
     }
 
@@ -319,10 +325,14 @@ impl BlockDir {
         while let Some(result) = subdir_tasks.join_next().await {
             let result = result.expect("await listdir result");
             match result {
-                Ok(ListDir { files, .. }) => {
-                    blocks.extend(files.into_iter().filter_map(|name|
-                        // just drop invalid names, for now
-                        name.parse().ok()));
+                Ok(entries) => {
+                    blocks.extend(entries.into_iter().filter_map(|entry| {
+                        if entry.kind == Kind::File {
+                            entry.name.parse().ok()
+                        } else {
+                            None
+                        }
+                    }));
                 }
                 Err(source) => {
                     monitor.error(Error::ListBlocks { source });
