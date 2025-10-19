@@ -435,10 +435,7 @@ mod tests {
                 .len(),
             0
         );
-        assert_eq!(
-            archive.all_blocks(TestMonitor::arc()).await.unwrap().len(),
-            0
-        );
+        assert_eq!(archive.all_blocks().await.unwrap().len(), 0);
     }
 
     #[tokio::test]

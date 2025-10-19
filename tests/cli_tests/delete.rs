@@ -16,8 +16,8 @@
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
-use conserve::monitor::test::TestMonitor;
 use conserve::test_fixtures::store_two_versions;
+use conserve::transport::Transport;
 use conserve::Archive;
 use predicates::prelude::*;
 
@@ -27,42 +27,48 @@ use crate::run_conserve;
 
 #[tokio::test]
 async fn delete_both_bands() {
-    let af = Archive::create_temp().await;
-    store_two_versions(&af).await;
+    let temp = Transport::temp();
+    let archive = Archive::create(temp.clone()).await.unwrap();
+    store_two_versions(&archive).await;
+    drop(archive);
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b0000"])
         .args(["-b", "b0001"])
-        .arg(af.transport().local_path().unwrap())
+        .arg(temp.local_path().unwrap())
         .assert()
         .success();
 
-    assert_eq!(af.list_band_ids().await.unwrap().len(), 0);
-    assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 0);
+    let archive = Archive::open(temp.clone()).await.unwrap();
+    assert_eq!(archive.list_band_ids().await.unwrap().len(), 0);
+    assert_eq!(archive.all_blocks().await.unwrap().len(), 0);
 }
 
 #[tokio::test]
 async fn delete_first_version() {
-    let af = Archive::create_temp().await;
-    store_two_versions(&af).await;
+    let temp = Transport::temp();
+    let archive = Archive::create(temp.clone()).await.unwrap();
+    store_two_versions(&archive).await;
+    drop(archive);
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b0"])
-        .arg(af.transport().local_path().unwrap())
+        .arg(temp.local_path().unwrap())
         .assert()
         .success();
 
-    assert_eq!(af.list_band_ids().await.unwrap(), &[BandId::new(&[1])]);
+    let archive = Archive::open(temp.clone()).await.unwrap();
+    assert_eq!(archive.list_band_ids().await.unwrap(), &[BandId::new(&[1])]);
     // b0 contains two small files packed into the same block, which is not deleted.
     // b1 (not deleted) adds one additional block, which is still referenced.
-    assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 2);
+    assert_eq!(archive.all_blocks().await.unwrap().len(), 2);
 
     let rd = TempDir::new().unwrap();
     run_conserve()
         .arg("restore")
-        .arg(af.transport().local_path().unwrap())
+        .arg(temp.local_path().unwrap())
         .arg(rd.path())
         .assert()
         .success();
@@ -75,31 +81,34 @@ async fn delete_first_version() {
 
     run_conserve()
         .arg("validate")
-        .arg(af.transport().local_path().unwrap())
+        .arg(temp.local_path().unwrap())
         .assert()
         .success();
 }
 
 #[tokio::test]
 async fn delete_second_version() {
-    let af = Archive::create_temp().await;
-    store_two_versions(&af).await;
+    let temp = Transport::temp();
+    let archive = Archive::create(temp.clone()).await.unwrap();
+    store_two_versions(&archive).await;
+    drop(archive);
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b1"])
-        .arg(af.transport().local_path().unwrap())
+        .arg(temp.local_path().unwrap())
         .assert()
         .success();
 
-    assert_eq!(af.list_band_ids().await.unwrap(), &[BandId::new(&[0])]);
+    let archive = Archive::open(temp.clone()).await.unwrap();
+    assert_eq!(archive.list_band_ids().await.unwrap(), &[BandId::new(&[0])]);
     // b0 contains two small files packed into the same block.
-    assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 1);
+    assert_eq!(archive.all_blocks().await.unwrap().len(), 1);
 
     let rd = TempDir::new().unwrap();
     run_conserve()
         .arg("restore")
-        .arg(af.transport().local_path().unwrap())
+        .arg(temp.local_path().unwrap())
         .arg(rd.path())
         .assert()
         .success();
@@ -112,19 +121,21 @@ async fn delete_second_version() {
 
     run_conserve()
         .arg("validate")
-        .arg(af.transport().local_path().unwrap())
+        .arg(temp.local_path().unwrap())
         .assert()
         .success();
 }
 
 #[tokio::test]
 async fn delete_nonexistent_band() {
-    let af = Archive::create_temp().await;
+    let temp = Transport::temp();
+    let archive = Archive::create(temp.clone()).await.unwrap();
+    drop(archive);
 
     run_conserve()
         .args(["delete"])
         .args(["-b", "b0000"])
-        .arg(af.transport().local_path().unwrap())
+        .arg(temp.local_path().unwrap())
         .assert()
         .stderr(predicate::str::contains(
             "ERROR conserve: Band not found: b0000",

@@ -279,10 +279,11 @@ impl DamageLocation {
                     .await
                     .expect("open archive");
                 let block_hash = archive
-                    .all_blocks(TestMonitor::arc())
+                    .all_blocks()
                     .await
                     .expect("list blocks")
-                    .into_iter()
+                    .iter()
+                    .cloned()
                     .sorted()
                     .nth(*block_index)
                     .expect("Archive has an nth block");

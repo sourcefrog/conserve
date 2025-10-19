@@ -15,7 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLockReadGuard};
 
 use std::time::Instant;
 
@@ -101,7 +101,7 @@ impl Archive {
                 version: header.conserve_archive_version,
             });
         }
-        let block_dir = Arc::new(BlockDir::open(transport.chdir(BLOCK_DIR)));
+        let block_dir = Arc::new(BlockDir::open(transport.chdir(BLOCK_DIR)).await?);
         debug!(?header, "Opened archive");
         Ok(Archive {
             block_dir,
@@ -110,8 +110,8 @@ impl Archive {
     }
 
     /// Return an unsorted list of all blocks in the archive.
-    pub async fn all_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
-        self.block_dir.blocks(monitor).await
+    pub async fn all_blocks(&self) -> Result<RwLockReadGuard<'_, HashSet<BlockHash>>> {
+        Ok(self.block_dir.blocks())
     }
 
     pub async fn band_exists(&self, band_id: BandId) -> Result<bool> {
@@ -227,10 +227,10 @@ impl Archive {
             .await?;
         Ok(self
             .block_dir
-            .blocks(monitor)
-            .await?
-            .into_iter()
+            .blocks()
+            .iter()
             .filter(move |h| !referenced.contains(h))
+            .cloned()
             .collect())
     }
 
@@ -266,12 +266,7 @@ impl Archive {
         debug!(referenced.len = referenced.len());
 
         debug!("Find present blocks...");
-        let present: HashSet<BlockHash> = self
-            .block_dir
-            .blocks(monitor.clone())
-            .await?
-            .into_iter()
-            .collect();
+        let present: HashSet<BlockHash> = self.block_dir.blocks().iter().cloned().collect();
         debug!(present.len = present.len());
 
         debug!("Find unreferenced blocks...");
@@ -343,12 +338,8 @@ impl Archive {
             // content.
             debug!("List blocks...");
             // TODO: Check for unexpected files or directories in the blockdir.
-            let present_blocks: HashSet<BlockHash> = self
-                .block_dir
-                .blocks(monitor.clone())
-                .await?
-                .into_iter()
-                .collect();
+            let present_blocks: HashSet<BlockHash> =
+                self.block_dir.blocks().iter().cloned().collect();
             for hash in referenced_lens.keys() {
                 if !present_blocks.contains(hash) {
                     monitor.error(Error::BlockMissing { hash: hash.clone() })
@@ -490,7 +481,7 @@ mod test {
                 .len(),
             0
         );
-        assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 0);
+        assert_eq!(af.all_blocks().await.unwrap().len(), 0);
     }
 
     #[tokio::test]

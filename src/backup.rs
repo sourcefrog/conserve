@@ -287,7 +287,11 @@ impl BackupWriter {
         trace!(?apath, "Copying file");
         let result = if let Some(basis_entry) = basis_entry {
             if content_heuristically_unchanged(source_entry, basis_entry) {
-                if all_blocks_present(&basis_entry.addrs, &self.block_dir, &monitor).await {
+                if basis_entry
+                    .addrs
+                    .iter()
+                    .all(|addr| self.block_dir.contains(&addr.hash))
+                {
                     self.stats.unmodified_files += 1;
                     let new_entry = IndexEntry {
                         addrs: basis_entry.addrs.clone(),
@@ -302,7 +306,7 @@ impl BackupWriter {
                     self.index_writer.push_entry(new_entry);
                     return Ok(Some(change));
                 } else {
-                    warn!(%apath, "Some referenced blocks are missing or truncated; file will be stored again");
+                    warn!(%apath, ?basis_entry.addrs, "Some referenced blocks are missing or truncated; file will be stored again");
                     self.stats.modified_files += 1;
                     self.stats.replaced_damaged_blocks += 1;
                     Some(EntryChange::changed(basis_entry, source_entry))
@@ -363,23 +367,6 @@ impl BackupWriter {
         // TODO: Emit the actual change.
         Ok(None)
     }
-}
-
-async fn all_blocks_present(
-    addresses: &[Address],
-    block_dir: &BlockDir,
-    monitor: &Arc<dyn Monitor>,
-) -> bool {
-    for addr in addresses {
-        if !block_dir
-            .contains(&addr.hash, monitor.clone())
-            .await
-            .unwrap_or(false)
-        {
-            return false;
-        }
-    }
-    true
 }
 
 async fn store_file_content(
@@ -911,10 +898,10 @@ mod test {
         );
         assert_eq!(
             archive
-                .all_blocks(TestMonitor::arc())
+                .all_blocks()
                 .await
                 .unwrap()
-                .into_iter()
+                .iter()
                 .map(|h| h.to_string())
                 .collect::<Vec<String>>(),
             vec![HELLO_HASH]
@@ -1248,7 +1235,7 @@ mod test {
         assert_eq!(stats2.written_blocks, 1);
         assert_eq!(stats2.combined_blocks, 1);
 
-        assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 2);
+        assert_eq!(af.all_blocks().await.unwrap().len(), 2);
     }
 
     #[tokio::test]
@@ -1472,15 +1459,14 @@ mod test {
         );
         let metadata_calls = recording.verb_paths(Verb::Metadata);
         println!("metadata calls for second backup without modification: {metadata_calls:#?}");
-        // TODO: Really we should not get metadata for data blocks, we should just read the directory up front.
         assert_eq!(
-            metadata_calls.len(),
-            3,
-            "with no modification, backup is expected to get metadata for data blocks"
+            metadata_calls,
+            ["GC_LOCK", "b0000/BANDTAIL"],
+            "don't get metadata for data blocks"
         );
         assert!(metadata_calls
             .iter()
-            .all(|c| c.ends_with("BANDTAIL") || c.ends_with("GC_LOCK") || c.starts_with("d/")));
+            .all(|c| c.ends_with("BANDTAIL") || c.ends_with("GC_LOCK")));
 
         // Change one of the files, and in a new backup it should be recognized
         // as unmodified.
@@ -1507,12 +1493,8 @@ mod test {
         let metadata_calls = recording.verb_paths(Verb::Metadata);
         println!("metadata calls for third backup after modification: {metadata_calls:#?}");
         assert_eq!(
-            metadata_calls.len(),
-            4,
-            "with modification to one file, backup is expected to get metadata for head, tail, one new data block, and one unchanged data block: {metadata_calls:#?}"
+            metadata_calls, ["GC_LOCK", "b0001/BANDTAIL"],
+            "with modification to one file, backup is expected to get metadata for lock and previous band tail: {metadata_calls:#?}"
         );
-        assert!(metadata_calls
-            .iter()
-            .all(|c| c.ends_with("BANDTAIL") || c.ends_with("GC_LOCK") || c.starts_with("d/")));
     }
 }

@@ -371,8 +371,8 @@ impl Command {
             Command::Debug(Debug::Blocks { archive }) => {
                 let mut bw = BufWriter::new(stdout);
                 let archive = Archive::open(Transport::new(archive).await?).await?;
-                let blocks = archive.all_blocks(monitor).await?;
-                for hash in blocks {
+                let blocks = archive.all_blocks().await?;
+                for hash in blocks.iter() {
                     writeln!(bw, "{hash}")?;
                 }
             }
@@ -384,7 +384,7 @@ impl Command {
                 let mut bw = BufWriter::new(stdout);
                 let archive = Archive::open(Transport::new(archive).await?).await?;
                 for hash in archive
-                    .referenced_blocks(&archive.list_band_ids().await?, monitor)
+                    .referenced_blocks(&archive.list_band_ids().await?, monitor.clone())
                     .await?
                 {
                     writeln!(bw, "{hash}")?;

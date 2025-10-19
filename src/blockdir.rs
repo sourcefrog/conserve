@@ -21,16 +21,16 @@
 //!
 //! The structure is: archive > blockdir > subdir > file.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use bytes::Bytes;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 use tracing::{instrument, trace};
 use transport::WriteMode;
 
@@ -64,14 +64,19 @@ pub struct Address {
 }
 
 /// A readable, writable directory within a band holding data blocks.
+///
+/// The `BlockDir` object corresponds to the `d` directory in the archive.
+///
+/// While the `BlockDir` object is open, it knows all the blocks that are present in the archive:
+/// they're listed when the `BlockDir` is opened, and the list is updated as blocks are added or removed.
 #[derive(Debug)]
 pub(crate) struct BlockDir {
     transport: Transport,
     pub stats: BlockDirStats,
     // TODO: There are fancier caches and they might help, but this one works, and Stretto did not work for me.
     cache: RwLock<LruCache<BlockHash, Bytes>>,
-    /// Presence means that we know that this block exists, even if we don't have its content.
-    exists: RwLock<LruCache<BlockHash, ()>>,
+    /// All the blocks that are known to be present in the archive.
+    exists: RwLock<HashSet<BlockHash>>,
 }
 
 /// Returns the transport-relative subdirectory name.
@@ -88,30 +93,30 @@ pub fn block_relpath(hash: &BlockHash) -> String {
 }
 
 impl BlockDir {
-    pub(crate) fn open(transport: Transport) -> BlockDir {
+    pub(crate) async fn open(transport: Transport) -> Result<BlockDir> {
+        // TODO: Take a Monitor here so we can show progress listing blocks.
         /// Cache this many blocks in memory.
         // TODO: Change to a cache that tracks the size of stored blocks?
         // As a safe conservative value, 100 blocks of 20MB each would be 2GB.
         const BLOCK_CACHE_SIZE: usize = 100;
 
-        /// Remember the existence of this many blocks, even if we don't have their content.
-        const EXISTENCE_CACHE_SIZE: usize = (64 << 20) / BLAKE_HASH_SIZE_BYTES;
-        const {
-            // Protect against excessive memory usage introduced by mutants.
-            assert!(EXISTENCE_CACHE_SIZE < 1_000_000_000, "Cache size too large");
-        }
+        let exists = list_blocks(&transport).await?;
 
-        BlockDir {
+        Ok(BlockDir {
             transport,
             stats: BlockDirStats::default(),
             cache: RwLock::new(LruCache::new(BLOCK_CACHE_SIZE.try_into().unwrap())),
-            exists: RwLock::new(LruCache::new(EXISTENCE_CACHE_SIZE.try_into().unwrap())),
-        }
+            exists: RwLock::new(exists),
+        })
     }
 
     pub(crate) async fn create(transport: Transport) -> Result<BlockDir> {
         transport.create_dir("").await?;
-        Ok(BlockDir::open(transport))
+        BlockDir::open(transport).await
+    }
+
+    pub fn blocks(&'_ self) -> RwLockReadGuard<'_, HashSet<BlockHash>> {
+        self.exists.read().unwrap()
     }
 
     /// Store block data, if it's not already present, and return the hash.
@@ -125,7 +130,7 @@ impl BlockDir {
     ) -> Result<BlockHash> {
         let hash = BlockHash::hash_bytes(&block_data);
         let uncomp_len = block_data.len() as u64;
-        if self.contains(&hash, monitor.clone()).await? {
+        if self.contains(&hash) {
             stats.deduplicated_blocks += 1;
             stats.deduplicated_bytes += uncomp_len;
             monitor.count(Counter::DeduplicatedBlocks, 1);
@@ -163,7 +168,7 @@ impl BlockDir {
             .write()
             .expect("Lock cache")
             .put(hash.clone(), block_data);
-        self.exists.write().unwrap().push(hash.clone(), ());
+        self.exists.write().unwrap().insert(hash.clone());
         Ok(hash)
     }
 
@@ -175,31 +180,8 @@ impl BlockDir {
     /// an interrupted operation on a local filesystem to leave an empty file.
     /// So, these are specifically treated as missing, so there's a chance to heal
     /// them later.
-    pub(crate) async fn contains(
-        &self,
-        hash: &BlockHash,
-        monitor: Arc<dyn Monitor>,
-    ) -> Result<bool> {
-        if self.cache.read().expect("Lock cache").contains(hash)
-            || self.exists.read().unwrap().contains(hash)
-        {
-            monitor.count(Counter::BlockExistenceCacheHit, 1);
-            self.stats.cache_hit.fetch_add(1, Relaxed);
-            return Ok(true);
-        }
-        monitor.count(Counter::BlockExistenceCacheMiss, 1);
-        match self.transport.metadata(&block_relpath(hash)).await {
-            Err(err) if err.is_not_found() => Ok(false),
-            Err(err) => {
-                warn!(?err, ?hash, "Error checking presence of block");
-                Err(err.into())
-            }
-            Ok(metadata) if metadata.kind == Kind::File && metadata.len > 0 => {
-                self.exists.write().unwrap().put(hash.clone(), ());
-                Ok(true)
-            }
-            Ok(_) => Ok(false),
-        }
+    pub(crate) fn contains(&self, hash: &BlockHash) -> bool {
+        self.exists.read().unwrap().contains(hash)
     }
 
     /// Returns the compressed on-disk size of a block.
@@ -257,7 +239,7 @@ impl BlockDir {
             .write()
             .expect("Lock cache")
             .put(hash.clone(), decompressed_bytes.clone());
-        self.exists.write().unwrap().put(hash.clone(), ());
+        self.exists.write().unwrap().insert(hash.clone());
         self.stats.read_blocks.fetch_add(1, Relaxed);
         monitor.count(Counter::BlockReads, 1);
         self.stats
@@ -276,70 +258,11 @@ impl BlockDir {
 
     pub(crate) async fn delete_block(&self, hash: &BlockHash) -> Result<()> {
         self.cache.write().expect("Lock cache").pop(hash);
-        self.exists.write().unwrap().pop(hash);
+        self.exists.write().unwrap().remove(hash);
         self.transport
             .remove_file(&block_relpath(hash))
             .await
             .map_err(Error::from)
-    }
-
-    /// Return an iterator of block subdirectories, in arbitrary order.
-    ///
-    /// Errors, other than failure to open the directory at all, are logged and discarded.
-    async fn subdirs(&self) -> Result<Vec<String>> {
-        let dirs = self
-            .transport
-            .list_dir("")
-            .await?
-            .into_iter()
-            .filter(|entry| entry.kind == Kind::Dir)
-            .map(|entry| entry.name)
-            .filter(|dirname| {
-                let t = dirname.len() == SUBDIR_NAME_CHARS;
-                if !t {
-                    warn!("Unexpected subdirectory in blockdir: {dirname:?}");
-                }
-                t
-            })
-            .collect();
-        Ok(dirs)
-    }
-
-    /// Return all the blocknames in the blockdir, in arbitrary order.
-    pub(crate) async fn blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
-        let transport = self.transport.clone();
-        let task = monitor.start_task("List block subdir".to_string());
-        let subdirs = self.subdirs().await?;
-        task.set_total(subdirs.len());
-        let mut subdir_tasks = JoinSet::new();
-        for subdir_name in subdirs {
-            let transport = transport.clone();
-            let my_task = task.clone();
-            subdir_tasks.spawn(async move {
-                let r = transport.list_dir(&subdir_name).await;
-                my_task.increment(1);
-                r
-            });
-        }
-        let mut blocks = vec![];
-        while let Some(result) = subdir_tasks.join_next().await {
-            let result = result.expect("await listdir result");
-            match result {
-                Ok(entries) => {
-                    blocks.extend(entries.into_iter().filter_map(|entry| {
-                        if entry.kind == Kind::File {
-                            entry.name.parse().ok()
-                        } else {
-                            None
-                        }
-                    }));
-                }
-                Err(source) => {
-                    monitor.error(Error::ListBlocks { source });
-                }
-            }
-        }
-        Ok(blocks)
     }
 
     /// Check format invariants of the BlockDir.
@@ -354,13 +277,13 @@ impl BlockDir {
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
         // TODO: Warn on blocks in the wrong subdir.
-        debug!("Start list blocks");
-        let blocks = self.blocks(monitor.clone()).await?;
+        let blocks = self.exists.read().unwrap().clone();
         debug!("Check {} blocks", blocks.len());
         let task = monitor.start_task("Validate blocks".to_string());
         task.set_total(blocks.len());
         let mut taskset = JoinSet::new();
-        for hash in blocks {
+        for hash in blocks.iter() {
+            let hash = hash.to_owned();
             let monitor = monitor.clone();
             let task = task.clone();
             let transport = self.transport.clone();
@@ -410,6 +333,68 @@ async fn get_async_uncached(
     Ok(decompressed_bytes)
 }
 
+/// Return an iterator of block subdirectories, in arbitrary order.
+///
+/// Errors, other than failure to open the directory at all, are logged and discarded.
+async fn subdirs(transport: &Transport) -> Result<Vec<String>> {
+    let dirs = transport
+        .list_dir("")
+        .await?
+        .into_iter()
+        .filter(|entry| entry.kind == Kind::Dir)
+        .map(|entry| entry.name)
+        .filter(|dirname| {
+            let t = dirname.len() == SUBDIR_NAME_CHARS;
+            if !t {
+                warn!("Unexpected subdirectory in blockdir: {dirname:?}");
+            }
+            t
+        })
+        .collect();
+    Ok(dirs)
+}
+
+/// Return all the blocknames in the blockdir, in arbitrary order.
+pub(crate) async fn list_blocks(transport: &Transport) -> Result<HashSet<BlockHash>> {
+    let subdirs = subdirs(transport).await?;
+    let mut subdir_tasks = JoinSet::new();
+    for subdir_name in subdirs {
+        let transport = transport.clone();
+        subdir_tasks.spawn(async move {
+            let r = transport.list_dir(&subdir_name).await;
+            r
+        });
+    }
+    let mut blocks = HashSet::new();
+    while let Some(result) = subdir_tasks.join_next().await {
+        let result = result.expect("await listdir result");
+        match result {
+            Ok(entries) => {
+                for entry in entries {
+                    if entry.is_file() {
+                        if entry.len.is_none_or(|a| a == 0) {
+                            warn!("Empty block file: {:?}", entry.name);
+                            continue;
+                        }
+                        let Ok(hash) = entry.name.parse() else {
+                            warn!("Unexpected block name: {:?}", entry.name);
+                            continue;
+                        };
+                        if !blocks.insert(hash) {
+                            warn!("Duplicate block name: {:?}", entry.name);
+                        }
+                    }
+                }
+            }
+            Err(source) => {
+                error!("Error listing blocks: {:?}", source);
+                return Err(Error::ListBlocks { source });
+            }
+        }
+    }
+    Ok(blocks)
+}
+
 #[derive(Debug, Default)]
 pub struct BlockDirStats {
     pub read_blocks: AtomicUsize,
@@ -425,7 +410,7 @@ mod test {
     use pretty_assertions::assert_eq;
     use tempfile::TempDir;
 
-    use crate::monitor::test::TestMonitor;
+    use crate::{monitor::test::TestMonitor, transport::record::Verb};
 
     use super::*;
 
@@ -434,37 +419,8 @@ mod test {
         // Due to an interruption or system crash we might end up with a block
         // file with 0 bytes. It's not valid compressed data. We just treat
         // the block as not present at all.
-        let transport = Transport::temp();
-        let blockdir = BlockDir::open(transport.clone());
-        let mut stats = BackupStats::default();
-        let monitor = TestMonitor::arc();
-        let hash = blockdir
-            .store_or_deduplicate(Bytes::from("stuff"), &mut stats, monitor.clone())
-            .await
-            .unwrap();
-        assert_eq!(monitor.get_counter(Counter::BlockWrites), 1);
-        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 0);
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
-        assert!(blockdir.contains(&hash, monitor.clone()).await.unwrap());
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1); // Since we just wrote it, we know it's there.
-
-        // Open again to get a fresh cache
-        let blockdir = BlockDir::open(transport.clone());
-        let monitor = TestMonitor::arc();
-        transport
-            .write(&block_relpath(&hash), b"", WriteMode::Overwrite)
-            .await
-            .unwrap();
-        assert!(!blockdir.contains(&hash, monitor.clone()).await.unwrap());
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
-    }
-
-    #[tokio::test]
-    async fn store_existing_block_is_not_an_error() {
-        let transport = Transport::temp();
-        let blockdir = BlockDir::open(transport.clone());
+        let transport = Transport::temp().enable_record_calls();
+        let blockdir = BlockDir::open(transport.clone()).await.unwrap();
         let mut stats = BackupStats::default();
         let monitor = TestMonitor::arc();
         let content = Bytes::from("stuff");
@@ -474,58 +430,170 @@ mod test {
             .unwrap();
         assert_eq!(monitor.get_counter(Counter::BlockWrites), 1);
         assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 0);
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
-        assert!(blockdir.contains(&hash, monitor.clone()).await.unwrap());
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1); // Since we just wrote it, we know it's there.
+        assert!(blockdir.contains(&hash));
+        let recording = transport.take_recording();
+        dbg!(&recording);
+        assert_eq!(
+            recording.verb_paths(Verb::Write),
+            vec![block_relpath(&hash)],
+            "should write the block to the transport"
+        );
+
+        // Overwrite the block with an empty file, simulating corruption where the filesystem
+        // created the file but lost the content.
+        transport
+            .write(&block_relpath(&hash), b"", WriteMode::Overwrite)
+            .await
+            .unwrap();
+        let _ = transport.take_recording();
 
         // Open again to get a fresh cache
-        let blockdir = BlockDir::open(transport.clone());
         let monitor = TestMonitor::arc();
+        let blockdir = BlockDir::open(transport.clone()).await.unwrap();
+        assert!(!blockdir.contains(&hash));
+        let recording = transport.take_recording();
+        dbg!(&recording);
+        assert_eq!(
+            recording.verb_paths(Verb::ListDir).len(),
+            2,
+            "should list base and subdirectory"
+        );
+        assert_eq!(
+            recording.verb_paths(Verb::Metadata).len(),
+            0,
+            "should not get metadata for the block"
+        );
+        assert_eq!(
+            recording.verb_paths(Verb::Write).len(),
+            0,
+            "should not write the block to the transport because it's now present"
+        );
+
+        // If you now store it, it will overwrite the empty file and you'll be able to read it again.
+        let hash = blockdir
+            .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
+            .await
+            .unwrap();
+        assert_eq!(monitor.get_counter(Counter::BlockWrites), 1);
+        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 0);
+        assert!(blockdir.contains(&hash));
+        let recording = transport.take_recording();
+        assert_eq!(
+            recording.verb_paths(Verb::Write).len(),
+            1,
+            "should write the block to the transport"
+        );
+
+        let blockdir = BlockDir::open(transport.clone()).await.unwrap();
+        let monitor = TestMonitor::arc();
+        let retrieved = blockdir
+            .get_block_content(&hash, monitor.clone())
+            .await
+            .unwrap();
+        assert_eq!(content, retrieved);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 0);
+        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 1);
+        let recording = transport.take_recording();
+        assert_eq!(
+            recording.verb_paths(Verb::Read).len(),
+            1,
+            "should read the block from the transport because it's not cached in memory"
+        );
+    }
+
+    #[tokio::test]
+    async fn store_existing_block_is_not_an_error() {
+        let transport = Transport::temp().enable_record_calls();
+        let blockdir = BlockDir::open(transport.clone()).await.unwrap();
+        let mut stats = BackupStats::default();
+        let monitor = TestMonitor::arc();
+        let content = Bytes::from("stuff");
+        let hash = blockdir
+            .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
+            .await
+            .unwrap();
+        assert_eq!(monitor.get_counter(Counter::BlockWrites), 1);
+        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 0);
+        assert!(blockdir.contains(&hash));
+        let recording = transport.take_recording();
+        assert_eq!(
+            recording.verb_paths(Verb::Write).len(),
+            1,
+            "should write the block to the transport"
+        );
+        assert_eq!(
+            recording.verb_paths(Verb::CreateDir).len(),
+            1,
+            "should create a subdirectory for the block"
+        );
+
+        // Open again to get a fresh cache
+        let blockdir = BlockDir::open(transport.clone()).await.unwrap();
+        let monitor = TestMonitor::arc();
+        let recording = transport.take_recording();
+        assert_eq!(
+            recording.verb_paths(Verb::ListDir).len(),
+            2,
+            "Loading a blockdir should list the base and subdirectory"
+        );
+
         let _hash = blockdir
             .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
             .await
             .unwrap();
         assert_eq!(monitor.get_counter(Counter::BlockWrites), 0);
         assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 1);
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheMiss), 1);
+        let recording = transport.take_recording();
+        assert_eq!(
+            recording.calls,
+            [],
+            "Storing existing block should do no IO",
+        );
     }
 
     #[tokio::test]
     async fn blocks_async() {
         let tempdir = TempDir::new().unwrap();
-        let blockdir = BlockDir::open(Transport::local(tempdir.path()));
+        let blockdir = BlockDir::open(Transport::local(tempdir.path()))
+            .await
+            .unwrap();
         let mut stats = BackupStats::default();
         let monitor = TestMonitor::arc();
 
-        let initial_blocks = blockdir.blocks(monitor.clone()).await.unwrap();
-        assert_eq!(initial_blocks, []);
+        assert_eq!(blockdir.blocks().len(), 0);
 
         let hash = blockdir
             .store_or_deduplicate(Bytes::from("stuff"), &mut stats, monitor.clone())
             .await
             .unwrap();
 
-        let blocks = blockdir.blocks(monitor.clone()).await.unwrap();
+        let blocks = blockdir.blocks().iter().cloned().collect::<Vec<_>>();
         assert_eq!(blocks, [hash]);
     }
 
     #[tokio::test]
     async fn temp_files_are_not_returned_as_blocks() {
         let tempdir = TempDir::new().unwrap();
-        let blockdir = BlockDir::open(Transport::local(tempdir.path()));
-        let monitor = TestMonitor::arc();
         let subdir = tempdir.path().join(subdir_relpath("123"));
         create_dir(&subdir).unwrap();
         // Write a temp file as was created by earlier versions of the code.
         write(subdir.join("tmp123123123"), b"123").unwrap();
-        let blocks = blockdir.blocks(monitor.clone()).await.unwrap();
-        assert_eq!(blocks, []);
+
+        let blockdir = BlockDir::open(Transport::local(tempdir.path()))
+            .await
+            .unwrap();
+        let blocks = blockdir.blocks();
+        assert_eq!(
+            blocks.len(),
+            0,
+            "Temp file should not be returned as a block"
+        );
     }
 
     #[tokio::test]
     async fn cache_hit() {
-        let blockdir = BlockDir::open(Transport::temp());
+        let transport = Transport::temp().enable_record_calls();
+        let blockdir = BlockDir::open(transport.clone()).await.unwrap();
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let hash = blockdir
@@ -534,11 +602,9 @@ mod test {
             .unwrap();
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
 
-        let monitor = TestMonitor::arc();
-        assert!(blockdir.contains(&hash, monitor.clone()).await.unwrap());
-        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1);
+        assert!(blockdir.contains(&hash));
 
+        let _recording = transport.take_recording();
         let monitor = TestMonitor::arc();
         let retrieved = blockdir
             .get_block_content(&hash, monitor.clone())
@@ -547,7 +613,13 @@ mod test {
         assert_eq!(content, retrieved);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 1);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 0);
-        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit against the value written
+        let recording = transport.take_recording();
+        assert_eq!(
+            recording.verb_paths(Verb::Read).len(),
+            0,
+            "should not read the block from the transport because it's cached in memory"
+        );
+        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1); // hit against the value written
 
         let retrieved = blockdir
             .get_block_content(&hash, monitor.clone())
@@ -556,13 +628,19 @@ mod test {
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 2);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 0);
         assert_eq!(content, retrieved);
-        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 3); // hit again
+        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit again
+        let recording = transport.take_recording();
+        assert_eq!(
+            recording.verb_paths(Verb::Read).len(),
+            0,
+            "should not read the block from the transport because it's cached in memory"
+        );
     }
 
     #[tokio::test]
     async fn existence_cache_hit() {
-        let transport = Transport::temp();
-        let blockdir = BlockDir::open(transport.clone());
+        let transport = Transport::temp().enable_record_calls();
+        let blockdir = BlockDir::open(transport.clone()).await.unwrap();
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let monitor = TestMonitor::arc();
@@ -572,21 +650,27 @@ mod test {
             .unwrap();
 
         // reopen
+        let _recording = transport.take_recording();
         let monitor = TestMonitor::arc();
-        let blockdir = BlockDir::open(transport.clone());
-        assert!(blockdir.contains(&hash, monitor.clone()).await.unwrap());
-        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 0);
+        let blockdir = BlockDir::open(transport.clone()).await.unwrap();
+        assert!(blockdir.contains(&hash));
 
-        assert!(blockdir.contains(&hash, monitor.clone()).await.unwrap());
-        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 1);
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 1);
+        assert!(blockdir.contains(&hash));
 
-        assert!(blockdir.contains(&hash, monitor.clone()).await.unwrap());
-        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2);
-        assert_eq!(monitor.get_counter(Counter::BlockExistenceCacheHit), 2);
+        assert!(blockdir.contains(&hash));
+        let recording = transport.take_recording();
+        assert_eq!(
+            recording.verb_paths(Verb::ListDir).len(),
+            2,
+            "should list base and subdirectory"
+        );
+        assert_eq!(
+            recording.verb_paths(Verb::Metadata).len(),
+            0,
+            "should not get metadata for the block"
+        );
 
-        // actually reading the content is a miss
+        // actually reading the content is a miss and requires reading the block from the transport
         let retrieved = blockdir
             .get_block_content(&hash, monitor.clone())
             .await
@@ -594,6 +678,26 @@ mod test {
         assert_eq!(content, retrieved);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 1);
         assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 0);
-        assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit again
+        assert_eq!(
+            blockdir.stats.cache_hit.load(Relaxed),
+            0,
+            "first read should miss the cache"
+        );
+        let recording = transport.take_recording();
+        assert_eq!(
+            recording.verb_paths(Verb::Read).len(),
+            1,
+            "should read the block from the transport because it's not cached in memory"
+        );
+        assert_eq!(
+            recording.verb_paths(Verb::ListDir).len(),
+            0,
+            "should list base and subdirectory"
+        );
+        assert_eq!(
+            recording.verb_paths(Verb::Metadata).len(),
+            0,
+            "should not get metadata for the block"
+        );
     }
 }

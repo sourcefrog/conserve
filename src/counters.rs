@@ -64,10 +64,6 @@ pub enum Counter {
     BlockContentCacheHit,
     /// Failed to find a block in memory.
     BlockContentCacheMiss,
-    /// Cache knows that this block exists.
-    BlockExistenceCacheHit,
-    /// Cache did not know whether this block exists.
-    BlockExistenceCacheMiss,
     /// Number of index hunks written.
     IndexWrites,
     /// Total uncompressed bytes in index hunks written.
