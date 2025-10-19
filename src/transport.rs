@@ -137,13 +137,21 @@ impl Transport {
 
     /// Start recording operations from this and any derived transports.
     #[cfg(test)]
-    pub(crate) fn enable_record(self) -> Transport {
+    #[must_use]
+    pub(crate) fn enable_record_calls(self) -> Transport {
         Transport {
             record_calls: true,
             ..self
         }
     }
 
+    /// Take out all the recorded calls, clearing the record.
+    #[cfg(test)]
+    pub(crate) fn take_recorded_calls(&self) -> Vec<Call> {
+        std::mem::take(&mut self.calls.lock().unwrap().as_mut())
+    }
+
+    /// Return a copy of the recorded calls.
     #[cfg(test)]
     pub(crate) fn recorded_calls(&self) -> Vec<Call> {
         self.calls.lock().unwrap().clone()

@@ -233,7 +233,7 @@ mod test {
 
         temp.child(filename).write_str(content).unwrap();
 
-        let transport = Transport::local(temp.path()).enable_record();
+        let transport = Transport::local(temp.path()).enable_record_calls();
 
         let bytes = transport.read(filename).await.unwrap();
         assert_eq!(bytes, content.as_bytes());
@@ -256,7 +256,7 @@ mod test {
 
     #[tokio::test]
     async fn read_file_not_found() {
-        let transport = Transport::temp().enable_record();
+        let transport = Transport::temp().enable_record_calls();
 
         let err = transport
             .read("nonexistent.json")
@@ -293,7 +293,7 @@ mod test {
         let filename = "poem.txt";
         temp.child(filename).write_str(content).unwrap();
 
-        let transport = Transport::local(temp.path()).enable_record();
+        let transport = Transport::local(temp.path()).enable_record_calls();
 
         let metadata = transport.metadata(filename).await.unwrap();
         dbg!(&metadata);
@@ -419,7 +419,7 @@ mod test {
 
     #[tokio::test]
     async fn write_file_can_overwrite() {
-        let transport = Transport::temp().enable_record();
+        let transport = Transport::temp().enable_record_calls();
         let filename = "filename";
         transport
             .write(filename, b"original content", WriteMode::Overwrite)
@@ -459,7 +459,7 @@ mod test {
     #[tokio::test]
     async fn sub_transport() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::local(temp.path()).enable_record();
+        let transport = Transport::local(temp.path()).enable_record_calls();
 
         transport.create_dir("aaa").await.unwrap();
         transport.create_dir("aaa/bbb").await.unwrap();
@@ -486,7 +486,7 @@ mod test {
     #[tokio::test]
     async fn remove_dir_all() {
         let temp = assert_fs::TempDir::new().unwrap();
-        let transport = Transport::local(temp.path()).enable_record();
+        let transport = Transport::local(temp.path()).enable_record_calls();
 
         transport.create_dir("aaa").await.unwrap();
         transport.create_dir("aaa/bbb").await.unwrap();
