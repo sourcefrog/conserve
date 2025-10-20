@@ -106,7 +106,7 @@ predicates = "3"
 pretty_assertions = "1.0"
 proptest = "1.5"
 proptest-derive = "0.5"
-rand = "0.8"
+rand = "0.9"
 rstest = { version = "0.19", default-features = false }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 

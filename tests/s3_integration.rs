@@ -49,12 +49,13 @@ impl TempBucket {
             .enable_all()
             .build()
             .expect("Create runtime");
+        let mut rng = rand::rng();
         let bucket_name = format!(
             "conserve-s3-integration-{time}-{rand:x}",
             time = OffsetDateTime::now_utc()
                 .format(format_description!("[year][month][day]-[hour][minute]"))
                 .expect("Format time"),
-            rand = rand::thread_rng().r#gen::<u64>()
+            rand = rng.random::<u64>()
         );
         let app_name = AppName::new(format!(
             "conserve-s3-integration-test-{}",
