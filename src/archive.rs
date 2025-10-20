@@ -409,12 +409,12 @@ mod test {
     use std::fs;
     use std::io::Read;
 
-    use assert_fs::prelude::*;
     use assert_fs::TempDir;
+    use assert_fs::prelude::*;
 
     use crate::monitor::test::TestMonitor;
-    use crate::test_fixtures::store_two_versions;
     use crate::test_fixtures::TreeFixture;
+    use crate::test_fixtures::store_two_versions;
 
     #[tokio::test]
     async fn create_then_open_archive() {
@@ -452,12 +452,13 @@ mod test {
         let af = Archive::create_temp().await;
 
         assert!(af.transport().local_path().unwrap().is_dir());
-        assert!(af
-            .transport()
-            .local_path()
-            .unwrap()
-            .join("CONSERVE")
-            .is_file());
+        assert!(
+            af.transport()
+                .local_path()
+                .unwrap()
+                .join("CONSERVE")
+                .is_file()
+        );
         assert!(af.transport().local_path().unwrap().join("d").is_dir());
 
         let header_path = af.transport().local_path().unwrap().join("CONSERVE");

@@ -128,7 +128,7 @@ impl Transport {
                     kind: ErrorKind::UrlScheme,
                     url: Some(url.clone()),
                     source: None,
-                })
+                });
             }
         };
         Ok(Transport::from_protocol(protocol))
@@ -315,7 +315,7 @@ type Result<T> = result::Result<T, Error>;
 mod test {
     use std::path::Path;
 
-    use assert_fs::{prelude::*, TempDir};
+    use assert_fs::{TempDir, prelude::*};
     use pretty_assertions::assert_eq;
     use url::Url;
 

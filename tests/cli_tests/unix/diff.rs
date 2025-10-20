@@ -18,7 +18,7 @@ use std::fs;
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 
-use conserve::{test_fixtures::TreeFixture, Archive};
+use conserve::{Archive, test_fixtures::TreeFixture};
 
 use crate::run_conserve;
 

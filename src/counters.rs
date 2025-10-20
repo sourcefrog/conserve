@@ -151,9 +151,11 @@ mod test {
             assert_eq!(counters.get(c), v);
         });
         assert_eq!(counters.iter().count(), Counter::COUNT);
-        assert!(counters
-            .iter()
-            .all(|(c, v)| (c == Counter::Files) == (v == 2)));
+        assert!(
+            counters
+                .iter()
+                .all(|(c, v)| (c == Counter::Files) == (v == 2))
+        );
     }
 
     #[test]

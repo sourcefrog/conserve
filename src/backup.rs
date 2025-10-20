@@ -18,8 +18,8 @@ use std::fmt;
 use std::io::prelude::*;
 use std::mem::take;
 use std::path::Path;
-use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
+use std::sync::atomic::Ordering::Relaxed;
 use std::time::{Duration, Instant};
 
 use bytes::BytesMut;
@@ -657,16 +657,16 @@ mod test {
     use std::sync::Arc;
     use std::sync::Mutex;
 
-    use assert_fs::{prelude::*, TempDir};
+    use assert_fs::{TempDir, prelude::*};
 
-    use filetime::{set_file_mtime, FileTime};
+    use filetime::{FileTime, set_file_mtime};
     use tracing_test::traced_test;
 
     use crate::counters::Counter;
     use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::TreeFixture;
-    use crate::transport::record::Verb;
     use crate::transport::Transport;
+    use crate::transport::record::Verb;
     use crate::*;
 
     use super::*;
@@ -717,8 +717,7 @@ mod test {
         assert_eq!(change.to_string(), "- /a");
     }
 
-    const HELLO_HASH: &str =
-        "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
+    const HELLO_HASH: &str = "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
      896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7";
 
     #[tokio::test]
@@ -1464,9 +1463,11 @@ mod test {
             ["GC_LOCK", "b0000/BANDTAIL"],
             "don't get metadata for data blocks"
         );
-        assert!(metadata_calls
-            .iter()
-            .all(|c| c.ends_with("BANDTAIL") || c.ends_with("GC_LOCK")));
+        assert!(
+            metadata_calls
+                .iter()
+                .all(|c| c.ends_with("BANDTAIL") || c.ends_with("GC_LOCK"))
+        );
 
         // Change one of the files, and in a new backup it should be recognized
         // as unmodified.
@@ -1493,7 +1494,8 @@ mod test {
         let metadata_calls = recording.verb_paths(Verb::Metadata);
         println!("metadata calls for third backup after modification: {metadata_calls:#?}");
         assert_eq!(
-            metadata_calls, ["GC_LOCK", "b0001/BANDTAIL"],
+            metadata_calls,
+            ["GC_LOCK", "b0001/BANDTAIL"],
             "with modification to one file, backup is expected to get metadata for lock and previous band tail: {metadata_calls:#?}"
         );
     }

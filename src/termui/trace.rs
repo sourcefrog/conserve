@@ -8,13 +8,13 @@ use std::fs::OpenOptions;
 use std::path::PathBuf;
 
 #[allow(unused_imports)]
-use tracing::{debug, error, info, trace, warn, Level};
+use tracing::{Level, debug, error, info, trace, warn};
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::Registry;
 use tracing_subscriber::filter;
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::layer::Layer;
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::Registry;
 
 /// Chosen style of timestamp prefix on trace lines.
 #[derive(clap::ValueEnum, Clone, Debug)]

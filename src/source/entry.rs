@@ -1,7 +1,7 @@
 use serde::{self, Serialize};
 use time::OffsetDateTime;
 
-use crate::{entry::KindMeta, Apath, EntryTrait, Kind, Owner, UnixMode};
+use crate::{Apath, EntryTrait, Kind, Owner, UnixMode, entry::KindMeta};
 
 /// A description of a file, directory, or symlink in a source tree.
 #[derive(Debug, Serialize, Clone, Eq, PartialEq)]

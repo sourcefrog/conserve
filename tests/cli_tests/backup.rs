@@ -18,7 +18,7 @@ use assert_fs::NamedTempFile;
 use indoc::indoc;
 use serde_json::Deserializer;
 
-use conserve::{test_fixtures::TreeFixture, Archive};
+use conserve::{Archive, test_fixtures::TreeFixture};
 
 use crate::run_conserve;
 

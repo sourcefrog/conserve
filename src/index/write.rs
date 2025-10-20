@@ -23,7 +23,7 @@ use crate::monitor::Monitor;
 use crate::transport::{Transport, WriteMode};
 use crate::*;
 
-use super::{hunk_relpath, subdir_relpath, HUNKS_PER_SUBDIR};
+use super::{HUNKS_PER_SUBDIR, hunk_relpath, subdir_relpath};
 
 /// Write out index hunks.
 ///

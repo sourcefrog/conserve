@@ -21,9 +21,9 @@ use windows_projfs::{
 };
 
 use crate::{
-    hunk_index::IndexHunkIndex,
-    monitor::{void::VoidMonitor, Monitor},
     Apath, Archive, BandId, BandSelectionPolicy, Error, IndexEntry, Kind, Result, StoredTree,
+    hunk_index::IndexHunkIndex,
+    monitor::{Monitor, void::VoidMonitor},
 };
 
 use super::{MountHandle, MountOptions};
@@ -78,7 +78,7 @@ impl Read for StoredFileReader {
             let current_chunk = match self.iter.peek_mut() {
                 Some(Ok(value)) => value,
                 Some(Err(_)) => {
-                    return Err(io::Error::other(self.iter.next().unwrap().unwrap_err()))
+                    return Err(io::Error::other(self.iter.next().unwrap().unwrap_err()));
                 }
                 None => break,
             };

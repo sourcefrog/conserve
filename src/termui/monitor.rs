@@ -5,17 +5,17 @@
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
-use std::thread::{sleep, spawn, JoinHandle};
+use std::thread::{JoinHandle, sleep, spawn};
 use std::time::Duration;
 
 use nutmeg::{Destination, View};
 use thousands::Separable;
 use tracing::error;
 
-use crate::counters::{Counter, Counters};
-use crate::monitor::task::{Task, TaskList};
-use crate::monitor::Monitor;
 use crate::Error;
+use crate::counters::{Counter, Counters};
+use crate::monitor::Monitor;
+use crate::monitor::task::{Task, TaskList};
 
 pub struct TermUiMonitor {
     // operation: Operation,

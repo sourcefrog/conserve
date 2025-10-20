@@ -18,7 +18,7 @@ use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
-use blake2_rfc::blake2b::{blake2b, Blake2bResult};
+use blake2_rfc::blake2b::{Blake2bResult, blake2b};
 use serde::{Deserialize, Serialize};
 
 use crate::*;

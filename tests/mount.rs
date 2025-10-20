@@ -7,7 +7,7 @@ use std::{
 };
 
 use conserve::{
-    backup, monitor::test::TestMonitor, test_fixtures::TreeFixture, BackupOptions, MountOptions,
+    BackupOptions, MountOptions, backup, monitor::test::TestMonitor, test_fixtures::TreeFixture,
 };
 use tempfile::TempDir;
 

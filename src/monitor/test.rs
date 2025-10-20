@@ -5,8 +5,8 @@
 use std::mem::take;
 use std::sync::{Arc, Mutex};
 
-use super::task::{Task, TaskList};
 use super::Monitor;
+use super::task::{Task, TaskList};
 use crate::counters::{Counter, Counters};
 use crate::{Apath, Error};
 

@@ -20,15 +20,15 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use clap::builder::{styling, Styles};
+use clap::builder::{Styles, styling};
 use clap::{Parser, Subcommand};
 use conserve::change::Change;
 use time::UtcOffset;
 #[allow(unused_imports)]
-use tracing::{debug, error, info, trace, warn, Level};
+use tracing::{Level, debug, error, info, trace, warn};
 
 use crate::transport::Transport;
-use conserve::termui::{enable_tracing, TermUiMonitor, TraceTimeStyle};
+use conserve::termui::{TermUiMonitor, TraceTimeStyle, enable_tracing};
 use conserve::*;
 
 /// Local timezone offset, calculated once at startup, to avoid issues about

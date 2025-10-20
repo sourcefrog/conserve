@@ -39,8 +39,8 @@ use aws_sdk_s3::operation::list_objects_v2::{ListObjectsV2Error, ListObjectsV2Ou
 use aws_sdk_s3::operation::put_object::PutObjectError;
 use aws_sdk_s3::primitives::ByteStreamError;
 use aws_sdk_s3::types::StorageClass;
-use aws_types::region::Region;
 use aws_types::SdkConfig;
+use aws_types::region::Region;
 use base64::Engine;
 use bytes::Bytes;
 use tracing::{debug, error, trace};

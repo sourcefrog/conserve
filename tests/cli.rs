@@ -20,11 +20,11 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use assert_cmd::prelude::*;
-use assert_fs::prelude::*;
 use assert_fs::NamedTempFile;
 use assert_fs::TempDir;
-use conserve::test_fixtures::setup_incomplete_empty_band;
+use assert_fs::prelude::*;
 use conserve::Archive;
+use conserve::test_fixtures::setup_incomplete_empty_band;
 use indoc::indoc;
 use predicates::prelude::*;
 use serde_json::Deserializer;

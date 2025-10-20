@@ -20,8 +20,8 @@ use std::borrow::Cow;
 use std::io::{BufWriter, Write};
 use std::sync::Arc;
 
-use time::format_description::well_known::Rfc3339;
 use time::UtcOffset;
+use time::format_description::well_known::Rfc3339;
 use tracing::error;
 
 use crate::index::entry::IndexEntry;

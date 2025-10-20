@@ -18,8 +18,8 @@ use indoc::indoc;
 use predicates::prelude::*;
 use serde_json::Value;
 
-use conserve::test_fixtures::TreeFixture;
 use conserve::Archive;
+use conserve::test_fixtures::TreeFixture;
 
 use crate::run_conserve;
 

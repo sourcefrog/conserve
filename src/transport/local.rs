@@ -267,12 +267,13 @@ mod test {
         assert!(message.contains("Not found"));
         assert!(message.contains("nonexistent.json"));
 
-        assert!(err
-            .url
-            .as_ref()
-            .expect("url")
-            .path()
-            .ends_with("/nonexistent.json"));
+        assert!(
+            err.url
+                .as_ref()
+                .expect("url")
+                .path()
+                .ends_with("/nonexistent.json")
+        );
         assert_eq!(err.kind(), transport::ErrorKind::NotFound);
         assert!(err.is_not_found());
 
@@ -301,11 +302,13 @@ mod test {
         assert_eq!(metadata.len, 24);
         assert_eq!(metadata.kind, Kind::File);
         assert!(metadata.modified + Duration::from_secs(60) > OffsetDateTime::now_utc());
-        assert!(transport
-            .metadata("nopoem")
-            .await
-            .unwrap_err()
-            .is_not_found());
+        assert!(
+            transport
+                .metadata("nopoem")
+                .await
+                .unwrap_err()
+                .is_not_found()
+        );
         assert_eq!(
             transport.recorded_calls(),
             [

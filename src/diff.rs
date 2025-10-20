@@ -89,7 +89,7 @@ impl Diff {
 
 #[cfg(test)]
 mod tests {
-    use filetime::{set_file_mtime, FileTime};
+    use filetime::{FileTime, set_file_mtime};
 
     use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::TreeFixture;

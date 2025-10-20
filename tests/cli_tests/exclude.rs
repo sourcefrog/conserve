@@ -12,8 +12,8 @@
 // GNU General Public License for more details.
 
 use assert_cmd::prelude::*;
-use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use assert_fs::prelude::*;
 use conserve::Archive;
 use indoc::indoc;
 use predicates::prelude::*;

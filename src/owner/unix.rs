@@ -15,7 +15,7 @@
 //! Unix implementation of file ownership.
 
 use std::io;
-use std::os::unix::fs::{lchown, MetadataExt};
+use std::os::unix::fs::{MetadataExt, lchown};
 use std::sync::Mutex;
 use std::{fs, path::Path};
 

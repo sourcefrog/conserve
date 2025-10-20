@@ -30,12 +30,12 @@
  */
 
 use std::fs::rename;
-use std::fs::{remove_file, OpenOptions};
+use std::fs::{OpenOptions, remove_file};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use assert_fs::prelude::*;
 use dir_assert::assert_paths;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
@@ -47,8 +47,8 @@ use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
 use conserve::transport::Transport;
 use conserve::{
-    backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait, Error,
-    Exclude, RestoreOptions, Result, ValidateOptions,
+    Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait, Error, Exclude,
+    RestoreOptions, Result, ValidateOptions, backup, restore,
 };
 
 // TODO: Test restore from a partially damaged backup.

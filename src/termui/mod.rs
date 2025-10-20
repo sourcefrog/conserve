@@ -16,4 +16,4 @@ mod monitor;
 mod trace;
 
 pub use monitor::TermUiMonitor;
-pub use trace::{enable_tracing, TraceTimeStyle};
+pub use trace::{TraceTimeStyle, enable_tracing};

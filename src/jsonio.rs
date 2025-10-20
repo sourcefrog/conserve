@@ -156,9 +156,11 @@ mod tests {
     #[tokio::test]
     async fn read_json_is_none_for_nonexistent_files() {
         let transport = Transport::temp();
-        assert!(read_json::<TestContents>(&transport, "nonexistent.json")
-            .await
-            .expect("No error for nonexistent file")
-            .is_none());
+        assert!(
+            read_json::<TestContents>(&transport, "nonexistent.json")
+                .await
+                .expect("No error for nonexistent file")
+                .is_none()
+        );
     }
 }

@@ -14,11 +14,11 @@
 //! Test `conserve delete`.
 
 use assert_cmd::prelude::*;
-use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use assert_fs::prelude::*;
+use conserve::Archive;
 use conserve::test_fixtures::store_two_versions;
 use conserve::transport::Transport;
-use conserve::Archive;
 use predicates::prelude::*;
 
 use conserve::BandId;

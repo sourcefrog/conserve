@@ -1,8 +1,8 @@
 use crate::counters::Counter;
 
 use super::{
-    task::{Task, TaskList},
     Monitor,
+    task::{Task, TaskList},
 };
 
 /// A monitor that does not capture any information.

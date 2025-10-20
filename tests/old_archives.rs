@@ -18,8 +18,8 @@ use std::fs::{self, metadata, read_dir};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use assert_fs::prelude::*;
 use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
 use predicates::prelude::*;
