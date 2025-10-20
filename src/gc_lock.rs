@@ -247,4 +247,53 @@ mod test {
         std::mem::forget(lock1);
         let _lock2 = GarbageCollectionLock::break_lock(&archive).await.unwrap();
     }
+
+    #[tokio::test]
+    async fn backup_prevented_by_gc_lock() -> Result<()> {
+        let archive = Archive::create_temp().await;
+        let tf = TreeFixture::new();
+        tf.create_file("hello");
+
+        let lock1 = GarbageCollectionLock::new(&archive).await?;
+
+        // Backup should fail while gc lock is held.
+        let monitor = TestMonitor::arc();
+        let backup_result = backup(
+            &archive,
+            tf.path(),
+            &BackupOptions::default(),
+            monitor.clone(),
+        )
+        .await;
+        assert_eq!(
+            backup_result.unwrap_err().to_string(),
+            "Archive is locked for garbage collection"
+        );
+
+        // Leak the lock, then gc breaking the lock.
+        std::mem::forget(lock1);
+        archive
+            .delete_bands(
+                &[],
+                &DeleteOptions {
+                    break_lock: true,
+                    ..Default::default()
+                },
+                monitor.clone(),
+            )
+            .await?;
+
+        // Backup should now succeed.
+        let backup_result = backup(
+            &archive,
+            tf.path(),
+            &BackupOptions::default(),
+            monitor.clone(),
+        )
+        .await
+        .unwrap();
+        dbg!(&backup_result);
+
+        Ok(())
+    }
 }

@@ -42,14 +42,13 @@ use pretty_assertions::assert_eq;
 use rstest::rstest;
 use tracing::info;
 use tracing_test::traced_test;
-// use predicates::prelude::*;
 
 use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
 use conserve::transport::Transport;
 use conserve::{
-    backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait,
-    Exclude, RestoreOptions, ValidateOptions,
+    backup, restore, Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait, Error,
+    Exclude, RestoreOptions, Result, ValidateOptions,
 };
 
 // TODO: Test restore from a partially damaged backup.
@@ -293,4 +292,40 @@ impl DamageLocation {
             }
         }
     }
+}
+
+#[traced_test]
+#[tokio::test]
+async fn missing_block_when_checking_hashes() -> Result<()> {
+    let archive = Archive::open_path(Path::new("testdata/damaged/missing-block")).await?;
+    let monitor = TestMonitor::arc();
+    archive
+        .validate(&ValidateOptions::default(), monitor.clone())
+        .await
+        .unwrap();
+    let errors = monitor.take_errors();
+    dbg!(&errors);
+    assert_eq!(errors.len(), 1);
+    assert!(matches!(errors[0], Error::BlockMissing { .. }));
+    Ok(())
+}
+
+#[traced_test]
+#[tokio::test]
+async fn missing_block_skip_block_hashes() -> Result<()> {
+    let archive = Archive::open_path(Path::new("testdata/damaged/missing-block")).await?;
+    let monitor = TestMonitor::arc();
+    archive
+        .validate(
+            &ValidateOptions {
+                skip_block_hashes: true,
+            },
+            monitor.clone(),
+        )
+        .await?;
+    let errors = monitor.take_errors();
+    dbg!(&errors);
+    assert_eq!(errors.len(), 1);
+    assert!(matches!(errors[0], Error::BlockMissing { .. }));
+    Ok(())
 }

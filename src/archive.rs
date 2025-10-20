@@ -411,3 +411,195 @@ impl Archive {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use std::fs;
+    use std::io::Read;
+
+    use assert_fs::prelude::*;
+    use assert_fs::TempDir;
+
+    use crate::monitor::test::TestMonitor;
+    use crate::test_fixtures::store_two_versions;
+    use crate::test_fixtures::TreeFixture;
+
+    #[tokio::test]
+    async fn create_then_open_archive() {
+        let testdir = TempDir::new().unwrap();
+        let arch_path = testdir.path().join("arch");
+        let arch = Archive::create_path(&arch_path).await.unwrap();
+
+        assert!(arch.list_band_ids().await.unwrap().is_empty());
+
+        // We can re-open it.
+        Archive::open_path(&arch_path).await.unwrap();
+        assert!(arch.list_band_ids().await.unwrap().is_empty());
+        assert!(arch.last_complete_band().await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn fails_on_non_empty_directory() {
+        let temp = TempDir::new().unwrap();
+
+        temp.child("i am already here").touch().unwrap();
+
+        let result = Archive::create_path(temp.path()).await;
+        assert_eq!(
+            result.as_ref().unwrap_err().to_string(),
+            "Directory for new archive is not empty",
+            "{result:?}"
+        );
+        temp.close().unwrap();
+    }
+
+    /// A new archive contains just one header file.
+    /// The header is readable json containing only a version number.
+    #[tokio::test]
+    async fn empty_archive() {
+        let af = Archive::create_temp().await;
+
+        assert!(af.transport().local_path().unwrap().is_dir());
+        assert!(af
+            .transport()
+            .local_path()
+            .unwrap()
+            .join("CONSERVE")
+            .is_file());
+        assert!(af.transport().local_path().unwrap().join("d").is_dir());
+
+        let header_path = af.transport().local_path().unwrap().join("CONSERVE");
+        let mut header_file = fs::File::open(header_path).unwrap();
+        let mut contents = String::new();
+        header_file.read_to_string(&mut contents).unwrap();
+        assert_eq!(contents, "{\"conserve_archive_version\":\"0.6\"}\n");
+
+        assert!(
+            af.last_band_id().await.unwrap().is_none(),
+            "Archive should have no bands yet"
+        );
+        assert!(
+            af.last_complete_band().await.unwrap().is_none(),
+            "Archive should have no bands yet"
+        );
+        assert_eq!(
+            af.referenced_blocks(&af.list_band_ids().await.unwrap(), TestMonitor::arc())
+                .await
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(af.all_blocks(TestMonitor::arc()).await.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn delete_all_bands() {
+        let af = Archive::create_temp().await;
+        store_two_versions(&af).await;
+
+        let stats = af
+            .delete_bands(
+                &[BandId::new(&[0]), BandId::new(&[1])],
+                &Default::default(),
+                TestMonitor::arc(),
+            )
+            .await
+            .expect("delete_bands");
+
+        assert_eq!(stats.deleted_block_count, 2);
+        assert_eq!(stats.deleted_band_count, 2);
+    }
+
+    #[tokio::test]
+    async fn unreferenced_blocks() {
+        let archive = Archive::create_temp().await;
+        let tf = TreeFixture::new();
+        tf.create_file("hello");
+        let content_hash: BlockHash =
+            "9063990e5c5b2184877f92adace7c801a549b00c39cd7549877f06d5dd0d3a6ca6eee42d5\
+        896bdac64831c8114c55cee664078bd105dc691270c92644ccb2ce7"
+                .parse()
+                .unwrap();
+
+        let _copy_stats = backup(
+            &archive,
+            tf.path(),
+            &BackupOptions::default(),
+            TestMonitor::arc(),
+        )
+        .await
+        .expect("backup");
+
+        // Delete the band and index
+        std::fs::remove_dir_all(archive.transport().local_path().unwrap().join("b0000")).unwrap();
+        let monitor = TestMonitor::arc();
+
+        let unreferenced: Vec<BlockHash> =
+            archive.unreferenced_blocks(monitor.clone()).await.unwrap();
+        assert_eq!(unreferenced, [content_hash]);
+
+        // Delete dry run.
+        let delete_stats = archive
+            .delete_bands(
+                &[],
+                &DeleteOptions {
+                    dry_run: true,
+                    break_lock: false,
+                },
+                monitor.clone(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            delete_stats,
+            DeleteStats {
+                unreferenced_block_count: 1,
+                unreferenced_block_bytes: 10,
+                deletion_errors: 0,
+                deleted_block_count: 0,
+                deleted_band_count: 0,
+                elapsed: delete_stats.elapsed,
+            }
+        );
+
+        // Delete unreferenced blocks.
+        let options = DeleteOptions {
+            dry_run: false,
+            break_lock: false,
+        };
+        let delete_stats = archive
+            .delete_bands(&[], &options, monitor.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            delete_stats,
+            DeleteStats {
+                unreferenced_block_count: 1,
+                unreferenced_block_bytes: 10,
+                deletion_errors: 0,
+                deleted_block_count: 1,
+                deleted_band_count: 0,
+                elapsed: delete_stats.elapsed,
+            }
+        );
+
+        // Try again to delete: should find no garbage.
+        let delete_stats = archive
+            .delete_bands(&[], &options, monitor.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            delete_stats,
+            DeleteStats {
+                unreferenced_block_count: 0,
+                unreferenced_block_bytes: 0,
+                deletion_errors: 0,
+                deleted_block_count: 0,
+                deleted_band_count: 0,
+                elapsed: delete_stats.elapsed,
+            }
+        );
+    }
+}
