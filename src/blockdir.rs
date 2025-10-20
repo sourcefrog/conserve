@@ -360,10 +360,7 @@ pub(crate) async fn list_blocks(transport: &Transport) -> Result<HashSet<BlockHa
     let mut subdir_tasks = JoinSet::new();
     for subdir_name in subdirs {
         let transport = transport.clone();
-        subdir_tasks.spawn(async move {
-            let r = transport.list_dir(&subdir_name).await;
-            r
-        });
+        subdir_tasks.spawn(async move { transport.list_dir(&subdir_name).await });
     }
     let mut blocks = HashSet::new();
     while let Some(result) = subdir_tasks.join_next().await {
