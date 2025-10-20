@@ -55,8 +55,7 @@ jobs:
           cargo --version
           rustc --version
       - name: Test
-        run: >
-          cargo test --features fail/failpoints
+        run: cargo test
       # S3 integration tests can't run from CI because they need credentials, but we
       # can at least make sure that they compile.
       - name: cargo build --all-targets --all-features
@@ -92,13 +91,11 @@ jobs:
           cargo --version
           rustc --version
       - name: Build
-        run: cargo build --all-targets --features fail/failpoints
+        run: cargo build --all-targets
       - name: Test (without mount)
-        run: cargo test --features fail/failpoints -- --skip mount
-          --include-ignored
+        run: cargo test -- --skip mount --include-ignored
       - name: Test (mount)
-        run: cargo test --features fail/failpoints --test mount --
-          --include-ignored
+        run: cargo test --test mount -- --include-ignored
         env:
           # Running multiple instances in parallel might cause a crash on low-end environments
           # when executing the mounting tests on Windows due to projfs.
@@ -128,7 +125,6 @@ jobs:
         run: >
           cargo mutants --no-shuffle -vV --in-diff git.diff --in-place
           --no-default-features
-          --features fail/failpoints
       - name: Archive mutants.out
         uses: actions/upload-artifact@v4
         if: always()
@@ -160,7 +156,6 @@ jobs:
           cargo mutants --no-shuffle -vV --in-place --baseline=skip
           --shard ${{ matrix.shard }}/10
           --no-default-features
-          --features fail/failpoints
       - name: Archive results
         uses: actions/upload-artifact@v4
         if: always()

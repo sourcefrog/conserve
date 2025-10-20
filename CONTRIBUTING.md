@@ -34,8 +34,6 @@ This is enough for normal iterative development. There are also some special tes
 
 `cargo test -- --include-ignored` runs some property-based tests that are slower (taking about a minute).
 
-`cargo test --features fail/failpoints` runs tests that use Rust [failpoints](https://docs.rs/fail/) to exercise error handling.
-
 `cargo test --features s3-integration-tests` runs tests that create real AWS S3 buckets and objects. These tests are slow and require AWS credentials to be set up. The buckets should be automatically cleaned up after the tests, but be aware that they are real resources and may incur (small) costs. I'd recommend you run this with credentials for an account that doesn't contain any important data, just in case.
 
 ## Adding new tests
