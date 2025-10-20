@@ -29,8 +29,8 @@ use aws_sdk_s3::types::{
 };
 use indoc::indoc;
 use rand::Rng;
-use time::macros::format_description;
 use time::OffsetDateTime;
+use time::macros::format_description;
 use tokio::runtime::Runtime;
 
 struct TempBucket {
@@ -54,7 +54,7 @@ impl TempBucket {
             time = OffsetDateTime::now_utc()
                 .format(format_description!("[year][month][day]-[hour][minute]"))
                 .expect("Format time"),
-            rand = rand::thread_rng().gen::<u64>()
+            rand = rand::thread_rng().r#gen::<u64>()
         );
         let app_name = AppName::new(format!(
             "conserve-s3-integration-test-{}",
