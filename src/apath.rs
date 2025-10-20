@@ -36,7 +36,7 @@ use serde::{Deserialize, Serialize};
 /// string ordering.
 ///
 /// Apaths must start with `/` and not end with `/` unless they have length 1.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct Apath(String);
 
 impl Apath {
@@ -348,15 +348,21 @@ mod test {
         assert!(Apath::from("/").is_prefix_of(&Apath::from("/stuff")));
         assert!(Apath::from("/").is_prefix_of(&Apath::from("/")));
         assert!(Apath::from("/stuff").is_prefix_of(&Apath::from("/stuff/file")));
-        assert!(Apath::from("/stuff/file")
-            .is_prefix_of(&Apath::from("/stuff"))
-            .not());
-        assert!(Apath::from("/this")
-            .is_prefix_of(&Apath::from("/that"))
-            .not());
-        assert!(Apath::from("/this")
-            .is_prefix_of(&Apath::from("/that/other"))
-            .not());
+        assert!(
+            Apath::from("/stuff/file")
+                .is_prefix_of(&Apath::from("/stuff"))
+                .not()
+        );
+        assert!(
+            Apath::from("/this")
+                .is_prefix_of(&Apath::from("/that"))
+                .not()
+        );
+        assert!(
+            Apath::from("/this")
+                .is_prefix_of(&Apath::from("/that/other"))
+                .not()
+        );
     }
 
     #[test]

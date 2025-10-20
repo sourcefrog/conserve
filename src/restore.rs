@@ -12,12 +12,13 @@
 
 //! Restore from the archive to the filesystem.
 
-use std::fs::{create_dir_all, File};
+#[cfg(test)]
+use std::collections::HashMap;
+use std::fs::{File, create_dir_all};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use fail::fail_point;
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
@@ -33,17 +34,25 @@ use crate::unix_time::ToFileTime;
 use crate::*;
 
 /// Description of how to restore a tree.
-// #[derive(Debug)]
 pub struct RestoreOptions {
+    /// Exclude these paths from being restored.
     pub exclude: Exclude,
+
     /// Restore only this subdirectory.
     pub only_subtree: Option<Apath>,
+
+    /// Overwrite existing files in the destination.
     pub overwrite: bool,
-    // The band to select, or by default the last complete one.
+
+    /// The band to select, or by default the last complete one.
     pub band_selection: BandSelectionPolicy,
 
-    // Call this callback as each entry is successfully restored.
+    /// Call this callback as each entry is successfully restored.
     pub change_callback: Option<ChangeCallback>,
+
+    /// For testing, fail to restore the named entries, with the given error.
+    #[cfg(test)]
+    pub inject_failures: HashMap<Apath, io::ErrorKind>,
 }
 
 impl Default for RestoreOptions {
@@ -54,6 +63,8 @@ impl Default for RestoreOptions {
             exclude: Exclude::nothing(),
             only_subtree: None,
             change_callback: None,
+            #[cfg(test)]
+            inject_failures: HashMap::new(),
         }
     }
 }
@@ -98,14 +109,13 @@ pub async fn restore(
             Kind::Dir => {
                 monitor.count(Counter::Dirs, 1);
                 if *entry.apath() != Apath::root() {
-                    if let Err(err) = create_dir(&path) {
-                        if err.kind() != io::ErrorKind::AlreadyExists {
-                            monitor.error(Error::RestoreDirectory {
-                                path: path.clone(),
-                                source: err,
-                            });
-                            continue;
-                        }
+                    // Create all the parents in case we're restoring only a nested subtree.
+                    if let Err(err) = restore_dir(&entry.apath, &path, &options) {
+                        monitor.error(Error::RestoreDirectory {
+                            path: path.clone(),
+                            source: err,
+                        });
+                        continue;
                     }
                 }
                 deferrals.push(DirDeferral {
@@ -146,15 +156,22 @@ pub async fn restore(
     Ok(())
 }
 
-fn create_dir(path: &Path) -> io::Result<()> {
-    fail_point!("restore::create-dir", |_| {
-        Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            "Simulated failure",
-        ))
-    });
-    // Create all the parents in case we're restoring only a nested subtree.
-    create_dir_all(path)
+fn restore_dir(apath: &Apath, restore_path: &Path, options: &RestoreOptions) -> io::Result<()> {
+    #[cfg(test)]
+    {
+        if let Some(err_kind) = options.inject_failures.get(apath) {
+            return Err(io::Error::from(*err_kind));
+        }
+    }
+    let _ = apath;
+    let _ = options;
+    create_dir_all(restore_path).or_else(|err| {
+        if err.kind() == io::ErrorKind::AlreadyExists {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    })
 }
 
 /// Recorded changes to apply to directories after all their contents
@@ -307,13 +324,16 @@ fn restore_symlink(_restore_path: &Path, entry: &IndexEntry) -> Result<()> {
 #[cfg(test)]
 mod test {
     use std::fs::{create_dir, write};
+    use std::io;
+    use std::path::Path;
     use std::sync::{Arc, Mutex};
 
     use tempfile::TempDir;
 
     use crate::counters::Counter;
     use crate::monitor::test::TestMonitor;
-    use crate::test_fixtures::{store_two_versions, TreeFixture};
+    use crate::test_fixtures::{TreeFixture, store_two_versions};
+    use crate::transport::Transport;
     use crate::*;
 
     #[tokio::test]
@@ -501,7 +521,7 @@ mod test {
         use std::fs::{read_link, symlink_metadata};
         use std::path::PathBuf;
 
-        use filetime::{set_symlink_file_times, FileTime};
+        use filetime::{FileTime, set_symlink_file_times};
 
         let af = Archive::create_temp().await;
         let srcdir = TreeFixture::new();
@@ -529,5 +549,45 @@ mod test {
             read_link(&restored_symlink_path).unwrap(),
             PathBuf::from("target")
         );
+    }
+
+    #[tokio::test]
+    async fn create_dir_permission_denied() {
+        let archive = Archive::open(Transport::local(Path::new(
+            "testdata/archive/simple/v0.6.10",
+        )))
+        .await
+        .unwrap();
+
+        let mut restore_options = RestoreOptions::default();
+        restore_options
+            .inject_failures
+            .insert(Apath::from("/subdir"), io::ErrorKind::PermissionDenied);
+        let restore_tmp = TempDir::new().unwrap();
+        let monitor = TestMonitor::arc();
+        let stats = restore(
+            &archive,
+            restore_tmp.path(),
+            restore_options,
+            monitor.clone(),
+        )
+        .await
+        .expect("Restore");
+        dbg!(&stats);
+        let errors = monitor.take_errors();
+        dbg!(&errors);
+        assert_eq!(errors.len(), 2);
+        if let Error::RestoreDirectory { path, .. } = &errors[0] {
+            assert!(path.ends_with("subdir"));
+        } else {
+            panic!("Unexpected error {:?}", errors[0]);
+        }
+        // Also, since we didn't create the directory, we fail to create the file within it.
+        if let Error::RestoreFile { path, source } = &errors[1] {
+            assert!(path.ends_with("subdir/subfile"));
+            assert_eq!(source.kind(), io::ErrorKind::NotFound);
+        } else {
+            panic!("Unexpected error {:?}", errors[1]);
+        }
     }
 }
