@@ -148,7 +148,8 @@ jobs:
           toolchain: stable
       - uses: swatinem/rust-cache@v2
       - name: Install cargo-mutants from git
-        run: cargo install --git https://github.com/sourcefrog/cargo-mutants cargo-mutants
+        # Force install in case there's a slightly different version cached.
+        run: cargo install --force --git https://github.com/sourcefrog/cargo-mutants cargo-mutants
       - name: Run mutant tests
         # Don't use the S3 features because they require AWS credentials for realistic
         # testing.
