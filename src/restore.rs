@@ -565,7 +565,7 @@ mod test {
             .insert(Apath::from("/subdir"), io::ErrorKind::PermissionDenied);
         let restore_tmp = TempDir::new().unwrap();
         let monitor = TestMonitor::arc();
-        let stats = restore(
+        restore(
             &archive,
             restore_tmp.path(),
             restore_options,
@@ -573,7 +573,6 @@ mod test {
         )
         .await
         .expect("Restore");
-        dbg!(&stats);
         let errors = monitor.take_errors();
         dbg!(&errors);
         assert_eq!(errors.len(), 2);
