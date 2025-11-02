@@ -365,32 +365,44 @@ pub(crate) async fn list_blocks(transport: &Transport) -> Result<HashSet<BlockHa
         let job_limit = job_limit.clone();
         subdir_tasks.spawn(async move {
             let _permit = job_limit.acquire().await.unwrap();
-            transport.list_dir(&subdir_name).await
+            (subdir_name.clone(), transport.list_dir(&subdir_name).await)
         });
     }
     let mut blocks = HashSet::new();
     while let Some(result) = subdir_tasks.join_next().await {
         let result = result.expect("await listdir result");
         match result {
-            Ok(entries) => {
+            (subdir_name, Ok(entries)) => {
                 for entry in entries {
                     if entry.is_file() {
-                        if entry.len.is_none_or(|a| a == 0) {
-                            warn!("Empty block file: {:?}", entry.name);
-                            continue;
+                        if let Ok(hash) = entry.name.parse() {
+                            if entry.len.is_none_or(|a| a == 0) {
+                                warn!(
+                                    "Empty block file in directory {:?}: {:?}",
+                                    subdir_name, entry.name
+                                );
+                            } else if !blocks.insert(hash) {
+                                warn!(
+                                    "Duplicate block name in directory {:?}: {:?}",
+                                    subdir_name, entry.name
+                                );
+                            }
+                        } else {
+                            warn!(
+                                "Unexpected file name in block directory {:?}: {:?}",
+                                subdir_name, entry.name
+                            );
                         }
-                        let Ok(hash) = entry.name.parse() else {
-                            warn!("Unexpected block name: {:?}", entry.name);
-                            continue;
-                        };
-                        if !blocks.insert(hash) {
-                            warn!("Duplicate block name: {:?}", entry.name);
-                        }
+                    } else if entry.is_dir() {
+                        warn!(
+                            "Unexpected subdirectory in block directory {:?}: {:?}",
+                            subdir_name, entry.name
+                        );
                     }
                 }
             }
-            Err(source) => {
-                error!("Error listing blocks: {:?}", source);
+            (subdir, Err(source)) => {
+                error!("Error listing block subdir {subdir:?}: {source:?}");
                 return Err(Error::ListBlocks { source });
             }
         }
