@@ -29,6 +29,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 use bytes::Bytes;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tracing::{debug, error, warn};
 use tracing::{instrument, trace};
@@ -358,9 +359,14 @@ async fn subdirs(transport: &Transport) -> Result<Vec<String>> {
 pub(crate) async fn list_blocks(transport: &Transport) -> Result<HashSet<BlockHash>> {
     let subdirs = subdirs(transport).await?;
     let mut subdir_tasks = JoinSet::new();
+    let job_limit = Arc::new(Semaphore::new(30));
     for subdir_name in subdirs {
         let transport = transport.clone();
-        subdir_tasks.spawn(async move { transport.list_dir(&subdir_name).await });
+        let job_limit = job_limit.clone();
+        subdir_tasks.spawn(async move {
+            let _permit = job_limit.acquire().await.unwrap();
+            transport.list_dir(&subdir_name).await
+        });
     }
     let mut blocks = HashSet::new();
     while let Some(result) = subdir_tasks.join_next().await {
