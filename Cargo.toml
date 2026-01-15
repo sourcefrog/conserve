@@ -31,9 +31,9 @@ name = "conserve"
 [dependencies]
 assert_matches = "1.5.0"
 async-trait = "0.1.85"
-aws-config = { version = "1.8", optional = true }
-aws-sdk-s3 = { version = "1.56", optional = true }
-aws-types = { version = "1.1", optional = true }
+aws-config = { version = "1", optional = true }
+aws-sdk-s3 = { version = "1", optional = true }
+aws-types = { version = "1", optional = true }
 base64 = { version = "0.22", optional = true }
 blake2-rfc = "0.2.18"
 bytes = "1.7"
