@@ -77,7 +77,7 @@ jobs:
       matrix:
         # windows-latest: currently broken and too hard for me to maintain -- mbp 2025-07
         os: [ubuntu-latest, macOS-latest]
-        version: [stable, nightly, "1.85"]
+        version: [stable, nightly, "1.88"]
 
     steps:
       - uses: actions/checkout@v4
