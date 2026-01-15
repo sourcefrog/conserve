@@ -24,25 +24,25 @@ pub struct Error {
 /// General categories of transport errors.
 #[derive(Debug, Display, PartialEq, Eq, Clone, Copy)]
 pub enum ErrorKind {
-    #[display(fmt = "Not found")]
+    #[display("Not found")]
     NotFound,
 
-    #[display(fmt = "Already exists")]
+    #[display("Already exists")]
     AlreadyExists,
 
-    #[display(fmt = "Permission denied")]
+    #[display("Permission denied")]
     PermissionDenied,
 
-    #[display(fmt = "Create transport error")]
+    #[display("Create transport error")]
     CreateTransport,
 
-    #[display(fmt = "Connect error")]
+    #[display("Connect error")]
     Connect,
 
-    #[display(fmt = "Unsupported URL scheme")]
+    #[display("Unsupported URL scheme")]
     UrlScheme,
 
-    #[display(fmt = "Other transport error")]
+    #[display("Other transport error")]
     Other,
 }
 
