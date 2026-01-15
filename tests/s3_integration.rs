@@ -23,6 +23,7 @@ use std::str::FromStr;
 
 use ::aws_config::{AppName, BehaviorVersion};
 use assert_cmd::Command;
+use assert_cmd::cargo::cargo_bin;
 use aws_sdk_s3::types::{
     BucketLifecycleConfiguration, BucketLocationConstraint, CreateBucketConfiguration,
     ExpirationStatus, LifecycleExpiration, LifecycleRule, LifecycleRuleFilter,
@@ -161,7 +162,7 @@ impl Drop for TempBucket {
 }
 
 fn conserve() -> Command {
-    Command::cargo_bin("conserve").expect("locate conserve binary")
+    Command::cargo_bin(cargo_bin!("conserve"));
 }
 
 #[test]

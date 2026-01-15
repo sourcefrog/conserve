@@ -96,7 +96,7 @@ version = "0.3.20"
 features = ["env-filter", "fmt", "json", "local-time", "time"]
 
 [dev-dependencies]
-assert_cmd = "2.0"
+assert_cmd = "2.1.2"
 assert_fs = "1.0"
 cp_r = "0.5"
 dir-assert = "0.2"

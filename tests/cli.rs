@@ -33,7 +33,8 @@ use url::Url;
 use conserve::test_fixtures::TreeFixture;
 
 fn run_conserve() -> Command {
-    let mut command = Command::cargo_bin("conserve").expect("locate conserve binary");
+    let binary_path = assert_cmd::cargo::cargo_bin!("conserve");
+    let mut command = Command::new(&binary_path);
     command.env_remove("RUST_LOG");
     command
 }
