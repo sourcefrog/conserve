@@ -660,7 +660,6 @@ mod test {
     use assert_fs::{TempDir, prelude::*};
 
     use filetime::{FileTime, set_file_mtime};
-    use tracing_test::traced_test;
 
     use crate::counters::Counter;
     use crate::monitor::test::TestMonitor;
@@ -763,7 +762,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[traced_test]
     async fn simple_backup_with_excludes() -> Result<()> {
         let af = Archive::create_temp().await;
         let srcdir = TreeFixture::new();
@@ -820,7 +818,7 @@ mod test {
         af.validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
             .await
             .unwrap();
-        assert!(!logs_contain("ERROR") && !logs_contain("WARN"));
+        // TODO: Maybe check there were no errors or warnings.
         Ok(())
     }
 

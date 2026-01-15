@@ -41,7 +41,6 @@ use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use rstest::rstest;
 use tracing::info;
-use tracing_test::traced_test;
 
 use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
@@ -77,7 +76,6 @@ impl TreeChanges {
 }
 
 #[rstest]
-#[traced_test]
 #[tokio::test]
 async fn backup_after_damage(
     #[values(DamageAction::Delete, DamageAction::Truncate)] action: DamageAction,
@@ -295,7 +293,6 @@ impl DamageLocation {
     }
 }
 
-#[traced_test]
 #[tokio::test]
 async fn missing_block_when_checking_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block")).await?;
@@ -311,7 +308,6 @@ async fn missing_block_when_checking_hashes() -> Result<()> {
     Ok(())
 }
 
-#[traced_test]
 #[tokio::test]
 async fn missing_block_skip_block_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block")).await?;
