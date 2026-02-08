@@ -55,9 +55,8 @@ impl TempBucket {
                 .to_string()
                 .chars()
                 .filter(|c| c.is_alphanumeric() || *c == '-')
-                .collect::<String>()
-                .replace("T", "-")
-                .split_at(16).0.to_owned(), // Take first 16 chars: "YYYY-MM-DD-HHMM"
+                .take(16) // Take first 16 characters
+                .collect::<String>(),
             rand = rng.random::<u64>()
         );
         let app_name = AppName::new(format!(

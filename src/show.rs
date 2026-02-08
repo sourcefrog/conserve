@@ -92,12 +92,12 @@ pub async fn show_versions(
                 if let Some(end_time) = info.end_time {
                     let span = end_time.since(info.start_time).unwrap();
                     // Convert jiff::Span to std::time::Duration
-                    let total_nanos = span.total(jiff::Unit::Nanosecond).unwrap_or(0.0);
-                    if total_nanos < 0.0 {
-                        Cow::Borrowed("negative")
-                    } else {
-                        let duration = std::time::Duration::from_nanos(total_nanos as u64);
-                        duration_to_hms(duration).into()
+                    match span.total(jiff::Unit::Nanosecond) {
+                        Ok(total_nanos) if total_nanos >= 0.0 => {
+                            let duration = std::time::Duration::from_nanos(total_nanos as u64);
+                            duration_to_hms(duration).into()
+                        }
+                        _ => Cow::Borrowed("negative"),
                     }
                 } else {
                     Cow::Borrowed("unknown")
