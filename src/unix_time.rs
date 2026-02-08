@@ -33,7 +33,7 @@ impl FromUnixAndNanos for Timestamp {
 }
 
 #[allow(unused)] // really unused at present, but might be useful
-pub(crate) trait ToTimestamp {
+pub trait ToTimestamp {
     fn to_timestamp(&self) -> Timestamp;
 }
 
