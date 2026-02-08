@@ -11,8 +11,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-use serde_json::json;
 use jiff::Timestamp;
+use serde_json::json;
 
 use crate::apath::Apath;
 use crate::entry::EntryTrait;

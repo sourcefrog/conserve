@@ -307,7 +307,13 @@ mod test {
 
         assert_eq!(metadata.len, 24);
         assert_eq!(metadata.kind, Kind::File);
-        assert!(metadata.modified.checked_add(jiff::Span::new().seconds(60)).unwrap() > jiff::Timestamp::now());
+        assert!(
+            metadata
+                .modified
+                .checked_add(jiff::Span::new().seconds(60))
+                .unwrap()
+                > jiff::Timestamp::now()
+        );
         assert!(
             transport
                 .metadata("nopoem")

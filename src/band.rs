@@ -26,8 +26,8 @@ use std::sync::Arc;
 
 use crate::transport::Transport;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 use jiff::Timestamp;
+use serde::{Deserialize, Serialize};
 use tracing::{debug, trace, warn};
 
 use crate::jsonio::{read_json, write_json};
@@ -267,18 +267,14 @@ impl Band {
     pub async fn get_info(&self) -> Result<Info> {
         let tail_option: Option<Tail> = read_json(&self.transport, BAND_TAIL_FILENAME).await?;
         let start_time =
-            Timestamp::from_second(self.head.start_time).map_err(|_| {
-                Error::InvalidMetadata {
-                    details: format!("Invalid band start timestamp {:?}", self.head.start_time),
-                }
+            Timestamp::from_second(self.head.start_time).map_err(|_| Error::InvalidMetadata {
+                details: format!("Invalid band start timestamp {:?}", self.head.start_time),
             })?;
         let end_time = tail_option
             .as_ref()
             .map(|tail| {
-                Timestamp::from_second(tail.end_time).map_err(|_| {
-                    Error::InvalidMetadata {
-                        details: format!("Invalid band end timestamp {:?}", tail.end_time),
-                    }
+                Timestamp::from_second(tail.end_time).map_err(|_| Error::InvalidMetadata {
+                    details: format!("Invalid band end timestamp {:?}", tail.end_time),
                 })
             })
             .transpose()?;
@@ -352,7 +348,11 @@ mod tests {
         assert_eq!(info.id.to_string(), "b0000");
         assert!(info.is_closed);
         assert_eq!(info.index_hunk_count, Some(0));
-        let dur = info.end_time.expect("info has an end_time").since(info.start_time).unwrap();
+        let dur = info
+            .end_time
+            .expect("info has an end_time")
+            .since(info.start_time)
+            .unwrap();
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)
         assert!(dur.total(jiff::Unit::Second).unwrap() < 5.0);

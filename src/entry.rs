@@ -16,8 +16,8 @@
 
 use std::fmt::Debug;
 
-use serde::Serialize;
 use jiff::Timestamp;
+use serde::Serialize;
 
 use crate::*;
 

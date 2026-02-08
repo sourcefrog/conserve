@@ -15,8 +15,8 @@
 
 use std::fmt;
 
-use serde::Serialize;
 use jiff::Timestamp;
+use serde::Serialize;
 
 use crate::{Apath, EntryTrait, Kind, Owner, Result, UnixMode};
 

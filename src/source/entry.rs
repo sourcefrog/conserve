@@ -1,5 +1,5 @@
-use serde::{self, Serialize};
 use jiff::Timestamp;
+use serde::{self, Serialize};
 
 use crate::{Apath, EntryTrait, Kind, Owner, UnixMode, entry::KindMeta};
 

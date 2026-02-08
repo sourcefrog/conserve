@@ -28,8 +28,8 @@ use aws_sdk_s3::types::{
     ExpirationStatus, LifecycleExpiration, LifecycleRule, LifecycleRuleFilter,
 };
 use indoc::indoc;
-use rand::Rng;
 use jiff::Timestamp;
+use rand::Rng;
 use tokio::runtime::Runtime;
 
 struct TempBucket {
