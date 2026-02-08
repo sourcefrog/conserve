@@ -116,12 +116,13 @@ pub async fn backup(
     // Create the new band only after finding the basis band!
     let band = Band::create(archive).await?;
     let index_writer = band.index_writer(monitor.clone());
+    let block_dir = archive.block_dir().await?;
     let mut writer = BackupWriter {
         band,
         index_writer,
-        block_dir: archive.block_dir.clone(),
+        block_dir: Arc::clone(&block_dir),
         stats: BackupStats::default(),
-        file_combiner: FileCombiner::new(archive.block_dir.clone(), options.max_block_size),
+        file_combiner: FileCombiner::new(Arc::clone(&block_dir), options.max_block_size),
     };
 
     while let Some(merged_entries) = merge.next().await {
@@ -182,7 +183,7 @@ pub async fn backup(
     }
     stats += writer.finish(monitor.clone()).await?;
     stats.elapsed = start.elapsed();
-    let block_stats = &archive.block_dir.stats;
+    let block_stats = &block_dir.stats;
     stats.read_blocks = block_stats.read_blocks.load(Relaxed);
     stats.read_blocks_compressed_bytes = block_stats.read_block_compressed_bytes.load(Relaxed);
     stats.read_blocks_uncompressed_bytes = block_stats.read_block_uncompressed_bytes.load(Relaxed);

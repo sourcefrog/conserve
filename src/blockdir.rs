@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015-2025 Martin Pool.
+// Copyright 2015-2026 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -75,7 +75,9 @@ pub(crate) struct BlockDir {
     transport: Transport,
     pub stats: BlockDirStats,
     // TODO: There are fancier caches and they might help, but this one works, and Stretto did not work for me.
+    /// A cache of the contents of recently read blocks, keyed by block hash.
     cache: RwLock<LruCache<BlockHash, Bytes>>,
+ 
     /// All the blocks that are known to be present in the archive.
     exists: RwLock<HashSet<BlockHash>>,
 }

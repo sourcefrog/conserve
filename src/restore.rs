@@ -84,7 +84,7 @@ pub async fn restore(
         return Err(Error::DestinationNotEmpty);
     }
     let task = monitor.start_task("Restore".to_string());
-    let block_dir = &archive.block_dir;
+    let block_dir = archive.block_dir().await?;
     // // This causes us to walk the source tree twice, which is probably an acceptable option
     // // since it's nice to see realistic overall progress. We could keep all the entries
     // // in memory, and maybe we should, but it might get unreasonably big.
@@ -128,7 +128,7 @@ pub async fn restore(
             Kind::File => {
                 monitor.count(Counter::Files, 1);
                 if let Err(err) =
-                    restore_file(path.clone(), &entry, block_dir, monitor.clone()).await
+                    restore_file(path.clone(), &entry, &block_dir, monitor.clone()).await
                 {
                     monitor.error(err);
                     continue;

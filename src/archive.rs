@@ -36,8 +36,10 @@ static BLOCK_DIR: &str = "d";
 /// An archive holding backup material.
 #[derive(Clone, Debug)]
 pub struct Archive {
-    /// Holds body content for all file versions.
-    pub(crate) block_dir: Arc<BlockDir>,
+    /// The block dir supports reading and writing file content.
+    ///
+    /// The object holds caches of both block content and recently read blocks.
+    block_dir: Arc<BlockDir>,
 
     /// Transport to the root directory of the archive.
     transport: Transport,
@@ -65,6 +67,11 @@ impl Archive {
     /// Panic if the tempdir can't be created.
     pub async fn create_temp() -> Archive {
         Archive::create(Transport::temp()).await.unwrap()
+    }
+
+    /// Return the block dir for this archive, opening it if isn't already open.
+    pub(crate) async fn block_dir(&self) -> Result<Arc<BlockDir>> {
+        Ok(self.block_dir.clone())
     }
 
     /// Make a new archive in a new directory accessed by a Transport.
