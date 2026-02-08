@@ -18,13 +18,13 @@ use std::{io, path};
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use jiff::Timestamp;
 use tempfile::TempDir;
 use tokio::sync::Semaphore;
 use tracing::{error, trace, warn};
 use url::Url;
 
 use crate::Kind;
-use crate::unix_time::ToTimestamp;
 
 use super::{DirEntry, Error, Metadata, Result, WriteMode};
 
@@ -144,10 +144,17 @@ impl super::Protocol for Protocol {
         let fsmeta = tokio::fs::metadata(&path)
             .await
             .map_err(|err| Error::io_error(&path, err))?;
-        let modified = fsmeta
-            .modified()
-            .map_err(|err| Error::io_error(&path, err))?
-            .to_timestamp();
+        let modified = Timestamp::try_from(
+            fsmeta
+                .modified()
+                .map_err(|err| Error::io_error(&path, err))?,
+        )
+        .map_err(|err| {
+            Error::io_error(
+                &path,
+                std::io::Error::new(std::io::ErrorKind::InvalidData, err),
+            )
+        })?;
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),

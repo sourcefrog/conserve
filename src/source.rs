@@ -23,6 +23,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use jiff::Timestamp;
 use tracing::{error, warn};
 
 use crate::counters::Counter;
@@ -30,7 +31,6 @@ use crate::entry::KindMeta;
 use crate::monitor::Monitor;
 use crate::stats::SourceIterStats;
 use crate::tree::TreeSize;
-use crate::unix_time::ToTimestamp;
 use crate::*;
 
 /// A real tree on the filesystem, as a backup source.
@@ -93,10 +93,8 @@ fn entry_from_fs_metadata(
     source_path: &Path,
     metadata: &fs::Metadata,
 ) -> Result<Entry> {
-    let mtime = metadata
-        .modified()
-        .expect("Failed to get file mtime")
-        .to_timestamp();
+    let mtime = Timestamp::try_from(metadata.modified().expect("Failed to get file mtime"))
+        .expect("File mtime converts to Timestamp");
     let kind_meta = if metadata.is_file() {
         KindMeta::File {
             size: metadata.len(),

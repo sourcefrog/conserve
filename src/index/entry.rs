@@ -19,7 +19,7 @@ use crate::entry::EntryTrait;
 use crate::kind::Kind;
 use crate::owner::Owner;
 use crate::unix_mode::UnixMode;
-use crate::unix_time::FromUnixAndNanos;
+use crate::unix_time::timestamp_from_unix_nanos;
 use crate::{blockdir, source};
 
 /// Description of one archived file.
@@ -84,7 +84,7 @@ impl EntryTrait for IndexEntry {
 
     #[inline]
     fn mtime(&self) -> Timestamp {
-        Timestamp::from_unix_seconds_and_nanos(self.mtime, self.mtime_nanos)
+        timestamp_from_unix_nanos(self.mtime, self.mtime_nanos)
     }
 
     /// Size of the file, if it is a file. None for directories and symlinks.
