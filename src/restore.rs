@@ -1,4 +1,4 @@
-// Copyright 2015-2025 Martin Pool.
+// Copyright 2015-2026 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,7 +12,6 @@
 
 //! Restore from the archive to the filesystem.
 
-#[cfg(test)]
 use std::collections::HashMap;
 use std::fs::{File, create_dir_all};
 use std::io::{self, Write};
@@ -51,7 +50,6 @@ pub struct RestoreOptions {
     pub change_callback: Option<ChangeCallback>,
 
     /// For testing, fail to restore the named entries, with the given error.
-    #[cfg(test)]
     pub inject_failures: HashMap<Apath, io::ErrorKind>,
 }
 
@@ -63,7 +61,6 @@ impl Default for RestoreOptions {
             exclude: Exclude::nothing(),
             only_subtree: None,
             change_callback: None,
-            #[cfg(test)]
             inject_failures: HashMap::new(),
         }
     }
@@ -157,11 +154,8 @@ pub async fn restore(
 }
 
 fn restore_dir(apath: &Apath, restore_path: &Path, options: &RestoreOptions) -> io::Result<()> {
-    #[cfg(test)]
-    {
-        if let Some(err_kind) = options.inject_failures.get(apath) {
-            return Err(io::Error::from(*err_kind));
-        }
+    if let Some(err_kind) = options.inject_failures.get(apath) {
+        return Err(io::Error::from(*err_kind));
     }
     let _ = apath;
     let _ = options;

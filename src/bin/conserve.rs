@@ -579,6 +579,7 @@ impl Command {
                         *long_listing,
                         &changes_json.as_deref(),
                     )?,
+                    inject_failures: Default::default(),
                 };
                 restore(&archive, destination, options, monitor).await?;
                 debug!("Restore complete");
