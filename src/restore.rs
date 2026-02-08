@@ -21,7 +21,7 @@ use std::sync::Arc;
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
-use time::OffsetDateTime;
+use jiff::Timestamp;
 use tracing::{instrument, trace};
 
 use crate::blockdir::BlockDir;
@@ -176,7 +176,7 @@ fn restore_dir(apath: &Apath, restore_path: &Path, options: &RestoreOptions) -> 
 struct DirDeferral {
     path: PathBuf,
     unix_mode: UnixMode,
-    mtime: OffsetDateTime,
+    mtime: Timestamp,
     owner: Owner,
 }
 
@@ -200,7 +200,7 @@ fn apply_deferrals(deferrals: &[DirDeferral], monitor: Arc<dyn Monitor>) -> Resu
                 source,
             });
         }
-        if let Err(source) = filetime::set_file_mtime(path, (*mtime).to_file_time()) {
+        if let Err(source) = filetime::set_file_mtime(path, mtime.to_file_time()) {
             monitor.error(Error::RestoreModificationTime {
                 path: path.clone(),
                 source,

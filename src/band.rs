@@ -26,8 +26,8 @@ use std::sync::Arc;
 
 use crate::transport::Transport;
 use itertools::Itertools;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
 use tracing::{debug, trace, warn};
 
 use crate::jsonio::{read_json, write_json};
@@ -83,7 +83,7 @@ pub struct Band {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Head {
     /// Seconds since the Unix epoch when writing of this band began.
-    start_time: i64,
+    start_time: i64, // TODO: Maybe a timestamp with custom serializer
 
     /// Semver string for the minimum Conserve version to read this band
     /// correctly.
@@ -99,7 +99,7 @@ struct Head {
 #[derive(Debug, Serialize, Deserialize)]
 struct Tail {
     /// Seconds since the Unix epoch when the band was closed.
-    end_time: i64,
+    end_time: i64, // TODO: Maybe a timestamp with custom serializer
 
     /// Number of index hunks in this band, to enable validation that none are missing.
     ///
@@ -113,10 +113,10 @@ pub struct Info {
     pub is_closed: bool,
 
     /// Time Conserve started writing this band.
-    pub start_time: OffsetDateTime,
+    pub start_time: Timestamp,
 
     /// Time this band was completed, if it is complete.
-    pub end_time: Option<OffsetDateTime>,
+    pub end_time: Option<Timestamp>,
 
     /// Number of hunks present in the index, if that is known.
     pub index_hunk_count: Option<u64>,
@@ -153,7 +153,7 @@ impl Band {
             Some("23.2.0".to_owned())
         };
         let head = Head {
-            start_time: OffsetDateTime::now_utc().unix_timestamp(),
+            start_time: Timestamp::now().as_second(),
             band_format_version,
             format_flags: format_flags.into(),
         };
@@ -171,7 +171,7 @@ impl Band {
             &self.transport,
             BAND_TAIL_FILENAME,
             &Tail {
-                end_time: OffsetDateTime::now_utc().unix_timestamp(),
+                end_time: Timestamp::now().as_second(),
                 index_hunk_count: Some(index_hunk_count),
             },
         )
@@ -267,18 +267,14 @@ impl Band {
     pub async fn get_info(&self) -> Result<Info> {
         let tail_option: Option<Tail> = read_json(&self.transport, BAND_TAIL_FILENAME).await?;
         let start_time =
-            OffsetDateTime::from_unix_timestamp(self.head.start_time).map_err(|_| {
-                Error::InvalidMetadata {
-                    details: format!("Invalid band start timestamp {:?}", self.head.start_time),
-                }
+            Timestamp::from_second(self.head.start_time).map_err(|_| Error::InvalidMetadata {
+                details: format!("Invalid band start timestamp {:?}", self.head.start_time),
             })?;
         let end_time = tail_option
             .as_ref()
             .map(|tail| {
-                OffsetDateTime::from_unix_timestamp(tail.end_time).map_err(|_| {
-                    Error::InvalidMetadata {
-                        details: format!("Invalid band end timestamp {:?}", tail.end_time),
-                    }
+                Timestamp::from_second(tail.end_time).map_err(|_| Error::InvalidMetadata {
+                    details: format!("Invalid band end timestamp {:?}", tail.end_time),
                 })
             })
             .transpose()?;
@@ -312,7 +308,6 @@ impl Band {
 mod tests {
     use std::fs;
     use std::str::FromStr;
-    use std::time::Duration;
 
     use serde_json::json;
 
@@ -355,7 +350,7 @@ mod tests {
         let dur = info.end_time.expect("info has an end_time") - info.start_time;
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)
-        assert!(dur < Duration::from_secs(5));
+        assert!(dur.get_seconds() < 5);
     }
 
     #[tokio::test]

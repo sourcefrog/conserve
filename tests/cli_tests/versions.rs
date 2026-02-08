@@ -28,9 +28,9 @@ fn utc() {
         .assert()
         .success()
         .stdout(indoc! { "
-            b0000                2021-03-04T13:21:15Z            0:00
-            b0001                2021-03-04T13:21:30Z            0:00
-            b0002                2021-03-04T13:27:28Z            0:00
+            b0000                2021-03-04T13:21:15+00:00[UTC]       0:00
+            b0001                2021-03-04T13:21:30+00:00[UTC]       0:00
+            b0002                2021-03-04T13:27:28+00:00[UTC]       0:00
             "});
 }
 
@@ -47,16 +47,16 @@ fn newest_first() {
         .success()
         .stderr(predicate::str::is_empty())
         .stdout(indoc! { "
-            b0002                2021-03-04T13:27:28Z            0:00
-            b0001                2021-03-04T13:21:30Z            0:00
-            b0000                2021-03-04T13:21:15Z            0:00
+            b0002                2021-03-04T13:27:28+00:00[UTC]       0:00
+            b0001                2021-03-04T13:21:30+00:00[UTC]       0:00
+            b0000                2021-03-04T13:21:15+00:00[UTC]       0:00
         "});
 }
 
 #[test]
 fn local_time() {
     // Without --utc we don't know exactly what times will be produced,
-    // and it's hard to control the timezone for tests on Windows.
+    // and it's hard to control the time+00:00[UTC]one for tests on Windows.
     run_conserve()
         .args(["versions", "testdata/archive/simple/v0.6.10"])
         .assert()
@@ -91,9 +91,9 @@ fn tree_sizes() {
         .assert()
         .success()
         .stdout(indoc! { "
-            b0000                2021-03-04T13:21:15Z            0:00           0 MB
-            b0001                2021-03-04T13:21:30Z            0:00           0 MB
-            b0002                2021-03-04T13:27:28Z            0:00           0 MB
+            b0000                2021-03-04T13:21:15+00:00[UTC]       0:00           0 MB
+            b0001                2021-03-04T13:21:30+00:00[UTC]       0:00           0 MB
+            b0002                2021-03-04T13:27:28+00:00[UTC]       0:00           0 MB
             "});
 }
 

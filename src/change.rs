@@ -15,8 +15,8 @@
 
 use std::fmt;
 
+use jiff::Timestamp;
 use serde::Serialize;
-use time::OffsetDateTime;
 
 use crate::{Apath, EntryTrait, Kind, Owner, Result, UnixMode};
 
@@ -138,7 +138,7 @@ pub struct EntryMetadata {
     // TODO: Eventually unify with EntryValue or Entry?
     #[serde(flatten)]
     pub kind: KindMetadata,
-    pub mtime: OffsetDateTime,
+    pub mtime: Timestamp,
     #[serde(flatten)]
     pub owner: Owner,
     pub unix_mode: UnixMode,

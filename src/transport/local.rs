@@ -146,7 +146,8 @@ impl super::Protocol for Protocol {
         let modified = fsmeta
             .modified()
             .map_err(|err| Error::io_error(&path, err))?
-            .into();
+            .try_into()
+            .expect("modified time should be representable as Timestamp");
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),
@@ -215,9 +216,9 @@ mod test {
     use std::time::Duration;
 
     use assert_fs::prelude::*;
+    use jiff::Timestamp;
     use predicates::prelude::*;
     use pretty_assertions::assert_eq;
-    use time::OffsetDateTime;
     use tokio;
 
     use super::*;
@@ -301,7 +302,7 @@ mod test {
 
         assert_eq!(metadata.len, 24);
         assert_eq!(metadata.kind, Kind::File);
-        assert!(metadata.modified + Duration::from_secs(60) > OffsetDateTime::now_utc());
+        assert!(metadata.modified + Duration::from_secs(60) > Timestamp::now());
         assert!(
             transport
                 .metadata("nopoem")
@@ -354,8 +355,8 @@ mod test {
         temp.close().unwrap();
     }
 
-    #[cfg(unix)]
     #[tokio::test]
+    #[cfg(unix)]
     async fn list_dir_skips_symlinks() {
         // Archives aren't expected to contain symlinks and so list_dir just skips them.
 
@@ -398,8 +399,8 @@ mod test {
         temp.close().unwrap();
     }
 
-    #[cfg(unix)]
     #[tokio::test]
+    #[cfg(unix)]
     async fn write_file_permission_denied() {
         use std::fs;
         use std::os::unix::prelude::PermissionsExt;

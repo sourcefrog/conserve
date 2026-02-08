@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015-2026 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,42 +12,19 @@
 // GNU General Public License for more details.
 
 //! Times relative to the Unix epoch.
-//!
-//! In particular, glue between [filetime] and [time].
+
+// TODO: delete this if <https://github.com/alexcrichton/filetime/pull/118/changes>
+// is merged and released.
 
 use filetime::FileTime;
-use time::OffsetDateTime;
-
-pub(crate) trait FromUnixAndNanos {
-    fn from_unix_seconds_and_nanos(unix_seconds: i64, nanoseconds: u32) -> Self;
-}
-
-impl FromUnixAndNanos for OffsetDateTime {
-    fn from_unix_seconds_and_nanos(unix_seconds: i64, nanoseconds: u32) -> Self {
-        OffsetDateTime::from_unix_timestamp(unix_seconds)
-            .unwrap()
-            .replace_nanosecond(nanoseconds)
-            .unwrap()
-    }
-}
-
-#[allow(unused)] // really unused at present, but might be useful
-pub(crate) trait ToOffsetDateTime {
-    fn to_offset_date_time(&self) -> OffsetDateTime;
-}
-
-impl ToOffsetDateTime for FileTime {
-    fn to_offset_date_time(&self) -> OffsetDateTime {
-        OffsetDateTime::from_unix_seconds_and_nanos(self.unix_seconds(), self.nanoseconds())
-    }
-}
+use jiff::Timestamp;
 
 pub(crate) trait ToFileTime {
     fn to_file_time(&self) -> FileTime;
 }
 
-impl ToFileTime for OffsetDateTime {
+impl ToFileTime for Timestamp {
     fn to_file_time(&self) -> FileTime {
-        FileTime::from_unix_time(self.unix_timestamp(), self.nanosecond())
+        FileTime::from_unix_time(self.as_second(), self.subsec_nanosecond().cast_unsigned())
     }
 }

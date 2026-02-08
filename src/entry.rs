@@ -16,8 +16,8 @@
 
 use std::fmt::Debug;
 
+use jiff::Timestamp;
 use serde::Serialize;
-use time::OffsetDateTime;
 
 use crate::*;
 
@@ -29,7 +29,7 @@ use crate::*;
 pub trait EntryTrait: Debug {
     fn apath(&self) -> &Apath;
     fn kind(&self) -> Kind;
-    fn mtime(&self) -> OffsetDateTime;
+    fn mtime(&self) -> Timestamp;
     fn size(&self) -> Option<u64>;
     fn symlink_target(&self) -> Option<&str>;
     fn unix_mode(&self) -> UnixMode;
