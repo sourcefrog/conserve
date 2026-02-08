@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex};
 use std::{fmt, result};
 
 use bytes::Bytes;
-use time::OffsetDateTime;
+use jiff::Timestamp;
 use url::Url;
 
 use crate::*;
@@ -307,7 +307,7 @@ pub struct Metadata {
     pub kind: Kind,
 
     /// Last modified time.
-    pub modified: OffsetDateTime,
+    pub modified: Timestamp,
 }
 
 impl Metadata {

@@ -46,6 +46,7 @@ use bytes::Bytes;
 use tracing::{debug, error, trace};
 use url::Url;
 
+use crate::unix_time::ToTimestamp;
 use super::{DirEntry, Error, ErrorKind, Kind, Metadata, Result, WriteMode};
 
 pub(super) struct Protocol {
@@ -341,7 +342,7 @@ impl super::Protocol for Protocol {
                 Ok(Metadata {
                     kind: Kind::File,
                     len,
-                    modified: modified.into(),
+                    modified: modified.to_timestamp(),
                 })
             }
             Err(err) => {

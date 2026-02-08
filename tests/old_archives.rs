@@ -26,7 +26,7 @@ use predicates::prelude::*;
 use pretty_assertions::assert_eq;
 
 use conserve::*;
-use time::OffsetDateTime;
+use conserve::unix_time::ToTimestamp;
 
 mod util;
 use util::{copy_testdata_archive, testdata_archive_path};
@@ -167,25 +167,23 @@ async fn restore_old_archive() {
 
         // Check that mtimes are restored. The sub-second times are not tested
         // because their behavior might vary depending on the local filesystem.
-        let file_mtime = OffsetDateTime::from(
-            metadata(dest.child("hello").path())
-                .unwrap()
-                .modified()
-                .unwrap(),
-        );
+        let file_mtime = metadata(dest.child("hello").path())
+            .unwrap()
+            .modified()
+            .unwrap()
+            .to_timestamp();
         assert_eq!(
-            file_mtime.unix_timestamp(),
+            file_mtime.as_second(),
             1592266523,
             "mtime not restored correctly"
         );
 
-        let dir_mtime = OffsetDateTime::from(
-            metadata(dest.child("subdir").path())
-                .unwrap()
-                .modified()
-                .unwrap(),
-        );
-        assert_eq!(dir_mtime.unix_timestamp(), 1592266523);
+        let dir_mtime = metadata(dest.child("subdir").path())
+            .unwrap()
+            .modified()
+            .unwrap()
+            .to_timestamp();
+        assert_eq!(dir_mtime.as_second(), 1592266523);
     }
 }
 

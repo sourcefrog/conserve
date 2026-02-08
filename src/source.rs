@@ -30,6 +30,7 @@ use crate::entry::KindMeta;
 use crate::monitor::Monitor;
 use crate::stats::SourceIterStats;
 use crate::tree::TreeSize;
+use crate::unix_time::ToTimestamp;
 use crate::*;
 
 /// A real tree on the filesystem, as a backup source.
@@ -95,7 +96,7 @@ fn entry_from_fs_metadata(
     let mtime = metadata
         .modified()
         .expect("Failed to get file mtime")
-        .into();
+        .to_timestamp();
     let kind_meta = if metadata.is_file() {
         KindMeta::File {
             size: metadata.len(),

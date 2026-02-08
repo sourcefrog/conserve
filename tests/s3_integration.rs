@@ -29,8 +29,7 @@ use aws_sdk_s3::types::{
 };
 use indoc::indoc;
 use rand::Rng;
-use time::OffsetDateTime;
-use time::macros::format_description;
+use jiff::Timestamp;
 use tokio::runtime::Runtime;
 
 struct TempBucket {
@@ -52,9 +51,13 @@ impl TempBucket {
         let mut rng = rand::rng();
         let bucket_name = format!(
             "conserve-s3-integration-{time}-{rand:x}",
-            time = OffsetDateTime::now_utc()
-                .format(format_description!("[year][month][day]-[hour][minute]"))
-                .expect("Format time"),
+            time = Timestamp::now()
+                .to_string()
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '-')
+                .collect::<String>()
+                .replace("T", "-")
+                .split_at(16).0.to_owned(), // Take first 16 chars: "YYYY-MM-DD-HHMM"
             rand = rng.random::<u64>()
         );
         let app_name = AppName::new(format!(

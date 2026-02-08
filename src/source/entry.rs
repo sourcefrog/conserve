@@ -1,5 +1,5 @@
 use serde::{self, Serialize};
-use time::OffsetDateTime;
+use jiff::Timestamp;
 
 use crate::{Apath, EntryTrait, Kind, Owner, UnixMode, entry::KindMeta};
 
@@ -13,7 +13,7 @@ pub struct Entry {
     pub(crate) kind_meta: KindMeta,
 
     /// Modification time.
-    pub(crate) mtime: OffsetDateTime,
+    pub(crate) mtime: Timestamp,
     pub(crate) unix_mode: UnixMode,
     #[serde(flatten)]
     pub(crate) owner: Owner,
@@ -28,7 +28,7 @@ impl EntryTrait for Entry {
         Kind::from(&self.kind_meta)
     }
 
-    fn mtime(&self) -> OffsetDateTime {
+    fn mtime(&self) -> Timestamp {
         self.mtime
     }
 

@@ -24,6 +24,7 @@ use tracing::{error, trace, warn};
 use url::Url;
 
 use crate::Kind;
+use crate::unix_time::ToTimestamp;
 
 use super::{DirEntry, Error, Metadata, Result, WriteMode};
 
@@ -146,7 +147,7 @@ impl super::Protocol for Protocol {
         let modified = fsmeta
             .modified()
             .map_err(|err| Error::io_error(&path, err))?
-            .into();
+            .to_timestamp();
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),
@@ -212,12 +213,10 @@ async fn collect_tokio_dir_entry(dir_entry: tokio::fs::DirEntry) -> Option<DirEn
 #[cfg(test)]
 mod test {
     use std::error::Error;
-    use std::time::Duration;
 
     use assert_fs::prelude::*;
     use predicates::prelude::*;
     use pretty_assertions::assert_eq;
-    use time::OffsetDateTime;
     use tokio;
 
     use super::*;
@@ -301,7 +300,7 @@ mod test {
 
         assert_eq!(metadata.len, 24);
         assert_eq!(metadata.kind, Kind::File);
-        assert!(metadata.modified + Duration::from_secs(60) > OffsetDateTime::now_utc());
+        assert!(metadata.modified.checked_add(jiff::Span::new().seconds(60)).unwrap() > jiff::Timestamp::now());
         assert!(
             transport
                 .metadata("nopoem")

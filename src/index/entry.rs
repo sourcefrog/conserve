@@ -12,7 +12,7 @@
 // GNU General Public License for more details.
 
 use serde_json::json;
-use time::OffsetDateTime;
+use jiff::Timestamp;
 
 use crate::apath::Apath;
 use crate::entry::EntryTrait;
@@ -83,8 +83,8 @@ impl EntryTrait for IndexEntry {
     }
 
     #[inline]
-    fn mtime(&self) -> OffsetDateTime {
-        OffsetDateTime::from_unix_seconds_and_nanos(self.mtime, self.mtime_nanos)
+    fn mtime(&self) -> Timestamp {
+        Timestamp::from_unix_seconds_and_nanos(self.mtime, self.mtime_nanos)
     }
 
     /// Size of the file, if it is a file. None for directories and symlinks.
@@ -142,8 +142,8 @@ impl IndexEntry {
             kind: source.kind(),
             addrs: Vec::new(),
             target: source.symlink_target().map(|t| t.to_owned()),
-            mtime: mtime.unix_timestamp(),
-            mtime_nanos: mtime.nanosecond(),
+            mtime: mtime.as_second(),
+            mtime_nanos: mtime.subsec_nanosecond() as u32,
             unix_mode: source.unix_mode(),
             owner: source.owner().to_owned(),
         }

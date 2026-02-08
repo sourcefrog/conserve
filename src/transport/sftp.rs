@@ -11,7 +11,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bytes::Bytes;
 use ssh2::Sftp;
-use time::OffsetDateTime;
+use jiff::Timestamp;
 use tokio::task::spawn_blocking;
 use tracing::{error, info, trace, warn};
 use url::Url;
@@ -208,7 +208,7 @@ impl super::Protocol for Protocol {
                 url: Some(self.join_url(relpath)),
             }
         })?;
-        let modified = OffsetDateTime::from_unix_timestamp(modified as i64).map_err(|err| {
+        let modified = Timestamp::from_second(modified as i64).map_err(|err| {
             warn!("Invalid mtime for {full_path:?}");
             super::Error {
                 kind: ErrorKind::Other,
