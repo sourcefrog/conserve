@@ -69,4 +69,19 @@ impl Recording {
             .map(|call| call.path.as_str())
             .collect()
     }
+
+    #[cfg(test)]
+    /// Assert that there were a certain number of calls with the given verb.
+    pub fn assert_verb_count(&self, verb: Verb, expected_count: usize, message: &str) {
+        let calls = self
+            .calls
+            .iter()
+            .filter(|call| call.verb == verb)
+            .collect::<Vec<_>>();
+        let count = calls.len();
+        assert_eq!(
+            count, expected_count,
+            "Expected {expected_count} calls with verb {verb:?}, but found {count}: {message}: {calls:#?}",
+        );
+    }
 }

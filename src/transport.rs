@@ -381,7 +381,10 @@ mod test {
 
         let url = Url::from_directory_path(temp.path()).unwrap();
         dbg!(&url);
-        let transport = Transport::new(url.as_str()).await.unwrap();
+        let transport = Transport::new(url.as_str())
+            .await
+            .unwrap()
+            .enable_record_calls();
         dbg!(&transport);
 
         let mut entries = transport.list_dir("").await.unwrap();
@@ -396,6 +399,9 @@ mod test {
         assert_eq!(entries[2].name, "another file");
         assert_eq!(entries[2].kind, Kind::File);
         assert_eq!(entries[2].len, Some(0));
+
+        let recording = transport.take_recording();
+        recording.assert_verb_count(Verb::ListDir, 1, "After explicit list_dir");
 
         temp.close().unwrap();
     }
