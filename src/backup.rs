@@ -965,8 +965,8 @@ mod test {
     }
 
     /// If some files are unreadable, others are stored and the backup completes with warnings.
-    #[cfg(unix)]
     #[tokio::test]
+    #[cfg(unix)]
     async fn source_unreadable() {
         let af = Archive::create_temp().await;
         let tf = TreeFixture::new();
@@ -1025,8 +1025,8 @@ mod test {
         .expect("backup shouldn't crash on before-epoch mtimes");
     }
 
-    #[cfg(unix)]
     #[tokio::test]
+    #[cfg(unix)]
     async fn symlink() -> Result<()> {
         let af = Archive::create_temp().await;
         let srcdir = TreeFixture::new();

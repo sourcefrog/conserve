@@ -137,8 +137,8 @@ mod tests {
         temp.close().unwrap();
     }
 
-    #[cfg(unix)]
     #[tokio::test]
+    #[cfg(unix)]
     async fn read_json_error_when_permission_denied() -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
         let transport = Transport::temp();
