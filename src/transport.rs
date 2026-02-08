@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Martin Pool.
+// Copyright 2020-2026 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -148,6 +148,13 @@ impl Transport {
     #[cfg(test)]
     pub(crate) fn take_recording(&self) -> Recording {
         std::mem::take(&mut self.recording.lock().unwrap())
+    }
+
+    /// Inspect the current recording, with it locked.
+    #[cfg(test)]
+    pub(crate) fn inspect_recording<F: Fn(&Recording)>(&self, f: F) {
+        let lock = self.recording.lock().unwrap();
+        f(&lock)
     }
 
     /// Return a copy of the recorded calls.
@@ -400,8 +407,9 @@ mod test {
         assert_eq!(entries[2].kind, Kind::File);
         assert_eq!(entries[2].len, Some(0));
 
-        let recording = transport.take_recording();
-        recording.assert_verb_count(Verb::ListDir, 1, "After explicit list_dir");
+        transport.inspect_recording(|recording| {
+            recording.assert_verb_count(Verb::ListDir, 1, "After list_dir");
+        });
 
         temp.close().unwrap();
     }
