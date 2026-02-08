@@ -18,6 +18,7 @@ use std::{io, path};
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use jiff::Timestamp;
 use tempfile::TempDir;
 use tokio::sync::Semaphore;
 use tracing::{error, trace, warn};
@@ -143,10 +144,17 @@ impl super::Protocol for Protocol {
         let fsmeta = tokio::fs::metadata(&path)
             .await
             .map_err(|err| Error::io_error(&path, err))?;
-        let modified = fsmeta
-            .modified()
-            .map_err(|err| Error::io_error(&path, err))?
-            .into();
+        let modified = Timestamp::try_from(
+            fsmeta
+                .modified()
+                .map_err(|err| Error::io_error(&path, err))?,
+        )
+        .map_err(|err| {
+            Error::io_error(
+                &path,
+                std::io::Error::new(std::io::ErrorKind::InvalidData, err),
+            )
+        })?;
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),
@@ -212,12 +220,10 @@ async fn collect_tokio_dir_entry(dir_entry: tokio::fs::DirEntry) -> Option<DirEn
 #[cfg(test)]
 mod test {
     use std::error::Error;
-    use std::time::Duration;
 
     use assert_fs::prelude::*;
     use predicates::prelude::*;
     use pretty_assertions::assert_eq;
-    use time::OffsetDateTime;
     use tokio;
 
     use super::*;
@@ -301,7 +307,13 @@ mod test {
 
         assert_eq!(metadata.len, 24);
         assert_eq!(metadata.kind, Kind::File);
-        assert!(metadata.modified + Duration::from_secs(60) > OffsetDateTime::now_utc());
+        assert!(
+            metadata
+                .modified
+                .checked_add(jiff::Span::new().seconds(60))
+                .unwrap()
+                > jiff::Timestamp::now()
+        );
         assert!(
             transport
                 .metadata("nopoem")

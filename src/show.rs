@@ -20,8 +20,6 @@ use std::borrow::Cow;
 use std::io::{BufWriter, Write};
 use std::sync::Arc;
 
-use time::UtcOffset;
-use time::format_description::well_known::Rfc3339;
 use tracing::error;
 
 use crate::index::entry::IndexEntry;
@@ -42,7 +40,7 @@ pub struct ShowVersionsOptions {
     /// Show how much time the backup took, or "incomplete" if it never finished.
     pub backup_duration: bool,
     /// Show times in this zone.
-    pub timezone: Option<UtcOffset>,
+    pub timezone: Option<jiff::tz::TimeZone>,
 }
 
 /// Print a list of versions, one per line, on stdout.
@@ -78,24 +76,28 @@ pub async fn show_versions(
         };
 
         if options.start_time {
-            let mut start_time = info.start_time;
-            if let Some(timezone) = options.timezone {
-                start_time = start_time.to_offset(timezone);
-            }
+            let start_time_str = if let Some(timezone) = options.timezone.as_ref() {
+                info.start_time.to_zoned(timezone.clone()).to_string()
+            } else {
+                info.start_time.to_string()
+            };
             l.push(format!(
                 "{date:<25}", // "yyyy-mm-ddThh:mm:ss+oooo" => 25
-                date = start_time.format(&Rfc3339).unwrap(),
+                date = start_time_str,
             ));
         }
 
         if options.backup_duration {
             let duration_str: Cow<str> = if info.is_closed {
                 if let Some(end_time) = info.end_time {
-                    let duration = end_time - info.start_time;
-                    if let Ok(duration) = duration.try_into() {
-                        duration_to_hms(duration).into()
-                    } else {
-                        Cow::Borrowed("negative")
+                    let span = end_time.since(info.start_time).unwrap();
+                    // Convert jiff::Span to std::time::Duration
+                    match span.total(jiff::Unit::Nanosecond) {
+                        Ok(total_nanos) if total_nanos >= 0.0 => {
+                            let duration = std::time::Duration::from_nanos(total_nanos as u64);
+                            duration_to_hms(duration).into()
+                        }
+                        _ => Cow::Borrowed("negative"),
                     }
                 } else {
                     Cow::Borrowed("unknown")

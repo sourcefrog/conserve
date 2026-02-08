@@ -21,7 +21,7 @@ use std::sync::Arc;
 use filetime::set_file_handle_times;
 #[cfg(unix)]
 use filetime::set_symlink_file_times;
-use time::OffsetDateTime;
+use jiff::Timestamp;
 use tracing::{instrument, trace};
 
 use crate::blockdir::BlockDir;
@@ -29,7 +29,7 @@ use crate::counters::Counter;
 use crate::index::entry::IndexEntry;
 use crate::io::{directory_is_empty, ensure_dir_exists};
 use crate::monitor::Monitor;
-use crate::unix_time::ToFileTime;
+use crate::unix_time::timestamp_to_file_time;
 use crate::*;
 
 /// Description of how to restore a tree.
@@ -176,7 +176,7 @@ fn restore_dir(apath: &Apath, restore_path: &Path, options: &RestoreOptions) -> 
 struct DirDeferral {
     path: PathBuf,
     unix_mode: UnixMode,
-    mtime: OffsetDateTime,
+    mtime: Timestamp,
     owner: Owner,
 }
 
@@ -200,7 +200,7 @@ fn apply_deferrals(deferrals: &[DirDeferral], monitor: Arc<dyn Monitor>) -> Resu
                 source,
             });
         }
-        if let Err(source) = filetime::set_file_mtime(path, (*mtime).to_file_time()) {
+        if let Err(source) = filetime::set_file_mtime(path, timestamp_to_file_time(mtime)) {
             monitor.error(Error::RestoreModificationTime {
                 path: path.clone(),
                 source,
@@ -247,7 +247,7 @@ async fn restore_file(
         source,
     })?;
 
-    let mtime = Some(source_entry.mtime().to_file_time());
+    let mtime = Some(timestamp_to_file_time(&source_entry.mtime()));
     set_file_handle_times(&out, mtime, mtime).map_err(|source| Error::RestoreModificationTime {
         path: path.clone(),
         source,
@@ -291,7 +291,7 @@ fn restore_symlink(path: &Path, entry: &IndexEntry) -> Result<()> {
                 source,
             });
         }
-        let mtime = entry.mtime().to_file_time();
+        let mtime = timestamp_to_file_time(&entry.mtime());
         if let Err(source) = set_symlink_file_times(path, mtime, mtime) {
             return Err(Error::RestoreModificationTime {
                 path: path.to_owned(),

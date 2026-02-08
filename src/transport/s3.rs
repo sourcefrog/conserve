@@ -43,6 +43,7 @@ use aws_types::SdkConfig;
 use aws_types::region::Region;
 use base64::Engine;
 use bytes::Bytes;
+use jiff::Timestamp;
 use tracing::{debug, error, trace};
 use url::Url;
 
@@ -341,7 +342,8 @@ impl super::Protocol for Protocol {
                 Ok(Metadata {
                     kind: Kind::File,
                     len,
-                    modified: modified.into(),
+                    modified: Timestamp::try_from(modified)
+                        .expect("S3 last_modified converts to Timestamp"),
                 })
             }
             Err(err) => {

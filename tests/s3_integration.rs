@@ -28,9 +28,8 @@ use aws_sdk_s3::types::{
     ExpirationStatus, LifecycleExpiration, LifecycleRule, LifecycleRuleFilter,
 };
 use indoc::indoc;
+use jiff::Timestamp;
 use rand::Rng;
-use time::OffsetDateTime;
-use time::macros::format_description;
 use tokio::runtime::Runtime;
 
 struct TempBucket {
@@ -52,9 +51,12 @@ impl TempBucket {
         let mut rng = rand::rng();
         let bucket_name = format!(
             "conserve-s3-integration-{time}-{rand:x}",
-            time = OffsetDateTime::now_utc()
-                .format(format_description!("[year][month][day]-[hour][minute]"))
-                .expect("Format time"),
+            time = Timestamp::now()
+                .to_string()
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '-')
+                .take(16) // Take first 16 characters
+                .collect::<String>(),
             rand = rng.random::<u64>()
         );
         let app_name = AppName::new(format!(

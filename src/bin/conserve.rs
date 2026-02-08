@@ -23,7 +23,6 @@ use std::time::Instant;
 use clap::builder::{Styles, styling};
 use clap::{Parser, Subcommand};
 use conserve::change::Change;
-use time::UtcOffset;
 #[allow(unused_imports)]
 use tracing::{Level, debug, error, info, trace, warn};
 
@@ -31,9 +30,9 @@ use crate::transport::Transport;
 use conserve::termui::{TermUiMonitor, TraceTimeStyle, enable_tracing};
 use conserve::*;
 
-/// Local timezone offset, calculated once at startup, to avoid issues about
+/// Local timezone, calculated once at startup, to avoid issues about
 /// looking at the environment once multiple threads are running.
-static LOCAL_OFFSET: RwLock<UtcOffset> = RwLock::new(UtcOffset::UTC);
+static LOCAL_TZ: RwLock<jiff::tz::TimeZone> = RwLock::new(jiff::tz::TimeZone::UTC);
 
 #[mutants::skip] // only visual effects, not worth testing
 fn clap_styles() -> Styles {
@@ -633,7 +632,7 @@ impl Command {
                 let timezone = if *utc {
                     None
                 } else {
-                    Some(*LOCAL_OFFSET.read().unwrap())
+                    Some(LOCAL_TZ.read().unwrap().clone())
                 };
                 let archive = Archive::open(Transport::new(archive).await?).await?;
                 let options = ShowVersionsOptions {
@@ -716,10 +715,9 @@ fn make_change_callback(
 }
 
 fn main() -> Result<ExitCode> {
-    // Before anything else, get the local time offset, to avoid `time-rs`
-    // problems with loading it when threads are running.
-    *LOCAL_OFFSET.write().unwrap() =
-        UtcOffset::current_local_offset().expect("get local time offset");
+    // Before anything else, get the local timezone, to avoid issues
+    // with loading it when threads are running.
+    *LOCAL_TZ.write().unwrap() = jiff::tz::TimeZone::system();
     let args = Args::parse();
     let start_time = Instant::now();
     let console_level = if args.debug {
