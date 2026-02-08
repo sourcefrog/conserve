@@ -15,13 +15,13 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::{Arc, RwLockReadGuard};
+use std::sync::Arc;
 
 use std::time::Instant;
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
 use crate::blockdir::BlockDir;
 use crate::index::stitch::Stitch;
@@ -36,11 +36,6 @@ static BLOCK_DIR: &str = "d";
 /// An archive holding backup material.
 #[derive(Clone, Debug)]
 pub struct Archive {
-    /// The block dir supports reading and writing file content.
-    ///
-    /// The object holds caches of both block content and recently read blocks.
-    block_dir: Arc<BlockDir>,
-
     /// Transport to the root directory of the archive.
     transport: Transport,
 }
@@ -69,27 +64,37 @@ impl Archive {
         Archive::create(Transport::temp()).await.unwrap()
     }
 
-    /// Return the block dir for this archive, opening it if isn't already open.
-    pub(crate) async fn block_dir(&self) -> Result<Arc<BlockDir>> {
-        Ok(self.block_dir.clone())
+    /// Open a new block dir accessor for this archive.
+    ///
+    /// This reads all the present blocks, so may be slow. The caller should usually call this once
+    /// and hold on to the result, rather than calling it multiple times.
+    pub async fn block_dir(&self) -> Result<Arc<BlockDir>> {
+        // TODO: Maybe make the Arc internal to the BlockDir?
+        trace!("Opening block dir...");
+        Ok(Arc::new(
+            BlockDir::open(self.transport.chdir(BLOCK_DIR)).await?,
+        ))
     }
 
     /// Make a new archive in a new directory accessed by a Transport.
     pub async fn create(transport: Transport) -> Result<Archive> {
-        transport.create_dir("").await?;
-        let entries = transport.list_dir("").await?;
-        if !entries.is_empty() {
-            return Err(Error::NewArchiveDirectoryNotEmpty);
+        match transport.list_dir("").await {
+            Ok(entries) => {
+                if !entries.is_empty() {
+                    return Err(Error::NewArchiveDirectoryNotEmpty);
+                }
+            }
+            Err(err) if err.kind() == transport::ErrorKind::NotFound => {
+                transport.create_dir("").await?;
+            }
+            Err(err) => return Err(err.into()),
         }
-        let block_dir = Arc::new(BlockDir::create(transport.chdir(BLOCK_DIR)).await?);
+        transport.create_dir(BLOCK_DIR).await?;
         let header = ArchiveHeader {
             conserve_archive_version: String::from(ARCHIVE_VERSION),
         };
         write_json(&transport, HEADER_FILENAME, &header).await?;
-        Ok(Archive {
-            block_dir,
-            transport,
-        })
+        Ok(Archive { transport })
     }
 
     /// Open an existing archive.
@@ -108,18 +113,10 @@ impl Archive {
                 version: header.conserve_archive_version,
             });
         }
-        let block_dir = Arc::new(BlockDir::open(transport.chdir(BLOCK_DIR)).await?);
         debug!(?header, "Opened archive");
-        Ok(Archive {
-            block_dir,
-            transport,
-        })
+        Ok(Archive { transport })
     }
 
-    /// Return an unsorted list of all blocks in the archive.
-    pub async fn all_blocks(&self) -> Result<RwLockReadGuard<'_, HashSet<BlockHash>>> {
-        Ok(self.block_dir.blocks())
-    }
 
     pub async fn band_exists(&self, band_id: BandId) -> Result<bool> {
         self.transport()
@@ -232,8 +229,8 @@ impl Archive {
         let referenced = self
             .referenced_blocks(&self.list_band_ids().await?, monitor.clone())
             .await?;
-        Ok(self
-            .block_dir
+        let block_dir = self.block_dir().await?;
+        Ok(block_dir
             .blocks()
             .iter()
             .filter(move |h| !referenced.contains(h))
@@ -273,7 +270,8 @@ impl Archive {
         debug!(referenced.len = referenced.len());
 
         debug!("Find present blocks...");
-        let present: HashSet<BlockHash> = self.block_dir.blocks().iter().cloned().collect();
+        let block_dir = self.block_dir().await?;
+        let present: HashSet<BlockHash> = block_dir.blocks().iter().cloned().collect();
         debug!(present.len = present.len());
 
         debug!("Find unreferenced blocks...");
@@ -288,7 +286,7 @@ impl Archive {
         // TODO: Parallelize
         let mut total_bytes = 0;
         for block_id in &unref {
-            total_bytes += self.block_dir.compressed_size(block_id).await?;
+            total_bytes += block_dir.compressed_size(block_id).await?;
             task.increment(1);
         }
         drop(task);
@@ -308,8 +306,9 @@ impl Archive {
             task.set_total(unref_count);
             let mut error_count = 0;
             for block_hash in unref {
+                // TODO: Parallelize
                 task.increment(1);
-                error_count += self.block_dir.delete_block(block_hash).await.is_err() as usize;
+                error_count += block_dir.delete_block(block_hash).await.is_err() as usize;
             }
             stats.deletion_errors += error_count;
             stats.deleted_block_count += unref_count - error_count;
@@ -340,13 +339,13 @@ impl Archive {
         //    values referenced by all the indexes.
         let referenced_lens = validate::validate_bands(self, &band_ids, monitor.clone()).await?;
 
+        let block_dir = self.block_dir().await?;
         if options.skip_block_hashes {
             // 3a. Check that all referenced blocks are present, without spending time reading their
             // content.
             debug!("List blocks...");
             // TODO: Check for unexpected files or directories in the blockdir.
-            let present_blocks: HashSet<BlockHash> =
-                self.block_dir.blocks().iter().cloned().collect();
+            let present_blocks: HashSet<BlockHash> = block_dir.blocks().iter().cloned().collect();
             for hash in referenced_lens.keys() {
                 if !present_blocks.contains(hash) {
                     monitor.error(Error::BlockMissing { hash: hash.clone() })
@@ -356,7 +355,7 @@ impl Archive {
             // 2. Check the hash of all blocks are correct, and remember how long
             //    the uncompressed data is.
             let block_lengths: HashMap<BlockHash, usize> =
-                self.block_dir.validate(monitor.clone()).await?;
+                block_dir.validate(monitor.clone()).await?;
             // 3b. Check that all referenced ranges are inside the present data.
             for (hash, referenced_len) in referenced_lens {
                 if let Some(&actual_len) = block_lengths.get(&hash) {
@@ -455,7 +454,7 @@ mod test {
     /// A new archive contains just one header file.
     /// The header is readable json containing only a version number.
     #[tokio::test]
-    async fn empty_archive() {
+    async fn empty_archive() -> Result<()> {
         let af = Archive::create_temp().await;
 
         assert!(af.transport().local_path().unwrap().is_dir());
@@ -489,7 +488,8 @@ mod test {
                 .len(),
             0
         );
-        assert_eq!(af.all_blocks().await.unwrap().len(), 0);
+        assert_eq!(af.block_dir().await?.blocks().len(), 0);
+        Ok(())
     }
 
     #[tokio::test]

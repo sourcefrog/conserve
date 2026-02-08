@@ -197,7 +197,6 @@ struct BackupWriter {
     index_writer: IndexWriter,
     stats: BackupStats,
     block_dir: Arc<BlockDir>,
-
     file_combiner: FileCombiner,
 }
 
@@ -722,13 +721,20 @@ mod test {
 
     #[tokio::test]
     async fn simple_backup() -> Result<()> {
-        let af = Archive::create_temp().await;
+        let transport = Transport::temp().enable_record_calls();
+        let archive = Archive::create(transport.clone()).await?;
+        transport.take_recording().assert_verb_count(
+            Verb::ListDir,
+            1,
+            "Initial list to check for empty directory",
+        );
+
         let srcdir = TreeFixture::new();
         srcdir.create_file("hello");
 
         let monitor = TestMonitor::arc();
         let backup_stats = backup(
-            &af,
+            &archive,
             srcdir.path(),
             &BackupOptions::default(),
             monitor.clone(),
@@ -741,11 +747,11 @@ mod test {
         assert_eq!(backup_stats.written_blocks, 1);
         assert_eq!(backup_stats.uncompressed_bytes, 8);
         assert_eq!(backup_stats.compressed_bytes, 10);
-        check_backup(&af).await?;
+        check_backup(&archive).await?;
 
         let restore_dir = TempDir::new().unwrap();
 
-        let archive = Archive::open(af.transport().clone()).await.unwrap();
+        let archive = Archive::open(archive.transport().clone()).await.unwrap();
         assert!(archive.band_exists(BandId::zero()).await.unwrap());
         assert!(archive.band_is_closed(BandId::zero()).await.unwrap());
         assert!(!archive.band_exists(BandId::new(&[1])).await.unwrap());
@@ -896,9 +902,9 @@ mod test {
         );
         assert_eq!(
             archive
-                .all_blocks()
-                .await
-                .unwrap()
+                .block_dir()
+                .await?
+                .blocks()
                 .iter()
                 .map(|h| h.to_string())
                 .collect::<Vec<String>>(),
@@ -1233,7 +1239,7 @@ mod test {
         assert_eq!(stats2.written_blocks, 1);
         assert_eq!(stats2.combined_blocks, 1);
 
-        assert_eq!(af.all_blocks().await.unwrap().len(), 2);
+        assert_eq!(af.block_dir().await.unwrap().blocks().len(), 2);
     }
 
     #[tokio::test]

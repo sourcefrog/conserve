@@ -273,13 +273,16 @@ impl DamageLocation {
                 .join(BandId::from(*band_id).to_string())
                 .join("BANDTAIL"),
             DamageLocation::Block(block_index) => {
+                // TODO: Perhaps we should keep the list of all blocks somewhere to avoid needing to repeatedly read the
+                // archive and list? However at the moment I think this code is not run very often.
                 let archive = Archive::open(Transport::local(archive_dir))
                     .await
                     .expect("open archive");
                 let block_hash = archive
-                    .all_blocks()
+                    .block_dir()
                     .await
-                    .expect("list blocks")
+                    .expect("open block dir")
+                    .blocks()
                     .iter()
                     .cloned()
                     .sorted()

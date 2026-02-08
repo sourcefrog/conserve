@@ -42,7 +42,7 @@ async fn delete_both_bands() {
 
     let archive = Archive::open(temp.clone()).await.unwrap();
     assert_eq!(archive.list_band_ids().await.unwrap().len(), 0);
-    assert_eq!(archive.all_blocks().await.unwrap().len(), 0);
+    assert_eq!(archive.block_dir().await.unwrap().blocks().len(), 0);
 }
 
 #[tokio::test]
@@ -63,7 +63,7 @@ async fn delete_first_version() {
     assert_eq!(archive.list_band_ids().await.unwrap(), &[BandId::new(&[1])]);
     // b0 contains two small files packed into the same block, which is not deleted.
     // b1 (not deleted) adds one additional block, which is still referenced.
-    assert_eq!(archive.all_blocks().await.unwrap().len(), 2);
+    assert_eq!(archive.block_dir().await.unwrap().blocks().len(), 2);
 
     let rd = TempDir::new().unwrap();
     run_conserve()
@@ -103,7 +103,7 @@ async fn delete_second_version() {
     let archive = Archive::open(temp.clone()).await.unwrap();
     assert_eq!(archive.list_band_ids().await.unwrap(), &[BandId::new(&[0])]);
     // b0 contains two small files packed into the same block.
-    assert_eq!(archive.all_blocks().await.unwrap().len(), 1);
+    assert_eq!(archive.block_dir().await.unwrap().blocks().len(), 1);
 
     let rd = TempDir::new().unwrap();
     run_conserve()

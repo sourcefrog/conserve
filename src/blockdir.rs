@@ -71,13 +71,13 @@ pub struct Address {
 /// While the `BlockDir` object is open, it knows all the blocks that are present in the archive:
 /// they're listed when the `BlockDir` is opened, and the list is updated as blocks are added or removed.
 #[derive(Debug)]
-pub(crate) struct BlockDir {
+pub struct BlockDir {
     transport: Transport,
     pub stats: BlockDirStats,
     // TODO: There are fancier caches and they might help, but this one works, and Stretto did not work for me.
     /// A cache of the contents of recently read blocks, keyed by block hash.
     cache: RwLock<LruCache<BlockHash, Bytes>>,
- 
+
     /// All the blocks that are known to be present in the archive.
     exists: RwLock<HashSet<BlockHash>>,
 }
@@ -113,7 +113,7 @@ impl BlockDir {
         })
     }
 
-    pub(crate) async fn create(transport: Transport) -> Result<BlockDir> {
+    pub async fn create(transport: Transport) -> Result<BlockDir> {
         transport.create_dir("").await?;
         BlockDir::open(transport).await
     }
