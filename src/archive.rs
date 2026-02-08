@@ -117,7 +117,6 @@ impl Archive {
         Ok(Archive { transport })
     }
 
-
     pub async fn band_exists(&self, band_id: BandId) -> Result<bool> {
         self.transport()
             .is_file(&format!("{}/{}", band_id, crate::BAND_HEAD_FILENAME))
