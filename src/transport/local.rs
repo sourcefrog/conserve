@@ -18,7 +18,6 @@ use std::{io, path};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use jiff::Timestamp;
 use tempfile::TempDir;
 use tokio::sync::Semaphore;
 use tracing::{error, trace, warn};
@@ -214,6 +213,7 @@ async fn collect_tokio_dir_entry(dir_entry: tokio::fs::DirEntry) -> Option<DirEn
 #[cfg(test)]
 mod test {
     use std::error::Error;
+    use std::time::Duration;
 
     use assert_fs::prelude::*;
     use jiff::Timestamp;

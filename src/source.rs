@@ -23,7 +23,6 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use jiff::Timestamp;
 use tracing::{error, warn};
 
 use crate::counters::Counter;

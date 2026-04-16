@@ -43,7 +43,6 @@ use aws_types::SdkConfig;
 use aws_types::region::Region;
 use base64::Engine;
 use bytes::Bytes;
-use jiff::Timestamp;
 use tracing::{debug, error, trace};
 use url::Url;
 
