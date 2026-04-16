@@ -15,6 +15,7 @@
 
 use std::time::Duration;
 
+
 use crate::stats::Sizes;
 
 pub fn bytes_to_human_mb(s: u64) -> String {
@@ -40,7 +41,7 @@ pub(crate) fn zero_u64(a: &u64) -> bool {
     *a == 0
 }
 
-pub fn duration_to_hms(d: Duration) -> String {
+pub(crate) fn duration_to_hms(d: Duration) -> String {
     let elapsed_secs = d.as_secs();
     if elapsed_secs >= 3600 {
         format!(

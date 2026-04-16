@@ -24,7 +24,6 @@ use jiff::tz::TimeZone;
 use tracing::error;
 
 use crate::index::entry::IndexEntry;
-use crate::misc::duration_to_hms;
 use crate::termui::TermUiMonitor;
 use crate::*;
 
@@ -93,12 +92,8 @@ pub async fn show_versions(
         if options.backup_duration {
             let duration_str: Cow<str> = if info.is_closed {
                 if let Some(end_time) = info.end_time {
-                    let duration = end_time - info.start_time;
-                    if let Ok(duration) = duration.try_into() {
-                        duration_to_hms(duration).into()
-                    } else {
-                        Cow::Borrowed("negative")
-                    }
+                    let span = end_time - info.start_time;
+                    format!("{span:#}").into()
                 } else {
                     Cow::Borrowed("unknown")
                 }
