@@ -342,8 +342,9 @@ impl super::Protocol for Protocol {
                 Ok(Metadata {
                     kind: Kind::File,
                     len,
-                    modified: Timestamp::try_from(modified)
-                        .expect("S3 last_modified converts to Timestamp"),
+                    modified: modified
+                        .try_into()
+                        .expect("Modified time is valid timestamp"),
                 })
             }
             Err(err) => {

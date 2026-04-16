@@ -51,12 +51,7 @@ impl TempBucket {
         let mut rng = rand::rng();
         let bucket_name = format!(
             "conserve-s3-integration-{time}-{rand:x}",
-            time = Timestamp::now()
-                .to_string()
-                .chars()
-                .filter(|c| c.is_alphanumeric() || *c == '-')
-                .take(16) // Take first 16 characters
-                .collect::<String>(),
+            time = Timestamp::now(),
             rand = rng.random::<u64>()
         );
         let app_name = AppName::new(format!(

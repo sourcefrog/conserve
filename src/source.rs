@@ -93,8 +93,11 @@ fn entry_from_fs_metadata(
     source_path: &Path,
     metadata: &fs::Metadata,
 ) -> Result<Entry> {
-    let mtime = Timestamp::try_from(metadata.modified().expect("Failed to get file mtime"))
-        .expect("File mtime converts to Timestamp");
+    let mtime = metadata
+        .modified()
+        .expect("Failed to get file mtime")
+        .try_into()
+        .expect("Failed to convert file mtime to Timestamp");
     let kind_meta = if metadata.is_file() {
         KindMeta::File {
             size: metadata.len(),

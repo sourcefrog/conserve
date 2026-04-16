@@ -1,5 +1,5 @@
 // Conserve backup system.
-// Copyright 2015, 2016, 2017, 2018, 2019, 2020 Martin Pool.
+// Copyright 2015-2026 Martin Pool.
 
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,13 +12,19 @@
 // GNU General Public License for more details.
 
 //! Times relative to the Unix epoch.
-//!
-//! In particular, glue between [filetime] and [jiff].
+
+// TODO: delete this if <https://github.com/alexcrichton/filetime/pull/118/changes>
+// is merged and released.
 
 use filetime::FileTime;
 use jiff::Timestamp;
 
-/// Helper to convert a Timestamp to a FileTime.
-pub(crate) fn timestamp_to_file_time(timestamp: &Timestamp) -> FileTime {
-    FileTime::from_unix_time(timestamp.as_second(), timestamp.subsec_nanosecond() as u32)
+pub(crate) trait ToFileTime {
+    fn to_file_time(&self) -> FileTime;
+}
+
+impl ToFileTime for Timestamp {
+    fn to_file_time(&self) -> FileTime {
+        FileTime::from_unix_time(self.as_second(), self.subsec_nanosecond().cast_unsigned())
+    }
 }

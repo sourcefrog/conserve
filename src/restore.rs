@@ -200,7 +200,7 @@ fn apply_deferrals(deferrals: &[DirDeferral], monitor: Arc<dyn Monitor>) -> Resu
                 source,
             });
         }
-        if let Err(source) = filetime::set_file_mtime(path, timestamp_to_file_time(mtime)) {
+        if let Err(source) = filetime::set_file_mtime(path, mtime.to_file_time()) {
             monitor.error(Error::RestoreModificationTime {
                 path: path.clone(),
                 source,

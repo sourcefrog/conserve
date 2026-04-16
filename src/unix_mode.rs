@@ -26,7 +26,7 @@
 //! The mode is also often presented as a string of characters, such as "rw-rw-r--",
 //! where each character represents one bit.
 //!
-//! On windows systems, files can be either read-only or writeable. For cross-compatibility,
+//! On windows systems, files can be either read-only or writable. For cross-compatibility,
 //! the mode is always stored using the unix format, where the read-only state is stored
 //! using the write bit in the user class.
 //! TODO: Properly implement and test Windows compatibility.

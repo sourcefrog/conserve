@@ -17,7 +17,7 @@ use std::cell::RefCell;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Instant;
 
 use clap::builder::{Styles, styling};
@@ -29,10 +29,6 @@ use tracing::{Level, debug, error, info, trace, warn};
 use crate::transport::Transport;
 use conserve::termui::{TermUiMonitor, TraceTimeStyle, enable_tracing};
 use conserve::*;
-
-/// Local timezone, calculated once at startup, to avoid issues about
-/// looking at the environment once multiple threads are running.
-static LOCAL_TZ: RwLock<jiff::tz::TimeZone> = RwLock::new(jiff::tz::TimeZone::UTC);
 
 #[mutants::skip] // only visual effects, not worth testing
 fn clap_styles() -> Styles {
@@ -629,16 +625,11 @@ impl Command {
                 sizes,
                 utc,
             } => {
-                let timezone = if *utc {
-                    None
-                } else {
-                    Some(LOCAL_TZ.read().unwrap().clone())
-                };
                 let archive = Archive::open(Transport::new(archive).await?).await?;
                 let options = ShowVersionsOptions {
                     newest_first: *newest,
                     tree_size: *sizes,
-                    timezone,
+                    utc: *utc,
                     start_time: !*short,
                     backup_duration: !*short,
                 };
@@ -715,9 +706,6 @@ fn make_change_callback(
 }
 
 fn main() -> Result<ExitCode> {
-    // Before anything else, get the local timezone, to avoid issues
-    // with loading it when threads are running.
-    *LOCAL_TZ.write().unwrap() = jiff::tz::TimeZone::system();
     let args = Args::parse();
     let start_time = Instant::now();
     let console_level = if args.debug {

@@ -20,6 +20,7 @@ use std::borrow::Cow;
 use std::io::{BufWriter, Write};
 use std::sync::Arc;
 
+use jiff::tz::TimeZone;
 use tracing::error;
 
 use crate::index::entry::IndexEntry;
@@ -39,8 +40,8 @@ pub struct ShowVersionsOptions {
     pub start_time: bool,
     /// Show how much time the backup took, or "incomplete" if it never finished.
     pub backup_duration: bool,
-    /// Show times in this zone.
-    pub timezone: Option<jiff::tz::TimeZone>,
+    /// Show times in UTC instead of local time.
+    pub utc: bool,
 }
 
 /// Print a list of versions, one per line, on stdout.
@@ -50,6 +51,11 @@ pub async fn show_versions(
     monitor: Arc<TermUiMonitor>,
 ) -> Result<()> {
     let mut band_ids = archive.list_band_ids().await?;
+    let timezone = if options.utc {
+        TimeZone::UTC
+    } else {
+        TimeZone::system()
+    };
     if options.newest_first {
         band_ids.reverse();
     }
@@ -76,14 +82,11 @@ pub async fn show_versions(
         };
 
         if options.start_time {
-            let start_time_str = if let Some(timezone) = options.timezone.as_ref() {
-                info.start_time.to_zoned(timezone.clone()).to_string()
-            } else {
-                info.start_time.to_string()
-            };
+            let start_time = info.start_time.to_zoned(timezone.clone());
+            let date = start_time;
+            // let date = start_time.strftime("%Y-%m-%dT%H:%M:%S");
             l.push(format!(
-                "{date:<25}", // "yyyy-mm-ddThh:mm:ss+oooo" => 25
-                date = start_time_str,
+                "{date:<35}", // "yyyy-mm-ddThh:mm:ss+oo:oo[UTC]"
             ));
         }
 

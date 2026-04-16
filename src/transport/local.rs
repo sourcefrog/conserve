@@ -144,17 +144,11 @@ impl super::Protocol for Protocol {
         let fsmeta = tokio::fs::metadata(&path)
             .await
             .map_err(|err| Error::io_error(&path, err))?;
-        let modified = Timestamp::try_from(
-            fsmeta
-                .modified()
-                .map_err(|err| Error::io_error(&path, err))?,
-        )
-        .map_err(|err| {
-            Error::io_error(
-                &path,
-                std::io::Error::new(std::io::ErrorKind::InvalidData, err),
-            )
-        })?;
+        let modified = fsmeta
+            .modified()
+            .map_err(|err| Error::io_error(&path, err))?
+            .try_into()
+            .expect("modified time should be representable as Timestamp");
         Ok(Metadata {
             len: fsmeta.len(),
             kind: fsmeta.file_type().into(),
@@ -222,6 +216,7 @@ mod test {
     use std::error::Error;
 
     use assert_fs::prelude::*;
+    use jiff::Timestamp;
     use predicates::prelude::*;
     use pretty_assertions::assert_eq;
     use tokio;
@@ -307,13 +302,7 @@ mod test {
 
         assert_eq!(metadata.len, 24);
         assert_eq!(metadata.kind, Kind::File);
-        assert!(
-            metadata
-                .modified
-                .checked_add(jiff::Span::new().seconds(60))
-                .unwrap()
-                > jiff::Timestamp::now()
-        );
+        assert!(metadata.modified + Duration::from_secs(60) > Timestamp::now());
         assert!(
             transport
                 .metadata("nopoem")
@@ -366,8 +355,8 @@ mod test {
         temp.close().unwrap();
     }
 
-    #[cfg(unix)]
     #[tokio::test]
+    #[cfg(unix)]
     async fn list_dir_skips_symlinks() {
         // Archives aren't expected to contain symlinks and so list_dir just skips them.
 
@@ -410,8 +399,8 @@ mod test {
         temp.close().unwrap();
     }
 
-    #[cfg(unix)]
     #[tokio::test]
+    #[cfg(unix)]
     async fn write_file_permission_denied() {
         use std::fs;
         use std::os::unix::prelude::PermissionsExt;

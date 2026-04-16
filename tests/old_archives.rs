@@ -22,11 +22,10 @@ use assert_fs::TempDir;
 use assert_fs::prelude::*;
 use conserve::counters::Counter;
 use conserve::monitor::test::TestMonitor;
+use conserve::*;
 use jiff::Timestamp;
 use predicates::prelude::*;
 use pretty_assertions::assert_eq;
-
-use conserve::*;
 
 mod util;
 use util::{copy_testdata_archive, testdata_archive_path};

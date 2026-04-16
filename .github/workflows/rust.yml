@@ -2,8 +2,15 @@ name: Rust
 
 on:
   push:
-    branches:
-      - main
+    # branches:
+    #   - main
+    paths:
+      - Cargo.*
+      - .cargo/**
+      - .github/workflows/rust.yml
+      - src/**
+      - tests/**
+      - testdata/**
   pull_request:
     paths:
       - Cargo.*

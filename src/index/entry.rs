@@ -83,7 +83,8 @@ impl EntryTrait for IndexEntry {
 
     #[inline]
     fn mtime(&self) -> Timestamp {
-        Timestamp::new(self.mtime, self.mtime_nanos as i32).expect("valid timestamp")
+        Timestamp::new(self.mtime, self.mtime_nanos.try_into().unwrap())
+            .expect("Failed to convert mtime and mtime_nanos to Timestamp")
     }
 
     /// Size of the file, if it is a file. None for directories and symlinks.
@@ -142,7 +143,7 @@ impl IndexEntry {
             addrs: Vec::new(),
             target: source.symlink_target().map(|t| t.to_owned()),
             mtime: mtime.as_second(),
-            mtime_nanos: mtime.subsec_nanosecond() as u32,
+            mtime_nanos: mtime.subsec_nanosecond().try_into().unwrap(),
             unix_mode: source.unix_mode(),
             owner: source.owner().to_owned(),
         }

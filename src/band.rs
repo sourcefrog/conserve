@@ -83,7 +83,7 @@ pub struct Band {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Head {
     /// Seconds since the Unix epoch when writing of this band began.
-    start_time: i64,
+    start_time: i64, // TODO: Maybe a timestamp with custom serializer
 
     /// Semver string for the minimum Conserve version to read this band
     /// correctly.
@@ -99,7 +99,7 @@ struct Head {
 #[derive(Debug, Serialize, Deserialize)]
 struct Tail {
     /// Seconds since the Unix epoch when the band was closed.
-    end_time: i64,
+    end_time: i64, // TODO: Maybe a timestamp with custom serializer
 
     /// Number of index hunks in this band, to enable validation that none are missing.
     ///
@@ -308,7 +308,6 @@ impl Band {
 mod tests {
     use std::fs;
     use std::str::FromStr;
-    use std::time::Duration;
 
     use serde_json::json;
 
@@ -355,7 +354,7 @@ mod tests {
             .unwrap();
         // Test should have taken (much) less than 5s between starting and finishing
         // the band.  (It might fail if you set a breakpoint right there.)
-        assert!(dur.total(jiff::Unit::Second).unwrap() < 5.0);
+        assert!(dur.get_seconds() < 5);
     }
 
     #[tokio::test]
