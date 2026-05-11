@@ -284,6 +284,8 @@ impl BackupWriter {
         self.stats.files += 1;
         monitor.count(Counter::Files, 1);
         let apath = source_entry.apath();
+        let size = source_entry.size().expect("source entry has a size");
+        self.stats.source_files_bytes += size;
         trace!(?apath, "Copying file");
         let result = if let Some(basis_entry) = basis_entry {
             if content_heuristically_unchanged(source_entry, basis_entry) {
@@ -293,6 +295,7 @@ impl BackupWriter {
                     .all(|addr| self.block_dir.contains(&addr.hash))
                 {
                     self.stats.unmodified_files += 1;
+                    self.stats.source_unchanged_files_bytes += size;
                     let new_entry = IndexEntry {
                         addrs: basis_entry.addrs.clone(),
                         ..IndexEntry::metadata_from(source_entry)
@@ -308,19 +311,21 @@ impl BackupWriter {
                 } else {
                     warn!(%apath, ?basis_entry.addrs, "Some referenced blocks are missing or truncated; file will be stored again");
                     self.stats.modified_files += 1;
+                    self.stats.source_modified_files_bytes += size;
                     self.stats.replaced_damaged_blocks += 1;
                     Some(EntryChange::changed(basis_entry, source_entry))
                 }
             } else {
                 self.stats.modified_files += 1;
+                self.stats.source_modified_files_bytes += size;
                 Some(EntryChange::changed(basis_entry, source_entry))
             }
         } else {
             self.stats.new_files += 1;
+            self.stats.source_new_files_bytes += size;
             trace!("New file");
             Some(EntryChange::added(source_entry))
         };
-        let size = source_entry.size().expect("source entry has a size");
         if size == 0 {
             self.index_writer
                 .push_entry(IndexEntry::metadata_from(source_entry));
@@ -570,7 +575,6 @@ fn content_heuristically_unchanged<E: EntryTrait, O: EntryTrait>(
 
 #[derive(Add, AddAssign, Debug, Default, Eq, PartialEq, Clone)]
 pub struct BackupStats {
-    // TODO: Include source file bytes, including unmodified files.
     pub files: usize,
     pub symlinks: usize,
     pub directories: usize,
@@ -583,6 +587,15 @@ pub struct BackupStats {
     /// Files that were previously stored and that have been stored again because
     /// some of their blocks were damaged.
     pub replaced_damaged_blocks: usize,
+
+    /// Total bytes in all source files.
+    pub source_files_bytes: u64,
+    /// Bytes in unchanged files.
+    pub source_unchanged_files_bytes: u64,
+    /// Bytes in new files.
+    pub source_new_files_bytes: u64,
+    /// Bytes in modified files.
+    pub source_modified_files_bytes: u64,
 
     /// Bytes that matched an existing block.
     pub deduplicated_bytes: u64,
@@ -618,6 +631,12 @@ impl fmt::Display for BackupStats {
         write_count(w, "symlinks", self.symlinks);
         write_count(w, "directories", self.directories);
         write_count(w, "unsupported file kind", self.unknown_kind);
+        writeln!(w).unwrap();
+
+        write_size(w, "source tree size:", self.source_files_bytes);
+        write_size(w, "  unchanged files", self.source_unchanged_files_bytes);
+        write_size(w, "  modified files", self.source_modified_files_bytes);
+        write_size(w, "  new files", self.source_new_files_bytes);
         writeln!(w).unwrap();
 
         write_count(w, "files stored:", self.new_files + self.modified_files);
@@ -679,7 +698,7 @@ mod test {
         // Create files with known sizes
         src.create_file_with_contents("file1", b"hello"); // 5 bytes
         src.create_file_with_contents("file2", b"world!!!"); // 8 bytes
-        src.create_file_with_contents("file3", b"testing backup stats feature"); // 29 bytes
+        src.create_file_with_contents("file3", b"testing backup stats feature"); // 28 bytes
 
         let stats = backup(&archive, src.path(), &BackupOptions::default(), monitor.clone())
             .await
@@ -687,8 +706,8 @@ mod test {
 
         // All files are new
         assert_eq!(stats.new_files, 3);
-        assert_eq!(stats.source_files_bytes, 42); // 5 + 8 + 29
-        assert_eq!(stats.source_new_files_bytes, 42);
+        assert_eq!(stats.source_files_bytes, 41); // 5 + 8 + 28
+        assert_eq!(stats.source_new_files_bytes, 41);
         assert_eq!(stats.source_modified_files_bytes, 0);
         assert_eq!(stats.source_unchanged_files_bytes, 0);
 
@@ -701,10 +720,10 @@ mod test {
 
         assert_eq!(stats2.modified_files, 1);
         assert_eq!(stats2.unmodified_files, 2);
-        assert_eq!(stats2.source_files_bytes, 54); // 5 + 20 + 29
+        assert_eq!(stats2.source_files_bytes, 53); // 5 + 20 + 28
         assert_eq!(stats2.source_new_files_bytes, 0);
         assert_eq!(stats2.source_modified_files_bytes, 20);
-        assert_eq!(stats2.source_unchanged_files_bytes, 34); // 5 + 29
+        assert_eq!(stats2.source_unchanged_files_bytes, 33); // 5 + 28
     }
 
     #[tokio::test]
