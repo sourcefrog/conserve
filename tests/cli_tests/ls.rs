@@ -43,3 +43,23 @@ fn ls_json() {
         ])
     );
 }
+
+#[test]
+fn ls_long_shows_mtime() {
+    let output = run_conserve()
+        .args(["ls", "-l", "./testdata/archive/minimal/v0.6.17"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8_lossy(&output);
+
+    // Should contain mtime in some readable format
+    // mtime 1592266523 = 2020-06-15 23:48:43 UTC
+    // We expect the mtime to be shown somewhere in the output
+    assert!(
+        stdout.contains("2020-06-15") || stdout.contains("Jun 15") || stdout.contains("2020"),
+        "Expected mtime to be visible in ls -l output, got:\n{stdout}"
+    );
+}

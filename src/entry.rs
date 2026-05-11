@@ -37,7 +37,18 @@ pub trait EntryTrait: Debug {
 
     fn format_ls(&self, long_listing: bool) -> String {
         if long_listing {
-            format!("{} {} {}", self.unix_mode(), self.owner(), self.apath())
+            let mtime = self.mtime();
+            // Format as YYYY-MM-DD HH:MM:SS (local time)
+            let mtime_str = mtime
+                .to_zoned(jiff::tz::TimeZone::system())
+                .strftime("%Y-%m-%d %H:%M:%S");
+            format!(
+                "{} {} {} {}",
+                self.unix_mode(),
+                self.owner(),
+                mtime_str,
+                self.apath()
+            )
         } else {
             self.apath().to_string()
         }
