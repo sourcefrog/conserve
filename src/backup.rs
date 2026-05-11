@@ -671,6 +671,43 @@ mod test {
     use super::*;
 
     #[tokio::test]
+    async fn source_tree_size_in_stats() {
+        let archive = Archive::create_temp().await;
+        let src = TreeFixture::new();
+        let monitor = TestMonitor::arc();
+
+        // Create files with known sizes
+        src.create_file_with_contents("file1", b"hello"); // 5 bytes
+        src.create_file_with_contents("file2", b"world!!!"); // 8 bytes
+        src.create_file_with_contents("file3", b"testing backup stats feature"); // 29 bytes
+
+        let stats = backup(&archive, src.path(), &BackupOptions::default(), monitor.clone())
+            .await
+            .unwrap();
+
+        // All files are new
+        assert_eq!(stats.new_files, 3);
+        assert_eq!(stats.source_files_bytes, 42); // 5 + 8 + 29
+        assert_eq!(stats.source_new_files_bytes, 42);
+        assert_eq!(stats.source_modified_files_bytes, 0);
+        assert_eq!(stats.source_unchanged_files_bytes, 0);
+
+        // Second backup - modify one file
+        src.create_file_with_contents("file2", b"changed content here"); // 20 bytes
+
+        let stats2 = backup(&archive, src.path(), &BackupOptions::default(), monitor.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(stats2.modified_files, 1);
+        assert_eq!(stats2.unmodified_files, 2);
+        assert_eq!(stats2.source_files_bytes, 54); // 5 + 20 + 29
+        assert_eq!(stats2.source_new_files_bytes, 0);
+        assert_eq!(stats2.source_modified_files_bytes, 20);
+        assert_eq!(stats2.source_unchanged_files_bytes, 34); // 5 + 29
+    }
+
+    #[tokio::test]
     async fn deleted_files_are_reported() {
         // tracing_subscriber::fmt::init();
 
