@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use assert_cmd::prelude::*;
 use assert_fs::TempDir;
 use assert_fs::prelude::*;
-use indoc::{formatdoc, indoc};
+use indoc::indoc;
 use predicates::prelude::*;
 
 use crate::run_conserve;
