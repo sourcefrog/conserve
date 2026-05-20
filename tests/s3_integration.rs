@@ -28,8 +28,8 @@ use aws_sdk_s3::types::{
     ExpirationStatus, LifecycleExpiration, LifecycleRule, LifecycleRuleFilter,
 };
 use indoc::indoc;
-use jiff::Timestamp;
-use rand::Rng;
+use jiff::{Timestamp, tz::TimeZone};
+use rand::random;
 use tokio::runtime::Runtime;
 
 struct TempBucket {
@@ -48,11 +48,10 @@ impl TempBucket {
             .enable_all()
             .build()
             .expect("Create runtime");
-        let mut rng = rand::rng();
+        let date = Timestamp::now().to_zoned(TimeZone::UTC).date();
         let bucket_name = format!(
-            "conserve-s3-integration-{time}-{rand:x}",
-            time = Timestamp::now(),
-            rand = rng.random::<u64>()
+            "conserve-s3-integration-{date}-{rand:x}",
+            rand = random::<u64>()
         );
         let app_name = AppName::new(format!(
             "conserve-s3-integration-test-{}",
