@@ -16,6 +16,8 @@ use tracing_subscriber::{
     prelude::*,
 };
 
+use crate::termui::TermUiMonitor;
+
 /// Chosen style of timestamp prefix on trace lines.
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum TraceTimeStyle {
@@ -31,7 +33,7 @@ pub enum TraceTimeStyle {
 
 #[must_use]
 pub fn enable_tracing(
-    monitor: &super::TermUiMonitor,
+    term_ui_monitor: &TermUiMonitor,
     time_style: &TraceTimeStyle,
     console_level: Level,
     json_path: &Option<PathBuf>,
@@ -40,7 +42,7 @@ pub fn enable_tracing(
     let time_style = time_style.clone();
     let console_layer = tracing_subscriber::fmt::Layer::default()
         .with_ansi(clicolors_control::colors_enabled())
-        .with_writer(monitor.view())
+        .with_writer(term_ui_monitor.view())
         .with_timer(time_style)
         .with_filter(filter::Targets::new().with_target("conserve", console_level));
     let json_layer;

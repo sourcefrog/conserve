@@ -16,7 +16,6 @@ use std::collections::HashMap;
 use std::fs::{File, create_dir_all};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use filetime::set_file_handle_times;
 #[cfg(unix)]
@@ -71,7 +70,7 @@ pub async fn restore(
     archive: &Archive,
     destination: &Path,
     options: RestoreOptions,
-    monitor: Arc<dyn Monitor>,
+    monitor: Monitor,
 ) -> Result<()> {
     let st = archive
         .open_stored_tree(options.band_selection.clone())
@@ -180,7 +179,7 @@ struct DirDeferral {
     owner: Owner,
 }
 
-fn apply_deferrals(deferrals: &[DirDeferral], monitor: Arc<dyn Monitor>) -> Result<()> {
+fn apply_deferrals(deferrals: &[DirDeferral], monitor: Monitor) -> Result<()> {
     for DirDeferral {
         path,
         unix_mode,
@@ -216,7 +215,7 @@ async fn restore_file(
     path: PathBuf,
     source_entry: &IndexEntry,
     block_dir: &BlockDir,
-    monitor: Arc<dyn Monitor>,
+    monitor: Monitor,
 ) -> Result<()> {
     let mut out = File::create(&path).map_err(|err| Error::RestoreFile {
         path: path.clone(),
@@ -325,7 +324,7 @@ mod test {
     use tempfile::TempDir;
 
     use crate::counters::Counter;
-    use crate::monitor::test::TestMonitor;
+    use crate::monitor::Monitor;
     use crate::test_fixtures::{TreeFixture, store_two_versions};
     use crate::transport::Transport;
     use crate::*;
@@ -348,13 +347,13 @@ mod test {
             })),
             ..Default::default()
         };
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         restore(&restore_archive, destdir.path(), options, monitor.clone())
             .await
             .expect("restore");
 
-        monitor.assert_no_errors();
-        monitor.assert_counter(Counter::Files, 3);
+        collector.assert_no_errors();
+        collector.assert_counter(Counter::Files, 3);
         let mut expected_names = vec![
             "/",
             "/hello",
@@ -392,13 +391,13 @@ mod test {
             band_selection: BandSelectionPolicy::Specified(band_id),
             ..RestoreOptions::default()
         };
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         restore(&archive, destdir.path(), options, monitor.clone())
             .await
             .expect("restore");
-        monitor.assert_no_errors();
+        collector.assert_no_errors();
         // Does not have the 'hello2' file added in the second version.
-        monitor.assert_counter(Counter::Files, 2);
+        collector.assert_counter(Counter::Files, 2);
     }
 
     /// Restoring a subdirectory works, and restores the parent directories:
@@ -408,25 +407,21 @@ mod test {
     async fn restore_only_subdir() {
         // We need the selected directory to be more than one level down, because the bug was that
         // its parent was not created.
-        let backup_monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
+
         let src = TempDir::new().unwrap();
         create_dir(src.path().join("parent")).unwrap();
         create_dir(src.path().join("parent/sub")).unwrap();
         write(src.path().join("parent/sub/file"), b"hello").unwrap();
         let af = Archive::create_temp().await;
-        backup(
-            &af,
-            src.path(),
-            &BackupOptions::default(),
-            backup_monitor.clone(),
-        )
-        .await
-        .unwrap();
-        backup_monitor.assert_counter(Counter::Files, 1);
-        backup_monitor.assert_no_errors();
+        backup(&af, src.path(), &BackupOptions::default(), monitor.clone())
+            .await
+            .unwrap();
+        collector.assert_no_errors();
+        collector.assert_counter(Counter::Files, 1);
 
         let destdir = TreeFixture::new();
-        let restore_monitor = TestMonitor::arc();
+        let (restore_monitor, restore_collector) = Monitor::for_test();
         let archive = Archive::open(af.transport().clone()).await.unwrap();
         let options = RestoreOptions {
             only_subtree: Some(Apath::from("/parent/sub")),
@@ -435,11 +430,11 @@ mod test {
         restore(&archive, destdir.path(), options, restore_monitor.clone())
             .await
             .expect("restore");
-        restore_monitor.assert_no_errors();
+        restore_collector.assert_no_errors();
         assert!(destdir.path().join("parent").is_dir());
         assert!(destdir.path().join("parent/sub/file").is_file());
-        dbg!(restore_monitor.counters());
-        restore_monitor.assert_counter(Counter::Files, 1);
+        dbg!(restore_collector.counters());
+        restore_collector.assert_counter(Counter::Files, 1);
     }
 
     #[tokio::test]
@@ -452,7 +447,7 @@ mod test {
             ..RestoreOptions::default()
         };
         assert!(!options.overwrite, "overwrite is false by default");
-        let restore_err_str = restore(&af, destdir.path(), options, TestMonitor::arc())
+        let restore_err_str = restore(&af, destdir.path(), options, Monitor::void())
             .await
             .expect_err("restore should fail if the destination exists")
             .to_string();
@@ -474,12 +469,12 @@ mod test {
             overwrite: true,
             ..RestoreOptions::default()
         };
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         restore(&restore_archive, destdir.path(), options, monitor.clone())
             .await
             .expect("restore");
-        monitor.assert_no_errors();
-        monitor.assert_counter(Counter::Files, 3);
+        collector.assert_no_errors();
+        collector.assert_counter(Counter::Files, 3);
         let dest = destdir.path();
         assert!(dest.join("hello").is_file());
         assert!(dest.join("existing").is_file());
@@ -496,7 +491,7 @@ mod test {
             exclude: Exclude::from_strings(["/**/subfile"]).unwrap(),
             ..RestoreOptions::default()
         };
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         restore(&restore_archive, destdir.path(), options, monitor.clone())
             .await
             .expect("restore");
@@ -505,8 +500,8 @@ mod test {
         assert!(dest.join("hello").is_file());
         assert!(dest.join("hello2").is_file());
         assert!(dest.join("subdir").is_dir());
-        monitor.assert_no_errors();
-        monitor.assert_counter(Counter::Files, 2);
+        collector.assert_no_errors();
+        collector.assert_counter(Counter::Files, 2);
     }
 
     #[tokio::test]
@@ -524,14 +519,12 @@ mod test {
         let years_ago = FileTime::from_unix_time(189216000, 0);
         set_symlink_file_times(srcdir.path().join("symlink"), years_ago, years_ago).unwrap();
 
-        let monitor = TestMonitor::arc();
-        backup(&af, srcdir.path(), &Default::default(), monitor.clone())
+        backup(&af, srcdir.path(), &Default::default(), Monitor::void())
             .await
             .unwrap();
 
         let restore_dir = TempDir::new().unwrap();
-        let monitor = TestMonitor::arc();
-        restore(&af, restore_dir.path(), Default::default(), monitor.clone())
+        restore(&af, restore_dir.path(), Default::default(), Monitor::void())
             .await
             .unwrap();
 
@@ -558,7 +551,7 @@ mod test {
             .inject_failures
             .insert(Apath::from("/subdir"), io::ErrorKind::PermissionDenied);
         let restore_tmp = TempDir::new().unwrap();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         restore(
             &archive,
             restore_tmp.path(),
@@ -567,7 +560,7 @@ mod test {
         )
         .await
         .expect("Restore");
-        let errors = monitor.take_errors();
+        let errors = collector.take_errors();
         dbg!(&errors);
         assert_eq!(errors.len(), 2);
         if let Error::RestoreDirectory { path, .. } = &errors[0] {

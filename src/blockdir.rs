@@ -129,7 +129,7 @@ impl BlockDir {
         &self,
         block_data: Bytes,
         stats: &mut BackupStats,
-        monitor: Arc<dyn Monitor>,
+        monitor: Monitor,
     ) -> Result<BlockHash> {
         let hash = BlockHash::hash_bytes(&block_data);
         let uncomp_len = block_data.len() as u64;
@@ -193,11 +193,7 @@ impl BlockDir {
     }
 
     /// Read back some content addressed by an [Address] (a block hash, start and end).
-    pub(crate) async fn read_address(
-        &self,
-        address: &Address,
-        monitor: Arc<dyn Monitor>,
-    ) -> Result<Bytes> {
+    pub(crate) async fn read_address(&self, address: &Address, monitor: Monitor) -> Result<Bytes> {
         let bytes = self.get_block_content(&address.hash, monitor).await?;
         let len = address.len as usize;
         let start = address.start as usize;
@@ -220,7 +216,7 @@ impl BlockDir {
     pub(crate) async fn get_block_content(
         &self,
         hash: &BlockHash,
-        monitor: Arc<dyn Monitor>,
+        monitor: Monitor,
     ) -> Result<Bytes> {
         // TODO: Tokio locks on caches
         if let Some(hit) = self.cache.write().expect("Lock cache").get(hash) {
@@ -272,10 +268,7 @@ impl BlockDir {
     ///
     /// Return a dict describing which blocks are present, and the length of their uncompressed
     /// data.
-    pub(crate) async fn validate(
-        &self,
-        monitor: Arc<dyn Monitor>,
-    ) -> Result<HashMap<BlockHash, usize>> {
+    pub(crate) async fn validate(&self, monitor: Monitor) -> Result<HashMap<BlockHash, usize>> {
         // TODO: In the top-level directory, no files or directories other than prefix
         // directories of the right length.
         // TODO: Test having a block with the right compression but the wrong contents.
@@ -318,7 +311,7 @@ impl BlockDir {
 async fn get_async_uncached(
     transport: &Transport,
     hash: BlockHash,
-    monitor: Arc<dyn Monitor>,
+    monitor: Monitor,
 ) -> Result<Bytes> {
     let block_relpath = block_relpath(&hash);
     let compressed_bytes = transport.read(&block_relpath).await?;
@@ -428,7 +421,7 @@ mod test {
     use pretty_assertions::assert_eq;
     use tempfile::TempDir;
 
-    use crate::{monitor::test::TestMonitor, transport::record::Verb};
+    use crate::transport::record::Verb;
 
     use super::*;
 
@@ -440,14 +433,15 @@ mod test {
         let transport = Transport::temp().enable_record_calls();
         let blockdir = BlockDir::open(transport.clone()).await.unwrap();
         let mut stats = BackupStats::default();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
+
         let content = Bytes::from("stuff");
         let hash = blockdir
             .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
             .await
             .unwrap();
-        assert_eq!(monitor.get_counter(Counter::BlockWrites), 1);
-        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 0);
+        assert_eq!(collector.get_counter(Counter::BlockWrites), 1);
+        assert_eq!(collector.get_counter(Counter::DeduplicatedBlocks), 0);
         assert!(blockdir.contains(&hash));
         let recording = transport.take_recording();
         dbg!(&recording);
@@ -466,7 +460,7 @@ mod test {
         let _ = transport.take_recording();
 
         // Open again to get a fresh cache
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let blockdir = BlockDir::open(transport.clone()).await.unwrap();
         assert!(!blockdir.contains(&hash));
         let recording = transport.take_recording();
@@ -492,8 +486,8 @@ mod test {
             .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
             .await
             .unwrap();
-        assert_eq!(monitor.get_counter(Counter::BlockWrites), 1);
-        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 0);
+        assert_eq!(collector.get_counter(Counter::BlockWrites), 1);
+        assert_eq!(collector.get_counter(Counter::DeduplicatedBlocks), 0);
         assert!(blockdir.contains(&hash));
         let recording = transport.take_recording();
         assert_eq!(
@@ -503,14 +497,15 @@ mod test {
         );
 
         let blockdir = BlockDir::open(transport.clone()).await.unwrap();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
+
         let retrieved = blockdir
             .get_block_content(&hash, monitor.clone())
             .await
             .unwrap();
         assert_eq!(content, retrieved);
-        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 0);
-        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 1);
+        assert_eq!(collector.get_counter(Counter::BlockContentCacheHit), 0);
+        assert_eq!(collector.get_counter(Counter::BlockContentCacheMiss), 1);
         let recording = transport.take_recording();
         assert_eq!(
             recording.verb_paths(Verb::Read).len(),
@@ -524,14 +519,15 @@ mod test {
         let transport = Transport::temp().enable_record_calls();
         let blockdir = BlockDir::open(transport.clone()).await.unwrap();
         let mut stats = BackupStats::default();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
+
         let content = Bytes::from("stuff");
         let hash = blockdir
             .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
             .await
             .unwrap();
-        assert_eq!(monitor.get_counter(Counter::BlockWrites), 1);
-        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 0);
+        assert_eq!(collector.get_counter(Counter::BlockWrites), 1);
+        assert_eq!(collector.get_counter(Counter::DeduplicatedBlocks), 0);
         assert!(blockdir.contains(&hash));
         let recording = transport.take_recording();
         assert_eq!(
@@ -547,7 +543,7 @@ mod test {
 
         // Open again to get a fresh cache
         let blockdir = BlockDir::open(transport.clone()).await.unwrap();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let recording = transport.take_recording();
         assert_eq!(
             recording.verb_paths(Verb::ListDir).len(),
@@ -559,8 +555,8 @@ mod test {
             .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
             .await
             .unwrap();
-        assert_eq!(monitor.get_counter(Counter::BlockWrites), 0);
-        assert_eq!(monitor.get_counter(Counter::DeduplicatedBlocks), 1);
+        assert_eq!(collector.get_counter(Counter::BlockWrites), 0);
+        assert_eq!(collector.get_counter(Counter::DeduplicatedBlocks), 1);
         let recording = transport.take_recording();
         assert_eq!(
             recording.calls,
@@ -576,7 +572,8 @@ mod test {
             .await
             .unwrap();
         let mut stats = BackupStats::default();
-        let monitor = TestMonitor::arc();
+
+        let (monitor, _collector) = Monitor::for_test();
 
         assert_eq!(blockdir.blocks().len(), 0);
 
@@ -615,7 +612,7 @@ mod test {
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
         let hash = blockdir
-            .store_or_deduplicate(content.clone(), &mut stats, TestMonitor::arc())
+            .store_or_deduplicate(content.clone(), &mut stats, Monitor::void())
             .await
             .unwrap();
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 0);
@@ -623,14 +620,14 @@ mod test {
         assert!(blockdir.contains(&hash));
 
         let _recording = transport.take_recording();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let retrieved = blockdir
             .get_block_content(&hash, monitor.clone())
             .await
             .unwrap();
         assert_eq!(content, retrieved);
-        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 1);
-        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 0);
+        assert_eq!(collector.get_counter(Counter::BlockContentCacheHit), 1);
+        assert_eq!(collector.get_counter(Counter::BlockContentCacheMiss), 0);
         let recording = transport.take_recording();
         assert_eq!(
             recording.verb_paths(Verb::Read).len(),
@@ -643,8 +640,8 @@ mod test {
             .get_block_content(&hash, monitor.clone())
             .await
             .unwrap();
-        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 2);
-        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 0);
+        assert_eq!(collector.get_counter(Counter::BlockContentCacheHit), 2);
+        assert_eq!(collector.get_counter(Counter::BlockContentCacheMiss), 0);
         assert_eq!(content, retrieved);
         assert_eq!(blockdir.stats.cache_hit.load(Relaxed), 2); // hit again
         let recording = transport.take_recording();
@@ -661,7 +658,7 @@ mod test {
         let blockdir = BlockDir::open(transport.clone()).await.unwrap();
         let mut stats = BackupStats::default();
         let content = Bytes::from("stuff");
-        let monitor = TestMonitor::arc();
+        let monitor = Monitor::void();
         let hash = blockdir
             .store_or_deduplicate(content.clone(), &mut stats, monitor.clone())
             .await
@@ -669,7 +666,7 @@ mod test {
 
         // reopen
         let _recording = transport.take_recording();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let blockdir = BlockDir::open(transport.clone()).await.unwrap();
         assert!(blockdir.contains(&hash));
 
@@ -694,8 +691,8 @@ mod test {
             .await
             .unwrap();
         assert_eq!(content, retrieved);
-        assert_eq!(monitor.get_counter(Counter::BlockContentCacheMiss), 1);
-        assert_eq!(monitor.get_counter(Counter::BlockContentCacheHit), 0);
+        assert_eq!(collector.get_counter(Counter::BlockContentCacheMiss), 1);
+        assert_eq!(collector.get_counter(Counter::BlockContentCacheHit), 0);
         assert_eq!(
             blockdir.stats.cache_hit.load(Relaxed),
             0,

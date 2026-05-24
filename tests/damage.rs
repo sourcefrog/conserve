@@ -32,10 +32,10 @@
 use std::fs::rename;
 use std::fs::{OpenOptions, remove_file};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use assert_fs::TempDir;
 use assert_fs::prelude::*;
+use conserve::monitor::Monitor;
 use dir_assert::assert_paths;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
@@ -43,7 +43,6 @@ use rstest::rstest;
 use tracing::info;
 
 use conserve::counters::Counter;
-use conserve::monitor::test::TestMonitor;
 use conserve::transport::Transport;
 use conserve::{
     Apath, Archive, BackupOptions, BandId, BandSelectionPolicy, EntryTrait, Error, Exclude,
@@ -104,7 +103,7 @@ async fn backup_after_damage(
         &archive,
         source_dir.path(),
         &backup_options,
-        TestMonitor::arc(),
+        Monitor::void(),
     )
     .await
     .expect("initial backup");
@@ -123,7 +122,7 @@ async fn backup_after_damage(
         &archive,
         source_dir.path(),
         &backup_options,
-        TestMonitor::arc(),
+        Monitor::void(),
     )
     .await
     .expect("write second backup after damage");
@@ -162,7 +161,8 @@ async fn backup_after_damage(
     // Can restore the second backup
     {
         let restore_dir = TempDir::new().unwrap();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
+
         restore(
             &archive,
             restore_dir.path(),
@@ -171,8 +171,8 @@ async fn backup_after_damage(
         )
         .await
         .expect("restore second backup");
-        monitor.assert_counter(Counter::Files, 1);
-        monitor.assert_no_errors();
+        collector.assert_counter(Counter::Files, 1);
+        collector.assert_no_errors();
 
         // Since the second backup rewrote the single file in the backup (and the root dir),
         // we should get all the content back out.
@@ -189,7 +189,7 @@ async fn backup_after_damage(
             BandSelectionPolicy::Latest,
             Apath::root(),
             Exclude::nothing(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .await
         .expect("iter entries")
@@ -209,7 +209,7 @@ async fn backup_after_damage(
     // Validation completes although with warnings.
     // TODO: This should return problems that we can inspect.
     archive
-        .validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
+        .validate(&ValidateOptions::default(), Monitor::void())
         .await
         .expect("validate");
 }
@@ -299,12 +299,12 @@ impl DamageLocation {
 #[tokio::test]
 async fn missing_block_when_checking_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block")).await?;
-    let monitor = TestMonitor::arc();
+    let (monitor, collector) = Monitor::for_test();
     archive
         .validate(&ValidateOptions::default(), monitor.clone())
         .await
         .unwrap();
-    let errors = monitor.take_errors();
+    let errors = collector.take_errors();
     dbg!(&errors);
     assert_eq!(errors.len(), 1);
     assert!(matches!(errors[0], Error::BlockMissing { .. }));
@@ -314,7 +314,7 @@ async fn missing_block_when_checking_hashes() -> Result<()> {
 #[tokio::test]
 async fn missing_block_skip_block_hashes() -> Result<()> {
     let archive = Archive::open_path(Path::new("testdata/damaged/missing-block")).await?;
-    let monitor = TestMonitor::arc();
+    let (monitor, collector) = Monitor::for_test();
     archive
         .validate(
             &ValidateOptions {
@@ -323,7 +323,7 @@ async fn missing_block_skip_block_hashes() -> Result<()> {
             monitor.clone(),
         )
         .await?;
-    let errors = monitor.take_errors();
+    let errors = collector.take_errors();
     dbg!(&errors);
     assert_eq!(errors.len(), 1);
     assert!(matches!(errors[0], Error::BlockMissing { .. }));

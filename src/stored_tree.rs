@@ -18,8 +18,6 @@
 //! across incremental backups, hiding from the caller that data may be distributed across
 //! multiple index files, bands, and blocks.
 
-use std::sync::Arc;
-
 use crate::counters::Counter;
 use crate::index::stitch::Stitch;
 use crate::monitor::Monitor;
@@ -49,7 +47,7 @@ impl StoredTree {
         self.band.is_closed().await
     }
 
-    pub async fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
+    pub async fn size(&self, exclude: Exclude, monitor: Monitor) -> Result<TreeSize> {
         let mut file_bytes = 0u64;
         let task = monitor.start_task("Measure tree".to_string());
         let mut stitch = self.iter_entries(Apath::from("/"), exclude, monitor.clone());
@@ -68,12 +66,7 @@ impl StoredTree {
     /// Return an iter of index entries in this stored tree.
     // TODO: Should perhaps return a sequence of results so that the caller has the
     // option to handle errors or continue.
-    pub fn iter_entries(
-        &self,
-        subtree: Apath,
-        exclude: Exclude,
-        monitor: Arc<dyn Monitor>,
-    ) -> Stitch {
+    pub fn iter_entries(&self, subtree: Apath, exclude: Exclude, monitor: Monitor) -> Stitch {
         // TODO: Pass in this band so that we don't need to reopen it.
         Stitch::new(&self.archive, self.band.id(), subtree, exclude, monitor)
     }
@@ -83,7 +76,7 @@ impl StoredTree {
 mod test {
     use std::path::Path;
 
-    use crate::monitor::test::TestMonitor;
+    use crate::monitor::Monitor;
 
     use super::super::test_fixtures::*;
     use super::super::*;
@@ -100,7 +93,7 @@ mod test {
 
         assert_eq!(st.band().id(), last_band_id);
 
-        let monitor = TestMonitor::arc();
+        let monitor = Monitor::void();
         let names: Vec<String> = st
             .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
             .collect_all()
@@ -146,7 +139,7 @@ mod test {
             .await
             .unwrap();
 
-        let monitor = TestMonitor::arc();
+        let monitor = Monitor::void();
         let names: Vec<String> = st
             .iter_entries("/subdir".into(), Exclude::nothing(), monitor.clone())
             .collect_all()

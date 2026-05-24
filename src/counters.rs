@@ -126,6 +126,17 @@ impl Serialize for Counters {
     }
 }
 
+impl Clone for Counters {
+    fn clone(&self) -> Self {
+        Self {
+            counters: self
+                .counters
+                .each_ref()
+                .map(|c| AtomicUsize::new(c.load(Relaxed))),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

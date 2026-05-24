@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use conserve::monitor::test::TestMonitor;
+use conserve::monitor::Monitor;
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
 use tempfile::TempDir;
@@ -94,7 +94,7 @@ async fn backup_sequential_changes(changes: &[TreeChange]) {
                     max_entries_per_hunk: 3,
                     ..BackupOptions::default()
                 };
-                backup(&archive, tf.path(), &options, TestMonitor::arc())
+                backup(&archive, tf.path(), &options, Monitor::void())
                     .await
                     .unwrap();
                 let snapshot = TempDir::new().unwrap();
@@ -129,7 +129,7 @@ async fn check_restore_against_snapshot(archive: &Archive, band_id: BandId, snap
         band_selection: BandSelectionPolicy::Specified(band_id),
         ..RestoreOptions::default()
     };
-    restore(archive, restore_dir.path(), options, TestMonitor::arc())
+    restore(archive, restore_dir.path(), options, Monitor::void())
         .await
         .unwrap();
     dir_assert::assert_paths(restore_dir.path(), snapshot).unwrap();

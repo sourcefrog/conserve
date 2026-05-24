@@ -13,8 +13,6 @@
 
 //! The index lists all the files in a backup, sorted in apath order.
 
-use std::sync::Arc;
-
 use tracing::trace;
 
 use crate::compress::snappy::Compressor;
@@ -49,13 +47,13 @@ pub struct IndexWriter {
 
     compressor: Compressor,
 
-    monitor: Arc<dyn Monitor>,
+    monitor: Monitor,
 }
 
 /// Accumulate and write out index entries into files in an index directory.
 impl IndexWriter {
     /// Make a new builder that will write files into the given directory.
-    pub fn new(transport: Transport, monitor: Arc<dyn Monitor>) -> IndexWriter {
+    pub fn new(transport: Transport, monitor: Monitor) -> IndexWriter {
         IndexWriter {
             transport,
             entries: Vec::new(),

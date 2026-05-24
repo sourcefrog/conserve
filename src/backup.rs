@@ -88,7 +88,7 @@ pub async fn backup(
     archive: &Archive,
     source_path: &Path,
     options: &BackupOptions,
-    monitor: Arc<dyn Monitor>,
+    monitor: Monitor,
 ) -> Result<BackupStats> {
     let start = Instant::now();
     if gc_lock::GarbageCollectionLock::is_locked(archive).await? {
@@ -201,7 +201,7 @@ struct BackupWriter {
 }
 
 impl BackupWriter {
-    async fn finish(mut self, monitor: Arc<dyn Monitor>) -> Result<BackupStats> {
+    async fn finish(mut self, monitor: Monitor) -> Result<BackupStats> {
         self.flush_group(monitor.clone()).await?;
         let hunks = self.index_writer.finish().await?;
         trace!(?hunks, "Closing band");
@@ -210,7 +210,7 @@ impl BackupWriter {
     }
 
     /// Write out any pending data blocks, and then the pending index entries.
-    async fn flush_group(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
+    async fn flush_group(&mut self, monitor: Monitor) -> Result<()> {
         let (stats, mut entries) = self.file_combiner.drain(monitor.clone()).await?;
         trace!("Got {} entries to write from file combiner", entries.len());
         self.stats += stats;
@@ -230,7 +230,7 @@ impl BackupWriter {
         mut source_entry: source::Entry,
         source_tree: &SourceTree,
         options: &BackupOptions,
-        monitor: Arc<dyn Monitor>,
+        monitor: Monitor,
     ) -> Result<Option<EntryChange>> {
         if !options.owner {
             source_entry.owner.clear();
@@ -238,7 +238,7 @@ impl BackupWriter {
         // TODO: Emit deletions for entries in the basis not present in the source,
         // probably by using Merge to read both trees in parallel.
         match source_entry.kind() {
-            Kind::Dir => self.copy_dir(&source_entry, monitor.as_ref()),
+            Kind::Dir => self.copy_dir(&source_entry, &monitor),
             Kind::File => {
                 self.copy_file(
                     &source_entry,
@@ -249,7 +249,7 @@ impl BackupWriter {
                 )
                 .await
             }
-            Kind::Symlink => self.copy_symlink(&source_entry, monitor.as_ref()),
+            Kind::Symlink => self.copy_symlink(&source_entry, &monitor),
             Kind::Unknown => {
                 self.stats.unknown_kind += 1;
                 // TODO: Perhaps eventually we could backup and restore pipes,
@@ -263,7 +263,7 @@ impl BackupWriter {
     fn copy_dir(
         &mut self,
         source_entry: &source::Entry,
-        monitor: &dyn Monitor,
+        monitor: &Monitor,
     ) -> Result<Option<EntryChange>> {
         monitor.count(Counter::Dirs, 1);
         self.stats.directories += 1;
@@ -279,7 +279,7 @@ impl BackupWriter {
         source_tree: &SourceTree,
         basis_entry: &Option<IndexEntry>,
         options: &BackupOptions,
-        monitor: Arc<dyn Monitor>,
+        monitor: Monitor,
     ) -> Result<Option<EntryChange>> {
         self.stats.files += 1;
         monitor.count(Counter::Files, 1);
@@ -356,7 +356,7 @@ impl BackupWriter {
     fn copy_symlink(
         &mut self,
         source_entry: &source::Entry,
-        monitor: &dyn Monitor,
+        monitor: &Monitor,
     ) -> Result<Option<EntryChange>> {
         monitor.count(Counter::Symlinks, 1);
         let target = source_entry.symlink_target();
@@ -375,7 +375,7 @@ async fn store_file_content(
     block_dir: &BlockDir,
     stats: &mut BackupStats,
     max_block_size: usize,
-    monitor: Arc<dyn Monitor>,
+    monitor: Monitor,
 ) -> Result<Vec<Address>> {
     let mut addresses = Vec::<Address>::with_capacity(1);
     loop {
@@ -463,7 +463,7 @@ impl FileCombiner {
 
     /// Flush any pending files, and return accumulated file entries and stats.
     /// The FileCombiner is then empty and ready for reuse.
-    async fn drain(&mut self, monitor: Arc<dyn Monitor>) -> Result<(BackupStats, Vec<IndexEntry>)> {
+    async fn drain(&mut self, monitor: Monitor) -> Result<(BackupStats, Vec<IndexEntry>)> {
         self.flush(monitor).await?;
         debug_assert!(self.queue.is_empty());
         debug_assert!(self.buf.is_empty());
@@ -479,7 +479,7 @@ impl FileCombiner {
     ///
     /// After this call the FileCombiner is empty and can be reused for more files into a new
     /// block.
-    async fn flush(&mut self, monitor: Arc<dyn Monitor>) -> Result<()> {
+    async fn flush(&mut self, monitor: Monitor) -> Result<()> {
         if self.queue.is_empty() {
             debug_assert!(self.buf.is_empty());
             return Ok(());
@@ -508,7 +508,7 @@ impl FileCombiner {
         &mut self,
         entry: &source::Entry,
         from_file: &mut dyn Read,
-        monitor: Arc<dyn Monitor>,
+        monitor: Monitor,
     ) -> Result<()> {
         let start = self.buf.len();
         let expected_len: usize = entry
@@ -662,7 +662,7 @@ mod test {
     use filetime::{FileTime, set_file_mtime};
 
     use crate::counters::Counter;
-    use crate::monitor::test::TestMonitor;
+    use crate::monitor::Monitor;
     use crate::test_fixtures::TreeFixture;
     use crate::transport::Transport;
     use crate::transport::record::Verb;
@@ -676,7 +676,7 @@ mod test {
 
         let archive = Archive::create_temp().await;
         let src = TempDir::new().unwrap();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
 
         src.child("a").touch().unwrap();
 
@@ -706,7 +706,7 @@ mod test {
             .unwrap();
 
         assert_eq!(stats2.files, 0);
-        assert_eq!(monitor.get_counter(Counter::EntriesDeleted), 1);
+        assert_eq!(collector.get_counter(Counter::EntriesDeleted), 1);
         assert_eq!(
             changes.lock().unwrap().len(),
             1,
@@ -732,7 +732,7 @@ mod test {
         let srcdir = TreeFixture::new();
         srcdir.create_file("hello");
 
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let backup_stats = backup(
             &archive,
             srcdir.path(),
@@ -741,7 +741,7 @@ mod test {
         )
         .await
         .expect("backup");
-        assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
+        assert_eq!(collector.get_counter(Counter::IndexWrites), 1);
         assert_eq!(backup_stats.files, 1);
         assert_eq!(backup_stats.deduplicated_blocks, 0);
         assert_eq!(backup_stats.written_blocks, 1);
@@ -764,7 +764,7 @@ mod test {
         .await
         .expect("restore");
 
-        monitor.assert_counter(Counter::FileBytes, 8);
+        collector.assert_counter(Counter::FileBytes, 8);
         Ok(())
     }
 
@@ -782,16 +782,16 @@ mod test {
             exclude,
             ..BackupOptions::default()
         };
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let stats = backup(&af, srcdir.path(), &options, monitor.clone())
             .await
             .expect("backup");
 
         check_backup(&af).await?;
 
-        let counters = monitor.counters();
+        let counters = collector.counters();
         dbg!(counters);
-        assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
+        assert_eq!(collector.get_counter(Counter::IndexWrites), 1);
         assert_eq!(stats.files, 1);
         // TODO: Check stats for the number of excluded entries.
         assert!(counters.get(Counter::IndexWriteCompressedBytes) > 100);
@@ -808,7 +808,7 @@ mod test {
         assert!(band_info.is_closed);
         assert!(band_info.end_time.is_some());
 
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         restore(
             &archive,
             restore_dir.path(),
@@ -817,12 +817,12 @@ mod test {
         )
         .await
         .expect("restore");
-        monitor.assert_counter(Counter::FileBytes, 8);
+        collector.assert_counter(Counter::FileBytes, 8);
         // TODO: Read back contents of that file.
         // TODO: Check index stats.
         // TODO: Check what was restored.
 
-        af.validate(&ValidateOptions::default(), Arc::new(TestMonitor::new()))
+        af.validate(&ValidateOptions::default(), Monitor::void())
             .await
             .unwrap();
         // TODO: Maybe check there were no errors or warnings.
@@ -848,7 +848,7 @@ mod test {
             exclude,
             ..Default::default()
         };
-        let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        let stats = backup(&af, srcdir.path(), &options, Monitor::void())
             .await
             .expect("backup");
 
@@ -892,7 +892,7 @@ mod test {
 
         assert_eq!(
             archive
-                .referenced_blocks(&archive.list_band_ids().await.unwrap(), TestMonitor::arc())
+                .referenced_blocks(&archive.list_band_ids().await.unwrap(), Monitor::void())
                 .await
                 .unwrap()
                 .into_iter()
@@ -912,7 +912,7 @@ mod test {
         );
         assert_eq!(
             archive
-                .unreferenced_blocks(TestMonitor::arc())
+                .unreferenced_blocks(Monitor::void())
                 .await
                 .unwrap()
                 .len(),
@@ -930,7 +930,7 @@ mod test {
         let large_content = vec![b'a'; file_size];
         tf.create_file_with_contents("large", &large_content);
 
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let backup_stats = backup(
             &af,
             tf.path(),
@@ -949,12 +949,12 @@ mod test {
         assert_eq!(backup_stats.deduplicated_blocks, 3);
         assert_eq!(backup_stats.deduplicated_bytes, 3 << 20);
         assert_eq!(backup_stats.errors, 0);
-        assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
+        assert_eq!(collector.get_counter(Counter::IndexWrites), 1);
 
         // Try to restore it
         let rd = TempDir::new().unwrap();
         let restore_archive = Archive::open(af.transport().clone()).await.unwrap();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         restore(
             &restore_archive,
             rd.path(),
@@ -963,9 +963,9 @@ mod test {
         )
         .await
         .expect("restore");
-        monitor.assert_no_errors();
-        monitor.assert_counter(Counter::Files, 1);
-        monitor.assert_counter(Counter::FileBytes, file_size);
+        collector.assert_no_errors();
+        collector.assert_counter(Counter::Files, 1);
+        collector.assert_counter(Counter::FileBytes, file_size);
 
         let content = std::fs::read(rd.path().join("large")).unwrap();
         assert_eq!(large_content, content);
@@ -984,14 +984,9 @@ mod test {
 
         tf.make_file_unreadable("b_unreadable");
 
-        let stats = backup(
-            &af,
-            tf.path(),
-            &BackupOptions::default(),
-            TestMonitor::arc(),
-        )
-        .await
-        .expect("backup");
+        let stats = backup(&af, tf.path(), &BackupOptions::default(), Monitor::void())
+            .await
+            .expect("backup");
         assert_eq!(stats.errors, 1);
         assert_eq!(stats.new_files, 3);
         assert_eq!(stats.files, 3);
@@ -1012,7 +1007,7 @@ mod test {
         set_file_mtime(file_path, t1969).expect("Failed to set file times");
 
         let lt = SourceTree::open(tf.path()).unwrap();
-        let monitor = TestMonitor::arc();
+        let monitor = Monitor::void();
         let entries = lt
             .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())
             .unwrap()
@@ -1022,14 +1017,9 @@ mod test {
         assert_eq!(entries[1].apath(), "/old_file");
 
         let af = Archive::create_temp().await;
-        backup(
-            &af,
-            tf.path(),
-            &BackupOptions::default(),
-            TestMonitor::arc(),
-        )
-        .await
-        .expect("backup shouldn't crash on before-epoch mtimes");
+        backup(&af, tf.path(), &BackupOptions::default(), Monitor::void())
+            .await
+            .expect("backup shouldn't crash on before-epoch mtimes");
     }
 
     #[tokio::test]
@@ -1043,7 +1033,7 @@ mod test {
             &af,
             srcdir.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .await
         .expect("backup");
@@ -1083,7 +1073,7 @@ mod test {
             &af,
             srcdir.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .await
         .unwrap();
@@ -1097,7 +1087,7 @@ mod test {
             .await
             .unwrap();
         let entries = st
-            .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .iter_entries(Apath::root(), Exclude::nothing(), Monitor::void())
             .collect_all()
             .await
             .unwrap();
@@ -1109,14 +1099,9 @@ mod test {
 
         // Restore it
         let dest = TempDir::new().unwrap();
-        restore(
-            &af,
-            dest.path(),
-            RestoreOptions::default(),
-            TestMonitor::arc(),
-        )
-        .await
-        .expect("restore");
+        restore(&af, dest.path(), RestoreOptions::default(), Monitor::void())
+            .await
+            .expect("restore");
         // TODO: Check restore stats.
         dest.child("empty").assert("");
     }
@@ -1129,7 +1114,7 @@ mod test {
         srcdir.create_file("bbb");
 
         let options = BackupOptions::default();
-        let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        let stats = backup(&af, srcdir.path(), &options, Monitor::void())
             .await
             .unwrap();
 
@@ -1139,7 +1124,7 @@ mod test {
 
         // Make a second backup from the same tree, and we should see that
         // both files are unmodified.
-        let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        let stats = backup(&af, srcdir.path(), &options, Monitor::void())
             .await
             .unwrap();
 
@@ -1151,7 +1136,7 @@ mod test {
         // as unmodified.
         srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
-        let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        let stats = backup(&af, srcdir.path(), &options, Monitor::void())
             .await
             .unwrap();
 
@@ -1169,7 +1154,7 @@ mod test {
         srcdir.create_file_with_contents("bbb", b"longer content for bbb");
 
         let options = BackupOptions::default();
-        let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        let stats = backup(&af, srcdir.path(), &options, Monitor::void())
             .await
             .unwrap();
 
@@ -1193,7 +1178,7 @@ mod test {
             }
         }
 
-        let stats = backup(&af, srcdir.path(), &options, TestMonitor::arc())
+        let stats = backup(&af, srcdir.path(), &options, Monitor::void())
             .await
             .unwrap();
         assert_eq!(stats.files, 2);
@@ -1211,7 +1196,7 @@ mod test {
             &af,
             srcdir.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .await
         .unwrap();
@@ -1230,7 +1215,7 @@ mod test {
             &af,
             srcdir.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .await
         .unwrap();
@@ -1260,12 +1245,12 @@ mod test {
             max_entries_per_hunk: 1000,
             ..Default::default()
         };
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let stats = backup(&af, srcdir.path(), &backup_options, monitor.clone())
             .await
             .expect("backup");
         assert_eq!(
-            monitor.get_counter(Counter::IndexWrites),
+            collector.get_counter(Counter::IndexWrites),
             2,
             "expect exactly 2 hunks"
         );
@@ -1285,7 +1270,7 @@ mod test {
             .await
             .unwrap();
         let entries = tree
-            .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .iter_entries(Apath::root(), Exclude::nothing(), Monitor::void())
             .collect_all()
             .await
             .unwrap();
@@ -1317,12 +1302,12 @@ mod test {
             small_file_cap: 100_000,
             ..Default::default()
         };
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let stats = backup(&af, srcdir.path(), &backup_options, monitor.clone())
             .await
             .expect("backup");
         assert_eq!(
-            monitor.get_counter(Counter::IndexWrites),
+            collector.get_counter(Counter::IndexWrites),
             2,
             "expect exactly 2 hunks"
         );
@@ -1342,7 +1327,7 @@ mod test {
             .await
             .unwrap();
         let entries = tree
-            .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .iter_entries(Apath::root(), Exclude::nothing(), Monitor::void())
             .collect_all()
             .await
             .unwrap();
@@ -1360,7 +1345,7 @@ mod test {
         srcdir.create_file("a");
         srcdir.create_file("b");
         // Use small hunks for easier manipulation.
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let stats = backup(
             &af,
             srcdir.path(),
@@ -1374,10 +1359,10 @@ mod test {
         .unwrap();
         assert_eq!(stats.new_files, 2);
         assert_eq!(stats.small_combined_files, 2);
-        assert_eq!(monitor.get_counter(Counter::IndexWrites), 3,);
+        assert_eq!(collector.get_counter(Counter::IndexWrites), 3,);
 
         // Make a second backup, with the first file changed.
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         srcdir.create_file_with_contents("a", b"new a contents");
         let stats = backup(
             &af,
@@ -1392,7 +1377,7 @@ mod test {
         .unwrap();
         assert_eq!(stats.unmodified_files, 1);
         assert_eq!(stats.modified_files, 1);
-        assert_eq!(monitor.get_counter(Counter::IndexWrites), 3,);
+        assert_eq!(collector.get_counter(Counter::IndexWrites), 3,);
 
         // Delete the last hunk and reopen the last band.
         af.transport().remove_file("b0001/BANDTAIL").await.unwrap();
@@ -1403,7 +1388,7 @@ mod test {
 
         // The third backup should see nothing changed, by looking at the stitched
         // index from both b0 and b1.
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let stats = backup(
             &af,
             srcdir.path(),
@@ -1416,7 +1401,7 @@ mod test {
         .await
         .unwrap();
         assert_eq!(stats.unmodified_files, 2, "both files are unmodified");
-        assert_eq!(monitor.get_counter(Counter::IndexWrites), 3);
+        assert_eq!(collector.get_counter(Counter::IndexWrites), 3);
     }
 
     #[tokio::test]
@@ -1428,7 +1413,8 @@ mod test {
         srcdir.create_file("bbb");
 
         let options = BackupOptions::default();
-        let stats = backup(&archive, srcdir.path(), &options, TestMonitor::arc())
+        let (monitor, _collector) = Monitor::for_test();
+        let stats = backup(&archive, srcdir.path(), &options, monitor)
             .await
             .unwrap();
 
@@ -1441,7 +1427,7 @@ mod test {
         // Reopen the archive to avoid cache effects.
         let archive = Archive::open(transport.clone()).await.unwrap();
         // Make a second backup from the same tree, and we should see that both files are unmodified.
-        let stats = backup(&archive, srcdir.path(), &options, TestMonitor::arc())
+        let stats = backup(&archive, srcdir.path(), &options, Monitor::void())
             .await
             .unwrap();
 
@@ -1478,7 +1464,7 @@ mod test {
         // as unmodified.
         let archive = Archive::open(transport.clone()).await.unwrap();
         srcdir.create_file_with_contents("bbb", b"longer content for bbb");
-        let stats = backup(&archive, srcdir.path(), &options, TestMonitor::arc())
+        let stats = backup(&archive, srcdir.path(), &options, Monitor::void())
             .await
             .unwrap();
 

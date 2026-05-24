@@ -22,9 +22,7 @@
 //! StoredTree rather than the Band itself.
 
 use std::borrow::Cow;
-use std::sync::Arc;
 
-use crate::transport::Transport;
 use itertools::Itertools;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -32,6 +30,7 @@ use tracing::{debug, trace, warn};
 
 use crate::jsonio::{read_json, write_json};
 use crate::monitor::Monitor;
+use crate::transport::Transport;
 use crate::*;
 
 static INDEX_DIR: &str = "i";
@@ -254,7 +253,7 @@ impl Band {
         &self.head.format_flags
     }
 
-    pub fn index_writer(&self, monitor: Arc<dyn Monitor>) -> IndexWriter {
+    pub fn index_writer(&self, monitor: Monitor) -> IndexWriter {
         IndexWriter::new(self.transport.chdir(INDEX_DIR), monitor)
     }
 
@@ -287,7 +286,7 @@ impl Band {
         })
     }
 
-    pub async fn validate(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
+    pub async fn validate(&self, monitor: Monitor) -> Result<()> {
         let entries = self.transport.list_dir("").await?;
         if !entries.iter().any(|entry| entry.name == BAND_HEAD_FILENAME) {
             monitor.error(Error::BandHeadMissing {
@@ -311,7 +310,6 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::monitor::test::TestMonitor;
     use crate::transport::WriteMode;
     use crate::*;
 
@@ -424,7 +422,7 @@ mod tests {
 
         assert_eq!(
             archive
-                .referenced_blocks(&archive.list_band_ids().await.unwrap(), TestMonitor::arc())
+                .referenced_blocks(&archive.list_band_ids().await.unwrap(), Monitor::void())
                 .await
                 .unwrap()
                 .len(),

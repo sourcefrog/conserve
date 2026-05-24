@@ -13,7 +13,6 @@
 use std::cmp::max;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::Arc;
 
 use tracing::debug;
 
@@ -34,7 +33,7 @@ pub struct ValidateOptions {
 pub(crate) async fn validate_bands(
     archive: &Archive,
     band_ids: &[BandId],
-    monitor: Arc<dyn Monitor>,
+    monitor: Monitor,
 ) -> Result<HashMap<BlockHash, u64>> {
     let mut block_lens = HashMap::new();
     let task = monitor.start_task("Validate indexes".to_string());
@@ -84,7 +83,7 @@ fn merge_block_lens(into: &mut HashMap<BlockHash, u64>, from: &HashMap<BlockHash
 
 async fn validate_stored_tree(
     st: &StoredTree,
-    monitor: Arc<dyn Monitor>,
+    monitor: Monitor,
 ) -> Result<HashMap<BlockHash, u64>> {
     // TODO: Check other entry properties are correct.
     // TODO: Check they're in apath order.

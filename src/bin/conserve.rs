@@ -23,6 +23,7 @@ use std::time::Instant;
 use clap::builder::{Styles, styling};
 use clap::{Parser, Subcommand};
 use conserve::change::Change;
+use conserve::monitor::Monitor;
 #[allow(unused_imports)]
 use tracing::{Level, debug, error, info, trace, warn};
 
@@ -334,7 +335,7 @@ impl std::process::Termination for ExitCode {
 
 impl Command {
     #[tokio::main]
-    async fn run(&self, monitor: Arc<TermUiMonitor>) -> Result<ExitCode> {
+    async fn run(&self, monitor: Monitor) -> Result<ExitCode> {
         let mut stdout = io::stdout();
         match self {
             Command::Backup {
@@ -353,6 +354,7 @@ impl Command {
                         *verbose,
                         *long_listing,
                         &changes_json.as_deref(),
+                        monitor.clone(),
                     )?,
                     ..Default::default()
                 };
@@ -421,8 +423,7 @@ impl Command {
                     )
                     .await?;
                 if !no_stats {
-                    monitor.clear_progress_bars();
-                    println!("{stats}");
+                    monitor.println(&stats.to_string());
                 }
             }
             Command::Diff {
@@ -494,9 +495,9 @@ impl Command {
                         // be different, or these should be a specific method to produce
                         // this json format...?
                         if *json {
-                            println!("{}", entry.listing_json());
+                            monitor.println(&entry.listing_json().to_string());
                         } else {
-                            println!("{}", entry.format_ls(*long_listing));
+                            monitor.println(&entry.format_ls(*long_listing));
                         }
                     }
                 } else {
@@ -507,14 +508,14 @@ impl Command {
                         monitor.clone(),
                     )?;
                     for entry in entry_iter {
-                        if *json {
-                            println!("{}", entry.listing_json());
+                        let line = if *json {
+                            entry.listing_json().to_string()
                         } else {
-                            println!("{}", entry.format_ls(*long_listing));
-                        }
+                            entry.format_ls(*long_listing)
+                        };
+                        monitor.println(&line);
                     }
                 };
-                monitor.clear_progress_bars();
             }
             #[cfg(windows)]
             Command::Mount {
@@ -577,6 +578,7 @@ impl Command {
                         *verbose,
                         *long_listing,
                         &changes_json.as_deref(),
+                        monitor.clone(),
                     )?,
                     inject_failures: Default::default(),
                 };
@@ -601,12 +603,12 @@ impl Command {
                         .size(exclude, monitor.clone())?
                         .file_bytes
                 };
-                monitor.clear_progress_bars();
-                if *bytes {
-                    println!("{size}");
+                let line = if *bytes {
+                    size.to_string()
                 } else {
-                    println!("{}", conserve::bytes_to_human_mb(size));
-                }
+                    conserve::bytes_to_human_mb(size)
+                };
+                monitor.println(&line);
             }
             Command::Validate { archive, quick, .. } => {
                 let options = ValidateOptions {
@@ -665,6 +667,7 @@ fn make_change_callback(
     print_changes: bool,
     ls_long: bool,
     changes_json: &Option<&Path>,
+    monitor: Monitor,
 ) -> Result<Option<ChangeCallback>> {
     if !print_changes && !ls_long && changes_json.is_none() {
         return Ok(None);
@@ -687,15 +690,19 @@ fn make_change_callback(
         }
         if ls_long {
             let change_meta = entry_change.change.primary_metadata();
-            println!(
+            monitor.println(&format!(
                 "{} {} {} {}",
                 entry_change.change.sigil(),
                 change_meta.unix_mode,
                 change_meta.owner,
                 entry_change.apath
-            );
+            ));
         } else if print_changes {
-            println!("{} {}", entry_change.change.sigil(), entry_change.apath);
+            monitor.println(&format!(
+                "{} {}",
+                entry_change.change.sigil(),
+                entry_change.apath
+            ));
         }
         if let Some(w) = &changes_json_writer {
             let mut w = w.borrow_mut();
@@ -717,9 +724,10 @@ fn main() -> Result<ExitCode> {
     } else {
         Level::INFO
     };
-    let monitor = Arc::new(TermUiMonitor::new(!args.no_progress));
+    let term_ui_monitor = Arc::new(TermUiMonitor::new(!args.no_progress));
+    let monitor = Monitor::new(term_ui_monitor.clone());
     let _flush_tracing = enable_tracing(
-        &monitor,
+        &term_ui_monitor,
         &args.trace_time,
         console_level,
         &args.log_json,
@@ -734,7 +742,7 @@ fn main() -> Result<ExitCode> {
                 .truncate(true)
                 .write(true)
                 .open(metrics_path)?,
-            monitor.counters(),
+            &monitor.get_counters(),
         )?;
     }
     match result {

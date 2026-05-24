@@ -140,7 +140,7 @@ mod tests {
     // fn merge_entry_trees() {
     //     let ta = TreeFixture::new();
     //     let tb = TreeFixture::new();
-    //     let monitor = TestMonitor::arc();
+    //     let monitor = Monitor::void();
     //     let di = MergeTrees::new(
     //         ta.live_tree()
     //             .iter_entries(Apath::root(), Exclude::nothing(), monitor.clone())

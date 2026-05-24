@@ -21,7 +21,6 @@ use std::fs;
 use std::fs::File;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use tracing::{error, warn};
 
@@ -62,7 +61,7 @@ impl SourceTree {
         File::open(&path).map_err(|source| Error::ReadSourceFile { path, source })
     }
 
-    pub fn size(&self, exclude: Exclude, monitor: Arc<dyn Monitor>) -> Result<TreeSize> {
+    pub fn size(&self, exclude: Exclude, monitor: Monitor) -> Result<TreeSize> {
         let mut file_bytes = 0u64;
         let task = monitor.start_task("Measure tree".to_string());
         for e in self.iter_entries(Apath::from("/"), exclude, monitor.clone())? {
@@ -81,7 +80,7 @@ impl SourceTree {
         &self,
         subtree: Apath,
         exclude: Exclude,
-        _monitor: Arc<dyn Monitor>,
+        _monitor: Monitor,
     ) -> Result<Iter> {
         Iter::new(&self.path, subtree, exclude)
     }
@@ -335,7 +334,6 @@ impl Iterator for Iter {
 mod test {
     use itertools::Itertools;
 
-    use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::TreeFixture;
 
     use super::*;
@@ -358,7 +356,7 @@ mod test {
         tf.create_dir("jam/.etc");
         let lt = SourceTree::open(tf.path()).unwrap();
         let result: Vec<Entry> = lt
-            .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .iter_entries(Apath::root(), Exclude::nothing(), Monitor::void())
             .unwrap()
             .collect();
         let names: Vec<String> = result.iter().map(|e| e.apath().to_string()).collect();
@@ -401,7 +399,7 @@ mod test {
 
         let lt = SourceTree::open(tf.path()).unwrap();
         let names = lt
-            .iter_entries(Apath::root(), exclude, TestMonitor::arc())
+            .iter_entries(Apath::root(), exclude, Monitor::void())
             .unwrap()
             .map(|e| e.apath().to_string())
             .collect_vec();
@@ -423,7 +421,7 @@ mod test {
 
         let lt = SourceTree::open(tf.path()).unwrap();
         let names = lt
-            .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .iter_entries(Apath::root(), Exclude::nothing(), Monitor::void())
             .unwrap()
             .map(|e| e.apath().to_string())
             .collect_vec();
@@ -443,7 +441,7 @@ mod test {
         let lt = SourceTree::open(tf.path()).unwrap();
 
         let names = lt
-            .iter_entries("/subdir".into(), Exclude::nothing(), TestMonitor::arc())
+            .iter_entries("/subdir".into(), Exclude::nothing(), Monitor::void())
             .unwrap()
             .map(|e| e.apath().to_string())
             .collect_vec();
@@ -460,7 +458,7 @@ mod test {
 
         let lt = SourceTree::open(tf.path()).unwrap();
         let names = lt
-            .iter_entries(Apath::root(), Exclude::nothing(), TestMonitor::arc())
+            .iter_entries(Apath::root(), Exclude::nothing(), Monitor::void())
             .unwrap()
             .map(|e| e.apath().to_string())
             .collect_vec();

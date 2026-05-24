@@ -2,8 +2,8 @@
 
 //! Monitor on a terminal UI.
 
-use std::sync::atomic::Ordering::Relaxed;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::fmt::Debug;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
 use std::sync::{Arc, Mutex};
 use std::thread::{JoinHandle, sleep, spawn};
 use std::time::Duration;
@@ -14,7 +14,7 @@ use tracing::error;
 
 use crate::Error;
 use crate::counters::{Counter, Counters};
-use crate::monitor::Monitor;
+use crate::monitor::MonitorImpl;
 use crate::monitor::task::{Task, TaskList};
 
 pub struct TermUiMonitor {
@@ -22,6 +22,7 @@ pub struct TermUiMonitor {
     counters: Arc<Counters>,
     // active_files: Mutex<Vec<String>>,
     tasks: Arc<Mutex<TaskList>>,
+    /// Nutmeg view that paints stdout periodically from the Model.
     view: Arc<View<Model>>,
     /// A thread that periodically updates the view's progress bars from the Model.
     ///
@@ -34,7 +35,16 @@ pub struct TermUiMonitor {
     error_count: AtomicUsize,
 }
 
-/// The nutmeg model.
+impl Debug for TermUiMonitor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TermUiMonitor")
+            .field("counters", &self.counters)
+            .field("tasks", &self.tasks)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The state that's painted into progress bars.
 pub(super) struct Model {
     counters: Arc<Counters>,
     tasks: Arc<Mutex<TaskList>>,
@@ -110,7 +120,7 @@ impl Drop for TermUiMonitor {
     }
 }
 
-impl Monitor for TermUiMonitor {
+impl MonitorImpl for TermUiMonitor {
     fn count(&self, counter: Counter, increment: usize) {
         self.counters.count(counter, increment)
     }
@@ -119,13 +129,26 @@ impl Monitor for TermUiMonitor {
         self.counters.set(counter, value)
     }
 
+    fn get_counters(&self) -> Counters {
+        self.counters.as_ref().clone()
+    }
+
     fn error(&self, error: Error) {
         error!(target: "conserve", "{error}");
         self.error_count.fetch_add(1, Relaxed);
     }
 
+    fn error_count(&self) -> usize {
+        self.error_count.load(Relaxed)
+    }
+
     fn start_task(&self, name: String) -> Task {
         self.tasks.lock().unwrap().start_task(name)
+    }
+
+    fn println(&self, text: &str) {
+        self.view.clear();
+        println!("{text}");
     }
 }
 

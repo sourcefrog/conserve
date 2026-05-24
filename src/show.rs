@@ -18,13 +18,12 @@
 
 use std::borrow::Cow;
 use std::io::{BufWriter, Write};
-use std::sync::Arc;
 
 use jiff::tz::TimeZone;
 use tracing::error;
 
 use crate::index::entry::IndexEntry;
-use crate::termui::TermUiMonitor;
+use crate::monitor::Monitor;
 use crate::*;
 
 /// Options controlling the behavior of `show_versions`.
@@ -47,7 +46,7 @@ pub struct ShowVersionsOptions {
 pub async fn show_versions(
     archive: &Archive,
     options: &ShowVersionsOptions,
-    monitor: Arc<TermUiMonitor>,
+    monitor: Monitor,
 ) -> Result<()> {
     let mut band_ids = archive.list_band_ids().await?;
     let timezone = if options.utc {
@@ -114,8 +113,7 @@ pub async fn show_versions(
                 crate::misc::bytes_to_human_mb(sizes.file_bytes)
             ));
         }
-        monitor.clear_progress_bars(); // to avoid fighting with stdout
-        println!("{}", l.join(" "));
+        monitor.println(&l.join(" "));
     }
     Ok(())
 }

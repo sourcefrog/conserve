@@ -7,7 +7,7 @@ use std::{
 };
 
 use conserve::{
-    BackupOptions, MountOptions, backup, monitor::test::TestMonitor, test_fixtures::TreeFixture,
+    BackupOptions, MountOptions, backup, monitor::test::Collector, test_fixtures::TreeFixture,
 };
 use tempfile::TempDir;
 
@@ -76,7 +76,7 @@ async fn mount_sub_dirs() {
             &archive,
             srcdir.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .unwrap();
     }
@@ -131,7 +131,7 @@ async fn mount_file_versions() {
             &archive,
             srcdir.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .unwrap();
 
@@ -141,7 +141,7 @@ async fn mount_file_versions() {
             &archive,
             srcdir.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .unwrap();
     }
@@ -225,7 +225,7 @@ async fn mount_cleanup() {
             &archive,
             srcdir.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .unwrap();
     }

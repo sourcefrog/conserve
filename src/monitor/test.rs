@@ -5,12 +5,12 @@
 use std::mem::take;
 use std::sync::{Arc, Mutex};
 
-use super::Monitor;
+use super::MonitorImpl;
 use super::task::{Task, TaskList};
 use crate::counters::{Counter, Counters};
 use crate::{Apath, Error};
 
-/// A monitor that collects information for later inspection,
+/// A monitor implementation that collects information for later inspection,
 /// particularly from tests.
 ///
 /// Errors are collected in a vector.
@@ -18,22 +18,22 @@ use crate::{Apath, Error};
 /// Tasks are ignored.
 ///
 /// Totals of counters are kept.
-#[derive(Default)]
-pub struct TestMonitor {
+#[derive(Default, Debug)]
+pub struct Collector {
     errors: Mutex<Vec<Error>>,
     counters: Counters,
     started_files: Mutex<Vec<Apath>>,
     task_list: Mutex<TaskList>,
 }
 
-impl TestMonitor {
+impl Collector {
     pub fn new() -> Self {
-        TestMonitor::default()
+        Collector::default()
     }
 
     /// Construct a new TestMonitor and wrap it in an Arc.
-    pub fn arc() -> Arc<TestMonitor> {
-        Arc::new(TestMonitor::new())
+    pub fn arc() -> Arc<Collector> {
+        Arc::new(Collector::new())
     }
 
     pub fn get_counter(&self, counter: Counter) -> usize {
@@ -71,7 +71,7 @@ impl TestMonitor {
     }
 }
 
-impl Monitor for TestMonitor {
+impl MonitorImpl for Collector {
     fn count(&self, counter: Counter, increment: usize) {
         self.counters.count(counter, increment)
     }
@@ -80,11 +80,23 @@ impl Monitor for TestMonitor {
         self.counters.set(counter, value)
     }
 
+    fn get_counters(&self) -> Counters {
+        self.counters.clone()
+    }
+
     fn error(&self, error: Error) {
         self.errors.lock().unwrap().push(error);
     }
 
     fn start_task(&self, name: String) -> Task {
         self.task_list.lock().unwrap().start_task(name)
+    }
+
+    fn println(&self, _text: &str) {
+        // Ignore output. (We could later collect it for tests to inspect.)
+    }
+
+    fn error_count(&self) -> usize {
+        self.errors.lock().unwrap().len()
     }
 }
