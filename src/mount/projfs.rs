@@ -12,8 +12,10 @@ use std::{
 };
 
 use bytes::Bytes;
+use futures::executor;
 use itertools::Itertools;
 use lru::LruCache;
+use tokio::runtime::Handle;
 use tracing::{debug, info, warn};
 use windows_projfs::{
     DirectoryEntry, DirectoryInfo, FileInfo, Notification, ProjectedFileSystem,
@@ -34,6 +36,7 @@ struct StoredFileReader {
 
 impl StoredFileReader {
     pub fn new(
+        handle: Handle,
         stored_tree: Arc<StoredTree>,
         entry: IndexEntry,
         byte_offset: u64,
@@ -56,10 +59,14 @@ impl StoredFileReader {
                 }
             })
             .map::<Result<Bytes>, _>(move |entry| {
-                let content = stored_tree
-                    .archive
-                    .block_dir
-                    .get_block_content(&entry.hash, monitor.clone())?;
+                let content = handle.block_on(async {
+                    stored_tree
+                        .archive
+                        .block_dir()
+                        .await?
+                        .get_block_content(&entry.hash, monitor.clone())
+                        .await
+                })?;
 
                 Ok(content.slice((entry.start as usize)..(entry.start + entry.len) as usize))
             });
@@ -155,6 +162,7 @@ fn index_entry_to_directory_entry(entry: &IndexEntry) -> Option<DirectoryEntry> 
 }
 
 struct ArchiveProjectionSource {
+    handle: Handle,
     archive: Archive,
 
     stored_tree_cache: Mutex<LruCache<BandId, Arc<StoredTree>>>,
@@ -186,22 +194,25 @@ impl ArchiveProjectionSource {
             .unwrap()
             .try_get_or_insert((band_id, hunk_id), || {
                 let mut index = stored_tree.band().index();
-                Ok(Arc::new(index.read_hunk(hunk_id)?.unwrap_or_default()))
+                Ok(Arc::new(
+                    executor::block_on(index.read_hunk(hunk_id))?.unwrap_or_default(),
+                ))
             })
             .cloned()
     }
 
     pub fn get_or_open_tree(&self, policy: BandSelectionPolicy) -> Result<Arc<StoredTree>> {
-        let band_id = self.archive.resolve_band_id(policy)?;
+        let band_id = executor::block_on(self.archive.resolve_band_id(policy))?;
         self.stored_tree_cache
             .lock()
             .unwrap()
             .try_get_or_insert(band_id, || {
                 debug!("Opening band {}", band_id);
 
-                let stored_tree = self
-                    .archive
-                    .open_stored_tree(BandSelectionPolicy::Specified(band_id))?;
+                let stored_tree = executor::block_on(
+                    self.archive
+                        .open_stored_tree(BandSelectionPolicy::Specified(band_id)),
+                )?;
 
                 Ok(Arc::new(stored_tree))
             })
@@ -220,7 +231,7 @@ impl ArchiveProjectionSource {
                 /* Inform the user that this band has been cached as this is most likely a heavy operation (cpu and memory wise) */
                 info!("Caching files for band {}", stored_tree.band().id());
 
-                let helper = IndexHunkIndex::from_index(&stored_tree.band().index())?;
+                let helper = executor::block_on(IndexHunkIndex::from_index(&stored_tree.band().index()))?;
                 Ok(Arc::new(helper))
             })
             .cloned()
@@ -241,11 +252,11 @@ impl ArchiveProjectionSource {
 
     fn band_id_to_directory_info(&self, policy: BandSelectionPolicy) -> Option<DirectoryInfo> {
         let stored_tree = self.get_or_open_tree(policy).ok()?;
-        let band_info = stored_tree.band().get_info().ok()?;
+        let band_info = executor::block_on(stored_tree.band().get_info()).ok()?;
 
         let timestamp = unix_time_to_windows(
-            band_info.start_time.unix_timestamp(),
-            band_info.start_time.unix_timestamp_nanos() as u32,
+            band_info.start_time.as_second(),
+            band_info.start_time.subsec_nanosecond() as u32,
         );
 
         Some(DirectoryInfo {
@@ -290,9 +301,7 @@ impl ArchiveProjectionSource {
                     BandSelectionPolicy::Specified(band_id.parse::<BandId>()?)
                 } else {
                     /* list bands */
-                    let entries = self
-                        .archive
-                        .list_band_ids()?
+                    let entries = executor::block_on(self.archive.list_band_ids())?
                         .into_iter()
                         .filter_map(|band_id| {
                             self.band_id_to_directory_info(BandSelectionPolicy::Specified(band_id))
@@ -391,6 +400,7 @@ impl ArchiveProjectionSource {
             file_size
         );
         let reader = StoredFileReader::new(
+            self.handle.clone(),
             stored_tree,
             index_entry,
             byte_offset as u64,
@@ -403,6 +413,8 @@ impl ArchiveProjectionSource {
 
 impl ProjectedFileSystemSource for ArchiveProjectionSource {
     fn list_directory(&self, path: &Path) -> Vec<DirectoryEntry> {
+        let _rt_guard = self.handle.enter();
+
         let cached_result = self
             .serve_dir_cache
             .lock()
@@ -435,6 +447,8 @@ impl ProjectedFileSystemSource for ArchiveProjectionSource {
         byte_offset: usize,
         length: usize,
     ) -> std::io::Result<Box<dyn Read>> {
+        let _rt_guard = self.handle.enter();
+
         match self.serve_file(path, byte_offset, length) {
             Ok(reader) => Ok(reader),
             Err(error) => {
@@ -508,6 +522,7 @@ pub fn mount(
     }
 
     let source = ArchiveProjectionSource {
+        handle: Handle::current(),
         archive: archive.clone(),
 
         /* cache at most 16 different bands in parallel */

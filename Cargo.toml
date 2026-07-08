@@ -45,6 +45,7 @@ filetime = "0.2"
 futures = { version = "0.3", optional = true }
 globset = "0.4.5"
 hex = "0.4.2"
+ignore = "0.4.25"
 itertools = "0.14"
 lazy_static = "1.4.0"
 libssh2-sys = { version = "0.3.0", optional = true }

@@ -205,6 +205,12 @@ pub enum Error {
         #[from]
         source: windows_projfs::Error,
     },
+
+    #[error(transparent)]
+    Ignorefile {
+        #[from]
+        source: ignore::Error,
+    },
 }
 
 impl From<jsonio::Error> for Error {

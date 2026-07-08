@@ -25,13 +25,15 @@ use std::iter::empty;
 use std::path::Path;
 
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 
 use super::*;
 
 /// Describes which files to exclude from a backup, restore, etc.
 #[derive(Clone, Debug)]
-pub struct Exclude {
-    globset: GlobSet,
+pub enum Exclude {
+    Pattern(GlobSet),
+    Ignorefile(Gitignore),
     // TODO: Control of matching cachedir.
 }
 
@@ -61,16 +63,22 @@ impl Exclude {
         for path in exclude_from {
             add_patterns_from_file(&mut gsb, path.as_ref())?;
         }
-        Ok(Exclude {
-            globset: gsb.build()?,
-        })
+        Ok(Exclude::Pattern(gsb.build()?))
+    }
+
+    pub fn from_ignorefile(file: impl AsRef<Path>) -> Result<Exclude> {
+        let mut builder = GitignoreBuilder::new("/");
+
+        if let Some(error) = builder.add(file) {
+            return Err(error.into());
+        }
+
+        Ok(Exclude::Ignorefile(builder.build()?))
     }
 
     /// Exclude nothing, even items that might be excluded by default.
     pub fn nothing() -> Exclude {
-        Exclude {
-            globset: GlobSet::empty(),
-        }
+        Exclude::Pattern(GlobSet::empty())
     }
 
     /// True if this apath should be excluded.
@@ -80,7 +88,10 @@ impl Exclude {
         A: ?Sized,
     {
         let apath: Apath = apath.into();
-        self.globset.is_match(apath)
+        match self {
+            Self::Pattern(globset) => globset.is_match(apath),
+            Self::Ignorefile(inner) => inner.matched(apath, false).is_ignore(),
+        }
     }
 }
 

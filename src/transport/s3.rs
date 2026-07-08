@@ -25,9 +25,9 @@
 //    cargo mutants -f s3.rs --no-config -C --features=s3,s3-integration-test
 
 use std::error::Error as StdError;
-use std::fmt;
 use std::sync::Arc;
 use std::time::SystemTime;
+use std::{env, fmt};
 
 use async_trait::async_trait;
 use aws_config::{AppName, BehaviorVersion};
@@ -68,20 +68,25 @@ impl Protocol {
         let bucket = url.authority().to_owned();
         assert!(!bucket.is_empty(), "S3 bucket name is empty in {url:?}");
 
-        // Find the bucket region.
-        let config = load_aws_config(None).await;
-        let client = aws_sdk_s3::Client::new(&config);
-        let location_response = client
-            .get_bucket_location()
-            .set_bucket(Some(bucket.clone()))
-            .send()
-            .await
-            .map_err(|err| s3_error(err, &url))?;
-        debug!(?location_response);
+        let region = if let Some(value) = env::var_os("AWS_REGION") {
+            Some(value.to_string_lossy().to_string())
+        } else {
+            // Find the bucket region.
+            debug!("Resolving S3 bucket region");
+            let config = load_aws_config(None).await;
+            let client = aws_sdk_s3::Client::new(&config);
+            let location_response = client
+                .get_bucket_location()
+                .set_bucket(Some(bucket.clone()))
+                .send()
+                .await
+                .map_err(|err| s3_error(err, &url))?;
+            debug!(?location_response);
 
-        let region = location_response
-            .location_constraint
-            .map(|c| c.as_str().to_owned());
+            location_response
+                .location_constraint
+                .map(|c| c.as_str().to_owned())
+        };
         debug!(?region, "S3 bucket region");
 
         // Make a new client in the right region.
