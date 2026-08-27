@@ -666,7 +666,6 @@ mod test {
     use crate::test_fixtures::TreeFixture;
     use crate::transport::Transport;
     use crate::transport::record::Verb;
-    use crate::*;
 
     use super::*;
 

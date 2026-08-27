@@ -313,7 +313,6 @@ mod tests {
 
     use crate::monitor::test::TestMonitor;
     use crate::transport::WriteMode;
-    use crate::*;
 
     use super::*;
 
