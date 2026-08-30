@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 
 use tempfile::TempDir;
 
-use crate::monitor::test::TestMonitor;
+use crate::monitor::Monitor;
 use crate::*;
 
 pub async fn setup_incomplete_empty_band(archive: &Archive) {
@@ -38,12 +38,12 @@ pub async fn store_two_versions(archive: &Archive) {
     }
 
     let options = &BackupOptions::default();
-    backup(archive, srcdir.path(), options, TestMonitor::arc())
+    backup(archive, srcdir.path(), options, Monitor::void())
         .await
         .unwrap();
 
     srcdir.create_file("hello2");
-    backup(archive, srcdir.path(), options, TestMonitor::arc())
+    backup(archive, srcdir.path(), options, Monitor::void())
         .await
         .unwrap();
 }

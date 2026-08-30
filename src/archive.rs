@@ -138,7 +138,7 @@ impl Archive {
         band_selection: BandSelectionPolicy,
         subtree: Apath,
         exclude: Exclude,
-        monitor: Arc<dyn Monitor>,
+        monitor: Monitor,
     ) -> Result<Stitch> {
         Ok(self
             .open_stored_tree(band_selection)
@@ -205,7 +205,7 @@ impl Archive {
     pub async fn referenced_blocks(
         &self,
         band_ids: &[BandId],
-        monitor: Arc<dyn Monitor>,
+        monitor: Monitor,
     ) -> Result<HashSet<BlockHash>> {
         let archive = self.clone();
         let task = monitor.start_task("Find referenced blocks".to_string());
@@ -224,7 +224,7 @@ impl Archive {
     }
 
     /// Returns an iterator of blocks that are present and referenced by no index.
-    pub async fn unreferenced_blocks(&self, monitor: Arc<dyn Monitor>) -> Result<Vec<BlockHash>> {
+    pub async fn unreferenced_blocks(&self, monitor: Monitor) -> Result<Vec<BlockHash>> {
         let referenced = self
             .referenced_blocks(&self.list_band_ids().await?, monitor.clone())
             .await?;
@@ -245,7 +245,7 @@ impl Archive {
         &self,
         delete_band_ids: &[BandId],
         options: &DeleteOptions,
-        monitor: Arc<dyn Monitor>,
+        monitor: Monitor,
     ) -> Result<DeleteStats> {
         let mut stats = DeleteStats::default();
         let start = Instant::now();
@@ -323,11 +323,7 @@ impl Archive {
     /// If problems are found, they are emitted as `warn` or `error` level
     /// tracing messages. This function only returns an error if validation
     /// stops due to a fatal error.
-    pub async fn validate(
-        &self,
-        options: &ValidateOptions,
-        monitor: Arc<dyn Monitor>,
-    ) -> Result<()> {
+    pub async fn validate(&self, options: &ValidateOptions, monitor: Monitor) -> Result<()> {
         self.validate_archive_dir(monitor.clone()).await?;
 
         debug!("List bands...");
@@ -373,7 +369,7 @@ impl Archive {
         Ok(())
     }
 
-    async fn validate_archive_dir(&self, monitor: Arc<dyn Monitor>) -> Result<()> {
+    async fn validate_archive_dir(&self, monitor: Monitor) -> Result<()> {
         // TODO: More tests for the problems detected here.
         debug!("Check archive directory...");
         let mut seen_bands = HashSet::<BandId>::new();
@@ -417,7 +413,6 @@ mod test {
     use assert_fs::TempDir;
     use assert_fs::prelude::*;
 
-    use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::TreeFixture;
     use crate::test_fixtures::store_two_versions;
 
@@ -481,7 +476,7 @@ mod test {
             "Archive should have no bands yet"
         );
         assert_eq!(
-            af.referenced_blocks(&af.list_band_ids().await.unwrap(), TestMonitor::arc())
+            af.referenced_blocks(&af.list_band_ids().await.unwrap(), Monitor::void())
                 .await
                 .unwrap()
                 .len(),
@@ -500,7 +495,7 @@ mod test {
             .delete_bands(
                 &[BandId::new(&[0]), BandId::new(&[1])],
                 &Default::default(),
-                TestMonitor::arc(),
+                Monitor::void(),
             )
             .await
             .expect("delete_bands");
@@ -524,14 +519,14 @@ mod test {
             &archive,
             tf.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .await
         .expect("backup");
 
         // Delete the band and index
         std::fs::remove_dir_all(archive.transport().local_path().unwrap().join("b0000")).unwrap();
-        let monitor = TestMonitor::arc();
+        let monitor = Monitor::void();
 
         let unreferenced: Vec<BlockHash> =
             archive.unreferenced_blocks(monitor.clone()).await.unwrap();

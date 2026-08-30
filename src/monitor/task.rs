@@ -8,7 +8,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, RwLock, Weak};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct TaskList {
     tasks: Vec<Weak<TaskState>>,
 }

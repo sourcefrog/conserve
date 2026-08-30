@@ -180,8 +180,7 @@ The library should support several modes of UI:
    in a limited way. (Tests that run the `conserve` binary as a subprocess have
    more freedom, including running it on a pseudoterminal.)
 
-Conserve writes messages to Rust's widely-used `tracing` crate. Logs can be written to a file with `--log-json`.
-well as to the terminal, and at a different level of detail.
+Conserve writes messages to Rust's widely-used `tracing` crate. Logs can be written to a file with `--log-json` or `--trace-tmp`, as well as to the terminal, and at a different level of detail.
 
 - The library will emit logs but will not by default configure any log targets,
   so that applications can choose the target they want.

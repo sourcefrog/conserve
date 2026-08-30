@@ -29,7 +29,6 @@
 //! * Bands might be deleted, so their numbers are not contiguous.
 
 use std::iter::Peekable;
-use std::sync::Arc;
 
 use tracing::trace;
 
@@ -55,7 +54,7 @@ pub struct Stitch {
     /// Only return entries within this directory.
     subtree: Apath,
 
-    monitor: Arc<dyn Monitor>,
+    monitor: Monitor,
 }
 
 /// What state is a stitch iter in, and what should happen next?
@@ -98,7 +97,7 @@ impl Stitch {
         band_id: BandId,
         subtree: Apath,
         exclude: Exclude,
-        monitor: Arc<dyn Monitor>,
+        monitor: Monitor,
     ) -> Stitch {
         Stitch {
             archive: archive.clone(),
@@ -111,7 +110,7 @@ impl Stitch {
     }
 
     /// Construct a stitcher that will just return nothing.
-    pub(crate) fn empty(archive: &Archive, monitor: Arc<dyn Monitor>) -> Stitch {
+    pub(crate) fn empty(archive: &Archive, monitor: Monitor) -> Stitch {
         Stitch {
             archive: archive.clone(),
             last_apath: None,
@@ -224,7 +223,6 @@ mod test {
 
     use super::*;
     use crate::counters::Counter;
-    use crate::monitor::test::TestMonitor;
     use crate::test_fixtures::TreeFixture;
 
     fn symlink(name: &str, target: &str) -> IndexEntry {
@@ -247,7 +245,7 @@ mod test {
             band_id,
             Apath::root(),
             Exclude::nothing(),
-            TestMonitor::arc(),
+            Monitor::void(),
         );
         while let Some(entry) = stitch.next().await {
             strs.push(format!("{}:{}", entry.apath, entry.target.unwrap()));
@@ -274,7 +272,7 @@ mod test {
         //   1 was deleted in b2, 2 is carried over from b2,
         //   and 3 is carried over from b1.
 
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let band = Band::create(&af).await?;
         assert_eq!(band.id(), BandId::zero());
         let mut ib = band.index_writer(monitor.clone());
@@ -286,12 +284,12 @@ mod test {
         let hunks = ib.finish().await?;
         assert_eq!(hunks, 2);
         assert_eq!(
-            monitor.get_counter(Counter::IndexWrites),
+            collector.get_counter(Counter::IndexWrites),
             2,
             "2 hunks were finished"
         );
 
-        let monitor = TestMonitor::arc();
+        let monitor = Monitor::void();
         let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0001");
         let mut ib = band.index_writer(monitor.clone());
@@ -302,11 +300,11 @@ mod test {
         ib.push_entry(symlink("/3", "b1"));
         let hunks = ib.finish().await?;
         assert_eq!(hunks, 2);
-        assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
+        assert_eq!(collector.get_counter(Counter::IndexWrites), 2);
         band.close(2).await?;
 
         // b2
-        let monitor = TestMonitor::arc();
+        let monitor = Monitor::void();
         let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0002");
         let mut ib = band.index_writer(monitor.clone());
@@ -316,7 +314,7 @@ mod test {
         // incomplete
         let hunks = ib.finish().await?;
         assert_eq!(hunks, 2);
-        assert_eq!(monitor.get_counter(Counter::IndexWrites), 2);
+        assert_eq!(collector.get_counter(Counter::IndexWrites), 2);
 
         // b3
         let band = Band::create(&af).await?;
@@ -327,7 +325,7 @@ mod test {
         assert_eq!(band.id().to_string(), "b0004");
 
         // b5
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let band = Band::create(&af).await?;
         assert_eq!(band.id().to_string(), "b0005");
         let mut ib = band.index_writer(monitor.clone());
@@ -335,7 +333,7 @@ mod test {
         ib.push_entry(symlink("/00", "b5"));
         let hunks = ib.finish().await?;
         assert_eq!(hunks, 1);
-        assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
+        assert_eq!(collector.get_counter(Counter::IndexWrites), 1);
         // incomplete
 
         std::fs::remove_dir_all(af.transport().local_path().unwrap().join("b0003"))?;
@@ -379,21 +377,17 @@ mod test {
         tf.create_file("file_a");
 
         let af = Archive::create_temp().await;
-        backup(
-            &af,
-            tf.path(),
-            &BackupOptions::default(),
-            TestMonitor::arc(),
-        )
-        .await
-        .expect("backup should work");
+        backup(&af, tf.path(), &BackupOptions::default(), Monitor::void())
+            .await
+            .expect("backup should work");
 
         af.transport().remove_file("b0000/BANDTAIL").await.unwrap(); // band is now incomplete
         let band_ids = af.list_band_ids().await.expect("should list bands");
 
         let band_id = band_ids.first().expect("expected at least one band");
 
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
+
         let mut entries = Stitch::new(
             &af,
             *band_id,
@@ -419,7 +413,7 @@ mod test {
 
         // It's not an error (at the moment) because a band with no head effectively doesn't exist.
         // (Maybe later the presence of a band directory with no head file should raise a warning.)
-        let errors = monitor.take_errors();
+        let errors = collector.take_errors();
         dbg!(&errors);
         assert_eq!(errors.len(), 0);
     }

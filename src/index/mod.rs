@@ -235,13 +235,13 @@ impl IndexHunkIter {
 mod tests {
     use tempfile::TempDir;
 
-    use crate::{counters::Counter, monitor::test::TestMonitor};
+    use crate::{counters::Counter, monitor::Monitor};
 
     use super::*;
 
     fn setup() -> (TempDir, IndexWriter) {
         let testdir = TempDir::new().unwrap();
-        let ib = IndexWriter::new(Transport::local(testdir.path()), TestMonitor::arc());
+        let ib = IndexWriter::new(Transport::local(testdir.path()), Monitor::void());
         (testdir, ib)
     }
 
@@ -326,14 +326,14 @@ mod tests {
     #[tokio::test]
     async fn basic() -> Result<()> {
         let transport = Transport::temp();
-        let monitor = TestMonitor::arc();
+        let (monitor, collector) = Monitor::for_test();
         let mut index_writer = IndexWriter::new(transport.clone(), monitor.clone());
         index_writer.append_entries(&mut vec![sample_entry("/apple"), sample_entry("/banana")]);
         let hunks = index_writer.finish().await.unwrap();
-        assert_eq!(monitor.get_counter(Counter::IndexWrites), 1);
+        assert_eq!(collector.get_counter(Counter::IndexWrites), 1);
 
         assert_eq!(hunks, 1);
-        let counters = monitor.counters();
+        let counters = collector.counters();
         dbg!(&counters);
         assert!(counters.get(Counter::IndexWriteCompressedBytes) > 30);
         assert!(counters.get(Counter::IndexWriteCompressedBytes) < 125,);

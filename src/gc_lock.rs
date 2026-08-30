@@ -155,7 +155,7 @@ mod test {
     use std::time::Duration;
 
     use super::*;
-    use crate::monitor::test::TestMonitor;
+    use crate::monitor::Monitor;
     use crate::test_fixtures::TreeFixture;
 
     #[tokio::test]
@@ -181,7 +181,7 @@ mod test {
             &archive,
             source.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .await
         .unwrap();
@@ -198,7 +198,7 @@ mod test {
             &archive,
             source.path(),
             &BackupOptions::default(),
-            TestMonitor::arc(),
+            Monitor::void(),
         )
         .await;
         assert_eq!(
@@ -257,7 +257,7 @@ mod test {
         let lock1 = GarbageCollectionLock::new(&archive).await?;
 
         // Backup should fail while gc lock is held.
-        let monitor = TestMonitor::arc();
+        let monitor = Monitor::void();
         let backup_result = backup(
             &archive,
             tf.path(),

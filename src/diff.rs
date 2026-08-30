@@ -15,8 +15,6 @@
 //!
 //! See also [conserve::show_diff] to format the diff as text.
 
-use std::sync::Arc;
-
 use crate::monitor::Monitor;
 use crate::*;
 
@@ -52,7 +50,7 @@ pub async fn diff(
     st: &StoredTree,
     lt: &SourceTree,
     options: DiffOptions,
-    monitor: Arc<dyn Monitor>,
+    monitor: Monitor,
 ) -> Result<Diff> {
     let a = st.iter_entries(Apath::root(), options.exclude.clone(), monitor.clone());
     let b = lt.iter_entries(Apath::root(), options.exclude.clone(), monitor.clone())?;
@@ -91,7 +89,7 @@ impl Diff {
 mod tests {
     use filetime::{FileTime, set_file_mtime};
 
-    use crate::monitor::test::TestMonitor;
+    use crate::monitor::Monitor;
     use crate::test_fixtures::TreeFixture;
     use crate::*;
 
@@ -100,7 +98,7 @@ mod tests {
         let a = Archive::create_temp().await;
         let tf = TreeFixture::new();
         tf.create_file_with_contents("thing", b"contents of thing");
-        let stats = backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc())
+        let stats = backup(&a, tf.path(), &BackupOptions::default(), Monitor::void())
             .await
             .unwrap();
         assert_eq!(stats.new_files, 1);
@@ -120,7 +118,7 @@ mod tests {
             include_unchanged: true,
             ..DiffOptions::default()
         };
-        let monitor = TestMonitor::arc();
+        let monitor = Monitor::void();
         let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, monitor.clone())
             .await
             .unwrap()
@@ -140,7 +138,7 @@ mod tests {
             include_unchanged: false,
             ..DiffOptions::default()
         };
-        let changes = diff(&st, &tf.live_tree(), options, TestMonitor::arc())
+        let changes = diff(&st, &tf.live_tree(), options, Monitor::void())
             .await
             .unwrap()
             .collect()
@@ -167,7 +165,7 @@ mod tests {
             include_unchanged: false,
             ..DiffOptions::default()
         };
-        let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, TestMonitor::arc())
+        let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, Monitor::void())
             .await
             .unwrap()
             .collect()
@@ -204,7 +202,7 @@ mod tests {
             include_unchanged: false,
             ..DiffOptions::default()
         };
-        let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, TestMonitor::arc())
+        let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, Monitor::void())
             .await
             .unwrap()
             .collect()
@@ -225,7 +223,7 @@ mod tests {
         let a = Archive::create_temp().await;
         let tf = TreeFixture::new();
         tf.create_symlink("link", "target");
-        backup(&a, tf.path(), &BackupOptions::default(), TestMonitor::arc())
+        backup(&a, tf.path(), &BackupOptions::default(), Monitor::void())
             .await
             .unwrap();
 
@@ -245,7 +243,7 @@ mod tests {
             include_unchanged: false,
             ..DiffOptions::default()
         };
-        let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, TestMonitor::arc())
+        let changes: Vec<EntryChange> = diff(&st, &tf.live_tree(), options, Monitor::void())
             .await
             .unwrap()
             .collect()
